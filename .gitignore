@@ -1,5 +1,6 @@
 .env
 *.pyc
+*.exe
 /Include
 /Lib
 /Scripts
