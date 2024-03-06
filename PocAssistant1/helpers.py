@@ -6,23 +6,21 @@ from datetime import datetime, timedelta
 from AssistModel import AssistantModel, AssistantIdsModel
 
 class ai:    
-    def create_full_assistant(model, instructions, message = None):
+    def create_full_assistant(model, instructions, run_instructions, message = None):
         assistant = ai.create_assistant(model, instructions)
         thread = ai.create_thread()
         if message:
             ai.add_message(thread.id, message)
-        run = ai.create_run(assistant.id, thread.id)
-        return AssistantModel(
-            assistant= assistant,
-            thread= thread,
-            run= run
-        )
+        run = ai.create_run(assistant.id, thread.id, run_instructions)
 
-    def create_assistant(model, instructions):
+        return AssistantModel(assistant, thread, run)
+
+    def create_assistant(model, instructions, file_ids = None):
         return openai.beta.assistants.create(
             name= f"auto_assist_{str(uuid.uuid4())}",
             instructions= instructions,
-            model=model
+            model=model,
+            file_ids= file_ids
         )
 
     def create_thread():
@@ -39,14 +37,14 @@ class ai:
             content= message
         )
 
-    def create_run(assistant_id, thread_id):
+    def create_run(assistant_id, thread_id, instructions):
         return openai.beta.threads.runs.create(
             assistant_id= assistant_id,
             thread_id= thread_id,
-            instructions= "be factual but write an accessible answer"
+            instructions= instructions
         )
     
-    def wait_for_runner_completion(run_id, thread_id):
+    def await_run_completed(run_id, thread_id):
         sleep_interval = 2
         max_allowed_time = 40
         start_time = datetime.now()
@@ -55,7 +53,7 @@ class ai:
         def has_allowed_time_elapsed():
             return start_time - datetime.now() > timedelta(seconds= max_allowed_time)
 
-        while True:
+        while not run_completed:
             try:
                 run = openai.beta.threads.runs.retrieve(
                     thread_id=thread_id,
@@ -69,11 +67,13 @@ class ai:
                     last_message = messages.data[0]
                     response = last_message.content[0].text.value
                     return f"Assistant response: {response}"
-                
+                                
             except Exception as ex:
+                run_completed = True
                 return f"Error while waiting for the runner to respond: {ex.with_traceback}"
-                break
+
             time.sleep(sleep_interval)
             
-            if has_allowed_time_elapsed():
+            if not run_completed and has_allowed_time_elapsed():
+                run_completed = True
                 return f"Runner has timeout. It takes more than: {max_allowed_time}s."

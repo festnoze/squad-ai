@@ -33,7 +33,8 @@ if do_create_assistant == "y":
     assistant_infos = ai.create_full_assistant(
         model= model, 
         instructions= """ you return response in french whatever the language the user input""",
-        message= "what's the weight of the moon? and how can it be deduced from the gravity on it? What's the general relationship between an object weight and its gravity?"
+        run_instructions= "write an accessible answer in less than 100 words",
+        message= "what's the weight and mass of the moon? what is the relationship with the gravity acceleration?"
     )
 else:
     assistant_infos = AssistantModel.create_from_ids(assistant_ids)
@@ -43,6 +44,9 @@ print(f"Using thread id:    {assistant_infos.thread.id}")
 print(f"Using run id:       {assistant_infos.run.id}")
 
 # Run the runner
-output = ai.wait_for_runner_completion(assistant_infos.thread.id, assistant_infos.run.id)
+output = ai.await_run_completed(
+    run_id= assistant_infos.run.id,
+    thread_id= assistant_infos.thread.id
+)
 print(output)
 
