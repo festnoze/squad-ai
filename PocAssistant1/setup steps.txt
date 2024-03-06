@@ -1,0 +1,11 @@
+Into a Git bash terminal (ctrl+shift+ù):
+
+- Create the python environment:
+python -m venv studienv
+
+- Activate the environment:
+source studienv/Scripts/activate
+
+-download the required packages (might need to run VS Code as administrator)
+pip install -r requirements.txt
+
