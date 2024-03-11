@@ -1,9 +1,10 @@
 import openai
 import os
-#import sys
 from dotenv import find_dotenv, load_dotenv
-from helpers import ai
-from AssistModel import AssistantModel, AssistantIdsModel
+from openai_helper import ai
+from display_helper import display
+from AssistantSet import AssistantSet, AssistantSetIds
+from ochestrator import assistants_ochestrator
 
 # Load environment variables from .env file
 load_dotenv(find_dotenv())
@@ -21,32 +22,51 @@ openai.api_key = openai_api_key
 # sys.exit()
 
 model = "gpt-3.5-turbo-16k"
-assistant_ids = AssistantIdsModel(
-    assistant_id= "asst_35c92DNd2Cu5MzTw2wfh4i2J",
-    thread_id= "thread_M0qkgndwCTKvRmqHzec2GkuC",
-    run_id= "run_SGVZKsDerWKW789Wq6KHAkdg"
+moa_assistant_infos = AssistantSetIds(
+    assistant_id= "asst_6sexVznA5YHOtY7SXNfX12HX",
+    thread_id= "thread_xgHIbYTaaqdiVvq7TKUp0lOy",
+    run_id= "run_CZdbwVcIHVgzjs4SqfgfQS1M"
+)
+
+moe_assistant_infos = AssistantSetIds(
+    assistant_id= "asst_pUTwZcNLyC6co5uuAfJzfSYS",
+    thread_id= "thread_fzyerG2D75xxfKveNX3LjA9n",
+    run_id= "run_93ZYlRQCnkG6653L9Hbf9Wdz"
 )
 
 # Assistant creation
-do_create_assistant = input("Create a new assistant? y/n ")
-if do_create_assistant == "y":
-    assistant_infos = ai.create_full_assistant(
-        model= model, 
-        instructions= """ you return response in french whatever the language the user input""",
-        run_instructions= "write an accessible answer in less than 100 words",
-        message= "what's the weight and mass of the moon? what is the relationship with the gravity acceleration?"
-    )
-else:
-    assistant_infos = AssistantModel.create_from_ids(assistant_ids)
-
-print(f"Using assistant id: {assistant_infos.assistant.id}")
-print(f"Using thread id:    {assistant_infos.thread.id}")
-print(f"Using run id:       {assistant_infos.run.id}")
-
-# Run the runner
-output = ai.await_run_completed(
-    run_id= assistant_infos.run.id,
-    thread_id= assistant_infos.thread.id
+# do_create_assistant = input("Create assistants? (C)reate, (R)euse, (N)ew thread")
+# if do_create_assistant == "c":
+moa_assistant = ai.create_full_assistant(
+    model= model, 
+    instructions= ai.str_file("moa_assistant_instructions.txt"),
+    run_instructions= ai.str_file("moa_run_instructions.txt")
 )
-print(output)
+moe_assistant = ai.create_full_assistant(
+    model= model, 
+    instructions= ai.str_file("moe_assistant_instructions.txt"),
+    run_instructions= ai.str_file("moa_run_instructions.txt")
+    #message= ""
+)
+# elif do_create_assistant == "r":
+#     moa_assistant = AssistantModel.create_from_ids(moa_assistant_infos)
+#     moe_assistant = AssistantModel.create_from_ids(moe_assistant_infos)
+# else:
+    # moa_assistant = ai.create_new_thread_on_existing_assistant(moa_assistant_infos.assistant_id)
+    # moe_assistant = ai.create_new_thread_on_existing_assistant(moe_assistant_infos.assistant_id)
+
+display.display_ids("MOA", moa_assistant)
+display.display_ids("MOE", moe_assistant)
+
+try:
+    #define the need
+    ai.pause(1)
+    message= "je souhaiterais créer un module de messagerie pour que les apprenants puisse communiquer entre eux, mais aussi avec des officiels"
+    output = assistants_ochestrator(message, moe_assistant, moa_assistant)
+    print(output)
+except Exception as ex:
+    print(ex)
+finally:
+    ai.delete_assistant_set(moe_assistant)
+    ai.delete_assistant_set(moa_assistant)
 

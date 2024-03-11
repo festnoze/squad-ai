@@ -1,0 +1,3 @@
+fait une réponse en français, fait des listes à puces des points pour lesquels tu as pris des décisions, 
+suivi, entre parenthèses, d'un indice de confiance entre 1 et 10, sur la confiance de la réponse que tu y aura apporté. 
+Donne un indice de confiance de 0 pour celles où tu ne te prononce pas
