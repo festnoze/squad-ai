@@ -1,10 +1,21 @@
 import openai
 import uuid
+import json
 from datetime import datetime, timedelta
+from enum import Enum
+# internal import
 from misc import misc
 from AssistantSet import AssistantSet
 
 class ai:    
+    def max_allowed_run_seconds(assistant_set):
+        model = assistant_set.assistant.model
+        #Set timeout depending on seleted model
+        if model.__contains__("gpt-4"):
+            return 120
+        else:
+            return 40
+
     def create_assistant_set(model, instructions, run_instructions, message = None):
         assistant = ai.create_assistant(model, instructions)
         thread = ai.create_thread()        
@@ -26,15 +37,14 @@ class ai:
     
     def add_message_and_run(assistant_set, message):
         ai.add_message(assistant_set.thread.id, message)
-        return ai.run(assistant_set)
-        
+        return ai.run(assistant_set)         
+    
     # Add a new user's message to the thread
     def add_message(thread_id, message):
         if not message: 
             return
-        thread = openai.beta.threads.retrieve(thread_id= thread_id)
         openai.beta.threads.messages.create(
-            thread_id= thread.id,
+            thread_id= thread_id,
             role= "user",
             content= message
         )
@@ -48,11 +58,10 @@ class ai:
     
     def run(assistant_set):
         sleep_interval = 1
-        max_allowed_time = 20
         start_time = datetime.now()
 
-        def has_allowed_time_elapsed():
-            return datetime.now() - start_time > timedelta(seconds= max_allowed_time)
+        def has_allowed_time_elapsed(assistant_set):
+            return datetime.now() - start_time > timedelta(seconds= ai.max_allowed_run_seconds(assistant_set))
         
         # create a new 'run' each time
         assistant_set.run = ai.create_run(assistant_set)
@@ -61,15 +70,34 @@ class ai:
             assistant_set.run = openai.beta.threads.runs.retrieve(run_id= assistant_set.run.id, thread_id= assistant_set.thread.id)
             try:
                 if assistant_set.run.completed_at:
-                    return ai.get_last_answer(assistant_set)
+                    return ai.RunResult.SUCCESS 
                                 
             except Exception as ex:
-                return f"Error while waiting for the runner to respond: {ex.with_traceback}"
+                return ai.RunResult.ERROR
 
             misc.pause(sleep_interval)
             
-            if assistant_set.run.status != "completed" and has_allowed_time_elapsed():
-                return f"Runner has timeout. Took more than: {max_allowed_time}s. to proceed"
+            if assistant_set.run.status != "completed" and has_allowed_time_elapsed(assistant_set):
+                return ai.RunResult.TIMEOUT
+    
+    class RunResult(Enum):
+        SUCCESS = 1
+        ONGOING = 0,
+        ERROR = -1
+        TIMEOUT = -2
+
+    def get_run_result(assistant_set, result, get_all_messages = False):
+        if result == ai.RunResult.SUCCESS:
+            if get_all_messages:
+                return ai.get_all_messages(assistant_set)
+            else:
+                return ai.get_last_answer(assistant_set)
+            
+        if result == ai.RunResult.ERROR:
+            return  f"Error while waiting for the runner to respond" #: {ex.with_traceback}"
+        
+        if result == ai.RunResult.TIMEOUT:
+            return f"Runner has timeout. Took more than: {ai.max_allowed_run_seconds(assistant_set)}s. to proceed"
             
     def get_last_answer(assistant_set):
         messages = openai.beta.threads.messages.list(thread_id= assistant_set.thread.id)
@@ -77,9 +105,35 @@ class ai:
     
     def get_all_messages(assistant_set):
         messages = openai.beta.threads.messages.list(thread_id= assistant_set.thread.id)
+        response = ""
+        index = 1
         for data in messages.data:
-            
+            #if data.role == "assistant":
+                response += f"(data {index})- '{data.role}':\n"
+                index += 1
+                for content in data.content:
+                    response += f"• {content.text.value}\n"
+                response += "\n"
+        #response = last_message.content[0].text.value
+        return f"{response}"
 
+    def get_all_messages_as_json(assistant_set):
+        messages = openai.beta.threads.messages.list(thread_id= assistant_set.thread.id)
+        json = []
+        for data in messages.data:
+            message_dict = {
+                "role": data.role,
+                "content": {"text": data.content[0].text.value}
+                #to rather handle multiple contents: 
+                #"content": [{"text": content.text.value} for content in data.content]
+            }
+            json.append(message_dict)
+    
+        result = str(json) #json.dumps(json, indent= 4)
+        return result
+        
+    def get_run_duration(run):
+        return misc.get_elapsed_time(run.created_at, run.completed_at)
     
     def create_from_ids(assist_ids):
         return AssistantSet(

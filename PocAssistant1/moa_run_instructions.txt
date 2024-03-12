@@ -1,4 +1,0 @@
-fait tes réponses en français, fait une liste à puces ou tu reprend point par point les questions qui te sont posées par le MOE, 
-suivi d'une réponse qui consiste en une prise de décision à la question posée, 
-suivi, entre parenthèses, d'un indice de confiance entre 1 et 10, sur la confiance de la réponse que tu y aura apporté. 
-Donne un indice de confiance de 0 pour celles où tu ne te prononce pas

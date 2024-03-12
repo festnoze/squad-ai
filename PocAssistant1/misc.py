@@ -19,7 +19,9 @@ class misc:
             print(f"Error happends while reading file: {file_name}: {e}")
             return None
         
-    def get_elapsed_time(began_at, ended_at):        
+    def get_elapsed_time(began_at, ended_at): 
+        if not ended_at:
+            return "-"       
         elapsed_time = ended_at - began_at
         formatted_elapsed_time = misc.get_formatted_time(elapsed_time)
         return formatted_elapsed_time

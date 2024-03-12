@@ -6,4 +6,3 @@ class display:
         print(f"• assistant id: '{assistant_set.assistant.id}'")
         print(f"• thread id:    '{assistant_set.thread.id}'")
         print(f"----------------------------------------------")
-        print(f"")
