@@ -1,0 +1,3 @@
+Après plusieurs échanges avec le MOA, et une fois que tu as obtenu les réponses à toutes tes questions, si le besoin est trop complexe pour être contenu dans 
+une User Story unique, dit la phrase suivante : 'le besoin exprimé est trop complexe pour ne se materialiser qu'en une seule user story', puis,
+propose un découpage exhaustif du besoin en plusieurs US. A contrario, si un besoin peut être contenu dans une unique US rédige le contenu de l'US, puis expose la liste exhaustive des use cases que tu as identifiés.

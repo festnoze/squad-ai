@@ -1,9 +1,11 @@
 import openai
 import os
+import sys
 from dotenv import find_dotenv, load_dotenv
 from openai_helper import ai
 from display_helper import display
-from AssistantSet import AssistantSet, AssistantSetIds
+from AssistantSet import AssistantSet
+from misc import misc
 from ochestrator import assistants_ochestrator
 
 # Load environment variables from .env file
@@ -16,57 +18,36 @@ openai_api_key = os.getenv("OPEN_API_KEY")
 openai.api_key = openai_api_key
 
 # List available models
-# models = openai.models.list()
-# for model in models:
-#     print("model: ", model.id)
+# ai.print_models()
 # sys.exit()
 
-model = "gpt-3.5-turbo-16k"
-moa_assistant_infos = AssistantSetIds(
-    assistant_id= "asst_6sexVznA5YHOtY7SXNfX12HX",
-    thread_id= "thread_xgHIbYTaaqdiVvq7TKUp0lOy",
-    run_id= "run_CZdbwVcIHVgzjs4SqfgfQS1M"
-)
+model = "gpt-4-turbo-preview"#"gpt-3.5-turbo-16k"
 
-moe_assistant_infos = AssistantSetIds(
-    assistant_id= "asst_pUTwZcNLyC6co5uuAfJzfSYS",
-    thread_id= "thread_fzyerG2D75xxfKveNX3LjA9n",
-    run_id= "run_93ZYlRQCnkG6653L9Hbf9Wdz"
-)
-
-# Assistant creation
-# do_create_assistant = input("Create assistants? (C)reate, (R)euse, (N)ew thread")
-# if do_create_assistant == "c":
-moa_assistant = ai.create_full_assistant(
+# Assistants creation
+moa_assistant = ai.create_assistant_set(
     model= model, 
-    instructions= ai.str_file("moa_assistant_instructions.txt"),
-    run_instructions= ai.str_file("moa_run_instructions.txt")
+    instructions= misc.get_str_file("moa_assistant_instructions.txt"),
+    run_instructions = misc.get_str_file("moa_run_instructions.txt")
 )
-moe_assistant = ai.create_full_assistant(
+moe_assistant = ai.create_assistant_set(
     model= model, 
-    instructions= ai.str_file("moe_assistant_instructions.txt"),
-    run_instructions= ai.str_file("moa_run_instructions.txt")
-    #message= ""
+    instructions= misc.get_str_file("moe_assistant_instructions.txt"),
+    run_instructions = misc.get_str_file("moe_run_instructions.txt")
 )
-# elif do_create_assistant == "r":
-#     moa_assistant = AssistantModel.create_from_ids(moa_assistant_infos)
-#     moe_assistant = AssistantModel.create_from_ids(moe_assistant_infos)
-# else:
-    # moa_assistant = ai.create_new_thread_on_existing_assistant(moa_assistant_infos.assistant_id)
-    # moe_assistant = ai.create_new_thread_on_existing_assistant(moe_assistant_infos.assistant_id)
 
 display.display_ids("MOA", moa_assistant)
 display.display_ids("MOE", moe_assistant)
 
 try:
-    #define the need
-    ai.pause(1)
-    message= "je souhaiterais créer un module de messagerie pour que les apprenants puisse communiquer entre eux, mais aussi avec des officiels"
-    output = assistants_ochestrator(message, moe_assistant, moa_assistant)
-    print(output)
+    #define the need and send it to the ochestrator
+    need= "je souhaiterais créer un module de messagerie pour que les apprenants puisse communiquer entre eux, mais aussi avec des officiels"
+    #need = "je souhaiterais afficher les informations administratives de l'utilisateur"
+    output = assistants_ochestrator(need, moe_assistant, moa_assistant)
 except Exception as ex:
     print(ex)
-finally:
+finally:    
     ai.delete_assistant_set(moe_assistant)
     ai.delete_assistant_set(moa_assistant)
+    #ai.delete_all_assistants()
+    print("[Fin de l'échange]")
 
