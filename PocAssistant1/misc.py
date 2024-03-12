@@ -1,4 +1,5 @@
 import time
+import json
 
 class misc:    
     def pause(duration = None):        
@@ -25,3 +26,12 @@ class misc:
         elapsed_time = ended_at - began_at
         formatted_elapsed_time = misc.get_formatted_time(elapsed_time)
         return formatted_elapsed_time
+    
+    def json_array_to_bullet_list_str(json_array):
+        bullet_point_list_str = ""
+        for item in json_array:
+            bullet_point_list_str += f"• {item}\n"
+        return bullet_point_list_str
+    
+    def str_to_json(json_string):
+        return json.loads(json_string)

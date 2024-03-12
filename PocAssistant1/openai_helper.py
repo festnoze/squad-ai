@@ -1,6 +1,5 @@
 import openai
 import uuid
-import json
 from datetime import datetime, timedelta
 from enum import Enum
 # internal import
@@ -16,12 +15,12 @@ class ai:
         else:
             return 40
 
-    def create_assistant_set(model, instructions, run_instructions, message = None):
+    async def create_assistant_set_async(model, instructions, run_instructions, message = None):
         assistant = ai.create_assistant(model, instructions)
         thread = ai.create_thread()        
         assistant_set = AssistantSet(assistant, thread, run_instructions)
         if message:
-            assistant_set.answer = ai.add_message_and_run(assistant_set)
+            assistant_set.answer = await ai.add_message_and_run_async(assistant_set)
         return assistant_set
 
     def create_assistant(model, instructions, file_ids = None):
@@ -35,9 +34,14 @@ class ai:
     def create_thread():
         return openai.beta.threads.create()
     
-    def add_message_and_run(assistant_set, message):
+    def add_new_thread_message(message):
+        new_thread = ai.create_thread()
+        ai.add_message(new_thread.id, message)
+        return new_thread
+    
+    async def add_message_and_run_async(assistant_set, message):
         ai.add_message(assistant_set.thread.id, message)
-        return ai.run(assistant_set)         
+        return await ai.run_async(assistant_set)         
     
     # Add a new user's message to the thread
     def add_message(thread_id, message):
@@ -49,14 +53,14 @@ class ai:
             content= message
         )
 
-    def create_run(assistant_set):
+    def create_run(assistant_set, specific_thread_id = None):
         return openai.beta.threads.runs.create(
             assistant_id= assistant_set.assistant.id,  
-            thread_id= assistant_set.thread.id,
+            thread_id= specific_thread_id if specific_thread_id else assistant_set.thread.id,
             instructions= assistant_set.run_instructions
         )
     
-    def run(assistant_set):
+    async def run_async(assistant_set, specific_thread_id = None):
         sleep_interval = 1
         start_time = datetime.now()
 
@@ -64,7 +68,7 @@ class ai:
             return datetime.now() - start_time > timedelta(seconds= ai.max_allowed_run_seconds(assistant_set))
         
         # create a new 'run' each time
-        assistant_set.run = ai.create_run(assistant_set)
+        assistant_set.run = ai.create_run(assistant_set, specific_thread_id)
 
         while assistant_set.run.status != "completed":
             assistant_set.run = openai.beta.threads.runs.retrieve(run_id= assistant_set.run.id, thread_id= assistant_set.thread.id)
@@ -101,6 +105,10 @@ class ai:
             
     def get_last_answer(assistant_set):
         messages = openai.beta.threads.messages.list(thread_id= assistant_set.thread.id)
+        return messages.data[0].content[0].text.value
+    
+    def get_last_thread_answer(thread_id):
+        messages = openai.beta.threads.messages.list(thread_id= thread_id)
         return messages.data[0].content[0].text.value
     
     def get_all_messages(assistant_set):
