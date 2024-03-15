@@ -10,46 +10,26 @@ class assistants_ochestrator:
         self.request_message = request_message
         self.max_exchanges_count = max_exchanges_count
 
-    def init_assistants(self):        
-        self.model_gpt_35 = "gpt-3.5-turbo-16k" 
-        self.model_gpt_40 = "gpt-4-turbo-preview"
+    async def perform_workflow_async(self):
+        
+        print(f"Description initiale de l'objectif : {self.request_message}")
+        self.do_moe_moa_exchanges()        
+        messages_json = ai.get_all_messages_as_json(self.moe_assistant_set)
+        messages_str = misc.json_to_str(messages_json).replace("\"user\"", "\"MOA\"").replace("\"assistant\"", "\"MOE\"")
+        file.write_file(messages_str, "outputs", "MOA_MOE_exchanges.json")
 
-        # Assistants creation
-        self.moa_assistant_set = ai.create_assistant_set(
-            model= self.model_gpt_35, 
-            instructions= file.get_as_str("moa_assistant_instructions.txt"),
-            run_instructions = ""#file.get_as_str("moa_run_instructions.txt")
-        )
-        moe_assistant_instructions = file.get_as_str("moe_assistant_instructions.txt").format(max_exchanges_count= self.max_exchanges_count)
-        self.moe_assistant_set = ai.create_assistant_set(
-            model= self.model_gpt_35, 
-            instructions= moe_assistant_instructions,
-            run_instructions = ""#file.get_as_str("moe_run_instructions.txt")
-        )
-        self.po_assistant_set = ai.create_assistant_set(
-            model= self.model_gpt_40, 
-            instructions= file.get_as_str("po_assistant_instructions.txt"),
-            run_instructions = ""
-        )
-        self.qa_assistant_set = ai.create_assistant_set(
-                model= self.model_gpt_35, 
-                instructions= file.get_as_str("qa_assistant_instructions.txt"),
-                run_instructions = "",
-        )
-
-    def print_assistants_ids(self):
-        display.display_ids("MOA", self.moa_assistant_set)
-        display.display_ids("MOE", self.moe_assistant_set)
-        display.display_ids("PO",  self.po_assistant_set)
-        display.display_ids("QA",  self.qa_assistant_set)
-        print("")
-
-    async def run_async(self):
-        #self.create_check_end_assistant()
-        print(f"GOAL : {self.request_message}")
-        self.do_moe_moa_exchanges()
-        self.write_po_us_and_usecases()
-        await self.write_qa_acceptance_tests_async()
+        self.create_po_us_and_usecases()        
+        us_and_usecases_json_str = ai.get_last_answer(self.po_assistant_set)
+        us_and_usecases_json = misc.str_to_json(us_and_usecases_json_str)
+        us_and_usecases_json_str = misc.json_to_str(us_and_usecases_json)
+        file.write_file(us_and_usecases_json_str, "outputs", "user_story.json")
+        
+        threads_ids = await self.create_qa_acceptance_tests_async()
+        i = 1
+        for thread_id in threads_ids:
+            content = misc.str_to_gherkin(ai.get_last_thread_answer(thread_id))
+            file.write_file(content, "outputs\\BDD", f"use_case{i}.feature")
+            i += 1
 
     def do_moe_moa_exchanges(self):
         self.moa_assistant_set.run_instructions += "Le besoin principal et le but à atteindre est : '{self.request_message}'."
@@ -63,11 +43,10 @@ class assistants_ochestrator:
             
             # Pass the need to MOE or latest MOA answer & run:
             run_result = ai.add_message_and_run(self.moe_assistant_set, moe_message) 
-            #all_moe_messages = ai.get_run_result(moe_assistant_set, result, True)
+            all_moe_messages = ai.get_run_result(self.moe_assistant_set, run_result, True)
             moe_response = ai.get_run_result(self.moe_assistant_set, run_result)            
-            elapsed = misc.get_elapsed_time(self.moe_assistant_set.run.created_at, self.moe_assistant_set.run.completed_at)
-            print(f"({elapsed}) MOE :\n{moe_response}\n")
-
+            elapsed = ai.get_run_duration(self.moe_assistant_set.run)
+            print(f"({elapsed}) MOE :\n{moe_response}\n")            
             if self.need_for_stop(moe_response, run_result, True):
                 return
             
@@ -82,7 +61,7 @@ class assistants_ochestrator:
             if self.need_for_stop(moa_response, run_result, False):
                 return
 
-    def write_po_us_and_usecases(self):
+    def create_po_us_and_usecases(self):
         moe_moa_thread_json_str = ai.get_all_messages_as_json(self.moa_assistant_set)
         po_message = file.get_as_str("po_message_for_us_and_usecases_creation.txt").format(moe_moa_thread_json= moe_moa_thread_json_str)
         result = ai.add_message_and_run(self.po_assistant_set, po_message)
@@ -90,9 +69,9 @@ class assistants_ochestrator:
             elapsed = ai.get_run_duration(self.moa_assistant_set.run)
             print(f"({elapsed}) PO: \n{ai.get_last_answer(self.po_assistant_set)}")
     
-    async def write_qa_acceptance_tests_async(self):        
+    async def create_qa_acceptance_tests_async(self):        
         us_and_usecases_json_str = ai.get_last_answer(self.po_assistant_set)
-        await self.write_qa_acceptance_tests_from_us_json_async(us_and_usecases_json_str)
+        return await self.write_qa_acceptance_tests_from_us_json_async(us_and_usecases_json_str)
 
     async def write_qa_acceptance_tests_from_us_json_async(self, us_and_usecases_json_str):
         us_and_usecases_json = misc.str_to_json(us_and_usecases_json_str)
@@ -129,6 +108,7 @@ class assistants_ochestrator:
             print(f"----- use case {i} ------")
             i += 1
             print(f"\n{ai.get_last_thread_answer(thread_id)}")
+        return threads_ids
             
 
     def new_thread_for_single_qa_acceptance_test(self, usecase_json):
@@ -164,7 +144,8 @@ class assistants_ochestrator:
         self.check_end_assistant = ai.create_assistant_set(
             model= "gpt-3.5-turbo-16k",
             instructions="Tu es un expert en analyse de phrases, et tu dois toujours répondre uniquement par oui ou non",
-            run_instructions= ""
+            run_instructions= "",
+            timeout_seconds= 20
         )
 
     def has_questions(self, message):
@@ -180,6 +161,44 @@ class assistants_ochestrator:
         if answer.__contains__("oui"):
             return True
         return False
+        
+    def create_assistants(self):        
+        self.model_gpt_35 = "gpt-3.5-turbo-16k" 
+        self.model_gpt_40 = "gpt-4-turbo-preview"
+
+        # Assistants creation
+        self.moa_assistant_set = ai.create_assistant_set(
+            model= self.model_gpt_35, 
+            instructions= file.get_as_str("moa_assistant_instructions.txt"),
+            run_instructions = "",#file.get_as_str("moa_run_instructions.txt"),
+            timeout_seconds= 50
+        )
+        moe_assistant_instructions = file.get_as_str("moe_assistant_instructions.txt").format(max_exchanges_count= self.max_exchanges_count)
+        self.moe_assistant_set = ai.create_assistant_set(
+            model= self.model_gpt_35, 
+            instructions= moe_assistant_instructions,
+            run_instructions = "",#file.get_as_str("moe_run_instructions.txt"),
+            timeout_seconds= 50
+        )
+        self.po_assistant_set = ai.create_assistant_set(
+            model= self.model_gpt_40, 
+            instructions= file.get_as_str("po_assistant_instructions.txt"),
+            run_instructions = "",
+            timeout_seconds= 100
+        )
+        self.qa_assistant_set = ai.create_assistant_set(
+                model= self.model_gpt_35, 
+                instructions= file.get_as_str("qa_assistant_instructions.txt"),
+                run_instructions = "",
+                timeout_seconds= 25
+        )
+
+    def print_assistants_ids(self):
+        display.display_ids("MOA", self.moa_assistant_set)
+        display.display_ids("MOE", self.moe_assistant_set)
+        display.display_ids("PO",  self.po_assistant_set)
+        display.display_ids("QA",  self.qa_assistant_set)
+        print("")
 
     def dispose(self):
         try:

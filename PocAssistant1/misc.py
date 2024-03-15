@@ -22,8 +22,24 @@ class misc:
         return bullet_point_list_str
     
     def str_to_json(json_string):
+        return json.loads(misc.str_to_json_str(json_string))
+    
+    def str_to_json_str(json_string):
         #remove code block added by ChatGPT to identify json code
         begin_json_code_block = "```json"
-        end_json_code_block = "```"
-        json_string = json_string.replace(begin_json_code_block, "").replace(end_json_code_block, "")
-        return json.loads(json_string)
+        end_code_block = "```"
+        return json_string.replace(begin_json_code_block, "").replace(end_code_block, "")#.replace("'", "\"")
+
+    def json_to_str(json_obj):
+        return json.dumps(json_obj, ensure_ascii=False, indent=4)
+    
+    def str_to_gherkin(gherkin_string):
+        #remove code block added by ChatGPT to identify json code
+        single_quotation_mark = "'"
+        gherkin_single_quotation_mark = "’"
+        markdown_bold = "**"
+        end_code_block = "```"
+        gherkin_string = gherkin_string.replace(single_quotation_mark, gherkin_single_quotation_mark).replace(markdown_bold, "").replace(end_code_block, "")
+        for i in range(1, 10):
+            gherkin_string = gherkin_string.replace(f" {str(i)}", "")
+        return gherkin_string

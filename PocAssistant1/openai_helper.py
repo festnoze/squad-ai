@@ -11,17 +11,14 @@ from file import file
 
 class ai:    
     def max_allowed_run_seconds(assistant_set):
-        model = assistant_set.assistant.model
-        #Set timeout depending on seleted model
-        if model.__contains__("gpt-4"):
-            return 90
-        else:
-            return 30
+        return assistant_set.timeout_seconds
 
-    def create_assistant_set(model, instructions, run_instructions):
+    def create_assistant_set(model, instructions, run_instructions, timeout_seconds = None):
         assistant = ai.create_assistant(model, instructions)
-        thread = ai.create_thread()        
-        assistant_set = AssistantSet(assistant, thread, run_instructions)
+        thread = ai.create_thread()
+        if not timeout_seconds:
+            timeout_seconds = 60
+        assistant_set = AssistantSet(assistant, thread, run_instructions, timeout_seconds)
         return assistant_set
 
     def create_assistant(model, instructions, file_ids = None):
@@ -78,6 +75,7 @@ class ai:
                 if run.completed_at:
                     # elapsed = ai.get_run_duration(run)
                     # print(f"run in: {elapsed}")
+                    assistant_set.run = run
                     return ai.RunResult.SUCCESS
                 
                 misc.pause(sleep_interval)
@@ -149,19 +147,16 @@ class ai:
         return f"{response}"
 
     def get_all_messages_as_json(assistant_set):
-        messages = openai.beta.threads.messages.list(thread_id= assistant_set.thread.id)
-        json = []
+        messages = openai.beta.threads.messages.list(assistant_set.thread.id)
+        messages_json = []
         for data in messages.data:
-            message_dict = {
-                "role": data.role,
-                "content": {"text": data.content[0].text.value}
+            message = {
+                f"{data.role}": data.content[0].text.value
                 #to rather handle multiple contents: 
                 #"content": [{"text": content.text.value} for content in data.content]
             }
-            json.append(message_dict)
-    
-        result = str(json) #json.dumps(json, indent= 4)
-        return result
+            messages_json.append(message)   
+        return messages_json[::-1] #reverse messages' order
         
     def get_run_duration(run):
         return misc.get_elapsed_time(run.created_at, run.completed_at)
