@@ -28,7 +28,7 @@ html, body {
 
 /* Generic message bubble */
 .message-source-sender {
-    font-size: smaller;
+    font-size: small;
     width: 80%;
     margin-left: 6px;
     color: cornflowerblue;
@@ -36,7 +36,7 @@ html, body {
 }
 /* Generic message bubble */
 .message-source-receiver {
-    font-size: smaller;
+    font-size: small;
     width: 80%;
     color: cornflowerblue;
     align-self: flex-end; /* Align to the right */
@@ -46,7 +46,8 @@ html, body {
     margin-bottom: 10px;
     padding: 15px;
     color: #333;
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    box-shadow: 0 12px 20px rgba(0, 0, 0, 0.2);
     text-align: justify;
     white-space: pre-wrap; /* Respects new lines and spaces */
 }

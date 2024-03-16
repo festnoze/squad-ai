@@ -11,21 +11,22 @@ public record MessageModel
     public string Content { get; set; }
 
 
-    [JsonPropertyName("content")]
+    [JsonPropertyName("durationSeconds")]
     public int DurationSeconds { get; set; }
 
-    public DateTime TimeStamp { get; init; }
+    public DateTime Timestamp { get; init; }
 
     public bool IsSender => Source == "MOE";
 
     public bool IsLastThreadMessage { get; private set; } = false;
-    public bool SetAsLastThreadMessage () => IsLastThreadMessage = true;
+    public void SetAsLastThreadMessage () => IsLastThreadMessage = true;
+    public bool SetAsLNotLastThreadMessage() => IsLastThreadMessage = false;
 
     public MessageModel(string source, string content, int durationSeconds)
     {
         Source = source;
         Content = content;
         DurationSeconds = durationSeconds;
-        TimeStamp = DateTime.Now;
+        Timestamp = DateTime.Now;
     }
 }

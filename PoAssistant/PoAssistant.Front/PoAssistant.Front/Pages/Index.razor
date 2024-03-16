@@ -48,8 +48,8 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        messages = threadService.GetMoeMoaExchange();
-        threadService.OnFileChanged += UpdatedMessages;
+        messages = threadService.GetMoeMoaThread();
+        threadService.OnThreadChanged += ReloadThread;
     }
 
     private bool isEditingLastMessage = false;
@@ -65,9 +65,9 @@ else
         // Here you would typically send the updated message back to your server or service
     }
 
-    private void UpdatedMessages()
+    private void ReloadThread()
     {
-        messages = threadService.GetMoeMoaExchange();
+        messages = threadService.GetMoeMoaThread();
         
         // Notify the component to re-render
         InvokeAsync(StateHasChanged);
@@ -75,7 +75,7 @@ else
 
     public void Dispose()
     {
-        threadService.OnFileChanged -= UpdatedMessages;
+        threadService.OnThreadChanged -= ReloadThread;
     }
 
 }

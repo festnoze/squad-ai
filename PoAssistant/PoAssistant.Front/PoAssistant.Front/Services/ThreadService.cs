@@ -5,30 +5,33 @@ namespace PoAssistant.Front.Services;
 
 public class ThreadService : IDisposable
 {
-    public const string threadPath = "..\\outputs\\";
-    public const string endMoeTag = "[FIN_MOE_ASSIST]";
-    private DateTime? latestFileModification = null;
-    private Timer? checkFileTimer;
     private ThreadModel? messages = null;
-    public event Action OnFileChanged;
+    public event Action? OnThreadChanged = null;
+    public const string endMoeTag = "[FIN_MOE_ASSIST]";
 
     public ThreadService()
     {
-        InitializeFileWatcher();
+        //InitializeFileWatcher();
     }
 
-    public ThreadModel GetMoeMoaExchange()
+    public ThreadModel? GetMoeMoaThread()
     {
-        //if (messages is not null)
-        //    return messages;
+        return messages;
+    }
 
-        var jsonFilePath = Path.Combine(threadPath, "MOA_MOE_exchanges.json");
-        if (!File.Exists(jsonFilePath))
-            return new ThreadModel();
+    public void AddNewMessage(MessageModel newMessage)
+    {
+        if (messages is null)
+            messages = new ThreadModel();
 
-        var jsonData = File.ReadAllText(jsonFilePath);
-        messages = JsonSerializer.Deserialize<ThreadModel>(jsonData);
+        messages.Add(newMessage);
+        CheckNeedToModifyLastMessage();
 
+        OnThreadChanged?.Invoke();
+    }
+
+    private void CheckNeedToModifyLastMessage()
+    {
         // Change end message of MOE & make it editable by user
         if (messages != null && messages.Any())
         {
@@ -38,69 +41,14 @@ public class ThreadService : IDisposable
                 messages.Add(new MessageModel("MOA", "Ajouter des points à aborder avec le MOE si vous le souhaitez", 0));
             }
 
+            messages!.RemoveLastThreadMessageFlags();
+
             if (!messages!.Last().IsSender)
                 messages?.Last().SetAsLastThreadMessage();
         }
-
-
-        return messages ?? new ThreadModel();
     }
-
-    public void AddNewMessage(MessageModel newMessage)
-    {
-        if (messages is null)
-            messages = new ThreadModel();
-        messages.Add(newMessage);
-    }
-
-    public void InitializeFileWatcher()
-    {
-        var jsonFilePath = Path.Combine(threadPath, "MOA_MOE_exchanges.json");
-        var fileInfo = new FileInfo(jsonFilePath);
-        latestFileModification = fileInfo?.LastWriteTime;
-
-        // Timer setup - checks every second (1000 milliseconds)
-        checkFileTimer = new Timer(CheckFileForChanges, jsonFilePath, 0, 1000);
-    }
-
-    private void CheckFileForChanges(object? state)
-    {
-        var jsonFilePath = state as string;
-        if (string.IsNullOrEmpty(jsonFilePath))
-            return;
-
-        var fileInfo = new FileInfo(jsonFilePath);
-        
-        if (!fileInfo.Exists)
-        {
-            if (latestFileModification is null)
-                return;
-
-            latestFileModification = null;
-            OnFileChanged?.Invoke();
-            return;
-        }
-
-        // Check if the file has been modified or created since the last check
-        if (fileInfo.LastWriteTime > (latestFileModification ?? DateTime.MinValue) 
-            || fileInfo.CreationTime > (latestFileModification ?? DateTime.MinValue))
-        {
-            latestFileModification = fileInfo.LastWriteTime > fileInfo.CreationTime ? fileInfo.LastWriteTime : fileInfo.CreationTime;
-            OnFileChanged?.Invoke();
-        }
-    }
-
-    //public void OnFileChanged()
-    //{
-    //    GetMoeMoaExchange();
-
-    //    // Trigger a UI refresh if necessary. For Blazor Server, consider using the CircuitHandler.
-    //    // For simplicity, force reloading the current page might not be the most efficient way.
-    //    // _navigationManager.NavigateTo(_navigationManager.Uri, forceLoad: true);
-    //}
 
     public void Dispose()
     {
-        checkFileTimer?.Dispose();
     }
 }

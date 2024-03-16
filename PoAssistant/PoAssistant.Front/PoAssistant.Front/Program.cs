@@ -5,7 +5,8 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
-builder.Services.AddScoped<ThreadService>();
+builder.Services.AddControllers();
+builder.Services.AddSingleton<ThreadService>();
 
 var app = builder.Build();
 
@@ -25,4 +26,6 @@ app.MapBlazorHub();
 
 app.UsePathBase("/MoaMoeExchange");
 app.MapFallbackToPage("/_Host");
+
+app.MapControllers(); // Handle proxy API controllers
 app.Run();

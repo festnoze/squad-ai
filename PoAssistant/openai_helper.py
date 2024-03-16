@@ -158,8 +158,11 @@ class ai:
                 messages_json.append(message)   
         return messages_json[::-1] #reverse messages' order
         
-    def get_run_duration(run):
-        return misc.get_elapsed_time(run.created_at, run.completed_at)
+    def get_run_duration_str(run):
+        return misc.get_elapsed_time_str(run.created_at, run.completed_at)
+    
+    def get_run_duration_seconds(run):
+        return misc.get_elapsed_time_seconds(run.created_at, run.completed_at)
     
     def create_from_ids(assist_ids):
         return AssistantSet(

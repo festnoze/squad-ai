@@ -20,4 +20,12 @@ public class FrontendProxyController
     {
         _threadService.AddNewMessage(newMessage);
     }
+
+
+    [HttpGet("ping")]
+    public string Ping()
+    {
+        return "{\"result\": \"pong\"}";
+    }
+
 }

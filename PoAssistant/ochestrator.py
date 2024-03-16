@@ -3,6 +3,7 @@ from misc import misc
 from display_helper import display
 from datetime import datetime
 from file import file
+from front_client import front_client
 
 class assistants_ochestrator:
     check_end_assistant = None
@@ -15,6 +16,7 @@ class assistants_ochestrator:
 
         print(f"Description initiale de l'objectif : {self.request_message}")
         self.do_moe_moa_exchanges()
+        self.save_moe_moa_exchange()
         return
     
         self.create_po_us_and_usecases()
@@ -41,7 +43,9 @@ class assistants_ochestrator:
 
     def do_moe_moa_exchanges(self):
         self.moa_assistant_set.run_instructions += "Le besoin principal et le but à atteindre est : '{self.request_message}'."
-        moe_message = self.request_message
+        moa_response = self.request_message
+        message_json = misc.get_message_as_json("MOA", moa_response, 0)
+        front_client.post_new_answer(message_json)
         counter = 0
 
         while True:
@@ -50,11 +54,13 @@ class assistants_ochestrator:
                 return
             
             # Pass the need to MOE or latest MOA answer & run:
-            run_result = ai.add_message_and_run(self.moe_assistant_set, moe_message) 
+            run_result = ai.add_message_and_run(self.moe_assistant_set, moa_response) 
             moe_response = ai.get_run_result(self.moe_assistant_set, run_result)            
-            elapsed = ai.get_run_duration(self.moe_assistant_set.run)
-            print(f"({elapsed}) MOE :\n{moe_response}\n")                    
-            self.save_moe_moa_exchange()
+            str_elapsed = ai.get_run_duration_str(self.moe_assistant_set.run)
+            elapsed_seconds = ai.get_run_duration_str(self.moe_assistant_set.run)
+            message_json = misc.get_message_as_json("MOE", moe_response, elapsed_seconds)
+            front_client.post_new_answer(message_json)
+            print(f"({str_elapsed}) MOE :\n{moe_response}\n")
             if self.need_for_stop(moe_response, run_result, True):
                 return
             
@@ -62,10 +68,11 @@ class assistants_ochestrator:
             moa_message = f"Ci-après sont les questions du MOE auxquelles tu dois répondre : \n{moe_response}"
             run_result = ai.add_message_and_run(self.moa_assistant_set, moa_message)
             moa_response = ai.get_run_result(self.moa_assistant_set, run_result)
-            elapsed = ai.get_run_duration(self.moa_assistant_set.run)
-            print(f"({elapsed}) MOA : \n{moa_response}\n")        
-            self.save_moe_moa_exchange()
-            moe_message = moa_response
+            str_elapsed = ai.get_run_duration_str(self.moa_assistant_set.run)            
+            elapsed_seconds = ai.get_run_duration_str(self.moa_assistant_set.run)
+            message_json = misc.get_message_as_json("MOA", moa_response, elapsed_seconds)
+            front_client.post_new_answer(message_json)
+            print(f"({str_elapsed}) MOA : \n{moa_response}\n")        
 
             if self.need_for_stop(moa_response, run_result, False):
                 return
@@ -75,7 +82,7 @@ class assistants_ochestrator:
         po_message = file.get_as_str("po_message_for_us_and_usecases_creation.txt").format(moe_moa_thread_json= moe_moa_thread_json_str)
         result = ai.add_message_and_run(self.po_assistant_set, po_message)
         if (result == ai.RunResult.SUCCESS):
-            elapsed = ai.get_run_duration(self.moa_assistant_set.run)
+            elapsed = ai.get_run_duration_str(self.moa_assistant_set.run)
             print(f"({elapsed}) PO: \n{ai.get_last_answer(self.po_assistant_set)}")
     
     async def create_qa_acceptance_tests_async(self):        
@@ -111,7 +118,7 @@ class assistants_ochestrator:
                 print("Toutes les requètes QA ont maintenant réussi")  
         
         i = 1
-        elapsed = misc.get_elapsed_time(start_time.timestamp(), datetime.now().timestamp())
+        elapsed = misc.get_elapsed_time_str(start_time.timestamp(), datetime.now().timestamp())
         print(f"({elapsed}) QA :\n")
         for thread_id in threads_ids:
             print(f"----- use case {i} ------")
