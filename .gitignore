@@ -63,7 +63,9 @@ bld/
 _Chutzpah*
 
 # Visual Studio files
-.vs/*
+.vs/
+
+*.vs
 
 # Visual C++ cache files
 ipch/
