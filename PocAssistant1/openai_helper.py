@@ -149,13 +149,13 @@ class ai:
     def get_all_messages_as_json(assistant_set):
         messages = openai.beta.threads.messages.list(assistant_set.thread.id)
         messages_json = []
-        for data in messages.data:
-            message = {
-                f"{data.role}": data.content[0].text.value
-                #to rather handle multiple contents: 
-                #"content": [{"text": content.text.value} for content in data.content]
-            }
-            messages_json.append(message)   
+        for data in messages.data:            
+            for content in data.content:
+                message = {
+                    "source": data.role,
+                    "content": content.text.value
+                }
+                messages_json.append(message)   
         return messages_json[::-1] #reverse messages' order
         
     def get_run_duration(run):

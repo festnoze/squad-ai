@@ -1,0 +1,69 @@
+﻿@page "/"
+
+<PageTitle>Assistant Product Owner</PageTitle>
+
+
+@using PoAssistant.Front.Data
+@inject ThreadService threadService
+@inject IJSRuntime JSRuntime
+
+<head>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css">
+</head>
+
+<h1>Atelier de conception MOA/MOE</h1>
+
+@if (messages == null)
+{
+    <p><em>Loading...</em></p>
+}
+else
+{
+    <div class="chat-wrapper">
+        <div class="chat-container">
+            @foreach (var message in messages.Where(m => !m.IsLastThreadMessage))
+            {
+                <div class="@($"message-bubble {(message.IsSender ? "message-sender" : "message-receiver")}")">
+                                <strong style="color:cornflowerblue">@message.Source</strong>
+@message.Content
+                </div>
+            }
+            @if (messages.Last().IsLastThreadMessage)
+            {
+                <div @ondblclick="MakeLastMessageEditable" class="message-bubble message-receiver">
+                    <strong style="color:cornflowerblue">@messages.Last().Source</strong>
+<textarea @bind="messages.Last().Content" @onblur="SaveLastMessage" class="message-editable"></textarea>
+                </div>
+            }            
+        </div>
+        <div class="input-area">
+            @* <input type="text" class="input-text" placeholder="Type a message..." />
+            <button class="send-button">Send</button> *@
+        </div>
+    </div>
+}
+
+<script>
+</script>
+
+@code {
+    private ThreadModel? messages;
+
+    protected override async Task OnInitializedAsync()
+    {
+        messages = threadService.GetMoeMoaExchange();
+    }
+
+    private bool isEditingLastMessage = false;
+
+    private void MakeLastMessageEditable()
+    {
+        isEditingLastMessage = true;
+    }
+
+    private void SaveLastMessage()
+    {
+        isEditingLastMessage = false;
+        // Here you would typically send the updated message back to your server or service
+    }
+}
