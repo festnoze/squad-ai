@@ -27,15 +27,41 @@ class misc:
             bullet_point_list_str += f"• {item}\n"
         return bullet_point_list_str
     
-    def str_to_json(json_string):
-        return json.loads(misc.remove_json_block(json_string))
+    def extract_json_from_text(json_string):
+        str_text_removed = misc.remove_json_block(json_string)
+        str_text_removed = misc.remove_text_around_json(str_text_removed)
+        return json.loads(str_text_removed)
     
     def remove_json_block(json_string):
         #remove code block added by ChatGPT to identify json code
         begin_json_code_block = "```json"
         end_code_block = "```"
-        return json_string.replace(begin_json_code_block, "").replace(end_code_block, "")#.replace("'", "\"")
+        index = json_string.find(begin_json_code_block)
+        if index != -1:
+            new_start_index = index + len(begin_json_code_block)
+            json_string = json_string[new_start_index:]
+            end_index = json_string.find(end_code_block)
+            if end_index != -1:
+                json_string = json_string[:end_index]                
+        return json_string
 
+    def remove_text_around_json(json_str):
+        return misc.remove_text_before_json(misc.remove_text_after_json(json_str))
+    
+    def remove_text_before_json(json_str):
+        index_item = json_str.find('{')
+        index_array = json_str.find('[')
+        if index_item == -1 and index_array == -1:
+            return json_str
+        return json_str[min(index_item, index_array):]
+    
+    def remove_text_after_json(json_str):
+        index_item = json_str.rfind('}')
+        index_array = json_str.rfind(']')
+        if index_item == -1 and index_array == -1:
+            return json_str
+        return json_str[:max(index_item, index_array) + 1]
+    
     def json_to_str(json_obj):
         return json.dumps(json_obj, ensure_ascii=False, indent=4)
     

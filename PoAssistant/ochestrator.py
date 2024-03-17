@@ -12,40 +12,27 @@ class assistants_ochestrator:
         self.max_exchanges_count = max_exchanges_count
 
     async def perform_workflow_async(self):
+        # us = file.get_as_str("outputs\\MOA_MOE_exchanges.json")
+        # front_client.post_po_us_and_usecases(moamoe)
+        # return
+        
         self.delete_all_outputs()
-
-        print(f"Description initiale de l'objectif : {self.request_message}")
+        front_client.delete_new_moe_moa_thread()
+        
         self.do_moe_moa_exchanges()
         self.save_moe_moa_exchange()
-        return
     
         self.create_po_us_and_usecases()
-        
-        us_and_usecases_json_str = ai.get_last_answer(self.po_assistant_set)
-        us_and_usecases_json = misc.str_to_json(us_and_usecases_json_str)
-        us_and_usecases_json_str = misc.json_to_str(us_and_usecases_json)
-        file.write_file(us_and_usecases_json_str, "outputs", "user_story.json")
+        self.save_po_us_and_usecases()
         
         threads_ids = await self.create_qa_acceptance_tests_async()
-        i = 1
-        for thread_id in threads_ids:
-            content = misc.str_to_gherkin(ai.get_last_thread_answer(thread_id))
-            file.write_file(content, "outputs\\BDD", f"use_case{i}.feature")
-            i += 1
-
-    def delete_all_outputs(self):
-        file.delete_folder("outputs")
-
-    def save_moe_moa_exchange(self):
-        messages_json = ai.get_all_messages_as_json(self.moe_assistant_set)
-        messages_str = misc.json_to_str(messages_json).replace("\"user\"", "\"MOA\"").replace("\"assistant\"", "\"MOE\"")
-        file.write_file(messages_str, "outputs", "MOA_MOE_exchanges.json")
+        self.save_qa_acceptance_tests(threads_ids)
 
     def do_moe_moa_exchanges(self):
         self.moa_assistant_set.run_instructions += "Le besoin principal et le but à atteindre est : '{self.request_message}'."
         moa_response = self.request_message
         message_json = misc.get_message_as_json("MOA", moa_response, 0)
-        front_client.post_new_answer(message_json)
+        front_client.post_new_answer_moe_moa(message_json)
         counter = 0
 
         while True:
@@ -59,7 +46,7 @@ class assistants_ochestrator:
             str_elapsed = ai.get_run_duration_str(self.moe_assistant_set.run)
             elapsed_seconds = ai.get_run_duration_str(self.moe_assistant_set.run)
             message_json = misc.get_message_as_json("MOE", moe_response, elapsed_seconds)
-            front_client.post_new_answer(message_json)
+            front_client.post_new_answer_moe_moa(message_json)
             print(f"({str_elapsed}) MOE :\n{moe_response}\n")
             if self.need_for_stop(moe_response, run_result, True):
                 return
@@ -71,7 +58,7 @@ class assistants_ochestrator:
             str_elapsed = ai.get_run_duration_str(self.moa_assistant_set.run)            
             elapsed_seconds = ai.get_run_duration_str(self.moa_assistant_set.run)
             message_json = misc.get_message_as_json("MOA", moa_response, elapsed_seconds)
-            front_client.post_new_answer(message_json)
+            front_client.post_new_answer_moe_moa(message_json)
             print(f"({str_elapsed}) MOA : \n{moa_response}\n")        
 
             if self.need_for_stop(moa_response, run_result, False):
@@ -90,7 +77,7 @@ class assistants_ochestrator:
         return await self.write_qa_acceptance_tests_from_us_json_async(us_and_usecases_json_str)
 
     async def write_qa_acceptance_tests_from_us_json_async(self, us_and_usecases_json_str):
-        us_and_usecases_json = misc.str_to_json(us_and_usecases_json_str)
+        us_and_usecases_json = misc.extract_json_from_text(us_and_usecases_json_str)
         user_story = us_and_usecases_json['us_desc']
         qa_assistant_run_instructions = f"Le contexte globale est une User Story dont la description est : '{user_story}'"
         threads_ids = []
@@ -156,6 +143,34 @@ class assistants_ochestrator:
         #   return True
         return False
     
+    
+    def save_qa_acceptance_tests(self, threads_ids):
+        i = 1
+        for thread_id in threads_ids:
+            content = misc.str_to_gherkin(ai.get_last_thread_answer(thread_id))
+            file.write_file(content, "AcceptanceTests", f"use_case{i}.feature")
+            i += 1
+
+    def save_po_us_and_usecases(self):
+        us_and_usecases_json_str = ai.get_last_answer(self.po_assistant_set)
+        us_and_usecases_json = misc.extract_json_from_text(us_and_usecases_json_str)
+        # print(f"new windows lines: {us_and_usecases_json.count('\r\n')}")
+        # print(f"new lines: {us_and_usecases_json.count('\n')}")
+        #print(f"caridge return: {us_and_usecases_json.count('\r')}")
+        front_client.post_po_us_and_usecases(us_and_usecases_json)
+        us_and_usecases_json_str = misc.json_to_str(us_and_usecases_json)
+        file.write_file(us_and_usecases_json_str, "outputs", "user_story.json")
+
+    def save_moe_moa_exchange(self):
+        messages_json = ai.get_all_messages_as_json(self.moe_assistant_set)
+        messages_str = misc.json_to_str(messages_json).replace("\"user\"", "\"MOA\"").replace("\"assistant\"", "\"MOE\"")
+        file.write_file(messages_str, "outputs", "MOA_MOE_exchanges.json")
+        
+    def delete_all_outputs(self):
+        file.delete_folder("outputs")
+        file.delete_files_with_extension("feature", "AcceptanceTests")
+
+    
     def create_check_end_assistant(self):
         self.check_end_assistant = ai.create_assistant_set(
             model= "gpt-3.5-turbo-16k",
@@ -184,14 +199,14 @@ class assistants_ochestrator:
 
         # Assistants creation
         self.moa_assistant_set = ai.create_assistant_set(
-            model= self.model_gpt_35, 
+            model= self.model_gpt_40, 
             instructions= file.get_as_str("moa_assistant_instructions.txt"),
             run_instructions = "",#file.get_as_str("moa_run_instructions.txt"),
             timeout_seconds= 50
         )
         moe_assistant_instructions = file.get_as_str("moe_assistant_instructions.txt").format(max_exchanges_count= self.max_exchanges_count)
         self.moe_assistant_set = ai.create_assistant_set(
-            model= self.model_gpt_35, 
+            model= self.model_gpt_40, 
             instructions= moe_assistant_instructions,
             run_instructions = "",#file.get_as_str("moe_run_instructions.txt"),
             timeout_seconds= 50

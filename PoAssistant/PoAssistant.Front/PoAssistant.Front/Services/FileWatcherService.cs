@@ -23,8 +23,8 @@ public class FileWatcherService : IDisposable
     // Obsolete: Load the json file containing the exchange MOE/MOA
     public ThreadModel LoadMoeMoaExchangeFromFile()
     {
-        //if (messages is not null)
-        //    return messages;
+        //if (userStory is not null)
+        //    return userStory;
 
         var jsonFilePath = Path.Combine(threadPath, "MOA_MOE_exchanges.json");
         if (!File.Exists(jsonFilePath))

@@ -30,7 +30,7 @@ html, body {
 .message-source-sender {
     font-size: small;
     width: 80%;
-    margin-left: 6px;
+    margin-left: 15px;
     color: cornflowerblue;
     align-self: flex-start; /* Align to the left */
 }
@@ -38,16 +38,19 @@ html, body {
 .message-source-receiver {
     font-size: small;
     width: 80%;
+    margin-right: 15px;
     color: cornflowerblue;
     align-self: flex-end; /* Align to the right */
 }
 .message-bubble {
     width: 80%;
-    margin-bottom: 10px;
+    margin-bottom: 35px;
+    margin-left: 15px;
+    margin-right: 15px;
     padding: 15px;
     color: #333;
     border-radius: 10px;
-    box-shadow: 0 12px 20px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 12px 15px rgba(100, 100, 100, 0.3);
     text-align: justify;
     white-space: pre-wrap; /* Respects new lines and spaces */
 }
@@ -60,14 +63,14 @@ html, body {
 
 /* Receiver's message bubble */
 .message-receiver {
-    background-color: #fffae5;
+    background-color: #fffcec;
     align-self: flex-end; /* Align to the right */
 }
 
 /* Responsive adjustments */
 @media (max-width: 1500px) {
     .chat-container {
-        width: 90%;
+        width: 80%;
         border-radius: 20px;
     }
 
@@ -89,24 +92,47 @@ html, body {
     outline: none; /* Remove the default focus outline */
 }
 
-    .message-editable:focus {
-        box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25); /* Optional: Add a subtle focus outline */
-        background-color: white;
-        overflow-y: hidden; /* Cache la scrollbar verticale */
-        height: auto;
-    }
+.message-editable:focus {
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25); /* Optional: Add a subtle focus outline */
+    background-color: white;
+    overflow-y: hidden; /* Cache la scrollbar verticale */
+    height: auto;
+}
 
-
-/* Input Area Styling */
 .input-area {
     display: flex;
-    justify-content: space-between; /* Align input and button */
+    flex-direction: column;
     padding: 10px;
 }
 
-/* Input and button styling */
-.input-text, .send-button {
-    margin: 0 5px; /* Spacing between input and button */
+.input-text {
+    width: 100%; /* Prend toute la largeur */
+    border: 1px solid #d3d3d3; /* Bordure stylisée */
+    border-radius: 15px; /* Bords arrondis */
+    padding: 10px; /* Espacement intérieur pour le texte */
+    resize: none; /* Empêche le redimensionnement manuel */
+    box-sizing: border-box; /* Assure que padding et border sont inclus dans la largeur */
+    min-height: 80px; /* Hauteur initiale pour 5 lignes approximativement */
+    overflow-y: auto; /* Permet le défilement vertical si le texte dépasse */
+    background-color: #fff; /* Fond blanc */
+    font-family: inherit; /* Utilise la même police que le reste de l'application */
+    margin-bottom: 10px; /* Espacement avec le bouton envoyer */
+}
+
+.send-button {
+    width: 100%; /* Prend toute la largeur */
+    padding: 10px 0; /* Padding vertical pour agrandir le bouton */
+    border-radius: 15px; /* Bords arrondis */
+    border: none; /* Pas de bordure */
+    background-color: cornflowerblue; /* Couleur de fond */
+    color: white; /* Couleur du texte */
+    cursor: pointer; /* Change le curseur */
+    font-size: 16px; /* Taille du texte */
+}
+
+.send-button:disabled {
+    background-color: #cccccc; /* Couleur de fond lorsque désactivé */
+    cursor: not-allowed; /* Change le curseur */
 }
 
 

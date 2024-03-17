@@ -1,0 +1,29 @@
+﻿using System.Text.Json;
+using PoAssistant.Front.Data;
+
+namespace PoAssistant.Front.Services;
+
+public class UserStoryService
+{
+    private UserStoryModel? userStory = null;
+    public event Action? OnUserStoryChanged = null;
+    public const string endMoeTag = "[FIN_MOE_ASSIST]";
+    private NavigationService _navigationService;
+    public UserStoryService(NavigationService navigationService)
+    {
+        _navigationService = navigationService;
+        //InitializeFileWatcher();
+    }
+
+    public void SetPoUserStory(UserStoryModel userStory)
+    {
+        this.userStory = userStory;
+        //_navigationService.NavigateToPoPage();
+        OnUserStoryChanged?.Invoke();
+    }
+
+    public UserStoryModel? GetPoUserStory()
+    {
+        return userStory;
+    }
+}

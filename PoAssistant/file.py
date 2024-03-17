@@ -1,5 +1,6 @@
 import os
 import shutil
+import glob
 
 class file:
     def get_as_str(filename):
@@ -42,4 +43,9 @@ class file:
     def delete_folder(folder_path):
         if os.path.exists(folder_path):
             shutil.rmtree(folder_path) # Delete the folder and all its contents
+
+    def delete_files_with_extension(extension, folder_path):
+        files_to_delete = glob.glob(os.path.join(folder_path, f"*.{extension}"))
+        for file_to_delete in files_to_delete:
+            os.remove(file_to_delete)
     
