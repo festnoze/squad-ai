@@ -1,28 +1,38 @@
-Fonctionnalité: Initier une conversation avec un officiel
+Fonctionnalité: Visualisation des ressources ’brouillon’ par l’apprenant
 
-Règle : Utilisateurs peuvent choisir un officiel parmi une liste pour démarrer une conversation
+Scénario: Les ressources en statut ’brouillon’ sont visibles uniquement pour les apprenants remplissant les critères spécifiques
+Etant donné un apprenant avec un compte validé et remplissant les critères spécifiques
+Etant donné une ressource en statut ’brouillon’ dans le parcours d’apprentissage de l’apprenant
+Quand l’apprenant accède à son parcours d’apprentissage
+Alors l’apprenant voit la ressource en statut ’brouillon’
 
-Scénario: Initier une conversation avec un officiel
-    Etant donné que je suis connecté en tant qu’utilisateur
-    Etant donné que je suis sur la page de messagerie
-    Etant donné que je peux voir une liste d’officiels disponibles
-    Quand je sélectionne un officiel dans la liste
-    Alors l’officiel sélectionné devrait être ajouté comme destinataire de la conversation
-    Et je devrais pouvoir taper mon message
-    Et je devrais pouvoir envoyer le message
+Scénario: Le titre, la mention ’indispensable’ ou non, une description ou résumé, le type de ressource, et une estimation de la date de disponibilité sont affichés
+Etant donné un apprenant avec un compte validé et remplissant les critères spécifiques
+Etant donné une ressource en statut ’brouillon’ avec un titre, une mention ’indispensable’ ou non, une description ou résumé, un type de ressource et une estimation de la date de disponibilité dans le parcours d’apprentissage de l’apprenant
+Quand l’apprenant accède à la ressource en statut ’brouillon’
+Alors l’apprenant voit le titre, la mention ’indispensable’ ou non, la description ou résumé, le type de ressource et l’estimation de la date de disponibilité de la ressource
 
-Règle : La possibilité d’initier des conversations est clairement signalée dans l’interface utilisateur
+Scénario: Les fonctionnalités d’interaction (commentaires, mise en favoris, téléchargement) sont désactivées pour les ressources ’brouillon’
+Etant donné un apprenant avec un compte validé et remplissant les critères spécifiques
+Etant donné une ressource en statut ’brouillon’ dans le parcours d’apprentissage de l’apprenant
+Quand l’apprenant accède à la ressource en statut ’brouillon’
+Alors l’apprenant ne voit pas les fonctionnalités d’interaction (commentaires, mise en favoris, téléchargement) pour la ressource
 
-Scénario: Vérifier que la possibilité d’initier des conversations est signalée
-    Etant donné que je suis connecté en tant qu’utilisateur
-    Etant donné que je suis sur la page de messagerie
-    Alors je devrais voir un bouton clairement indiqué pour initier une conversation avec un officiel
+Scénario: Un moyen d’exprimer l’intérêt (’J’attends cela avec impatience’) est disponible et fonctionnel
+Etant donné un apprenant avec un compte validé et remplissant les critères spécifiques
+Etant donné une ressource en statut ’brouillon’ dans le parcours d’apprentissage de l’apprenant
+Quand l’apprenant accède à la ressource en statut ’brouillon’
+Et que l’apprenant clique sur le bouton ’J’attends cela avec impatience’
+Alors la ressource est marquée comme étant attendue avec impatience par l’apprenant
 
-Règle : Les utilisateurs reçoivent confirmation que leur message a été envoyé
+Scénario: La visualisation des ressources ’brouillon’ n’influence pas le calcul de la progression de l’apprenant
+Etant donné un apprenant avec un compte validé et remplissant les critères spécifiques
+Etant donné une ressource en statut ’brouillon’ dans le parcours d’apprentissage de l’apprenant
+Quand l’apprenant accède à la ressource en statut ’brouillon’
+Alors la visualisation de la ressource n’affecte pas la progression de l’apprenant
 
-Scénario: Vérifier la confirmation d’envoi du message
-    Etant donné que je suis connecté en tant qu’utilisateur
-    Etant donné que je suis sur la page de messagerie
-    Etant donné que j’ai déjà initié une conversation avec un officiel
-    Quand j’envoie un message
-    Alors je devrais voir une confirmation indiquant que mon message a été envoyé avec succès
+Scénario: Les ressources ’brouillon’ sont visibles uniquement pour les apprenants remplissant les critères spécifiques, même en cas de ressources qui ne passent jamais en statut ’validé’
+Etant donné un apprenant avec un compte validé et remplissant les critères spécifiques
+Etant donné une ressource en statut ’brouillon’ dans le parcours d’apprentissage de l’apprenant qui ne passe jamais en statut ’validé’
+Quand l’apprenant accède à son parcours d’apprentissage
+Alors l’apprenant voit la ressource en statut ’brouillon’

@@ -148,6 +148,7 @@ class assistants_ochestrator:
         i = 1
         for thread_id in threads_ids:
             content = misc.str_to_gherkin(ai.get_last_thread_answer(thread_id))
+            content = misc.output_parser_gherkin(content)
             file.write_file(content, "AcceptanceTests", f"use_case{i}.feature")
             i += 1
 
@@ -168,7 +169,8 @@ class assistants_ochestrator:
         
     def delete_all_outputs(self):
         file.delete_folder("outputs")
-        file.delete_all_files_with_extension("feature", "AcceptanceTests")
+        file.delete_all_files_with_extension("*.feature", "AcceptanceTests")
+        file.delete_all_files_with_extension("*StepDefinitions.cs", "AcceptanceTests")
         file.delete_file("need.txt")
 
     
@@ -203,7 +205,7 @@ class assistants_ochestrator:
             model= self.model_gpt_40, 
             instructions= file.get_as_str("moa_assistant_instructions.txt"),
             run_instructions = "",#file.get_as_str("moa_run_instructions.txt"),
-            timeout_seconds= 50
+            timeout_seconds= 100
         )
         moe_assistant_instructions = file.get_as_str("moe_assistant_instructions.txt").format(max_exchanges_count= self.max_exchanges_count)
         self.moe_assistant_set = ai.create_assistant_set(

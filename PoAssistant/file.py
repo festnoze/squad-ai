@@ -45,7 +45,7 @@ class file:
             shutil.rmtree(folder_path) # Delete the folder and all its contents
 
     def delete_all_files_with_extension(extension, folder_path):
-        files_to_delete = glob.glob(os.path.join(folder_path, f"*.{extension}"))
+        files_to_delete = glob.glob(os.path.join(folder_path, f"{extension}"))
         for file_to_delete in files_to_delete:
             os.remove(file_to_delete)
     

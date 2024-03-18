@@ -25,9 +25,6 @@ async def main():
     # sys.exit()
     max_exchanges_count = 5
 
-    #need = "je souhaiterais afficher les informations administratives de l'utilisateur ainsi que ces expériences professionnelles"
-    #need= "je souhaiterais créer un module de messagerie avec deux boites, une pour que les apprenants puisse communiquer entre eux, une autre pour les communications avec des officiels"
-    
     #define the need and send it to the ochestrator
     need_file = "need.txt"
     file.delete_file(need_file)

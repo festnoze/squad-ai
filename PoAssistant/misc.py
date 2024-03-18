@@ -88,4 +88,7 @@ class misc:
         sleep_interval = 2
         while file.file_exists("need.txt") == False:
             misc.pause(sleep_interval)
+
+    def output_parser_gherkin(feature_content: str):
+        return feature_content.replace(" :", ":").replace("gherkin", "").replace("Feature:", "Fonctionnalité:").replace("Scenario:", "Scénario:")
                 
