@@ -1,25 +1,39 @@
-Fonctionnalité: Confidentialité et sécurité des messages
+Fonctionnalité: Gestion des notifications de messages
 
-Scénario: Chiffrement de bout en bout des messages
-     Soit Alice est un apprenant dans une institution éducative
-     Et Alice a ouvert l’application de messagerie
-     Quand Alice envoie un message à Bob
-     Alors Bob reçoit le message chiffré de bout en bout
-     
-Scénario: Accès aux conversations restreint selon le rôle de l’utilisateur
-     Soit Alice est un administrateur dans une institution éducative
-     Et Alice a ouvert l’application de messagerie
-     Quand Alice accède aux conversations
-     Alors Alice peut voir toutes les conversations de tous les utilisateurs
-     
-Scénario: Accès aux conversations restreint selon le rôle de l’utilisateur
-     Soit Bob est un enseignant dans une institution éducative
-     Et Bob a ouvert l’application de messagerie
-     Quand Bob accède aux conversations
-     Alors Bob peut voir les conversations des apprenants dont il est l’enseignant
-     
-Scénario: Accès aux conversations restreint selon le rôle de l’utilisateur
-     Soit Charlie est un apprenant dans une institution éducative
-     Et Charlie a ouvert l’application de messagerie
-     Quand Charlie accède aux conversations
-     Alors Charlie peut voir seulement ses propres conversations
+Scénario: Personnalisation des préférences de notification par type de message
+    Etant donné un utilisateur connecté
+    Lorsque l’utilisateur accède à ses préférences de notification
+    Et que l’utilisateur sélectionne le type de message "Nouveau message privé"
+    Et que l’utilisateur active la notification pour ce type de message
+    Alors les préférences de notification sont enregistrées
+    Et l’utilisateur recevra des notifications pour les nouveaux messages privés
+
+Scénario: Personnalisation des préférences de notification par expéditeur
+    Etant donné un utilisateur connecté
+    Lorsque l’utilisateur accède à ses préférences de notification
+    Et que l’utilisateur sélectionne un expéditeur spécifique
+    Et que l’utilisateur active la notification pour cet expéditeur
+    Alors les préférences de notification sont enregistrées
+    Et l’utilisateur recevra des notifications pour les messages provenant de cet expéditeur
+
+Scénario: Personnalisation des préférences de notification par thématique
+    Etant donné un utilisateur connecté
+    Lorsque l’utilisateur accède à ses préférences de notification
+    Et que l’utilisateur sélectionne une thématique spécifique
+    Et que l’utilisateur active la notification pour cette thématique
+    Alors les préférences de notification sont enregistrées
+    Et l’utilisateur recevra des notifications pour les messages liés à cette thématique
+
+Scénario: Application instantanée des modifications des préférences de notification
+    Etant donné un utilisateur connecté
+    Lorsque l’utilisateur modifie ses préférences de notification
+    Alors les modifications sont appliquées instantanément
+    Et l’utilisateur recevra les notifications selon les nouvelles préférences
+
+Scénario: Notification sans retard selon les préférences de l’utilisateur
+    Etant donné un utilisateur connecté
+    Lorsqu’un autre utilisateur envoie un message à l’utilisateur connecté
+    Et que l’utilisateur a des préférences de notification activées
+    Et que l’utilisateur a une connexion Internet stable
+    Alors l’utilisateur reçoit une notification sans délai
+    Et la notification correspond aux préférences de l’utilisateur.

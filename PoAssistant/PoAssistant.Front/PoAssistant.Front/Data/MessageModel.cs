@@ -10,7 +10,6 @@ public record MessageModel
     [JsonPropertyName("content")]
     public string Content { get; set; }
 
-
     [JsonPropertyName("durationSeconds")]
     public int DurationSeconds { get; set; }
 
@@ -19,14 +18,23 @@ public record MessageModel
     public bool IsSender => Source == "MOE";
 
     public bool IsLastThreadMessage { get; private set; } = false;
+
+    public bool IsSavedMessage { get; set; }
+
     public void SetAsLastThreadMessage () => IsLastThreadMessage = true;
     public bool SetAsLNotLastThreadMessage() => IsLastThreadMessage = false;
 
-    public MessageModel(string source, string content, int durationSeconds)
+    public MessageModel(string source, string content, int durationSeconds, bool isSavedMessage = true)
     {
         Source = source;
         Content = content;
         DurationSeconds = durationSeconds;
         Timestamp = DateTime.Now;
+        IsSavedMessage = isSavedMessage;
+    }
+
+    public void ChangeContent(string newContent)
+    {
+        this.Content = newContent;
     }
 }

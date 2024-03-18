@@ -2,8 +2,11 @@ import asyncio
 import openai
 import os
 import sys
+from misc import misc
+from file import file
 from dotenv import find_dotenv, load_dotenv
 from ochestrator import assistants_ochestrator
+#from langchain import langchain
 
 async def main():
     # Load environment variables from .env file
@@ -15,14 +18,21 @@ async def main():
     # Set the OpenAI API key
     openai.api_key = openai_api_key
 
+    #response = langchain.create_openai_assistant("what the wheather in {topic}", "lattes")
+
     # List available models
     # ai.print_models()
     # sys.exit()
     max_exchanges_count = 5
 
+    #need = "je souhaiterais afficher les informations administratives de l'utilisateur ainsi que ces expériences professionnelles"
+    #need= "je souhaiterais créer un module de messagerie avec deux boites, une pour que les apprenants puisse communiquer entre eux, une autre pour les communications avec des officiels"
+    
     #define the need and send it to the ochestrator
-    #need = "je souhaiterais afficher les informations administratives de l'utilisateur"
-    need= "je souhaiterais créer un module de messagerie pour que les apprenants puisse communiquer entre eux, mais aussi avec des officiels"
+    need_file = "need.txt"
+    file.delete_file(need_file)
+    misc.wait_until_need_file_is_created()
+    need = file.get_as_str(need_file)
     print(f"Description initiale de l'objectif : {need}")
     
     orchestrator = assistants_ochestrator(need, max_exchanges_count)

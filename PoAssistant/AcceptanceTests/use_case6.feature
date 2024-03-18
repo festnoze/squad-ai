@@ -1,20 +1,27 @@
-Fonctionnalité: Surveillance des conversations par les administrateurs
+Fonctionnalité: Envoi et réception de fichiers
 
-Scenario: Accès aux logs de conversation après un signalement
-Given Un administrateur est connecté au système de gestion d’apprentissage
-And Un utilisateur signale une conversation suspecte
-When L’administrateur recherche les logs de conversation liés au signalement
-Then L’administrateur peut accéder aux logs de la conversation suspecte
+Critères d’acceptance:
+- Les utilisateurs peuvent joindre des fichiers à leurs messages selon des critères prédéfinis (taille, format).
+- Les restrictions (taille, format) sont clairement communiquées aux utilisateurs.
+- Les utilisateurs reçoivent un feedback immédiat en cas d’échec de l’envoi d’un fichier non conforme.
 
-Scenario: Alertes en temps réel basées sur des mots-clés
-Given Un administrateur est connecté au système de gestion d’apprentissage
-And Des mots-clés de monitoring ont été définis
-When Une conversation contenant un mot-clé est créée ou modifiée
-Then L’administrateur reçoit une alerte en temps réel concernant la conversation contenant le mot-clé
+Scénario: Envoi d’un fichier conforme
+    Etant donné que je suis connecté en tant qu’utilisateur
+    Et que je suis dans une conversation avec un autre utilisateur
+    Lorsque j’envoie un message en y joignant un fichier de format PDF
+    Alors le système envoie le fichier avec succès
+    Et les utilisateurs peuvent accéder et télécharger le fichier dans la conversation
 
-Scenario: Respect de la confidentialité lors de la surveillance
-Given Un administrateur est connecté au système de gestion d’apprentissage
-And La confidentialité des utilisateurs est garantie
-When L’administrateur décide de surveiller une conversation pour des raisons légitimes
-Then L’administrateur accède uniquement aux informations nécessaires pour la surveillance
-And Les informations des utilisateurs non concernés par la surveillance restent confidentielles.
+Scénario: Envoi d’un fichier non conforme (format incorrect)
+    Etant donné que je suis connecté en tant qu’utilisateur
+    Et que je suis dans une conversation avec un autre utilisateur
+    Lorsque j’essaie d’envoyer un fichier de format EXE
+    Alors le système bloque l’envoi du fichier avec un message d’erreur mentionnant le format non autorisé
+    Et les utilisateurs ne peuvent pas accéder ou télécharger le fichier dans la conversation
+
+Scénario: Envoi d’un fichier non conforme (taille trop grande)
+    Etant donné que je suis connecté en tant qu’utilisateur
+    Et que je suis dans une conversation avec un autre utilisateur
+    Lorsque j’essaie d’envoyer un fichier de taille supérieure à0 Mo
+    Alors le système bloque l’envoi du fichier avec un message d’erreur mentionnant la taille maximum autorisée
+    Et les utilisateurs ne peuvent pas accéder ou télécharger le fichier dans la conversation

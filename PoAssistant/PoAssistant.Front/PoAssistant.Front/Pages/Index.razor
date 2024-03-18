@@ -13,51 +13,60 @@
 
 <h3>Atelier de conception MOA/MOE : spécification du besoin</h3>
 
-@if (messages == null)
-{
-    <p><em>Loading...</em></p>
-}
-else
-{
-    <div class="chat-wrapper">
-        <div class="chat-container">
-            @foreach (var message in messages@* .Where(m => !m.IsLastThreadMessage) *@)
-            {
-                <div class="@($"{(message.IsSender ? "message-source-sender" : "message-source-receiver")}")">@message.Source</div>
-                <div class="@($"message-bubble {(message.IsSender ? "message-sender" : "message-receiver")}")">@message.Content</div>
-            }
-            @* @if (messages.Any() && messages.Last().IsLastThreadMessage)
-            {
-                <div class="message-source-receiver" style="color:cornflowerblue">@messages.Last().Source</div>
-                <div @ondblclick="MakeLastMessageEditable" class="message-bubble message-receiver">
-                    <textarea @bind="messages.Last().Content" @onblur="SaveLastMessage" class="message-editable"></textarea>
+<div class="chat-wrapper">
+    <div class="chat-container">
+        @foreach (var message in messages.Where(m => isEditingLastMessage ? !m.IsLastThreadMessage : true))
+        {
+            <div class="@($"{(message.IsSender ? "message-source-sender" : "message-source-receiver")}")">@message.Source</div>
+            <div class="@($"message-bubble {(message.IsSender ? "message-sender" : "message-receiver")}")">@message.Content
+                @if (!isLoading && !isEditingLastMessage && message.IsLastThreadMessage)
+                {
+                    <button @onclick="() => MakeLastMessageEditable()" class="edit-button"><span class="oi oi-pencil"></span></button>
+                }
+            </div>
+        }
+        @if (isLoading && !isEditingLastMessage)
+        {
+            <div class="@($"{(!messages.Last().IsSender ? "message-source-sender" : "message-source-receiver")}")">en cours de rédaction</div>
+            <div class="@($"message-bubble {(!messages.Last().IsSender ? "message-sender" : "message-receiver")}")">
+                <div class="loader">
+                    <div class="circle"></div>
+                    <div class="circle"></div>
+                    <div class="circle"></div>
+                    <div class="circle"></div>
+                    <div class="circle"></div>
                 </div>
-            } *@
-            @* @if (isLoading)
-            {
-                <i class="fas fa-spinner fa-spin"></i>
-            } *@
-        </div>
-        @* <div class="input-area">
-            @if (messages.Any() && messages.Last().IsLastThreadMessage)
-            {
-                <textarea class="input-text" @bind="messages.Last().Content"></textarea>
-            }
-            else
-            {
-                <textarea class="input-text" placeholder="Attendre le prochain message MOA à corriger" readonly></textarea>
-            }
-            <button class="send-button" disabled="@(messages.Any() && messages.Last().IsLastThreadMessage ? false : true)">Send</button>
-        </div> *@
+            </div>
+        }
+        @if (isEditingLastMessage)
+        {
+            <div class="message-source-receiver" style="color:cornflowerblue">@messages.Last().Source</div>
+            <div class="message-bubble message-receiver">
+                <textarea @bind="messages.Last().Content" class="message-editable" placeholder="Décrivez le besoin que vous souhaitez spécifier"></textarea>
+                <button @onclick="() => SaveLastMessage()" class="edit-button" style="margin: 0px 0px;"><span class="oi oi-check"></span></button>
+            </div>
+        }
+    </div> 
+    @* <div class="input-area">
+        @if (messages.Any() && messages.Last().IsLastThreadMessage)
+        {
+            <textarea class="input-text" @bind="messages.Last().Content"></textarea>
+        }
+        else
+        {
+            <textarea class="input-text" placeholder="Attendre le prochain message MOA à corriger" readonly></textarea>
+        }
+        <button class="send-button" disabled="@(messages.Any() && messages.Last().IsLastThreadMessage ? false : true)">Send</button>
+    </div> *@
 
-    </div>
-}
+</div>
+
 <body>
 </body>
 
 
 @code {
-    private ThreadModel? messages;
+    private ThreadModel messages;
     private ElementReference textAreaElement;
     private bool isLoading = true;
 
@@ -65,10 +74,10 @@ else
     {
         isLoading = true;
         messages = threadService.GetMoeMoaThread();
-        isLoading = !threadService.HasExchangeEnded();
+        isLoading = threadService.IsLoading();
         threadService.OnThreadChanged += ReloadThread;
     }
-    
+
     // private async Task AdjustTextAreaHeight()
     // {
     //     await JSRuntime.InvokeVoidAsync("adjustTextAreaHeight", textAreaElement);
@@ -79,22 +88,28 @@ else
     private void MakeLastMessageEditable()
     {
         isEditingLastMessage = true;
+        threadService.EditingLastMessage();
+
+        // Notify the component to re-render
+        InvokeAsync(StateHasChanged);
     }
 
     private void SaveLastMessage()
     {
         isEditingLastMessage = false;
-        // Here you would typically send the updated message back to your server or service
+        isLoading = true;
+        threadService.SavedUserMessage();
+        InvokeAsync(StateHasChanged);
     }
 
     private void ReloadThread()
     {
         messages = threadService.GetMoeMoaThread();
+        isLoading = threadService.IsLoading();
         
         // Notify the component to re-render
         InvokeAsync(StateHasChanged);
     }
-
 
     // public void NavigateToPo(bool forceLoad = false)
     // {

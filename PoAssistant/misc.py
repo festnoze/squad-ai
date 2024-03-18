@@ -1,8 +1,9 @@
 import time
 import json
+from file import file
 
 class misc:    
-    def pause(duration = None):        
+    def pause(duration):        
         time.sleep(duration)
 
     def get_formatted_time(duration):
@@ -82,4 +83,9 @@ class misc:
                     "content": content,
                     "duration": duration
                 }
-        
+    
+    def wait_until_need_file_is_created():
+        sleep_interval = 2
+        while file.file_exists("need.txt") == False:
+            misc.pause(sleep_interval)
+                

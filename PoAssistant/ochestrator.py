@@ -168,7 +168,8 @@ class assistants_ochestrator:
         
     def delete_all_outputs(self):
         file.delete_folder("outputs")
-        file.delete_files_with_extension("feature", "AcceptanceTests")
+        file.delete_all_files_with_extension("feature", "AcceptanceTests")
+        file.delete_file("need.txt")
 
     
     def create_check_end_assistant(self):

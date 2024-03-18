@@ -1,0 +1,60 @@
+{
+    "us_desc": "En tant qu'apprenant ou membre officiel (enseignant, personnel administratif, bibliothécaire, conseiller d'orientation) d'une institution éducative, je souhaite pouvoir utiliser un module de messagerie intégré au système de gestion d'apprentissage (LMS) existant, afin de faciliter la collaboration sur des projets, poser ou répondre à des questions relatives aux cours, et encourager les interactions sociales au sein de l'institution. Ce module devrait permettre l'envoi de messages aussi bien individuels qu'en groupe, organiser les messages par sujet ou par cours, permettre l'attachement de fichiers avec des restrictions de taille et de type, offrir une fonction de notification personnalisable, garantir la confidentialité des messages via un chiffrement de bout en bout, permettre une surveillance adéquate des conversations par les administrateurs dans le respect de la confidentialité, et être pleinement fonctionnel sur mobiles et ordinateurs de bureau. L'intégration de ce module au système de gestion des utilisateurs existant est cruciale pour offrir une expérience utilisateur cohérente et intégrée.",
+    "use_cases": [
+        {
+            "uc_desc": "Utilisation de la messagerie individuelle et en groupe pour collaboration sur des projets",
+            "acceptance_criteria": [
+                "Les utilisateurs doivent pouvoir envoyer des messages à d'autres utilisateurs individuellement ou en groupes.",
+                "Les utilisateurs doivent pouvoir créer, nommer et inviter des membres dans des groupes de messagerie.",
+                "Les officiels et administrateurs doivent avoir la possibilité de créer et gérer des groupes pour des projets de cours spécifiques."
+            ]
+        },
+        {
+            "uc_desc": "Organisation et recherche de messages",
+            "acceptance_criteria": [
+                "Les messages doivent être organisables par sujet ou par cours.",
+                "Les utilisateurs doivent pouvoir créer des 'espaces de discussion' spécifiques à un sujet ou un cours.",
+                "Doit exister la possibilité de recherche de messages passés par mots-clés ou par participants."
+            ]
+        },
+        {
+            "uc_desc": "Attachement de fichiers aux messages avec restrictions",
+            "acceptance_criteria": [
+                "Les utilisateurs peuvent attacher des fichiers à leurs messages.",
+                "Les fichiers attachés ne doivent pas dépasser une taille maximale définie.",
+                "Les types de fichiers autorisés doivent être préalablement définis pour des raisons de sécurité."
+            ]
+        },
+        {
+            "uc_desc": "Gestion des notifications",
+            "acceptance_criteria": [
+                "Les notifications de nouveaux messages s'affichent en temps réel.",
+                "Les utilisateurs peuvent personnaliser leurs préférences de notification (immédiatement, une fois par jour, désactivation).",
+                "Les notifications doivent être fonctionnelles sur les versions mobiles et de bureau."
+            ]
+        },
+        {
+            "uc_desc": "Confidentialité et sécurité des messages",
+            "acceptance_criteria": [
+                "Les messages échangés doivent être chiffrés de bout en bout.",
+                "L'accès aux conversations peut être restreint en fonction du rôle de l'utilisateur."
+            ]
+        },
+        {
+            "uc_desc": "Surveillance des conversations par les administrateurs",
+            "acceptance_criteria": [
+                "Les administrateurs ont accès aux logs de conversation après un signalement.",
+                "Des outils de monitoring basés sur des mots-clés alertent les administrateurs en temps réel.",
+                "La surveillance doit respecter la confidentialité des utilisateurs, intervenant uniquement en cas de nécessité."
+            ]
+        },
+        {
+            "uc_desc": "Intégration avec le système de gestion des utilisateurs existant sur le LMS",
+            "acceptance_criteria": [
+                "Les utilisateurs sont automatiquement connectés à la messagerie lors de la connexion au LMS.",
+                "L'intégration inclut l'affichage de la disponibilité en ligne des utilisateurs selon leur activité dans le LMS.",
+                "Les utilisateurs doivent avoir accès à leurs espaces de discussion adaptés à leurs cours sans actions supplémentaires."
+            ]
+        }
+    ]
+}

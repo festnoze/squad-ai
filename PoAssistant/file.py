@@ -44,8 +44,15 @@ class file:
         if os.path.exists(folder_path):
             shutil.rmtree(folder_path) # Delete the folder and all its contents
 
-    def delete_files_with_extension(extension, folder_path):
+    def delete_all_files_with_extension(extension, folder_path):
         files_to_delete = glob.glob(os.path.join(folder_path, f"*.{extension}"))
         for file_to_delete in files_to_delete:
             os.remove(file_to_delete)
+    
+    def delete_file(path_and_name):
+        if file.file_exists(path_and_name):
+            os.remove(path_and_name)
+    
+    def file_exists(filepath):
+        return os.path.exists(filepath)
     
