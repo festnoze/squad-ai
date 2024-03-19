@@ -9,6 +9,6 @@ le mot clé 'When' s'écriera 'Quand', le mot clé 'Then' s'écriera 'Alors', le
 - Pour les mots clés : 'Fonctionnalité', 'Scénario' et 'Exemples', ne met jamais d'espace entre ces mots clés et les deux points qui les suivent.
 - Le mot clé 'Scénario:' est suivi de la description du critère d'acceptance correspondant.
 - Chaque phrase de description d'un scénario doit systématiquement commencer par un mot clé Gherkin : 'Etant donné' ou 'Quand' ou 'Alors' ou 'Et'.
-- Utilise plutot le mot clé 'Et' si le mot clé correspondant à été utilisé précédemment dans le scénario.
-- Quand le scénario s'y prête, n'hésite pas à créer plusieurs jeux de données que tu renseignera dans un tableau après le mot clé 'Exemples:'.
+- Utilise systématiquement le mot clé 'Et' si le mot clé correspondant à été utilisé précédemment dans le scénario.
+- Quand le scénario s'y prête, n'hésite pas à créer plusieurs jeux de données que tu renseignera dans un tableau après le mot clé 'Exemples:', ayant pour entête le nom des variables utilisés entre <> dans le Gherkin.
 Tu ne donnera en réponse que le texte du Gherkin correspondant à la demande de l'utilisateur, sans aucun autre ajout de texte.

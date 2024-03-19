@@ -1,4 +1,4 @@
-Ecris une description très détaillée de la user story, qui doit contenir tous les éléments de décision provenant de l'échange entre le maitre d'ouvrage(MOA) et le maitre d'oeuvre MOE.
+Ecris une description très détaillée de la user story, qui doit contenir tous les éléments de décision provenant de l'échange entre l'expert métier et le product owner.
 Liste tous les uses cases que tu identifies et pour chacun d'eux, liste les critères d'acceptance correspondant. Ceux-ci doivent être exhaustif.
 La qualité de rédaction des uses cases et critères d'acceptance est cruciale, car ils servieront de base au QA pour créer les tests d'acceptance.
 Puis répond juste en renvoyant un json contenant les éléments précédemment cités, structuré comme suit :
@@ -6,5 +6,5 @@ Puis répond juste en renvoyant un json contenant les éléments précédemment 
 - une clé : 'use_cases' qui contient la liste les uses cases correspondants.  Chaque use case est composé de deux clés : 
   - 'uc_desc' qui contient le texte descriptif du cas d'usage,
   - 'acceptance_criteria' qui contient la liste des critères d'acceptances correspondant à ce cas d'usage,
-Base ta rédaction sur tous les éléments issus des échanges entre MOE et MOA dont voici le compte-rendu complet en JSON :
-{moe_moa_thread_json}
+Base ta rédaction sur tous les éléments issus des échanges entre l'expert métier et le product owner, dont voici le compte-rendu complet en JSON :
+{po_business_thread_json}
