@@ -34,7 +34,7 @@ public class FrontendProxyController
     [HttpPost("po/us")]
     public void ReadyPoUserStory([FromBody] UserStoryModel userStory)
     {
-        //var tmp = JsonConvert.DeserializeObject<UserStoryModel>(userStory);
+        _threadService.EndMoaMoaExchange();
         _userStoryService.SetPoUserStory(userStory);
     }
 

@@ -1,6 +1,0 @@
-
-    Je souhaiterais afficher les informations administratives de l'utilisateur ainsi que ces expériences professionnelles
-
-    Je souhaiterais créer un module de messagerie avec deux boites, une pour que les apprenants puisse communiquer entre eux, une autre pour les communications avec des officiels
-    
-    Je souhaiterais créer un module d'annuaire des apprenants avec une carte permettant de rechercher des utilisateurs autour de soi, ou/et inscris aux mêmes parcours

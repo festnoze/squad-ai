@@ -1,29 +1,33 @@
-﻿using System.Text.Json;
+﻿using System.Linq;
+using System.Text.Json;
 using PoAssistant.Front.Data;
 
 namespace PoAssistant.Front.Services;
 
 public class ThreadMoaMoeService : IDisposable
 {
-    private ThreadModel? messages = null;
+    private ThreadModel messages = null!;
     public event Action? OnThreadChanged = null;
     private bool isWaitingForLLM = false;
     public const string endMoeTag = "[FIN_MOE_ASSIST]";
 
     public ThreadMoaMoeService()
     {
-        //InitializeFileWatcher();
-    }
-
-    public const string defaultIntroMessage = "Cliquez sur le stylo à droite pour commencer";
-    public ThreadModel GetMoeMoaThread()
-    {
         if (messages is null)
         {
-            messages = new ThreadModel("MOA", defaultIntroMessage, true);
+            messages = new ThreadModel("MOA", string.Empty, true);
             isWaitingForLLM = false;
         }
+    }
+
+    public ThreadModel GetMoeMoaThread()
+    {
         return messages!;
+    }
+
+    public bool IsEditingLastMessage()
+    {
+        return messages.Last().IsLastThreadMessage && !messages.Last().IsSavedMessage;
     }
 
     public void AddNewMessage(MessageModel newMessage)
@@ -31,16 +35,28 @@ public class ThreadMoaMoeService : IDisposable
         if (messages is null)
             messages = new ThreadModel();
 
-        messages.Add(newMessage);
+        messages!.Add(newMessage);
         CheckNeedToModifyLastMessage();
+
+        if (newMessage.Source == "MOA")
+            isWaitingForLLM = false;
 
         OnThreadChanged?.Invoke();
     }
 
     public void DeleteMoaMoeThread()
     {
-        messages = null;
-        isWaitingForLLM = true;
+        messages = new ThreadModel();
+        isWaitingForLLM = false;
+        OnThreadChanged?.Invoke();
+    }
+
+    public void EndMoaMoaExchange()
+    {
+
+        messages!.Add(new MessageModel("MOE", "Le PO a maintenant rédigé la User Story et défini les use cases.", 0, true));
+        isWaitingForLLM = false;
+        OnThreadChanged?.Invoke();
     }
 
     private void CheckNeedToModifyLastMessage()
@@ -62,7 +78,7 @@ public class ThreadMoaMoeService : IDisposable
         }
     }
 
-    public bool IsLoading()
+    public bool IsWaitingForLLM()
     {
         return isWaitingForLLM;
     }
@@ -73,14 +89,32 @@ public class ThreadMoaMoeService : IDisposable
             messages!.Last().ChangeContent(string.Empty);
     }
 
-    public void SavedUserMessage()
+    public void ValidateMoaAnswer()
+    {
+        if (!messages?.Any() ?? true)
+            return;
+
+        if (messages!.Count() == 1)
+            SaveMoaNeed();
+        else
+            SaveMoaAnswer();
+    }
+
+    private void SaveMoaNeed()
     {
         var needFilePath = "..\\..\\need.txt";
-        if (messages != null && messages.Count() == 1)
-        {
-            messages!.Last().IsSavedMessage = true;
-            File.WriteAllText(needFilePath, messages!.Single().Content);
-        }
+        messages!.Last().IsSavedMessage = true;
+        File.WriteAllText(needFilePath, messages!.Single().Content);
+    }
+
+    private void SaveMoaAnswer()
+    {
+        var filePath = "..\\..\\moa_answer.txt";
+        if (messages == null || messages.Last().Source != "MOA")
+            throw new Exception("Le dernier message n'est pas présent ou n'est pas du MOA");
+     
+        messages!.Last().IsSavedMessage = true;
+        File.WriteAllText(filePath, messages!.Last().Content);
     }
 
     public void Dispose()

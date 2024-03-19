@@ -6,8 +6,8 @@ class front_client:
     host_uri = "http://localhost:5132"
     frontend_proxy_subpath = "FrontendProxy"
 
-    new_moe_moa_message_url_post = "moa-moe/new-message"
-    delete_moe_moa_thread_url_delete = "moa-moe/delete"
+    new_moe_moa_message_url_post = "metier-po/new-message"
+    delete_moe_moa_thread_url_delete = "metier-po/delete"
     new_po_us_and_usecases_url_post = "po/us"
 
     def post_new_answer_moe_moa(message_json):

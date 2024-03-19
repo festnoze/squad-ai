@@ -25,14 +25,8 @@ async def main():
     # sys.exit()
     max_exchanges_count = 5
 
-    #define the need and send it to the ochestrator
-    need_file = "need.txt"
-    file.delete_file(need_file)
-    misc.wait_until_need_file_is_created()
-    need = file.get_as_str(need_file)
-    print(f"Description initiale de l'objectif : {need}")
-    
-    orchestrator = assistants_ochestrator(need, max_exchanges_count)
+    #Start the ochestrator workflow        
+    orchestrator = assistants_ochestrator(max_exchanges_count)
     try:
         orchestrator.create_assistants()
         orchestrator.print_assistants_ids()        

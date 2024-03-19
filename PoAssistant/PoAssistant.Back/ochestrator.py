@@ -7,14 +7,12 @@ from front_client import front_client
 
 class assistants_ochestrator:
     check_end_assistant = None
-    def __init__(self, request_message, max_exchanges_count):
-        self.request_message = request_message
+    def __init__(self, max_exchanges_count):
         self.max_exchanges_count = max_exchanges_count
 
-    async def perform_workflow_async(self):
-        # us = file.get_as_str("outputs\\MOA_MOE_exchanges.json")
-        # front_client.post_po_us_and_usecases(moamoe)
-        # return
+    async def perform_workflow_async(self):        
+        self.request_message = misc.wait_need_file_creation_and_return()
+        print(f"Description initiale de l'objectif : {self.request_message}")
         
         self.delete_all_outputs()
         front_client.delete_new_moe_moa_thread()
@@ -31,8 +29,7 @@ class assistants_ochestrator:
     def do_moe_moa_exchanges(self):
         self.moa_assistant_set.run_instructions += "Le besoin principal et le but à atteindre est : '{self.request_message}'."
         moa_response = self.request_message
-        message_json = misc.get_message_as_json("MOA", moa_response, 0)
-        front_client.post_new_answer_moe_moa(message_json)
+        message_json = misc.get_message_as_json("Métier", moa_response, 0)
         counter = 0
 
         while True:
@@ -40,26 +37,27 @@ class assistants_ochestrator:
             if counter > self.max_exchanges_count:
                 return
             
-            # Pass the need to MOE or latest MOA answer & run:
+            # Pass the need to PO or latest business expert's answer & run:
             run_result = ai.add_message_and_run(self.moe_assistant_set, moa_response) 
             moe_response = ai.get_run_result(self.moe_assistant_set, run_result)            
             str_elapsed = ai.get_run_duration_str(self.moe_assistant_set.run)
             elapsed_seconds = ai.get_run_duration_str(self.moe_assistant_set.run)
-            message_json = misc.get_message_as_json("MOE", moe_response, elapsed_seconds)
+            message_json = misc.get_message_as_json("PO", moe_response, elapsed_seconds)
             front_client.post_new_answer_moe_moa(message_json)
-            print(f"({str_elapsed}) MOE :\n{moe_response}\n")
+            print(f"({str_elapsed}) PO :\n{moe_response}\n")
             if self.need_for_stop(moe_response, run_result, True):
                 return
             
-            # Pass response to MOA & run:
-            moa_message = f"Ci-après sont les questions du MOE auxquelles tu dois répondre : \n{moe_response}"
+            # Pass latest PO questions to business expert & run:
+            moa_message = f"Ci-après sont les questions du PO auxquelles tu dois répondre : \n{moe_response}"
             run_result = ai.add_message_and_run(self.moa_assistant_set, moa_message)
             moa_response = ai.get_run_result(self.moa_assistant_set, run_result)
             str_elapsed = ai.get_run_duration_str(self.moa_assistant_set.run)            
             elapsed_seconds = ai.get_run_duration_str(self.moa_assistant_set.run)
-            message_json = misc.get_message_as_json("MOA", moa_response, elapsed_seconds)
+            message_json = misc.get_message_as_json("Métier", moa_response, elapsed_seconds)
             front_client.post_new_answer_moe_moa(message_json)
-            print(f"({str_elapsed}) MOA : \n{moa_response}\n")        
+            print(f"({str_elapsed}) Métier : \n{moa_response}\n") 
+            moa_response = misc.wait_until_moa_file_is_created()       
 
             if self.need_for_stop(moa_response, run_result, False):
                 return
@@ -128,7 +126,7 @@ class assistants_ochestrator:
         
     
     def need_for_stop(self, response, result, check_for_questions):
-        # Handle the escape sentence from the MOE model
+        # Handle the escape sentence from the PO/MOE model
         if response.__contains__("[FIN_MOE_ASSIST]"):
             return True
         if check_for_questions and not self.has_questions(response):
@@ -164,7 +162,7 @@ class assistants_ochestrator:
 
     def save_moe_moa_exchange(self):
         messages_json = ai.get_all_messages_as_json(self.moe_assistant_set)
-        messages_str = misc.json_to_str(messages_json).replace("\"user\"", "\"MOA\"").replace("\"assistant\"", "\"MOE\"")
+        messages_str = misc.json_to_str(messages_json).replace("\"user\"", "\"Métier\"").replace("\"assistant\"", "\"PO\"")
         file.write_file(messages_str, "outputs", "MOA_MOE_exchanges.json")
         
     def delete_all_outputs(self):
@@ -172,6 +170,7 @@ class assistants_ochestrator:
         file.delete_all_files_with_extension("*.feature", "AcceptanceTests")
         file.delete_all_files_with_extension("*StepDefinitions.cs", "AcceptanceTests")
         file.delete_file("need.txt")
+        file.delete_file("moa_answer.txt")
 
     
     def create_check_end_assistant(self):
@@ -228,8 +227,8 @@ class assistants_ochestrator:
         )
 
     def print_assistants_ids(self):
-        display.display_ids("MOA", self.moa_assistant_set)
-        display.display_ids("MOE", self.moe_assistant_set)
+        display.display_ids("Métier", self.moa_assistant_set)
+        display.display_ids("PO/MOE", self.moe_assistant_set)
         display.display_ids("PO",  self.po_assistant_set)
         display.display_ids("QA",  self.qa_assistant_set)
         print("")

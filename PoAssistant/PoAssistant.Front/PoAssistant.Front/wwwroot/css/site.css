@@ -179,11 +179,17 @@ html, body {
     }
 }
 
+.edit-button-wrapper {
+    position: absolute;
+    right: 0px;
+    bottom: 0px;
+}
+
 .edit-button {
     position: absolute;
-    right: 8px;
+    right: 68px;
     bottom: 4px;
-    background-color: #4CAF50; /* Green background */
+    background-color: #ffcc40;
     border: none; /* Remove borders */
     color: white; /* White text */
     padding: 6px 16px; /* Some padding */
@@ -200,6 +206,31 @@ html, body {
 }
 
     .edit-button:hover {
+        background-color: #ff6a3a; 
+        box-shadow: 0 10px 40px 0 rgba(0,0,0,0.24), 0 17px 50px 0 rgba(0,0,0,0.22); /* Deeper shadow on hover */
+    }
+
+.next-button {
+    position: absolute;
+    right: 8px;
+    bottom: 4px;
+    background-color: #4CAF50;
+    border: none; /* Remove borders */
+    color: white; /* White text */
+    padding: 6px 16px; /* Some padding */
+    margin-left: auto; /* Pushes the button to the right */
+    text-align: center; /* Centered text */
+    text-decoration: none; /* No underline */
+    display: inline-block; /* Allow it to be inline with other elements */
+    font-size: 16px; /* Set font-size */
+    margin: 6px 4px;
+    transition: 0.8s; /* 300ms transition effect on hover */
+    border-radius: 18px; /* Rounded corners */
+    box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2); /* Add a shadow effect */
+    cursor: pointer; /* Change mouse pointer on hover */
+}
+
+    .next-button:hover {
         background-color: #3ad964; /* Darker shade of green */
         box-shadow: 0 10px 40px 0 rgba(0,0,0,0.24), 0 17px 50px 0 rgba(0,0,0,0.22); /* Deeper shadow on hover */
     }

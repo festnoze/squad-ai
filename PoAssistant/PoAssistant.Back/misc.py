@@ -84,10 +84,23 @@ class misc:
                     "duration": duration
                 }
     
-    def wait_until_need_file_is_created():
+    def wait_need_file_creation_and_return():
         sleep_interval = 2
+        need_file = "need.txt"
+        file.delete_file(need_file)
         while file.file_exists("need.txt") == False:
             misc.pause(sleep_interval)
+
+        return file.get_as_str(need_file)
+
+    def wait_until_moa_file_is_created():
+        sleep_interval = 1
+        moa_answer_file_name = "moa_answer.txt"   
+        while file.file_exists(moa_answer_file_name) == False:
+            misc.pause(sleep_interval)
+        moa_answer = file.get_as_str(moa_answer_file_name)
+        file.delete_file(moa_answer_file_name)
+        return moa_answer
 
     def output_parser_gherkin(feature_content: str):
         return feature_content.replace(" :", ":").replace("gherkin", "").replace("Feature:", "Fonctionnalité:").replace("Scenario:", "Scénario:")

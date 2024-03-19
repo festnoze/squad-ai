@@ -11,21 +11,30 @@
 <head>
 </head>
 
-<h3>Atelier de conception MOA/MOE : spécification du besoin</h3>
+<h4>Atelier de conception MOA/MOE : spécification du besoin</h4>
 
 <div class="chat-wrapper">
     <div class="chat-container">
         @foreach (var message in messages.Where(m => isEditingLastMessage ? !m.IsLastThreadMessage : true))
         {
-            <div class="@($"{(message.IsSender ? "message-source-sender" : "message-source-receiver")}")">@message.Source</div>
-            <div class="@($"message-bubble {(message.IsSender ? "message-sender" : "message-receiver")}")">@message.Content
-                @if (!isLoading && !isEditingLastMessage && message.IsLastThreadMessage)
+            <div class="@($"{(message.IsSender ? "message-source-sender" : "message-source-receiver")}")">
+                @message.Source
+                @if (message.DurationSeconds > 0)
                 {
-                    <button @onclick="() => MakeLastMessageEditable()" class="edit-button"><span class="oi oi-pencil"></span></button>
+                    <text>(@message.DurationSeconds s.)</text>
+                }
+            </div>
+            <div class="@($"message-bubble {(message.IsSender ? "message-sender" : "message-receiver")}")">@message.Content
+                @if (!isWaitingForLLM && !isEditingLastMessage && message.IsLastThreadMessage)
+                {
+                    <div class="edit-button-wrapper">
+                        <button @onclick="() => MakeLastMessageEditable()" class="edit-button"><span class="oi oi-pencil"></span></button>
+                        <button @onclick="() => ValidateMoaAnswer()" class="next-button"><span class="oi oi-arrow-right"></span></button>
+                    </div>
                 }
             </div>
         }
-        @if (isLoading && !isEditingLastMessage)
+        @if (isWaitingForLLM && !isEditingLastMessage)
         {
             <div class="@($"{(!messages.Last().IsSender ? "message-source-sender" : "message-source-receiver")}")">en cours de rédaction</div>
             <div class="@($"message-bubble {(!messages.Last().IsSender ? "message-sender" : "message-receiver")}")">
@@ -42,8 +51,8 @@
         {
             <div class="message-source-receiver" style="color:cornflowerblue">@messages.Last().Source</div>
             <div class="message-bubble message-receiver">
-                <textarea @bind="messages.Last().Content" class="message-editable" placeholder="Décrivez le besoin que vous souhaitez spécifier"></textarea>
-                <button @onclick="() => SaveLastMessage()" class="edit-button" style="margin: 0px 0px;"><span class="oi oi-check"></span></button>
+                <textarea @bind="messages.Last().Content" class="message-editable" placeholder="Décrivez ici le besoin à spécifier"></textarea>
+                <button @onclick="() => ValidateMoaAnswer()" class="next-button" style="margin: 0px 0px;"><span class="oi oi-check"></span></button>
             </div>
         }
     </div> 
@@ -68,13 +77,14 @@
 @code {
     private ThreadModel messages;
     private ElementReference textAreaElement;
-    private bool isLoading = true;
+    private bool isWaitingForLLM = true;
+    private bool isEditingLastMessage = false;
 
     protected override async Task OnInitializedAsync()
     {
-        isLoading = true;
         messages = threadService.GetMoeMoaThread();
-        isLoading = threadService.IsLoading();
+        isEditingLastMessage = threadService.IsEditingLastMessage();
+        isWaitingForLLM = threadService.IsWaitingForLLM();
         threadService.OnThreadChanged += ReloadThread;
     }
 
@@ -83,7 +93,6 @@
     //     await JSRuntime.InvokeVoidAsync("adjustTextAreaHeight", textAreaElement);
     // }
 
-    private bool isEditingLastMessage = false;
 
     private void MakeLastMessageEditable()
     {
@@ -94,18 +103,18 @@
         InvokeAsync(StateHasChanged);
     }
 
-    private void SaveLastMessage()
+    private void ValidateMoaAnswer()
     {
         isEditingLastMessage = false;
-        isLoading = true;
-        threadService.SavedUserMessage();
+        isWaitingForLLM = true;
+        threadService.ValidateMoaAnswer();
         InvokeAsync(StateHasChanged);
     }
 
     private void ReloadThread()
     {
         messages = threadService.GetMoeMoaThread();
-        isLoading = threadService.IsLoading();
+        isWaitingForLLM = threadService.IsWaitingForLLM();
         
         // Notify the component to re-render
         InvokeAsync(StateHasChanged);
