@@ -15,7 +15,7 @@ public record MessageModel
 
     public DateTime Timestamp { get; init; }
 
-    public bool IsSender => Source == "MOE";
+    public bool IsSender => Source == "PO";
 
     public bool IsLastThreadMessage { get; private set; } = false;
 

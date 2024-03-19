@@ -3,7 +3,7 @@
     "windowsAuthentication": false,
     "anonymousAuthentication": true,
     "iisExpress": {
-      "applicationUrl": "http://localhost:51886/MoaMoeExchange",
+      "applicationUrl": "http://localhost:51886/MetierPoExchange",
       "sslPort": 0
     }
   },

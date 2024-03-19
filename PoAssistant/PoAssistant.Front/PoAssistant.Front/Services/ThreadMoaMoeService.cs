@@ -1,26 +1,26 @@
-﻿using System.Linq;
+using System.Linq;
 using System.Text.Json;
 using PoAssistant.Front.Data;
 
 namespace PoAssistant.Front.Services;
 
-public class ThreadMoaMoeService : IDisposable
+public class ThreadMetierPoService : IDisposable
 {
     private ThreadModel messages = null!;
     public event Action? OnThreadChanged = null;
     private bool isWaitingForLLM = false;
-    public const string endMoeTag = "[FIN_MOE_ASSIST]";
+    public const string endPoTag = "[FIN_PO_ASSIST]";
 
-    public ThreadMoaMoeService()
+    public ThreadMetierPoService()
     {
         if (messages is null)
         {
-            messages = new ThreadModel("MOA", string.Empty, true);
+            messages = new ThreadModel("Métier", string.Empty, true);
             isWaitingForLLM = false;
         }
     }
 
-    public ThreadModel GetMoeMoaThread()
+    public ThreadModel GetPoMetierThread()
     {
         return messages!;
     }
@@ -38,36 +38,36 @@ public class ThreadMoaMoeService : IDisposable
         messages!.Add(newMessage);
         CheckNeedToModifyLastMessage();
 
-        if (newMessage.Source == "MOA")
+        if (newMessage.Source == "Métier")
             isWaitingForLLM = false;
 
         OnThreadChanged?.Invoke();
     }
 
-    public void DeleteMoaMoeThread()
+    public void DeleteMetierPoThread()
     {
         messages = new ThreadModel();
         isWaitingForLLM = false;
         OnThreadChanged?.Invoke();
     }
 
-    public void EndMoaMoaExchange()
+    public void EndMetierMetierExchange()
     {
 
-        messages!.Add(new MessageModel("MOE", "Le PO a maintenant rédigé la User Story et défini les use cases.", 0, true));
+        messages!.Add(new MessageModel("PO", "Le PO a maintenant rédigé la User Story et défini les use cases.", 0, true));
         isWaitingForLLM = false;
         OnThreadChanged?.Invoke();
     }
 
     private void CheckNeedToModifyLastMessage()
     {
-        // Change end message of MOE & make it editable by user
+        // Change end message of PO & make it editable by user
         if (messages != null && messages.Any())
         {
-            if (messages!.Last().Source == "MOE" &&(messages!.Last().Content.Contains(endMoeTag) || messages!.Last().Content.StartsWith("Merci")))
+            if (messages!.Last().Source == "PO" &&(messages!.Last().Content.Contains(endPoTag) || messages!.Last().Content.StartsWith("Merci")))
             {
                 messages!.Last().ChangeContent("Merci. Nous avons fini, j'ai tous les éléments dont j'ai besoin. Avez-vous d'autres points à aborder ?");
-                messages.Add(new MessageModel("MOA", "Ajouter des points à aborder avec le MOE si vous le souhaitez. Sinon, cliquez 'Envoyer' pour passez à l'étape de rédaction de l'US", 0));
+                messages.Add(new MessageModel("Métier", "Ajouter des points à aborder avec le PO si vous le souhaitez. Sinon, cliquez 'Envoyer' pour passez à l'étape de rédaction de l'US", 0));
                 isWaitingForLLM = false;
             }
 
@@ -89,29 +89,29 @@ public class ThreadMoaMoeService : IDisposable
             messages!.Last().ChangeContent(string.Empty);
     }
 
-    public void ValidateMoaAnswer()
+    public void ValidateMetierAnswer()
     {
         if (!messages?.Any() ?? true)
             return;
 
         if (messages!.Count() == 1)
-            SaveMoaNeed();
+            SaveMetierBrief();
         else
-            SaveMoaAnswer();
+            SaveMetierAnswer();
     }
 
-    private void SaveMoaNeed()
+    private void SaveMetierBrief()
     {
-        var needFilePath = "..\\..\\need.txt";
+        var needFilePath = "..\\..\\Shared\\brief.txt";
         messages!.Last().IsSavedMessage = true;
         File.WriteAllText(needFilePath, messages!.Single().Content);
     }
 
-    private void SaveMoaAnswer()
+    private void SaveMetierAnswer()
     {
-        var filePath = "..\\..\\moa_answer.txt";
-        if (messages == null || messages.Last().Source != "MOA")
-            throw new Exception("Le dernier message n'est pas présent ou n'est pas du MOA");
+        var filePath = "..\\..\\Shared\\moa_answer.txt";
+        if (messages == null || messages.Last().Source != "Métier")
+            throw new Exception("Le dernier message n'est pas présent ou n'est pas du Métier");
      
         messages!.Last().IsSavedMessage = true;
         File.WriteAllText(filePath, messages!.Last().Content);

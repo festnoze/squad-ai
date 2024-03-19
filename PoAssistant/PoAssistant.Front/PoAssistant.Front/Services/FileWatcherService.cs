@@ -20,8 +20,8 @@ public class FileWatcherService : IDisposable
     }
 
 
-    // Obsolete: Load the json file containing the exchange MOE/MOA
-    public ThreadModel LoadMoeMoaExchangeFromFile()
+    // Obsolete: Load the json file containing the exchange PO/Métier
+    public ThreadModel LoadPoMetierExchangeFromFile()
     {
         //if (userStory is not null)
         //    return userStory;

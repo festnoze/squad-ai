@@ -8,7 +8,7 @@ builder.Services.AddServerSideBlazor();
 
 builder.Services.AddControllers();
 
-builder.Services.AddSingleton<ThreadMoaMoeService>();
+builder.Services.AddSingleton<ThreadMetierPoService>();
 builder.Services.AddSingleton<UserStoryService>();
 builder.Services.AddSingleton<NavigationService>();
 
@@ -28,7 +28,7 @@ app.UseRouting();
 
 app.MapBlazorHub();
 
-app.UsePathBase("/MoaMoeExchange");
+app.UsePathBase("/MetierPoExchange");
 app.MapFallbackToPage("/_Host");
 
 app.MapControllers(); // Handle proxy API controllers

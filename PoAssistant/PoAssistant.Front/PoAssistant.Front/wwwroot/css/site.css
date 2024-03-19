@@ -241,6 +241,27 @@ html, body {
         transform: translateY(4px); /* Slight push down */
     }
 
+.notification {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    background-color: #ff4a31cc;
+    color: white;
+    padding: 15px; /* Augmentez le padding pour plus d'espace autour du texte */
+    border-radius: 5px;
+    z-index: 1000;
+    box-shadow: 0px 0px 10px rgba(0,0,0,0.5);
+    display: flex; /* Utilisez flexbox pour aligner l'icône et le texte */
+    align-items: center; /* Centre verticalement l'icône et le texte */
+}
+
+    .notification .oi {
+        margin-right: 10px; /* Ajoute un espace entre l'icône et le texte */
+        font-size: 1.5em; /* Ajuste la taille à 1.5 fois la taille normale */
+    }
+
+
+
 
 
 

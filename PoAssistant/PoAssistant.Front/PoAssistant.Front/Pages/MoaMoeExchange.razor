@@ -1,11 +1,11 @@
-﻿@page "/MoaMoeExchange"
+﻿@page "/MetierPoExchange"
 @using PoAssistant.Front.Data
 @using PoAssistant.Front.Services
-@inject ThreadMoaMoeService threadService
+@inject ThreadMetierPoService threadService
 
 <PageTitle>Weather forecast</PageTitle>
 
-<h1>Assistant Product Owner: Atelier de conception MOE/MOA</h1>
+<h1>Assistant Product Owner: Atelier de conception PO/Métier</h1>
 
 @if (messages == null)
 {
@@ -28,6 +28,6 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        messages = threadService.GetMoeMoaThread();
+        messages = threadService.GetPoMetierThread();
     }
 }
