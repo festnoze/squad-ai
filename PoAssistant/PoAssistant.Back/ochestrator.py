@@ -11,11 +11,16 @@ class assistants_ochestrator:
         self.max_exchanges_count = max_exchanges_count
 
     async def perform_workflow_async(self):  
-        self.delete_all_outputs()
+        self.delete_all_outputs()        
+        print("Waiting for front-end connection establishment .....")
         front_client.ping_front_until_responding()
         front_client.delete_all_metier_po_thread()
+        print("Communication with front-end established!!!")
 
-        self.request_message = misc.wait_brief_file_creation_and_return()
+        self.create_assistants()
+        self.print_assistants_ids()
+
+        self.request_message = front_client.wait_brief_creation_and_get()
         print(f"Description initiale de l'objectif : {self.request_message}")
                 
         self.do_metier_po_exchanges()
@@ -37,6 +42,8 @@ class assistants_ochestrator:
             counter += 1
             if counter > self.max_exchanges_count:
                 return
+            if business_response.__contains__("[ENDS_EXCHANGE]"):
+                return
             
             # Pass to PO latest business expert's answer (or the need / brief on first) & run:
             run_result = ai.add_message_and_run(self.po_moe_assistant_set, business_response) 
@@ -47,9 +54,10 @@ class assistants_ochestrator:
 
             front_client.post_new_metier_or_po_answer(message_json)
 
-            if self.need_for_stop(po_moe_response, run_result, True):
-                return
-            
+            if po_moe_response.__contains__("[FIN_PO_ASSIST]"):
+                business_response = front_client.wait_metier_answer_validation_and_get() 
+                continue
+                
             # Pass to business expert latest PO questions & run:
             moa_message = f"Ci-après sont les questions du PO auxquelles tu dois répondre : \n{po_moe_response}"
             run_result = ai.add_message_and_run(self.business_assistant_set, moa_message)
@@ -58,12 +66,8 @@ class assistants_ochestrator:
             message_json = misc.get_message_as_json("Métier", business_response, elapsed_seconds)
             print(f"({elapsed_seconds}s.) Métier : \n{business_response}\n") 
             
-            front_client.post_new_metier_or_po_answer(message_json)
-            
-            business_response = misc.wait_metier_answer_file_creation_and_return()       
-
-            # if self.need_for_stop(business_response, run_result, False):
-            #     return
+            front_client.post_new_metier_or_po_answer(message_json)            
+            business_response = front_client.wait_metier_answer_validation_and_get()
 
     def create_po_us_and_usecases(self):
         po_business_thread_json_str = ai.get_all_messages_as_json(self.business_assistant_set)
@@ -126,17 +130,7 @@ class assistants_ochestrator:
         acceptance_criteria = misc.array_to_bullet_list_str(usecase_json['acceptance_criteria'])
         qa_message = qa_init_message.format(use_case= use_case, acceptance_criteria= acceptance_criteria)
         return qa_message
-        
-    
-    def need_for_stop(self, po_response, result, check_for_questions):
-        if po_response.__contains__("[FIN_PO_ASSIST]"):
-            business_response = misc.wait_metier_answer_file_creation_and_return() 
-            if business_response.__contains__("[ENDS_EXCHANGE]"):
-                return True
-            else:
-                return False
-    
-    
+            
     def save_qa_acceptance_tests(self, threads_ids):
         i = 1
         for thread_id in threads_ids:
@@ -164,9 +158,6 @@ class assistants_ochestrator:
         file.delete_folder_contents(misc.sharedFolder)
         file.delete_all_files_with_extension("*.feature", "AcceptanceTests")
         file.delete_all_files_with_extension("*StepDefinitions.cs", "AcceptanceTests")
-        file.delete_file(misc.brief_file_path)
-        file.delete_file(misc.metier_answer_file_path)
-
     
     def create_check_end_assistant(self):
         self.check_end_assistant = ai.create_assistant_set(

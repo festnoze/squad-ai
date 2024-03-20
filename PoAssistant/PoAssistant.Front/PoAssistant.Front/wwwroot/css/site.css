@@ -47,7 +47,10 @@ html, body {
     margin-bottom: 35px;
     margin-left: 15px;
     margin-right: 15px;
-    padding: 15px;
+    padding-left: 15px;
+    padding-right: 15px;
+    padding-top: 15px;
+    padding-bottom: 43px;
     color: #333;
     border-radius: 10px;
     box-shadow: 0 12px 15px rgba(100, 100, 100, 0.3);
@@ -139,6 +142,7 @@ html, body {
     display: flex;
     justify-content: center;
     align-items: center;
+    padding-top: 20px;
 }
 
 .circle {
@@ -187,8 +191,8 @@ html, body {
 
 .edit-button {
     position: absolute;
-    right: 68px;
-    bottom: 0px;
+    right: 64px;
+    bottom: 2px;
     background-color: #ffcc40;
     border: none; /* Remove borders */
     color: white; /* White text */
@@ -218,8 +222,8 @@ html, body {
 
 .next-button {
     position: absolute;
-    right: 4px;
-    bottom: 0px;
+    right: 0px;
+    bottom: 2px;
     background-color: #57cc49;
     border: none; /* Remove borders */
     color: white; /* White text */
@@ -250,8 +254,8 @@ html, body {
 
 .end-exchange-button {
     position: absolute;
-    right: 4px;
-    bottom: 0px;
+    right: 0px;
+    bottom: 2px;
     background-color: #ff6961;
     border: none;
     color: white;

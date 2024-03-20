@@ -10,6 +10,8 @@ from AssistantSet import AssistantSet
 from file import file
 
 class ai:    
+    timeout_tag = "[LLM_REQUEST_TIMEOUT]"
+
     def max_allowed_run_seconds(assistant_set):
         return assistant_set.timeout_seconds
 
@@ -116,7 +118,7 @@ class ai:
             return  f"Error while waiting for the runner to respond" #: {ex.with_traceback}"
         
         if result == ai.RunResult.TIMEOUT:
-            return f"Runner has timeout. Took more than: {ai.max_allowed_run_seconds(assistant_set)}s. to proceed"
+            return f"Runner has timeout. Took more than: {ai.max_allowed_run_seconds(assistant_set)}s. to proceed {ai.timeout_tag}"
             
     def get_last_answer(assistant_set):
         return ai.get_last_thread_answer(assistant_set.thread.id)

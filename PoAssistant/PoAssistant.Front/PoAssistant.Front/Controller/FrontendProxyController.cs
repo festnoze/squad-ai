@@ -17,6 +17,26 @@ public class FrontendProxyController
     private readonly ThreadMetierPoService _threadService;
     private readonly UserStoryService _userStoryService;
 
+    /// <summary>
+    /// Send the brief if ready, or an empty string otherwise
+    /// </summary>
+    /// <returns></returns>
+    [HttpGet("metier/brief")]
+    public string GetMetierBriefIfReady()
+    {
+        return _threadService.GetMetierBriefIfReady();
+    }
+
+    /// <summary>
+    /// Send the latest business expert answer if validated, or an empty string otherwise
+    /// </summary>
+    /// <returns></returns>
+    [HttpGet("metier/last-answer")]
+    public string GetLatestBusinessExpertAnswerIfValidated()
+    {
+        return _threadService.GetLatestBusinessExpertAnswerIfValidated();
+    }
+
     [HttpPost("metier-po/new-message")]
     public void NewMetierPoMessage([FromBody] MessageModel newMessage)
     {

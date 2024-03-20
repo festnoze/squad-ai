@@ -5,8 +5,6 @@ from datetime import datetime
 
 class misc: 
     sharedFolder = "..\\Shared"
-    brief_file_path = f"{sharedFolder}\\brief.txt"
-    metier_answer_file_path = f"{sharedFolder}\\metier_answer.txt"
 
     def pause(duration):        
         time.sleep(duration)
@@ -89,24 +87,6 @@ class misc:
                     "duration": duration
                 }
     
-    def wait_brief_file_creation_and_return():
-        sleep_interval = 2
-        file.delete_file(misc.brief_file_path)
-        while file.file_exists(misc.brief_file_path) == False:
-            misc.pause(sleep_interval)
-
-        brief_str = file.get_as_str(misc.brief_file_path)
-        file.delete_file(misc.brief_file_path)
-        return brief_str
-
-    def wait_metier_answer_file_creation_and_return():
-        sleep_interval = 1 
-        while file.file_exists(misc.metier_answer_file_path) == False:
-            misc.pause(sleep_interval)
-        metier_answer_str = file.get_as_str(misc.metier_answer_file_path)
-        file.delete_file(misc.metier_answer_file_path)
-        return metier_answer_str
-
     def output_parser_gherkin(feature_content: str):
         return feature_content.replace(" :", ":").replace("gherkin", "").replace("Feature:", "Fonctionnalité:").replace("Scenario:", "Scénario:")
                 

@@ -32,7 +32,8 @@
                 @if (!IsEditingMode(message))
                 {
                     @* Display message for reading *@
-                    @message.Content
+                    @message.Content.Replace("[ENDS_EXCHANGE]", "- Fin de l'échange -")
+
                     @if (DisplayEditingButtons(message))
                     {
                         @* Display reading actions buttons*@
@@ -136,7 +137,7 @@
 
     private bool DisplayEditingButtons(MessageModel message)
     {
-        return !isEditingLastMessage && !isWaitingForLLM && message.IsLastThreadMessage;
+        return !isEditingLastMessage && !isWaitingForLLM && message.IsLastThreadMessage && !message.IsSavedMessage;
     }
 
     private bool IsEditingMode(MessageModel message)

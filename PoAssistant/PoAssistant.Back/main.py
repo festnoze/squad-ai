@@ -28,11 +28,8 @@ async def main():
     #Start the ochestrator workflow        
     orchestrator = assistants_ochestrator(max_exchanges_count)
     try:
-        orchestrator.create_assistants()
-        orchestrator.print_assistants_ids()        
-
         await orchestrator.perform_workflow_async()
-
+        
     except Exception as ex:
         print(ex)
     finally:    

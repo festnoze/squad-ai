@@ -7,6 +7,8 @@ class front_client:
     host_uri = "http://localhost:5132"
     frontend_proxy_subpath = "FrontendProxy"
 
+    metier_brief_url_get = "metier/brief"
+    validated_metier_answer_url_get = "metier/last-answer"
     new_metier_po_message_url_post = "metier-po/new-message"
     new_metier_po_message_url_post = "metier-po/new-message"
     delete_metier_po_thread_url_delete = "metier-po/delete-all"
@@ -25,7 +27,37 @@ class front_client:
             return front_client.does_request_succeed(response) and response.text == "pong"
         except Exception:
             return False
+    
+    def get_metier_brief_if_ready():        
+        url = f"{front_client.host_uri}/{front_client.frontend_proxy_subpath}/{front_client.metier_brief_url_get}"
+        response = requests.get(url)
+        if front_client.does_request_succeed(response):
+            return response.text
+        return ""
 
+    def wait_brief_creation_and_get():
+        sleep_interval = 2
+        brief_str = front_client.get_metier_brief_if_ready()
+        while brief_str == "":
+            misc.pause(sleep_interval)
+            brief_str = front_client.get_metier_brief_if_ready()
+        return brief_str
+    
+    def get_validated_metier_answer_if_ready():        
+        url = f"{front_client.host_uri}/{front_client.frontend_proxy_subpath}/{front_client.validated_metier_answer_url_get}"
+        response = requests.get(url)
+        if front_client.does_request_succeed(response):
+            return response.text
+        return ""
+
+    def wait_metier_answer_validation_and_get():
+        sleep_interval = 2
+        metier_answer_str = front_client.get_validated_metier_answer_if_ready()
+        while metier_answer_str == "":
+            misc.pause(sleep_interval)
+            metier_answer_str = front_client.get_validated_metier_answer_if_ready()
+        return metier_answer_str
+    
     def post_new_metier_or_po_answer(message_json):
         url = f"{front_client.host_uri}/{front_client.frontend_proxy_subpath}/{front_client.new_metier_po_message_url_post}"        
         headers = {'Content-Type': 'application/json'}

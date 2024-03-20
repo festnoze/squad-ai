@@ -25,6 +25,29 @@ public class ThreadMetierPoService : IDisposable
         }
     }
 
+    public string GetMetierBriefIfReady()
+    {
+        if (messages is null ||
+            !messages.Any() || 
+            !messages!.First().IsSavedMessage || 
+            messages!.First().Content.Length < 1)
+            return string.Empty;
+
+        return messages!.First().Content;
+    }
+
+    public string GetLatestBusinessExpertAnswerIfValidated()
+    {
+        if (messages == null ||
+            !messages.Any() ||
+            messages.Last().Source != "Métier" ||
+            !messages!.Last().IsSavedMessage ||
+            messages!.Last().Content.Length < 1)
+            return string.Empty;
+
+        return messages!.Last().Content;
+    }
+
     public ThreadModel GetPoMetierThread()
     {
         return messages!;
@@ -40,6 +63,7 @@ public class ThreadMetierPoService : IDisposable
         if (messages is null)
             messages = new ThreadModel();
 
+        newMessage.IsSavedMessage = false;
         messages!.Add(newMessage);
 
         isWaitingForLLM = IsWaiting();
@@ -112,38 +136,8 @@ public class ThreadMetierPoService : IDisposable
     {
         if (!messages?.Any() ?? true)
             return;
-
-        if (messages!.Count() == 1)
-            SaveMetierBrief();
-        else
-            SaveMetierAnswer();
-    }
-
-    private void SaveMetierBrief()
-    {
-        var sharedFolderPath = "..\\..\\Shared";
-        var needFilePath = $"{sharedFolderPath}\\brief.txt";
-
-        if (!Directory.Exists(sharedFolderPath))
-            Directory.CreateDirectory(sharedFolderPath);
         
-        File.WriteAllText(needFilePath, messages!.Single().Content);
         messages!.Last().IsSavedMessage = true;
-    }
-
-    private void SaveMetierAnswer()
-    {
-        if (messages == null || messages.Last().Source != "Métier")
-            throw new Exception("Le dernier message n'est pas présent ou n'est pas du Métier");
-
-        messages!.Last().IsSavedMessage = true;
-        SaveBusinessAnswer(messages!.Last().Content);
-    }
-
-    private void SaveBusinessAnswer(string content)
-    {
-        var filePath = "..\\..\\Shared\\metier_answer.txt";
-        File.WriteAllText(filePath, content);
     }
 
     public event Action? UserStoryReadyNotification;
@@ -155,9 +149,11 @@ public class ThreadMetierPoService : IDisposable
 
     public void DoEndBusinessPoExchange()
     {
-        SaveBusinessAnswer("[ENDS_EXCHANGE]");
+        messages.Last().Content = "[ENDS_EXCHANGE]";
+        messages.Last().IsSavedMessage = true;
     }
 
     public void Dispose()
-    {}
+    {
+    }
 }
