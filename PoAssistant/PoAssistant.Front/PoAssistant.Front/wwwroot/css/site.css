@@ -302,7 +302,7 @@ html, body {
     bottom: 20px;
     background-color: #4CAF50;
     color: white;
-    padding: 15px;
+    padding: 25px;
     border-radius: 5px;
     z-index: 1000;
     box-shadow: 0px 0px 10px rgba(0,0,0,0.5);
@@ -316,6 +316,18 @@ html, body {
         font-size: 1.5em; /* Ajuste la taille à 1.5 fois la taille normale */
     }
 
+    .user-story-notification .close-btn {
+        position: absolute;
+        top: 0px;
+        right: 6px;
+        cursor: pointer;
+        font-size: 20px; /* Taille de la croix */
+    }
+
+        /* Optionnel : Ajouter un effet au survol pour la croix */
+        .user-story-notification .close-btn:hover {
+            color: #f44336; /* Changez la couleur au survol */
+        }
 
 
 

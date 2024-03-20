@@ -1,0 +1,53 @@
+{
+    "us_desc": "En tant qu'utilisateur de la plateforme LMS, je souhaiterais que mes noms et prénoms soient affichés de manière appropriée en fonction de mon rôle et des paramètres de confidentialité, afin de personnaliser mon expérience sur la plateforme, faciliter la communication et l'interaction avec les autres membres, et renforcer le sentiment d'appartenance à la communauté d'apprentissage.",
+    "use_cases": [
+        {
+            "uc_desc": "Affichage des noms et prénoms sur la page de connexion/accueil",
+            "acceptance_criteria": [
+                "Les noms et prénoms complets doivent être visibles pour tous les utilisateurs lors de la connexion/accueil.",
+                "Un message de bienvenue personnalisé doit être présenté en utilisant le nom complet de l'utilisateur."
+            ]
+        },
+        {
+            "uc_desc": "Affichage des noms dans les profils utilisateurs",
+            "acceptance_criteria": [
+                "Les apprenants doivent voir seulement leur nom complet dans leur profil, mais ont accès au nom et initiale du prénom des autres dans contextes sécurisés.",
+                "Les enseignants peuvent voir les noms complets de tous leurs apprenants dans les profils.",
+                "Les administrateurs ont accès aux noms complets de tous les utilisateurs.",
+                "Les utilisateurs doivent pouvoir configurer la visibilité de leur nom complet dans les paramètres de confidentialité."
+            ]
+        },
+        {
+            "uc_desc": "Visualisation des noms dans les listes de classe et forums",
+            "acceptance_criteria": [
+                "Les apprenants voient le nom et l'initiale du prénom de leurs pairs.",
+                "Les enseignants et administrateurs voient les noms complets dans les listes de classe et forums.",
+                "La visibilité du nom complet est conditionnée par les paramètres de vie privée de l'utilisateur."
+            ]
+        },
+        {
+            "uc_desc": "Gestion du consentement utilisateur pour l'affichage des noms",
+            "acceptance_criteria": [
+                "Un processus d'onboarding doit être présent pour les nouveaux utilisateurs avec explicitation des options de consentement.",
+                "Une notification doit être envoyée aux utilisateurs existants pour les inviter à revoir leurs paramètres de confidentialité.",
+                "Les utilisateurs doivent pouvoir modifier à tout moment leurs préférences de visibilité dans les paramètres de confidentialité."
+            ]
+        },
+        {
+            "uc_desc": "Interaction et accès aux profils via les listes de classe et les espaces de discussion",
+            "acceptance_criteria": [
+                "Les utilisateurs doivent pouvoir accéder au profil d'un autre membre en cliquant sur son nom, si les permissions et les paramètres de confidentialité le permettent.",
+                "Les membres d'un même groupe de travail ou de classe ont la permission de voir le profil des autres membres.",
+                "Les fonctionnalités spécifiques pour l'envoi de messages privés doivent respecter les paramètres de confidentialité."
+            ]
+        },
+        {
+            "uc_desc": "Recueil de feedbacks post-implémentation",
+            "acceptance_criteria": [
+                "Des enquêtes en ligne et forums de discussion doivent être mis en place pour collecter les avis des utilisateurs.",
+                "Des sessions de retours utilisateur doivent être organisées régulièrement.",
+                "L'analyse des feedbacks est essentielle pour évaluer l'impact des fonctionnalités sur l'expérience utilisateur."
+            ]
+        }
+    ]
+}
