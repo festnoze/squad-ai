@@ -7,12 +7,14 @@ html, body {
 /* Container for chat and input */
 .chat-wrapper {
     max-width: none; /* Allowing the container to expand */
+    min-width: 450px;
     resize: horizontal; /* Make the container resizable */
     overflow: auto; /* Ensuring the content fits within the resized container */
     border: 1px solid #d3d3d3;
     border-radius: 10px;
     margin: 20px auto;
     padding-bottom: 10px; /* Space for the input area at the bottom */
+    box-shadow: 0 12px 15px rgba(100, 100, 100, 0.3);
 }
 
 /* Chat container */
@@ -44,13 +46,10 @@ html, body {
 .message-bubble {
     position: relative;
     width: 80%;
-    margin-bottom: 35px;
+    margin-bottom: 25px;
     margin-left: 15px;
     margin-right: 15px;
-    padding-left: 15px;
-    padding-right: 15px;
-    padding-top: 15px;
-    padding-bottom: 43px;
+    padding: 15px;
     color: #333;
     border-radius: 10px;
     box-shadow: 0 12px 15px rgba(100, 100, 100, 0.3);
@@ -311,22 +310,23 @@ html, body {
 }
 
     .user-story-notification .oi {
-        top: -3px;
+        top: -1px;
         margin-right: 10px; /* Ajoute un espace entre l'icône et le texte */
-        font-size: 1.5em; /* Ajuste la taille à 1.5 fois la taille normale */
+        font-size: 1.3em; /* Ajuste la taille à 1.5 fois la taille normale */
     }
 
     .user-story-notification .close-btn {
+        color: #dcdcdc;
         position: absolute;
         top: 0px;
-        right: 6px;
+        right: 10px;
         cursor: pointer;
         font-size: 20px; /* Taille de la croix */
     }
 
         /* Optionnel : Ajouter un effet au survol pour la croix */
         .user-story-notification .close-btn:hover {
-            color: #f44336; /* Changez la couleur au survol */
+            color: #ffffff; /* Changez la couleur au survol */
         }
 
 

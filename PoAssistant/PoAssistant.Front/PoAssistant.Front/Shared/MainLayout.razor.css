@@ -40,21 +40,9 @@ main {
         margin-left: 0;
     }
 }
-
-.sidebar {
-    background-image: linear-gradient(150deg, rgb(140, 164, 187) 25%, rgb(208, 240, 255) 100%);
-}
-
 @media (min-width: 641px) {
     .page {
         flex-direction: row;
-    }
-
-    .sidebar {
-        width: 390px;
-        height: 100vh;
-        position: sticky;
-        top: 0;
     }
 
     .top-row {

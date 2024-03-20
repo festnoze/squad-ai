@@ -27,8 +27,7 @@
             </div>
             
             @* Display message bubble & its content *@
-            <div class="@($"message-bubble {(message.IsSender ? "message-sender" : "message-receiver")}")">
-
+            <div class="@($"message-bubble {(message.IsSender ? "message-sender" : "message-receiver")}")" style="@(DisplayEditingButtons(message) ? "padding-bottom: 35px;" : "")">
                 @if (!IsEditingMode(message))
                 {
                     @* Display message for reading *@
@@ -50,8 +49,7 @@
                             }
                         </div>
                     }
-                }
-                
+                }                
                 @if (IsEditingMode(message))
                 {
                     @* Display message for editing *@

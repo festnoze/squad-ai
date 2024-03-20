@@ -1,39 +1,49 @@
-﻿<div class="top-row ps-3 navbar navbar-dark">
-    <div class="container-fluid">
-        <a class="navbar-brand" href="">Assistant spécification fonctionnelle</a>
-        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
-            <span class="navbar-toggler-icon"></span>
-        </button>
+﻿<div class="sidebar @(isMenuReduced ? "menu-reduced" : "")">
+    <div class="top-row ps-3 navbar navbar-dark">
+        <div style="padding-top: 5px;">
+            <span class="oi oi-double-quote-serif-right" style="color: #1e8a56; font-size: 1.9rem; top: -5px; padding-left: 8px;" />
+            <a class="navbar-brand">@(!isMenuReduced ? "Assistant cadrage" : "")</a>
+            <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
     </div>
-</div>
 
-<div class="@NavMenuCssClass" @onclick="ToggleNavMenu">
-    <nav class="flex-column">
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                <span class="oi oi-people" aria-hidden="true"></span> Métier/PO: définition du besoin
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="po">
-                <span class="oi oi-file" aria-hidden="true"></span> PO: Rédaction de l'US
-            </NavLink>
-        </div>
-        <div class="nav-item px-3">
-            <NavLink class="nav-link" href="qa">
-                <span class="oi oi-check" aria-hidden="true"></span> QA: Rédaction tests acceptance
-            </NavLink>
-        </div>
-    </nav>
+    <div @onclick="ToggleNavMenu">
+        <div class="toggle-menu" @onclick="ToggleMenuSize"></div>
+        <nav class="flex-column">
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                    <span class="oi oi-people" aria-hidden="true"></span>@(!isMenuReduced ? "Métier/PO: définition du besoin" : "")
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="po">
+                    <span class="oi oi-file" aria-hidden="true"></span> @(!isMenuReduced ? "PO: Rédaction de l'US" : "")
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="qa">
+                    <span class="oi oi-check" aria-hidden="true"></span> @(!isMenuReduced ? "QA: Rédaction tests acceptance" : "")
+                </NavLink>
+            </div>
+        </nav>
+    </div>
 </div>
 
 @code {
     private bool collapseNavMenu = true;
+    private bool isMenuReduced = false; // Ajout pour gérer l'état réduit/étendu
 
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
 
     private void ToggleNavMenu()
     {
         collapseNavMenu = !collapseNavMenu;
+    }
+
+    private void ToggleMenuSize()
+    {
+        isMenuReduced = !isMenuReduced;
     }
 }
