@@ -13,7 +13,12 @@ public class ThreadMetierPoService : IDisposable
 
     public ThreadMetierPoService()
     {
-        if (messages is null)
+        InitializeThread();
+    }
+
+    private void InitializeThread()
+    {
+        if (messages is null || !messages.Any())
         {
             messages = new ThreadModel("Métier", string.Empty, true);
             isWaitingForLLM = false;
@@ -36,10 +41,9 @@ public class ThreadMetierPoService : IDisposable
             messages = new ThreadModel();
 
         messages!.Add(newMessage);
-        CheckNeedToModifyLastMessage();
 
-        if (newMessage.Source == "Métier")
-            isWaitingForLLM = false;
+        isWaitingForLLM = IsWaiting();
+        RefreshLastMessageInThread();
 
         OnThreadChanged?.Invoke();
     }
@@ -47,30 +51,45 @@ public class ThreadMetierPoService : IDisposable
     public void DeleteMetierPoThread()
     {
         messages = new ThreadModel();
-        isWaitingForLLM = false;
+        InitializeThread();
         OnThreadChanged?.Invoke();
     }
 
     public void EndMetierMetierExchange()
     {
-
         messages!.Add(new MessageModel("PO", "Le PO a maintenant rédigé la User Story et défini les use cases.", 0, true));
         isWaitingForLLM = false;
+        NotifyForUserStoryReady();
         OnThreadChanged?.Invoke();
     }
 
-    private void CheckNeedToModifyLastMessage()
+    private bool IsWaiting()
     {
-        // Change end message of PO & make it editable by user
         if (messages != null && messages.Any())
         {
-            if (messages!.Last().Source == "PO" &&(messages!.Last().Content.Contains(endPoTag) || messages!.Last().Content.StartsWith("Merci")))
+            // Change end message of PO & make it editable by user
+            if (messages!.Last().IsSender)
             {
-                messages!.Last().ChangeContent("Merci. Nous avons fini, j'ai tous les éléments dont j'ai besoin. Avez-vous d'autres points à aborder ?");
-                messages.Add(new MessageModel("Métier", "Ajouter des points à aborder avec le PO si vous le souhaitez. Sinon, cliquez 'Envoyer' pour passez à l'étape de rédaction de l'US", 0));
-                isWaitingForLLM = false;
+                if (messages!.Last().Content.Contains(endPoTag) || !messages!.Last().Content.Contains("?"))
+                {
+                    messages!.Last().ChangeContent("Merci. Nous avons fini, j'ai tous les éléments dont j'ai besoin. Avez-vous d'autres points à aborder ?");
+                    messages.Add(new MessageModel("Métier", "Ajouter des points à aborder avec le PO si vous le souhaitez. Sinon, cliquez 'Envoyer' pour passez à l'étape de rédaction de l'US", 0, false, true));
+                    return false;
+                }
+                return true;
             }
 
+            if (!messages!.Last().IsSender)
+                return false;
+        }
+        
+        return false;
+    }
+
+    private void RefreshLastMessageInThread()
+    {
+        if (messages != null && messages.Any())
+        {
             messages!.RemoveLastThreadMessageFlags();
 
             if (!messages!.Last().IsSender)
@@ -85,7 +104,7 @@ public class ThreadMetierPoService : IDisposable
 
     public void EditingLastMessage()
     {
-        if (messages != null && messages.Count() == 1 && !messages!.Last().IsSavedMessage)
+        if (messages != null && messages.Last().IsEndMessage)
             messages!.Last().ChangeContent(string.Empty);
     }
 
@@ -102,19 +121,41 @@ public class ThreadMetierPoService : IDisposable
 
     private void SaveMetierBrief()
     {
-        var needFilePath = "..\\..\\Shared\\brief.txt";
-        messages!.Last().IsSavedMessage = true;
+        var sharedFolderPath = "..\\..\\Shared";
+        var needFilePath = $"{sharedFolderPath}\\brief.txt";
+
+        if (!Directory.Exists(sharedFolderPath))
+            Directory.CreateDirectory(sharedFolderPath);
+        
         File.WriteAllText(needFilePath, messages!.Single().Content);
+        messages!.Last().IsSavedMessage = true;
     }
 
     private void SaveMetierAnswer()
     {
-        var filePath = "..\\..\\Shared\\moa_answer.txt";
         if (messages == null || messages.Last().Source != "Métier")
             throw new Exception("Le dernier message n'est pas présent ou n'est pas du Métier");
-     
+
         messages!.Last().IsSavedMessage = true;
-        File.WriteAllText(filePath, messages!.Last().Content);
+        SaveBusinessAnswer(messages!.Last().Content);
+    }
+
+    private void SaveBusinessAnswer(string content)
+    {
+        var filePath = "..\\..\\Shared\\metier_answer.txt";
+        File.WriteAllText(filePath, content);
+    }
+
+    public event Action? UserStoryReadyNotification;
+
+    protected virtual void NotifyForUserStoryReady()
+    {
+        UserStoryReadyNotification?.Invoke();
+    }
+
+    public void DoEndBusinessPoExchange()
+    {
+        SaveBusinessAnswer("[ENDS_EXCHANGE]");
     }
 
     public void Dispose()

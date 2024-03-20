@@ -28,8 +28,16 @@
                 @if (AreMetierButtonsVisible(message))
                 {
                     <div class="edit-button-wrapper">
-                        <button @onclick="() => MakeLastMessageEditable()" class="edit-button"><span class="oi oi-pencil"></span></button>
-                        <button @onclick="() => ValidateMetierAnswer()" class="next-button"><span class="oi oi-arrow-right"></span></button>
+                        <button title="Modifier la réponse" @onclick="() => MakeLastMessageEditable()" class="edit-button"><span class="oi oi-pencil"></span></button>
+
+                        @if (!message.IsEndMessage)
+                        {
+                            <button title="Valider la réponse" @onclick="() => ValidateMetierAnswer()" class="next-button"><span class="oi oi-arrow-right"></span></button>
+                        }
+                        else
+                        {
+                            <button title="Terminer l'échange" @onclick="() => DoEndBusinessPoExchange()" class="end-exchange-button"><span class="oi oi-account-login"></span></button>
+                        }
                     </div>
                 }
             </div>
@@ -52,7 +60,7 @@
             <div class="message-source-receiver" style="color:cornflowerblue">@messages.Last().Source</div>
             <div class="message-bubble message-receiver">
                 <textarea @bind="messages.Last().Content" class="message-editable" placeholder="Décrivez ici le besoin à spécifier"></textarea>
-                <button @onclick="() => ValidateMetierAnswer()" class="next-button" style="margin: 0px 0px;"><span class="oi oi-check"></span></button>
+                <button title="Valider la réponse" @onclick="() => ValidateMetierAnswer()" class="next-button" style="margin: 0px 0px;"><span class="oi oi-check"></span></button>
             </div>
         }
     </div> 
@@ -74,6 +82,13 @@
             <span>Impossible d'envoyer un message vide</span>
         </div>
     }
+    @if (showUserStoryNotification)
+    {
+        <div class="user-story-notification">
+            <span class="oi oi-task" aria-hidden="true"></span>
+            <span>La rédaction de la User Story est terminée</span>
+        </div>
+    }
 </div>
 
 <body>
@@ -81,11 +96,12 @@
 
 
 @code {
-    private ThreadModel messages;
+    private ThreadModel messages = null!;
     private ElementReference textAreaElement;
     private bool isWaitingForLLM = true;
     private bool isEditingLastMessage = false;
-    private bool showMessageEmptyError = false;
+    private bool showMessageEmptyError = false; 
+    private bool showUserStoryNotification = false;
 
     protected override async Task OnInitializedAsync()
     {
@@ -93,6 +109,7 @@
         isEditingLastMessage = threadService.IsEditingLastMessage();
         isWaitingForLLM = threadService.IsWaitingForLLM();
         threadService.OnThreadChanged += ReloadThread;
+        threadService.UserStoryReadyNotification += HandleUserStoryReadyNotification;
     }
 
     // private async Task AdjustTextAreaHeight()
@@ -114,13 +131,17 @@
         InvokeAsync(StateHasChanged);
     }
 
+    private void ShowMessageEmptyError()
+    {
+        showMessageEmptyError = true;
+        var task = Task.Delay(4000).ContinueWith(t => { showMessageEmptyError = false; InvokeAsync(StateHasChanged); });        
+    }
+
     private void ValidateMetierAnswer()
     {
         if (string.IsNullOrEmpty(messages.Last().Content))
         {
-            showMessageEmptyError = true;
-            // Optionnel : Ajoutez un délai pour cacher la notification automatiquement
-            var task = Task.Delay(3000).ContinueWith(t => { showMessageEmptyError = false; InvokeAsync(StateHasChanged); });
+            ShowMessageEmptyError();
             return;
         }
 
@@ -130,23 +151,29 @@
         InvokeAsync(StateHasChanged);
     }
 
+    private void DoEndBusinessPoExchange()
+    {
+        isEditingLastMessage = false;
+        isWaitingForLLM = true;
+        threadService.DoEndBusinessPoExchange();
+    }
+
     private void ReloadThread()
     {
         messages = threadService.GetPoMetierThread();
         isWaitingForLLM = threadService.IsWaitingForLLM();
-        
-        // Notify the component to re-render
         InvokeAsync(StateHasChanged);
     }
 
-    // public void NavigateToPo(bool forceLoad = false)
-    // {
-    //     navigationService.Navigate("po", forceLoad);
-    // }
+    private void HandleUserStoryReadyNotification()
+    {
+        showUserStoryNotification = true;
+        InvokeAsync(StateHasChanged);
+    }
 
     public void Dispose()
     {
-        threadService.OnThreadChanged -= ReloadThread;
+        threadService.OnThreadChanged -= ReloadThread; 
+        threadService.UserStoryReadyNotification -= HandleUserStoryReadyNotification;
     }
-
 }

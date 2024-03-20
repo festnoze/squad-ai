@@ -40,9 +40,6 @@ class file:
         with open(full_path, 'w', encoding='utf-8') as file:
             file.write(content)
 
-    def delete_folder(folder_path):
-        if os.path.exists(folder_path):
-            shutil.rmtree(folder_path) # Delete the folder and all its contents
 
     def delete_all_files_with_extension(extension, folder_path):
         files_to_delete = glob.glob(os.path.join(folder_path, f"{extension}"))
@@ -56,3 +53,18 @@ class file:
     def file_exists(filepath):
         return os.path.exists(filepath)
     
+    def delete_folder(folder_path):
+        if os.path.exists(folder_path):
+            shutil.rmtree(folder_path) # Delete the folder and all its contents
+
+    def delete_folder_contents(folder_path):
+        if os.path.exists(folder_path):
+            for filename in os.listdir(folder_path):
+                file_path = os.path.join(folder_path, filename)
+                try:
+                    if os.path.isfile(file_path) or os.path.islink(file_path):
+                        os.unlink(file_path)
+                    elif os.path.isdir(file_path):
+                        shutil.rmtree(file_path)
+                except Exception as e:
+                    print(f'{file_path} deletion failed: {e}')

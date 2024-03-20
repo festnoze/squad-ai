@@ -32,7 +32,7 @@ public class FileWatcherService : IDisposable
 
         var jsonData = File.ReadAllText(jsonFilePath);
         messages = JsonSerializer.Deserialize<ThreadModel>(jsonData);
-       // CheckNeedToModifyLastMessage();
+       // IsWaiting();
 
         return messages ?? new ThreadModel();
     }

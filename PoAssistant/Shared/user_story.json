@@ -1,0 +1,53 @@
+{
+    "us_desc": "En tant qu'utilisateur d'un système de gestion de l'apprentissage (LMS), je souhaite que l'intégration d'un modèle de langage à grande échelle (LLM) améliore mon expérience utilisateur en personnalisant mon apprentissage et en optimisant la gestion des contenus éducatifs. Cette intégration doit viser à rendre la plateforme plus interactive, réactive et adaptative aux besoins spécifiques de chaque utilisateur pour augmenter l'engagement, faciliter la rétention des informations, et rendre le processus d'apprentissage plus efficace et agréable.",
+    "use_cases": [
+        {
+            "uc_desc": "Création automatique de contenus éducatifs personnalisés",
+            "acceptance_criteria": [
+                "Les contenus créés doivent être pertinents pour le parcours d'apprentissage de l'utilisateur.",
+                "Les contenus générés automatiquement doivent s'adapter au niveau de compétence et aux préférences de l'utilisateur.",
+                "L'utilisateur doit pouvoir donner son feedback sur la pertinence des contenus pour améliorer les futures créations."
+            ]
+        },
+        {
+            "uc_desc": "Soutien à la réponse aux questions des apprenants",
+            "acceptance_criteria": [
+                "Les réponses fournies par le LLM doivent être précises et contextualisées par rapport aux questions des apprenants.",
+                "Le système doit être capable de fournir des réponses dans un délai raisonnable, typiquement moins de quelques secondes.",
+                "Si le LLM ne peut pas répondre à la question, il doit orienter l'apprenant vers des ressources supplémentaires ou la possibilité de demander de l'aide à un formateur."
+            ]
+        },
+        {
+            "uc_desc": "Rédaction de résumés de cours pour faciliter la révision",
+            "acceptance_criteria": [
+                "Les résumés doivent capturer les points clés et concepts importants du cours.",
+                "Les résumés doivent être courts, concis et faciles à comprendre.",
+                "Les utilisateurs doivent pouvoir accéder aux résumés depuis l'interface principale du LMS sans difficultés."
+            ]
+        },
+        {
+            "uc_desc": "Génération de questions de quiz personnalisées",
+            "acceptance_criteria": [
+                "Les questions doivent être alignées avec le contenu du cours et le niveau de l'apprenant.",
+                "Le LLM doit proposer divers types de questions (choix multiples, vrai/faux, réponses courtes, etc.) pour évaluer différentes compétences.",
+                "Le système doit fournir un feedback instantané sur les réponses des apprenants pour favoriser l'apprentissage."
+            ]
+        },
+        {
+            "uc_desc": "Analyse des données d'apprentissage et proposition de parcours personnalisés",
+            "acceptance_criteria": [
+                "Le LLM doit analyser les performances passées, les préférences et les interactions de l'utilisateur pour proposer des parcours personnalisés.",
+                "Les propositions de parcours doivent inclure des recommandations de contenus supplémentaires adaptées aux besoins et aux objectifs de l'apprenant.",
+                "Les utilisateurs doivent pouvoir ajuster manuellement leur parcours d'apprentissage basé sur les recommandations du LLM."
+            ]
+        },
+        {
+            "uc_desc": "Offrir des retours adaptatifs basés sur les performances des utilisateurs",
+            "acceptance_criteria": [
+                "Les retours doivent être concrets, constructifs et orientés vers des actions que l'utilisateur peut entreprendre pour améliorer sa compréhension.",
+                "Le système doit reconnaître les progrès de l'utilisateur et adapter les défis et contenus en conséquence.",
+                "Les retours adaptatifs doivent inclure des encouragements personnalisés pour maintenir l'engagement de l'utilisateur."
+            ]
+        }
+    ]
+}

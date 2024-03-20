@@ -1,26 +1,31 @@
 import time
 import json
 from file import file
+from datetime import datetime
 
-class misc:    
+class misc: 
+    sharedFolder = "..\\Shared"
+    brief_file_path = f"{sharedFolder}\\brief.txt"
+    metier_answer_file_path = f"{sharedFolder}\\metier_answer.txt"
+
     def pause(duration):        
         time.sleep(duration)
 
-    def get_formatted_time(duration):
-        return time.strftime("%M:%S", time.gmtime(duration))
+    # def get_formatted_time(duration):
+    #     return time.strftime("%M:%S", time.gmtime(duration))
         
-    def get_elapsed_time_str(began_at_timestamp, ended_at_timestamp): 
-        if not ended_at_timestamp:
-            return "-"       
-        elapsed_time = ended_at_timestamp - began_at_timestamp
-        formatted_elapsed_time = misc.get_formatted_time(elapsed_time)
-        return formatted_elapsed_time
+    # def get_elapsed_time_str(began_at_timestamp, ended_at_timestamp): 
+    #     if not ended_at_timestamp:
+    #         return "-"       
+    #     elapsed_time = ended_at_timestamp - began_at_timestamp
+    #     formatted_elapsed_time = misc.get_formatted_time(elapsed_time)
+    #     return formatted_elapsed_time
         
-    def get_elapsed_time_seconds(began_at_timestamp, ended_at_timestamp): 
+    def get_elapsed_time_seconds(began_at_timestamp: datetime, ended_at_timestamp: datetime): 
         if not ended_at_timestamp:
-            return "-"       
+            return -1      
         elapsed_time = ended_at_timestamp - began_at_timestamp
-        return int(elapsed_time.total_seconds())
+        return elapsed_time
     
     def array_to_bullet_list_str(str_array):
         bullet_point_list_str = ""
@@ -84,23 +89,23 @@ class misc:
                     "duration": duration
                 }
     
-    def wait_need_file_creation_and_return():
+    def wait_brief_file_creation_and_return():
         sleep_interval = 2
-        need_file = "need.txt"
-        file.delete_file(need_file)
-        while file.file_exists("need.txt") == False:
+        file.delete_file(misc.brief_file_path)
+        while file.file_exists(misc.brief_file_path) == False:
             misc.pause(sleep_interval)
 
-        return file.get_as_str(need_file)
+        brief_str = file.get_as_str(misc.brief_file_path)
+        file.delete_file(misc.brief_file_path)
+        return brief_str
 
-    def wait_until_moa_file_is_created():
-        sleep_interval = 1
-        moa_answer_file_name = "moa_answer.txt"   
-        while file.file_exists(moa_answer_file_name) == False:
+    def wait_metier_answer_file_creation_and_return():
+        sleep_interval = 1 
+        while file.file_exists(misc.metier_answer_file_path) == False:
             misc.pause(sleep_interval)
-        moa_answer = file.get_as_str(moa_answer_file_name)
-        file.delete_file(moa_answer_file_name)
-        return moa_answer
+        metier_answer_str = file.get_as_str(misc.metier_answer_file_path)
+        file.delete_file(misc.metier_answer_file_path)
+        return metier_answer_str
 
     def output_parser_gherkin(feature_content: str):
         return feature_content.replace(" :", ":").replace("gherkin", "").replace("Feature:", "Fonctionnalité:").replace("Scenario:", "Scénario:")

@@ -21,16 +21,19 @@ public record MessageModel
 
     public bool IsSavedMessage { get; set; }
 
+    public bool IsEndMessage { get; set; } = false;
+
     public void SetAsLastThreadMessage () => IsLastThreadMessage = true;
     public bool SetAsLNotLastThreadMessage() => IsLastThreadMessage = false;
 
-    public MessageModel(string source, string content, int durationSeconds, bool isSavedMessage = true)
+    public MessageModel(string source, string content, int durationSeconds, bool isSavedMessage = true, bool isEndMessage = false)
     {
         Source = source;
         Content = content;
         DurationSeconds = durationSeconds;
         Timestamp = DateTime.Now;
         IsSavedMessage = isSavedMessage;
+        IsEndMessage = isEndMessage;
     }
 
     public void ChangeContent(string newContent)
