@@ -106,7 +106,7 @@ class assistants_ochestrator:
                 print("Toutes les requètes QA ont maintenant réussi")  
         
         i = 1
-        elapsed_seconds = ai.get_run_duration_seconds(start_time.timestamp(), datetime.now().timestamp())
+        elapsed_seconds = misc.get_elapsed_time_seconds(start_time.timestamp(), datetime.now().timestamp())
         print(f"({elapsed_seconds}s.) QA :\n")
         for thread_id in threads_ids:
             print(f"----- use case {i} ------")

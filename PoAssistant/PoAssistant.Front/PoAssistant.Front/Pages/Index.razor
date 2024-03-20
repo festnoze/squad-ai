@@ -15,8 +15,9 @@
 
 <div class="chat-wrapper">
     <div class="chat-container">
-        @foreach (var message in messages.Where(m => isEditingLastMessage ? !m.IsLastThreadMessage : true))
+        @foreach (var message in messages)
         {
+            @* Display message bubble header *@
             <div class="@($"{(message.IsSender ? "message-source-sender" : "message-source-receiver")}")">
                 @message.Source
                 @if (message.DurationSeconds > 0)
@@ -24,17 +25,41 @@
                     <text>(@message.DurationSeconds s.)</text>
                 }
             </div>
-            <div class="@($"message-bubble {(message.IsSender ? "message-sender" : "message-receiver")}")">@message.Content
-                @if (AreMetierButtonsVisible(message))
-                {
-                    <div class="edit-button-wrapper">
-                        <button title="Modifier la réponse" @onclick="() => MakeLastMessageEditable()" class="edit-button"><span class="oi oi-pencil"></span></button>
+            
+            @* Display message bubble & its content *@
+            <div class="@($"message-bubble {(message.IsSender ? "message-sender" : "message-receiver")}")">
 
-                        @if (!message.IsEndMessage)
-                        {
-                            <button title="Valider la réponse" @onclick="() => ValidateMetierAnswer()" class="next-button"><span class="oi oi-arrow-right"></span></button>
-                        }
-                        else
+                @if (!IsEditingMode(message))
+                {
+                    @* Display message for reading *@
+                    @message.Content
+                    @if (DisplayEditingButtons(message))
+                    {
+                        @* Display reading actions buttons*@
+                        <div class="edit-button-wrapper">
+                            <button title="Modifier la réponse" @onclick="() => EditLastMessage()" class="edit-button"><span class="oi oi-pencil"></span></button>
+
+                            @if (!message.IsEndMessage)
+                            {
+                                <button title="Valider la réponse" @onclick="() => ValidateMetierAnswer()" class="next-button"><span class="oi oi-arrow-right"></span></button>
+                            }
+                            else
+                            {
+                                <button title="Terminer l'échange" @onclick="() => DoEndBusinessPoExchange()" class="end-exchange-button"><span class="oi oi-account-login"></span></button>
+                            }
+                        </div>
+                    }
+                }
+                
+                @if (IsEditingMode(message))
+                {
+                    @* Display message for editing *@
+                    <textarea @bind="message.Content" class="message-editable" placeholder="Décrivez ici le besoin à spécifier"></textarea>
+
+                    @* Display editing actions buttons *@
+                    <div class="edit-button-wrapper">
+                        <button title="Valider la réponse" @onclick="() => ValidateMetierAnswer()" class="next-button" style="@(message.IsEndMessage ? "right: 68px;" : "")"><span class="oi oi-check"></span></button>
+                        @if (message.IsEndMessage)
                         {
                             <button title="Terminer l'échange" @onclick="() => DoEndBusinessPoExchange()" class="end-exchange-button"><span class="oi oi-account-login"></span></button>
                         }
@@ -53,14 +78,6 @@
                     <div class="circle"></div>
                     <div class="circle"></div>
                 </div>
-            </div>
-        }
-        @if (isEditingLastMessage)
-        {
-            <div class="message-source-receiver" style="color:cornflowerblue">@messages.Last().Source</div>
-            <div class="message-bubble message-receiver">
-                <textarea @bind="messages.Last().Content" class="message-editable" placeholder="Décrivez ici le besoin à spécifier"></textarea>
-                <button title="Valider la réponse" @onclick="() => ValidateMetierAnswer()" class="next-button" style="margin: 0px 0px;"><span class="oi oi-check"></span></button>
             </div>
         }
     </div> 
@@ -117,12 +134,17 @@
     //     await JSRuntime.InvokeVoidAsync("adjustTextAreaHeight", textAreaElement);
     // }
 
-    private bool AreMetierButtonsVisible(MessageModel message)
+    private bool DisplayEditingButtons(MessageModel message)
     {
-        return !isWaitingForLLM && !isEditingLastMessage && message.IsLastThreadMessage;
+        return !isEditingLastMessage && !isWaitingForLLM && message.IsLastThreadMessage;
     }
 
-    private void MakeLastMessageEditable()
+    private bool IsEditingMode(MessageModel message)
+    {
+        return isEditingLastMessage && message.IsLastThreadMessage;
+    }
+    
+    private void EditLastMessage()
     {
         isEditingLastMessage = true;
         threadService.EditingLastMessage();

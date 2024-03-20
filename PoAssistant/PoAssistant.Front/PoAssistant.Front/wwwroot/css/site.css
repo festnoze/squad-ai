@@ -188,11 +188,11 @@ html, body {
 .edit-button {
     position: absolute;
     right: 68px;
-    bottom: 4px;
+    bottom: 0px;
     background-color: #ffcc40;
     border: none; /* Remove borders */
     color: white; /* White text */
-    padding: 6px 16px; /* Some padding */
+    padding: 6px 20px;
     margin-left: auto; /* Pushes the button to the right */
     text-align: center; /* Centered text */
     text-decoration: none; /* No underline */
@@ -218,12 +218,12 @@ html, body {
 
 .next-button {
     position: absolute;
-    right: 8px;
-    bottom: 4px;
-    background-color: #4CAF50;
+    right: 4px;
+    bottom: 0px;
+    background-color: #57cc49;
     border: none; /* Remove borders */
     color: white; /* White text */
-    padding: 6px 16px; /* Some padding */
+    padding: 6px 20px;
     margin-left: auto; /* Pushes the button to the right */
     text-align: center; /* Centered text */
     text-decoration: none; /* No underline */
@@ -237,7 +237,7 @@ html, body {
 }
 
     .next-button:hover {
-        background-color: #4bf177; /* Darker shade of green */
+        background-color: #178734; /* Darker shade of green */
         box-shadow: 0 10px 40px 0 rgba(0,0,0,0.24), 0 17px 50px 0 rgba(0,0,0,0.22); /* Deeper shadow on hover */
     }
 
@@ -250,40 +250,40 @@ html, body {
 
 .end-exchange-button {
     position: absolute;
-    right: 8px;
-    bottom: 4px;
+    right: 4px;
+    bottom: 0px;
     background-color: #ff6961;
-    border: none; /* Remove borders */
-    color: white; /* White text */
-    padding: 6px 16px; /* Some padding */
-    margin-left: auto; /* Pushes the button to the right */
-    text-align: center; /* Centered text */
-    text-decoration: none; /* No underline */
-    display: inline-block; /* Allow it to be inline with other elements */
-    font-size: 16px; /* Set font-size */
+    border: none;
+    color: white;
+    padding: 6px 20px;
+    margin-left: auto;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
     margin: 6px 4px;
-    transition: 0.8s; /* 300ms transition effect on hover */
-    border-radius: 18px; /* Rounded corners */
-    box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2); /* Add a shadow effect */
-    cursor: pointer; /* Change mouse pointer on hover */
+    transition: 0.8s;
+    border-radius: 18px;
+    box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2);
+    cursor: pointer;
 }
 
     .end-exchange-button:hover {
         background-color: #ff3d33; /* Darker shade of green */
         box-shadow: 0 10px 40px 0 rgba(0,0,0,0.24), 0 17px 50px 0 rgba(0,0,0,0.22); /* Deeper shadow on hover */
     }
-    }
+
 .notification {
     position: fixed;
     right: 20px;
     bottom: 20px;
     background-color: #ff4a31cc;
     color: white;
-    padding: 15px; /* Augmentez le padding pour plus d'espace autour du texte */
+    padding: 15px;
     border-radius: 5px;
     z-index: 1000;
     box-shadow: 0px 0px 10px rgba(0,0,0,0.5);
-    display: flex; /* Utilisez flexbox pour aligner l'icône et le texte */
+    display: flex; /
     align-items: center; /* Centre verticalement l'icône et le texte */
 }
 
