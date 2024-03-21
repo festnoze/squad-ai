@@ -1,12 +1,15 @@
 using Microsoft.AspNetCore.Mvc;
 using PoAssistant.Front.Data;
 using PoAssistant.Front.Services;
+using System.Text;
+using System.IO;
+using PoAssistant.Front.Helpers;
 
 namespace PoAssistant.Front.Controller;
 
 [ApiController]
 [Route("[controller]")]
-public class FrontendProxyController
+public class FrontendProxyController : ControllerBase
 {
     public FrontendProxyController(ThreadMetierPoService threadService, UserStoryService userStoryService)
     {
@@ -57,6 +60,21 @@ public class FrontendProxyController
         _userStoryService.SetPoUserStory(userStory);
     }
 
+    [HttpPost("metier-po/message-content-stream")]
+    public async Task ReceiveMessageStreamaSYNC(/*[FromBody] IAsyncEnumerable<string> messageChunks*/)
+    {
+        var buffer = new StringBuilder();
+        _threadService.InitStreamMessage();
+        string? newWord = string.Empty;
+        using (var reader = new StreamReader(Request.Body, Encoding.UTF8))
+        {
+            //StreamReaderExtensions.AddNewCharDelimiters(StreamHelper.NewLineForStream);
+            while ((newWord = await reader.ReadWordAsync()) != null)
+            {
+                _threadService.DisplayStreamMessage(newWord);
+            }
+        }
+    }
 
     [HttpGet("ping")]
     public string Ping()

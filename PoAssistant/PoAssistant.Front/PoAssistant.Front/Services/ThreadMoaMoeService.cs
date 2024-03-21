@@ -1,6 +1,7 @@
 using System.Linq;
 using System.Text.Json;
 using PoAssistant.Front.Data;
+using PoAssistant.Front.Helpers;
 
 namespace PoAssistant.Front.Services;
 
@@ -155,5 +156,26 @@ public class ThreadMetierPoService : IDisposable
 
     public void Dispose()
     {
+    }
+
+    public void InitStreamMessage()
+    {
+        if (messages is null)
+            messages = new ThreadModel();
+
+        var newMessage = new MessageModel("test", string.Empty, 0, false);
+        messages!.Add(newMessage);
+
+        isWaitingForLLM = false;
+        RefreshLastMessageInThread();
+    }
+
+    public void DisplayStreamMessage(string? messageChunk)
+    {
+        if (messageChunk != null)
+        {
+            messages!.Last().Content += messageChunk.Replace(StreamHelper.NewLineForStream, StreamHelper.WindowsNewLine);
+            OnThreadChanged?.Invoke();
+        }
     }
 }
