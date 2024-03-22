@@ -7,7 +7,7 @@ public class UserStoryService
 {
     private UserStoryModel? userStory = null;
     public event Action? OnUserStoryChanged = null;
-    public const string endPoTag = "[FIN_PO_ASSIST]";
+    public const string endPmTag = "[FIN_PM_ASSIST]";
     private NavigationService _navigationService;
     public UserStoryService(NavigationService navigationService)
     {

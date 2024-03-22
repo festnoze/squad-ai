@@ -11,7 +11,7 @@ class file:
             filename (str): the name of the file in the current directory
         """
         try:
-            with open(filename, 'r', encoding='utf-8') as file_reader:
+            with open(f"inputs\\{filename}", 'r', encoding='utf-8') as file_reader:
                 content = file_reader.read()
                 return content
         except FileNotFoundError:

@@ -4,6 +4,8 @@ namespace PoAssistant.Front.Data;
 
 public record MessageModel
 {
+    public static string BusinessExpertName = "Métier";
+
     [JsonPropertyName("source")]
     public string Source { get; init; }
 
@@ -15,7 +17,7 @@ public record MessageModel
 
     public DateTime Timestamp { get; init; }
 
-    public bool IsSender => Source == "PO";
+    public bool IsSender => Source != BusinessExpertName;
 
     public bool IsLastThreadMessage { get; private set; } = false;
 

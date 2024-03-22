@@ -45,21 +45,21 @@ class assistants_ochestrator:
             if business_response.__contains__("[ENDS_EXCHANGE]"):
                 return
             
-            # Pass to PO latest business expert's answer (or the need / brief on first) & run:
-            run_result = ai.add_message_and_run(self.po_moe_assistant_set, business_response) 
-            po_moe_response = ai.get_run_result(self.po_moe_assistant_set, run_result)
-            elapsed_seconds = ai.get_run_duration_seconds(self.po_moe_assistant_set.run)
-            message_json = misc.get_message_as_json("PO", po_moe_response, elapsed_seconds)
-            print(f"({elapsed_seconds}s.) PO :\n{po_moe_response}\n")
+            # Pass to PM the latest business expert's answer (or the need / brief on first) & run:
+            run_result = ai.add_message_and_run(self.pm_assistant_set, business_response) 
+            pm_response = ai.get_run_result(self.pm_assistant_set, run_result)
+            elapsed_seconds = ai.get_run_duration_seconds(self.pm_assistant_set.run)
+            message_json = misc.get_message_as_json("PM", pm_response, elapsed_seconds)
+            print(f"({elapsed_seconds}s.) PM :\n{pm_response}\n")
 
             front_client.post_new_metier_or_po_answer(message_json)
 
-            if po_moe_response.__contains__("[FIN_PO_ASSIST]"):
+            if pm_response.__contains__("[FIN_PM_ASSIST]"):
                 business_response = front_client.wait_metier_answer_validation_and_get() 
                 continue
                 
-            # Pass to business expert latest PO questions & run:
-            moa_message = f"Ci-après sont les questions du PO auxquelles tu dois répondre : \n{po_moe_response}"
+            # Pass to business expert latest PM questions & run:
+            moa_message = f"Ci-après sont les questions du PM auxquelles tu dois répondre : \n{pm_response}"
             run_result = ai.add_message_and_run(self.business_assistant_set, moa_message)
             business_response = ai.get_run_result(self.business_assistant_set, run_result)      
             elapsed_seconds = ai.get_run_duration_seconds(self.business_assistant_set.run)
@@ -70,8 +70,8 @@ class assistants_ochestrator:
             business_response = front_client.wait_metier_answer_validation_and_get()
 
     def create_po_us_and_usecases(self):
-        po_business_thread_json_str = ai.get_all_messages_as_json(self.business_assistant_set)
-        po_message = file.get_as_str("po_message_for_us_and_usecases_creation.txt").format(po_business_thread_json= po_business_thread_json_str)
+        pm_business_thread_json_str = ai.get_all_messages_as_json(self.business_assistant_set)
+        po_message = file.get_as_str("po_message_for_us_and_usecases_creation.txt").format(pm_business_thread_json= pm_business_thread_json_str)
         result = ai.add_message_and_run(self.po_assistant_set, po_message)
         if (result == ai.RunResult.SUCCESS):
             elapsed = ai.get_run_duration_seconds(self.business_assistant_set.run)
@@ -150,8 +150,8 @@ class assistants_ochestrator:
         file.write_file(us_and_usecases_json_str, misc.sharedFolder, "user_story.json")
 
     def save_metier_po_exchange(self):
-        messages_json = ai.get_all_messages_as_json(self.po_moe_assistant_set)
-        messages_str = misc.json_to_str(messages_json).replace("\"user\"", "\"Métier\"").replace("\"assistant\"", "\"PO\"")
+        messages_json = ai.get_all_messages_as_json(self.pm_assistant_set)
+        messages_str = misc.json_to_str(messages_json).replace("\"user\"", "\"Métier\"").replace("\"assistant\"", "\"PM\"")
         file.write_file(messages_str, misc.sharedFolder, "BusinessExpert_ProductOwner_Exchanges.json")
         
     def delete_all_outputs(self):
@@ -192,10 +192,10 @@ class assistants_ochestrator:
             run_instructions = "",#file.get_as_str("moa_run_instructions.txt"),
             timeout_seconds= 100
         )
-        po_moe_assistant_instructions = file.get_as_str("po_moe_assistant_instructions.txt").format(max_exchanges_count= self.max_exchanges_count)
-        self.po_moe_assistant_set = ai.create_assistant_set(
+        pm_assistant_instructions = file.get_as_str("pm_assistant_instructions.txt").format(max_exchanges_count= self.max_exchanges_count)
+        self.pm_assistant_set = ai.create_assistant_set(
             model= self.model_gpt_40, 
-            instructions= po_moe_assistant_instructions,
+            instructions= pm_assistant_instructions,
             run_instructions = "",
             timeout_seconds= 50
         )
@@ -214,14 +214,14 @@ class assistants_ochestrator:
 
     def print_assistants_ids(self):
         display.display_ids("Métier", self.business_assistant_set)
-        display.display_ids("PO(MOE)", self.po_moe_assistant_set)
-        display.display_ids("PO(US)",  self.po_assistant_set)
+        display.display_ids("PM", self.pm_assistant_set)
+        display.display_ids("PO",  self.po_assistant_set)
         display.display_ids("QA",  self.qa_assistant_set)
         print("")
 
     def dispose(self):
         try:
-            ai.delete_assistant_set(self.po_moe_assistant_set)
+            ai.delete_assistant_set(self.pm_assistant_set)
             ai.delete_assistant_set(self.business_assistant_set)
             ai.delete_assistant_set(self.po_assistant_set)
             ai.delete_assistant_set(self.qa_assistant_set)

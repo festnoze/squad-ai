@@ -10,7 +10,7 @@ public class ThreadMetierPoService : IDisposable
     private ThreadModel messages = null!;
     public event Action? OnThreadChanged = null;
     private bool isWaitingForLLM = false;
-    public const string endPoTag = "[FIN_PO_ASSIST]";
+    public const string endPmTag = "[FIN_PM_ASSIST]";
 
     public ThreadMetierPoService()
     {
@@ -21,7 +21,7 @@ public class ThreadMetierPoService : IDisposable
     {
         if (messages is null || !messages.Any())
         {
-            messages = new ThreadModel("Métier", string.Empty, true);
+            messages = new ThreadModel(MessageModel.BusinessExpertName, string.Empty, true);
             isWaitingForLLM = false;
         }
     }
@@ -41,7 +41,7 @@ public class ThreadMetierPoService : IDisposable
     {
         if (messages == null ||
             !messages.Any() ||
-            messages.Last().Source != "Métier" ||
+            messages.Last().IsSender ||
             !messages!.Last().IsSavedMessage ||
             messages!.Last().Content.Length < 1)
             return string.Empty;
@@ -82,7 +82,7 @@ public class ThreadMetierPoService : IDisposable
 
     public void EndMetierMetierExchange()
     {
-        messages!.Add(new MessageModel("PO", "Le PO a maintenant rédigé la User Story et défini les use cases.", 0, true));
+        messages!.Add(new MessageModel("PM", "Le PO a maintenant rédigé la User Story et ses 'use cases'.", 0, true));
         isWaitingForLLM = false;
         NotifyForUserStoryReady();
         OnThreadChanged?.Invoke();
@@ -95,10 +95,10 @@ public class ThreadMetierPoService : IDisposable
             // Change end message of PO & make it editable by user
             if (messages!.Last().IsSender)
             {
-                if (messages!.Last().Content.Contains(endPoTag) || !messages!.Last().Content.Contains("?"))
+                if (messages!.Last().Content.Contains(endPmTag) || !messages!.Last().Content.Contains("?"))
                 {
                     messages!.Last().ChangeContent("Merci. Nous avons fini, j'ai tous les éléments dont j'ai besoin. Avez-vous d'autres points à aborder ?");
-                    messages.Add(new MessageModel("Métier", "Ajouter des points à aborder avec le PO si vous le souhaitez. Sinon, cliquez 'Envoyer' pour passez à l'étape de rédaction de l'US", 0, false, true));
+                    messages.Add(new MessageModel(MessageModel.BusinessExpertName, "Ajouter des points à aborder avec le Project Manager si vous le souhaitez. Sinon, cliquez sur le boutton : 'Terminer l'échange' pour passer à l'étape de rédaction de l'US", 0, false, true));
                     return false;
                 }
                 return true;
