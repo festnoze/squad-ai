@@ -1,7 +1,8 @@
 ﻿<div class="sidebar @(isMenuReduced ? "menu-reduced" : "")">
     <div class="top-row ps-3 navbar navbar-dark">
         <div style="padding-top: 5px;">
-            <span class="oi oi-double-quote-serif-right" style="color: #1e8a56; font-size: 1.9rem; top: -5px; padding-left: 8px;" />
+            <span class="oi oi-double-quote-serif-right" style="color: #1e8a56; font-size: 1.9rem; top: -5px; padding-left: 9px;" />
+            <span class="oi oi-double-quote-serif-left" style="color: #aaaaaa; font-size: 2.8rem; top: -15px; left: -26px; @(isMenuReduced ? "opacity: 0.0" : "opacity: 0.1")" />
             <a class="navbar-brand">@(!isMenuReduced ? "Assistant cadrage" : "")</a>
             <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
                 <span class="navbar-toggler-icon"></span>

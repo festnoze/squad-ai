@@ -1,9 +1,11 @@
-from openai_helper import ai
 from misc import misc
 from display_helper import display
 from datetime import datetime
 from file import file
 from front_client import front_client
+from langchain_openai_adapter import lc
+from models.conversation import Conversation, Message
+from openai_helper import ai
 
 class assistants_ochestrator:
     check_end_assistant = None
@@ -20,65 +22,74 @@ class assistants_ochestrator:
         self.create_assistants()
         self.print_assistants_ids()
 
-        self.request_message = front_client.wait_brief_creation_and_get()
-        print(f"Description initiale de l'objectif : {self.request_message}")
+        request_message = front_client.wait_need_expression_creation_and_get()
+        print(f"Description initiale de l'objectif : {request_message}")
                 
-        self.do_metier_po_exchanges()
-        self.save_metier_po_exchange()
+        conversation = self.do_metier_pm_exchanges(request_message)
+        self.save_metier_po_exchange(conversation)
     
-        self.create_po_us_and_usecases()
+        self.create_po_us_and_usecases(conversation)
         self.save_po_us_and_usecases()
         
         threads_ids = await self.create_qa_acceptance_tests_async()
         self.save_qa_acceptance_tests(threads_ids)
 
-    def do_metier_po_exchanges(self):
-        self.business_assistant_set.run_instructions += "Le besoin principal et le but à atteindre est : '{self.request_message}'."
-        business_response = self.request_message
-        message_json = misc.get_message_as_json("Métier", business_response, 0)
-        counter = 0
+    def do_metier_pm_exchanges(self, initial_request: str) -> Conversation:
+        pm_role = "PM"
+        business_role = "Métier"
+        initial_request_instruction = f"Le besoin fonctionnel central et but à atteindre est : '{initial_request}'."
+        business_answer = initial_request_instruction
+        conversation = Conversation()
+        conversation.add_message(business_role, initial_request_instruction, 0)
+        counter = 0        
 
         while True:
             counter += 1
             if counter > self.max_exchanges_count:
-                return
-            if business_response.__contains__("[ENDS_EXCHANGE]"):
-                return
+                return conversation
+            if business_answer.__contains__("[ENDS_EXCHANGE]"):
+                return conversation
             
-            # Pass to PM the latest business expert's answer (or the need / brief on first) & run:
-            run_result = ai.add_message_and_run(self.pm_assistant_set, business_response) 
-            pm_response = ai.get_run_result(self.pm_assistant_set, run_result)
-            elapsed_seconds = ai.get_run_duration_seconds(self.pm_assistant_set.run)
-            message_json = misc.get_message_as_json("PM", pm_response, elapsed_seconds)
-            print(f"({elapsed_seconds}s.) PM :\n{pm_response}\n")
+            # Ask PM with latest business' answer (or the initial request on first shot):
+            instructions = [self.pm_instructions]
+            if len(conversation.messages) > 1:
+                instructions.append(initial_request_instruction)
 
-            front_client.post_new_metier_or_po_answer(message_json)
+            pm_message = lc.invoke(
+                            chat_model= self.pm_llm,
+                            user_role= pm_role,
+                            conversation= conversation,
+                            instructions= instructions
+                        )
+            misc.print_message(pm_message)
+            front_client.post_new_metier_or_po_answer(pm_message)
 
-            if pm_response.__contains__("[FIN_PM_ASSIST]"):
-                business_response = front_client.wait_metier_answer_validation_and_get() 
+            if pm_message.content.__contains__("[FIN_PM_ASSIST]"):
+                pm_answer = front_client.wait_metier_answer_validation_and_get() 
                 continue
                 
-            # Pass to business expert latest PM questions & run:
-            moa_message = f"Ci-après sont les questions du PM auxquelles tu dois répondre : \n{pm_response}"
-            run_result = ai.add_message_and_run(self.business_assistant_set, moa_message)
-            business_response = ai.get_run_result(self.business_assistant_set, run_result)      
-            elapsed_seconds = ai.get_run_duration_seconds(self.business_assistant_set.run)
-            message_json = misc.get_message_as_json("Métier", business_response, elapsed_seconds)
-            print(f"({elapsed_seconds}s.) Métier : \n{business_response}\n") 
-            
-            front_client.post_new_metier_or_po_answer(message_json)            
-            business_response = front_client.wait_metier_answer_validation_and_get()
+            # Ask business with latest PM questions & run:
+            business_message = lc.invoke(
+                                chat_model= self.business_llm,
+                                user_role= business_role,
+                                conversation= conversation,
+                                instructions= [self.business_instructions, initial_request_instruction]
+                            )
+            misc.print_message(business_message)            
+            front_client.post_new_metier_or_po_answer(business_message)        
+            business_answer = front_client.wait_metier_answer_validation_and_get()
+            # update last conversation message if changed by the user
+            if conversation.messages[-1].content != business_answer:
+                conversation.messages[-1].content = business_answer            
 
-    def create_po_us_and_usecases(self):
-        pm_business_thread_json_str = ai.get_all_messages_as_json(self.business_assistant_set)
-        po_message = file.get_as_str("po_message_for_us_and_usecases_creation.txt").format(pm_business_thread_json= pm_business_thread_json_str)
-        result = ai.add_message_and_run(self.po_assistant_set, po_message)
-        if (result == ai.RunResult.SUCCESS):
-            elapsed = ai.get_run_duration_seconds(self.business_assistant_set.run)
-            print(f"({elapsed}s.) PO: \n{ai.get_last_answer(self.po_assistant_set)}")
+    def create_po_us_and_usecases(self, conversation: Conversation):
+        pm_business_thread_json_str = conversation.get_all_messages_as_json()
+        po_question = file.get_as_str("po_message_for_us_and_usecases_creation.txt").format(pm_business_thread_json= pm_business_thread_json_str)
+        po_message = lc.invoke(self.po_llm, "", po_question, Conversation())
+        misc.print_message(po_message)
     
     async def create_qa_acceptance_tests_async(self):        
-        us_and_usecases_json_str = ai.get_last_answer(self.po_assistant_set)
+        us_and_usecases_json_str = ai.get_last_answer(self.po_llm)
         return await self.write_qa_acceptance_tests_from_us_json_async(us_and_usecases_json_str)
 
     async def write_qa_acceptance_tests_from_us_json_async(self, us_and_usecases_json_str):
@@ -140,7 +151,7 @@ class assistants_ochestrator:
             i += 1
 
     def save_po_us_and_usecases(self):
-        us_and_usecases_json_str = ai.get_last_answer(self.po_assistant_set)
+        us_and_usecases_json_str = ai.get_last_answer(self.po_llm)
         us_and_usecases_json = misc.extract_json_from_text(us_and_usecases_json_str)
         # print(f"new windows lines: {us_and_usecases_json.count('\r\n')}")
         # print(f"new lines: {us_and_usecases_json.count('\n')}")
@@ -149,9 +160,9 @@ class assistants_ochestrator:
         us_and_usecases_json_str = misc.json_to_str(us_and_usecases_json)
         file.write_file(us_and_usecases_json_str, misc.sharedFolder, "user_story.json")
 
-    def save_metier_po_exchange(self):
-        messages_json = ai.get_all_messages_as_json(self.pm_assistant_set)
-        messages_str = misc.json_to_str(messages_json).replace("\"user\"", "\"Métier\"").replace("\"assistant\"", "\"PM\"")
+    def save_metier_po_exchange(self, conversation: Conversation):
+        messages_json = conversation.get_all_messages_as_json()
+        messages_str = misc.json_to_str(messages_json)
         file.write_file(messages_str, misc.sharedFolder, "BusinessExpert_ProductOwner_Exchanges.json")
         
     def delete_all_outputs(self):
@@ -159,13 +170,13 @@ class assistants_ochestrator:
         file.delete_all_files_with_extension("*.feature", "AcceptanceTests")
         file.delete_all_files_with_extension("*StepDefinitions.cs", "AcceptanceTests")
     
-    def create_check_end_assistant(self):
-        self.check_end_assistant = ai.create_assistant_set(
-            model= "gpt-3.5-turbo-16k",
-            instructions="Tu es un expert en analyse de phrases, et tu dois toujours répondre uniquement par oui ou non",
-            run_instructions= "",
-            timeout_seconds= 20
-        )
+    # def create_check_end_assistant(self):
+    #     self.check_end_assistant = lc.create_chat_langchain(
+    #         model= "gpt-3.5-turbo-16k",
+    #         instructions="Tu es un expert en analyse de phrases, et tu dois toujours répondre uniquement par oui ou non",
+    #         run_instructions= "",
+    #         timeout_seconds= 20
+    #     )
 
     def has_questions(self, message):
         return message.__contains__("?") or  message.__contains__("merci")
@@ -183,49 +194,51 @@ class assistants_ochestrator:
         
     def create_assistants(self):        
         self.model_gpt_35 = "gpt-3.5-turbo-16k" 
-        self.model_gpt_40 = "gpt-4-turbo-preview"
+        self.model_gpt_40 = "gpt-4-0613"
 
         # Assistants creation
-        self.business_assistant_set = ai.create_assistant_set(
-            model= self.model_gpt_40, 
-            instructions= file.get_as_str("business_expert_assistant_instructions.txt"),
-            run_instructions = "",#file.get_as_str("moa_run_instructions.txt"),
-            timeout_seconds= 100
+        self.business_llm = lc.create_chat_langchain(
+             model= self.model_gpt_40,
+            timeout_seconds= 100, 
+            temperature= 0.1,
         )
-        pm_assistant_instructions = file.get_as_str("pm_assistant_instructions.txt").format(max_exchanges_count= self.max_exchanges_count)
-        self.pm_assistant_set = ai.create_assistant_set(
-            model= self.model_gpt_40, 
-            instructions= pm_assistant_instructions,
-            run_instructions = "",
-            timeout_seconds= 50
+        self.business_instructions= file.get_as_str("business_expert_assistant_instructions.txt")
+
+        self.pm_instructions = file.get_as_str("pm_assistant_instructions.txt").format(max_exchanges_count= self.max_exchanges_count)
+        self.pm_llm = lc.create_chat_langchain(
+            model= self.model_gpt_40,
+            timeout_seconds= 100, 
+            temperature= 0.1
         )
-        self.po_assistant_set = ai.create_assistant_set(
-            model= self.model_gpt_40, 
-            instructions= file.get_as_str("po_us_assistant_instructions.txt"),
-            run_instructions = "",
-            timeout_seconds= 100
+
+        self.po_llm = lc.create_chat_langchain(
+            model= self.model_gpt_40,
+            timeout_seconds= 100, 
+            temperature= 0.1,
         )
-        self.qa_assistant_set = ai.create_assistant_set(
-                model= self.model_gpt_35, 
-                instructions= file.get_as_str("qa_assistant_instructions.txt"),
-                run_instructions = "",
-                timeout_seconds= 45
+        self.po_instructions= file.get_as_str("po_us_assistant_instructions.txt")
+
+        self.qa_assistant_set = lc.create_chat_langchain(
+            model= self.model_gpt_40,
+            timeout_seconds= 100, 
+            temperature= 0.1,
         )
+        self.qa_instructions= file.get_as_str("qa_assistant_instructions.txt")
 
     def print_assistants_ids(self):
-        display.display_ids("Métier", self.business_assistant_set)
-        display.display_ids("PM", self.pm_assistant_set)
-        display.display_ids("PO",  self.po_assistant_set)
-        display.display_ids("QA",  self.qa_assistant_set)
+        display.display_chat_infos("Métier", self.business_llm)
+        display.display_chat_infos("PM", self.pm_llm)
+        display.display_chat_infos("PO",  self.po_llm)
+        display.display_chat_infos("QA",  self.qa_assistant_set)
         print("")
 
-    def dispose(self):
-        try:
-            ai.delete_assistant_set(self.pm_assistant_set)
-            ai.delete_assistant_set(self.business_assistant_set)
-            ai.delete_assistant_set(self.po_assistant_set)
-            ai.delete_assistant_set(self.qa_assistant_set)
-            ai.delete_all_assistants()
-        except Exception:
-            pass
+    # def dispose(self):
+    #     try:
+    #         ai.delete_assistant_set(self.pm_llm)
+    #         ai.delete_assistant_set(self.business_llm)
+    #         ai.delete_assistant_set(self.po_llm)
+    #         ai.delete_assistant_set(self.qa_assistant_set)
+    #         ai.delete_all_assistants()
+    #     except Exception:
+    #         pass
 

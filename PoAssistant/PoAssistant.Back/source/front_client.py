@@ -2,6 +2,7 @@ import requests
 from requests.exceptions import HTTPError
 import json
 from misc import misc
+from models.conversation import Message
 
 class front_client:
     host_uri = "http://localhost:5132"
@@ -35,7 +36,7 @@ class front_client:
             return response.text
         return ""
 
-    def wait_brief_creation_and_get():
+    def wait_need_expression_creation_and_get():
         sleep_interval = 2
         brief_str = front_client.get_metier_brief_if_ready()
         while brief_str == "":
@@ -58,7 +59,8 @@ class front_client:
             metier_answer_str = front_client.get_validated_metier_answer_if_ready()
         return metier_answer_str
     
-    def post_new_metier_or_po_answer(message_json):
+    def post_new_metier_or_po_answer(message: Message):
+        message_json = misc.get_message_as_json(message)
         url = f"{front_client.host_uri}/{front_client.frontend_proxy_subpath}/{front_client.new_metier_po_message_url_post}"        
         headers = {'Content-Type': 'application/json'}
         response = requests.post(url, data= json.dumps(message_json), headers= headers)

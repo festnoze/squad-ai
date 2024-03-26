@@ -4,11 +4,16 @@ from dotenv import find_dotenv, load_dotenv
 # imports langchain package
 from langchain_openai import OpenAI
 from langchain_openai import ChatOpenAI
-from langchain.prompts import PromptTemplate
-from langchain.schema.messages import HumanMessage, SystemMessage
+from langchain.agents.openai_assistant import OpenAIAssistantRunnable
+
+from langchain.prompts import PromptTemplate, ChatPromptTemplate, HumanMessagePromptTemplate, MessagesPlaceholder
+from langchain.schema.messages import HumanMessage, SystemMessage, FunctionMessage
+#from langchain_core.messages import SystemMessage
 from langchain.output_parsers import CommaSeparatedListOutputParser
-from langchain.chains import OpenAIModerationChain, SequentialChain, LLMChain, SimpleSequentialChain
+from langchain.memory import ConversationBufferMemory
+from langchain.chains import OpenAIModerationChain, SequentialChain, LLMChain, SimpleSequentialChain, ConversationChain
 from streaming import stream
+from conversation import Conversation, Message
 
 load_dotenv(find_dotenv())
 openai_api_key = os.getenv("OPEN_API_KEY")
@@ -36,7 +41,7 @@ openai_api_key = os.getenv("OPEN_API_KEY")
 # # specify several messages and roles
 # messages = [
 #     SystemMessage(content="You are a personal math tutor that answers questions in the style of Gandalf from The Hobbit."),
-#     HumanMessage(content="I'm trying to understand calculus.  Can you explain the basic idea?"),
+#     HumanMessage(content="I'm trying to understand calculus. Can you explain the basic idea?"),
 # ]
 # response = chat_model.invoke(messages)
 # print(response.content)
@@ -133,8 +138,26 @@ openai_api_key = os.getenv("OPEN_API_KEY")
 # gpt-4-1106-preview
 # ft:gpt-3.5-turbo-1106:studi::8wvICt6e
 
-chat = ChatOpenAI(openai_api_key= openai_api_key, temperature= 0, model_name= "ft:gpt-3.5-turbo-1106:studi::8wvICt6e")
-print(chat.invoke("Ton modèle est 'ft:gpt-3.5-turbo-1106:studi::8wvICt6e'. Si tous tes paramètres sont communs avec ton grand frère : 'GPT-3.5 turbo', tu n'est pas fine-tuné, on t'a juste ajouter un du pré-prompting, non ? Explique moi comment cela fonctionne et tes différences"))
+# assist = OpenAIAssistantRunnable.create_assistant(    
+#     api_key= openai_api_key,
+#     name="langchain assistant",
+#     instructions="You are a personal math tutor. Write and run code to answer math questions.",
+#     tools=[{"type": "code_interpreter"}],
+#     model="gpt-4-1106-preview",
+# )
+# res = assist.invoke({"content": "What's 10 - 4 raised to the 2.7"})
+#print(res)
+
+# chat = ChatOpenAI(openai_api_key= openai_api_key, temperature= 0, model_name= "gpt-4-turbo-preview")
+# messages = [
+#     HumanMessage(content="Mon nom est MILLER"),
+#     HumanMessage(content="Mon prénom est Etienne"),    
+#     SystemMessage(content="Hello Etienne"),
+#     HumanMessage(content="Quel est mon nom entier ?"),
+# ]
+
+# memory=ConversationBufferMemory(chat_memory=messages)
+# print(chat.invoke(messages).content)
 # prompt = PromptTemplate.from_template(instructions + ": {text}")
 
 # chain = LLMChain(llm= llm, prompt= prompt)
@@ -142,3 +165,24 @@ print(chat.invoke("Ton modèle est 'ft:gpt-3.5-turbo-1106:studi::8wvICt6e'. Si t
 # #response = chat_model.invoke(messages)
 # response = chain.invoke("Je ne penses pas être en mesure de décider de la portée de la solution ni de définir un nouveau scope pour la nouvelle user story")
 # print(response)
+
+chat_model = ChatOpenAI(api_key= openai_api_key, timeout= 20)
+
+# Création d'une conversation
+conversation = Conversation()
+
+# Ajout de messages à la conversation
+conversation.add_message(Message(role="system", content="You are a personal math tutor that try avoid answering questions because you don't know nothing about maths, if you can't avoid, answer some vague things."))
+conversation.add_message(Message(role="human", content="I'm Etienne. I'm trying to understand calculus. Can you explain the basic idea?"))
+conversation.add_message(Message(role="AI", content="It's so easy Etienne, you should know that. Have a look to your courses if needed."))
+
+# Génération de la mémoire pour un rôle spécifique
+memory = conversation.to_memory(user_role="human")
+conversation = ConversationChain(
+    llm= chat_model,
+    memory= memory,
+)
+conversation.invoke(input= "i prefer you explain it to me again!")
+
+for msg in memory.chat_memory.messages:
+    print(msg.content)

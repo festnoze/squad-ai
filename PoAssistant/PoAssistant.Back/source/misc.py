@@ -2,9 +2,13 @@ import time
 import json
 from file import file
 from datetime import datetime
+from models.conversation import Message
 
 class misc: 
     sharedFolder = "..\\Shared"
+
+    def print_message(message: Message):
+        print(f"{message.role} ({message.elapsed_seconds}s.):\n{message.content}\n")
 
     def pause(duration):        
         time.sleep(duration)
@@ -19,11 +23,11 @@ class misc:
     #     formatted_elapsed_time = misc.get_formatted_time(elapsed_time)
     #     return formatted_elapsed_time
         
-    def get_elapsed_time_seconds(began_at_timestamp: datetime, ended_at_timestamp: datetime): 
-        if not ended_at_timestamp:
-            return -1      
-        elapsed_time = ended_at_timestamp - began_at_timestamp
-        return elapsed_time
+    def get_elapsed_time_seconds(began_at: datetime, ended_at: datetime) -> int:
+        if not ended_at:
+            return -1
+        elapsed_time = ended_at - began_at
+        return int(elapsed_time)
     
     def array_to_bullet_list_str(str_array):
         bullet_point_list_str = ""
@@ -80,11 +84,11 @@ class misc:
             gherkin_string = gherkin_string.replace(f" {str(i)}", "")
         return gherkin_string
     
-    def get_message_as_json(source, content, duration):
+    def get_message_as_json(message: Message):
         return  {
-                    "source": source,
-                    "content": content,
-                    "duration": duration
+                    "source": message.role,
+                    "content": message.content,
+                    "duration": message.elapsed_seconds
                 }
     
     def output_parser_gherkin(feature_content: str):

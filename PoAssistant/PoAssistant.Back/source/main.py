@@ -6,6 +6,7 @@ from misc import misc
 from file import file
 from dotenv import find_dotenv, load_dotenv
 from ochestrator import assistants_ochestrator
+from langchain_openai_adapter import lc
 #from langchain import langchain
 
 async def main():
@@ -25,7 +26,8 @@ async def main():
     # sys.exit()
     max_exchanges_count = 5
 
-    #Start the ochestrator workflow        
+    #Start the ochestrator workflow  
+    lc.set_api_key(openai_api_key)
     orchestrator = assistants_ochestrator(max_exchanges_count)
     try:
         await orchestrator.perform_workflow_async()
@@ -33,7 +35,7 @@ async def main():
     except Exception as ex:
         print(ex)
     finally:    
-        orchestrator.dispose()
+        # orchestrator.dispose()
         print("[Fin de l'échange]")
 
 

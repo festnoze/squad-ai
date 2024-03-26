@@ -4,12 +4,13 @@ from datetime import datetime, timedelta
 from enum import Enum
 import concurrent.futures
 import asyncio
+
 # internal import
 from misc import misc
 from AssistantSet import AssistantSet
 from file import file
 
-class ai:    
+class ai:
     timeout_tag = "[LLM_REQUEST_TIMEOUT]"
 
     def max_allowed_run_seconds(assistant_set):
@@ -164,8 +165,8 @@ class ai:
         return misc.get_elapsed_time_seconds(run.created_at, run.completed_at)
     
     def create_from_ids(assist_ids):
-        return AssistantSet(
-            assistant= openai.beta.assistants.retrieve(assist_ids.assistant_id),
+        return LlmSet(
+            llm= openai.beta.assistants.retrieve(assist_ids.assistant_id),
             thread= openai.beta.threads.retrieve(assist_ids.thread_id),
             run_instructions= assist_ids.run_instructions
         )
