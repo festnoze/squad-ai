@@ -5,7 +5,7 @@ namespace PoAssistant.Front.Data;
 public record MessageModel
 {
     public static string BusinessExpertName = "Métier";
-
+    public static string ProjectManagerName = "PM";
     [JsonPropertyName("source")]
     public string Source { get; init; }
 
@@ -20,6 +20,8 @@ public record MessageModel
     public bool IsSender => Source != BusinessExpertName;
 
     public bool IsLastThreadMessage { get; private set; } = false;
+
+    public bool IsStreaming { get; set; } = false;
 
     public bool IsSavedMessage { get; set; }
 
@@ -36,6 +38,7 @@ public record MessageModel
         Timestamp = DateTime.Now;
         IsSavedMessage = isSavedMessage;
         IsEndMessage = isEndMessage;
+        IsStreaming = false;
     }
 
     public void ChangeContent(string newContent)

@@ -47,6 +47,12 @@ public class FrontendProxyController : ControllerBase
     }
 
 
+    [HttpPost("metier-po/update-last-message")]
+    public void UpdateLastMetierPoMessage([FromBody] MessageModel newMessage)
+    {
+        _threadService.UpdateLastMessage(newMessage);
+    }
+
     [HttpDelete("metier-po/delete-all")]
     public void DeleteMetierPoThread()
     {
@@ -61,7 +67,7 @@ public class FrontendProxyController : ControllerBase
     }
 
     [HttpPost("metier-po/message-content-stream")]
-    public async Task ReceiveMessageStreamaSYNC(/*[FromBody] IAsyncEnumerable<string> messageChunks*/)
+    public async Task TestReceiveMessageAsStream()
     {
         var buffer = new StringBuilder();
         _threadService.InitStreamMessage();
@@ -74,6 +80,24 @@ public class FrontendProxyController : ControllerBase
                 _threadService.DisplayStreamMessage(newWord);
             }
         }
+        _threadService.EndsStreamMessage();
+    }
+
+    [HttpPost("metier-po/new-message/stream")]
+    public async Task ReceiveMessageAsStream()
+    {
+        var buffer = new StringBuilder();
+        _threadService.InitStreamMessage();
+        string? newWord = string.Empty;
+        using (var reader = new StreamReader(Request.Body, Encoding.UTF8))
+        {
+            //StreamReaderExtensions.AddNewCharDelimiters(StreamHelper.NewLineForStream);
+            while ((newWord = await reader.ReadWordAsync()) != null)
+            {
+                _threadService.DisplayStreamMessage(newWord);
+            }
+        }
+        _threadService.EndsStreamMessage();
     }
 
     [HttpGet("ping")]

@@ -9,16 +9,20 @@ from langchain_core.prompts.chat import (
 from langchain.chains import ConversationChain
 from langchain_core.prompts.chat import MessagesPlaceholder
 from langchain.memory import ConversationBufferMemory
+from langchain_core.messages.base import BaseMessage, BaseMessageChunk
 from typing import List, Tuple, Union
 import uuid
 from datetime import datetime, timedelta
 from enum import Enum
+import uuid
+import time
 import concurrent.futures
 import asyncio
 # internal import
 from misc import misc
-import uuid
-import time
+from front_client import front_client
+from models.stream_container import StreamContainer
+from streaming import stream
 
 from models.conversation import Conversation, Message
 
@@ -40,9 +44,10 @@ class lc:
     
     def invoke_with_conversation(chat_model: ChatOpenAI, user_role: str, conversation: Conversation, instructions: List[str]) -> Message:
         exchanges = conversation.to_langchain_messages(user_role, instructions)
-        answer, elapsed = lc.invoke(chat_model, exchanges)
-        conversation.add_message(user_role, answer, elapsed)
-        return conversation.messages[-1] #return the last conv msg which corresponds to the invoke answer
+        answer, elapsed = lc.invoke(chat_model, exchanges)        
+        answer_message = Message(user_role, answer, elapsed)
+        conversation.add_message(answer_message)
+        return answer_message
     
     def invoke(chat_model: ChatOpenAI, input) -> Tuple[str, float]:
         start_time = time.time()
@@ -51,6 +56,20 @@ class lc:
         elapsed = misc.get_elapsed_time_seconds(start_time, end_time)
         answer = response.content
         return (answer, elapsed)
+    
+    async def ask_llm_new_pm_business_message_streamed_to_front_async(chat_model: ChatOpenAI, user_role: str, conversation: Conversation, instructions: List[str]):
+        exchanges = conversation.to_langchain_messages(user_role, instructions)            
+        full_stream = StreamContainer()
+        start_time = time.time()
+        content_stream = stream.get_chat_answer_as_stream_not_await_async(chat= chat_model, input= exchanges, full_stream= full_stream, display_console= True)
+        await front_client.post_new_metier_or_pm_answer_as_stream(content_stream)
+        end_time = time.time()
+        elapsed = misc.get_elapsed_time_seconds(start_time, end_time)
+        answer_message = Message(user_role, full_stream.content, elapsed)
+        conversation.add_message(answer_message)
+        front_client.post_change_last_metier_or_pm_answer(answer_message)
+        return answer_message
+    
 
     def create_assistant_langchain(model, instructions, file_ids = None):
         return OpenAIAssistantRunnable.create_assistant(    

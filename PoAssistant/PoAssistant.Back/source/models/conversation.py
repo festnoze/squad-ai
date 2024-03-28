@@ -16,7 +16,7 @@ class Conversation:
     def add_message(self, message: Message) -> None:
         self.messages.append(message)
     
-    def add_message(self, role: str, content: str, elapsed_seconds: int) -> None:
+    def add_new_message(self, role: str, content: str, elapsed_seconds: int) -> None:
         self.messages.append(Message(role, content, elapsed_seconds))
 
     def to_memory(self, user_role: str, instructions: List[str]) -> ConversationBufferMemory:

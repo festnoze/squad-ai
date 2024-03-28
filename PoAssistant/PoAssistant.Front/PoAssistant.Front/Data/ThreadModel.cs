@@ -13,4 +13,6 @@ public class ThreadModel : List<MessageModel>
     }
 
     public void RemoveLastThreadMessageFlags() => this.ForEach(msg => msg.SetAsLNotLastThreadMessage());
+    public void RemoveLastMessage() => this.RemoveAt(this.Count - 1);
+    public bool IsLastMessageFromSender => this[this.Count - 1].IsSender;
 }

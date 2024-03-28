@@ -80,18 +80,19 @@ openai_api_key = os.getenv("OPEN_API_KEY")
 # # Print the parsed result
 # print(parsed_result)
 
-# # test display the LLM answer's stream in .NET
-# import asyncio
-# from front_client import front_client
+# test display the LLM answer's stream in .NET
+import asyncio
+from front_client import front_client
 
-# async def main():
-#     stream.set_api_key(api_key= openai_api_key)
-#     question = "Liste 30 types de cépages de vin et leurs histoire, localisation et caractérisques complètes"
-#     # async for content in stream.get_stream(question):
-#     #     print(content, end="", flush=True)
-#     await front_client.send_stream_to_api_async(question)
+async def main():
+    stream.set_api_key(api_key= openai_api_key)
+    question = "Liste 3 types de cépages de vin et leurs histoire, localisation et caractérisques complètes"
+    # async for content in stream.get_stream(question):
+    #     print(content, end="", flush=True)
+    content_stream = stream.get_chatgpt_answer_as_stream_async(question)
+    await front_client.send_stream_to_api_async(content_stream)
 
-# asyncio.run(main())
+asyncio.run(main())
 
 #llm = OpenAI(openai_api_key= openai_api_key, temperature= 0, model_name= "gpt-3.5-turbo-instruct")
 
@@ -166,23 +167,25 @@ openai_api_key = os.getenv("OPEN_API_KEY")
 # response = chain.invoke("Je ne penses pas être en mesure de décider de la portée de la solution ni de définir un nouveau scope pour la nouvelle user story")
 # print(response)
 
-chat_model = ChatOpenAI(api_key= openai_api_key, timeout= 20)
 
-# Création d'une conversation
-conversation = Conversation()
+# # test of memory usage
+# chat_model = ChatOpenAI(api_key= openai_api_key, timeout= 20)
 
-# Ajout de messages à la conversation
-conversation.add_message(Message(role="system", content="You are a personal math tutor that try avoid answering questions because you don't know nothing about maths, if you can't avoid, answer some vague things."))
-conversation.add_message(Message(role="human", content="I'm Etienne. I'm trying to understand calculus. Can you explain the basic idea?"))
-conversation.add_message(Message(role="AI", content="It's so easy Etienne, you should know that. Have a look to your courses if needed."))
+# # Création d'une conversation
+# conversation = Conversation()
 
-# Génération de la mémoire pour un rôle spécifique
-memory = conversation.to_memory(user_role="human")
-conversation = ConversationChain(
-    llm= chat_model,
-    memory= memory,
-)
-conversation.invoke(input= "i prefer you explain it to me again!")
+# # Ajout de messages à la conversation
+# conversation.add_message(Message(role="system", content="You are a personal math tutor that try avoid answering questions because you don't know nothing about maths, if you can't avoid, answer some vague things."))
+# conversation.add_message(Message(role="human", content="I'm Etienne. I'm trying to understand calculus. Can you explain the basic idea?"))
+# conversation.add_message(Message(role="AI", content="It's so easy Etienne, you should know that. Have a look to your courses if needed."))
 
-for msg in memory.chat_memory.messages:
-    print(msg.content)
+# # Génération de la mémoire pour un rôle spécifique
+# memory = conversation.to_memory(user_role="human")
+# conversation = ConversationChain(
+#     llm= chat_model,
+#     memory= memory,
+# )
+# conversation.invoke(input= "i prefer you explain it to me again!")
+
+# for msg in memory.chat_memory.messages:
+#     print(msg.content)

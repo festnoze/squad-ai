@@ -79,6 +79,35 @@ public class ThreadMetierPoService : IDisposable
         OnThreadChanged?.Invoke();
     }
 
+     public void UpdateLastMessage(MessageModel updatedLastMessage)
+    {
+        if (messages is null || !messages.Any())
+            throw new InvalidOperationException("Cannot modify the last messages as the thread don't has any message yet");
+
+        messages.RemoveLastMessage();
+
+        isWaitingForLLM = false;
+        updatedLastMessage.IsSavedMessage = false;
+        updatedLastMessage.IsStreaming = false;
+
+
+        messages.Add(updatedLastMessage);
+
+        RefreshLastMessageInThread();
+        OnThreadChanged?.Invoke();
+    }
+
+    public void DisplayStreamMessage(string? messageChunk)
+    {
+        if (messageChunk != null)
+        {
+            // New line are specific to the stream to allow stream spliting words and avoid win/mac issue
+            isWaitingForLLM = true;
+            messages!.Last().Content += messageChunk.Replace(StreamHelper.NewLineForStream, StreamHelper.WindowsNewLine);
+            OnThreadChanged?.Invoke();
+        }
+    }
+
     public void DeleteMetierPoThread()
     {
         messages = new ThreadModel();
@@ -88,7 +117,7 @@ public class ThreadMetierPoService : IDisposable
 
     public void EndMetierMetierExchange()
     {
-        messages!.Add(new MessageModel("PM", "Le PO a maintenant rédigé la User Story et ses 'use cases'.", 0, true));
+        messages!.Add(new MessageModel(MessageModel.ProjectManagerName, "Le PO a maintenant rédigé la User Story et ses 'use cases'.", 0, true));
         isWaitingForLLM = false;
         NotifyForUserStoryReady();
         OnThreadChanged?.Invoke();
@@ -174,19 +203,22 @@ public class ThreadMetierPoService : IDisposable
         if (messages is null)
             messages = new ThreadModel();
 
-        var newMessage = new MessageModel("test", string.Empty, 0, false);
+        var role = "Métier";
+        if (messages?.Any() ?? false)
+            role =  messages.Last().IsSender ? MessageModel.BusinessExpertName : MessageModel.ProjectManagerName;
+        var newMessage = new MessageModel(role, string.Empty, 0, false);
+        newMessage.IsStreaming = true;
+
         messages!.Add(newMessage);
 
-        isWaitingForLLM = false;
+        isWaitingForLLM = true;
         RefreshLastMessageInThread();
     }
 
-    public void DisplayStreamMessage(string? messageChunk)
+    public void EndsStreamMessage()
     {
-        if (messageChunk != null)
-        {
-            messages!.Last().Content += messageChunk.Replace(StreamHelper.NewLineForStream, StreamHelper.WindowsNewLine);
-            OnThreadChanged?.Invoke();
-        }
+        var lastMessage = messages!.Last();
+        lastMessage.IsStreaming = false;
+        isWaitingForLLM = IsWaiting();
     }
 }

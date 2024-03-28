@@ -1,3 +1,4 @@
+import time
 from misc import misc
 from display_helper import display
 from datetime import datetime
@@ -7,6 +8,7 @@ from langchain_openai_adapter import lc
 from models.conversation import Conversation, Message
 from langchain.schema.messages import HumanMessage, AIMessage, SystemMessage
 from openai_helper import ai
+from streaming import stream
 
 class Orchestrator:
     check_end_assistant = None       
@@ -33,7 +35,7 @@ class Orchestrator:
         request_message = front_client.wait_need_expression_creation_and_get()
         print(f"Description initiale de l'objectif : {request_message}")
                 
-        conversation = self.do_metier_pm_exchanges(request_message)
+        conversation = await self.do_metier_pm_exchanges_async(request_message)
         self.save_metier_pm_exchanges(conversation)
     
         us_content = self.create_po_us_and_usecases(conversation)
@@ -45,54 +47,63 @@ class Orchestrator:
         self.save_qa_acceptance_tests(threads_ids)
 
 
-    def do_metier_pm_exchanges(self, initial_request: str) -> Conversation:
+    async def do_metier_pm_exchanges_async(self, initial_request: str) -> Conversation:
         initial_request_instruction = f"Le besoin fonctionnel central et but à atteindre est : '{initial_request}'."
         business_answer = initial_request_instruction
         conversation = Conversation()
-        conversation.add_message(Orchestrator.business_role, initial_request_instruction, 0)
+        conversation.add_new_message(Orchestrator.business_role, initial_request_instruction, 0)
         counter = 0        
 
         while True:
             counter += 1
-            if counter > self.max_exchanges_count:
-                return conversation
-            if business_answer == Orchestrator.tag_end_exchange:
+            if counter > self.max_exchanges_count or business_answer == Orchestrator.tag_end_exchange:
                 return conversation
             
-            # Ask PM with latest business' answer (or the initial request on first shot):
-            # instructions = [self.pm_instructions]
-            # if len(conversation.messages) > 1:
-            #     instructions.append(initial_request_instruction)
+            pm_answer_message = await lc.ask_llm_new_pm_business_message_streamed_to_front_async(
+                        chat_model= self.pm_llm,
+                        user_role= Orchestrator.pm_role,
+                        conversation= conversation,
+                        instructions= [self.pm_instructions, initial_request_instruction]
+            )
 
-            pm_message = lc.invoke_with_conversation(
-                            chat_model= self.pm_llm,
-                            user_role= Orchestrator.pm_role,
-                            conversation= conversation,
-                            instructions= [self.pm_instructions, initial_request_instruction]
-                        )
-            misc.print_message(pm_message)
-            front_client.post_new_metier_or_po_answer(pm_message)
+            # pm_message = lc.invoke_with_conversation(
+            #                 chat_model= self.pm_llm,
+            #                 user_role= Orchestrator.pm_role,
+            #                 conversation= conversation,
+            #                 instructions= [self.pm_instructions, initial_request_instruction]
+            #             )
+            # misc.print_message(pm_message)
+            # front_client.post_new_metier_or_po_answer(pm_message)
 
             # If PM has no more questions, ask business if they still want to add other points
-            if pm_message.content.__contains__(Orchestrator.tag_end_pm_questions):
+            if pm_answer_message.content.__contains__(Orchestrator.tag_end_pm_questions):
                 business_answer = front_client.wait_metier_answer_validation_and_get() 
                 if business_answer != Orchestrator.tag_end_exchange:
-                    conversation.add_message(Orchestrator.business_role, business_answer, 0)
+                    conversation.add_new_message(Orchestrator.business_role, business_answer, 0)
                 continue
-                
+
+            business_message = await lc.ask_llm_new_pm_business_message_streamed_to_front_async(
+                        chat_model= self.business_llm,
+                        user_role= Orchestrator.business_role,
+                        conversation= conversation,
+                        instructions= [self.business_instructions, initial_request_instruction]
+            ) 
+
             # Ask business with latest PM questions & run:
-            business_message = lc.invoke_with_conversation(
-                                chat_model= self.business_llm,
-                                user_role= Orchestrator.business_role,
-                                conversation= conversation,
-                                instructions= [self.business_instructions, initial_request_instruction]
-                            )
-            misc.print_message(business_message)            
-            front_client.post_new_metier_or_po_answer(business_message)        
+            # business_message = lc.invoke_with_conversation(
+            #                     chat_model= self.business_llm,
+            #                     user_role= Orchestrator.business_role,
+            #                     conversation= conversation,
+            #                     instructions= [self.business_instructions, initial_request_instruction]
+            #                 )
+            # misc.print_message(business_message)            
+            # front_client.post_new_metier_or_pm_answer(business_message)   
+                 
             business_answer = front_client.wait_metier_answer_validation_and_get()
-            # update last conversation message if changed by the user
+
+            # update last conversation message if changed on the front-end
             if conversation.messages[-1].content != business_answer:
-                conversation.messages[-1].content = business_answer            
+                conversation.messages[-1].content = business_answer 
 
     def create_po_us_and_usecases(self, conversation: Conversation) -> str:
         pm_business_exchange_as_json_str = conversation.get_all_messages_as_json()
