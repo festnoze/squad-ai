@@ -11,6 +11,7 @@ public class ThreadMetierPoService : IDisposable
     public event Action? OnThreadChanged = null;
     private bool isWaitingForLLM = false;
     public const string endPmTag = "[FIN_PM_ASSIST]";
+    private static string endExchangeProposalMessage = "Ajouter des points à aborder avec le Project Manager si vous le souhaitez. Sinon, cliquez sur le boutton : 'Terminer l'échange' pour passer à l'étape de rédaction de l'US";
 
     public ThreadMetierPoService()
     {
@@ -46,7 +47,12 @@ public class ThreadMetierPoService : IDisposable
             messages!.Last().Content.Length < 1)
             return string.Empty;
 
-        return messages!.Last().Content;
+        // Handle end exchange case
+        var lastMessage = messages!.Last();
+        if (lastMessage.IsEndMessage && lastMessage.IsSavedMessage)
+            return "[ENDS_EXCHANGE]";
+
+        return lastMessage.Content;
     }
 
     public ThreadModel GetPoMetierThread()
@@ -98,7 +104,7 @@ public class ThreadMetierPoService : IDisposable
                 if (messages!.Last().Content.Contains(endPmTag) || !messages!.Last().Content.Contains("?"))
                 {
                     messages!.Last().ChangeContent("Merci. Nous avons fini, j'ai tous les éléments dont j'ai besoin. Avez-vous d'autres points à aborder ?");
-                    messages.Add(new MessageModel(MessageModel.BusinessExpertName, "Ajouter des points à aborder avec le Project Manager si vous le souhaitez. Sinon, cliquez sur le boutton : 'Terminer l'échange' pour passer à l'étape de rédaction de l'US", 0, false, true));
+                    messages.Add(new MessageModel(MessageModel.BusinessExpertName, endExchangeProposalMessage, 0, false, true));
                     return false;
                 }
                 return true;
@@ -138,7 +144,12 @@ public class ThreadMetierPoService : IDisposable
         if (!messages?.Any() ?? true)
             return;
         
-        messages!.Last().IsSavedMessage = true;
+        var lastMessage = messages!.Last();
+
+        if (lastMessage.IsEndMessage && lastMessage.Content != endExchangeProposalMessage)
+            lastMessage.IsEndMessage = false;
+
+        lastMessage.IsSavedMessage = true;
     }
 
     public event Action? UserStoryReadyNotification;
@@ -150,7 +161,7 @@ public class ThreadMetierPoService : IDisposable
 
     public void DoEndBusinessPoExchange()
     {
-        messages.Last().Content = "[ENDS_EXCHANGE]";
+        messages.Last().IsEndMessage = true; ;
         messages.Last().IsSavedMessage = true;
     }
 

@@ -1,5 +1,3 @@
-from typing import List, Union
-import openai
 from langchain_openai import ChatOpenAI
 from langchain.agents.openai_assistant import OpenAIAssistantRunnable
 from langchain.prompts import PromptTemplate
@@ -11,6 +9,7 @@ from langchain_core.prompts.chat import (
 from langchain.chains import ConversationChain
 from langchain_core.prompts.chat import MessagesPlaceholder
 from langchain.memory import ConversationBufferMemory
+from typing import List, Tuple, Union
 import uuid
 from datetime import datetime, timedelta
 from enum import Enum
@@ -26,6 +25,7 @@ from models.conversation import Conversation, Message
 
 class lc:
     api_key = ""
+
     def set_api_key(openai_api_key):
         lc.api_key = openai_api_key
 
@@ -38,23 +38,24 @@ class lc:
             api_key= lc.api_key,
         )
     
-    def invoke(chat_model: ChatOpenAI, user_role: str, conversation: Conversation, instructions: List[str]) -> Message:
-        memory = conversation.to_memory(user_role, *instructions)
-        conversation_chain = ConversationChain(
-                                llm= chat_model,
-                                memory= memory)
+    def invoke_with_conversation(chat_model: ChatOpenAI, user_role: str, conversation: Conversation, instructions: List[str]) -> Message:
+        exchanges = conversation.to_langchain_messages(user_role, instructions)
+        answer, elapsed = lc.invoke(chat_model, exchanges)
+        conversation.add_message(user_role, answer, elapsed)
+        return conversation.messages[-1] #return the last conv msg which corresponds to the invoke answer
+    
+    def invoke(chat_model: ChatOpenAI, input) -> Tuple[str, float]:
         start_time = time.time()
-        chain_invoke_response = conversation_chain.invoke(input= conversation.messages[-1].content)
+        response = chat_model.invoke(input)
         end_time = time.time()
         elapsed = misc.get_elapsed_time_seconds(start_time, end_time)
-        answer = chain_invoke_response['response']
-        conversation.add_message(user_role, answer, elapsed)
-        return conversation.messages[-1]
-    
+        answer = response.content
+        return (answer, elapsed)
+
     def create_assistant_langchain(model, instructions, file_ids = None):
         return OpenAIAssistantRunnable.create_assistant(    
             name= f"assistant_{str(uuid.uuid4())}",
-            instructions="instructions",
+            instructions= instructions,
             tools=[],
             model= model,
             file_ids = file_ids,

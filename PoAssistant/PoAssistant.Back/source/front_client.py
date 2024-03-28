@@ -37,7 +37,7 @@ class front_client:
         return ""
 
     def wait_need_expression_creation_and_get():
-        sleep_interval = 2
+        sleep_interval = 1
         brief_str = front_client.get_metier_brief_if_ready()
         while brief_str == "":
             misc.pause(sleep_interval)
