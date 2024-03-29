@@ -5,10 +5,10 @@ from datetime import datetime
 from file import file
 from front_client import front_client
 from langchain_openai_adapter import lc
+#from langchain_ollama_adapter import lc
 from models.conversation import Conversation, Message
 from langchain.schema.messages import HumanMessage, AIMessage, SystemMessage
 from openai_helper import ai
-from streaming import stream
 
 class Orchestrator:
     check_end_assistant = None       

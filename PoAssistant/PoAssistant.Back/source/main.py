@@ -6,6 +6,7 @@ from file import file
 from dotenv import find_dotenv, load_dotenv
 from orchestrator import Orchestrator
 from langchain_openai_adapter import lc
+#from langchain_ollama_adapter import lc
 #from langchain import langchain
 
 async def main():

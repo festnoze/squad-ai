@@ -107,6 +107,23 @@
 
 <body></body>
 
+<script>
+    function scrollToBottom(id) {
+        var element = document.getElementById(id);
+        if (element) {
+            console.error("Element '" + id + "' found!");
+            // Vérifie si l'ascenseur est déjà tout en bas avant d'ajouter le nouveau contenu
+            var isAtBottom = element.scrollHeight - element.scrollTop === element.clientHeight;
+            console.error("Element '" + id + "' is at bottom = " + isAtBottom.valueOf())
+            // Si l'élément existe et que l'ascenseur est tout en bas, alors on fait défiler vers le bas
+            if (isAtBottom) {
+                element.scrollTop = element.scrollHeight;
+            }
+        } else {
+            console.error("Element '" + id + "' not found");
+        }
+    }
+</script>
 
 @code {
     private ThreadModel messages = null!;
@@ -123,6 +140,15 @@
         isWaitingForLLM = threadService.IsWaitingForLLM();
         threadService.OnThreadChanged += ReloadThread;
         threadService.UserStoryReadyNotification += HandleUserStoryReadyNotification;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        //if (firstRender)
+        {
+            await JSRuntime.InvokeVoidAsync("scrollToBottom", "mainContent");
+        }
+        await base.OnAfterRenderAsync(firstRender);
     }
 
     // private async Task AdjustTextAreaHeight()
@@ -145,22 +171,22 @@
         return isEditingLastMessage && message.IsLastThreadMessage;
     }
     
-    private void EditLastMessage()
+    private async Task EditLastMessage()
     {
         isEditingLastMessage = true;
         threadService.EditingLastMessage();
 
         // Notify the component to re-render
-        InvokeAsync(StateHasChanged);
+        await InvokeAsync(StateHasChanged);
     }
 
     private void ShowMessageEmptyError()
     {
         showMessageEmptyError = true;
-        var task = Task.Delay(4000).ContinueWith(t => { showMessageEmptyError = false; InvokeAsync(StateHasChanged); });        
+        var task = Task.Delay(4000).ContinueWith(t => { showMessageEmptyError = false; InvokeAsync(StateHasChanged); });
     }
 
-    private void ValidateMetierAnswer()
+    private async Task ValidateMetierAnswer()
     {
         if (string.IsNullOrEmpty(messages.Last().Content))
         {
@@ -171,7 +197,7 @@
         isEditingLastMessage = false;
         isWaitingForLLM = true;
         threadService.ValidateMetierAnswer();
-        InvokeAsync(StateHasChanged);
+        await InvokeAsync(StateHasChanged);
     }
 
     private void DoEndBusinessPoExchange()
@@ -181,17 +207,17 @@
         threadService.DoEndBusinessPoExchange();
     }
 
-    private void ReloadThread()
+    private async void ReloadThread()
     {
         messages = threadService.GetPoMetierThread();
         isWaitingForLLM = threadService.IsWaitingForLLM();
-        InvokeAsync(StateHasChanged);
+        await InvokeAsync(StateHasChanged);
     }
 
-    private void HandleUserStoryReadyNotification()
+    private async void HandleUserStoryReadyNotification()
     {
         showUserStoryNotification = true;
-        InvokeAsync(StateHasChanged);
+        await InvokeAsync(StateHasChanged);
     }
 
     public void Dispose()
