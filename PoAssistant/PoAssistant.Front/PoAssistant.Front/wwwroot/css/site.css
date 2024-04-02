@@ -1,7 +1,11 @@
 @import url('open-iconic/font/css/open-iconic-bootstrap.min.css');
+@import url('https://fonts.googleapis.com/css2?family=Mulish:wght@400;700&display=swap');
 
 html, body {
-    font-family: Verdana, Geneva, Tahoma, sans-serif;
+    font-family: "Mulish", sans-serif;
+    font-size: 18px;
+    font-weight: 400;
+    line-height: 1.5;
 }
 
 /* Container for chat and input */
@@ -29,18 +33,18 @@ html, body {
 }
 
 .message-source-sender {
-    font-size: small;
+    font-size: 0.85em;
     width: 80%;
     margin-left: 15px;
-    color: cornflowerblue;
+    color: #6495ED;
     align-self: flex-start; /* Align to the left */
 }
 
 .message-source-receiver {
-    font-size: small;
+    font-size: 0.85em;
     width: 80%;
     margin-right: 15px;
-    color: cornflowerblue;
+    color: #7E74FD;
     align-self: flex-end; /* Align to the right */
 }
 .message-bubble {
@@ -80,17 +84,25 @@ html, body {
         max-width: 85%;
     }
 }
+
+.duration-text {
+    color: grey;
+    font-style: italic;
+    font-size: 0.75em;
+    margin-left: 8px;
+}
+
 .message-editable {
     width: 100%; /* Full width of the bubble */
-    height: auto; /* Adjust height based on content */
+    /*height: auto;*/ /* Adjust height based on content */
     border: none; /* Remove border */
     padding: 10px; /* Same padding as the bubble for internal spacing */
     border-radius: 10px; /* Match the bubble's border radius */
     resize: none; /* Disable resizing of the textarea */
     background-color: white;
     background-color: inherit; /* Inherit the bubble's background color */
-    font-family: inherit; /* Match the font of the rest of your application */
-    font-size: inherit; /* Match the font size of the bubble text */
+    font-family: "Mulish", sans-serif;
+    font-weight: 400;
     outline: none; /* Remove the default focus outline */
 }
 
@@ -98,7 +110,7 @@ html, body {
     box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25); /* Optional: Add a subtle focus outline */
     background-color: white;
     overflow-y: hidden; /* Cache la scrollbar verticale */
-    height: auto;
+    /*height: auto;*/
 }
 
 .input-area {
@@ -139,9 +151,8 @@ html, body {
 
 .loader {
     display: flex;
-    justify-content: center;
+    justify-content: right;
     align-items: center;
-    padding-top: 20px;
 }
 
 .circle {
@@ -150,26 +161,26 @@ html, body {
     margin: 5px;
     width: 17px;
     height: 17px;
-    animation: circleBounce 2.0s infinite ease-in-out both;
+    animation: circleBounce 1.8s infinite ease-in-out both;
 }
 
     .circle:nth-child(1) {
-        animation-delay: -1.3s;
-    }
-
-    .circle:nth-child(2) {
         animation-delay: -1.1s;
     }
 
-    .circle:nth-child(3) {
+    .circle:nth-child(2) {
         animation-delay: -0.9s;
     }
 
-    .circle:nth-child(4) {
+    .circle:nth-child(3) {
         animation-delay: -0.7s;
     }
-    .circle:nth-child(5) {
+
+    .circle:nth-child(4) {
         animation-delay: -0.5s;
+    }
+    .circle:nth-child(5) {
+        animation-delay: -0.3s;
     }
 
 @keyframes circleBounce {

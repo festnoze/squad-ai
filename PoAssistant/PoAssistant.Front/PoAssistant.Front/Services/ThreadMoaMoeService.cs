@@ -75,7 +75,6 @@ public class ThreadMetierPoService : IDisposable
 
         isWaitingForLLM = IsWaiting();
         RefreshLastMessageInThread();
-
         OnThreadChanged?.Invoke();
     }
 
@@ -168,12 +167,14 @@ public class ThreadMetierPoService : IDisposable
             messages!.Last().ChangeContent(string.Empty);
     }
 
-    public void ValidateMetierAnswer()
+    public void ValidateMetierAnswer(string modifiedMessageContent)
     {
         if (!messages?.Any() ?? true)
             return;
         
         var lastMessage = messages!.Last();
+        if (!string.IsNullOrWhiteSpace(modifiedMessageContent))
+            lastMessage.Content = modifiedMessageContent;
 
         if (lastMessage.IsEndMessage && lastMessage.Content != endExchangeProposalMessage)
             lastMessage.IsEndMessage = false;
@@ -220,5 +221,7 @@ public class ThreadMetierPoService : IDisposable
         var lastMessage = messages!.Last();
         lastMessage.IsStreaming = false;
         isWaitingForLLM = IsWaiting();
+        RefreshLastMessageInThread();
+        OnThreadChanged?.Invoke();
     }
 }

@@ -1,0 +1,4 @@
+Ecris les tests d'acceptance en Gherkin correspondants à la fonctionnalité :
+{use_case}
+Ecris un ou plusieurs scénario pour chacun des critères d'acceptance suivants :
+{acceptance_criteria}

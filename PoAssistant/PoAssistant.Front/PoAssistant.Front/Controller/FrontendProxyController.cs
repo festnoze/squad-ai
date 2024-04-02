@@ -46,13 +46,6 @@ public class FrontendProxyController : ControllerBase
         _threadService.AddNewMessage(newMessage);
     }
 
-
-    [HttpPost("metier-po/update-last-message")]
-    public void UpdateLastMetierPoMessage([FromBody] MessageModel newMessage)
-    {
-        _threadService.UpdateLastMessage(newMessage);
-    }
-
     [HttpDelete("metier-po/delete-all")]
     public void DeleteMetierPoThread()
     {
@@ -60,10 +53,10 @@ public class FrontendProxyController : ControllerBase
     }
 
     [HttpPost("po/us")]
-    public void ReadyPoUserStory([FromBody] UserStoryModel userStory)
+    public void ReadyPoUserStory([FromBody]IEnumerable<UserStoryModel> userStories)
     {
         _threadService.EndMetierMetierExchange();
-        _userStoryService.SetPoUserStory(userStory);
+        _userStoryService.SetPoUserStory(userStories);
     }
 
     [HttpPost("metier-po/message-content-stream")]
@@ -98,6 +91,12 @@ public class FrontendProxyController : ControllerBase
             }
         }
         _threadService.EndsStreamMessage();
+    }
+
+    [HttpPost("metier-po/update-last-message")]
+    public void UpdateLastMetierPoMessage([FromBody] MessageModel newMessage)
+    {
+        _threadService.UpdateLastMessage(newMessage);
     }
 
     [HttpGet("ping")]

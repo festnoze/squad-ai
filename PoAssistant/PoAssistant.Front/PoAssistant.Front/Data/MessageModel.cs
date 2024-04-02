@@ -5,14 +5,14 @@ namespace PoAssistant.Front.Data;
 public record MessageModel
 {
     public static string BusinessExpertName = "Métier";
-    public static string ProjectManagerName = "PM";
+    public static string ProjectManagerName = "Chef de Projet";
     [JsonPropertyName("source")]
     public string Source { get; init; }
 
     [JsonPropertyName("content")]
     public string Content { get; set; }
 
-    [JsonPropertyName("durationSeconds")]
+    [JsonPropertyName("duration")]
     public int DurationSeconds { get; set; }
 
     public DateTime Timestamp { get; init; }
@@ -32,6 +32,9 @@ public record MessageModel
 
     public MessageModel(string source, string content, int durationSeconds, bool isSavedMessage = true, bool isEndMessage = false)
     {
+        if (source == "PM") source = ProjectManagerName;
+        if (source.StartsWith("Business")) source = BusinessExpertName;
+
         Source = source;
         Content = content;
         DurationSeconds = durationSeconds;

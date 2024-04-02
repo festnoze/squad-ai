@@ -38,11 +38,11 @@ class Orchestrator:
         conversation = await self.do_metier_pm_exchanges_async(request_message)
         self.save_metier_pm_exchanges(conversation)
     
-        us_content = self.create_po_us_and_usecases(conversation)
-        self.save_po_us_and_usecases(us_content)
+        us_contents = self.create_po_us_and_usecases(conversation)
+        self.save_po_us_and_usecases(us_contents)
         
         return
-    
+        # not tested QA tests creation
         threads_ids = await self.create_qa_acceptance_tests_async()
         self.save_qa_acceptance_tests(threads_ids)
 
@@ -59,21 +59,13 @@ class Orchestrator:
             if counter > self.max_exchanges_count or business_answer == Orchestrator.tag_end_exchange:
                 return conversation
             
+            # Ask PM with latest business expert feedback (or initial need expression):
             pm_answer_message = await lc.ask_llm_new_pm_business_message_streamed_to_front_async(
                         chat_model= self.pm_llm,
                         user_role= Orchestrator.pm_role,
                         conversation= conversation,
                         instructions= [self.pm_instructions, initial_request_instruction]
             )
-
-            # pm_message = lc.invoke_with_conversation(
-            #                 chat_model= self.pm_llm,
-            #                 user_role= Orchestrator.pm_role,
-            #                 conversation= conversation,
-            #                 instructions= [self.pm_instructions, initial_request_instruction]
-            #             )
-            # misc.print_message(pm_message)
-            # front_client.post_new_metier_or_po_answer(pm_message)
 
             # If PM has no more questions, ask business if they still want to add other points
             if pm_answer_message.content.__contains__(Orchestrator.tag_end_pm_questions):
@@ -82,26 +74,17 @@ class Orchestrator:
                     conversation.add_new_message(Orchestrator.business_role, business_answer, 0)
                 continue
 
+            # Ask business with latest PM questions:
             business_message = await lc.ask_llm_new_pm_business_message_streamed_to_front_async(
                         chat_model= self.business_llm,
                         user_role= Orchestrator.business_role,
                         conversation= conversation,
                         instructions= [self.business_instructions, initial_request_instruction]
-            ) 
-
-            # Ask business with latest PM questions & run:
-            # business_message = lc.invoke_with_conversation(
-            #                     chat_model= self.business_llm,
-            #                     user_role= Orchestrator.business_role,
-            #                     conversation= conversation,
-            #                     instructions= [self.business_instructions, initial_request_instruction]
-            #                 )
-            # misc.print_message(business_message)            
-            # front_client.post_new_metier_or_pm_answer(business_message)   
+            )
                  
             business_answer = front_client.wait_metier_answer_validation_and_get()
 
-            # update last conversation message if changed on the front-end
+            # Update last conversation message if changed on the front-end
             if conversation.messages[-1].content != business_answer:
                 conversation.messages[-1].content = business_answer 
 
@@ -179,8 +162,8 @@ class Orchestrator:
             file.write_file(content, "AcceptanceTests", f"use_case{i}.feature")
             i += 1
 
-    def save_po_us_and_usecases(self, us_content: str):
-        us_and_usecases_json = misc.extract_json_from_text(us_content)
+    def save_po_us_and_usecases(self, us_contents: str):
+        us_and_usecases_json = misc.extract_json_from_text(us_contents)
         front_client.post_po_us_and_usecases(us_and_usecases_json)
         us_and_usecases_json_str = misc.json_to_str(us_and_usecases_json)
         file.write_file(us_and_usecases_json_str, misc.sharedFolder, "user_story.json")

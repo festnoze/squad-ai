@@ -5,25 +5,41 @@ namespace PoAssistant.Front.Services;
 
 public class UserStoryService
 {
-    private UserStoryModel? userStory = null;
+    private List<UserStoryModel>? userStories = null;
+    private int currentUsIndex = 0;
     public event Action? OnUserStoryChanged = null;
-    public const string endPmTag = "[FIN_PM_ASSIST]";
-    private NavigationService _navigationService;
-    public UserStoryService(NavigationService navigationService)
+
+    public UserStoryService()
     {
-        _navigationService = navigationService;
-        //InitializeFileWatcher();
     }
 
-    public void SetPoUserStory(UserStoryModel userStory)
+    public void SetPoUserStory(IEnumerable<UserStoryModel> userStories)
     {
-        this.userStory = userStory;
-        //_navigationService.NavigateToPoPage();
+        this.userStories = userStories.ToList();
+        currentUsIndex = 0;
         OnUserStoryChanged?.Invoke();
+    }
+
+    public void NavigateToNextUS()
+    {
+        if (userStories is null)
+            return;
+
+        if (currentUsIndex < userStories!.Count - 1)
+            currentUsIndex++;
+    }
+
+    public void NavigateToPreviousUS()
+    {
+        if (userStories is null)
+            return;
+
+        if (currentUsIndex > 0)
+            currentUsIndex--;
     }
 
     public UserStoryModel? GetPoUserStory()
     {
-        return userStory;
+        return userStories?[currentUsIndex];
     }
 }

@@ -11,7 +11,7 @@
 <head>
 </head>
 
-<h4>Atelier de conception Métier/PM : spécification du besoin</h4>
+<h4>Atelier de conception Métier/Chef de Projet : Cadrons le brief</h4>
 
 <div class="chat-wrapper">
     <div class="chat-container">
@@ -22,7 +22,7 @@
                 @message.Source
                 @if (message.DurationSeconds > 0)
                 {
-                    <text>(@message.DurationSeconds s.)</text>
+                    <span class="duration-text">(@message.DurationSeconds s.)</span>
                 }
             </div>
             
@@ -56,14 +56,14 @@
                         <div class="circle"></div>
                         <div class="circle"></div>
                         <div class="circle"></div>
-                        <div class="circle"></div>
-                        <div class="circle"></div>
                     </div>
                 }
                 @if (IsEditingMode(message))
                 {
                     @* Display message for editing *@
-                    <textarea @bind="message.Content" class="message-editable" placeholder="Décrivez ici le besoin à spécifier"></textarea>
+                    <textarea id="editingMessageTextarea" @onblur="HandleEditMessageExit" class="message-editable" placeholder="Décrivez ici le besoin à spécifier">
+                        @message.Content
+                    </textarea>
 
                     @* Display editing actions buttons *@
                     <div class="edit-button-wrapper">
@@ -77,17 +77,6 @@
             </div>
         }
     </div> 
-    @* <div class="input-area">
-        @if (messages.Any() && messages.Last().IsLastThreadMessage)
-        {
-            <textarea class="input-text" @bind="messages.Last().Content"></textarea>
-        }
-        else
-        {
-            <textarea class="input-text" placeholder="Attendre le prochain message Métier à corriger" readonly></textarea>
-        }
-        <button class="send-button" disabled="@(messages.Any() && messages.Last().IsLastThreadMessage ? false : true)">Send</button>
-    </div> *@
     @if (showMessageEmptyError)
     {
         <div class="notification">
@@ -105,9 +94,10 @@
     }
 </div>
 
-<body></body>
+<body>
+</body>
 
-<script>
+@* <script>
     function scrollToBottom(id) {
         var element = document.getElementById(id);
         if (element) {
@@ -123,6 +113,32 @@
             console.error("Element '" + id + "' not found");
         }
     }
+    function copyHeightTo(id1, id2) {
+        var element1 = document.getElementById(id1);
+        var element2 = document.getElementById(id2);
+        if (element1 && element2) {
+            console.error("Elements '" + id1 + "and " + id2 + "' found!");
+            // Vérifie si l'ascenseur est déjà tout en bas avant d'ajouter le nouveau contenu
+            id1.height = id2.height;
+        }
+    }
+</script> *@
+<script>
+    function getTextareaValue(id) {
+        return document.getElementById(id).value;
+    }
+    function autoResizeTextarea(id) {
+        var textarea = document.getElementById(id);
+        if (textarea) {
+            console.error('testy!');
+            textarea.style.height = 'auto';
+            textarea.style.height = textarea.scrollHeight + 'px';
+            textarea.addEventListener('input', function () {
+                this.style.height = 'auto';
+                this.style.height = this.scrollHeight + 'px';
+            }, false);
+        }
+    }
 </script>
 
 @code {
@@ -132,6 +148,12 @@
     private bool isEditingLastMessage = false;
     private bool showMessageEmptyError = false; 
     private bool showUserStoryNotification = false;
+    public string modifiedMessageContent =string.Empty;
+
+    private async Task HandleEditMessageExit()
+    {
+        modifiedMessageContent = await JSRuntime.InvokeAsync<string>("getTextareaValue", "editingMessageTextarea");
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -144,17 +166,17 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        //if (firstRender)
+        if (firstRender)
         {
-            await JSRuntime.InvokeVoidAsync("scrollToBottom", "mainContent");
+            await AutosizeEditingTextAreaAsync();
         }
         await base.OnAfterRenderAsync(firstRender);
     }
 
-    // private async Task AdjustTextAreaHeight()
-    // {
-    //     await JSRuntime.InvokeVoidAsync("adjustTextAreaHeight", textAreaElement);
-    // }
+    private async Task AutosizeEditingTextAreaAsync()
+    {
+        await JSRuntime.InvokeVoidAsync("autoResizeTextarea", "editingMessageTextarea");
+    }
 
     private bool DisplayEditingButtons(MessageModel message)
     {
@@ -170,13 +192,17 @@
     {
         return isEditingLastMessage && message.IsLastThreadMessage;
     }
-    
+
     private async Task EditLastMessage()
     {
         isEditingLastMessage = true;
         threadService.EditingLastMessage();
 
         // Notify the component to re-render
+        await AutosizeEditingTextAreaAsync();
+        await InvokeAsync(StateHasChanged);
+
+        await AutosizeEditingTextAreaAsync();
         await InvokeAsync(StateHasChanged);
     }
 
@@ -188,7 +214,7 @@
 
     private async Task ValidateMetierAnswer()
     {
-        if (string.IsNullOrEmpty(messages.Last().Content))
+        if (isEditingLastMessage && string.IsNullOrEmpty(modifiedMessageContent))
         {
             ShowMessageEmptyError();
             return;
@@ -196,7 +222,8 @@
 
         isEditingLastMessage = false;
         isWaitingForLLM = true;
-        threadService.ValidateMetierAnswer();
+        threadService.ValidateMetierAnswer(modifiedMessageContent);
+        modifiedMessageContent = string.Empty;
         await InvokeAsync(StateHasChanged);
     }
 

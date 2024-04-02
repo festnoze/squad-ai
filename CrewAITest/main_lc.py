@@ -97,7 +97,7 @@ asyncio.run(main())
 #llm = OpenAI(openai_api_key= openai_api_key, temperature= 0, model_name= "gpt-3.5-turbo-instruct")
 
 # messages = [
-#     SystemMessage(content="We are playing a game of repeat after me."),
+#     SystemMessage(content="We are playing a game of repeat after me."
 #     HumanMessage(content="I'm trying to understand calculus. Can you explain the basic idea?"),
 # ]
 

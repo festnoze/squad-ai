@@ -8,8 +8,8 @@
 }
 
 .navbar-brand {
-    font-size: 1.2rem;
-    padding-left: 20px;
+    /*font-size: 1.3rem;*/
+    padding-left: 12px;
     justify-content: center
 }
 
@@ -32,6 +32,9 @@
         font-size: 1.1rem;
         vertical-align: text-top;
         top: -2px;
+    }
+    .nav-icon {
+        font-size: 1.5rem;
     }
 
     .nav-item {
@@ -92,7 +95,7 @@
 
     /* Styles additionnels pour le menu réduit */
     .menu-reduced {
-        width: 80px; /* Largeur réduite pour n'afficher que les icônes */
+        width: 95px; /* Largeur réduite pour n'afficher que les icônes */
     }
 
         .menu-reduced .nav-link {
