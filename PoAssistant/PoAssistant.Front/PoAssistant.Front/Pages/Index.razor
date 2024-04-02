@@ -24,6 +24,10 @@
                 {
                     <span class="duration-text">(@message.DurationSeconds s.)</span>
                 }
+                else if (message.DurationSeconds == -1)
+                {
+                    <span class="duration-text">[...]</span>
+                }
             </div>
             
             @* Display message bubble & its content *@

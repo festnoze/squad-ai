@@ -11,7 +11,7 @@ public class ThreadMetierPoService : IDisposable
     public event Action? OnThreadChanged = null;
     private bool isWaitingForLLM = false;
     public const string endPmTag = "[FIN_PM_ASSIST]";
-    private static string endExchangeProposalMessage = "Ajouter des points à aborder avec le Project Manager si vous le souhaitez. Sinon, cliquez sur le boutton : 'Terminer l'échange' pour passer à l'étape de rédaction de l'US";
+    private static string endExchangeProposalMessage = "Ajouter des points à aborder avec le Project Manager si vous le souhaitez. Sinon, cliquez sur le bouton : 'Terminer l'échange' pour passer à l'étape de rédaction de l'US";
 
     public ThreadMetierPoService()
     {
@@ -73,9 +73,7 @@ public class ThreadMetierPoService : IDisposable
         newMessage.IsSavedMessage = false;
         messages!.Add(newMessage);
 
-        isWaitingForLLM = IsWaiting();
-        RefreshLastMessageInThread();
-        OnThreadChanged?.Invoke();
+        HandleWaitingStateAndEndExchange();
     }
 
      public void UpdateLastMessage(MessageModel updatedLastMessage)
@@ -122,7 +120,7 @@ public class ThreadMetierPoService : IDisposable
         OnThreadChanged?.Invoke();
     }
 
-    private bool IsWaiting()
+    private void HandleWaitingStateAndEndExchange()
     {
         if (messages != null && messages.Any())
         {
@@ -133,16 +131,19 @@ public class ThreadMetierPoService : IDisposable
                 {
                     messages!.Last().ChangeContent("Merci. Nous avons fini, j'ai tous les éléments dont j'ai besoin. Avez-vous d'autres points à aborder ?");
                     messages.Add(new MessageModel(MessageModel.BusinessExpertName, endExchangeProposalMessage, 0, false, true));
-                    return false;
+                    isWaitingForLLM = false;
                 }
-                return true;
+                else
+                    isWaitingForLLM = true;
             }
-
-            if (!messages!.Last().IsSender)
-                return false;
+            else if (!messages!.Last().IsSender)
+                isWaitingForLLM = false;
         }
-        
-        return false;
+        else
+            isWaitingForLLM = false;
+
+        RefreshLastMessageInThread();
+        OnThreadChanged?.Invoke();
     }
 
     private void RefreshLastMessageInThread()
@@ -207,7 +208,7 @@ public class ThreadMetierPoService : IDisposable
         var role = "Métier";
         if (messages?.Any() ?? false)
             role =  messages.Last().IsSender ? MessageModel.BusinessExpertName : MessageModel.ProjectManagerName;
-        var newMessage = new MessageModel(role, string.Empty, 0, false);
+        var newMessage = new MessageModel(role, string.Empty, -1, false);
         newMessage.IsStreaming = true;
 
         messages!.Add(newMessage);
@@ -220,8 +221,6 @@ public class ThreadMetierPoService : IDisposable
     {
         var lastMessage = messages!.Last();
         lastMessage.IsStreaming = false;
-        isWaitingForLLM = IsWaiting();
-        RefreshLastMessageInThread();
-        OnThreadChanged?.Invoke();
+        HandleWaitingStateAndEndExchange();
     }
 }
