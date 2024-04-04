@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List, Tuple
+# internal import
 from models.conversation import Conversation, Message
 
 class LangChainAdapter(ABC):

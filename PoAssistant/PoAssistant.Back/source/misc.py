@@ -1,7 +1,8 @@
 import time
 import json
-from file import file
 from datetime import datetime
+# internal import
+from file_helper import file
 from models.conversation import Message
 
 class misc: 

@@ -16,7 +16,6 @@ from langchain_core.messages.base import BaseMessage, BaseMessageChunk
 from typing import List, Tuple, Union
 import uuid
 import time
-
 # internal import
 from misc import misc
 from front_client import front_client

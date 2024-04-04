@@ -1,0 +1,38 @@
+[
+    {
+        "us_desc": "En tant qu'apprenant\nPour les écoles utilisant notre plateforme\nJe souhaiterais accéder à un module de passage des examens intégré à la plateforme existante\nAfin de passer mes examens de manière flexible, avec des options pour des examens à heure spécifique ou à plage de passage.\n\nCe module doit permettre aux apprenants de consulter les détails de l'examen, recevoir une confirmation d'inscription, accéder à un historique de leurs tentatives précédentes avec leurs scores, et uploader leur copie à la fin de l'examen. Pour les formateurs, il doit permettre de créer et configurer les examens, y compris définir les plages horaires ou les heures spécifiques, le type d'examen, le nombre de tentatives autorisées, la pondération des questions, les matériaux autorisés, et les critères de réussite.",
+        "use_cases": [
+            {
+                "uc_desc": "Accès et inscription à l'examen",
+                "acceptance_criteria": [
+                    "L'apprenant peut consulter les détails de l'examen avant de commencer.",
+                    "L'apprenant reçoit une confirmation d'inscription à l'examen.",
+                    "L'apprenant peut accéder à un historique de leurs tentatives précédentes avec leurs scores."
+                ]
+            },
+            {
+                "uc_desc": "Passage de l'examen",
+                "acceptance_criteria": [
+                    "L'apprenant peut passer des examens à heure spécifique ou à plage de passage.",
+                    "L'apprenant peut uploader sa copie à la fin de l'examen."
+                ]
+            },
+            {
+                "uc_desc": "Consultation des résultats et feedback",
+                "acceptance_criteria": [
+                    "L'apprenant reçoit les résultats des QCM instantanément et des questions ouvertes dans un délai d'une semaine.",
+                    "L'apprenant reçoit une notification par email et peut consulter ses résultats sur la plateforme.",
+                    "L'apprenant reçoit un feedback détaillé sur les réponses, avec des recommandations de ressources supplémentaires."
+                ]
+            },
+            {
+                "uc_desc": "Création et configuration des examens par les formateurs",
+                "acceptance_criteria": [
+                    "Le formateur peut définir les plages horaires ou les heures spécifiques pour les examens.",
+                    "Le formateur peut configurer le type d'examen, le nombre de tentatives autorisées, la pondération des questions, les matériaux autorisés, et les critères de réussite.",
+                    "Le formateur peut configurer des restrictions d'accès basées sur l'inscription à un cours, la complétion de prérequis, des groupes d'utilisateurs, ou des restrictions temporelles."
+                ]
+            }
+        ]
+    }
+]

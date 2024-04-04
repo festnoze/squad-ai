@@ -1,5 +1,3 @@
-import os
-
 class display:
     def display_assistant_ids(title, assistant_set):
         print(f"{title}:")
