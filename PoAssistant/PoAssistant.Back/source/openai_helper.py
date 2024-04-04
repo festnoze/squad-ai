@@ -163,14 +163,7 @@ class ai:
             
     def get_run_duration_seconds(run):
         return misc.get_elapsed_time_seconds(run.created_at, run.completed_at)
-    
-    def create_from_ids(assist_ids):
-        return LlmSet(
-            llm= openai.beta.assistants.retrieve(assist_ids.assistant_id),
-            thread= openai.beta.threads.retrieve(assist_ids.thread_id),
-            run_instructions= assist_ids.run_instructions
-        )
-            
+     
     def delete_assistant_set(assistant):
         openai.beta.assistants.delete(assistant_id= assistant.assistant.id)
         openai.beta.threads.delete(thread_id= assistant.thread.id)

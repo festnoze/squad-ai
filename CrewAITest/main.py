@@ -32,14 +32,14 @@ business_agent = Agent(
     openai_api_key= openai_api_key
 )
 
-# po = Agent(
-#     role= "product owner",
-#     goal= file.get_as_str("po_us_assistant_instructions.txt"),
-#     backstory= "",
-#     verbose= True,
-#     allow_delegation= False,
-#    openai_api_key= openai_api_key
-# )
+po = Agent(
+    role= "product owner",
+    goal= file.get_as_str("po_us_assistant_instructions.txt"),
+    backstory= "",
+    verbose= True,
+    allow_delegation= False,
+   openai_api_key= openai_api_key
+)
 
 #orchestrator workload
 

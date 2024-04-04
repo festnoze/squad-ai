@@ -82,7 +82,7 @@ class front_client:
             # Stream the data to the API endpoint
             response = await http_client.post(url, content=content_stream, headers=headers)
             if (response.status_code == 200):
-                print("[stream sent]")
+                print(" [end sent]")
         
     def delete_all_metier_po_thread(throw_upon_error = True):
         url = f"{front_client.host_uri}/{front_client.frontend_proxy_subpath}/{front_client.delete_metier_pm_thread_url_delete}"

@@ -24,7 +24,7 @@ async def main():
     # List available models
     # ai.print_models()
     # sys.exit()
-    max_exchanges_count = 5
+    max_exchanges_count = 2
 
     #Start the ochestrator workflow  
     lc.set_api_key(openai_api_key)

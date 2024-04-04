@@ -87,11 +87,8 @@ public class ThreadMetierPoService : IDisposable
         updatedLastMessage.IsSavedMessage = false;
         updatedLastMessage.IsStreaming = false;
 
-
         messages.Add(updatedLastMessage);
-
-        RefreshLastMessageInThread();
-        OnThreadChanged?.Invoke();
+        HandleWaitingStateAndEndExchange();
     }
 
     public void DisplayStreamMessage(string? messageChunk)
@@ -127,9 +124,9 @@ public class ThreadMetierPoService : IDisposable
             // Change end message of PO & make it editable by user
             if (messages!.Last().IsSender)
             {
-                if (messages!.Last().Content.Contains(endPmTag) || !messages!.Last().Content.Contains("?"))
+                if (messages!.Last().Content.Contains(endPmTag) /*|| !messages!.Last().Content.Contains("?")*/)
                 {
-                    messages!.Last().ChangeContent("Merci. Nous avons fini, j'ai tous les éléments dont j'ai besoin. Avez-vous d'autres points à aborder ?");
+                    messages!.Last().ChangeContent(messages!.Last().Content.Replace(endPmTag, string.Empty)); //"Merci. Nous avons fini, j'ai tous les éléments dont j'ai besoin. Avez-vous d'autres points à aborder ?");
                     messages.Add(new MessageModel(MessageModel.BusinessExpertName, endExchangeProposalMessage, 0, false, true));
                     isWaitingForLLM = false;
                 }
@@ -219,8 +216,6 @@ public class ThreadMetierPoService : IDisposable
 
     public void EndsStreamMessage()
     {
-        var lastMessage = messages!.Last();
-        lastMessage.IsStreaming = false;
-        HandleWaitingStateAndEndExchange();
+        messages!.Last().IsStreaming = false;
     }
 }
