@@ -69,7 +69,7 @@ class front_client:
         response = requests.post(url, data= json.dumps(message_json), headers= headers)
         front_client.print_response_status(response, front_client.post_new_metier_or_pm_answer.__name__)
 
-    def post_change_last_metier_or_pm_answer(message: Message):
+    def post_update_last_metier_or_pm_answer(message: Message):
         message_json = misc.get_message_as_json(message)
         url = f"{front_client.host_uri}/{front_client.frontend_proxy_subpath}/{front_client.update_last_metier_pm_message_url_post}"        
         headers = {'Content-Type': 'application/json'}

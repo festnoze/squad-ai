@@ -1,15 +1,15 @@
 from misc import misc
 from display_helper import display
 from datetime import datetime
-from file_helper import file
-from front_client import front_client
-from langchain_openai_adapter import lc
 #from langchain_ollama_adapter import lc
 # internal import
+from langchain_adapter_interface import LangChainAdapter
+from front_client import front_client
 from models.conversation import Conversation, Message
 from langchain.schema.messages import HumanMessage, AIMessage, SystemMessage
 from openai_helper import ai
-
+from file_helper import file
+from langchain_factory import LangChainFactory
 class Orchestrator:
     check_end_assistant = None       
     pm_role = "PM"
@@ -19,8 +19,9 @@ class Orchestrator:
     tag_end_exchange = "[ENDS_EXCHANGE]"
     tag_end_pm_questions = "[FIN_PM_ASSIST]"
 
-    def __init__(self, max_exchanges_count):
+    def __init__(self, langchain_adapter, max_exchanges_count):
         self.max_exchanges_count = max_exchanges_count
+        self.langchain = langchain_adapter
 
     async def perform_workflow_async(self):  
         self.delete_all_outputs()        
@@ -68,7 +69,7 @@ class Orchestrator:
                 return conversation
             
             # Ask PM with latest business expert feedback (or initial need expression):
-            pm_answer_message = await lc.ask_llm_new_pm_business_message_streamed_to_front_async(
+            pm_answer_message = await self.langchain.ask_llm_new_pm_business_message_streamed_to_front_async(
                         chat_model= self.llm,
                         user_role= Orchestrator.pm_role,
                         conversation= conversation,
@@ -83,7 +84,7 @@ class Orchestrator:
                 continue
 
             # Ask business with latest PM questions:
-            business_message = await lc.ask_llm_new_pm_business_message_streamed_to_front_async(
+            business_message = await self.langchain.ask_llm_new_pm_business_message_streamed_to_front_async(
                         chat_model= self.llm,
                         user_role= Orchestrator.business_role,
                         conversation= conversation,
@@ -104,7 +105,7 @@ class Orchestrator:
         request_with_instructions.append(SystemMessage(content= po_instructions_for_us_writing))
         request_with_instructions.append(HumanMessage(content= f"Voici l'échange sous forme Json :\n{pm_business_exchange_as_json_str}"))        
         
-        answer, elapsed = lc.invoke(self.llm, request_with_instructions)
+        answer, elapsed = self.langchain.invoke(self.llm, request_with_instructions)
         misc.print_message(Message(Orchestrator.po_role, answer, elapsed))
         return answer
     
@@ -183,7 +184,7 @@ class Orchestrator:
         file.delete_all_files_with_extension("*StepDefinitions.cs", "AcceptanceTests")
     
     # def create_check_end_assistant(self):
-    #     self.check_end_assistant = lc.create_chat_langchain(
+    #     self.check_end_assistant = self.langchain.create_chat_langchain(
     #         model= "gpt-3.5-turbo-16k",
     #         instructions="Tu es un expert en analyse de phrases, et tu dois toujours répondre uniquement par oui ou non",
     #         run_instructions= "",
@@ -214,10 +215,10 @@ class Orchestrator:
         self.po_instructions= file.get_as_str("po_us_assistant_instructions.txt")
         self.qa_instructions= file.get_as_str("qa_assistant_instructions.txt")
 
-        self.llm = lc.create_chat_langchain(
+        self.llm = self.langchain.create_chat_langchain(
             model= self.model_gpt_40,
-            timeout_seconds= 100, 
-            temperature= 0,
+            timeout_seconds= 100,
+            temperature=  0
         )
 
 
