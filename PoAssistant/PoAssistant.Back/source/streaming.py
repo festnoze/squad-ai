@@ -9,8 +9,8 @@ class stream:
     def set_api_key(api_key):
         stream.openai_api_key = api_key
 
-    async def get_chat_answer_as_stream_not_await_async(chat: ChatOpenAI, input, full_stream: StreamContainer, display_console: bool = True):
-        async for chunk in chat.astream(input):
+    async def get_llm_answer_stream_not_await_async(llm, input, full_stream: StreamContainer, display_console: bool = True):
+        async for chunk in llm.astream(input):
             content = chunk.content
             if display_console:
                 print(content, end= "", flush= True)

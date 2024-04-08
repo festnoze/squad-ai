@@ -2,7 +2,6 @@ from langchain.llms.ollama  import Ollama
 from langchain.callbacks.manager import CallbackManager
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 
-
 from langchain.prompts import PromptTemplate
 from langchain.schema.messages import HumanMessage, SystemMessage
 from langchain_core.prompts.chat import (
@@ -20,40 +19,53 @@ import time
 from misc import misc
 from front_client import front_client
 from models.stream_container import StreamContainer
-from langchain_adapter_interface import LangChainAdapter
+from langchains.langchain_adapter_interface import LangChainAdapter
 from streaming import stream
 from models.conversation import Conversation, Message
 
-class LangChainOllamaAdapter(LangChainAdapter):
-    def create_chat_langchain(self, model: str, timeout_seconds: int = 50, temperature:float = 0.7) -> Ollama:
+class LangChainAdapterForOllama(LangChainAdapter):
+    def __init__(self, llm_model_name: str):
+        self.llm_model_name = llm_model_name
+        self.llm: Ollama = self.create_langchain_llm(llm_model_name)
+
+    def create_langchain_llm(self, llm_model_name: str, timeout_seconds: int = 50, temperature:float = 0.1) -> Ollama:
         return Ollama(    
             name= f"ollama_{str(uuid.uuid4())}",
-            model= model,
+            model= llm_model_name,
+            timeout= timeout_seconds,
+            temperature= temperature,
+            callback_manager= CallbackManager([StreamingStdOutCallbackHandler()])
+        )
+        
+    def create_langchain_llm(self, llm_model_name: str, timeout_seconds: int = 50, temperature:float = 0.1) -> Ollama:
+        return Ollama(    
+            name= f"ollama_{str(uuid.uuid4())}",
+            model= llm_model_name,
             timeout= timeout_seconds,
             temperature= temperature,
             callback_manager= CallbackManager([StreamingStdOutCallbackHandler()])
         )
     
-    def invoke_with_conversation(self, chat_model: Ollama, user_role: str, conversation: Conversation, instructions: List[str]) -> Message:
+    def invoke_with_conversation(self, user_role: str, conversation: Conversation, instructions: List[str]) -> Message:
         exchanges = conversation.to_langchain_messages(user_role, instructions)
-        answer, elapsed = LangChainOllamaAdapter.invoke(chat_model, exchanges)        
+        answer, elapsed = self.invoke_with_elapse_time(llm= self.llm, input= exchanges)        
         answer_message = Message(user_role, answer, elapsed)
         conversation.add_message(answer_message)
         return answer_message
     
-    def invoke(self, chat_model: Ollama, input) -> Tuple[str, float]:
+    def invoke_with_elapse_time(self, input) -> Tuple[str, float]:
         start_time = time.time()
-        response = chat_model.invoke(input)
+        response = self.llm.invoke(input)
         end_time = time.time()
         elapsed = misc.get_elapsed_time_seconds(start_time, end_time)
         answer = response.content
         return (answer, elapsed)
     
-    async def ask_llm_new_pm_business_message_streamed_to_front_async(self, chat_model: Ollama, user_role: str, conversation: Conversation, instructions: List[str]) -> Message:
+    async def ask_llm_new_pm_business_message_streamed_to_front_async(self, user_role: str, conversation: Conversation, instructions: List[str]) -> Message:
         exchanges = conversation.to_langchain_messages(user_role, instructions)            
         full_stream = StreamContainer()
         start_time = time.time()
-        content_stream = stream.get_chat_answer_as_stream_not_await_async(chat= chat_model, input= exchanges, full_stream= full_stream, display_console= True)
+        content_stream = stream.get_llm_answer_stream_not_await_async(llm= self.llm, input= exchanges, full_stream= full_stream, display_console= True)
         await front_client.post_new_metier_or_pm_answer_as_stream(content_stream)
         end_time = time.time()
         elapsed = misc.get_elapsed_time_seconds(start_time, end_time)

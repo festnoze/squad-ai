@@ -1,44 +1,28 @@
 [
     {
-        "us_desc": "En tant qu'apprenant de tous âges et niveaux scolaires,\nJe souhaiterais utiliser un module de dessin libre,\nAfin de développer ma créativité et faciliter l'apprentissage par le visuel.\n\nCe module de dessin libre vise à permettre aux apprenants de développer leur créativité et de faciliter l'apprentissage par le visuel. Il servira également d'outil pour expliquer des concepts complexes de manière intuitive ou pour réaliser des exercices pratiques dans diverses matières. Le module doit être compatible avec tous les types d'appareils et permettre la sauvegarde et le partage des travaux réalisés.",
+        "us_desc": "En tant qu'utilisateur de la plateforme d'apprentissage,\nJe souhaiterais accéder à un module de jeu sudoku,\nAfin de développer ma logique, ma concentration et ma capacité de résolution de problèmes tout en bénéficiant d'une approche ludique de l'apprentissage.\n\nLe module de jeu sudoku vise à offrir une expérience pédagogique enrichissante en développant des compétences clés chez les utilisateurs. Il sera accessible à tous les utilisateurs de la plateforme, proposant trois niveaux de complexité (débutant, intermédiaire, avancé) pour s'adapter à divers niveaux d'expérience. Les utilisateurs pourront choisir librement la difficulté de chaque sudoku, avec une option de recommandation automatique basée sur leurs performances antérieures pour un parcours adaptatif. L'interface sera intuitive, épurée, et inclura des fonctionnalités d'accessibilité pour assurer une expérience utilisateur optimale et inclusive.",
         "use_cases": [
             {
-                "uc_desc": "Utilisation des fonctionnalités de base du module de dessin",
+                "uc_desc": "Choix de la difficulté du sudoku par l'utilisateur",
                 "acceptance_criteria": [
-                    "Choix de la couleur et de l'épaisseur du trait disponibles",
-                    "Gomme pour effacer et outil de sélection pour déplacer des éléments présents",
-                    "Possibilité de dessiner des formes géométriques simples",
-                    "Fonctions 'annuler' et 'refaire' implémentées",
-                    "Option pour importer des images comme fond pour dessiner dessus",
-                    "Les travaux peuvent être sauvegardés sous forme de fichiers image (PNG ou JPEG)",
-                    "Les travaux peuvent être intégrés dans les portfolios des apprenants ou partagés dans des espaces de travail collaboratifs"
+                    "L'utilisateur peut sélectionner un niveau de difficulté (débutant, intermédiaire, avancé) avant de commencer une partie.",
+                    "Une option de recommandation automatique de difficulté est disponible et peut être activée ou désactivée par l'utilisateur."
                 ]
             },
             {
-                "uc_desc": "Adaptation du module pour les jeunes apprenants et les utilisateurs moins familiers avec la technologie",
+                "uc_desc": "Accès et utilisation du module de jeu sudoku",
                 "acceptance_criteria": [
-                    "Interface utilisateur simplifiée avec des icônes grandes et intuitives",
-                    "Palettes de couleurs prédéfinies pour faciliter le choix des couleurs",
-                    "Tutoriels interactifs pour guider l'utilisateur à travers les fonctionnalités de base",
-                    "Possibilité de régler le niveau de complexité de l'interface et des outils",
-                    "Retours visuels et sonores pour confirmer les actions"
+                    "Le module de jeu sudoku est accessible à tous les utilisateurs de la plateforme sans restriction.",
+                    "Les utilisateurs avec un abonnement premium ont accès à des fonctionnalités supplémentaires telles que des sudokus à thèmes spéciaux, des défis quotidiens avec récompenses exclusives, et des niveaux de difficulté 'expert' ou 'maître'.",
+                    "Le module peut être utilisé principalement en ligne, avec une option de téléchargement de grilles pour une utilisation hors ligne."
                 ]
             },
             {
-                "uc_desc": "Gestion des droits d'auteur et de propriété intellectuelle pour les images importées",
+                "uc_desc": "Conception de l'interface utilisateur du module de jeu sudoku",
                 "acceptance_criteria": [
-                    "Accord d'utilisation à accepter avant d'importer des images",
-                    "Fonctionnalité pour signaler des contenus inappropriés ou violant les droits d'auteur",
-                    "Informations et ressources éducatives sur les droits d'auteur disponibles dans la plateforme"
-                ]
-            },
-            {
-                "uc_desc": "Partage des travaux réalisés et fonctionnalités de commentaires ou d'évaluation",
-                "acceptance_criteria": [
-                    "Section de commentaires sous chaque travail partagé",
-                    "Options d'évaluation comme des étoiles ou des likes",
-                    "Possibilité pour les enseignants de laisser des annotations directement sur les travaux",
-                    "Paramètres de confidentialité pour choisir qui peut voir et commenter les travaux"
+                    "L'interface est intuitive, épurée, et accessible à tous les utilisateurs, indépendamment de leur âge ou de leur expérience avec les jeux de sudoku.",
+                    "Des fonctionnalités d'accessibilité telles que des options de contraste élevé, une taille de texte ajustable, et une navigation simple sont incluses.",
+                    "Des tutoriels ou des astuces pour les débutants sont intégrés pour faciliter l'apprentissage et l'engagement."
                 ]
             }
         ]
