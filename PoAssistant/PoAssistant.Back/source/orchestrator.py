@@ -1,14 +1,13 @@
 from misc import misc
 from display_helper import display
 from datetime import datetime
-
 # internal import
 from front_client import front_client
 from models.conversation import Conversation, Message
 from langchain.schema.messages import HumanMessage, AIMessage, SystemMessage
 from openai_helper import ai
 from file_helper import file
-from langchains.langchain_adapter_base import LangChainAdapter
+from langchains.langchain_adapter_generic import LangChainAdapter
 
 class Orchestrator:
     check_end_assistant = None       

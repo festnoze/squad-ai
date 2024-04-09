@@ -1,6 +1,8 @@
-from abc import ABC, abstractmethod
 import time
 from typing import Any, List, Tuple, Union
+from langchain_openai import ChatOpenAI
+from langchain.llms.ollama  import Ollama
+import uuid
 # internal imports
 from models.conversation import Conversation, Message
 from langchains.langchain_adapter_type import LangChainAdapterType
@@ -22,15 +24,39 @@ from misc import misc
 # from langchain.memory import ConversationBufferMemory
 # from langchain_core.messages.base import BaseMessage, BaseMessageChunk
 
-class LangChainAdapter(ABC):
+class LangChainAdapter():
     api_key: str = None
     adapter_type: LangChainAdapterType = None
     llm: Any = None
 
-    @abstractmethod
-    def create_langchain_llm(self, llm_model_name: str, timeout_seconds: int = 50, temperature:float = 0.1):
-        pass
+    def __init__(self, adapter_type: LangChainAdapterType, llm_model_name: str, timeout_seconds: int = 50, temperature: float = 0.1, api_key: str = None):
+        self.adapter_type = adapter_type
+        self.api_key = api_key
+        if adapter_type == LangChainAdapterType.OpenAI:
+            self.llm = self.create_llm_openai(llm_model_name, timeout_seconds, temperature)
+        elif adapter_type == LangChainAdapterType.Ollama:
+            self.llm = self.create_llm_ollama(llm_model_name, timeout_seconds, temperature)
+        else:
+            raise ValueError(f"Unknown adapter type: {adapter_type}")
  
+    def create_llm_ollama(self, llm_model_name: str, timeout_seconds: int = 50, temperature:float = 0.1) -> Ollama:
+        return Ollama(    
+            name= f"ollama_{str(uuid.uuid4())}",
+            model= llm_model_name,
+            timeout= timeout_seconds,
+            temperature= temperature,
+            #callback_manager= CallbackManager([StreamingStdOutCallbackHandler()]) # display answer's steam to the console
+        )
+    
+    def create_llm_openai(self, llm_model_name: str, timeout_seconds: int = 50, temperature:float = 0.1) -> ChatOpenAI:
+        return ChatOpenAI(    
+            name= f"chat_openai_{str(uuid.uuid4())}",
+            model= llm_model_name,
+            timeout= timeout_seconds,
+            temperature= temperature,
+            api_key= self.api_key,
+        )
+    
     def invoke_with_conversation(self, user_role: str, conversation: Conversation, instructions: List[str]) -> Message:
         exchanges = conversation.to_langchain_messages(user_role, instructions)
         answer, elapsed = self.invoke_with_elapse_time(llm= self.llm, input= exchanges)        
