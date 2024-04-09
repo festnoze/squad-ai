@@ -1,4 +1,4 @@
-from langchains.langchain_adapter_interface import LangChainAdapter
+from langchains.langchain_adapter_base import LangChainAdapter
 from langchains.langchain_adapter_ollama import LangChainAdapterForOllama
 from langchains.langchain_adapter_openai import LangChainAdapterForOpenAI
 from langchains.langchain_adapter_type import LangChainAdapterType

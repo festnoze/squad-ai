@@ -6,7 +6,6 @@ from collections import namedtuple
 # internal import
 from orchestrator import Orchestrator
 from langchains.langchain_factory import LangChainFactory
-from langchains.langchain_adapter_interface import LangChainAdapter
 from langchains.langchain_adapter_type import LangChainAdapterType
 
 async def main():
@@ -29,10 +28,10 @@ async def main():
     LlmInfo = namedtuple('LlmInfo', ['type', 'model', 'api_key'])
 
     # Select the LLM to be use
-    llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo-preview", api_key= openai_api_key)
+    #llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo-preview", api_key= openai_api_key)
     #llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "dolphin-mixtral", api_key= None)
     #llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "llama2", api_key= None)
-    #llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "mistral", api_key= None)
+    llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "mistral", api_key= None)
     #llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "nous-hermes2", api_key= None)
     #llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "openhermes", api_key= None)
 

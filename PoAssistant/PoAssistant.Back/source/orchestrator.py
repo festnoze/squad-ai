@@ -8,7 +8,7 @@ from models.conversation import Conversation, Message
 from langchain.schema.messages import HumanMessage, AIMessage, SystemMessage
 from openai_helper import ai
 from file_helper import file
-from langchains.langchain_adapter_interface import LangChainAdapter
+from langchains.langchain_adapter_base import LangChainAdapter
 
 class Orchestrator:
     check_end_assistant = None       
