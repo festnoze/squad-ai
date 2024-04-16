@@ -1,0 +1,30 @@
+Ecris une description détaillée de une ou plusieurs user story, qui doivent contenir tous les éléments de décision provenant de l'échange entre l'expert métier et le project manager.
+Base ta rédaction sur l'analyse approfondie de tous les éléments issus des échanges entre l'expert métier, nommé "Métier", et le project manager, nommé "PM", dont le compte-rendu complet te sera fourni en JSON.
+Pour déterminer si tu dois découper le besoin exprimé en plusieurs user story plutot qu'une seule, suit les règles INVEST:
+L’acronyme INVEST veut dire :
+I pour Indépendante : chaque user-story doit être indépendante des autres au moins sur le sprint en cours.
+N pour négociable : les détails doivent être négociables. C’est pour cela qu’on écrit une user-story de façon ouvertement détaillé afin de ne pas forcer les détails
+V pour valeur : chaque user story doit apporter de la valeur business pour les métiers ou les clients
+E pour Estimable : chaque user-story doit être estimable par les équipes de développement ; pour cela, ces équipes doivent bien les comprendre.
+S pour Suffisamment petite : chaque user story doit être bien découpée afin d’être livrée au sein d’un seul Sprint.
+T pour Testable : il faut que toutes les user story soient testables.
+Les sprints correspondent à 10 jours de travail, pour donner une idée de la granularité à choisir.
+Chaque User Story doit systématiquement commencer par une introduction scriptée, comme suit : 
+"En tant que <acteur(s)>
+Pour les écoles : <noms des écoles>
+Je souhaiterais <résultat attendu>
+Afin de <bénéfice attendu>",
+où chaque élément entre crochets <> doit être remplacé par la où les valeurs correspondantes.
+Ensuite, la user story se compose de plusieurs paragraphes, mais certains peuvent rester vide si n'ont pas d'usage dans ce cas :
+- description de la US en une ou deux phrases.
+- explication du contexte, aidant à en saisir les contours,
+- liste des règles métiers impliqués avec leurs descriptions,
+- le use case qui englobe l'US, ou les uses cases qui sont compris dans cette US.
+- et pour chaque use case, tu identifies pour chacun d'eux une liste les critères d'acceptance correspondant. Ceux-ci doivent être exhaustif.
+La qualité de rédaction des uses cases et critères d'acceptance est cruciale, car ils servieront de base au QA pour créer ensuite les tests d'acceptance.
+Puis répond juste en renvoyant un json contenant les éléments précédemment cités, structuré comme suit :
+- tu renvoies un tableau, chaque élément correspondant à une user story
+- chaque user story contient une clé : 'us_desc' qui a pour valeur le texte de la user story complète : entête, description, contexte, et règles métiers.
+- chaque user story contient une clé : 'use_cases' qui contient la liste les uses cases correspondants.  Chaque use case est composé de deux clés : 
+    - 'uc_desc' qui contient le texte descriptif du cas d'usage,
+    - 'acceptance_criteria' qui contient la liste des critères d'acceptances correspondant à ce cas d'usage.
