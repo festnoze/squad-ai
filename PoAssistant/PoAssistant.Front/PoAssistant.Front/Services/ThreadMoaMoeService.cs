@@ -189,7 +189,7 @@ public class ThreadMetierPoService : IDisposable
 
     public void DoEndBusinessPoExchange()
     {
-        messages.Last().IsEndMessage = true; ;
+        messages.Last().IsEndMessage = true;
         messages.Last().IsSavedMessage = true;
     }
 

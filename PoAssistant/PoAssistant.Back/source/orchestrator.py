@@ -29,7 +29,7 @@ class Orchestrator:
         front_client.delete_all_metier_po_thread()
         print("Communication with front-end established!!!")
 
-        # Role-play instructions loading
+        # Load roles instructions
         self.business_instructions= file.get_as_str("business_expert_assistant_instructions.txt")
         self.pm_instructions = file.get_as_str("pm_assistant_instructions.txt").format(max_exchanges_count= self.max_exchanges_count)
         self.po_instructions= file.get_as_str("po_us_assistant_instructions.txt")

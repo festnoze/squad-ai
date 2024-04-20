@@ -26,21 +26,21 @@ async def main():
     # sys.exit()
 
     # Define named tuple for holding LLM infos: type and model
-    LlmInfo = namedtuple('LlmInfo', ['type', 'model', 'api_key'])
+    LlmInfo = namedtuple('LlmInfo', ['type', 'model', 'timeout', 'api_key'])
 
-    # Select the LLM to be use
-    llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0613", api_key= openai_api_key)
-    #llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo-preview", api_key= openai_api_key)
-    #llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "dolphin-mixtral", api_key= None)
-    #llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "llama2", api_key= None)
-    #llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "mistral", api_key= None)
-    #llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "nous-hermes2", api_key= None)
+    # Select the LLM to be used
+    #llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0613",  timeout= 60, api_key= openai_api_key)
+    llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo-preview",  timeout= 120, api_key= openai_api_key)
+    #llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "dolphin-mixtral",  timeout= 300, api_key= None)
+    #llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "llama2",  timeout= 200, api_key= None)
+    #llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "mistral",  timeout= 200, api_key= None)
+    #llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "nous-hermes2", timeout= 200, api_key= None)
     #llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "openhermes", api_key= None)
 
     langchain_adapter = LangChainAdapter(
         adapter_type= llm_infos.type,
         llm_model_name= llm_infos.model,
-        timeout_seconds= 100,
+        timeout_seconds= llm_infos.timeout,
         temperature= 0.1,
         api_key= llm_infos.api_key)
     
