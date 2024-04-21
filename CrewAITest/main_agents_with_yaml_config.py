@@ -1,9 +1,9 @@
-from dotenv import load_dotenv
-from langchain_community.llms import Ollama
 
+from langchain_community.llms import Ollama
+from dotenv import load_dotenv
 load_dotenv()
 
-from config.financial_crew import FinancialAnalystCrew
+from test_crew_yaml_config_files.financial_crew import FinancialAnalystCrew
 
 def run():
     inputs = {
