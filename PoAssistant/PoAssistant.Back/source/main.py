@@ -30,12 +30,14 @@ async def main():
 
     # Select the LLM to be used
     #llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0613",  timeout= 60, api_key= openai_api_key)
-    llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo-preview",  timeout= 120, api_key= openai_api_key)
+    llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo-2024-04-09",  timeout= 120, api_key= openai_api_key)
+    #llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "phi3", timeout= 20, api_key= None)
+    #llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "llama3", timeout= 100, api_key= None)
     #llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "dolphin-mixtral",  timeout= 300, api_key= None)
     #llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "llama2",  timeout= 200, api_key= None)
     #llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "mistral",  timeout= 200, api_key= None)
     #llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "nous-hermes2", timeout= 200, api_key= None)
-    #llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "openhermes", api_key= None)
+    #llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "openhermes", timeout= 200, api_key= None)
 
     langchain_adapter = LangChainAdapter(
         adapter_type= llm_infos.type,

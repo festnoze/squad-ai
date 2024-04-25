@@ -1,22 +1,28 @@
 
+from langchains.langchain_adapter import LangChainAdapter
 from models.acceptance_criterion import AcceptanceCriterion
 from plan_tdd_action import PlanTddAction
 from write_failing_test import WriteFailingTest
 from write_passing_code import WritePassingCode
 from refactor_code_and_test import RefactorCodeAndTest
-from langchains.langchain_adapter_type import LangChainAdapterType
-from langchains.langchain_adapter import LangChainAdapter
 
 class TddWorkflow:
     @staticmethod
-    def write_code_for_feature(feature_description):
-        lc = LangChainAdapter(adapter_type= LangChainAdapterType.Ollama, llm_model_name= "nous-hermes2", temperature= 0, timeout_seconds= 40)
-        implemented_acceptance_criteria = []
-        next_criterion = AcceptanceCriterion()
-        while next_criterion is not None:
-            next_criterion = PlanTddAction.plan_next_action(lc.llm, feature_description, implemented_acceptance_criteria)
+    def write_feature_code_using_tdd(lc: LangChainAdapter, feature_description: str) -> tuple[str, str]:
+        implemented_acceptance_criteria: list[AcceptanceCriterion] = []
+        next_criterion: AcceptanceCriterion = AcceptanceCriterion()
+        stop_sentence = "No more acceptance criteria to implement"
+        
+        def has_duplicate_name():
+            return any(criterion.name == next_criterion.name for criterion in implemented_acceptance_criteria)
+
+        while next_criterion.description != stop_sentence and not has_duplicate_name():
+            next_criterion = PlanTddAction.plan_next_action(lc, feature_description, implemented_acceptance_criteria, stop_sentence)
+            
+            print("Test name: '" + next_criterion.name + "'. Desc: " + next_criterion.description)
             implemented_acceptance_criteria.append(next_criterion)
             continue
+
             test_design = WriteFailingTest.design_test(next_criterion)
             test_code = WriteFailingTest.write_test_code(test_design)
             code = WritePassingCode.create_tests_new_concepts_in_code(implementation_plan, code)
@@ -32,8 +38,15 @@ class TddWorkflow:
             RefactorCodeAndTest.apply_refactorings(refactorings)
             RefactorCodeAndTest.ensure_tests_pass()
 
-            next_criterion = PlanTddAction.plan_next_action(lc.llm, feature_description, implemented_acceptance_criteria)
+            next_criterion = PlanTddAction.plan_next_action(lc, feature_description, implemented_acceptance_criteria, stop_sentence)
+        
+        while next_criterion.description != stop_sentence and len([criterion for criterion in implemented_acceptance_criteria if criterion.name == next_criterion.name]) < 2:
+            next_criterion = PlanTddAction.plan_next_action(lc, feature_description, implemented_acceptance_criteria, stop_sentence)
+            
+            print("Test name: '" + next_criterion.name + "'. Desc: " + next_criterion.description)
+            implemented_acceptance_criteria.append(next_criterion)
+            continue
 
-if __name__ == "__main__":
-    workflow = TddWorkflow()
-    workflow.write_feature_code_using_tdd("Add a new string calculator feature")
+            process_criterion(next_criterion)
+        
+        return ("", "")
