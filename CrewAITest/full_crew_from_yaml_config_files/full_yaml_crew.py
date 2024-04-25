@@ -1,16 +1,14 @@
 import yaml
 import os
+from dotenv import load_dotenv, find_dotenv
+load_dotenv(find_dotenv())
 from env import env
-from dotenv import load_dotenv
-load_dotenv()
-# openai_api_key = os.getenv("OPEN_API_KEY")
-# env.api_key = openai_api_key
+env.api_key = os.getenv("OPEN_API_KEY")
+#from langchain.llms.openai import OpenAI, OpenAIChat
 from langchain_community.llms import Ollama
-from crewai import Crew, Agent, Process, Task
-from crewai_tools import SerperDevTool
-
-# create LLM instance
-llm = Ollama(model="nous-hermes2")
+from crewai import Crew, Agent, Task, Process
+from crewai_tools import SerperDevTool # search google API
+from langchain_community.tools import DuckDuckGoSearchRun # search duck duck go API
 
 def get_config_file(base_name):
     # List of possible file extensions and suffixes
@@ -21,6 +19,8 @@ def get_config_file(base_name):
     potential_files = [base_name + suffix + ext for ext in extensions for suffix in suffixes]
 
     # Check if any of the potential files exist
+    
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
     for filename in potential_files:
         if os.path.exists(filename):
             with open(filename, 'r') as file:
@@ -30,11 +30,11 @@ def get_config_file(base_name):
     print(f"Error: No config file found for '{base_file_name}'.")
     exit()
 
-# Use the function to get the config file
 base_file_name = os.path.splitext(os.path.basename(__file__))[0]
 config = get_config_file(base_file_name)
+llm = Ollama(model="nous-hermes2")
 
-# load tools first
+# set used tools first
 search_tool = SerperDevTool()
     
 # Initialize agents and tasks based on the YAML file

@@ -8,10 +8,11 @@ crew:
       verbose: true
       tools: [search_tool]
       backstory: "A seasoned AI researcher dedicated to uncovering the latest trends in machine learning from search on the internet using tools."
-      allow_delegation: true
+      allow_delegation: false
     - role: Writer
       goal: Write articles on AI
       verbose: true
+      tools: [search_tool]
       backstory: "An expert tech writer known for translating complex technical topics into engaging stories."
       allow_delegation: false
   tasks:
