@@ -4,8 +4,8 @@
 @using PoAssistant.Front.Services
 @using Microsoft.AspNetCore.Components.Authorization
 
-@inject ThreadMetierPoService threadService
 @inject IJSRuntime JSRuntime
+@inject ThreadMetierCdPService threadService
 @inject NavigationService navigationService
 @inject ISimpleAuthenticationStateProvider authenticationStateProvider
 
@@ -177,6 +177,7 @@
         if (!IsLoginModalVisible)
         {
             userName = await JSRuntime.InvokeAsync<string>("blazorExtensions.ReadStorage", "userName");
+            threadService.SetCurrentUser(userName);
             var authState = await authenticationStateProvider.GetAuthenticationStateAsync(userName);
             if (!authState.User.Identity!.IsAuthenticated)
             {

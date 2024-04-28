@@ -2,19 +2,22 @@ using System.Linq;
 using System.Text.Json;
 using PoAssistant.Front.Data;
 using PoAssistant.Front.Helpers;
+using PoAssistant.Front.Infrastructure;
 
 namespace PoAssistant.Front.Services;
 
-public class ThreadMetierPoService : IDisposable
+public class ThreadMetierCdPService : IDisposable
 {
-    private ThreadModel messages = null!;
+    private readonly IExchangesRepository _exchangesRepository;
+    private ThreadModel? messages = null;
     public event Action? OnThreadChanged = null;
     private bool isWaitingForLLM = false;
     public const string endPmTag = "[FIN_PM_ASSIST]";
     private static string endExchangeProposalMessage = "Ajouter des points à aborder avec le Project Manager si vous le souhaitez. Sinon, cliquez sur le bouton : 'Terminer l'échange' pour passer à l'étape de rédaction de l'US";
 
-    public ThreadMetierPoService()
+    public ThreadMetierCdPService(IExchangesRepository exchangesRepository)
     {
+        _exchangesRepository = exchangesRepository;
         InitializeThread();
     }
 
@@ -60,6 +63,12 @@ public class ThreadMetierPoService : IDisposable
         return messages!;
     }
 
+    private string? username = null;
+    public void SetCurrentUser(string userName)
+    {
+        this.username = userName;
+    }
+
     public bool IsEditingLastMessage()
     {
         return messages.Last().IsLastThreadMessage && !messages.Last().IsSavedMessage;
@@ -73,10 +82,29 @@ public class ThreadMetierPoService : IDisposable
         newMessage.IsSavedMessage = false;
         messages!.Add(newMessage);
 
+        SaveThread();
         HandleWaitingStateAndEndExchange();
     }
 
-     public void UpdateLastMessage(MessageModel updatedLastMessage)
+    public void LoadThreadByName(string exchangeNameTruncated, bool truncatedExchangeName = false)
+    {
+        messages = _exchangesRepository.LoadUserExchange(username!, exchangeNameTruncated, truncatedExchangeName);
+        if (messages is null)
+            throw new InvalidOperationException($"Cannot load the thread as the exchange is not found for user: {username}");
+
+        HandleWaitingStateAndEndExchange();
+        OnThreadChanged?.Invoke();
+    }
+
+    public void SaveThread()
+    {
+        if (username is null)
+            throw new InvalidOperationException($"Cannot save the thread as the user is not set to service: {nameof(ThreadMetierCdPService)}");
+
+        _exchangesRepository.SaveUserExchange(username, messages!);
+    }
+
+    public void UpdateLastMessage(MessageModel updatedLastMessage)
     {
         if (messages is null || !messages.Any())
             throw new InvalidOperationException("Cannot modify the last messages as the thread don't has any message yet");
@@ -88,6 +116,8 @@ public class ThreadMetierPoService : IDisposable
         updatedLastMessage.IsStreaming = false;
 
         messages.Add(updatedLastMessage);
+        SaveThread();
+
         HandleWaitingStateAndEndExchange();
     }
 
@@ -178,6 +208,7 @@ public class ThreadMetierPoService : IDisposable
             lastMessage.IsEndMessage = false;
 
         lastMessage.IsSavedMessage = true;
+        SaveThread();
     }
 
     public event Action? UserStoryReadyNotification;

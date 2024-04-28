@@ -13,7 +13,8 @@ public interface IUserRepository
 
 public class UserRepository : IUserRepository
 {
-    private const string _usersJsonPath = "users_log_infos.json";
+    private const string _dataPath = "savedData\\";
+    private const string _usersListFileName = "users_log_infos.json";
     private List<User> _users = new List<User>();
 
     public UserRepository()
@@ -23,9 +24,12 @@ public class UserRepository : IUserRepository
 
     private void LoadUsers()
     {
-        if (File.Exists(_usersJsonPath))
+        if (!Directory.Exists(_dataPath))
+            Directory.CreateDirectory(_dataPath);
+
+        if (File.Exists(_dataPath + _usersListFileName))
         {
-            string json = File.ReadAllText(_usersJsonPath);
+            string json = File.ReadAllText(_dataPath + _usersListFileName);
             _users = JsonConvert.DeserializeObject<List<User>>(json) ?? throw new Exception("Unable to deserialize _users from Json file: got null");
         }
     }
@@ -33,8 +37,8 @@ public class UserRepository : IUserRepository
 
     private void SaveUsersToJson()
     {
-        string json = JsonConvert.SerializeObject(_users);
-        File.WriteAllText(_usersJsonPath, json);
+        var json = JsonConvert.SerializeObject(_users);
+        File.WriteAllText(_dataPath + _usersListFileName, json);
     }
 
     public void AddUser(User user)
@@ -57,9 +61,8 @@ public class UserRepository : IUserRepository
     {
         var user = _users.FirstOrDefault(u => u.Username.Equals(username, StringComparison.OrdinalIgnoreCase));
         if (user != null)
-        {
             return user.Password.Equals(password);
-        }
+        
         return false;
     }
 
