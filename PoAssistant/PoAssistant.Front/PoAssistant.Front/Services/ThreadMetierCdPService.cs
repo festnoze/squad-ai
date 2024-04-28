@@ -88,6 +88,7 @@ public class ThreadMetierCdPService : IDisposable
 
     public void LoadThreadByName(string exchangeNameTruncated, bool truncatedExchangeName = false)
     {
+        _isExchangesLoaded = false;
         messages = _exchangesRepository.LoadUserExchange(username!, exchangeNameTruncated, truncatedExchangeName);
         if (messages is null)
             throw new InvalidOperationException($"Cannot load the thread as the exchange is not found for user: {username}");
@@ -101,7 +102,8 @@ public class ThreadMetierCdPService : IDisposable
         if (username is null)
             throw new InvalidOperationException($"Cannot save the thread as the user is not set to service: {nameof(ThreadMetierCdPService)}");
 
-        _exchangesRepository.SaveUserExchange(username, messages!);
+        var newThread = _exchangesRepository.SaveUserExchange(username, messages!);
+        if (newThread) _isExchangesLoaded = false;
     }
 
     public void UpdateLastMessage(MessageModel updatedLastMessage)
@@ -134,6 +136,7 @@ public class ThreadMetierCdPService : IDisposable
 
     public void DeleteMetierPoThread()
     {
+        _isExchangesLoaded = false;
         messages = new ThreadModel();
         InitializeThread();
         OnThreadChanged?.Invoke();
@@ -248,5 +251,16 @@ public class ThreadMetierCdPService : IDisposable
     public void EndsStreamMessage()
     {
         messages!.Last().IsStreaming = false;
+    }
+
+    private bool _isExchangesLoaded = false;
+    public bool IsExchangesLoaded()
+    {
+        return _isExchangesLoaded;
+    }
+
+    public void ExchangesIsLoaded()
+    {
+        _isExchangesLoaded = true;
     }
 }

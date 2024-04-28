@@ -39,7 +39,7 @@
             </div>
             @if (exchangesNames != null && exchangesNames.Count > 0)
             {
-                <div class="nav-item px-3" @onclick="ToggleExchangeList">
+                <div class="nav-item px-3" @onclick="ToggleExchangesListVisibility">
                     <NavLink class="nav-link" href="">
                         <span class="oi oi-list nav-icon" aria-hidden="true"></span> @(!isMenuReduced ? "Historique des échanges" : "")
                     </NavLink>
@@ -51,7 +51,7 @@
                     </li>
                     @foreach (var exchangeName in exchangesNames)
                     {                        
-                        <li class="nav-item px-3 nav-link sub-menu-item" @onclick="() => ToggleExchangeList(exchangeName)">
+                        <li class="nav-item px-3 nav-link sub-menu-item" @onclick="() => LoadExchangeList(exchangeName)">
                             <span class="oi oi-chat nav-icon" style="font-size: 1.6rem" aria-hidden="true"></span>
                             <span style="color: white;">@TruncateExchangeName(exchangeName)</span>
                         </li>
@@ -74,7 +74,7 @@
 @code {
     private bool collapseNavMenu = true;
     private bool isMenuReduced = false;
-    private List<string> exchangesNames = new List<string>(); 
+    private List<string> exchangesNames = new List<string>();
     private string? username;
     private bool isExchangeListHidden = true;
     private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
@@ -82,8 +82,9 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         username = await JSRuntime.InvokeAsync<string>("blazorExtensions.ReadStorage", "userName");
-        if (username != null)
+        if (!threadService.IsExchangesLoaded() && username != null)
         {
+            threadService.ExchangesIsLoaded();
             exchangesNames = exchangesRepository.GetAllUserExchangesNames(username);
             await InvokeAsync(StateHasChanged);
         }
@@ -101,7 +102,7 @@
         isMenuReduced = !isMenuReduced;
     }
 
-    private void ToggleExchangeList()
+    private void ToggleExchangesListVisibility()
     {
         isExchangeListHidden = !isExchangeListHidden;
     }
@@ -114,7 +115,7 @@
             return exchangeName;
     }
 
-    private void ToggleExchangeList(string exchangeNameTruncated)
+    private void LoadExchangeList(string exchangeNameTruncated)
     {
         threadService.LoadThreadByName(exchangeNameTruncated, true);
     }

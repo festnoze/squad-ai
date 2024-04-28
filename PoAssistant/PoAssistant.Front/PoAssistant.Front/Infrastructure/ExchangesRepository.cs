@@ -8,7 +8,7 @@ public interface IExchangesRepository
 {
     List<string> GetAllUserExchangesNames(string username);
     ThreadModel? LoadUserExchange(string username, string exchangeDisplayName, bool truncatedExchangeName = false);
-    void SaveUserExchange(string username, ThreadModel exchange);
+    bool SaveUserExchange(string username, ThreadModel exchange);
 }
 
 public class ExchangesRepository : IExchangesRepository
@@ -26,7 +26,8 @@ public class ExchangesRepository : IExchangesRepository
 
         var userExchangesFiles = GetFolderFilesNames(userExchangeFolderPath);
 
-        return userExchangesFiles.Select(fileName => ToDisplayName(Path.GetFileNameWithoutExtension(fileName))).ToList();
+        var userExchangesNames = userExchangesFiles.Select(fileName => ToDisplayName(Path.GetFileNameWithoutExtension(fileName))).ToList();
+        return userExchangesNames;
     }
 
     public ThreadModel? LoadUserExchange(string username, string exchangeDisplayName, bool isTruncatedExchangeName = false)
@@ -50,7 +51,7 @@ public class ExchangesRepository : IExchangesRepository
         return JsonConvert.DeserializeObject<ThreadModel>(exchangeJson);
     }
 
-    public void SaveUserExchange(string username, ThreadModel exchange)
+    public bool SaveUserExchange(string username, ThreadModel exchange)
     {
         var maxTitleLength = 100;
         if (exchange.First().Content.Length < maxTitleLength)
@@ -67,6 +68,7 @@ public class ExchangesRepository : IExchangesRepository
         var exchangeJson = JsonConvert.SerializeObject(exchange);
 
         File.WriteAllText(exchangePath, exchangeJson);
+        return isNewExchange;
     }
 
     private bool DoesExistUserExchangeFile(string username, string exchangeFilePath)
@@ -110,17 +112,17 @@ public class ExchangesRepository : IExchangesRepository
 
     private static string ToFileSystemName(string username)
     {
-        var fileSystemNameWithHandledSpecialChar = username.Replace(".", "___").Replace(",", "__").Replace(" ", "_");
+        var fileSystemNameWithHandledSpecialChar = username.Replace(",", "__").Replace(".", "_");
         return RemoveSpecialCharacters(fileSystemNameWithHandledSpecialChar);
     }
 
     private static string ToDisplayName(string username)
     {
-        return username.Replace("___", ".").Replace("__", ",").Replace("_", " ");
+        return username.Replace("__", ",").Replace("_", ".");
     }
     public static string RemoveSpecialCharacters(string input)
     {
-        var pattern = "[^a-zA-Z0-9_éèêëàâäôöûüçÇîïÏÎÉÈÊËÀÂÄÔÖÛÜ_-]";
+        var pattern = "[^a-zA-Z0-9_éèêëàâäôöûüçÇîïÏÎÉÈÊËÀÂÄÔÖÛÜ_ -]";
         var replacement = "~";
         Regex regex = new Regex(pattern);
         var result = regex.Replace(input, replacement);
