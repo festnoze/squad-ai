@@ -1,0 +1,37 @@
+﻿@page "/signup"
+@using PoAssistant.Front.Services
+@inject IAuthenticationService AuthenticationService
+@inject NavigationManager NavigationManager
+
+<h3>Sign Up</h3>
+
+@if (showMessage)
+{
+    <div class="alert alert-danger">Registration failed. Please check your details.</div>
+}
+
+<form>
+    <div class="mb-3">
+        <label for="username">Username</label>
+        <input @bind="username" class="form-control" />
+    </div>
+    <div class="mb-3">
+        <label for="password">Password</label>
+        <input type="password" @bind="password" class="form-control" />
+    </div>
+    <button class="btn btn-primary" @onclick="Register">Sign Up</button>
+</form>
+
+@code {
+    private string username = "";
+    private string password = "";
+    private bool showMessage = false;
+
+    private async Task Register()
+    {
+        if (!await AuthenticationService.SignUpAsync(username, password))
+            showMessage = true;
+
+        //NavigationManager.NavigateTo("/login");
+    }
+}

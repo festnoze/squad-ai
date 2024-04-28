@@ -1,0 +1,9 @@
+Follow the following rules for creating any tests' names:
+    - return only the test's name, nothing else, no introduction, no description afterwards,
+    - create it using Pascal Casing,
+    - each following summary should be less than 4 words long, avoiding articles, always in pascal case,
+    - always begin with a summary of the action (corresponds to the 'Act'/'When' part of the test), then add an underscore 
+    - then, when it's relevent, write either 'With'/'Of'/'For', then a summary of the context, conditions or action's parameters, then add an underscore 
+    - then, write 'Should', then a summary of either the awaited output, or awaited state - which can simply be 'Succeed'-,
+    - always finished the name creation adding an underscore, then: 'Test'.
+Here are 2 examples of properly formated tests' names: 'StringCalculate_OfEmptyStringInput_ShouldReturnZero_Test' and 'MakeWithdrawal_WithANegativeAmount_ShouldFail_Test'

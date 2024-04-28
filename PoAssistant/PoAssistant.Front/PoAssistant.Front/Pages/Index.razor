@@ -2,19 +2,27 @@
 
 @using PoAssistant.Front.Data
 @using PoAssistant.Front.Services
+@using Microsoft.AspNetCore.Components.Authorization
+
 @inject ThreadMetierPoService threadService
 @inject IJSRuntime JSRuntime
 @inject NavigationService navigationService
+@inject ISimpleAuthenticationStateProvider authenticationStateProvider
 
-<PageTitle>Assistant Product Owner</PageTitle>
+<PageTitle>Assistant Cadrage</PageTitle>
 
 <head>
 </head>
 
 <h4>Atelier de conception Métier/Chef de Projet : Cadrons le brief</h4>
 
+<Modal @ref="modal" IsVisible="@IsLoginModalVisible" IsVisibleChanged="@LoginModalIsVisibleChangedAsync">
+    <Login IsVisibleChanged="@LoginModalIsVisibleChangedAsync" />
+</Modal>
+
 <div class="chat-wrapper">
     <div class="chat-container">
+        @if (messages != null)
         @foreach (var message in messages)
         {
             @* Display message bubble header *@
@@ -101,32 +109,6 @@
 <body>
 </body>
 
-@* <script>
-    function scrollToBottom(id) {
-        var element = document.getElementById(id);
-        if (element) {
-            console.error("Element '" + id + "' found!");
-            // Vérifie si l'ascenseur est déjà tout en bas avant d'ajouter le nouveau contenu
-            var isAtBottom = element.scrollHeight - element.scrollTop === element.clientHeight;
-            console.error("Element '" + id + "' is at bottom = " + isAtBottom.valueOf())
-            // Si l'élément existe et que l'ascenseur est tout en bas, alors on fait défiler vers le bas
-            if (isAtBottom) {
-                element.scrollTop = element.scrollHeight;
-            }
-        } else {
-            console.error("Element '" + id + "' not found");
-        }
-    }
-    function copyHeightTo(id1, id2) {
-        var element1 = document.getElementById(id1);
-        var element2 = document.getElementById(id2);
-        if (element1 && element2) {
-            console.error("Elements '" + id1 + "and " + id2 + "' found!");
-            // Vérifie si l'ascenseur est déjà tout en bas avant d'ajouter le nouveau contenu
-            id1.height = id2.height;
-        }
-    }
-</script> *@
 <script>
     function getTextareaValue(id) {
         return document.getElementById(id).value;
@@ -143,21 +125,27 @@
             }, false);
         }
     }
+    window.blazorExtensions = {
+        WriteStorage: function (key, value) {
+            window.localStorage.setItem(key, value);
+        },
+        ReadStorage: function (key) {
+            return window.localStorage.getItem(key);
+        }
+    };
 </script>
 
 @code {
+    private string? userName = null;
     private ThreadModel messages = null!;
     private ElementReference textAreaElement;
     private bool isWaitingForLLM = true;
     private bool isEditingLastMessage = false;
     private bool showMessageEmptyError = false; 
     private bool showUserStoryNotification = false;
-    public string modifiedMessageContent =string.Empty;
-
-    private async Task HandleEditMessageExit()
-    {
-        modifiedMessageContent = await JSRuntime.InvokeAsync<string>("getTextareaValue", "editingMessageTextarea");
-    }
+    public string modifiedMessageContent = string.Empty;
+    private Modal modal { get; set; } = new Modal();
+    private bool IsLoginModalVisible { get; set; } 
 
     protected override async Task OnInitializedAsync()
     {
@@ -168,12 +156,35 @@
         threadService.UserStoryReadyNotification += HandleUserStoryReadyNotification;
     }
 
+    private async Task LoginModalIsVisibleChangedAsync(bool isVisible)
+    {
+        IsLoginModalVisible = isVisible;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task HandleEditMessageExit()
+    {
+        modifiedMessageContent = await JSRuntime.InvokeAsync<string>("getTextareaValue", "editingMessageTextarea");
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
             await AutosizeEditingTextAreaAsync();
         }
+
+        if (!IsLoginModalVisible)
+        {
+            userName = await JSRuntime.InvokeAsync<string>("blazorExtensions.ReadStorage", "userName");
+            var authState = await authenticationStateProvider.GetAuthenticationStateAsync(userName);
+            if (!authState.User.Identity!.IsAuthenticated)
+            {
+                IsLoginModalVisible = true;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+
         await base.OnAfterRenderAsync(firstRender);
     }
 

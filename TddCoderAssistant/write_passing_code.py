@@ -1,10 +1,10 @@
-from models.acceptance_criterion import AcceptanceCriterion
+from models.acceptance_criterion import AcceptanceCriterionTestUnit
 from models.implementation_plan import ImplementationPlan
 
 
 class WritePassingCode:
     @staticmethod
-    def plan_implementation(criterion: AcceptanceCriterion) -> ImplementationPlan:
+    def plan_implementation(criterion: AcceptanceCriterionTestUnit) -> ImplementationPlan:
         return {}
     
 

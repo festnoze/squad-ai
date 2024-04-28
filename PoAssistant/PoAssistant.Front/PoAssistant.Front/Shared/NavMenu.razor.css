@@ -8,9 +8,7 @@
 }
 
 .navbar-brand {
-    /*font-size: 1.3rem;*/
-    padding-left: 12px;
-    justify-content: center
+    justify-content: start
 }
 
 .sidebar {

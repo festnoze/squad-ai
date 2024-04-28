@@ -1,0 +1,1 @@
+We want you to write the gherkin test corresponding to the following acceptance criterion: {acceptance_criterion_description}.

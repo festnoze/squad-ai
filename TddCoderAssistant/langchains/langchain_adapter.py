@@ -57,7 +57,7 @@ class LangChainAdapter():
         start_time = time.time()
         response = self.llm.invoke(input)
         end_time = time.time()
-        elapsed = self.get_elapsed_time_seconds(start_time, end_time)
+        elapsed = LangChainAdapter.get_elapsed_time_seconds(start_time, end_time)
         
         if isinstance(response, str):
             answer = response
@@ -86,7 +86,7 @@ class LangChainAdapter():
             content = content.replace('\r\n', '\n').replace('\n', new_line_for_stream)
             yield content.encode('utf-8')
 
-    def get_elapsed_time_seconds(self, began_at: datetime, ended_at: datetime) -> int:
+    def get_elapsed_time_seconds(began_at: datetime, ended_at: datetime) -> int:
         if not ended_at:
             return -1
         elapsed_time = ended_at - began_at

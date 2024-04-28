@@ -1,0 +1,6 @@
+Given that we already had implemented the following acceptance criteria: {handled_acceptance_criteria}.
+Propose the next single acceptance criterion which is unhandled and should be implemented first. 
+Ifever, you don't find any acceptance criterion left to implement, just write: '""" + stop_sentence + """'.
+Otherwise, write only the content of the description of the acceptance criterion without any other words added, just a concise description. Don't mention the feature itself as we know the context. Focus on the behavior/result awaited when performing an action under specific conditions (or data).
+For example, if the feature is: implement a string calculator, an example of well formated acceptance criterion could be : 'an empty string input should return 0 as result'. 
+A bad example for the same criterion would be: 'Acceptance Criterion: Test that the string calculator can handle a string which is empty, then returned result should be 0 (e.g., '')
