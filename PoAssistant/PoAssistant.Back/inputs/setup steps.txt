@@ -9,3 +9,5 @@ source studienv/Scripts/activate
 -download the required packages (might need to run VS Code as administrator)
 pip install -r requirements.txt
 
+WARNING: reinstall 'pip' on venv whether pip install don't work anymore
+

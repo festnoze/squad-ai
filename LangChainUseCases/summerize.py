@@ -1,0 +1,33 @@
+from langchain.llms import OpenAI
+from langchain import PromptTemplate
+
+def summarize_short(text: str, llm) -> str:
+    template = """\
+    %INSTRUCTIONS:
+    Please summarize the following piece of text.
+    Respond in a manner that a 5 year old would understand.
+
+    %TEXT:
+    {text}
+    """
+
+    # Create a LangChain prompt template that we can insert values to later
+    prompt = PromptTemplate(
+        input_variables=["text"],
+        template=template,
+    )
+
+    chain = prompt | llm
+    result = chain.run(text="""Coding architecture refers to the overall structure and organization of a software system. It involves making design decisions that determine how different components of the system interact with each other and how the system as a whole is organized. A well-designed architecture is crucial for building scalable, maintainable, and extensible software.
+    There are various architectural patterns and principles that guide the design of software systems. Let's explore some of the key concepts and patterns commonly used in coding architecture:
+    Layered Architecture: This pattern divides the system into multiple layers, each responsible for a specific set of functionalities. The layers are organized hierarchically, with each layer building upon the one below it. This separation of concerns helps in modularizing the codebase and promoting code reusability.
+    Model-View-Controller (MVC): MVC is a popular architectural pattern used in web development. It separates the application into three interconnected components: the model (data and business logic), the view (user interface), and the controller (handles user input and updates the model and view). MVC promotes separation of concerns and facilitates easier maintenance and testing.
+    Microservices: In a microservices architecture, a large application is broken down into smaller, loosely coupled services that can be developed, deployed, and scaled independently. Each microservice focuses on a specific business capability and communicates with other services through well-defined APIs. This architecture promotes flexibility, scalability, and fault tolerance.
+    Event-Driven Architecture: In an event-driven architecture, components communicate with each other by producing and consuming events. Events represent significant occurrences or changes in the system. This architecture allows for loose coupling between components and enables asynchronous communication, making it suitable for systems with high scalability and responsiveness requirements.
+    Domain-Driven Design (DDD): DDD is an approach that emphasizes understanding and modeling the core business domain. It encourages close collaboration between domain experts and developers to create a shared understanding of the problem domain. DDD promotes the use of ubiquitous language, aggregates, entities, value objects, and domain services to build a well-structured and maintainable codebase.
+    Dependency Injection (DI): DI is a design pattern that helps manage dependencies between components. Instead of creating dependencies within a component, dependencies are provided from the outside. This promotes loose coupling, testability, and modularity. DI containers or frameworks can be used to automate the process of injecting dependencies.
+    These are just a few examples of coding architecture concepts and patterns. It's important to note that there is no one-size-fits-all solution, and the choice of architecture depends on the specific requirements and constraints of the project.
+    When designing a coding architecture, it's crucial to consider factors such as scalability, maintainability, performance, security, and extensibility. It's also important to follow coding best practices, such as writing clean and modular code, using appropriate design patterns, and documenting the architecture to aid future development and maintenance.
+    Remember, coding architecture is an ongoing process that evolves as the project grows and requirements change. It requires careful planning, continuous evaluation, and collaboration among team members to ensure a robust and efficient software system.""")
+
+    return result
