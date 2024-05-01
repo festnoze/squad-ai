@@ -3,6 +3,8 @@
 *.exe
 /Include
 /Lib
+Lib/
+site-packages/
 /Scripts
 /__pycache__
 
