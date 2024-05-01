@@ -1,5 +1,5 @@
 import time
-from langchains.langchain_adapter import LangChainAdapter
+from langchain_core.language_models import BaseChatModel
 from models.acceptance_criterion import AcceptanceCriterionTestUnit
 from plan_tdd_action import PlanTddAction
 from write_test import WriteTest
@@ -8,7 +8,7 @@ from refactor_code_and_test import RefactorCodeAndTest
 
 class TddWorkflow:
     @staticmethod
-    def write_feature_code_using_tdd(lc: LangChainAdapter, feature_description: str) -> tuple[str, str]:
+    def write_feature_code_using_tdd(llm: BaseChatModel, feature_description: str) -> tuple[str, str]:
         start_time = time.time()
         code: str = ""
         tests_code: str = ""
@@ -19,13 +19,13 @@ class TddWorkflow:
         def has_duplicate_name():
             return any(criterion.name == next_criterion.name for criterion in acceptance_criteria)
 
-        while next_criterion.description != stop_sentence and not has_duplicate_name():
-            acceptance_criterion = PlanTddAction.plan_next_acceptance_criterion(lc, feature_description, acceptance_criteria, stop_sentence)            
-            #print("Test name: '" + next_criterion.name + "'. Desc: " + next_criterion.description)            
-            WriteTest.create_test_name(lc, acceptance_criterion)        
-            WriteTest.create_test_gherkin(lc, acceptance_criterion)
+        while next_criterion.acceptance_criterion_desc != stop_sentence and not has_duplicate_name():
+            next_criterion = PlanTddAction.plan_next_acceptance_criterion(llm, feature_description, acceptance_criteria, stop_sentence)            
+            print("Test name: '" + next_criterion.unittest_name + "'. Desc: " + next_criterion.acceptance_criterion_desc)            
+            WriteTest.create_test_name(llm, next_criterion)        
+            WriteTest.create_test_gherkin(llm, next_criterion)
             #test_design = WriteTest.design_test(acceptance_criteria, code, tests_code)
-            test_code = WriteTest.write_unittest_code(lc, acceptance_criterion)
+            test_code = WriteTest.write_unittest_code(llm, next_criterion)
             continue
         
             code = WritePassingCode.create_tests_new_concepts_in_code(implementation_plan, code)
@@ -41,10 +41,10 @@ class TddWorkflow:
             RefactorCodeAndTest.apply_refactorings(refactorings)
             RefactorCodeAndTest.ensure_tests_pass()
 
-            next_criterion = PlanTddAction.plan_next_acceptance_criterion(lc, feature_description, acceptance_criteria, stop_sentence)
+            next_criterion = PlanTddAction.plan_next_acceptance_criterion(llm, feature_description, acceptance_criteria, stop_sentence)
         
         while next_criterion.description != stop_sentence and len([criterion for criterion in acceptance_criteria if criterion.name == next_criterion.name]) < 2:
-            next_criterion = PlanTddAction.plan_next_acceptance_criterion(lc, feature_description, acceptance_criteria, stop_sentence)
+            next_criterion = PlanTddAction.plan_next_acceptance_criterion(llm, feature_description, acceptance_criteria, stop_sentence)
             
             print("Test name: '" + next_criterion.name + "'. Desc: " + next_criterion.description)
             acceptance_criteria.append(next_criterion)
