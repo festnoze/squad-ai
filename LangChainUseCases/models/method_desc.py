@@ -1,5 +1,8 @@
 from models.base_desc import BaseDesc
 import json
+import re
+
+from models.param_desc import ParameterDesc
 
 class MethodDesc(BaseDesc):
     def __init__(self, summary_lines: list[str], attributs: list[str], method_name: str, method_return_type: str, code: str, is_async: bool = False, is_task: bool = False, is_ctor: bool = False, is_static: bool = False, is_abstract: bool = False, is_override: bool = False, is_virtual: bool = False, is_sealed: bool = False, is_new: bool = False):
@@ -19,13 +22,75 @@ class MethodDesc(BaseDesc):
         self.is_sealed = is_sealed
         self.is_new = is_new
 
+        self._code_chunks: list[str] = None
         @property
         def code_chunks(self):
             if not self._code_chunks:
                 return [self.code]
             return self._code_chunks
-        self.code_chunks: list[str] = None
+        
+        self.generated_summary: str = None
 
+    @staticmethod
+    def get_method_desc_from_code(code: str, previous_chunk:str, class_name: str) -> 'MethodDesc':
+        #retrieve summary and attributs from previous chunk
+        previous_chunk_last_double_newline_index = previous_chunk.rfind('\n\n')
+        previous_chunk_last_brace_index = previous_chunk.rfind('}')
+        summary_lines: list[str] = []
+        attributs: list[str] = []
+        if previous_chunk_last_double_newline_index > previous_chunk_last_brace_index:
+            previous_chunk_last_part = previous_chunk[previous_chunk_last_double_newline_index:]
+            attributs = MethodDesc.detect_attributes(previous_chunk_last_part)
+            summary_lines = [line.strip().replace('///', '').strip() for line in previous_chunk_last_part.split('\n') if '///' in line]
+        
+        # get method infos from main code chunk
+        method_sign = code.split(')')[0]
+        is_ctor = class_name == method_sign.split('(')[0].strip()
+        is_task = 'Task<' in method_sign
+        is_async = 'async ' in method_sign
+        is_override = 'override ' in method_sign
+        is_new = 'new ' in method_sign
+        is_static = 'static ' in method_sign
+        is_abstract = 'abstract ' in method_sign
+        is_virtual = 'virtual ' in method_sign
+        is_sealed = 'sealed ' in method_sign
+
+        if not is_ctor:
+            if is_async or is_override or is_new or is_static or is_abstract or is_virtual or is_sealed:
+                method_sign = method_sign.replace('override ', '').replace('new ', '').replace('async ','').replace('static ','').replace('abstract ','').replace('virtual ','').replace('sealed ','').strip() 
+
+            if is_async:
+                method_return_type = method_sign.split(' ')[0].replace('Task<', '').rsplit('>', 1)[0]
+            else:
+                method_return_type = method_sign.split(' ')[0]
+            method_name = method_sign.split(' ')[1].split('(')[0]
+
+
+        if is_ctor:
+            method_name = class_name
+            method_return_type = None
+
+        method_params = MethodDesc.get_method_parameters(method_sign)
+        method_code = code.split('{')[1].rsplit('}', 1)[0]
+        return MethodDesc(summary_lines, attributs, method_name, method_return_type, method_code, is_async, is_task, is_ctor, is_static, is_abstract, is_override, is_virtual, is_sealed, is_new)
+    
+    def get_method_parameters(method_sign: str) -> list[ParameterDesc]:
+        params = method_sign.split('(')[1].split(')')[0].split(',')
+        params_code = [param.strip() for param in params]
+        return [ParameterDesc.get_param_desc_from_code(param_code) for param_code in params_code]
+
+    
+    def detect_attributes(code: str) -> list[str]:
+        attributes: list[str] = []
+        attribute_pattern = r'\[.*?\]'
+        lines = code.split('\n')
+        for line in lines:
+            if '[' in line:
+                line_attributes = re.findall(attribute_pattern, line)
+                if len(line_attributes) > 0:
+                    attributes.extend(line_attributes)
+        return attributes
+    
     def to_json(self):
         return json.dumps(self.__dict__, cls=MethodDescEncoder)
 

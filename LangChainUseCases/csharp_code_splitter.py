@@ -1,22 +1,28 @@
 from langchain_text_splitters import Language, RecursiveCharacterTextSplitter
 import re
 # internal imports
+from helpers.file_helper import file
 from models.base_desc import BaseDesc
 from models.class_desc import ClassDesc
 from models.method_desc import MethodDesc
-from models.prop_desc import PropDesc
+from models.prop_desc import PropertyDesc
+from summarize import Summarize
 
 class CSharpCodeSplit:
     @staticmethod
-    def get_code_structure(code: str, chunk_size:int = 8000, chunk_overlap: int = 0) -> BaseDesc:
+    def get_code_structure(file_path: str, chunk_size:int = 8000, chunk_overlap: int = 0) -> BaseDesc:
+        code = file.get_as_str(file_path)
+        
         found_class_interface_enum, class_interface_enum_contents = CSharpCodeSplit.split_by_class_interface_enum_definition(code)
         last_item_kind: str = found_class_interface_enum[-1][0] # TODO: don't yet handle files with multiple class/interface/enum definitions (can happened, especially in transfert objects files)
+        
         if 'class' in last_item_kind:
-            class_desc = CSharpCodeSplit.extract_class_methods_and_props(class_interface_enum_contents[-1])
+            class_desc = CSharpCodeSplit.extract_class_methods_and_props(file_path, class_interface_enum_contents[-1])
         elif 'interface' in last_item_kind:
             pass
         elif 'enum' in last_item_kind:
             pass
+
         # split each method into chunks adapted to the LLM context window size
         chunk_count = 0
         for method in class_desc.methods:
@@ -45,18 +51,18 @@ class CSharpCodeSplit:
         
         return found_class_interface_enum, class_interface_enum_contents
     
-    def extract_class_methods_and_props(code: str) -> ClassDesc:
+    def extract_class_methods_and_props(file_path: str, code: str) -> ClassDesc:
         separators = ['public ', 'protected ', 'private ', 'internal ']
         pattern = '|'.join(map(re.escape, separators))
-        chunks = re.split(pattern, code, flags=re.MULTILINE)
+        code_chunks = re.split(pattern, code, flags=re.MULTILINE)
         
         # Segregate methods from properies        
         methods: list[MethodDesc] = []
-        properties: list[PropDesc] = []
+        properties: list[PropertyDesc] = []
         chunk_index = -1
-        for chunk in chunks:
+        for code_chunk in code_chunks:
             chunk_index += 1
-            first_line = chunk.split('\n')[0]
+            first_line = code_chunk.split('\n')[0]
             if chunk_index == 0:
                 # detect if inherit from an interface
                 if CSharpCodeSplit.has_interfaces(first_line):
@@ -67,73 +73,15 @@ class CSharpCodeSplit:
                     interfaces_names = []
             else:
                 if CSharpCodeSplit.is_property(first_line):
-                    properties.append(CSharpCodeSplit.property_desc_from_code(chunk))
+                    properties.append(PropertyDesc.get_property_desc_from_code(code_chunk))
                 else: # is method
-                    previous_chunk = chunks[chunk_index - 1]
-                    previous_chunk_last_double_newline_index = previous_chunk.rfind('\n\n')
-                    previous_chunk_last_brace_index = previous_chunk.rfind('}')
-                    if previous_chunk_last_double_newline_index > previous_chunk_last_brace_index:
-                        previous_chunk_last_part = previous_chunk[previous_chunk_last_double_newline_index:]
-                        attributs = CSharpCodeSplit.detect_attributes(previous_chunk_last_part)
-                        summary_lines = [line.strip().replace('///', '').strip() for line in previous_chunk_last_part.split('\n') if '///' in line]
-                    methods.append(CSharpCodeSplit.method_desc_from_code(chunk, class_name, summary_lines, attributs))
+                    methods.append(MethodDesc.get_method_desc_from_code(code_chunk, code_chunks[chunk_index - 1], class_name))
         
         print("Le code a été découpé en " + str(len(methods)) + " méthodes et " + str(len(properties)) + " propriétés.")
-        return ClassDesc(class_name=class_name, interfaces_names=interfaces_names, methods=methods, properties=properties)
+        return ClassDesc(file_path=file_path, class_name=class_name, interfaces_names=interfaces_names, methods=methods, properties=properties)
 
     def is_property(first_line) -> bool:
         return first_line.endswith(';') or first_line.endswith('; }') or first_line.endswith(';}')
-
-    def detect_attributes(code: str) -> list[str]:
-        attributes: list[str] = []
-        attribute_pattern = r'\[.*?\]'
-        lines = code.split('\n')
-        for line in lines:
-            if '[' in line:
-                line_attributes = re.findall(attribute_pattern, line)
-                if len(line_attributes) > 0:
-                    attributes.extend(line_attributes)
-        return attributes
-    
-    def property_desc_from_code(first_line) -> PropDesc:
-        first_line = first_line.replace('const ', '').replace('readonly ', '').strip()
-        is_property = first_line.endswith('; }') or first_line.endswith(';}')
-        prop_type = first_line.split(' ')[0]
-        if is_property:
-            prop_name = first_line.split(' ')[1].split('{')[0].strip()
-        else:
-            prop_name = first_line.split(' ')[1].split(';')[0].strip()
-        return PropDesc(prop_name, prop_type, is_property)
-    
-    def method_desc_from_code(code: str, class_name: str, summary_lines: list[str], attributs: list[str]) -> MethodDesc:
-        first_line = code.split('\n')[0]
-
-        is_ctor = class_name == first_line.split('(')[0].strip()
-        is_task = 'Task<' in first_line
-        is_async = 'async ' in first_line
-        is_override = 'override ' in first_line
-        is_new = 'new ' in first_line
-        is_static = 'static ' in first_line
-        is_abstract = 'abstract ' in first_line
-        is_virtual = 'virtual ' in first_line
-        is_sealed = 'sealed ' in first_line
-
-        if not is_ctor:
-            if is_async or is_override or is_new or is_static or is_abstract or is_virtual or is_sealed:
-                first_line = first_line.replace('override ', '').replace('new ', '').replace('async ','').replace('static ','').replace('abstract ','').replace('virtual ','').replace('sealed ','').strip() 
-
-            if is_async:
-                method_return_type = first_line.split(' ')[0].replace('Task<', '').rsplit('>', 1)[0]
-            else:
-                method_return_type = first_line.split(' ')[0]
-            method_name = first_line.split(' ')[1].split('(')[0]
-
-        if is_ctor:
-            method_name = class_name
-            method_return_type = None
-
-        method_content = code.split('{')[1].rsplit('}', 1)[0]
-        return MethodDesc(summary_lines, attributs, method_name, method_return_type, method_content, is_async, is_task, is_ctor, is_static, is_abstract, is_override, is_virtual, is_sealed, is_new)
     
     def split_method(method_or_prop: str, chunk_size: int, chunk_overlap: int) -> list[str]:
         csharp_splitter = RecursiveCharacterTextSplitter.from_language(language=Language.CSHARP, chunk_size=chunk_size, chunk_overlap=chunk_overlap)

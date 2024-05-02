@@ -19,12 +19,18 @@ class Summarize:
     @staticmethod
     def summarize_long_text(llm: BaseChatModel, text: str, max_tokens = 8000) -> str:
         num_tokens = llm.get_num_tokens(text)
-        print (f"There are {num_tokens} tokens in your file")
+        #print (f"There are {num_tokens} tokens in your file")
        
         text_splitter = RecursiveCharacterTextSplitter(separators=["\n\n", "\n", ". "], chunk_size=max_tokens, chunk_overlap=300)
         docs = text_splitter.create_documents([text])        
-        print (f"Initial document has been splitted into {len(docs)} documents")
+        #print (f"Initial document has been splitted into {len(docs)} documents")
         
-        chain = load_summarize_chain(llm=llm, chain_type='map_reduce', verbose=True)
-        result = chain.run(docs)
-        return result
+        chain = load_summarize_chain(llm=llm, chain_type='map_reduce', verbose=False)
+        result = chain.invoke(docs)
+        
+        answer: str
+        if 'output_text' in result and result['output_text'] != '':
+            answer = result['output_text']
+        else:
+            answer = result
+        return answer

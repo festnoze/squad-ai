@@ -23,8 +23,8 @@ openai_api_key = os.getenv("OPEN_API_KEY")
 openai.api_key = openai_api_key
 
 # Select the LLM to be used
-llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0613",  timeout= 60, api_key= openai_api_key)
-#llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo-2024-04-09",  timeout= 120, api_key= openai_api_key)
+#llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0613",  timeout= 60, api_key= openai_api_key)
+llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo-2024-04-09",  timeout= 120, api_key= openai_api_key)
 
 #llm_infos = LlmInfo(type= LangChainAdapterType.Groq, model= "mixtral-8x7b-32768",  timeout= 20, api_key= groq_api_key)
 #llm_infos = LlmInfo(type= LangChainAdapterType.Groq, model= "llama3-8b-8192",  timeout= 10, api_key= groq_api_key)
@@ -54,12 +54,19 @@ llm = LangChainFactory.create_llm(
 # text = file.get_as_str("LLM agents PhD thesis full.txt")
 # res = Summarize.summarize_long_text(llm, text, 15000)
 
-# Split C Sharp code
+# Extract C# file code structure
 file_name = "MessageService.cs"
-code = file.get_as_str(file_name)
-class_desc = CSharpCodeSplit.get_code_structure(code)
+class_description = CSharpCodeSplit.get_code_structure(file_name)
 
-class_desc_json = class_desc.to_json()
+for method in class_description.methods:
+    ctor_txt = ''
+    if method.is_ctor:
+        ctor_txt = 'Take into account that this very method  is a constructor for the containing class of the same name.'
+    text = f"Analyse method name and the method code to produce a summary of it's functionnal purpose and behavior without any mention to the method name or any technicalities. {ctor_txt} Begin by an action verb, like 'Get', 'Retrieve', 'Update', 'Check', etc ... The method name is: '{method.method_name}' and its code: {method.code} "
+    method.generated_summary = Summarize.summarize_long_text(llm, text, 15000)
+    print('- ' + method.generated_summary)
+
+class_desc_json = class_description.to_json()
 file.write_file(class_desc_json, "outputs", file_name + ".json")
 
 # for method in class_desc.methods:

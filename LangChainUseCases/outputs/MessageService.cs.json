@@ -1,5 +1,6 @@
 {
     "name": "MessageService",
+    "file_path": "MessageService.cs",
     "class_name": "MessageService",
     "interfaces_names": [
         " IMessageService"
@@ -21,6 +22,8 @@
             "is_virtual": false,
             "is_sealed": false,
             "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Establish a service to oversee messaging operations, such as managing conversations, messages, attachments, and associated user details.",
             "code_chunks": null
         },
         {
@@ -46,6 +49,8 @@
             "is_virtual": false,
             "is_sealed": false,
             "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the latest date from a specific conversation, omitting messages sent by a designated user.",
             "code_chunks": null
         },
         {
@@ -68,6 +73,8 @@
             "is_virtual": false,
             "is_sealed": false,
             "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the count of messages filtered by user and school identifiers, and sorted according to specific criteria.",
             "code_chunks": null
         },
         {
@@ -86,6 +93,8 @@
             "is_virtual": false,
             "is_sealed": false,
             "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Count the messages in a conversation that match defined criteria.",
             "code_chunks": null
         },
         {
@@ -104,6 +113,8 @@
             "is_virtual": false,
             "is_sealed": false,
             "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the number of unread messages for a specific user associated with a particular school.",
             "code_chunks": null
         },
         {
@@ -122,6 +133,8 @@
             "is_virtual": false,
             "is_sealed": false,
             "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve messages from a verified existing conversation only if the user requesting is a participant.",
             "code_chunks": null
         },
         {
@@ -140,6 +153,8 @@
             "is_virtual": false,
             "is_sealed": false,
             "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "A new message is created in the system, linked to the current user, and all associated repositories are registered to maintain transactional integrity.",
             "code_chunks": null
         },
         {
@@ -158,6 +173,8 @@
             "is_virtual": false,
             "is_sealed": false,
             "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve specific message details by ID, including sender information and attachments.",
             "code_chunks": null
         },
         {
@@ -178,6 +195,8 @@
             "is_virtual": false,
             "is_sealed": false,
             "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the archive status of conversations for a user based on their membership in those conversations.",
             "code_chunks": null
         }
     ],
