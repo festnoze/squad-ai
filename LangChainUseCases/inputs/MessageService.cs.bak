@@ -62,7 +62,7 @@ public class MessageService : IMessageService
     }
 
     /// <inheritdoc/>
-    [Obsolete("This method is deprecated, use CountMessagesAsync instead.")]
+    [Obsolete("This method is deprecated, use CountMessagesAsync instead.")
     public async Task<int> CountMessagesAsync(int userId, IEnumerable<int> schoolsIds, IUntypedListingSelector listingSelector)
     {
         return await _messageRepository.CountMessagesWithFilterAndSort(userId, schoolsIds, listingSelector);

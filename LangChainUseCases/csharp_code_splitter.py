@@ -8,7 +8,7 @@ from models.prop_desc import PropDesc
 
 class CSharpCodeSplit:
     @staticmethod
-    def split_code(code: str, chunk_size:int = 8000, chunk_overlap: int = 0) -> BaseDesc:
+    def get_code_structure(code: str, chunk_size:int = 8000, chunk_overlap: int = 0) -> BaseDesc:
         found_class_interface_enum, class_interface_enum_contents = CSharpCodeSplit.split_by_class_interface_enum_definition(code)
         last_item_kind: str = found_class_interface_enum[-1][0] # TODO: don't yet handle files with multiple class/interface/enum definitions (can happened, especially in transfert objects files)
         if 'class' in last_item_kind:
@@ -66,25 +66,23 @@ class CSharpCodeSplit:
                     class_name = first_line[0].split('(')
                     interfaces_names = []
             else:
-                if first_line.endswith(';') or first_line.endswith('; }') or first_line.endswith(';}'):
+                if CSharpCodeSplit.is_property(first_line):
                     properties.append(CSharpCodeSplit.property_desc_from_code(chunk))
-                else:
-                    summary_str: str = ''
-                    attributs_str: str = ''
+                else: # is method
                     previous_chunk = chunks[chunk_index - 1]
                     previous_chunk_last_double_newline_index = previous_chunk.rfind('\n\n')
                     previous_chunk_last_brace_index = previous_chunk.rfind('}')
                     if previous_chunk_last_double_newline_index > previous_chunk_last_brace_index:
                         previous_chunk_last_part = previous_chunk[previous_chunk_last_double_newline_index:]
-                        attributes = CSharpCodeSplit.detect_attributes(previous_chunk_last_part)
-                        if len(attributes) > 0:
-                            summary = previous_chunk_last_part[:code.index(attributes[0])].split('///')
-                        else:
-                            summary = previous_chunk_last_part.strip().split('///')
-                    methods.append(CSharpCodeSplit.method_desc_from_code(chunk, class_name, summary_str, attributs_str))
+                        attributs = CSharpCodeSplit.detect_attributes(previous_chunk_last_part)
+                        summary_lines = [line.strip().replace('///', '').strip() for line in previous_chunk_last_part.split('\n') if '///' in line]
+                    methods.append(CSharpCodeSplit.method_desc_from_code(chunk, class_name, summary_lines, attributs))
         
         print("Le code a été découpé en " + str(len(methods)) + " méthodes et " + str(len(properties)) + " propriétés.")
         return ClassDesc(class_name=class_name, interfaces_names=interfaces_names, methods=methods, properties=properties)
+
+    def is_property(first_line) -> bool:
+        return first_line.endswith(';') or first_line.endswith('; }') or first_line.endswith(';}')
 
     def detect_attributes(code: str) -> list[str]:
         attributes: list[str] = []
@@ -107,7 +105,7 @@ class CSharpCodeSplit:
             prop_name = first_line.split(' ')[1].split(';')[0].strip()
         return PropDesc(prop_name, prop_type, is_property)
     
-    def method_desc_from_code(code: str, class_name: str, summary: str, attributs: list[str]) -> MethodDesc:
+    def method_desc_from_code(code: str, class_name: str, summary_lines: list[str], attributs: list[str]) -> MethodDesc:
         first_line = code.split('\n')[0]
 
         is_ctor = class_name == first_line.split('(')[0].strip()
@@ -135,7 +133,7 @@ class CSharpCodeSplit:
             method_return_type = None
 
         method_content = code.split('{')[1].rsplit('}', 1)[0]
-        return MethodDesc(summary, attributs, method_name, method_return_type, method_content, is_async, is_task, is_ctor, is_static, is_abstract, is_override, is_virtual, is_sealed, is_new)
+        return MethodDesc(summary_lines, attributs, method_name, method_return_type, method_content, is_async, is_task, is_ctor, is_static, is_abstract, is_override, is_virtual, is_sealed, is_new)
     
     def split_method(method_or_prop: str, chunk_size: int, chunk_overlap: int) -> list[str]:
         csharp_splitter = RecursiveCharacterTextSplitter.from_language(language=Language.CSHARP, chunk_size=chunk_size, chunk_overlap=chunk_overlap)

@@ -10,6 +10,7 @@ from langchains.langchain_adapter_type import LangChainAdapterType
 from models.llm_info import LlmInfo
 #use cases imports
 from summarize import Summarize
+import json
 
 # Load environment variables from .env file
 print("Started")
@@ -54,9 +55,15 @@ llm = LangChainFactory.create_llm(
 # res = Summarize.summarize_long_text(llm, text, 15000)
 
 # Split C Sharp code
-code = file.get_as_str("MessageService.cs")
-class_desc = CSharpCodeSplit.split_code(code)
-for method in class_desc.methods:
-    for code_chunk in method.code_chunks:
-        print(code_chunk)
-        print("-------------------------------------------------")
+file_name = "MessageService.cs"
+code = file.get_as_str(file_name)
+class_desc = CSharpCodeSplit.get_code_structure(code)
+
+class_desc_json = class_desc.to_json()
+file.write_file(class_desc_json, "outputs", file_name + ".json")
+
+# for method in class_desc.methods:
+#     if method.code_chunks:
+#         for code_chunk in method.code_chunks:
+#             print(code_chunk)
+#             print("-------------------------------------------------")
