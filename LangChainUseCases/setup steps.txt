@@ -12,6 +12,9 @@ pip install -r requirements.txt
 WARNING: to reinstall 'pip' on venv whether pip don't work anymore, do:
 python -m ensurepip --upgrade
 python -m pip install --upgrade pip
-then check 'source' with: Get-Command pip
+then do: Get-Command pip and check the 'source' column value
+
+To update all libs, do: pip install --upgrade -r requirements.txt
+(you can also create file with the updated list of used libs doing: pip freeze > requirements.g.txt)
 
 

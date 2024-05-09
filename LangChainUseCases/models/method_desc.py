@@ -5,22 +5,23 @@ import re
 from models.param_desc import ParameterDesc
 
 class MethodDesc(BaseDesc):
-    def __init__(self, summary_lines: list[str], attributs: list[str], method_name: str, method_return_type: str, code: str, is_async: bool = False, is_task: bool = False, is_ctor: bool = False, is_static: bool = False, is_abstract: bool = False, is_override: bool = False, is_virtual: bool = False, is_sealed: bool = False, is_new: bool = False):
+    def __init__(self, summary_lines: list[str], attributs: list[str], method_name: str, method_return_type: str, method_params: list[ParameterDesc], code: str, is_async: bool = False, is_task: bool = False, is_ctor: bool = False, is_static: bool = False, is_abstract: bool = False, is_override: bool = False, is_virtual: bool = False, is_sealed: bool = False, is_new: bool = False):
         super().__init__(name=method_name)
-        self.method_name = method_name
-        self.summary_lines = summary_lines
-        self.attributs = attributs
-        self.method_return_type = method_return_type
-        self.code = code
-        self.is_async = is_async
-        self.is_task = is_task
-        self.is_ctor = is_ctor
-        self.is_static = is_static
-        self.is_abstract = is_abstract
-        self.is_override = is_override
-        self.is_virtual = is_virtual
-        self.is_sealed = is_sealed
-        self.is_new = is_new
+        self.method_name: str = method_name
+        self.summary_lines: list[str] = summary_lines
+        self.attributs: list[str] = attributs
+        self.return_type: str = method_return_type
+        self.params: list[ParameterDesc] = method_params
+        self.code: str = code
+        self.is_async: bool = is_async
+        self.is_task: bool = is_task
+        self.is_ctor: bool = is_ctor
+        self.is_static: bool = is_static
+        self.is_abstract: bool = is_abstract
+        self.is_override: bool = is_override
+        self.is_virtual: bool = is_virtual
+        self.is_sealed: bool = is_sealed
+        self.is_new: bool = is_new
 
         self._code_chunks: list[str] = None
         @property
@@ -65,21 +66,21 @@ class MethodDesc(BaseDesc):
                 method_return_type = method_sign.split(' ')[0]
             method_name = method_sign.split(' ')[1].split('(')[0]
 
-
         if is_ctor:
             method_name = class_name
             method_return_type = None
 
         method_params = MethodDesc.get_method_parameters(method_sign)
         method_code = code.split('{')[1].rsplit('}', 1)[0]
-        return MethodDesc(summary_lines, attributs, method_name, method_return_type, method_code, is_async, is_task, is_ctor, is_static, is_abstract, is_override, is_virtual, is_sealed, is_new)
+        return MethodDesc(summary_lines, attributs, method_name, method_return_type, method_params, method_code, is_async, is_task, is_ctor, is_static, is_abstract, is_override, is_virtual, is_sealed, is_new)
     
+    @staticmethod
     def get_method_parameters(method_sign: str) -> list[ParameterDesc]:
         params = method_sign.split('(')[1].split(')')[0].split(',')
         params_code = [param.strip() for param in params]
         return [ParameterDesc.get_param_desc_from_code(param_code) for param_code in params_code]
 
-    
+    @staticmethod
     def detect_attributes(code: str) -> list[str]:
         attributes: list[str] = []
         attribute_pattern = r'\[.*?\]'

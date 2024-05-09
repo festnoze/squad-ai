@@ -18,8 +18,7 @@ class LangChainFactory():
             llm = LangChainFactory.create_llm_groq(llm_model_name, api_key, timeout_seconds, temperature)
         else:
             raise ValueError(f"Unknown adapter type: {adapter_type}")
-        return llm
- 
+        return llm 
  
     @staticmethod
     def create_llm_openai(llm_model_name: str, api_key: str, timeout_seconds: int = 50, temperature:float = 0.1) -> ChatOpenAI:
