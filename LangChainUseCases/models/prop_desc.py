@@ -9,6 +9,12 @@ class PropertyDesc(BaseDesc):
         self.is_property = is_property
         self.is_field = not is_property
 
+    def __str__(self):
+        str = f"{self.prop_type} {self.prop_name};" 
+        if self.is_property:
+            str += f" {{ get; set; }}"
+        return str
+
     @staticmethod
     def get_property_desc_from_code(first_line) -> 'PropertyDesc':
         first_line = first_line.replace('const ', '').replace('readonly ', '').strip()

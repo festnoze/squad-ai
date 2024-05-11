@@ -7,31 +7,31 @@ from langchain.tools import tool
 
 from langchain.agents import AgentExecutor, create_tool_calling_agent, tool
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.language_models import BaseChatModel
 from langchain import hub
 
-class ToolsTests:
+class ToolsHelper:
     @staticmethod
-    def test_agent_executor(llm):        
+    def test_agent_executor_with_tools(llm):
+        tools = [ToolsContainer.multiply, ToolsContainer.divide, ToolsContainer.add, ToolsContainer.subtract, ToolsContainer.power, ToolsContainer.root, ToolsContainer.get_random_string, ToolsContainer.get_random_number]
+        question = "Take 3 to the fifth power and multiply that by the sum of twelve and three, then square root the whole result"
+        answer = ToolsHelper.invoke_llm_with_tools(llm, tools, question)
+        print(answer)
+
+    @staticmethod
+    def invoke_llm_with_tools(llm: BaseChatModel, tools: list[any], input: str) -> str:
         #prompt = hub.pull("hwchase17/openai-tools-agent")
         prompt = ChatPromptTemplate.from_messages(
                     [
-                        ("system", "You're good at mathematics and problem solving. Use tools whenever you can for calculation"),
+                        ("system", "You're a helpful AI assistant. You know which tools use to solve the given user problem."),
                         ("human", "{input}"),
                         MessagesPlaceholder("agent_scratchpad")
                     ]
                 )
-        prompt.pretty_print()
-
-        tools = [ToolsContainer.multiply, ToolsContainer.divide, ToolsContainer.add, ToolsContainer.subtract, ToolsContainer.power, ToolsContainer.root, ToolsContainer.get_random_string, ToolsContainer.get_random_number]
         agent = create_tool_calling_agent(llm, tools, prompt)
         agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
-        # res = agent_executor.invoke({ "input": {"Calculate: 3 x 4"} })
-        res = agent_executor.invoke(
-            {
-                "input": "Take 3 to the fifth power and multiply that by the sum of twelve and three, then square root the whole result"
-            }
-        )
-        print(res["output"])
+        res = agent_executor.invoke({"input": input})
+        return res["output"]
 
     @staticmethod
     def test_tool_bind(llm):

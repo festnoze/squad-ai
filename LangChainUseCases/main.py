@@ -2,13 +2,14 @@
 from csharp_code_splitter import CSharpCodeSplit
 from helpers.file_helper import file
 from helpers.groq_helper import GroqHelper
-from helpers.tools_helpers import ToolsContainer
+from helpers.tools_helpers import ToolsContainer, ToolsHelper
 from helpers.txt_helper import txt
-from helpers.c_sharp_helpers import CSharpXMLDocumentation
+from helpers.c_sharp_helpers import CSharpXMLDocumentation, CSharpXMLDocumentationFactory
 from langchains.langchain_factory import LangChainFactory
 from langchains.langchain_adapter_type import LangChainAdapterType
 from models.class_desc import ClassDesc
 from models.llm_info import LlmInfo
+from models.param_doc import MethodParametersDocumentation, ParameterDocumentation
 from summarize import Summarize
 
 # external imports
@@ -64,6 +65,9 @@ llm = LangChainFactory.create_llm(
 # res = web_search.run("what's Obama's first name?")
 # print(res)
 
+## use tools through agent executor
+#ToolsHelper.test_agent_executor_with_tools(llm)
+
 # Summarize short text
 # text = file.get_as_str("short-text.txt")
 # res = Summarize.summarize_short_text(llm, text)
@@ -81,22 +85,38 @@ for method in class_description.methods:
     ctor_txt = ''
     if method.is_ctor:
         ctor_txt = 'Take into account that this very method is a constructor for the containing class of the same name.'
-    text = f"Analyse method name and the method code to produce a summary of it's functionnal purpose and behavior without any mention to the method name or any technicalities. {ctor_txt} Begin by an action verb, like 'Get', 'Retrieve', 'Update', 'Check', etc ... The method name is: '{method.method_name}' and its code: {method.code} "
-    generated_summary = Summarize.summarize_long_text(llm, text, 15000)
+    text = f"""Analyse method name and the method code to produce a summary of it's functionnal purpose and behavior without any mention to the method name or any technicalities. {ctor_txt} Begin by an action verb, like 'Get', 'Retrieve', 'Update', 'Check', etc ... The method name is: '{method.method_name}' and its code: {method.code}"""
+    method_summary = Summarize.summarize_long_text(llm, text, 15000)
     method_params_str = ', '.join([item.to_str() for item in method.params])
-    prompt = f"Create a summary in XML for a C# method named: '{method.method_name}' having those parameters: '{method_params_str}', with this functionnal purpose: '{generated_summary}'."
-     
-    method.generated_summary = CSharpXMLDocumentation(
-        txt.get_content(llm.invoke(prompt)),
-        method.params,
-        method.return_type
+
+    method_params_summaries_prompt = f"Create a description of each parameter of the following C# method. The awaited output should be a json array, with two keys: param_name, and param_desc. The list of parameters is (a parameter consist of a type followed by a name with comma as separator): '{method_params_str}'. The containing method name is: '{method.method_name}', {ctor_txt} and to help you understand the purpose of the method, method summary is: '{method_summary}'."
+    #don't succeed with tools directly (for now!)
+    #tools = [ParameterDocumentation.create_parameter_documentation]
+    #method_params_summaries_response = ToolsHelper.invoke_llm_with_tools(llm, tools, method_params_summaries_prompt)
+    method_params_summaries_response = llm.invoke(method_params_summaries_prompt)
+    method_params_summaries_json = txt.get_code_block('json', txt.get_content(method_params_summaries_response))
+    method_params_summaries = MethodParametersDocumentation.from_json(method_params_summaries_json)
+
+    # method_params_prompt = f"Create a json object having each parameter name as key and each generated parameter summary as value C# method named: '{method.method_name}' having those parameters: '{method_params_str}', with this functionnal purpose: '{generated_summary}'."
+    method.generated_summary = CSharpXMLDocumentation.get_xml(
+        method_summary,
+        method_params_summaries,
+        method.return_type,
+        None, #method.example
     )
 
+
+# Generate new class file including generated summaries
+new_file_content = class_description.generate_class_file()
+# Save file with modified code
+new_file_name = file_name.replace('.cs', '_modif.cs')
+file.write_file(new_file_content, "inputs", new_file_name)
+exit()
 # Generate unit tests for all the class methods
 # TODO
 
-class_desc_json = class_description.to_json()
-file.write_file(class_desc_json, "outputs", file_name + ".json")
+# class_desc_json = class_description.to_json()
+# file.write_file(class_desc_json, "outputs", file_name + ".json")
 
 
 

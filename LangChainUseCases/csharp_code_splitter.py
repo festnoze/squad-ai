@@ -13,14 +13,22 @@ class CSharpCodeSplit:
     def get_code_structure(file_path: str, chunk_size:int = 8000, chunk_overlap: int = 0) -> BaseDesc:
         code = file.get_as_str(file_path)
         
-        found_class_interface_enum, class_interface_enum_contents = CSharpCodeSplit.split_by_class_interface_enum_definition(code)
-        last_item_kind: str = found_class_interface_enum[-1][0] # TODO: don't yet handle files with multiple class/interface/enum definitions (can happened, especially in transfert objects files)
+        found_struct_separators, splitted_struct_contents = CSharpCodeSplit.split_by_class_interface_enum_definition(code)
+        struct_type: str = found_struct_separators[-1].split()[-1] # TODO: don't yet handle files with multiple class/interface/enum definitions (can happened, especially in transfert objects files)
+        access_modifier = found_struct_separators[-1].split()[0]
+        first_chunk_has_usings =  'using' in splitted_struct_contents[0]
+        first_chunk_has_namespace = 'namespace' in splitted_struct_contents[0]
         
-        if 'class' in last_item_kind:
-            class_desc = CSharpCodeSplit.extract_class_methods_and_props(file_path, class_interface_enum_contents[-1])
-        elif 'interface' in last_item_kind:
+        if first_chunk_has_namespace:
+            namespace_name = re.search(r'namespace\s+([\w.]+)[\s;]*', splitted_struct_contents[0]).group(1)
+        if first_chunk_has_usings:
+            usings = re.findall(r'using\s+([\w.]+)[\s;]*', splitted_struct_contents[0]) 
+
+        if struct_type == 'class':
+            class_desc = CSharpCodeSplit.extract_class_methods_and_props(file_path, namespace_name, usings, access_modifier, struct_type, splitted_struct_contents[-1])
+        elif struct_type == 'interface':
             pass
-        elif 'enum' in last_item_kind:
+        elif struct_type == 'enum':
             pass
 
         # split each method into chunks adapted to the LLM context window size
@@ -32,30 +40,34 @@ class CSharpCodeSplit:
             else:
                 method.code_chunks = method_chunks
             chunk_count += len(method_chunks)
-        print("Le code a été découpé en " + str(chunk_count) + " morceaux.")
         return class_desc
     
     def split_by_class_interface_enum_definition(code: str) -> tuple[list[str], list[str]]:
-        separators = [
+        struct_separators_array = [
             'public class ', 'protected class ', 'private class ', 'internal class ', 
             'public interface ', 'protected interface ', 'private interface ', 'internal interface' , 
             'public enum ', 'protected enum ', 'private enum ', 'internal enum '
             ]
-        pattern = '|'.join(map(re.escape, separators))
-        
-        found_class_interface_enum = re.findall(f'({pattern})', code), 
-        class_interface_enum_contents = re.split(pattern, code, flags=re.MULTILINE)
+        struct_separators = '|'.join(map(re.escape, struct_separators_array))
+        struct_separators_pattern = f'({struct_separators})'
 
-        if len(found_class_interface_enum) + 1 != len(class_interface_enum_contents):
+        found_struct_separators = re.findall(struct_separators_pattern, code)  
+        splitted_contents = re.split(struct_separators, code, flags=re.MULTILINE)
+        first_chunk_has_usings =  'using' in splitted_contents[0]
+        first_chunk_has_namespace = 'namespace' in splitted_contents[0]
+        no_content_chunks = int(first_chunk_has_usings or first_chunk_has_namespace)
+
+        if len(found_struct_separators) + no_content_chunks != len(splitted_contents):
             raise Exception('Found class/interface/enum count does not match the contents count')
         
-        return found_class_interface_enum, class_interface_enum_contents
+        return found_struct_separators, splitted_contents
     
-    def extract_class_methods_and_props(file_path: str, code: str) -> ClassDesc:
+    def extract_class_methods_and_props(file_path: str, namespace_name: str, usings: list[str], access_modifier: str, structure_type: str, code: str) -> ClassDesc:
         separators = ['public ', 'protected ', 'private ', 'internal ']
         pattern = '|'.join(map(re.escape, separators))
         code_chunks = re.split(pattern, code, flags=re.MULTILINE)
-        
+        access_modifier = access_modifier
+        structure_type = structure_type
         # Segregate methods from properies        
         methods: list[MethodDesc] = []
         properties: list[PropertyDesc] = []
@@ -76,9 +88,7 @@ class CSharpCodeSplit:
                     properties.append(PropertyDesc.get_property_desc_from_code(code_chunk))
                 else: # is method
                     methods.append(MethodDesc.get_method_desc_from_code(code_chunk, code_chunks[chunk_index - 1], class_name))
-        
-        print("Le code a été découpé en " + str(len(methods)) + " méthodes et " + str(len(properties)) + " propriétés.")
-        return ClassDesc(file_path=file_path, class_name=class_name, interfaces_names=interfaces_names, methods=methods, properties=properties)
+        return ClassDesc(file_path=file_path, namespace_name=namespace_name, usings=usings, class_name=class_name, access_modifier=access_modifier, structure_type=structure_type, interfaces_names=interfaces_names, methods=methods, properties=properties)
 
     def is_property(first_line) -> bool:
         return first_line.endswith(';') or first_line.endswith('; }') or first_line.endswith(';}')

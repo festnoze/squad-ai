@@ -32,6 +32,19 @@ class MethodDesc(BaseDesc):
         
         self.generated_summary: str = None
 
+    def to_str(self, include_summary: bool = False):
+        method_code: str = ""
+        if include_summary:
+            if self.generated_summary:
+                method_code = f"{self.generated_summary}\n"
+            else:
+                method_code = f"{self.summary}\n"
+        method_code += f"{self.return_type} {self.method_name}({', '.join([str(param) for param in self.params])})\n"
+        method_code += "{\n"
+        method_code += f"{self.code}\n"
+        method_code += "}\n\n"
+        return method_code
+
     @staticmethod
     def get_method_desc_from_code(code: str, previous_chunk:str, class_name: str) -> 'MethodDesc':
         #retrieve summary and attributs from previous chunk
