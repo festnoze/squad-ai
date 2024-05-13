@@ -17,7 +17,7 @@ class ParameterDocumentation(BaseDesc):
         self.param_desc = param_desc
 
     def __str__(self):
-        return f"Parameter Name: '{self.param_name}', Description: '{self.param_desc}'" 
+        return f"Name: '{self.param_name}', Description: '{self.param_desc}'" 
     
     def to_json(self):
         return {

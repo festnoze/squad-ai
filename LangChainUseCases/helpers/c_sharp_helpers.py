@@ -19,20 +19,6 @@ class CSharpXMLDocumentation:
     params: MethodParametersDocumentation
     returns: str = None
     example: str = None
-
-    def __init__(self, summary: str = "", returns: str = None, example: str = None, *method_parameters_pairs: str):
-        """
-        Create an instance of CSharpXMLDocumentation with the following parameters:
-        - summary: The method's summary.
-        - returns: The method's return if any.
-        - example: An example of method usage.
-        - method_parameters_pairs: Method parameters provided in pairs of strings, where the first argument is the parameter name and the second argument is the parameter description.
-        """
-        self.summary: str = summary
-        self.params: MethodParametersDocumentation = MethodParametersDocumentation(method_parameters_pairs)
-        self.returns: str = returns
-        self.example: str = example
-        
     def __init__(self, summary: str = "", parameters_docs: MethodParametersDocumentation = None, returns: str = None, example: str = None):
         """
         Create an instance of CSharpXMLDocumentation with the following parameters:

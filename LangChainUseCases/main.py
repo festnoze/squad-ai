@@ -18,10 +18,12 @@ from summarize import Summarize
 import openai
 import os
 from dotenv import find_dotenv, load_dotenv
+from langchain_community.callbacks import get_openai_callback, OpenAICallbackHandler
 
 # Text splitters
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.document_loaders import TextLoader
+import yfinance as yf
 
 # Load environment variables from .env file
 print("Started")
@@ -50,76 +52,101 @@ llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-061
 #llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "nous-hermes2", timeout= 200, api_key= None)
 #llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "openhermes", timeout= 200, api_key= None)
 
-# Instanciate the LLM
-llm = LangChainFactory.create_llm(
-    adapter_type= llm_infos.type,
-    llm_model_name= llm_infos.model,
-    timeout_seconds= llm_infos.timeout,
-    temperature= 0.1,
-    api_key= llm_infos.api_key)
+def run_main():
+    # Instanciate the LLM
+    llm = LangChainFactory.create_llm(
+        adapter_type= llm_infos.type,
+        llm_model_name= llm_infos.model,
+        timeout_seconds= llm_infos.timeout,
+        temperature= 0.0,
+        api_key= llm_infos.api_key)
 
-# Test Groq through its own client (no langchain)
-#GroqHelper.test_query(llm_infos)
+    # Test Groq through its own client (no langchain)
+    #GroqHelper.test_query(llm_infos)
 
-# # use web search tool
-# from langchain_community.utilities import GoogleSerperAPIWrapper
-# web_search = GoogleSerperAPIWrapper()
-# res = web_search.run("what's Obama's first name?")
-# print(res)
+    ## Use web search tool
+    # from langchain_community.utilities import GoogleSerperAPIWrapper
+    # web_search = GoogleSerperAPIWrapper()
+    # res = web_search.run("what's Obama's first name?")
+    # print(res)
 
-## use tools through agent executor
-#ToolsHelper.test_agent_executor_with_tools(llm)
+    ## Use tools through agent executor
+    #ToolsHelper.test_agent_executor_with_tools(llm)
 
-# Summarize short text
-# text = file.get_as_str("short-text.txt")
-# res = Summarize.summarize_short_text(llm, text)
+    # Summarize short text
+    # text = file.get_as_str("short-text.txt")
+    # res = Summarize.summarize_short_text(llm, text)
 
-# Summarize long text
-# text = file.get_as_str("LLM agents PhD thesis full.txt")
-# res = Summarize.summarize_long_text(llm, text, 15000)
+    # Summarize long text
+    # text = file.get_as_str("LLM agents PhD thesis full.txt")
+    # res = Summarize.summarize_long_text(llm, text, 15000)
 
-# Extract C# file code structure (homemade) 
-start_time = time.time()
-file_path = "MessageService.cs"
-code = file.get_as_str(file_path)
-class_description: ClassDesc = CSharpCodeSplit.extract_code_struct_and_generate_methods_summaries(llm, file_path, code)
+    # Extract C# file code structure (homemade) 
+    start_time = time.time()
+    file_path = "MessageService.cs"
+    code = file.get_as_str(file_path)
 
-# Generate new class file including generated summaries
-new_file_content = class_description.generate_code_from_initial_code(code)
-# Save file with modified code
-new_file_name = file_path.replace('.cs', '_modif.cs')
-file.write_file(new_file_content, "inputs", new_file_name)
-end_time = time.time()
-elapsed_minutes = int((end_time - start_time) / 60)
-elapsed_seconds = int((end_time - start_time) % 60)
-print(f">> {elapsed_minutes}m. {elapsed_seconds}s. elapsed")
-exit()
-# Generate unit tests for all the class methods
-# TODO
+    # Remove existing summaries from code
+    lines = code.splitlines()
+    lines = [line for line in lines if not line.strip().startswith('///')]
+    code = '\n'.join(lines)
 
-# class_desc_json = class_description.to_json()
-# file.write_file(class_desc_json, "outputs", file_name + ".json")
+    class_description: ClassDesc = CSharpCodeSplit.extract_code_struct_and_generate_methods_summaries(llm, file_path, code)
+
+    # Generate new class file including generated summaries
+    new_file_content = class_description.generate_code_with_summaries_from_initial_code(code)
+    # Save file with modified code
+    new_file_name = file_path.replace('.cs', '_modif.cs')
+    file.write_file(new_file_content, "inputs", new_file_name)
+    end_time = time.time()
+    txt.display_elapsed(start_time, end_time)
+
+    # Generate unit tests for all the class methods
+    # TODO
+
+    # class_desc_json = class_description.to_json()
+    # file.write_file(class_desc_json, "outputs", file_name + ".json")
 
 
 
-# -- dont work --
-# retrieve fonction
-# docs = []
-# dirpath = '.\\'
-# #for dirpath, dirnames, filenames in os.walk(root_dir):
-    
-#     # Go through each file
-#     #for file_name in filenames:
-# try: 
-#     # Load up the file as a doc and split
-#     current_dir = os.getcwd()
-#     loader = TextLoader(os.path.join(current_dir, "inputs\\" + file_name), encoding='utf-8')
-#     res = loader.load_and_split()
-# except Exception as e: 
-#     pass
+    # -- dont work --
+    # retrieve fonction
+    # docs = []
+    # dirpath = '.\\'
+    # #for dirpath, dirnames, filenames in os.walk(root_dir):
+        
+    #     # Go through each file
+    #     #for file_name in filenames:
+    # try: 
+    #     # Load up the file as a doc and split
+    #     current_dir = os.getcwd()
+    #     loader = TextLoader(os.path.join(current_dir, "inputs\\" + file_name), encoding='utf-8')
+    #     res = loader.load_and_split()
+    # except Exception as e: 
+    #     pass
 
-# for method in class_desc.methods:
-#     if method.code_chunks:
-#         for code_chunk in method.code_chunks:
-#             print(code_chunk)
-#             print("-------------------------------------------------")
+    # for method in class_desc.methods:
+    #     if method.code_chunks:
+    #         for code_chunk in method.code_chunks:
+    #             print(code_chunk)
+    #             print("-------------------------------------------------")
+
+def get_eur_usd_rate():
+    ticker = yf.Ticker("EURUSD=X")
+    data = ticker.history(period="1d")
+    rate = data["Close"].iloc[-1]
+    return rate
+
+def display_tokens_consumtion(cb: OpenAICallbackHandler):
+    max_len = max(len(str(cb.completion_tokens)), len(str(cb.prompt_tokens)), len(str(cb.total_tokens)))
+    print(f"Prompt Tokens:       {cb.prompt_tokens}")
+    print(f"Completion Tokens: + {cb.completion_tokens}")    
+    print(f"                     " + "-" * max_len)
+    print(f"Total Tokens:        {cb.total_tokens}")
+    print(f"Cost:                {cb.total_cost / get_eur_usd_rate():.7f}€ ({cb.total_cost:.7f}$)")
+    print(f"(Cost by 1K token:   {1000 * cb.total_cost / cb.total_tokens}$)")   
+
+with get_openai_callback() as openai_callback:
+    run_main()
+    if llm_infos.type == LangChainAdapterType.OpenAI:
+        display_tokens_consumtion(openai_callback)

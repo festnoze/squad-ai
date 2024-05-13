@@ -17,6 +17,9 @@ using Studi.Api.Lms.Messenger.Infra.External.Data.Repositories.UserRepository;
 using Studi.Api.Lms.Messenger.Localization.Error.GeneratedClasses;
 using Studi.Api.Core.ListingSelector.Untyped;
 using Studi.Api.Core.ListingSelector;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using System;
 
 namespace Studi.Api.Lms.Messenger.Application.Services.MessageService;
 
@@ -30,6 +33,13 @@ public class MessageService : IMessageService
     private readonly IMessageAttachmentRepository _messageAttachmentRepository;
     private readonly IUserRepository _userRepository;
     private readonly ICorrespondantRepository _correspondantRepository;
+
+    /// <inheritdoc/>
+    [Obsolete("This method is deprecated, use CountMessagesAsync instead.")]
+    public async Task<int> CountMessagesAsync(int userId, IEnumerable<int> schoolsIds, IUntypedListingSelector listingSelector)
+    {
+        return await _messageRepository.CountMessagesWithFilterAndSort(userId, schoolsIds, listingSelector);
+    }
 
     public MessageService(
         IMessageAttachmentService messageAttachmentService,
@@ -62,12 +72,6 @@ public class MessageService : IMessageService
     }
 
     /// <inheritdoc/>
-    [Obsolete("This method is deprecated, use CountMessagesAsync instead.")]
-    public async Task<int> CountMessagesAsync(int userId, IEnumerable<int> schoolsIds, IUntypedListingSelector listingSelector)
-    {
-        return await _messageRepository.CountMessagesWithFilterAndSort(userId, schoolsIds, listingSelector);
-    }
-
     public async Task<int> CountFilteredMessagesByConversationIdAsync(int conversationId, IUntypedListingSelector? listingSelector = null)
     {
         return await _messageRepository.CountFilteredMessagesByConversationIdAsync(conversationId, listingSelector);

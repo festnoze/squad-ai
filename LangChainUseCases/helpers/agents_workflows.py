@@ -1,3 +1,4 @@
+import inspect
 from langchain_core.language_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.pydantic_v1 import BaseModel, Field
@@ -22,6 +23,8 @@ TOutputModel = TypeVar('TOutputModel')
 
 def invoke_llm_with_json_output_parser(llm: BaseChatModel, prompt_str: str, json_type: TPydanticModel, output_type: TOutputModel, max_retries= None) -> TOutputModel:
     assert issubclass(json_type, BaseModel), "json_type must inherit from BaseModel"
+    assert inspect.isclass(output_type), "output_type must be a class"
+
     prompt = ChatPromptTemplate.from_messages(
         [
             ("system", "Process the following input, then create a JSON object respecting those formating instructions: {formating_instructions}"),
@@ -42,5 +45,6 @@ def invoke_llm_with_json_output_parser(llm: BaseChatModel, prompt_str: str, json
         result = chain.invoke(input)
 
     # transform the result's dict into the awaited type
+    # the awaited type must have an 'init' method that takes the dict as kwargs
     result_obj = output_type(**result)
     return result_obj
