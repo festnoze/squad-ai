@@ -117,14 +117,14 @@ class CSharpCodeSplit:
     
     def generate_all_methods_summaries(llm: BaseChatModel, class_desc: ClassDesc, separate_output_formating: bool):
         for method in class_desc.methods:
-            method_summary = CSharpCodeSplit.generate_method_summary(llm, method)
+            method_summary = CSharpCodeSplit.get_method_summary_chain(llm, method)
             method_params_summaries = CSharpCodeSplit.generate_parameters_summaries(llm, method, method_summary, separate_output_formating)
             method_return_summary = CSharpCodeSplit.generate_method_return_summary(llm, method, method_summary, method_params_summaries) if not method.is_ctor else None  
             method.generated_summary = CSharpXMLDocumentation.get_xml(method_summary, method_params_summaries, method_return_summary, None) #method.example
 
     ctor_txt = "Take into account that this method is a constructor for the containing class of the same name."
         
-    def generate_method_summary(llm: BaseChatModel, method: MethodDesc) -> str:        
+    def get_method_summary_chain(llm: BaseChatModel, method: MethodDesc) -> str:        
         output_format = txt.single_line(f"""
                 Respect the following format: Your answer must have a direct, conscise and factual style. 
                 Your answer must always begin by an action verb, (like: 'Get', 'Retrieve', 'Update', 'Check', etc ...) to describe the aim of the method, 
@@ -139,7 +139,7 @@ class CSharpCodeSplit:
                 The method name is: '{method.method_name}' and its full code is: """)
         prompt += '\n' + method.code
 
-        method_summary = Summarize.split_and_invoke(llm, prompt, 15000)
+        method_summary = Summarize.split_prompt_and_invoke(llm, prompt, 15000)
         return method_summary
     
     def generate_parameters_summaries(llm: BaseChatModel, method: MethodDesc, method_summary: str, separate_output_formating: bool) -> MethodParametersDocumentation:      

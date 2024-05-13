@@ -18,12 +18,13 @@ from summarize import Summarize
 import openai
 import os
 from dotenv import find_dotenv, load_dotenv
+import yfinance as yf
 from langchain_community.callbacks import get_openai_callback, OpenAICallbackHandler
 
 # Text splitters
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.document_loaders import TextLoader
-import yfinance as yf
+
 
 # Load environment variables from .env file
 print("Started")
@@ -36,8 +37,8 @@ openai_api_key = os.getenv("OPEN_API_KEY")
 openai.api_key = openai_api_key
 
 # Select the LLM to be used
-#llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0613",  timeout= 60, api_key= openai_api_key)
-llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo-2024-04-09",  timeout= 120, api_key= openai_api_key)
+llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0613",  timeout= 60, api_key= openai_api_key)
+#llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo-2024-04-09",  timeout= 120, api_key= openai_api_key)
 
 #llm_infos = LlmInfo(type= LangChainAdapterType.Groq, model= "mixtral-8x7b-32768",  timeout= 20, api_key= groq_api_key)
 #llm_infos = LlmInfo(type= LangChainAdapterType.Groq, model= "llama3-8b-8192",  timeout= 10, api_key= groq_api_key)
@@ -111,8 +112,6 @@ def run_main():
     # class_desc_json = class_description.to_json()
     # file.write_file(class_desc_json, "outputs", file_name + ".json")
 
-
-
     # -- dont work --
     # retrieve fonction
     # docs = []
@@ -147,8 +146,8 @@ def display_tokens_consumtion(cb: OpenAICallbackHandler):
     print(f"Completion Tokens: + {cb.completion_tokens}")    
     print(f"                     " + "-" * max_len)
     print(f"Total Tokens:        {cb.total_tokens}")
-    print(f"Cost:                {cb.total_cost / get_eur_usd_rate():.7f}€ ({cb.total_cost:.7f}$)")
-    print(f"(Cost by 1K token:   {1000 * cb.total_cost / cb.total_tokens}$)")   
+    print(f"Cost:                {cb.total_cost / get_eur_usd_rate():.3f}€ ({cb.total_cost:.3f}$)")
+    print(f"(Cost by 1M token:   {(1000000 * cb.total_cost / cb.total_tokens):.3f}$)")   
 
 with get_openai_callback() as openai_callback:
     run_main()
