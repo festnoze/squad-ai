@@ -1,4 +1,5 @@
 # internal import
+import time
 from csharp_code_splitter import CSharpCodeSplit
 from helpers.file_helper import file
 from helpers.groq_helper import GroqHelper
@@ -9,7 +10,8 @@ from langchains.langchain_factory import LangChainFactory
 from langchains.langchain_adapter_type import LangChainAdapterType
 from models.class_desc import ClassDesc
 from models.llm_info import LlmInfo
-from models.param_doc import MethodParametersDocumentation, ParameterDocumentation
+from models.param_doc import ParameterDocumentation, ParameterDocumentationPydantic
+from models.params_doc import MethodParametersDocumentation, MethodParametersDocumentationPydantic
 from summarize import Summarize
 
 # external imports
@@ -32,8 +34,8 @@ openai_api_key = os.getenv("OPEN_API_KEY")
 openai.api_key = openai_api_key
 
 # Select the LLM to be used
-#llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0613",  timeout= 60, api_key= openai_api_key)
-llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo-2024-04-09",  timeout= 120, api_key= openai_api_key)
+llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0613",  timeout= 60, api_key= openai_api_key)
+#llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo-2024-04-09",  timeout= 120, api_key= openai_api_key)
 
 #llm_infos = LlmInfo(type= LangChainAdapterType.Groq, model= "mixtral-8x7b-32768",  timeout= 20, api_key= groq_api_key)
 #llm_infos = LlmInfo(type= LangChainAdapterType.Groq, model= "llama3-8b-8192",  timeout= 10, api_key= groq_api_key)
@@ -77,40 +79,20 @@ llm = LangChainFactory.create_llm(
 # res = Summarize.summarize_long_text(llm, text, 15000)
 
 # Extract C# file code structure (homemade) 
-file_name = "MessageService.cs"
-class_description: ClassDesc = CSharpCodeSplit.get_code_structure(file_name)
-
-# Generate summaries for all the class methods
-for method in class_description.methods:
-    ctor_txt = ''
-    if method.is_ctor:
-        ctor_txt = 'Take into account that this very method is a constructor for the containing class of the same name.'
-    text = f"""Analyse method name and the method code to produce a summary of it's functionnal purpose and behavior without any mention to the method name or any technicalities. {ctor_txt} Begin by an action verb, like 'Get', 'Retrieve', 'Update', 'Check', etc ... The method name is: '{method.method_name}' and its code: {method.code}"""
-    method_summary = Summarize.summarize_long_text(llm, text, 15000)
-    method_params_str = ', '.join([item.to_str() for item in method.params])
-
-    method_params_summaries_prompt = f"Create a description of each parameter of the following C# method. The awaited output should be a json array, with two keys: param_name, and param_desc. The list of parameters is (a parameter consist of a type followed by a name with comma as separator): '{method_params_str}'. The containing method name is: '{method.method_name}', {ctor_txt} and to help you understand the purpose of the method, method summary is: '{method_summary}'."
-    #don't succeed with tools directly (for now!)
-    #tools = [ParameterDocumentation.create_parameter_documentation]
-    #method_params_summaries_response = ToolsHelper.invoke_llm_with_tools(llm, tools, method_params_summaries_prompt)
-    method_params_summaries_response = llm.invoke(method_params_summaries_prompt)
-    method_params_summaries_json = txt.get_code_block('json', txt.get_content(method_params_summaries_response))
-    method_params_summaries = MethodParametersDocumentation.from_json(method_params_summaries_json)
-
-    # method_params_prompt = f"Create a json object having each parameter name as key and each generated parameter summary as value C# method named: '{method.method_name}' having those parameters: '{method_params_str}', with this functionnal purpose: '{generated_summary}'."
-    method.generated_summary = CSharpXMLDocumentation.get_xml(
-        method_summary,
-        method_params_summaries,
-        method.return_type,
-        None, #method.example
-    )
-
+start_time = time.time()
+file_path = "MessageService.cs"
+code = file.get_as_str(file_path)
+class_description: ClassDesc = CSharpCodeSplit.extract_code_struct_and_generate_methods_summaries(llm, file_path, code)
 
 # Generate new class file including generated summaries
-new_file_content = class_description.generate_class_file()
+new_file_content = class_description.generate_code_from_initial_code(code)
 # Save file with modified code
-new_file_name = file_name.replace('.cs', '_modif.cs')
+new_file_name = file_path.replace('.cs', '_modif.cs')
 file.write_file(new_file_content, "inputs", new_file_name)
+end_time = time.time()
+elapsed_minutes = int((end_time - start_time) / 60)
+elapsed_seconds = int((end_time - start_time) % 60)
+print(f">> {elapsed_minutes}m. {elapsed_seconds}s. elapsed")
 exit()
 # Generate unit tests for all the class methods
 # TODO

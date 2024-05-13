@@ -1,28 +1,56 @@
+using Hangfire;
+using Studi.Api.Core.Exceptions.Guards;
+using Studi.Api.Core.Infrastructure.Repository.UnitOfWork;
+using Studi.Api.Core.Services.DependencyInjection.Attributes;
+using Studi.Api.Lms.Messenger.Application.Services.ConversationService.Ato;
+using Studi.Api.Lms.Messenger.Application.Services.MessageAttachmentService;
+using Studi.Api.Lms.Messenger.Application.Services.MessageService.Ato;
+using Studi.Api.Lms.Messenger.Application.Services.MessageService.Mapping;
+using Studi.Api.Lms.Messenger.Application.Services.NotificationService;
+using Studi.Api.Lms.Messenger.Infra.Data.Repositories.ConversationRepository;
+using Studi.Api.Lms.Messenger.Infra.Data.Repositories.CorrespondantRepository;
+using Studi.Api.Lms.Messenger.Infra.Data.Repositories.MessageAttachmentRepository;
+using Studi.Api.Lms.Messenger.Infra.Data.Repositories.MessageRepository;
+using Studi.Api.Lms.Messenger.Infra.Data.Repositories.MessageRepository.Ito;
+using Studi.Api.Lms.Messenger.Infra.Data.Repositories.MessageRepository.Ito.Implementation;
+using Studi.Api.Lms.Messenger.Infra.External.Data.Repositories.UserRepository;
+using Studi.Api.Lms.Messenger.Localization.Error.GeneratedClasses;
+using Studi.Api.Core.ListingSelector.Untyped;
+using Studi.Api.Core.ListingSelector;
+
 namespace Studi.Api.Lms.Messenger.Application.Services.MessageService;
 
-public class MessageService :  IMessageService
+[ScopedService(typeof(IMessageService))]
+public class MessageService : IMessageService
 {
-	IUnitOfWork _unitOfWork;
-	IMessageAttachmentService _messageAttachmentService;
-	IConversationRepository _conversationRepository;
-	IMessageRepository _messageRepository;
-	IMessageAttachmentRepository _messageAttachmentRepository;
-	IUserRepository _userRepository;
-	ICorrespondantRepository _correspondantRepository;
-	/// <summary>
-/// Initiate a service to manage messaging features, such as attachments, database transactions, and interactions with conversations, messages, users, and correspondents.
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly IMessageAttachmentService _messageAttachmentService;
+    private readonly IConversationRepository _conversationRepository;
+    private readonly IMessageRepository _messageRepository;
+    private readonly IMessageAttachmentRepository _messageAttachmentRepository;
+    private readonly IUserRepository _userRepository;
+    private readonly ICorrespondantRepository _correspondantRepo/// <summary>
+/// The method is a constructor for the 'MessageService' class, setting up dependencies and repositories for the class to function properly.
 /// </summary>
-/// <param name="messageAttachmentService">Provides services related to message attachments, such as saving, retrieving, and managing attachment data.</param>
-/// <param name="unitOfWork">Manages transactions and commits operations to the database, ensuring data consistency and integrity across operations.</param>
-/// <param name="conversationRepository">Handles data access and operations for conversation entities, allowing querying and manipulation of conversation data.</param>
-/// <param name="messageRepository">Responsible for accessing and managing message data, supporting operations like adding, deleting, and updating messages.</param>
-/// <param name="messageAttachmentRepository">Deals with the persistence and retrieval of message attachment entities, facilitating operations on attachments linked to messages.</param>
-/// <param name="userRepository">Manages user-related data access and operations, such as retrieving user information and updating user profiles.</param>
-/// <param name="correspondantRepository">Focuses on managing data related to correspondents, who are entities or individuals involved in messaging or conversations.</param>
+/// <param name="messageAttachmentService">An instance of the 'IMessageAttachmentService' interface, used for handling message attachments.</param>
+/// <param name="unitOfWork">An instance of the 'IUnitOfWork' interface, used for managing unit of work operations.</param>
+/// <param name="conversationRepository">An instance of the 'IConversationRepository' interface, used for accessing conversation data.</param>
+/// <param name="messageRepository">An instance of the 'IMessageRepository' interface, used for accessing message data.</param>
+/// <param name="messageAttachmentRepository">An instance of the 'IMessageAttachmentRepository' interface, used for accessing message attachment data.</param>
+/// <param name="userRepository">An instance of the 'IUserRepository' interface, used for accessing user data.</param>
+/// <param name="correspondantRepository">An instance of the 'ICorrespondantRepository' interface, used for accessing correspondant data.</param>
+sitory;
 
-None MessageService(Name: 'messageAttachmentService', Name: 'unitOfWork', Name: 'conversationRepository', Name: 'messageRepository', Name: 'messageAttachmentRepository', Name: 'userRepository', Name: 'correspondantRepository')
-{
-
+    public MessageService(
+        IMessageAttachmentService messageAttachmentService,
+        IUnitOfWork unitOfWork,
+        IConversationRepository conversationRepository,
+        IMessageRepository messageRepository,
+        IMessageAttachmentRepository messageAttachmentRepository,
+        IUserRepository userRepository,
+        ICorrespondantRepository correspondantRepository
+    )
+    {
         _messageAttachmentService = messageAttachmentService;
         _unitOfWork = unitOfWork;
         _conversationRepository = conversationRepository;
@@ -30,106 +58,218 @@ None MessageService(Name: 'messageAttachmentService', Name: 'unitOfWork', Name: 
         _messageAttachmentRepository = messageAttachmentRepository;
         _userRepository = userRepository;
         _correspondantRepository = correspondantRepository;
-    
-}
+    }
 
-
-	/// <summary>
-/// Retrieve the date of the latest message in a specific conversation that was sent by someone other than a specified user.
+    /// <summary>
+    /// description
+    /// </summary>
+    /// <param name="conversationId"></param>
+    /// <param name="userId"></param>
+    /// <returns><//// <summary>
+/// This method allows retrieving the last message date for a conversation, excluding a specific user, by using the conversation ID and user ID as parameters.
 /// </summary>
-/// <param name="conversationId">The unique identifier of the conversation for which the latest message date is being retrieved.</param>
-/// <param name="userId">The identifier of the user who should be excluded from the search for the latest message.</param>
+/// <param name="messageAttachmentService">An instance of the 'IMessageAttachmentService' interface, used for handling message attachments.</param>
+/// <param name="unitOfWork">An instance of the 'IUnitOfWork' interface, used for managing unit of work operations.</param>
+/// <param name="conversationRepository">An instance of the 'IConversationRepository' interface, used for accessing conversation data.</param>
+/// <param name="messageRepository">An instance of the 'IMessageRepository' interface, used for accessing message data.</param>
+/// <param name="messageAttachmentRepository">An instance of the 'IMessageAttachmentRepository' interface, used for accessing message attachment data.</param>
+/// <param name="userRepository">An instance of the 'IUserRepository' interface, used for accessing user data.</param>
+/// <param name="correspondantRepository">An instance of the 'ICorrespondantRepository' interface, used for accessing correspondant data.</param>
+/// <param name="conversationId">The ID of the conversation for which to retrieve the last message date.</param>
+/// <param name="userId">The ID of the user to exclude when retrieving the last message date.</param>
 /// <returns>DateTime?</returns>
-
-DateTime? GetLastMessageDateByConversationIdExceptUserIdAsync(Name: 'conversationId', Name: 'userId')
-{
-
+returns>
+    public async Task<DateTime?> GetLastMessageDateByConversationIdExceptUserIdAsync(int conversationId, int userId)
+    {
         return await _messageRepository.GetLastMessageDateByConversationIdExceptUserIdAsync(conversationId, userId);
-    
-}
+    }
 
-
-	/// <summary>
-/// Retrieve the count of messages for a specific user and selected schools, applying designated filters and sorting criteria.
+    /// <inheritdoc/>
+    [Obsolete("This method is deprecated, use CountMessagesAsync ins/// <summary>
+/// The 'CountMessagesAsync' method retrieves the count of messages using specific filters and sorting criteria.
 /// </summary>
-/// <param name="userId">The unique identifier of the user for whom the message count is being retrieved.</param>
-/// <param name="schoolsIds">A collection of school identifiers for which the message count needs to be calculated. This allows filtering the messages by specific schools associated with the user.</param>
-/// <param name="listingSelector">An interface that provides methods for applying filters and sorting criteria to the message data, helping to customize the retrieval of the message count.</param>
+/// <param name="messageAttachmentService">An instance of the 'IMessageAttachmentService' interface, used for handling message attachments.</param>
+/// <param name="unitOfWork">An instance of the 'IUnitOfWork' interface, used for managing unit of work operations.</param>
+/// <param name="conversationRepository">An instance of the 'IConversationRepository' interface, used for accessing conversation data.</param>
+/// <param name="messageRepository">An instance of the 'IMessageRepository' interface, used for accessing message data.</param>
+/// <param name="messageAttachmentRepository">An instance of the 'IMessageAttachmentRepository' interface, used for accessing message attachment data.</param>
+/// <param name="userRepository">An instance of the 'IUserRepository' interface, used for accessing user data.</param>
+/// <param name="correspondantRepository">An instance of the 'ICorrespondantRepository' interface, used for accessing correspondant data.</param>
+/// <param name="conversationId">The ID of the conversation for which to retrieve the last message date.</param>
+/// <param name="userId">The ID of the user to exclude when retrieving the last message date.</param>
+/// <param name="userId">The ID of the user.</param>
+/// <param name="schoolsIds">A collection of school IDs.</param>
+/// <param name="listingSelector">An untyped listing selector.</param>
 /// <returns>int</returns>
-
-int CountMessagesAsync(Name: 'userId', Name: 'schoolsIds', Name: 'listingSelector')
-{
-
-        return await _messageRepository.CountMessagesWithFilterAndSort(userId, schoolsIds, listingSelector);
-    
-}
-
-
-	/// <summary>
-/// Count the messages that fulfill certain conditions in a specified conversation.
+tead.")]
+    public async Task<int> CountMessagesAsync(int userId, IEnumerable<int> schoolsIds, IUntypedListingSelector listingSelector)
+    {
+        return await _messageRepository.CountMessagesWithFilterAndSort(userId, schoolsIds, listingSelector)/// <summary>
+/// This method retrieves the count of filtered messages by conversation ID in an asynchronous manner.
 /// </summary>
-/// <param name="conversationId">An integer identifier for the conversation whose messages are to be counted. This ID uniquely identifies the conversation within the system.</param>
-/// <param name="listingSelector">An optional parameter of type IUntypedListingSelector that allows specifying additional conditions or filters to apply when counting the messages. If null, no additional filters are applied.</param>
+/// <param name="messageAttachmentService">An instance of the 'IMessageAttachmentService' interface, used for handling message attachments.</param>
+/// <param name="unitOfWork">An instance of the 'IUnitOfWork' interface, used for managing unit of work operations.</param>
+/// <param name="conversationRepository">An instance of the 'IConversationRepository' interface, used for accessing conversation data.</param>
+/// <param name="messageRepository">An instance of the 'IMessageRepository' interface, used for accessing message data.</param>
+/// <param name="messageAttachmentRepository">An instance of the 'IMessageAttachmentRepository' interface, used for accessing message attachment data.</param>
+/// <param name="userRepository">An instance of the 'IUserRepository' interface, used for accessing user data.</param>
+/// <param name="correspondantRepository">An instance of the 'ICorrespondantRepository' interface, used for accessing correspondant data.</param>
+/// <param name="conversationId">The ID of the conversation for which to retrieve the last message date.</param>
+/// <param name="userId">The ID of the user to exclude when retrieving the last message date.</param>
+/// <param name="userId">The ID of the user.</param>
+/// <param name="schoolsIds">A collection of school IDs.</param>
+/// <param name="listingSelector">An untyped listing selector.</param>
+/// <param name="conversationId">The ID of the conversation.</param>
+/// <param name="listingSelector">An optional listing selector used to filter the messages. Defaults to null if not provided.</param>
 /// <returns>int</returns>
+;
+    }
 
-int CountFilteredMessagesByConversationIdAsync(Name: 'conversationId', Name: 'listingSelector')
-{
-
-        return await _messageRepository.CountFilteredMessagesByConversationIdAsync(conversationId, listingSelector);
-    
-}
-
-
-	/// <summary>
-/// Retrieve the count of unread messages for a designated user at a specific school.
+    public async Task<int> CountFilteredMessagesByConversationIdAsync(int conversationId, IUntypedListingSelector? listingSelector = null)
+    {
+        return await _messageRepository.CountFilteredMessagesByConversationIdAsync(conversationId, listingSelector)/// <summary>
+/// The method retrieves and formats the count of unread messages for a specific user and school.
 /// </summary>
-/// <param name="userId">The unique identifier of the user for whom the unread messages count is being retrieved.</param>
-/// <param name="schoolId">The unique identifier of the school where the unread messages are being counted.</param>
+/// <param name="messageAttachmentService">An instance of the 'IMessageAttachmentService' interface, used for handling message attachments.</param>
+/// <param name="unitOfWork">An instance of the 'IUnitOfWork' interface, used for managing unit of work operations.</param>
+/// <param name="conversationRepository">An instance of the 'IConversationRepository' interface, used for accessing conversation data.</param>
+/// <param name="messageRepository">An instance of the 'IMessageRepository' interface, used for accessing message data.</param>
+/// <param name="messageAttachmentRepository">An instance of the 'IMessageAttachmentRepository' interface, used for accessing message attachment data.</param>
+/// <param name="userRepository">An instance of the 'IUserRepository' interface, used for accessing user data.</param>
+/// <param name="correspondantRepository">An instance of the 'ICorrespondantRepository' interface, used for accessing correspondant data.</param>
+/// <param name="conversationId">The ID of the conversation for which to retrieve the last message date.</param>
+/// <param name="userId">The ID of the user to exclude when retrieving the last message date.</param>
+/// <param name="userId">The ID of the user.</param>
+/// <param name="schoolsIds">A collection of school IDs.</param>
+/// <param name="listingSelector">An untyped listing selector.</param>
+/// <param name="conversationId">The ID of the conversation.</param>
+/// <param name="listingSelector">An optional listing selector used to filter the messages. Defaults to null if not provided.</param>
+/// <param name="userId">The ID of the user for whom the unread message count is retrieved.</param>
+/// <param name="schoolId">The ID of the school for which the unread message count is retrieved.</param>
 /// <returns>IUnreadMessageCountAto</returns>
+;
+    }
 
-IUnreadMessageCountAto GetUnreadMessageCountByUserIdAndSchoolIdAsync(Name: 'userId', Name: 'schoolId')
-{
-
+    public async Task<IUnreadMessageCountAto> GetUnreadMessageCountByUserIdAndSchoolIdAsync(int userId, int schoolId)
+    {
         var unreadMessageCountByConversation = await _messageRepository.GetUnreadMessagesByUserIdAndSchoolIdAsync(userId, schoolId);
 
-        return unreadMessageCountByConversation.ToAto();
-    
-}
-
-
-	/// <summary>
-/// Retrieve messages from a verified conversation only if the user is a participant.
+        return unreadMessageCountByConversation.ToAto()/// <summary>
+/// This method retrieves paginated messages by conversation ID asynchronously, checking if the conversation and user IDs exist and if the user ID is included in the list of correspondents.
 /// </summary>
-/// <param name="conversationId">The unique identifier of the conversation from which messages are to be retrieved. This ID ensures that the messages are fetched from the correct conversation.</param>
-/// <param name="userId">The identifier of the user requesting the messages. This is used to verify that the user is a participant in the conversation.</param>
-/// <param name="schoolIds">A list of school identifiers that the user is associated with. This may be used to further validate access rights to the conversation based on school affiliations.</param>
-/// <param name="pageNumber">The number of the page to retrieve in a paginated query. This helps in fetching a specific subset of messages, making the data retrieval more manageable.</param>
-/// <param name="pageSize">The number of messages to retrieve per page. This parameter defines the limit of messages returned in one page of the result, aiding in pagination control.</param>
+/// <param name="messageAttachmentService">An instance of the 'IMessageAttachmentService' interface, used for handling message attachments.</param>
+/// <param name="unitOfWork">An instance of the 'IUnitOfWork' interface, used for managing unit of work operations.</param>
+/// <param name="conversationRepository">An instance of the 'IConversationRepository' interface, used for accessing conversation data.</param>
+/// <param name="messageRepository">An instance of the 'IMessageRepository' interface, used for accessing message data.</param>
+/// <param name="messageAttachmentRepository">An instance of the 'IMessageAttachmentRepository' interface, used for accessing message attachment data.</param>
+/// <param name="userRepository">An instance of the 'IUserRepository' interface, used for accessing user data.</param>
+/// <param name="correspondantRepository">An instance of the 'ICorrespondantRepository' interface, used for accessing correspondant data.</param>
+/// <param name="conversationId">The ID of the conversation for which to retrieve the last message date.</param>
+/// <param name="userId">The ID of the user to exclude when retrieving the last message date.</param>
+/// <param name="userId">The ID of the user.</param>
+/// <param name="schoolsIds">A collection of school IDs.</param>
+/// <param name="listingSelector">An untyped listing selector.</param>
+/// <param name="conversationId">The ID of the conversation.</param>
+/// <param name="listingSelector">An optional listing selector used to filter the messages. Defaults to null if not provided.</param>
+/// <param name="userId">The ID of the user for whom the unread message count is retrieved.</param>
+/// <param name="schoolId">The ID of the school for which the unread message count is retrieved.</param>
+/// <param name="conversationId">The ID of the conversation.</param>
+/// <param name="userId">The ID of the user.</param>
+/// <param name="schoolIds">A list of school IDs.</param>
+/// <param name="pageNumber">The page number for pagination.</param>
+/// <param name="pageSize">The number of items per page for pagination.</param>
 /// <returns>PaginedData<IMessageRAto></returns>
+;
+    }
 
-PaginedData<IMessageRAto> GetPaginatedMessagesByConversationIdAsync(Name: 'conversationId', Name: 'userId', Name: 'schoolIds', Name: 'pageNumber', Name: 'pageSize')
-{
-
+    public async Task<PaginedData<IMessageRAto>> GetPaginatedMessagesByConversationIdAsync(int conversationId, int userId, List<int> schoolIds, int pageNumber, int pageSize)
+    {
         var conversation = await _conversationRepository.GetConversationByIdAsync(conversationId);
 
         Guard.Against.Null(conversation, ErrorCode.Api.Lms.Messenger.DataValidation.Query.Conversation.NotFoundById, paramsValues: conversationId.ToString());
 
         var conversationUserIds = await _conversationRepository.GetCorrespondantsUserIdsByConversationIdAsync(conversationId);
 
-        Guard.Against.False(conversationUserIds.Contains(userId), ErrorCode.Api.Lms.Messenger.DataValidation.Query.Conversation.UserNotInCorrespondants, paramsValues: new string[] 
-}
+        Guard.Against.False(conversationUserIds.Contains(userId), ErrorCode.Api.Lms.Messenger.DataValidation.Query.Conversation.UserNotInCorrespondants, paramsValues: new string[] { userId.ToString(), conversationId.ToString() });
 
+        // Get total
+        var total = await CountFilteredMessagesByConversationIdAsync(conversationId);
 
-	/// <summary>
-/// A new message is created in the system, linked to the current user, with all associated repositories registered to maintain transactional integrity.
+        var take = pageSize;
+        var skip = (pageNumber - 1) * take;
+
+        IEnumerable<IMessageRIto> messages = Enumerable.Empty<IMessageRIto>();
+
+        if (total > 0)
+        {
+            messages = (await _messageRepository.GetPaginatedMessagesByConversationIdAsync(conversationId, skip, take));
+        }
+
+        var usersIds = messages.Select(m => m.SenderCorrespondant.UserId).Distinct().ToList();
+
+        var users = await _userRepository.GetUsersByIdsAsync(usersIds);
+
+        var flattenUploadedFileGuids = messages
+            .SelectMany(m =>
+            {
+                var guids = new List<Guid>();
+
+                guids.AddRange(m.AttachmentsUploadedFiles.Select(a => a.UploadedFileGuid));
+
+                if (m.AudioMessageUploadedFile != null)
+                {
+                    guids.Add(m.AudioMessageUploadedFile.UploadedFileGuid);
+                }
+
+                return guids;
+            }).Distinct();
+
+        var flattenMessageAttachements = await _messageAttachmentService.GetMultipleMessageAttachmentbyGuidsAsync(flattenUploadedFileGuids);
+
+        var currentUser = await _userRepository.GetUserByIdAsync(userId);
+        Guard.Against.Null(currentUser, ErrorCode.Api.Lms.Messenger.DataValidation.Query.User.NotFoundById, paramsValues: userId.ToString());
+
+        // pagined data
+        var paginedData = new PaginedData<IMessageRAto>
+        {
+            Data = messages.Select(m => m.ToAto(users.Single(u => u.Id == m.SenderCorrespondant.UserId), currentUser, flattenMessageAttachements)),
+            PageNumber = pageNumber,
+            PageSize = pageSize,
+            Total = total,
+        };
+
+        return paginedData/// <summary>
+/// This method adds a message asynchronously and registers repositories for message-related entities.
 /// </summary>
-/// <param name="messageWAto">An instance of IMessageWAto representing the message to be added to the system. This object contains all necessary information about the message, such as content, recipient, and other metadata.</param>
-/// <param name="enableNotification">A boolean flag indicating whether notifications should be sent for this message. The default value is true, meaning notifications are enabled unless specified otherwise.</param>
+/// <param name="messageAttachmentService">An instance of the 'IMessageAttachmentService' interface, used for handling message attachments.</param>
+/// <param name="unitOfWork">An instance of the 'IUnitOfWork' interface, used for managing unit of work operations.</param>
+/// <param name="conversationRepository">An instance of the 'IConversationRepository' interface, used for accessing conversation data.</param>
+/// <param name="messageRepository">An instance of the 'IMessageRepository' interface, used for accessing message data.</param>
+/// <param name="messageAttachmentRepository">An instance of the 'IMessageAttachmentRepository' interface, used for accessing message attachment data.</param>
+/// <param name="userRepository">An instance of the 'IUserRepository' interface, used for accessing user data.</param>
+/// <param name="correspondantRepository">An instance of the 'ICorrespondantRepository' interface, used for accessing correspondant data.</param>
+/// <param name="conversationId">The ID of the conversation for which to retrieve the last message date.</param>
+/// <param name="userId">The ID of the user to exclude when retrieving the last message date.</param>
+/// <param name="userId">The ID of the user.</param>
+/// <param name="schoolsIds">A collection of school IDs.</param>
+/// <param name="listingSelector">An untyped listing selector.</param>
+/// <param name="conversationId">The ID of the conversation.</param>
+/// <param name="listingSelector">An optional listing selector used to filter the messages. Defaults to null if not provided.</param>
+/// <param name="userId">The ID of the user for whom the unread message count is retrieved.</param>
+/// <param name="schoolId">The ID of the school for which the unread message count is retrieved.</param>
+/// <param name="conversationId">The ID of the conversation.</param>
+/// <param name="userId">The ID of the user.</param>
+/// <param name="schoolIds">A list of school IDs.</param>
+/// <param name="pageNumber">The page number for pagination.</param>
+/// <param name="pageSize">The number of items per page for pagination.</param>
+/// <param name="messageWAto">The message to be added. It should implement the IMessageWAto interface.</param>
+/// <param name="enableNotification">Optional. Specifies whether to enable notifications for the added message. Default value is true.</param>
 /// <returns>IMessageRAto</returns>
+;
+    }
 
-IMessageRAto AddMessageAsync(Name: 'messageWAto', Name: 'enableNotification')
-{
-
+    public async Task<IMessageRAto> AddMessageAsync(IMessageWAto messageWAto, bool enableNotification = true)
+    {
         int messageCreatedId;
         var currentUser = await _userRepository.GetUserByIdAsync(messageWAto.UserId);
 
@@ -138,20 +278,82 @@ IMessageRAto AddMessageAsync(Name: 'messageWAto', Name: 'enableNotification')
         await _unitOfWork.RegisterRepositoryAsync(_correspondantRepository);
 
         try
-        
-}
+        {
+            var conversationCorrespondants = (await _conversationRepository.GetCorrespondantsByConversationIdAsync(messageWAto.ConversationId));
 
+            Guard.Against.False(conversationCorrespondants.Any(corr => corr.UserId == messageWAto.UserId), ErrorCode.Api.Lms.Messenger.DataValidation.Query.Correspondant.MissingCorrespondantForMessageSender, paramsValues: messageWAto.UserId.ToString());
 
-	/// <summary>
-/// Retrieve specific message details using its ID, including sender information and attachments.
+            var senderCorrespondantId = conversationCorrespondants.First(corr => corr.UserId == messageWAto.UserId).CorrespondantId;
+
+            var messageWIto = MessageWIto.Create(messageWAto.ConversationId, senderCorrespondantId, messageWAto.MessageContent);
+
+            var messageRIto = await _messageRepository.AddMessageAsync(messageWIto, currentUser.Email);
+
+            await _messageAttachmentService.AddMessageAttachmentsAsync(messageRIto.Id, messageWAto.AttachmentsUploadedFilesGuids, messageWAto.AudioMessageGuid, currentUser.Email);
+
+            await _correspondantRepository.UpdateIsArchivedForAllCorrespondantsByConversationsIdsAsync(new int[] { messageWAto.ConversationId }, false, currentUser.Email);
+
+            messageCreatedId = messageRIto.Id;
+
+            await _unitOfWork.CommitAsync();
+        }
+        catch (Exception)
+        {
+            await _unitOfWork.RollbackAsync();
+            throw;
+        }
+
+        var guids = messageWAto.AttachmentsUploadedFilesGuids.ToList();
+        if (messageWAto.AudioMessageGuid != null)
+        {
+            guids.Add((Guid)messageWAto.AudioMessageGuid);
+        }
+
+        var flattenMessageAttachements = await _messageAttachmentService.GetMultipleMessageAttachmentbyGuidsAsync(guids);
+
+        var message = (await _messageRepository.GetMessageByIdAsync(messageCreatedId)).ToAto(currentUser, currentUser, flattenMessageAttachements);
+
+        if (enableNotification)
+        {
+            BackgroundJob.Enqueue<INotificationService>(service => service.SendNewMessageWebsocketsEventAsync(message.Id));
+
+            BackgroundJob.Enqueue<INotificationService>(service => service.SendNewMessageNotificationAsync(message.Id));
+        }
+
+        return message/// <summary>
+/// This method retrieves a message and its associated information asynchronously, including the current user, sender, and any attachments. It also performs a specific action if there is an audio file attached to the message.
 /// </summary>
-/// <param name="messageId">The unique identifier of the message to be retrieved. This ID is used to locate the specific message in the database or data store.</param>
-/// <param name="currentUserId">The ID of the user who is currently logged in and requesting the message details. This can be used for authorization checks to ensure the user has the right to access the message.</param>
+/// <param name="messageAttachmentService">An instance of the 'IMessageAttachmentService' interface, used for handling message attachments.</param>
+/// <param name="unitOfWork">An instance of the 'IUnitOfWork' interface, used for managing unit of work operations.</param>
+/// <param name="conversationRepository">An instance of the 'IConversationRepository' interface, used for accessing conversation data.</param>
+/// <param name="messageRepository">An instance of the 'IMessageRepository' interface, used for accessing message data.</param>
+/// <param name="messageAttachmentRepository">An instance of the 'IMessageAttachmentRepository' interface, used for accessing message attachment data.</param>
+/// <param name="userRepository">An instance of the 'IUserRepository' interface, used for accessing user data.</param>
+/// <param name="correspondantRepository">An instance of the 'ICorrespondantRepository' interface, used for accessing correspondant data.</param>
+/// <param name="conversationId">The ID of the conversation for which to retrieve the last message date.</param>
+/// <param name="userId">The ID of the user to exclude when retrieving the last message date.</param>
+/// <param name="userId">The ID of the user.</param>
+/// <param name="schoolsIds">A collection of school IDs.</param>
+/// <param name="listingSelector">An untyped listing selector.</param>
+/// <param name="conversationId">The ID of the conversation.</param>
+/// <param name="listingSelector">An optional listing selector used to filter the messages. Defaults to null if not provided.</param>
+/// <param name="userId">The ID of the user for whom the unread message count is retrieved.</param>
+/// <param name="schoolId">The ID of the school for which the unread message count is retrieved.</param>
+/// <param name="conversationId">The ID of the conversation.</param>
+/// <param name="userId">The ID of the user.</param>
+/// <param name="schoolIds">A list of school IDs.</param>
+/// <param name="pageNumber">The page number for pagination.</param>
+/// <param name="pageSize">The number of items per page for pagination.</param>
+/// <param name="messageWAto">The message to be added. It should implement the IMessageWAto interface.</param>
+/// <param name="enableNotification">Optional. Specifies whether to enable notifications for the added message. Default value is true.</param>
+/// <param name="messageId">The ID of the message to retrieve.</param>
+/// <param name="currentUserId">The ID of the current user.</param>
 /// <returns>IMessageRAto</returns>
+;
+    }
 
-IMessageRAto GetMessageByIdAsync(Name: 'messageId', Name: 'currentUserId')
-{
-
+    public async Task<IMessageRAto> GetMessageByIdAsync(int messageId, int currentUserId)
+    {
         var messageRIto = await _messageRepository.GetMessageByIdAsync(messageId);
 
         var currentUser = await _userRepository.GetUserByIdAsync(currentUserId);
@@ -160,27 +362,72 @@ IMessageRAto GetMessageByIdAsync(Name: 'messageId', Name: 'currentUserId')
 
         var guids = messageRIto.AttachmentsUploadedFiles.Select(a => a.UploadedFileGuid).ToList();
         if (messageRIto.AudioMessageUploadedFile != null)
-        
-}
+        {
+            guids.Add(messageRIto.AudioMessageUploadedFile.UploadedFileGuid);
+        }
 
+        var flattenMessageAttachements = await _messageAttachmentService.GetMultipleMessageAttachmentbyGuidsAsync(guids);
 
-	/// <summary>
-/// Update the archival status of conversations for a user depending on their participation in those conversations.
+        return messageRIto.ToAto(user, currentUser, flattenMessageAttachements);
+    }
+
+    /// <inhe/// <summary>
+/// This method updates the 'IsArchived' status for a specific user and conversations by retrieving the conversations based on their IDs and the user ID, and checking if the user belongs to each conversation.
 /// </summary>
-/// <param name="conversationIds">An array of integers representing the unique identifiers of the conversations whose archival status needs to be updated.</param>
-/// <param name="archived">A boolean value indicating the new archival status to be set for the specified conversations. If true, the conversations are to be marked as archived; if false, they are to be marked as unarchived.</param>
-/// <param name="userId">An integer representing the unique identifier of the user for whom the archival status of the conversations is being updated. This parameter ensures that the archival status is updated only for conversations in which this user has participated.</param>
+/// <param name="messageAttachmentService">An instance of the 'IMessageAttachmentService' interface, used for handling message attachments.</param>
+/// <param name="unitOfWork">An instance of the 'IUnitOfWork' interface, used for managing unit of work operations.</param>
+/// <param name="conversationRepository">An instance of the 'IConversationRepository' interface, used for accessing conversation data.</param>
+/// <param name="messageRepository">An instance of the 'IMessageRepository' interface, used for accessing message data.</param>
+/// <param name="messageAttachmentRepository">An instance of the 'IMessageAttachmentRepository' interface, used for accessing message attachment data.</param>
+/// <param name="userRepository">An instance of the 'IUserRepository' interface, used for accessing user data.</param>
+/// <param name="correspondantRepository">An instance of the 'ICorrespondantRepository' interface, used for accessing correspondant data.</param>
+/// <param name="conversationId">The ID of the conversation for which to retrieve the last message date.</param>
+/// <param name="userId">The ID of the user to exclude when retrieving the last message date.</param>
+/// <param name="userId">The ID of the user.</param>
+/// <param name="schoolsIds">A collection of school IDs.</param>
+/// <param name="listingSelector">An untyped listing selector.</param>
+/// <param name="conversationId">The ID of the conversation.</param>
+/// <param name="listingSelector">An optional listing selector used to filter the messages. Defaults to null if not provided.</param>
+/// <param name="userId">The ID of the user for whom the unread message count is retrieved.</param>
+/// <param name="schoolId">The ID of the school for which the unread message count is retrieved.</param>
+/// <param name="conversationId">The ID of the conversation.</param>
+/// <param name="userId">The ID of the user.</param>
+/// <param name="schoolIds">A list of school IDs.</param>
+/// <param name="pageNumber">The page number for pagination.</param>
+/// <param name="pageSize">The number of items per page for pagination.</param>
+/// <param name="messageWAto">The message to be added. It should implement the IMessageWAto interface.</param>
+/// <param name="enableNotification">Optional. Specifies whether to enable notifications for the added message. Default value is true.</param>
+/// <param name="messageId">The ID of the message to retrieve.</param>
+/// <param name="currentUserId">The ID of the current user.</param>
+/// <param name="conversationIds">An array of integers representing the IDs of the conversations to update.</param>
+/// <param name="archived">A boolean value indicating whether the conversations should be archived or not.</param>
+/// <param name="userId">An integer representing the ID of the user for whom the conversations should be updated.</param>
 /// <returns>Task</returns>
-
-Task UpdateIsArchivedForUserIdByConversationsIdsAsync(Name: 'conversationIds', Name: 'archived', Name: 'userId')
-{
-
+ritdoc/>
+    public async Task UpdateIsArchivedForUserIdByConversationsIdsAsync(int[] conversationIds, bool archived, int userId)
+    {
         var conversations = await _conversationRepository.GetConversationsByConversationIdsAndUserIdAsync(conversationIds, userId);
                 
         List<string> conversationsIdsWhereUserIdDontBelongs = new();
 
         foreach (var conversation in conversations)
-        
+        {
+            var correspondants = await _conversationRepository.GetCorrespondantsByConversationIdAsync(conversation.Id);
+            if (!correspondants.Any(cor => cor.UserId == userId))
+                conversationsIdsWhereUserIdDontBelongs.Add(conversation.Id.ToString());
+        }
+
+        // Check if the user belongs to all the conversations he want to update
+        Guard.Against.NotEmpty(
+            conversationsIdsWhereUserIdDontBelongs, 
+            ErrorCode.Api.Lms.Messenger.DataValidation.Command.Conversation.Archive.MissingRightOnEntity, 
+            paramsValues: string.Join(", ", conversationsIdsWhereUserIdDontBelongs));
+ 
+        // Check if the number of records persisted in the database correspond to the number of conversations to update
+        Guard.Against.NotEqual(conversationIds.Count(), conversations.Count(), ErrorCode.Api.Lms.Messenger.DataValidation.Command.Conversation.Archive.WrongEntityCount);
+
+        var currentUser = await _userRepository.GetUserByIdAsync(userId);
+
+        await _correspondantRepository.UpdateIsArchivedForUserIdByConversationsIdsAsync(conversationIds, userId, archived, currentUser.Email);
+    }
 }
-
-

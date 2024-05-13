@@ -9,12 +9,23 @@ from langchain.agents import AgentExecutor, create_tool_calling_agent, tool
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.language_models import BaseChatModel
 from langchain import hub
+from langchain_core.runnables import Runnable, RunnablePassthrough
+
+from models.param_doc import ParameterDocumentation, ParameterDocumentationPydantic
+from models.params_doc import MethodParametersDocumentation
 
 class ToolsHelper:
     @staticmethod
     def test_agent_executor_with_tools(llm):
         tools = [ToolsContainer.multiply, ToolsContainer.divide, ToolsContainer.add, ToolsContainer.subtract, ToolsContainer.power, ToolsContainer.root, ToolsContainer.get_random_string, ToolsContainer.get_random_number]
         question = "Take 3 to the fifth power and multiply that by the sum of twelve and three, then square root the whole result"
+        answer = ToolsHelper.invoke_llm_with_tools(llm, tools, question)
+        print(answer)
+
+    @staticmethod
+    def test_make_method_params_doc_with_agent_executor_and_tools(llm):
+        tools = [ParameterDocumentation.create_parameter_documentation]
+        question = "Here is the method 'divide' parameters: int dividand, int divisor. Please provide a description for each parameter."
         answer = ToolsHelper.invoke_llm_with_tools(llm, tools, question)
         print(answer)
 

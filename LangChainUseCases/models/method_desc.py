@@ -1,3 +1,4 @@
+from helpers.txt_helper import txt
 from models.base_desc import BaseDesc
 import json
 import re
@@ -5,8 +6,9 @@ import re
 from models.param_desc import ParameterDesc
 
 class MethodDesc(BaseDesc):
-    def __init__(self, summary_lines: list[str], attributs: list[str], method_name: str, method_return_type: str, method_params: list[ParameterDesc], code: str, is_async: bool = False, is_task: bool = False, is_ctor: bool = False, is_static: bool = False, is_abstract: bool = False, is_override: bool = False, is_virtual: bool = False, is_sealed: bool = False, is_new: bool = False):
+    def __init__(self, code_start_index: int, summary_lines: list[str], attributs: list[str], method_name: str, method_return_type: str, method_params: list[ParameterDesc], code: str, is_async: bool = False, is_task: bool = False, is_ctor: bool = False, is_static: bool = False, is_abstract: bool = False, is_override: bool = False, is_virtual: bool = False, is_sealed: bool = False, is_new: bool = False):
         super().__init__(name=method_name)
+        self.code_start_index: int = code_start_index
         self.method_name: str = method_name
         self.summary_lines: list[str] = summary_lines
         self.attributs: list[str] = attributs
@@ -32,21 +34,26 @@ class MethodDesc(BaseDesc):
         
         self.generated_summary: str = None
 
-    def to_str(self, include_summary: bool = False):
+    def to_code(self, indent_level: int = 1, include_summary: bool = False):
         method_code: str = ""
+        # Add summary (generated or existing)
         if include_summary:
             if self.generated_summary:
-                method_code = f"{self.generated_summary}\n"
+                method_code += txt.indent(indent_level, f"{self.generated_summary}\n")
             else:
-                method_code = f"{self.summary}\n"
-        method_code += f"{self.return_type} {self.method_name}({', '.join([str(param) for param in self.params])})\n"
-        method_code += "{\n"
-        method_code += f"{self.code}\n"
-        method_code += "}\n\n"
+                method_code +=  txt.indent(indent_level, f"{self.summary}\n")
+        # Add method full signature
+        method_code += txt.indent(indent_level, f"{self.return_type} {self.method_name}({', '.join([str(param) for param in self.params])})\n")
+        # Add method code
+        method_code += txt.indent(indent_level, "{\n")
+        indent_level += 1
+        method_code += txt.indent(indent_level, self.code)
+        indent_level -= 1
+        method_code += txt.indent(indent_level, "}\n\n")
         return method_code
 
     @staticmethod
-    def get_method_desc_from_code(code: str, previous_chunk:str, class_name: str) -> 'MethodDesc':
+    def factory_from_code(code: str, start_index: int, previous_chunk:str, class_name: str) -> 'MethodDesc':
         #retrieve summary and attributs from previous chunk
         previous_chunk_last_double_newline_index = previous_chunk.rfind('\n\n')
         previous_chunk_last_brace_index = previous_chunk.rfind('}')
@@ -85,7 +92,7 @@ class MethodDesc(BaseDesc):
 
         method_params = MethodDesc.get_method_parameters(method_sign)
         method_code = code.split('{')[1].rsplit('}', 1)[0]
-        return MethodDesc(summary_lines, attributs, method_name, method_return_type, method_params, method_code, is_async, is_task, is_ctor, is_static, is_abstract, is_override, is_virtual, is_sealed, is_new)
+        return MethodDesc(start_index, summary_lines, attributs, method_name, method_return_type, method_params, method_code, is_async, is_task, is_ctor, is_static, is_abstract, is_override, is_virtual, is_sealed, is_new)
     
     @staticmethod
     def get_method_parameters(method_sign: str) -> list[ParameterDesc]:

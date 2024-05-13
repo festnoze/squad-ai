@@ -1,8 +1,8 @@
 
 from langchain.pydantic_v1 import BaseModel, Field
 from langchain.tools import BaseTool, StructuredTool, tool
-from models.param_desc import ParameterDesc
-from models.param_doc import MethodParametersDocumentation, ParameterDocumentation
+from models.param_doc import ParameterDocumentation
+from models.params_doc import MethodParametersDocumentation
     
 # class CSharpXMLDocumentationInput(BaseModel):
 #     summary: str = Field(description="A string representing the summary section.")
@@ -52,7 +52,7 @@ class CSharpXMLDocumentation:
         """
         doc_str = f"/// <summary>\n/// {self.summary}\n/// </summary>\n"
         for param in self.params.params_list:
-            doc_str += f"/// <param name=\"{param['param_name']}\">{param['param_desc']}</param>\n"
+            doc_str += f"/// <param name=\"{param.param_name}\">{param.param_desc}</param>\n"
         if self.returns:
             doc_str += f"/// <returns>{self.returns}</returns>\n"
         if self.example:
