@@ -10,7 +10,10 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.language_models import BaseChatModel
 from langchain import hub
 from langchain_core.runnables import Runnable, RunnablePassthrough
+from langchain_core.prompts import ChatPromptTemplate
+from langchain.schema.runnable import RunnableParallel
 
+from helpers.txt_helper import txt
 from models.param_doc import ParameterDocumentation, ParameterDocumentationPydantic
 from models.params_doc import MethodParametersDocumentation
 
@@ -28,6 +31,25 @@ class ToolsHelper:
         question = "Here is the method 'divide' parameters: int dividand, int divisor. Please provide a description for each parameter."
         answer = ToolsHelper.invoke_llm_with_tools(llm, tools, question)
         print(answer)
+
+    def test_parallel_invocations(llm: BaseChatModel):        
+        # Define different chains, assume both use {topic} in their templates
+        chain1 = ChatPromptTemplate.from_template("Tell me a joke about {topic}") | llm
+        chain2 = ChatPromptTemplate.from_template("Write a short poem about {topic2}") | llm
+
+        # Combine chains for parallel execution
+        combined = RunnableParallel(joke=chain1, poem=chain2)
+
+        # Invoke the combined chain with specific inputs for each chain
+        results = combined.invoke({"topic": "bears", "topic2": "trees"})
+
+        # Retrieve and print the output from each chain
+        joke_result = results['joke']
+        poem_result = results['poem']
+
+        print("Joke about bears:", txt.get_llm_answer_content(joke_result))
+        print("Poem about trees:", txt.get_llm_answer_content(poem_result))
+        exit()
 
     @staticmethod
     def invoke_llm_with_tools(llm: BaseChatModel, tools: list[any], input: str) -> str:

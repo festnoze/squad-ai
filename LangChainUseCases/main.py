@@ -25,7 +25,6 @@ from langchain_community.callbacks import get_openai_callback, OpenAICallbackHan
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.document_loaders import TextLoader
 
-
 # Load environment variables from .env file
 print("Started")
 
@@ -61,9 +60,12 @@ def run_main():
         timeout_seconds= llm_infos.timeout,
         temperature= 0.0,
         api_key= llm_infos.api_key)
-
+    
     # Test Groq through its own client (no langchain)
     #GroqHelper.test_query(llm_infos)
+
+    # Test paralell invocations
+    #ToolsHelper.test_parallel_invocations(llm)
 
     ## Use web search tool
     # from langchain_community.utilities import GoogleSerperAPIWrapper
@@ -92,9 +94,10 @@ def run_main():
     lines = [line for line in lines if not line.strip().startswith('///')]
     code = '\n'.join(lines)
 
+    # Extract code structure from C# file
     class_description: ClassDesc = CSharpCodeSplit.extract_code_struct(llm, file_path, code)
     
-    # generate summaries for all methods for the current class
+    # Generate summaries for all methods for the current class
     CSharpCodeSplit.generate_all_methods_summaries(llm, class_description, True)
 
     # Including generated summaries to class code
