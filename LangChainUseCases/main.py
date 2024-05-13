@@ -36,8 +36,8 @@ openai_api_key = os.getenv("OPEN_API_KEY")
 openai.api_key = openai_api_key
 
 # Select the LLM to be used
-llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0613",  timeout= 60, api_key= openai_api_key)
-#llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo-2024-04-09",  timeout= 120, api_key= openai_api_key)
+#llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0613",  timeout= 60, api_key= openai_api_key)
+llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo-2024-04-09",  timeout= 120, api_key= openai_api_key)
 
 #llm_infos = LlmInfo(type= LangChainAdapterType.Groq, model= "mixtral-8x7b-32768",  timeout= 20, api_key= groq_api_key)
 #llm_infos = LlmInfo(type= LangChainAdapterType.Groq, model= "llama3-8b-8192",  timeout= 10, api_key= groq_api_key)
@@ -91,11 +91,14 @@ def run_main():
     lines = [line for line in lines if not line.strip().startswith('///')]
     code = '\n'.join(lines)
 
-    class_description: ClassDesc = CSharpCodeSplit.extract_code_struct_and_generate_methods_summaries(llm, file_path, code)
+    class_description: ClassDesc = CSharpCodeSplit.extract_code_struct(llm, file_path, code)
+    
+    # generate summaries for all methods for the current class
+    CSharpCodeSplit.generate_all_methods_summaries(llm, class_description, True)
 
     # Including generated summaries to class code
     new_file_content = class_description.generate_code_with_summaries_from_initial_code(code)
-    
+
     # Save file with modified code
     new_file_name = file_path.replace('.cs', '_modif.cs')
     file.write_file(new_file_content, "inputs", new_file_name)

@@ -16,7 +16,7 @@ from summarize import Summarize
 
 class CSharpCodeSplit:
     @staticmethod
-    def extract_code_struct_and_generate_methods_summaries(llm: BaseChatModel, file_path: str, code: str, chunk_size:int = 8000, chunk_overlap: int = 0) -> BaseDesc:
+    def extract_code_struct(llm: BaseChatModel, file_path: str, code: str, chunk_size:int = 8000, chunk_overlap: int = 0) -> BaseDesc:
         found_struct_separators, splitted_struct_contents, separator_indexes = CSharpCodeSplit.split_by_class_interface_enum_definition(code)
          # TODO: don't yet handle files with multiple class/interface/enum definitions (can happened, especially in transfert objects files)
         if len(splitted_struct_contents) > 2:
@@ -42,9 +42,6 @@ class CSharpCodeSplit:
         # split each method into chunks adapted to the LLM context window size
         CSharpCodeSplit.split_class_methods_and_add_to_class_desc(class_desc, chunk_size, chunk_overlap)
         
-        # generate summaries for all methods for the current class
-        CSharpCodeSplit.generate_all_methods_summaries(llm, class_desc, True)
-
         return class_desc
     
     def split_class_methods_and_add_to_class_desc(class_desc: ClassDesc, chunk_size:int = 8000, chunk_overlap: int = 0):

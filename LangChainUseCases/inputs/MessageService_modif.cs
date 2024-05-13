@@ -41,22 +41,22 @@ public class MessageService : IMessageService
     }
 
     /// <summary>
-    /// This task involves counting the number of messages that meet specific criteria for a user ID, school IDs, and listing selector.
+    /// The task involves tallying messages by user and school identifiers, using designated filters and sorting parameters.
     /// </summary>
-    /// <param name="userId">The ID of the user for whom the messages will be counted. It should be an integer value.</param>
-    /// <param name="schoolsIds">A collection of school IDs for which the messages will be counted. It should be a list of integers.</param>
-    /// <param name="listingSelector">The selector used to filter the messages based on specific criteria. It should be an untyped listing selector.</param>
-    /// <returns>Returns the number of messages that meet specific criteria for a user ID, school IDs, and listing selector.</returns>
+    /// <param name="userId">The identifier for a user, used to filter messages associated with this user.</param>
+    /// <param name="schoolsIds">A collection of school identifiers, used to filter messages associated with the listed schools.</param>
+    /// <param name="listingSelector">A tool or mechanism for applying additional filters and sorting options to the message tallying process.</param>
+    /// <returns>Returns the asynchronous count of filtered and sorted messages by user and school identifiers.</returns>
     /// <summary>
-    /// To create an instance of the MessageService class, its dependencies need to be initialized.
+    /// Set up necessary resources and repositories for handling messages and associated entities.
     /// </summary>
-    /// <param name="messageAttachmentService">An instance of the IMessageAttachmentService interface that provides methods for managing message attachments.</param>
-    /// <param name="unitOfWork">An instance of the IUnitOfWork interface that represents a unit of work for database operations.</param>
-    /// <param name="conversationRepository">An instance of the IConversationRepository interface that provides methods for managing conversations.</param>
-    /// <param name="messageRepository">An instance of the IMessageRepository interface that provides methods for managing messages.</param>
-    /// <param name="messageAttachmentRepository">An instance of the IMessageAttachmentRepository interface that provides methods for managing message attachments.</param>
-    /// <param name="userRepository">An instance of the IUserRepository interface that provides methods for managing users.</param>
-    /// <param name="correspondantRepository">An instance of the ICorrespondantRepository interface that provides methods for managing correspondants.</param>
+    /// <param name="messageAttachmentService">This service handles operations related to message attachments.</param>
+    /// <param name="unitOfWork">Manages transactions and commits changes to the database.</param>
+    /// <param name="conversationRepository">Provides access to conversation data and operations.</param>
+    /// <param name="messageRepository">Manages message data and related operations.</param>
+    /// <param name="messageAttachmentRepository">Handles data and operations specific to message attachments.</param>
+    /// <param name="userRepository">Manages user data and operations.</param>
+    /// <param name="correspondantRepository">Handles data and operations for correspondents involved in conversations.</param>
     public MessageService(
         IMessageAttachmentService messageAttachmentService,
         IUnitOfWork unitOfWork,
@@ -77,33 +77,33 @@ public class MessageService : IMessageService
     }
 
     /// <summary>
-    /// This task involves finding the most recent message date in a conversation, while excluding a particular user.
+    /// Retrieve the date of the most recent message in a specific conversation, excluding any messages sent by a specified user.
     /// </summary>
-    /// <param name="conversationId">The ID of the conversation for which to find the most recent message date.</param>
-    /// <param name="userId">The ID of the user to exclude while finding the most recent message date.</param>
-    /// <returns>Returns the most recent message date in a conversation, excluding a particular user.</returns>
+    /// <param name="conversationId">The unique identifier of the conversation for which to retrieve the most recent message date.</param>
+    /// <param name="userId">The identifier of the user whose messages should be excluded from the search.</param>
+    /// <returns>Returns the latest message date in a conversation, excluding messages from a specified user.</returns>
     public async Task<DateTime?> GetLastMessageDateByConversationIdExceptUserIdAsync(int conversationId, int userId)
     {
         return await _messageRepository.GetLastMessageDateByConversationIdExceptUserIdAsync(conversationId, userId);
     }
 
     /// <summary>
-    /// This task involves counting the number of filtered messages based on conversation ID in an asynchronous manner.
+    /// The task involves tallying messages within a specific conversation that fulfill designated criteria.
     /// </summary>
-    /// <param name="conversationId">The ID of the conversation for which the filtered messages will be counted. It should be of type 'int'.</param>
-    /// <param name="listingSelector">An optional parameter of type 'IUntypedListingSelector'. It represents the selector used to filter the messages. If not provided, the default value is 'null'.</param>
-    /// <returns>Returns the count of filtered messages based on conversation ID in an asynchronous manner.</returns>
+    /// <param name="conversationId">A unique identifier for the conversation whose messages are to be tallied.</param>
+    /// <param name="listingSelector">Specifies the criteria for filtering messages within the conversation. It is optional and can be null if no specific filtering is required.</param>
+    /// <returns>Returns the count of messages meeting specified criteria for a given conversation ID.</returns>
     public async Task<int> CountFilteredMessagesByConversationIdAsync(int conversationId, IUntypedListingSelector? listingSelector = null)
     {
         return await _messageRepository.CountFilteredMessagesByConversationIdAsync(conversationId, listingSelector);
     }
 
     /// <summary>
-    /// This task involves retrieving the number of unread messages for a particular user and school.
+    /// The task involves calculating the number of unread messages for a specific user associated with a particular school.
     /// </summary>
-    /// <param name="userId">The ID of the user for whom the unread message count is being retrieved. It should be an integer value.</param>
-    /// <param name="schoolId">The ID of the school for which the unread message count is being retrieved. It should be an integer value.</param>
-    /// <returns>Returns the number of unread messages for a specific user and school.</returns>
+    /// <param name="userId">The unique identifier of the user for whom the unread messages are being counted.</param>
+    /// <param name="schoolId">The identifier of the school associated with the user to filter the messages.</param>
+    /// <returns>Returns the count of unread messages for a user linked to a specific school.</returns>
     public async Task<IUnreadMessageCountAto> GetUnreadMessageCountByUserIdAndSchoolIdAsync(int userId, int schoolId)
     {
         var unreadMessageCountByConversation = await _messageRepository.GetUnreadMessagesByUserIdAndSchoolIdAsync(userId, schoolId);
@@ -112,14 +112,14 @@ public class MessageService : IMessageService
     }
 
     /// <summary>
-    /// This method retrieves paginated messages for a conversation by its ID. It checks if the conversation exists and if the specified user is one of the correspondents.
+    /// Fetch paginated messages from a specific conversation only if the user is a verified participant.
     /// </summary>
-    /// <param name="conversationId">The ID of the conversation for which to retrieve paginated messages. It should be an integer.</param>
-    /// <param name="userId">The ID of the user who is requesting the paginated messages. It should be an integer.</param>
-    /// <param name="schoolIds">A list of school IDs. It should be a list of integers.</param>
-    /// <param name="pageNumber">The page number of the paginated messages. It should be an integer.</param>
-    /// <param name="pageSize">The number of messages per page in the paginated result. It should be an integer.</param>
-    /// <returns>Returns a paginated list of messages for a conversation by its ID.</returns>
+    /// <param name="conversationId">The unique identifier of the conversation from which messages are to be fetched.</param>
+    /// <param name="userId">The identifier of the user requesting the messages. This is used to verify if the user is a participant in the conversation.</param>
+    /// <param name="schoolIds">A list of school identifiers which may be used to filter or verify access to the conversation based on school affiliation.</param>
+    /// <param name="pageNumber">The number of the page in the pagination sequence, used to fetch a specific subset of messages.</param>
+    /// <param name="pageSize">The number of messages to be returned per page, determining the size of each paginated segment.</param>
+    /// <returns>Returns a paginated list of messages from a verified conversation participant.</returns>
     public async Task<PaginedData<IMessageRAto>> GetPaginatedMessagesByConversationIdAsync(int conversationId, int userId, List<int> schoolIds, int pageNumber, int pageSize)
     {
         var conversation = await _conversationRepository.GetConversationByIdAsync(conversationId);
@@ -180,11 +180,11 @@ public class MessageService : IMessageService
     }
 
     /// <summary>
-    /// This statement is instructing to create and add a new message asynchronously, including the user ID and any attachments or correspondents.
+    /// The process involves adding a new message to the database, which includes setting up the required repositories and managing user data according to the specified user ID.
     /// </summary>
-    /// <param name="IMessageWAto messageWAto">The message object that contains the details of the message to be added.</param>
-    /// <param name="bool enableNotification">A flag indicating whether to enable notifications for the added message. Default value is true.</param>
-    /// <returns>Returns void.</returns>
+    /// <param name="messageWAto">Represents the message object to be added to the database.</param>
+    /// <param name="enableNotification">Indicates whether a notification should be sent after adding the message.</param>
+    /// <returns>Returns a task indicating completion of the message addition process.</returns>
     public async Task<IMessageRAto> AddMessageAsync(IMessageWAto messageWAto, bool enableNotification = true)
     {
         int messageCreatedId;
@@ -241,11 +241,11 @@ public class MessageService : IMessageService
     }
 
     /// <summary>
-    /// This task involves retrieving a message by its ID asynchronously, obtaining information about the current user and the sender of the message, and retrieving the GUIDs of any attachments.
+    /// Retrieve a specific message by its identifier, along with details about the sender and any attachments included.
     /// </summary>
-    /// <param name="messageId">The ID of the message to retrieve.</param>
-    /// <param name="currentUserId">The ID of the current user.</param>
-    /// <returns>Returns a message object with information about the user, sender, and attachments.</returns>
+    /// <param name="messageId">The unique identifier of the message to retrieve.</param>
+    /// <param name="currentUserId">The user ID of the current user requesting the message details.</param>
+    /// <returns>Returns the message details, sender information, and attachments for a specified ID.</returns>
     public async Task<IMessageRAto> GetMessageByIdAsync(int messageId, int currentUserId)
     {
         var messageRIto = await _messageRepository.GetMessageByIdAsync(messageId);
@@ -266,12 +266,12 @@ public class MessageService : IMessageService
     }
 
     /// <summary>
-    /// This method updates the 'IsArchived' status for a specific user in conversations identified by their IDs. It retrieves the conversations and user ID, and then iterates through each conversation to update the status.
+    /// Update the archive status of a user's conversations according to their membership in those conversations.
     /// </summary>
-    /// <param name="conversationIds">An array of integers representing the IDs of the conversations.</param>
-    /// <param name="archived">A boolean value indicating whether the conversations should be archived or not.</param>
-    /// <param name="userId">An integer representing the ID of the user.</param>
-    /// <returns>Returns a boolean value indicating the success of updating the 'IsArchived' status.</returns>
+    /// <param name="conversationIds">Array of identifiers for the conversations to be updated.</param>
+    /// <param name="archived">The new archive status to apply to the user's conversations.</param>
+    /// <param name="userId">Identifier of the user whose conversation archive status is being updated.</param>
+    /// <returns>Returns a task indicating the completion of the archive status update.</returns>
     public async Task UpdateIsArchivedForUserIdByConversationsIdsAsync(int[] conversationIds, bool archived, int userId)
     {
         var conversations = await _conversationRepository.GetConversationsByConversationIdsAndUserIdAsync(conversationIds, userId);
