@@ -58,14 +58,14 @@ def run_main():
         adapter_type= llm_infos.type,
         llm_model_name= llm_infos.model,
         timeout_seconds= llm_infos.timeout,
-        temperature= 0.0,
+        temperature= 1.0,
         api_key= llm_infos.api_key)
     
     # Test Groq through its own client (no langchain)
     #GroqHelper.test_query(llm_infos)
 
     # Test paralell invocations
-    #ToolsHelper.test_parallel_invocations(llm)
+    ToolsHelper.test_parallel_invocations_with_homemade_parallel_invocation(llm)
 
     ## Use web search tool
     # from langchain_community.utilities import GoogleSerperAPIWrapper

@@ -99,7 +99,7 @@ public class MessageService : IMessageService
     }
 
     /// <summary>
-    /// This task involves retrieving the number of unread messages for a specific user and school.
+    /// This task involves retrieving the number of unread messages for a particular user and school.
     /// </summary>
     /// <param name="userId">The ID of the user for whom the unread message count is being retrieved. It should be an integer value.</param>
     /// <param name="schoolId">The ID of the school for which the unread message count is being retrieved. It should be an integer value.</param>
@@ -112,14 +112,14 @@ public class MessageService : IMessageService
     }
 
     /// <summary>
-    /// This method retrieves paginated messages for a conversation by its ID. It checks if the conversation exists, retrieves the user IDs of the correspondents, and checks if the provided user ID is included in the list of correspondents.
+    /// This function allows users to retrieve messages for a conversation by its ID in a paginated format.
     /// </summary>
-    /// <param name="conversationId">The ID of the conversation for which to retrieve paginated messages. It should be an integer value.</param>
-    /// <param name="userId">The ID of the user who is requesting the paginated messages. It should be an integer value.</param>
-    /// <param name="schoolIds">A list of integer values representing the IDs of the schools associated with the conversation. It can be an empty list.</param>
-    /// <param name="pageNumber">The number of the page to retrieve. It should be an integer value.</param>
-    /// <param name="pageSize">The number of messages to include per page. It should be an integer value.</param>
-    /// <returns>Returns a paginated list of messages for a conversation by its ID.</returns>
+    /// <param name="conversationId">The ID of the conversation for which messages will be retrieved. It should be an integer.</param>
+    /// <param name="userId">The ID of the user who wants to retrieve the messages. It should be an integer.</param>
+    /// <param name="schoolIds">A list of IDs representing the schools. It should be a list of integers.</param>
+    /// <param name="pageNumber">The page number of the paginated results. It should be an integer.</param>
+    /// <param name="pageSize">The number of messages to be displayed per page. It should be an integer.</param>
+    /// <returns>Returns a paginated list of messages for a conversation.</returns>
     public async Task<PaginedData<IMessageRAto>> GetPaginatedMessagesByConversationIdAsync(int conversationId, int userId, List<int> schoolIds, int pageNumber, int pageSize)
     {
         var conversation = await _conversationRepository.GetConversationByIdAsync(conversationId);

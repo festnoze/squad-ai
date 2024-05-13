@@ -13,6 +13,7 @@ from langchain_core.runnables import Runnable, RunnablePassthrough
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.schema.runnable import RunnableParallel
 
+from helpers.agents_workflows import invoke_parallel_prompts
 from helpers.txt_helper import txt
 from models.param_doc import ParameterDocumentation, ParameterDocumentationPydantic
 from models.params_doc import MethodParametersDocumentation
@@ -36,19 +37,56 @@ class ToolsHelper:
         # Define different chains, assume both use {topic} in their templates
         chain1 = ChatPromptTemplate.from_template("Tell me a joke about {topic}") | llm
         chain2 = ChatPromptTemplate.from_template("Write a short poem about {topic2}") | llm
+        chain3 = ChatPromptTemplate.from_template("Write a short rebus about {input_x}") | llm
 
         # Combine chains for parallel execution
-        combined = RunnableParallel(joke=chain1, poem=chain2)
+        combined = RunnableParallel(joke=chain1, poem=chain2, xx=chain3)
 
         # Invoke the combined chain with specific inputs for each chain
-        results = combined.invoke({"topic": "bears", "topic2": "trees"})
+        results = combined.invoke({"topic": "bears", "topic2": "trees", "input_x": "flowers"})
 
         # Retrieve and print the output from each chain
         joke_result = results['joke']
         poem_result = results['poem']
+        input_x_result = results['xx']
 
         print("Joke about bears:", txt.get_llm_answer_content(joke_result))
         print("Poem about trees:", txt.get_llm_answer_content(poem_result))
+        print("Rebus about flowers:", txt.get_llm_answer_content(input_x_result))
+        exit()
+    def test_parallel_invocations_with_homemade_parallel_invocation(llm: BaseChatModel):        
+        # Define different chains, assume both use {topic} in their templates
+        prompts = [
+            "Tell me a joke about flowers",
+            "Write a short poem about darkness",
+            "Write a short rebus about fruits"
+        ]
+        answers = invoke_parallel_prompts(llm, *prompts)
+        for i, answer in enumerate(answers):
+            print(f"Answer to prompt n°{i+1}: {txt.get_llm_answer_content(answer)}")
+            print("--------------------------------------------------")
+        exit()
+
+    def test_parallel_invocations_no_template(llm: BaseChatModel):        
+        # Define different chains, assume both use {topic} in their templates
+        chain1 = ChatPromptTemplate.from_template("Tell me a joke about flowers") | llm
+        chain2 = ChatPromptTemplate.from_template("Write a short poem about darkness") | llm
+        chain3 = ChatPromptTemplate.from_template("Write a short rebus about fruits") | llm
+
+        # Combine chains for parallel execution
+        combined = RunnableParallel(joke=chain1, poem=chain2, xx=chain3)
+
+        # Invoke the combined chain with specific inputs for each chain
+        results = combined.invoke({"topic": ""})
+
+        # Retrieve and print the output from each chain
+        joke_result = results['joke']
+        poem_result = results['poem']
+        input_x_result = results['xx']
+
+        print("Joke about flowers:", txt.get_llm_answer_content(joke_result))
+        print("Poem about darkness:", txt.get_llm_answer_content(poem_result))
+        print("Rebus about fruits:", txt.get_llm_answer_content(input_x_result))
         exit()
 
     @staticmethod

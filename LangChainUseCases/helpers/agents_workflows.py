@@ -3,6 +3,8 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_core.output_parsers import StrOutputParser, ListOutputParser, MarkdownListOutputParser, JsonOutputParser
+from langchain.schema.runnable import RunnableParallel
+
 from typing import TypeVar, Generic, Any
 
 from helpers.txt_helper import txt
@@ -48,3 +50,20 @@ def invoke_llm_with_json_output_parser(llm: BaseChatModel, prompt_str: str, json
     # the awaited type must have an 'init' method that takes the dict as kwargs
     result_obj = output_type(**result)
     return result_obj
+
+def invoke_parallel_prompts(llm: BaseChatModel, *prompts: str) -> list[str]:        
+    # Define different chains, assume both use {topic} in their templates
+    chains = []
+    for prompt in prompts:
+        chains.append(ChatPromptTemplate.from_template(prompt) | llm)
+
+    # Combine chains for parallel execution
+    combined = RunnableParallel(**{f"invoke_{i}": chain for i, chain in enumerate(chains)})
+
+    # Invoke the combined chain with specific inputs for each chain
+    responses = combined.invoke({"topic": ""})
+
+    # Retrieve and print the output from each chain
+    responses_list = [responses[key] for key in responses.keys()]
+    answers = [txt.get_llm_answer_content(response) for response in responses_list]
+    return answers
