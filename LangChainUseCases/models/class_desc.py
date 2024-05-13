@@ -44,10 +44,16 @@ class ClassDesc(BaseDesc):
             class_file += method.to_code(1, True) + "\n"
         return class_file
     
-    def generate_code_from_initial_code(self, initial_code: str):
+    def generate_code_with_summaries_from_initial_code(self, initial_code: str):
         for method_desc in self.methods[::-1]:
             index = method_desc.code_start_index + self.index_shift_code
-            initial_code = initial_code[:index] + method_desc.generated_summary + initial_code[index:]
+            nindex = initial_code[index:].find('\n\n') + 2
+            if nindex != -1:
+                nindex += index
+            else:
+                nindex = len(initial_code)
+            
+            initial_code = initial_code[:nindex] + txt.indent(1, method_desc.generated_summary) + initial_code[nindex:]
         return initial_code
 
 class ClassDescEncoder(json.JSONEncoder):

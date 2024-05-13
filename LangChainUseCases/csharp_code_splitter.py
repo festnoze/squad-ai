@@ -43,7 +43,7 @@ class CSharpCodeSplit:
         CSharpCodeSplit.split_class_methods_and_add_to_class_desc(class_desc, chunk_size, chunk_overlap)
         
         # generate summaries for all methods for the current class
-        CSharpCodeSplit.generate_all_methods_summaries(llm, class_desc, False)
+        CSharpCodeSplit.generate_all_methods_summaries(llm, class_desc, True)
 
         return class_desc
     

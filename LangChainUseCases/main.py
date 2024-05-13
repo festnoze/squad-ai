@@ -93,8 +93,9 @@ def run_main():
 
     class_description: ClassDesc = CSharpCodeSplit.extract_code_struct_and_generate_methods_summaries(llm, file_path, code)
 
-    # Generate new class file including generated summaries
+    # Including generated summaries to class code
     new_file_content = class_description.generate_code_with_summaries_from_initial_code(code)
+    
     # Save file with modified code
     new_file_name = file_path.replace('.cs', '_modif.cs')
     file.write_file(new_file_content, "inputs", new_file_name)
