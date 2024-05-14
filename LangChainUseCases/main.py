@@ -2,17 +2,14 @@
 import time
 from csharp_code_splitter import CSharpCodeSplit
 from helpers.file_helper import file
-from helpers.groq_helper import GroqHelper
-from helpers.tools_helpers import ToolsContainer, ToolsHelper
+from helpers.test_helpers import test_agent_executor_with_tools, test_parallel_invocations_with_homemade_parallel_chains_invocations, test_parallel_invocations_with_homemade_parallel_prompts_invocations
 from helpers.txt_helper import txt
-from helpers.c_sharp_helpers import CSharpXMLDocumentation, CSharpXMLDocumentationFactory
 from langchains.langchain_factory import LangChainFactory
 from langchains.langchain_adapter_type import LangChainAdapterType
 from models.class_desc import ClassDesc
 from models.llm_info import LlmInfo
-from models.param_doc import ParameterDocumentation, ParameterDocumentationPydantic
-from models.params_doc import MethodParametersDocumentation, MethodParametersDocumentationPydantic
 from summarize import Summarize
+from helpers.groq_helper import GroqHelper
 
 # external imports
 import openai
@@ -36,8 +33,8 @@ openai_api_key = os.getenv("OPEN_API_KEY")
 openai.api_key = openai_api_key
 
 # Select the LLM to be used
-llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0613",  timeout= 60, api_key= openai_api_key)
-#llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo-2024-04-09",  timeout= 120, api_key= openai_api_key)
+#llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0613",  timeout= 60, api_key= openai_api_key)
+llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo-2024-04-09",  timeout= 120, api_key= openai_api_key)
 
 #llm_infos = LlmInfo(type= LangChainAdapterType.Groq, model= "mixtral-8x7b-32768",  timeout= 20, api_key= groq_api_key)
 #llm_infos = LlmInfo(type= LangChainAdapterType.Groq, model= "llama3-8b-8192",  timeout= 10, api_key= groq_api_key)
@@ -65,7 +62,8 @@ def run_main():
     #GroqHelper.test_query(llm_infos)
 
     # Test paralell invocations
-    ToolsHelper.test_parallel_invocations_with_homemade_parallel_invocation(llm)
+    # test_parallel_invocations_with_homemade_parallel_prompts_invocations(llm)
+    # test_parallel_invocations_with_homemade_parallel_chains_invocations(llm)
 
     ## Use web search tool
     # from langchain_community.utilities import GoogleSerperAPIWrapper
@@ -74,7 +72,7 @@ def run_main():
     # print(res)
 
     ## Use tools through agent executor
-    #ToolsHelper.test_agent_executor_with_tools(llm)
+    #test_agent_executor_with_tools(llm)
 
     # Summarize short text
     # text = file.get_as_str("short-text.txt")
@@ -83,6 +81,8 @@ def run_main():
     # Summarize long text
     # text = file.get_as_str("LLM agents PhD thesis full.txt")
     # res = Summarize.summarize_long_text(llm, text, 15000)
+
+
 
     # Extract C# file code structure (homemade) 
     start_time = time.time()
@@ -98,7 +98,7 @@ def run_main():
     class_description: ClassDesc = CSharpCodeSplit.extract_code_struct(llm, file_path, code)
     
     # Generate summaries for all methods for the current class
-    CSharpCodeSplit.generate_all_methods_summaries(llm, class_description, True)
+    CSharpCodeSplit.generate_all_methods_summaries(llm, class_description, False)
 
     # Including generated summaries to class code
     new_file_content = class_description.generate_code_with_summaries_from_initial_code(code)

@@ -4,6 +4,7 @@ import json
 import re
 
 from models.param_desc import ParameterDesc
+from models.params_doc import MethodParametersDocumentation
 
 class MethodDesc(BaseDesc):
     def __init__(self, code_start_index: int, summary_lines: list[str], attributs: list[str], method_name: str, method_return_type: str, method_params: list[ParameterDesc], code: str, is_async: bool = False, is_task: bool = False, is_ctor: bool = False, is_static: bool = False, is_abstract: bool = False, is_override: bool = False, is_virtual: bool = False, is_sealed: bool = False, is_new: bool = False):
@@ -33,13 +34,16 @@ class MethodDesc(BaseDesc):
             return self._code_chunks
         
         self.generated_summary: str = None
+        self.generated_parameters_summaries: MethodParametersDocumentation = None
+        self.generated_return_summary: str = None
+        self.generated_xml_summary: str = None
 
     def to_code(self, indent_level: int = 1, include_summary: bool = False):
         method_code: str = ""
         # Add summary (generated or existing)
         if include_summary:
-            if self.generated_summary:
-                method_code += txt.indent(indent_level, f"{self.generated_summary}\n")
+            if self.generated_xml_summary:
+                method_code += txt.indent(indent_level, f"{self.generated_xml_summary}\n")
             else:
                 method_code +=  txt.indent(indent_level, f"{self.summary}\n")
         # Add method full signature
@@ -93,6 +97,9 @@ class MethodDesc(BaseDesc):
         method_params = MethodDesc.get_method_parameters(method_sign)
         method_code = code.split('{')[1].rsplit('}', 1)[0]
         return MethodDesc(start_index, summary_lines, attributs, method_name, method_return_type, method_params, method_code, is_async, is_task, is_ctor, is_static, is_abstract, is_override, is_virtual, is_sealed, is_new)
+    
+    def has_return_type(self) -> bool:
+        return self.return_type is not None and self.return_type != 'void' and self.return_type != 'Task' and not self.is_ctor
     
     @staticmethod
     def get_method_parameters(method_sign: str) -> list[ParameterDesc]:

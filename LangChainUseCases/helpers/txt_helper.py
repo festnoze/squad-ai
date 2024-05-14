@@ -22,6 +22,29 @@ class txt:
         else:
             return text
         
+    def extract_json_from_llm_response(response: any) -> str:
+        content = txt.get_llm_answer_content(response)
+        content = txt.get_code_block("json", content)
+        start_index = -1 
+        first_index_open_curly_brace = content.find('{')
+        first_index_open_square_brace = content.find('[')
+        last_index_close_curly_brace = content.rfind('}')
+        last_index_close_square_brace = content.rfind(']')
+        
+        if first_index_open_curly_brace != -1:
+            start_index = first_index_open_curly_brace
+        if first_index_open_square_brace != -1 and (start_index == -1 or first_index_open_square_brace < start_index):
+            start_index = first_index_open_square_brace
+
+        if last_index_close_curly_brace != -1:
+            end_index = last_index_close_curly_brace + 1
+        if last_index_close_square_brace != -1 and (end_index == -1 or last_index_close_square_brace > end_index):
+            end_index = last_index_close_square_brace + 1
+
+        if start_index == -1 or end_index == -1:
+            raise Exception("No JSON content found in response")
+        return content[start_index:end_index]
+        
     def indent(indent_level: int, code: str) -> str:
         indent_str = '    '
         lines = code.split('\n')

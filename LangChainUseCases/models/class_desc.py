@@ -53,7 +53,7 @@ class ClassDesc(BaseDesc):
             else:
                 nindex = len(initial_code)
             
-            initial_code = initial_code[:nindex] + txt.indent(1, method_desc.generated_summary) + initial_code[nindex:]
+            initial_code = initial_code[:nindex] + txt.indent(1, str(method_desc.generated_xml_summary)) + initial_code[nindex:]
         return initial_code
 
 class ClassDescEncoder(json.JSONEncoder):

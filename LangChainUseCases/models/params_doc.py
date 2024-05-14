@@ -55,13 +55,19 @@ class MethodParametersDocumentation:
             MethodParametersDocumentation: The MethodParametersDocumentation object created from the JSON string.
         """
         data = json.loads(json_data)
+        is_list = isinstance(data, list) 
+        has_params_list_prop = len(data) == 1 and isinstance(data[0], list)
         params_docs_list: List[ParameterDocumentation] = []
-        if 'params_list' in data:
-            params_docs_list = [ParameterDocumentation(param['param_name'], param['param_desc']) for param in data['params_list']]
-        elif 'parameters' in data:
-            params_docs_list = [ParameterDocumentation(param['param_name'], param['param_desc']) for param in data['parameters']]
-        else:
+        
+        if has_params_list_prop:
             params_docs_list = [ParameterDocumentation(param['param_name'], param['param_desc']) for param in data]
+        else:
+            if is_list:
+                for param in data:
+                    params_docs_list.append(ParameterDocumentation(param['param_name'], param['param_desc']))
+            else:
+                for key in data.keys():
+                    params_docs_list.append(ParameterDocumentation(data[key]['param_name'], data[key]['param_desc']))
         documentation = MethodParametersDocumentation(params_list=params_docs_list)
         return documentation
         
