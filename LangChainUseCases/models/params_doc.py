@@ -4,6 +4,7 @@ from typing import List
 from langchain.tools import tool
 from langchain.pydantic_v1 import BaseModel, Field
 
+from helpers.txt_helper import txt
 from models.param_doc import ParameterDocumentation, ParameterDocumentationPydantic
 
 class MethodParametersDocumentation:
@@ -54,12 +55,22 @@ class MethodParametersDocumentation:
         Returns:
             MethodParametersDocumentation: The MethodParametersDocumentation object created from the JSON string.
         """
+        json_data = txt.fix_invalid_json(json_data)
         data = json.loads(json_data)
         is_list = isinstance(data, list) 
-        has_params_list_prop = len(data) == 1 and isinstance(data[0], list)
+        has_single_prop = len(data) == 1
+
+        if has_single_prop:
+            if is_list:
+                is_first_param_list = isinstance(data[0], list)
+            else:
+                is_first_param_list = isinstance(data.keys()[0], list)
+        else:
+            is_first_param_list = False
+
         params_docs_list: List[ParameterDocumentation] = []
         
-        if has_params_list_prop:
+        if is_list and not is_first_param_list:
             params_docs_list = [ParameterDocumentation(param['param_name'], param['param_desc']) for param in data]
         else:
             if is_list:

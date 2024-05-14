@@ -4,6 +4,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_core.output_parsers import StrOutputParser, ListOutputParser, MarkdownListOutputParser, JsonOutputParser
 from langchain.schema.runnable import RunnableParallel
+from langchain.chains.base import Chain
 
 from typing import TypeVar, Generic, Any
 
@@ -22,6 +23,33 @@ def invoke_llm_with_retry(llm: BaseChatModel, input: str = "", max_retries: int 
 
 TPydanticModel = TypeVar('TPydanticModel', bound=BaseModel)    
 TOutputModel = TypeVar('TOutputModel')
+output_parser_instructions_name: str = 'output_parser_instructions'
+
+#TODO: to remove
+def invoke_llm_with_json_output_parser_full(llm: BaseChatModel, prompt_str: str, json_type: TPydanticModel, output_type: TOutputModel, max_retries= None) -> TOutputModel:
+    assert issubclass(json_type, BaseModel), "json_type must inherit from BaseModel"
+    assert inspect.isclass(output_type), "output_type must be a class"
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", "Process the following input, then create a JSON object respecting those formating instructions: {" + output_parser_instructions_name + "}"),
+            ("human", prompt_str),
+        ]
+    )
+    
+    parser = JsonOutputParser(pydantic_object=json_type)
+    chain = prompt | llm | parser
+    input = {output_parser_instructions_name: parser.get_format_instructions()}
+
+    if max_retries:
+        result = invoke_llm_with_retry(chain, input, max_retries)
+    else:
+        result = chain.invoke(input)
+
+    # transform the result's dict into the awaited type
+    # the awaited type must have an 'init' method that takes the dict as kwargs
+    result_obj = output_type(**result)
+    return result_obj
 
 def invoke_llm_with_json_output_parser(llm: BaseChatModel, prompt_str: str, json_type: TPydanticModel, output_type: TOutputModel, max_retries= None) -> TOutputModel:
     chain = get_chain_for_json_output_parser(llm, prompt_str, json_type, output_type)
@@ -39,17 +67,15 @@ def invoke_llm_with_json_output_parser(llm: BaseChatModel, prompt_str: str, json
 def get_chain_for_json_output_parser(llm: BaseChatModel, prompt_str: str, json_type: TPydanticModel, output_type: TOutputModel):
     assert issubclass(json_type, BaseModel), "json_type must inherit from BaseModel"
     assert inspect.isclass(output_type), "output_type must be a class"
-
-    parser = JsonOutputParser(pydantic_object=json_type)
-    instructions = f"Process the following input, then output a JSON object respecting those formating instructions: {parser.get_format_instructions()}"
     prompt = ChatPromptTemplate.from_messages(
         [
-            ("system", instructions),
-            ("human", prompt_str + " {input}"),
+            ("system", "Process the following input, then create a JSON object respecting those formating instructions: {" + output_parser_instructions_name + "}"),
+            ("human", prompt_str),
         ]
-    )
+    )    
+    parser = JsonOutputParser(pydantic_object=json_type)
     chain = prompt | llm | parser
-    return chain       
+    return chain, parser.get_format_instructions()
 
 def invoke_parallel_prompts(llm: BaseChatModel, *prompts: str) -> list[str]:        
     # Define different chains, assume both use {input} in their templates
@@ -57,15 +83,17 @@ def invoke_parallel_prompts(llm: BaseChatModel, *prompts: str) -> list[str]:
     for prompt in prompts:
         chain = ChatPromptTemplate.from_template(prompt) | llm
         chains.append(chain)
-    answers = invoke_parallel_chains(*chains)
+    answers = invoke_parallel_chains(None, *chains)
     return answers
 
-def invoke_parallel_chains(*chains) -> list[str]:        
+def invoke_parallel_chains(inputs: dict = None, *chains: Chain) -> list[str]:        
     # Combine chains for parallel execution
     combined = RunnableParallel(**{f"invoke_{i}": chain for i, chain in enumerate(chains)})
 
-    # Invoke the combined chain with specific inputs for each chain
-    responses = combined.invoke({"input": ""})
+    # Invoke the combined chain with specific inputs for each chain if specified
+    if not inputs:
+        inputs = {"input": ""}
+    responses = combined.invoke(inputs)
 
     # Retrieve and print the output from each chain
     responses_list = [responses[key] for key in responses.keys()]

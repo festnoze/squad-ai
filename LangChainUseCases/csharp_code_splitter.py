@@ -4,7 +4,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
 import re
 # internal imports
-from helpers.agents_workflows import invoke_llm_with_json_output_parser, invoke_parallel_chains, invoke_parallel_prompts
+from helpers.agents_workflows import get_chain_for_json_output_parser, invoke_llm_with_json_output_parser, invoke_parallel_chains, invoke_parallel_prompts, output_parser_instructions_name
 from helpers.c_sharp_helpers import CSharpXMLDocumentation
 from helpers.txt_helper import txt
 from models.base_desc import BaseDesc
@@ -116,8 +116,8 @@ class CSharpCodeSplit:
     def has_interfaces(first_line: str) -> bool:
         return ':' in first_line
     
-    def generate_all_methods_summaries(llm: BaseChatModel, class_desc: ClassDesc, separate_output_formating: bool):
-        # Generate all methods summaries
+    def generate_all_methods_summaries(llm: BaseChatModel, class_desc: ClassDesc, with_json_output_parsing: bool):
+        # Generate methods summaries
         methods_summaries_prompts = []
         for method in class_desc.methods:
             method_summary = CSharpCodeSplit.generate_method_summary_prompt(llm, method)
@@ -127,13 +127,25 @@ class CSharpCodeSplit:
         for method, method_summary in zip(class_desc.methods, methods_summaries):
             method.generated_summary = method_summary
 
-        # Generate all parameters summaries for all methods
-        chains = []
+        # Generate parameters summaries for all methods
+        prompts_or_chains = []
+        format_instructions = ''
         for method in class_desc.methods:
-            chains.append(CSharpCodeSplit.get_chain_to_generate_parameters_summaries(llm, method, method_summary, separate_output_formating))
+            prompt, json_formatting_spec_prompt = CSharpCodeSplit.get_prompt_for_parameters_summaries(method, method_summary)        
+            if with_json_output_parsing:
+                prompt_or_chain, format_instructions = get_chain_for_json_output_parser(llm, prompt, MethodParametersDocumentationPydantic, MethodParametersDocumentation)
+            else:
+                prompt_or_chain = prompt + json_formatting_spec_prompt
+            prompts_or_chains.append(prompt_or_chain)
 
-        methods_parameters_summaries = invoke_parallel_chains(*chains)
-        if separate_output_formating:
+        if with_json_output_parsing:
+            methods_parameters_summaries = invoke_parallel_chains({output_parser_instructions_name: format_instructions}, *prompts_or_chains)
+            for i in range(len(methods_parameters_summaries)):
+                methods_parameters_summaries[i] = MethodParametersDocumentation(**methods_parameters_summaries[i])
+        else:
+            methods_parameters_summaries = invoke_parallel_prompts(llm, *prompts_or_chains)
+
+        if with_json_output_parsing:
             for method, method_params_summaries in zip(class_desc.methods, methods_parameters_summaries):
                 method.generated_parameters_summaries = method_params_summaries
         else:            
@@ -144,7 +156,7 @@ class CSharpCodeSplit:
                 method.generated_parameters_summaries = method_params_summaries_built
 
 
-        # Generate all methods return summaries
+        # Generate method return summaries for all methods
         prompts = []
         for method in [met for met in class_desc.methods if met.has_return_type()]:
             prompts.append(CSharpCodeSplit.get_prompt_for_method_return_summary(llm, method))
@@ -186,7 +198,7 @@ class CSharpCodeSplit:
         # method_summary = Summarize.split_prompt_and_invoke(llm, prompt, 8000)
         # return method_summary
     
-    def get_prompt_for_parameters_summaries(method: MethodDesc, method_summary: str, separate_output_formating: bool) -> MethodParametersDocumentation:      
+    def get_prompt_for_parameters_summaries(method: MethodDesc, method_summary: str):      
         method_params_str = ', '.join([item.to_str() for item in method.params])
 
         # Base prompt w/o json output format spec. (used alone in case of further use of an output parser to convert the LLM response to the specified pydantic json object)
@@ -196,28 +208,19 @@ class CSharpCodeSplit:
             Generate a description for each parameter of the following C# method.""")
         
         # Prompt extension to specify the awaited json output format (used when no output parser is defined)
-        specify_json_formatting_prompt = txt.single_line(f"""
+        json_formatting_spec_prompt = txt.single_line(f"""
             The awaited output should be a json array, with one item by parameter, each item having two keys: 
             - 'param_name': containing the parameter name, 
             - and 'param_desc': containing the description that you have generated of the parameter.""")
         
-        if separate_output_formating:
-            return method_params_summaries_prompt
-        else:
-            return method_params_summaries_prompt + specify_json_formatting_prompt
+        return method_params_summaries_prompt, json_formatting_spec_prompt
             
-    def get_chain_to_generate_parameters_summaries(llm: BaseChatModel, method: MethodDesc, method_summary: str, separate_output_formating: bool) -> MethodParametersDocumentation:      
-        prompt = CSharpCodeSplit.get_prompt_for_parameters_summaries(method, method_summary, separate_output_formating)        
-        if separate_output_formating:
-            method_params_summaries_chain = invoke_llm_with_json_output_parser(llm, prompt, MethodParametersDocumentationPydantic, MethodParametersDocumentation)
-        else:
-            method_params_summaries_chain = ChatPromptTemplate.from_template(prompt) | llm
-        return method_params_summaries_chain
-    
     def get_prompt_for_method_return_summary(llm: BaseChatModel, method: MethodDesc) -> str:
+        params_list = txt.get_prop_or_key(method.generated_parameters_summaries, 'params_list')
+        params_list_str = ' ; '.join([str(item) for item in params_list])
         prompt = txt.single_line(f"""\
             Create a description of the return value of the following C# method.
             Instructions: You always begin with: 'Returns ' then generate a description of the return value. The description must be very short and synthetic (less than 15 words)
             The method name is: '{method.method_name}', {CSharpCodeSplit.ctor_txt if method.is_ctor else ""} and to help you understand the purpose of the method, method summary is: '{method.generated_summary}'.
-            The list of parameters is: '{' ; '.join([str(item) for item in method.generated_parameters_summaries.params_list])}'.""")
+            The list of parameters is: '{params_list_str}'.""")
         return prompt

@@ -2,7 +2,7 @@
 import time
 from csharp_code_splitter import CSharpCodeSplit
 from helpers.file_helper import file
-from helpers.test_helpers import test_agent_executor_with_tools, test_parallel_invocations_with_homemade_parallel_chains_invocations, test_parallel_invocations_with_homemade_parallel_prompts_invocations
+from helpers.test_helpers import test_agent_executor_with_tools, test_parallel_chains_invocations_with_imputs, test_parallel_invocations_with_homemade_parallel_chains_invocations, test_parallel_invocations_with_homemade_parallel_prompts_invocations
 from helpers.txt_helper import txt
 from langchains.langchain_factory import LangChainFactory
 from langchains.langchain_adapter_type import LangChainAdapterType
@@ -32,9 +32,15 @@ groq_api_key = os.getenv("GROQ_API_KEY")
 openai_api_key = os.getenv("OPEN_API_KEY")
 openai.api_key = openai_api_key
 
+# models = openai.models.list()
+# for model in models:
+#     print(model.id)
+# exit()
+
 # Select the LLM to be used
 #llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0613",  timeout= 60, api_key= openai_api_key)
-llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo-2024-04-09",  timeout= 120, api_key= openai_api_key)
+#llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo-2024-04-09",  timeout= 120, api_key= openai_api_key)
+llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout= 60, api_key= openai_api_key)
 
 #llm_infos = LlmInfo(type= LangChainAdapterType.Groq, model= "mixtral-8x7b-32768",  timeout= 20, api_key= groq_api_key)
 #llm_infos = LlmInfo(type= LangChainAdapterType.Groq, model= "llama3-8b-8192",  timeout= 10, api_key= groq_api_key)
@@ -64,6 +70,7 @@ def run_main():
     # Test paralell invocations
     # test_parallel_invocations_with_homemade_parallel_prompts_invocations(llm)
     # test_parallel_invocations_with_homemade_parallel_chains_invocations(llm)
+    #test_parallel_chains_invocations_with_imputs(llm)
 
     ## Use web search tool
     # from langchain_community.utilities import GoogleSerperAPIWrapper

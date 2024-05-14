@@ -1,3 +1,6 @@
+import json
+
+
 class txt:
     @staticmethod
     def get_llm_answer_content(response: any) -> str:
@@ -45,6 +48,22 @@ class txt:
             raise Exception("No JSON content found in response")
         return content[start_index:end_index]
         
+    def fix_invalid_json(json_str: str) -> str:
+        if txt.validate_json(json_str):
+            return json_str
+        
+        # embed into a json array
+        json_str = '[' + json_str + ']'
+        return json_str
+            
+    def validate_json(json_str: str) -> bool:
+        try:
+            json.loads(json_str)
+            return True
+        except json.JSONDecodeError as e:
+            return False
+        
+
     def indent(indent_level: int, code: str) -> str:
         indent_str = '    '
         lines = code.split('\n')
@@ -64,3 +83,11 @@ class txt:
         elapsed_minutes = int((end_time - start_time) / 60)
         elapsed_seconds = int((end_time - start_time) % 60)
         print(f">> {elapsed_minutes}m {elapsed_seconds}s elapsed")
+
+    def get_prop_or_key(object, prop_to_find):
+        if hasattr(object, prop_to_find):
+            return getattr(object, prop_to_find)
+        elif isinstance(object, dict) and prop_to_find in object:
+            return object[prop_to_find]
+        else:
+            return None

@@ -57,10 +57,9 @@ def test_parallel_invocations_with_homemade_parallel_prompts_invocations(llm: Ba
     for i, answer in enumerate(answers):
         print(f"Answer to prompt n°{i+1}: {txt.get_llm_answer_content(answer)}")
         print("--------------------------------------------------")
-    #exit()
+    exit()
 
-def test_parallel_invocations_with_homemade_parallel_chains_invocations(llm: BaseChatModel):        
-    # Define different chains, assume both use {topic} in their templates
+def test_parallel_invocations_with_homemade_parallel_chains_invocations(llm: BaseChatModel):
     prompts = [
         "Tell me a joke about flowers",
         "Write a short poem about darkness",
@@ -70,7 +69,24 @@ def test_parallel_invocations_with_homemade_parallel_chains_invocations(llm: Bas
     for prompt in prompts:
         chain = ChatPromptTemplate.from_template(prompt) | llm
         chains.append(chain)
-    answers = invoke_parallel_chains(*chains)
+    answers = invoke_parallel_chains(None, *chains)
+    for i, answer in enumerate(answers):
+        print(f"Answer to prompt n°{i+1}: {txt.get_llm_answer_content(answer)}")
+        print("--------------------------------------------------")
+    exit()
+
+def test_parallel_chains_invocations_with_imputs(llm: BaseChatModel):
+    prompts = [
+        "Tell me a joke about {input_1}",
+        "Write a short poem about {input_2}",
+        "Write a short rebus about {input_3}"
+    ]
+    chains= []
+    for prompt in prompts:
+        chain = ChatPromptTemplate.from_template(prompt) | llm
+        chains.append(chain)
+    inputs = {"input_1": "flowers", "input_2": "darkness", "input_3": "fruits"}
+    answers = invoke_parallel_chains(inputs, *chains)
     for i, answer in enumerate(answers):
         print(f"Answer to prompt n°{i+1}: {txt.get_llm_answer_content(answer)}")
         print("--------------------------------------------------")
