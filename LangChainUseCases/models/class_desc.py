@@ -47,13 +47,22 @@ class ClassDesc(BaseDesc):
     def generate_code_with_summaries_from_initial_code(self, initial_code: str):
         for method_desc in self.methods[::-1]:
             index = method_desc.code_start_index + self.index_shift_code
-            nindex = initial_code[index:].find('\n\n') + 2
-            if nindex != -1:
-                nindex += index
+            next_nl_dist = initial_code[index:].find('\n')     
+
+            if next_nl_dist != -1:
+                next_nl_nindex = index + 2 # add +2 to include the newline
             else:
-                nindex = len(initial_code)
-            
-            initial_code = initial_code[:nindex] + txt.indent(1, str(method_desc.generated_xml_summary)) + initial_code[nindex:]
+                next_nl_nindex = len(initial_code)
+
+            if method_desc.has_attributs():
+                att_index = initial_code[:next_nl_nindex].rfind(method_desc.attributs[0])
+                att_nl_index = initial_code[:att_index].rfind('\n')
+                split_index = att_nl_index + 2 # add +2 to include the newline
+            else:
+                split_index = next_nl_nindex
+                
+            method_summary = '\n' + txt.indent(1, str(method_desc.generated_xml_summary))
+            initial_code = initial_code[:split_index] + method_summary + initial_code[split_index:]
         return initial_code
 
 class ClassDescEncoder(json.JSONEncoder):

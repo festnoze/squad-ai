@@ -36,7 +36,7 @@ class CSharpXMLDocumentation:
         """
         Returns the C# style XML documentation string.
         """
-        doc_str = f"/// <summary>\n/// {self.summary}\n/// </summary>\n"
+        doc_str = f"/// <summary>\n/// {self.summary.replace('\n', '\n/// ')}\n/// </summary>\n"
         for param in self.params.params_list:
             doc_str += f"/// <param name=\"{param.param_name}\">{param.param_desc}</param>\n"
         if self.returns:

@@ -105,7 +105,7 @@ def run_main():
     class_description: ClassDesc = CSharpCodeSplit.extract_code_struct(llm, file_path, code)
     
     # Generate summaries for all methods for the current class
-    CSharpCodeSplit.generate_all_methods_summaries(llm, class_description, False)
+    CSharpCodeSplit.generate_all_methods_summaries(llm, class_description, True)
 
     # Including generated summaries to class code
     new_file_content = class_description.generate_code_with_summaries_from_initial_code(code)

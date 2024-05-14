@@ -55,6 +55,9 @@ class MethodDesc(BaseDesc):
         indent_level -= 1
         method_code += txt.indent(indent_level, "}\n\n")
         return method_code
+    
+    def has_attributs(self) -> bool:
+        return self.has_attributs and len(self.attributs) > 0
 
     @staticmethod
     def factory_from_code(code: str, start_index: int, previous_chunk:str, class_name: str) -> 'MethodDesc':
