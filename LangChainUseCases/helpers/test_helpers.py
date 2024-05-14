@@ -6,22 +6,21 @@ from langchain_core.runnables import Runnable, RunnablePassthrough
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.schema.runnable import RunnableParallel
 
-from helpers.agents_workflows import invoke_parallel_prompts, invoke_parallel_chains
-from helpers.tools_helpers import ToolsContainer, ToolsHelper
-from helpers.txt_helper import txt
-from models.param_doc import ParameterDocumentation, ParameterDocumentationPydantic
+from helpers.llm_helper import Llm
+from helpers.tools_helpers import ToolsContainer
+from models.param_doc import ParameterDocumentation
 from models.params_doc import MethodParametersDocumentation
 
 def test_agent_executor_with_tools(llm):
     tools = [ToolsContainer.multiply, ToolsContainer.divide, ToolsContainer.add, ToolsContainer.subtract, ToolsContainer.power, ToolsContainer.root, ToolsContainer.get_random_string, ToolsContainer.get_random_number]
     question = "Take 3 to the fifth power and multiply that by the sum of twelve and three, then square root the whole result"
-    answer = ToolsHelper.invoke_llm_with_tools(llm, tools, question)
+    answer = Llm.invoke_llm_with_tools(llm, tools, question)
     print(answer)
 
 def test_make_method_params_doc_with_agent_executor_and_tools(llm):
     tools = [ParameterDocumentation.create_parameter_documentation]
     question = "Here is the method 'divide' parameters: int dividand, int divisor. Please provide a description for each parameter."
-    answer = ToolsHelper.invoke_llm_with_tools(llm, tools, question)
+    answer = Llm.invoke_llm_with_tools(llm, tools, question)
     print(answer)
 
 def test_parallel_invocations(llm: BaseChatModel):        
@@ -41,9 +40,9 @@ def test_parallel_invocations(llm: BaseChatModel):
     poem_result = results['poem']
     input_x_result = results['xx']
 
-    print("Joke about bears:", txt.get_llm_answer_content(joke_result))
-    print("Poem about trees:", txt.get_llm_answer_content(poem_result))
-    print("Rebus about flowers:", txt.get_llm_answer_content(input_x_result))
+    print("Joke about bears:", Llm.get_llm_answer_content(joke_result))
+    print("Poem about trees:", Llm.get_llm_answer_content(poem_result))
+    print("Rebus about flowers:", Llm.get_llm_answer_content(input_x_result))
     exit()
 
 def test_parallel_invocations_with_homemade_parallel_prompts_invocations(llm: BaseChatModel):        
@@ -53,9 +52,9 @@ def test_parallel_invocations_with_homemade_parallel_prompts_invocations(llm: Ba
         "Write a short poem about darkness",
         "Write a short rebus about fruits"
     ]
-    answers = invoke_parallel_prompts(llm, *prompts)
+    answers = Llm.invoke_parallel_prompts(llm, *prompts)
     for i, answer in enumerate(answers):
-        print(f"Answer to prompt n°{i+1}: {txt.get_llm_answer_content(answer)}")
+        print(f"Answer to prompt n°{i+1}: {Llm.get_llm_answer_content(answer)}")
         print("--------------------------------------------------")
     exit()
 
@@ -69,9 +68,9 @@ def test_parallel_invocations_with_homemade_parallel_chains_invocations(llm: Bas
     for prompt in prompts:
         chain = ChatPromptTemplate.from_template(prompt) | llm
         chains.append(chain)
-    answers = invoke_parallel_chains(None, *chains)
+    answers = Llm.invoke_parallel_chains(None, *chains)
     for i, answer in enumerate(answers):
-        print(f"Answer to prompt n°{i+1}: {txt.get_llm_answer_content(answer)}")
+        print(f"Answer to prompt n°{i+1}: {Llm.get_llm_answer_content(answer)}")
         print("--------------------------------------------------")
     exit()
 
@@ -86,9 +85,9 @@ def test_parallel_chains_invocations_with_imputs(llm: BaseChatModel):
         chain = ChatPromptTemplate.from_template(prompt) | llm
         chains.append(chain)
     inputs = {"input_1": "flowers", "input_2": "darkness", "input_3": "fruits"}
-    answers = invoke_parallel_chains(inputs, *chains)
+    answers = Llm.invoke_parallel_chains(inputs, *chains)
     for i, answer in enumerate(answers):
-        print(f"Answer to prompt n°{i+1}: {txt.get_llm_answer_content(answer)}")
+        print(f"Answer to prompt n°{i+1}: {Llm.get_llm_answer_content(answer)}")
         print("--------------------------------------------------")
     exit()
 
@@ -109,7 +108,14 @@ def test_parallel_invocations_no_template(llm: BaseChatModel):
     poem_result = results['poem']
     input_x_result = results['xx']
 
-    print("Joke about flowers:", txt.get_llm_answer_content(joke_result))
-    print("Poem about darkness:", txt.get_llm_answer_content(poem_result))
-    print("Rebus about fruits:", txt.get_llm_answer_content(input_x_result))
+    print("Joke about flowers:", Llm.get_llm_answer_content(joke_result))
+    print("Poem about darkness:", Llm.get_llm_answer_content(poem_result))
+    print("Rebus about fruits:", Llm.get_llm_answer_content(input_x_result))
     exit()
+
+def test_tool_bind(llm):
+    """Test binding tools w/ direct binding to LLM - !! works only with few llm providers !! """
+    tools = [ToolsContainer.multiply, ToolsContainer.divide, ToolsContainer.add, ToolsContainer.subtract, ToolsContainer.power, ToolsContainer.root]
+    llm_with_tools = llm.bind_tools(tools)
+    res = llm_with_tools.invoke("Calculate: 3 x 4")
+    print(res)

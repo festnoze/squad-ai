@@ -50,17 +50,17 @@ class ClassDesc(BaseDesc):
             next_nl_dist = initial_code[index:].find('\n')     
 
             if next_nl_dist != -1:
-                next_nl_nindex = index + 2 # add +2 to include the newline
+                next_nl_nindex = index + 2 # add +2 to include the newline+
             else:
                 next_nl_nindex = len(initial_code)
 
             if method_desc.has_attributs():
                 att_index = initial_code[:next_nl_nindex].rfind(method_desc.attributs[0])
                 att_nl_index = initial_code[:att_index].rfind('\n')
-                split_index = att_nl_index + 2 # add +2 to include the newline
+                split_index = att_nl_index + 1 # add +1 to include the newline
             else:
                 split_index = next_nl_nindex
-                
+
             method_summary = '\n' + txt.indent(1, str(method_desc.generated_xml_summary))
             initial_code = initial_code[:split_index] + method_summary + initial_code[split_index:]
         return initial_code

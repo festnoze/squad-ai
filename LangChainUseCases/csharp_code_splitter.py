@@ -4,8 +4,8 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
 import re
 # internal imports
-from helpers.agents_workflows import get_chain_for_json_output_parser, invoke_llm_with_json_output_parser, invoke_parallel_chains, invoke_parallel_prompts, output_parser_instructions_name
 from helpers.c_sharp_helpers import CSharpXMLDocumentation
+from helpers.llm_helper import Llm
 from helpers.txt_helper import txt
 from models.base_desc import BaseDesc
 from models.class_desc import ClassDesc
@@ -123,7 +123,7 @@ class CSharpCodeSplit:
             method_summary = CSharpCodeSplit.generate_method_summary_prompt(llm, method)
             methods_summaries_prompts.append(method_summary)
 
-        methods_summaries = invoke_parallel_prompts(llm, *methods_summaries_prompts)
+        methods_summaries = Llm.invoke_parallel_prompts(llm, *methods_summaries_prompts)
         for method, method_summary in zip(class_desc.methods, methods_summaries):
             method.generated_summary = method_summary
 
@@ -133,25 +133,25 @@ class CSharpCodeSplit:
         for method in class_desc.methods:
             prompt, json_formatting_spec_prompt = CSharpCodeSplit.get_prompt_for_parameters_summaries(method, method_summary)        
             if with_json_output_parsing:
-                prompt_or_chain, format_instructions = get_chain_for_json_output_parser(llm, prompt, MethodParametersDocumentationPydantic, MethodParametersDocumentation)
+                prompt_or_chain, format_instructions = Llm.get_chain_for_json_output_parser(llm, prompt, MethodParametersDocumentationPydantic, MethodParametersDocumentation)
             else:
                 prompt_or_chain = prompt + json_formatting_spec_prompt
             prompts_or_chains.append(prompt_or_chain)
 
         if with_json_output_parsing:
-            methods_parameters_summaries = invoke_parallel_chains({output_parser_instructions_name: format_instructions}, *prompts_or_chains)
+            methods_parameters_summaries = Llm.invoke_parallel_chains({Llm.output_parser_instructions_name: format_instructions}, *prompts_or_chains)
             for i in range(len(methods_parameters_summaries)):
                 methods_parameters_summaries[i] = MethodParametersDocumentation(**methods_parameters_summaries[i])
         else:
-            methods_parameters_summaries = invoke_parallel_prompts(llm, *prompts_or_chains)
+            methods_parameters_summaries = Llm.invoke_parallel_prompts(llm, *prompts_or_chains)
 
         if with_json_output_parsing:
             for method, method_params_summaries in zip(class_desc.methods, methods_parameters_summaries):
                 method.generated_parameters_summaries = method_params_summaries
         else:            
             for method, method_params_summaries in zip(class_desc.methods, methods_parameters_summaries):
-                method_params_summaries_str = txt.get_llm_answer_content(method_params_summaries)
-                method_params_summaries_str = txt.extract_json_from_llm_response(method_params_summaries_str)
+                method_params_summaries_str = Llm.get_llm_answer_content(method_params_summaries)
+                method_params_summaries_str = Llm.extract_json_from_llm_response(method_params_summaries_str)
                 method_params_summaries_built = MethodParametersDocumentation.from_json(method_params_summaries_str)
                 method.generated_parameters_summaries = method_params_summaries_built
 
@@ -160,7 +160,7 @@ class CSharpCodeSplit:
         prompts = []
         for method in [met for met in class_desc.methods if met.has_return_type()]:
             prompts.append(CSharpCodeSplit.get_prompt_for_method_return_summary(llm, method))
-        methods_return_summaries_only = invoke_parallel_prompts(llm, *prompts)
+        methods_return_summaries_only = Llm.invoke_parallel_prompts(llm, *prompts)
         # Apply return method summary only to methods with a return type
         return_index = 0
         for i in range(len(class_desc.methods)):

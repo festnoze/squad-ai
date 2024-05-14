@@ -1,52 +1,11 @@
 import datetime
 import random
 import string
-
 from langchain.tools import tool
-from langchain.agents import AgentExecutor, create_tool_calling_agent, create_json_chat_agent, tool
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain_core.language_models import BaseChatModel
-from langchain_core.prompts import ChatPromptTemplate
 
 class ToolsHelper:
-    @staticmethod
-    def invoke_llm_with_tools(llm: BaseChatModel, tools: list[any], input: str) -> str:
-        #prompt = hub.pull("hwchase17/openai-tools-agent")
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", "You're a helpful AI assistant. You know which tools use to solve the given user problem."),
-                ("human", "{input}"),
-                MessagesPlaceholder("agent_scratchpad")
-            ]
-        )
-        agent = create_tool_calling_agent(llm, tools, prompt)
-        agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
-        res = agent_executor.invoke({"input": input})
-        return res["output"]
-
-    @staticmethod
-    def invoke_json_llm_with_tools(llm: BaseChatModel, tools: list[any], input: str) -> str:
-        #prompt = hub.pull("hwchase17/openai-tools-agent")
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", "You're a helpful AI assistant. You know which tools use to solve the given user problem."),
-                ("human", "{input}"),
-                MessagesPlaceholder("agent_scratchpad")
-            ]
-        )
-        
-        agent = create_json_chat_agent(llm, tools, ChatPromptTemplate.from_messages([("human", "{input}")]))
-        agent_executor = AgentExecutor(agent=agent, tools=tools)
-        res = agent_executor.invoke({"input": input})
-        return res["output"]
+    pass    
     
-    @staticmethod
-    def test_tool_bind(llm):
-        """Test binding tools w/ direct binding to LLM - !! works only with few llm providers !! """
-        tools = [ToolsContainer.multiply, ToolsContainer.divide, ToolsContainer.add, ToolsContainer.subtract, ToolsContainer.power, ToolsContainer.root]
-        llm_with_tools = llm.bind_tools(tools)
-        res = llm_with_tools.invoke("Calculate: 3 x 4")
-        print(res)
 
 class ToolsContainer:
     @tool

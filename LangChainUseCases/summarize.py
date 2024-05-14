@@ -4,6 +4,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain.chains.summarize import load_summarize_chain
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_core.documents import Document
+from helpers.llm_helper import Llm
 from helpers.txt_helper import txt
 
 class Summarize:
@@ -39,4 +40,4 @@ class Summarize:
         docs = Summarize.split_text(llm, text, max_tokens)
         chain = Summarize.splitting_chain(llm)
         result = chain.invoke(docs)        
-        return txt.get_llm_answer_content(result)
+        return Llm.get_llm_answer_content(result)
