@@ -8,18 +8,11 @@ from langchain.schema.runnable import RunnableParallel
 
 from helpers.llm_helper import Llm
 from helpers.tools_helpers import ToolsContainer
-from models.param_doc import ParameterDocumentation
 from models.params_doc import MethodParametersDocumentation
 
 def test_agent_executor_with_tools(llm):
     tools = [ToolsContainer.multiply, ToolsContainer.divide, ToolsContainer.add, ToolsContainer.subtract, ToolsContainer.power, ToolsContainer.root, ToolsContainer.get_random_string, ToolsContainer.get_random_number]
     question = "Take 3 to the fifth power and multiply that by the sum of twelve and three, then square root the whole result"
-    answer = Llm.invoke_llm_with_tools(llm, tools, question)
-    print(answer)
-
-def test_make_method_params_doc_with_agent_executor_and_tools(llm):
-    tools = [ParameterDocumentation.create_parameter_documentation]
-    question = "Here is the method 'divide' parameters: int dividand, int divisor. Please provide a description for each parameter."
     answer = Llm.invoke_llm_with_tools(llm, tools, question)
     print(answer)
 

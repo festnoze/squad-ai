@@ -1,12 +1,10 @@
 # internal import
 import time
-from csharp_code_splitter import CSharpCodeSplit
 from helpers.file_helper import file
 from helpers.test_helpers import test_agent_executor_with_tools, test_parallel_chains_invocations_with_imputs, test_parallel_invocations_with_homemade_parallel_chains_invocations, test_parallel_invocations_with_homemade_parallel_prompts_invocations
 from helpers.txt_helper import txt
 from langchains.langchain_factory import LangChainFactory
 from langchains.langchain_adapter_type import LangChainAdapterType
-from models.class_desc import ClassDesc
 from models.llm_info import LlmInfo
 from summarize import Summarize
 from helpers.groq_helper import GroqHelper
@@ -65,84 +63,29 @@ def run_main():
         api_key= llm_infos.api_key)
     
     # Test Groq through its own client (no langchain)
-    #GroqHelper.test_query(llm_infos)
+    GroqHelper.test_query(llm_infos)
 
     # Test paralell invocations
-    # test_parallel_invocations_with_homemade_parallel_prompts_invocations(llm)
-    # test_parallel_invocations_with_homemade_parallel_chains_invocations(llm)
-    #test_parallel_chains_invocations_with_imputs(llm)
+    test_parallel_invocations_with_homemade_parallel_prompts_invocations(llm)
+    test_parallel_invocations_with_homemade_parallel_chains_invocations(llm)
+    test_parallel_chains_invocations_with_imputs(llm)
 
     ## Use web search tool
-    # from langchain_community.utilities import GoogleSerperAPIWrapper
-    # web_search = GoogleSerperAPIWrapper()
-    # res = web_search.run("what's Obama's first name?")
-    # print(res)
+    from langchain_community.utilities import GoogleSerperAPIWrapper
+    web_search = GoogleSerperAPIWrapper()
+    res = web_search.run("what's Obama's first name?")
+    print(res)
 
     ## Use tools through agent executor
-    #test_agent_executor_with_tools(llm)
+    test_agent_executor_with_tools(llm)
 
     # Summarize short text
-    # text = file.get_as_str("short-text.txt")
-    # res = Summarize.summarize_short_text(llm, text)
+    text = file.get_as_str("short-text.txt")
+    res = Summarize.summarize_short_text(llm, text)
 
     # Summarize long text
-    # text = file.get_as_str("LLM agents PhD thesis full.txt")
-    # res = Summarize.summarize_long_text(llm, text, 15000)
-
-
-
-    # Extract C# file code structure (homemade) 
-    start_time = time.time()
-    file_path = "MessageService.cs"
-    code = file.get_as_str(file_path)
-
-    # Remove existing summaries from code
-    lines = code.splitlines()
-    lines = [line for line in lines if not line.strip().startswith('///')]
-    code = '\n'.join(lines)
-
-    # Extract code structure from C# file
-    class_description: ClassDesc = CSharpCodeSplit.extract_code_struct(llm, file_path, code)
-    
-    # Generate summaries for all methods for the current class
-    CSharpCodeSplit.generate_all_methods_summaries(llm, class_description, True)
-
-    # Including generated summaries to class code
-    new_code = class_description.generate_code_with_summaries_from_initial_code(code)
-
-    # Save file with modified code
-    new_file_name = file_path.replace('.cs', '_modif.cs')
-    file.write_file(new_code, "inputs", new_file_name)
-    end_time = time.time()
-    txt.display_elapsed(start_time, end_time)
-
-    # Generate unit tests for all the class methods
-    # TODO
-
-    # class_desc_json = class_description.to_json()
-    # file.write_file(class_desc_json, "outputs", file_name + ".json")
-
-    # -- dont work --
-    # retrieve fonction
-    # docs = []
-    # dirpath = '.\\'
-    # #for dirpath, dirnames, filenames in os.walk(root_dir):
-        
-    #     # Go through each file
-    #     #for file_name in filenames:
-    # try: 
-    #     # Load up the file as a doc and split
-    #     current_dir = os.getcwd()
-    #     loader = TextLoader(os.path.join(current_dir, "inputs\\" + file_name), encoding='utf-8')
-    #     res = loader.load_and_split()
-    # except Exception as e: 
-    #     pass
-
-    # for method in class_desc.methods:
-    #     if method.code_chunks:
-    #         for code_chunk in method.code_chunks:
-    #             print(code_chunk)
-    #             print("-------------------------------------------------")
+    text = file.get_as_str("LLM agents PhD thesis full.txt")
+    res = Summarize.summarize_long_text(llm, text, 15000)
 
 def get_eur_usd_rate():
     ticker = yf.Ticker("EURUSD=X")
