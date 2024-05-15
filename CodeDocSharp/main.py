@@ -2,6 +2,7 @@
 import time
 from csharp_code_parser import CSharpCodeStructureParser
 from helpers.file_helper import file
+from helpers.llm_helper import Llm
 from helpers.test_helpers import test_agent_executor_with_tools, test_parallel_chains_invocations_with_imputs, test_parallel_invocations_with_homemade_parallel_chains_invocations, test_parallel_invocations_with_homemade_parallel_prompts_invocations
 from helpers.txt_helper import txt
 from langchains.langchain_factory import LangChainFactory
@@ -19,6 +20,7 @@ from dotenv import find_dotenv, load_dotenv
 # Text splitters
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.document_loaders import TextLoader
+from langchain_community.callbacks import get_openai_callback, OpenAICallbackHandler
 
 # Load environment variables from .env file
 print("Started")
@@ -34,6 +36,61 @@ openai.api_key = openai_api_key
 # for model in models:
 #     print(model.id)
 # exit()
+
+def generate_csharp_files_summaries(file_path: str, file_name: str, llm_infos: LlmInfo):
+    # Instanciate the LLM
+    llm = LangChainFactory.create_llm(
+        adapter_type= llm_infos.type,
+        llm_model_name= llm_infos.model,
+        timeout_seconds= llm_infos.timeout,
+        temperature= 1.0,
+        api_key= llm_infos.api_key)
+    
+    # Load C# file code
+    start_time = time.time()
+    if file_path and file_name:   
+        full_file_path = os.path.join(file_path, file_name)
+    else:
+        if file_path:
+            full_file_path = file_path
+        else:
+            full_file_path = file_name            
+    code = file.get_as_str(full_file_path)
+
+    # Remove existing summaries from code
+    lines = code.splitlines()
+    lines = [line for line in lines if not line.strip().startswith('///')]
+    code = '\n'.join(lines)
+
+    # Extract code structure from C# file
+    class_description: ClassDesc = CSharpCodeStructureParser.extract_code_struct(llm, file_path, code)
+    
+    # Generate summaries for all methods for the current class
+    CSharpCodeStructureParser.generate_all_methods_summaries(llm, class_description, True)
+
+    # Including generated summaries to class code
+    new_code = class_description.generate_code_with_summaries_from_initial_code(code)
+
+    # Save file with modified code
+    new_file_name = full_file_path.replace('.cs', '_modif.cs')
+    file.write_file(new_code, "inputs", new_file_name)
+    end_time = time.time()
+    txt.display_elapsed(start_time, end_time)
+
+def invoke_method_mesuring_tokens_consumption(method_handler, *args, **kwargs):
+    """
+    Invokes the provided method handler within an OpenAI callback context 
+    and displays the token consumption.
+    
+    Args:
+        method_handler (callable): The method to be executed.
+        *args: Variable length argument list for the method_handler.
+        **kwargs: Arbitrary keyword arguments for the method_handler.
+    """
+    with get_openai_callback() as openai_callback:
+        method_handler(*args, **kwargs)
+        Llm.display_tokens_consumtion(openai_callback)
+
 
 # Select the LLM to be used
 #llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0613",  timeout= 60, api_key= openai_api_key)
@@ -53,43 +110,4 @@ llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout
 #llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "nous-hermes2", timeout= 200, api_key= None)
 #llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "openhermes", timeout= 200, api_key= None)
 
-def generate_csharp_files_summaries(file_path: str, file_name: str, llm_infos: LlmInfo):
-    # Instanciate the LLM
-    llm = LangChainFactory.create_llm(
-        adapter_type= llm_infos.type,
-        llm_model_name= llm_infos.model,
-        timeout_seconds= llm_infos.timeout,
-        temperature= 1.0,
-        api_key= llm_infos.api_key)
-    
-    # Load C# file code
-    start_time = time.time()
-    file_path = "MessageService.cs"
-    code = file.get_as_str(file_path)
-
-    # Remove existing summaries from code
-    lines = code.splitlines()
-    lines = [line for line in lines if not line.strip().startswith('///')]
-    code = '\n'.join(lines)
-
-    # Extract code structure from C# file
-    class_description: ClassDesc = CSharpCodeStructureParser.extract_code_struct(llm, file_path, code)
-    
-    # Generate summaries for all methods for the current class
-    CSharpCodeStructureParser.generate_all_methods_summaries(llm, class_description, True)
-
-    # Including generated summaries to class code
-    new_code = class_description.generate_code_with_summaries_from_initial_code(code)
-
-    # Save file with modified code
-    new_file_name = file_path.replace('.cs', '_modif.cs')
-    file.write_file(new_code, "inputs", new_file_name)
-    end_time = time.time()
-    txt.display_elapsed(start_time, end_time)
-
-  
-
-with get_openai_callback() as openai_callback:
-    run_main()
-    if llm_infos.type == LangChainAdapterType.OpenAI:
-        display_tokens_consumtion(openai_callback)
+invoke_method_mesuring_tokens_consumption(generate_csharp_files_summaries, None, "MessageService.cs", llm_infos)
