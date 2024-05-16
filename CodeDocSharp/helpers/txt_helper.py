@@ -101,8 +101,6 @@ class txt:
             return None
         
         empty = 120 * ' '
-        
-
         if not text:
             text = empty
             sys.stdout.write(f'\r{empty}')
@@ -112,6 +110,6 @@ class txt:
                 elapsed_str += txt.get_elapsed_str(txt.start_time, time.time())                
                 txt.start_time = None
 
-            text = f"✓ {text} {elapsed_str}" 
+            text = f"✓ {text} {elapsed_str}." 
             sys.stdout.write(f'\r{empty}')
             sys.stdout.write(f'\r{text}\r\n')

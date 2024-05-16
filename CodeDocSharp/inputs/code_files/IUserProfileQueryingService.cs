@@ -10,188 +10,188 @@ namespace Studi.Api.Lms.User.Application.Interfaces
     {
 
     /// <summary>
-    /// Verify the validity of a user ID being positive and non-zero, then retrieve the payment reliability information for the specified user ID.
+    /// Check the payment reliability status for a specified user.
     /// </summary>
-    /// <param name="userId">The ID of the user whose profile and civility details are to be retrieved and formatted.</param>
-    /// <returns>Returns the user's payment reliability status.</returns>
+    /// <param name="userId">The identifier of the user whose profile information and civility details need to be retrieved.</param>
+    /// <returns>Returns a Task indicating the payment reliability status of the specified user.</returns>
 
         Task<string> GetPaymentReliabilityAsync(int userId);
 
     /// <summary>
-    /// Retrieve personal information for a specified user. Ensure that the user's information exists and handle cases where it is not found.
+    /// Retrieve user details including personal information, ensuring validity through data validation checks.
     /// </summary>
-    /// <param name="userId">Specifies the user ID for which the user's profile information and civility details need to be retrieved and mapped.</param>
-    /// <returns>Returns the user's profile and civility information.</returns>
+    /// <param name="userId">An integer representing the unique identifier of the user whose profile information and civility details are to be retrieved.</param>
+    /// <returns>Returns user profile and personal details as a validated user object.</returns>
 
         Task<UserModel> GetUserWithPersonalInfosAsync(int userId);
 
     /// <summary>
-    /// Retrieve basic information for a specified user, with error handling for non-existent users.
+    /// Retrieve basic information for a specified user after confirming their existence.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user whose profile and civility details need to be retrieved.</param>
-    /// <param name="schoolId">The unique identifier for the school associated with the user, necessary for mapping the data to a specific format.</param>
-    /// <param name="loadSchoolOptions">A boolean flag indicating whether school options should be loaded during the retrieval process.</param>
-    /// <returns>Returns basic user information or an error if user does not exist.</returns>
+    /// <param name="userId">The unique identifier for the user whose profile information is to be retrieved.</param>
+    /// <param name="schoolId">The unique identifier for the school to which the user is linked.</param>
+    /// <param name="loadSchoolOptions">Optional parameter indicating whether to load additional school options. Default is false.</param>
+    /// <returns>Returns a user's basic profile information.</returns>
 
         Task<UserModel> GetUserWithBasicInfoAsync(int userId, int schoolId, bool loadSchoolOptions = false);
 
     /// <summary>
-    /// Retrieve user information along with public details, considering validation and checks for null values and corresponding school options for a specified user and school.
+    /// Retrieve user public information and related school options for a specified user. Check for the existence of user data and handle possible null values.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user whose profile information and civility details need to be retrieved.</param>
-    /// <param name="schoolId">The unique identifier for the school associated with the user, used to fetch relevant information within the specified context.</param>
-    /// <returns>Returns user info with public details for the specified user and school.</returns>
+    /// <param name="userId">The unique identifier for the user whose profile information and corresponding civility details are to be retrieved.</param>
+    /// <param name="schoolId">The unique identifier for the school associated with the user. This helps in retrieving specific details related to the user's affiliation with the school.</param>
+    /// <returns>Returns the user's public profile and associated school details.</returns>
 
         Task<UserModel> GetUserWithPublicInfoAsync(int userId, int schoolId);
 
     /// <summary>
-    /// Retrieve available school options for a specified user within a specific school, ensuring the retrieved data is not null, and constructing a model with the retrieved information.
+    /// Retrieve school options associated with a specific user and school, validating the data and returning a structured model.
     /// </summary>
-    /// <param name="userId">The unique identifier representing the user whose profile information and civility details are to be retrieved.</param>
-    /// <param name="schoolId">The unique identifier of the school associated with the user, necessary to map the data into the specified format.</param>
-    /// <returns>Returns available school options for the specified user in a specified school.</returns>
+    /// <param name="userId">The unique identifier for the user whose profile information and corresponding civility details need to be retrieved.</param>
+    /// <param name="schoolId">The unique identifier for the school associated with the user profile information and corresponding civility details.</param>
+    /// <returns>Returns a list of validated school options for the specified user and school.</returns>
 
         Task<UserSchoolOptionsModel> GetUserSchoolOptions(int userId, int schoolId);
 
     /// <summary>
-    /// Retrieve professional experiences associated with a specified user.
+    /// Retrieve the professional experiences for a specified user.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user. It is used to retrieve the user's profile information and civility details in the GetUserProfessionalExperiencesAsync method.</param>
-    /// <returns>Returns the user's professional experiences asynchronously.</returns>
+    /// <param name="userId">The ID of the user for whom the profile information and corresponding civility details are to be retrieved.</param>
+    /// <returns>Returns a list of professional experiences for the specified user.</returns>
 
         Task<IEnumerable<ProfessionalExperienceModel>> GetUserProfessionalExperiencesAsync(int userId);
 
     /// <summary>
-    /// Retrieve the review date of a user's profile using the user's unique identifier.
+    /// Retrieve the review date of a user's profile based on a specific user ID.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user whose profile information and civility details are to be retrieved.</param>
-    /// <returns>Returns the review date of a user's profile as a DateTime object.</returns>
+    /// <param name="userId">An integer representing the unique identifier of the user whose profile information and corresponding civility details are being retrieved.</param>
+    /// <returns>Returns the review date of a user's profile.</returns>
 
         Task<DateTime?> GetUserProfileReviewDateAsync(int userId);
 
     /// <summary>
-    /// Retrieve the most recent study information for a specific user.
+    /// Retrieve the most recent study information for a specified user.
     /// </summary>
-    /// <param name="userId">The unique identifier of the user whose profile information and civility details are being retrieved.</param>
-    /// <returns>Returns the user's most recent study information asynchronously.</returns>
+    /// <param name="userId">The user ID for which the profile information and corresponding civility details are to be retrieved.</param>
+    /// <returns>Returns the most recent study information for the specified user.</returns>
 
         Task<StudyModel?> GetUserLastStudyInfosAsync(int userId);
 
     /// <summary>
-    /// Retrieve the list of contract types related to professional experiences.
+    /// Retrieve a list of contract types related to professional experiences.
     /// </summary>
-    /// <returns>Returns a list of contract types associated with professional experiences.</returns>
+    /// <returns>Returns a task containing a list of contract type strings.</returns>
 
         Task<IEnumerable<ContractTypeIto>> GetContractTypesListForProfessionalExperiencesAsync();
 
     /// <summary>
-    /// Retrieve training records for a specified user and school.
+    /// Retrieve trainings associated with a specified user and school, ensuring data validity and returning an existing list of training models.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user whose profile information and civility details need to be retrieved.</param>
-    /// <param name="schoolId">The unique identifier for the school associated with the user's profile information.</param>
-    /// <returns>Returns a list of training records for the specified user and school.</returns>
+    /// <param name="userId">The unique identifier for a user. This ID is used to retrieve the user profile information along with the corresponding civility details.</param>
+    /// <param name="schoolId">The unique identifier for a school. This ID helps to filter and contextualize the user's profile information within the specific school context.</param>
+    /// <returns>Returns a list of training models for a specified user and school.</returns>
         Task<IEnumerable<TrainingModel>> GetUserTrainingsAsync(int userId, int schoolId);
 
     /// <summary>
-    /// Retrieve user notification settings for a specified user and school combination.
+    /// Retrieve user notifications settings for a specified user and school.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user whose profile information and civility details are to be retrieved.</param>
-    /// <param name="schoolId">The unique identifier for the school to associate the user's information with.</param>
-    /// <returns>Returns user notification settings.</returns>
+    /// <param name="userId">The unique identifier for the user whose profile information and corresponding civility details are to be retrieved.</param>
+    /// <param name="schoolId">The unique identifier for the school to filter the user's profile information and corresponding civility details.</param>
+    /// <returns>Returns user notification settings for the specified user and school.</returns>
 
         Task<UserModel> GetUserNotificationsByIdAndSchoolIdAsync(int userId, int schoolId);
 
     /// <summary>
-    /// Get the time zone for a specified user.
+    /// Retrieve the time zone information for a specified user.
     /// </summary>
     /// <param name="userId">The unique identifier for the user whose profile information and civility details need to be retrieved.</param>
-    /// <returns>Returns the user's time zone in asynchronous operation.</returns>
+    /// <returns>Returns the time zone information of the specified user.</returns>
 
         Task<string> GetUserTimeZoneAsync(int userId);
 
     /// <summary>
-    /// Retrieve configuration information for a specified user within a specified school.
+    /// Retrieve configuration information for a specified user and school.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user whose profile information and civility details need to be retrieved.</param>
-    /// <param name="schoolId">The unique identifier for the school to which the user belongs.</param>
-    /// <returns>Returns a task with user configuration information for the specified school.</returns>
+    /// <param name="userId">The unique identifier for the user whose profile information and civility details are being retrieved.</param>
+    /// <param name="schoolId">The unique identifier for the school associated with the user. This helps in retrieving school-specific information if needed.</param>
+    /// <returns>Returns configuration details for a specified user and associated school.</returns>
 
         Task<UserConfigInfosIto?> GetUserConfigInfosAsync(int userId, int schoolId);
 
     /// <summary>
     /// Retrieve the last session information for a specified user and school.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user whose profile information and civility details are to be retrieved.</param>
-    /// <param name="schoolId">The unique identifier for the school associated with the user.</param>
-    /// <returns>Returns the last session information for a given user and school asynchronously.</returns>
+    /// <param name="userId">The ID of the user for whom the profile information and civility details are to be retrieved. This is a required parameter for identifying the user in the GetLastSessionInfosAsync method.</param>
+    /// <param name="schoolId">The ID of the school associated with the user. This parameter helps to retrieve the specific user profile information and civility details in the context of the specified school in the GetLastSessionInfosAsync method.</param>
+    /// <returns>Returns the last session information of a given user in a specified school.</returns>
 
         Task<LastSessionInfosModel> GetLastSessionInfosAsync(int userId, int schoolId);
 
     /// <summary>
-    /// Retrieve the first connection date of a specified user.
+    /// Retrieve the first connection date for a specified user.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user whose profile information and civility details are to be retrieved and mapped.</param>
-    /// <returns>Returns the first connection date of the specified user as a Task<DateTime>.</returns>
+    /// <param name="userId">The unique identifier for the user whose profile information and civility details are being retrieved.</param>
+    /// <returns>Returns the user's first connection date asynchronously.</returns>
 
         Task<DateTime?> GetUserFirstConnectionDateAsync(int userId);
 
     /// <summary>
-    /// Retrieve the avatar URL for a specified user, if available, or return a default avatar URL.
+    /// Retrieve the avatar URL for a specified user or return the default avatar URL if none is available.
     /// </summary>
-    /// <param name="userId">The identifier for the user whose profile information and civility details need to be retrieved. It is an integer value that specifies the user ID.</param>
-    /// <returns>Returns the user's avatar URL or a default URL if not available.</returns>
+    /// <param name="userId">The identifier for the user whose profile information and civility details are to be retrieved.</param>
+    /// <returns>Returns the avatar URL for the specified user or a default if unavailable.</returns>
 
         Task<string> GetAvatarUrlAsync(int userId);
 
     /// <summary>
-    /// Check whether a user exists based on their email.
+    /// Check if a user exists by their email address.
     /// </summary>
-    /// <param name="email">The email address of the user whose profile information and civility details need to be retrieved.</param>
-    /// <returns>Returns a boolean indicating if a user exists for the given email.</returns>
+    /// <param name="email">The email address associated with the user profile to be retrieved. This parameter is used to locate and return the user's profile information and corresponding civility details.</param>
+    /// <returns>Returns a boolean indicating whether a user exists with the given email address.</returns>
 
         Task<bool> ExistUserByEmailAsync(string email);
 
     /// <summary>
-    /// Check for the existence of a user by their pseudonym.
+    /// Check if a user exists by their pseudonym.
     /// </summary>
-    /// <param name="pseudo">The pseudonym of the user whose profile information and civility details are to be retrieved. This parameter is crucial for identifying the specific user.</param>
-    /// <returns>Returns a task indicating whether the user exists.</returns>
+    /// <param name="pseudo">The pseudonym or username of the user whose profile information and civility details are to be retrieved.</param>
+    /// <returns>Returns whether a user exists by their pseudonym.</returns>
 
         Task<bool> ExistUserByPseudoAsync(string pseudo);
 
     /// <summary>
-    /// Generate a pseudo name for a user based on their first and last names.
+    /// Generate a pseudonym for a user based on their given first name and last name.
     /// </summary>
-    /// <param name="firstName">The first name of the user whose profile information is being retrieved.</param>
-    /// <param name="lastName">The last name of the user whose profile information is being retrieved.</param>
-    /// <returns>Returns a pseudo name based on the user's first and last names.</returns>
+    /// <param name="firstName">The first name of the user to retrieve profile information for.</param>
+    /// <param name="lastName">The last name of the user to retrieve profile information for.</param>
+    /// <returns>Returns a pseudonym based on the user's first and last names.</returns>
 
         Task<string> GeneratePseudoAsync(string firstName, string lastName);
 
     /// <summary>
-    /// Count the number of user profiles based on specified filters.
+    /// Retrieve the total number of user profiles based on specified filtering conditions.
     /// </summary>
-    /// <param name="filtersCompositions">An optional collection of filter compositions that may be used to refine which user profiles are retrieved. This encompasses a set of defined filter rules, and if left null, the default fetching without any filters will be applied.</param>
-    /// <returns>Returns the total count of user profiles matching the filters.</returns>
+    /// <param name="filtersCompositions">An optional collection of filter compositions that determine which profiles to count. Each filter composition can provide specific criteria for filtering the profiles.</param>
+    /// <returns>Returns the total count of user profiles matching the specified filters.</returns>
 
         Task<int> CountProfilesAsync(IEnumerable<IFiltersComposition<object>>? filtersCompositions = null);
 
     /// <summary>
-    /// Retrieve user profiles based on specified filters and sort criteria, and map them to a specific format, including associated civility IDs if available.
+    /// Retrieve a list of user profiles based on specified filters and sorting parameters, including civility information.
     /// </summary>
-    /// <param name="skip">The number of items to be skipped before starting to collect the result set. This is useful for pagination.</param>
-    /// <param name="take">The number of items to be included in the result set. This is useful for pagination.</param>
-    /// <param name="filtersCompositions">A collection of filter compositions applied to the data. This allows the filtering of results based on specific conditions. It can be null.</param>
-    /// <param name="sort">An object that specifies the sort order of the results. This allows sorting based on certain criteria. It can be null.</param>
-    /// <returns>Returns a list of mapped user profiles with optional civility IDs.</returns>
+    /// <param name="skip">The number of records to skip before starting to return results.</param>
+    /// <param name="take">The number of records to return.</param>
+    /// <param name="filtersCompositions">A collection of filters applied to the results. Null if no filters are specified.</param>
+    /// <param name="sort">The sorting criteria for the results. Null if no specific sorting is required.</param>
+    /// <returns>Returns a list of filtered and sorted user profiles.</returns>
 
         Task<IEnumerable<IUserProfileRAto>> GetUserProfilesAsync(int skip, int take, IEnumerable<IFiltersComposition<object>>? filtersCompositions = null, ISort? sort = null);
 
     /// <summary>
-    /// Retrieve a user's profile information and civility details based on a specified user ID, and map this data into a specific format.
+    /// Retrieve user profile information and corresponding civility details based on the provided user ID.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user whose profile information and civility details are to be retrieved.</param>
-    /// <returns>Returns the user's formatted profile and civility details.</returns>
+    /// <param name="userId">The unique identifier for the user whose profile information and civility details are being retrieved.</param>
+    /// <returns>Returns user profile and civility details for the specified user ID.</returns>
 
         Task<IUserProfileRAto> GetUserProfileAsync(int userId);
     }

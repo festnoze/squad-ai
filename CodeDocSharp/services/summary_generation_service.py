@@ -71,7 +71,7 @@ class SummaryGenerationService:
         for interface_struct in [s for s in known_structures if s.struct_type == StructureType.Interface]:
             SummaryGenerationService.apply_interface_generated_summaries_of_classes(interface_struct, known_structures)
 
-        txt.stop_spinner_replace_text("Summaries generated successfully.")
+        txt.stop_spinner_replace_text("All methods' summaries generated successfully")
 
     @staticmethod
     def methods_count(known_structures: list[StructureDesc]):
