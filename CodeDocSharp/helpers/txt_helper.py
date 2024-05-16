@@ -46,49 +46,52 @@ class txt:
         if txt.activate_print:
             print(text)
 
-    waiting_spinner_thread: Thread = None
+    waiting_spinner_thread = None
+    @staticmethod
     def print_with_spinner(text: str) -> Thread:
-        if txt.activate_print == False:
+        if not txt.activate_print:
             return None
         
-        while txt.waiting_spinner_thread is not None:
-            if not txt.waiting_spinner_thread.is_alive():
-                txt.waiting_spinner_thread = None
+        # Ensure only one spinner thread is running at a time
+        if txt.waiting_spinner_thread is not None and txt.waiting_spinner_thread.is_alive():
+            txt.stop_spinner()
 
-        waiting_spinner_thread = Thread(target=txt.wait_spinner, args=(text,))
-        waiting_spinner_thread.daemon = True
-        waiting_spinner_thread.start()
-        return waiting_spinner_thread
+        txt.waiting_spinner_thread = Thread(target=txt.wait_spinner, args=(text,))
+        txt.waiting_spinner_thread.daemon = True
+        txt.waiting_spinner_thread.start()
+        return txt.waiting_spinner_thread
 
-    stop_animation = True
+    @staticmethod
     def wait_spinner(prefix):  # Optional prefix text
-        #chars = "-\|/"
-        #chars = "⢄⢂⢁⡁⡈⡐⡠⢠⢰⢸⣸⣴⣼⣾⣿"
-        #chars = "⠈⠐⠠⢀⡀⠄⠂⠅⡁⡈⡐⡠"
-        #chars = "⠄⠆⠖⠶⡶⣶⣷⣧⣩⣉⠉⠈"
-        #chars = "⠟⠯⠷⠾⠽⠻⠹⠸⠼⠴⠦⠧⠇⠏"
+        # Spinner characters
         chars = "⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹"
 
         txt.stop_animation = False
         while not txt.stop_animation:
             for char in chars:
+                if txt.stop_animation:
+                    break
                 sys.stdout.write('\r' + prefix + ' ' + char + ' ')
+                sys.stdout.flush()
                 time.sleep(0.1)
+    @staticmethod
+    def stop_spinner():
+        txt.stop_animation = True
+        if txt.waiting_spinner_thread:
+            txt.waiting_spinner_thread.join()
+            txt.waiting_spinner_thread = None
 
+    @staticmethod
     def stop_spinner_replace_text(text=None):
-        if txt.activate_print == False:
+        if not txt.activate_print:
             return None
+
         empty = 80 * ' '
         
         if not text:
             text = empty
             sys.stdout.write(f'\r{empty}')
         else:
-            text = '✓ ' + text            
+            text = '✓ ' + text
             sys.stdout.write(f'\r{empty}')
             sys.stdout.write(f'\r{text}\r\n')
-
-        txt.stop_animation = True
-        if txt.waiting_spinner_thread:
-            txt.waiting_spinner_thread.join()
-        

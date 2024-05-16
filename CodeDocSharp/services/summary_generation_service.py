@@ -88,7 +88,7 @@ class SummaryGenerationService:
             if structure_description.file_path != file_path: raise Exception("Mismatch between lists")
             new_code = SummaryGenerationService.generate_code_with_generated_summaries_from_initial_code(structure_description, code)
             paths_and_new_codes[file_path] = new_code
-            
+
         txt.stop_spinner_replace_text("Summaries successfully included in initial files code.")
         return paths_and_new_codes
 
@@ -189,7 +189,8 @@ class SummaryGenerationService:
                 without any mention to the method name or any technicalities, nor any mention whether it's asynchronous. 
                 {SummaryGenerationService.ctor_txt if method.is_ctor else ""} {output_format}             
                 The method name is: '{method.method_name}' and its full code is: """)
-        prompt += '\n```csharp' + method.code + '\n```'            
+        
+        prompt += Llm.embed_into_code_block('csharp', method.code)
         return prompt
 
         # TODO: see how to rather use code_chunks from method_desc for big methods

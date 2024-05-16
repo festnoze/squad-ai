@@ -36,6 +36,10 @@ class Llm:
             return text[start_index + 3 + len(code_block_type):end_index].strip()
         else:
             return text
+    
+    @staticmethod
+    def embed_into_code_block(code_block_type: str, text: str) -> str:
+        return  f"```{code_block_type} \n{text}\n```\n"
         
     @staticmethod
     def extract_json_from_llm_response(response: any) -> str:

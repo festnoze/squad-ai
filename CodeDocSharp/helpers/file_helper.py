@@ -45,9 +45,10 @@ class file:
     def save_contents_within_files(paths_and_new_codes: list):
         csharp_files_count = len(paths_and_new_codes)
         t = txt.print_with_spinner(f"Saving and override the {csharp_files_count} files:")
-        for path_and_code in paths_and_new_codes:
-            file.write_file(path_and_code.file_path, path_and_code.code)
-        txt.stop_spinner_replace_text(t, f"{csharp_files_count} files overrided and saved successfully.")
+
+        for file_path in paths_and_new_codes:
+            file.write_file(paths_and_new_codes[file_path], file_path)
+        txt.stop_spinner_replace_text(f"{csharp_files_count} files overrided and saved successfully.")
 
     @staticmethod
     def delete_all_files_with_extension(extension, folder_path):

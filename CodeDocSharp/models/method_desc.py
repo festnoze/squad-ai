@@ -98,8 +98,11 @@ class MethodDesc(BaseDesc):
             method_return_type = None
 
         method_params = MethodDesc.get_method_parameters(method_sign)
-        if '{' and '}' in code:
+        method_code = code
+        if '{' and '}' in method_code: # remove method main brackets {}
             method_code = code.split('{')[1].rsplit('}', 1)[0].strip()
+        if '{' and '}' in method_code: # write others brackets {} as litteral (no to be confond with formating brackets)
+            method_code = method_code.replace('{', '{{}').replace('}', '}}')
         return MethodDesc(start_index, summary_lines, attributs, method_name, method_return_type, method_params, method_code, is_async, is_task, is_ctor, is_static, is_abstract, is_override, is_virtual, is_sealed, is_new)
     
     def factory_for_interface_code(code: str, start_index: int, interface_name: str) -> 'MethodDesc':
@@ -137,7 +140,7 @@ class MethodDesc(BaseDesc):
             method_code = code.split('{')[1].rsplit('}', 1)[0].strip()
         else:
             method_code = ''
-            
+
         return MethodDesc(start_index, summary_lines, attributs, method_name, method_return_type, method_params, method_code, is_async, is_task, is_ctor, is_static, is_abstract, is_override, is_virtual, is_sealed, is_new)
     
     def has_return_type(self) -> bool:
@@ -145,9 +148,8 @@ class MethodDesc(BaseDesc):
     
     @staticmethod
     def get_method_parameters(method_sign: str) -> list[ParameterDesc]:
-        params = method_sign.split('(')[1].split(')')[0].split(',')
-        params_code = [param.strip() for param in params]
-        return [ParameterDesc.get_param_desc_from_code(param_code) for param_code in params_code]
+        params = [param.strip() for param in method_sign.split('(')[1].split(')')[0].split(',') if param.strip()]
+        return [ParameterDesc.get_param_desc_from_code(param) for param in params]
 
     @staticmethod
     def detect_attributes(code: str) -> list[str]:
