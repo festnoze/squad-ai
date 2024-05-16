@@ -10,16 +10,18 @@ from models.structure_types import StructureType
 import json
 
 class StructureDesc(BaseDesc):
-    def __init__(self, file_path: str, index_shift_code: int, structure_type: StructureType, namespace_name: str, usings: list[str], class_name: str, access_modifier: str, interfaces_names: list[str] = [], methods: list[MethodDesc] = [], properties: list[PropertyDesc] = []):
-        super().__init__(name=class_name)
+    def __init__(self, file_path: str, index_shift_code: int, struct_type: StructureType, namespace_name: str, usings: list[str], struct_name: str, access_modifier: str, base_class_name: str, interfaces_names: list[str] = [], methods: list[MethodDesc] = [], properties: list[PropertyDesc] = []):
+        super().__init__(name=struct_name)
         self.file_path: str = file_path
         self.index_shift_code: int = index_shift_code
-        self.structure_type: StructureType = structure_type
+        self.struct_type: StructureType = struct_type
         self.namespace_name: str = namespace_name
         self.usings: list[str] = usings
         self.access_modifier: str = access_modifier
-        self.class_name: str = class_name
+        self.struct_name: str = struct_name
+        self.base_class_name: str = base_class_name
         self.interfaces_names: list[str] = interfaces_names
+        self.related_structures: list[StructureDesc] = []
         self.methods: list[MethodDesc] = methods
         self.properties: list[PropertyDesc] = properties
     
@@ -39,7 +41,7 @@ class StructureDesc(BaseDesc):
                 setattr(self, key, value)
     
     def to_json(self):
-        return json.dumps(self.__dict__, cls=ClassDescEncoder, indent=4)
+        return json.dumps(self.__dict__, cls=StructureDescEncoder, indent=4)
     
     def generate_code_from_class_desc(self):
         class_file = ""
@@ -50,7 +52,7 @@ class StructureDesc(BaseDesc):
         # Namespace and class declaration
         if self.namespace_name:
             class_file += f"namespace {self.namespace_name};\n\n"
-        class_file += f"{self.access_modifier} {self.structure_type} {self.class_name}"
+        class_file += f"{self.access_modifier} {self.struct_type} {self.struct_name}"
         if self.interfaces_names:
             class_file += " : " + ", ".join(self.interfaces_names)
         class_file += "\n"
@@ -63,7 +65,7 @@ class StructureDesc(BaseDesc):
             class_file += method.to_code(1, True) + "\n"
         return class_file
     
-class ClassDescEncoder(json.JSONEncoder):
+class StructureDescEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, StructureDesc):
             return obj.__dict__

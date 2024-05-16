@@ -12,6 +12,7 @@ from models.llm_info import LlmInfo
 from models.method_desc import MethodDesc
 from models.params_doc import MethodParametersDocumentation, MethodParametersDocumentationPydantic
 from models.structure_desc import StructureDesc
+from models.structure_types import StructureType
 from services.csharp_code_analyser_service import CSharpCodeStructureAnalyser
 import os
 
@@ -22,8 +23,8 @@ class SummaryGenerationService:
         llm = SummaryGenerationService.get_llm(llm_infos)
         paths_and_codes = SummaryGenerationService.load_csharp_files(file_path)
         SummaryGenerationService.remove_existing_summaries_from_all_files(paths_and_codes)
-        structures_descriptions = SummaryGenerationService.extract_code_structures_from_code_files(llm, paths_and_codes)
-        SummaryGenerationService.generate_summaries_for_all_methods_from_code_files(llm, structures_descriptions)
+        structures_descriptions = CSharpCodeStructureAnalyser.extract_code_structures_from_code_files(llm, paths_and_codes)
+        SummaryGenerationService.generate_summaries_for_all_classes_methods(llm, structures_descriptions)
         paths_and_new_codes = SummaryGenerationService.including_generated_summaries_to_codes(paths_and_codes, structures_descriptions)
         file.save_contents_within_files(paths_and_new_codes)
 
@@ -61,22 +62,34 @@ class SummaryGenerationService:
             paths_and_codes[file_path] = '\n'.join(lines)
 
     @staticmethod
-    def extract_code_structures_from_code_files(llm, paths_and_codes):
-        csharp_files_count = len(paths_and_codes)
-        t = txt.print_with_spinner(f"Parsing all {csharp_files_count} files for code structure:")
-        structures_descriptions = []
-        for file_path, code in paths_and_codes.items():
-            structure_description: StructureDesc = CSharpCodeStructureAnalyser.get_code_structure(llm, file_path, code)
-            structures_descriptions.append(structure_description)
-        txt.stop_spinner_replace_text(f"{csharp_files_count} files parsed successfully for code.")
-        return structures_descriptions
+    def generate_summaries_for_all_classes_methods(llm, known_structures):
+        t = txt.print_with_spinner(f"Generate all summaries:")
+        
+        for class_struct in [s for s in known_structures if s.struct_type == StructureType.Class]:
+            SummaryGenerationService.generate_methods_summaries_for_class(llm, class_struct, True)
+        
+        for interface_struct in [s for s in known_structures if s.struct_type == StructureType.Interface]:
+            SummaryGenerationService.apply_interface_generated_summaries_of_classes(interface_struct, known_structures)
+
+        txt.stop_spinner_replace_text("Summaries generated successfully.")
 
     @staticmethod
-    def generate_summaries_for_all_methods_from_code_files(llm, structures_descriptions):
-        t = txt.print_with_spinner(f"Generate all summaries:")
-        for structure_description in structures_descriptions:
-            SummaryGenerationService.generate_all_methods_summaries(llm, structure_description, True)
-        txt.stop_spinner_replace_text("Summaries generated successfully.")
+    def apply_interface_generated_summaries_of_classes(interface_structure: StructureDesc, known_structures: list[StructureDesc]):
+            classes_implementing_interface = [s for s in known_structures if s.struct_type == StructureType.Class and interface_structure.struct_name in s.interfaces_names]
+            interface_structure.related_structures = classes_implementing_interface #TODO: should add base classes too
+            
+            for method in interface_structure.methods:
+                class_method = None
+                for class_desc in classes_implementing_interface:
+                    class_method = next((m for m in class_desc.methods if m.method_name == method.method_name), None)
+                    if class_method:
+                        break
+
+                if class_method:
+                    method.generated_summary = class_method.generated_summary
+                    method.generated_parameters_summaries = class_method.generated_parameters_summaries
+                    method.generated_return_summary = class_method.generated_return_summary
+                    method.generated_xml_summary = class_method.generated_xml_summary
 
     @staticmethod
     def including_generated_summaries_to_codes(paths_and_codes, structures_descriptions):
@@ -86,37 +99,33 @@ class SummaryGenerationService:
         
         for structure_description, (file_path, code) in zip(structures_descriptions, paths_and_codes_list):
             if structure_description.file_path != file_path: raise Exception("Mismatch between lists")
-            new_code = SummaryGenerationService.generate_code_with_generated_summaries_from_initial_code(structure_description, code)
+            new_code = SummaryGenerationService.add_generated_summaries_to_initial_code(structure_description, code)
             paths_and_new_codes[file_path] = new_code
 
         txt.stop_spinner_replace_text("Summaries successfully included in initial files code.")
         return paths_and_new_codes
 
     @staticmethod
-    def generate_code_with_generated_summaries_from_initial_code(class_description, initial_code: str):
-        for method_desc in class_description.methods[::-1]:
-            index = method_desc.code_start_index + class_description.index_shift_code
-            next_nl_dist = initial_code[index:].find('\n')     
-
-            if next_nl_dist != -1:
-                next_nl_nindex = index + 2 # add +2 to include the newline+
-            else:
-                next_nl_nindex = len(initial_code)
+    def add_generated_summaries_to_initial_code(struct_desc: StructureDesc, initial_code: str):
+        for method_desc in struct_desc.methods[::-1]:
+            index = method_desc.code_start_index + struct_desc.index_shift_code
 
             if method_desc.has_attributs():
-                att_index = initial_code[:next_nl_nindex].rfind(method_desc.attributs[0])
-                att_nl_index = initial_code[:att_index].rfind('\n')
-                split_index = att_nl_index + 1 # add +1 to include the newline
-            else:
-                split_index = next_nl_nindex
+                index = initial_code[:index].rfind(method_desc.attributs[0])
+
+            special_shift = 1# if struct_desc.structure_type == StructureType.Class.value else 2
+            index = initial_code[:index].rfind('\n') + special_shift
 
             method_summary = '\n' + txt.indent(1, str(method_desc.generated_xml_summary))
-            initial_code = initial_code[:split_index] + method_summary + initial_code[split_index:]
+            initial_code = initial_code[:index] + method_summary + initial_code[index:]
         return initial_code
         
     @staticmethod
-    def generate_all_methods_summaries(llm: BaseChatModel, class_desc: StructureDesc, with_json_output_parsing: bool):
-        # Generate methods summaries
+    def generate_methods_summaries_for_class(llm: BaseChatModel, class_desc: StructureDesc, with_json_output_parsing: bool):
+        if class_desc.struct_type != StructureType.Class:
+            return
+        
+        # Generate all class' methods summaries
         methods_summaries_prompts = []
         for method in class_desc.methods:
             method_summary = SummaryGenerationService.generate_method_summary_prompt(llm, method)
@@ -126,7 +135,7 @@ class SummaryGenerationService:
         for method, method_summary in zip(class_desc.methods, methods_summaries):
             method.generated_summary = method_summary
 
-        # Generate parameters summaries for all methods
+        # Generate parameters description for all methods
         prompts_or_chains = []
         format_instructions = ''
         for method in class_desc.methods:
@@ -171,7 +180,7 @@ class SummaryGenerationService:
         # Assign to all methods a generated summary including method description, parameters description, and return type description
         for i in range(len(class_desc.methods)):
             method = class_desc.methods[i]
-            method.generated_xml_summary = CSharpXMLDocumentation(method.generated_summary, method.generated_parameters_summaries, method.generated_return_summary, None) #method.example
+            method.generated_xml_summary = str(CSharpXMLDocumentation(method.generated_summary, method.generated_parameters_summaries, method.generated_return_summary, None)) #method.example
 
 
     ctor_txt = "Take into account that this method is a constructor for the containing class of the same name."

@@ -74,6 +74,7 @@ class txt:
                 sys.stdout.write('\r' + prefix + ' ' + char + ' ')
                 sys.stdout.flush()
                 time.sleep(0.1)
+                
     @staticmethod
     def stop_spinner():
         txt.stop_animation = True

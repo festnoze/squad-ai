@@ -48,5 +48,5 @@ txt.activate_print = True # Activate print each step advancement
 
 Llm.invoke_method_mesuring_openai_tokens_consumption(
     SummaryGenerationService.generate_summaries_for_csharp_files_and_save, 
-        "inputs\\code_files", llm_infos
+        "inputs\\code_files", llm_infos #\\UserProfileQueryingService.cs \\IMessageService.cs
 )

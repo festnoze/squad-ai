@@ -33,18 +33,18 @@ namespace Studi.Api.Lms.User.Application.Services
         private readonly ITrackingRestClient _trackingClient;
         private readonly IUserRepository _userRepository;
 
-    
+
     /// <summary>
-    /// Set up a service with required components for handling user profile writing operations.
+    /// Initialize the service with provided mediator, tracking client, logger, and user repository.
     /// </summary>
-    /// <param name="mediator">A mediator instance used for handling various indirect calls and commands within the system.</param>
-    /// <param name="customWebResource">An instance of ICustomWebResourceService for managing custom web resources.</param>
-    /// <param name="civilityService">An instance of ICivilityService used for handling civility-related operations.</param>
-    /// <param name="userQueryService">An instance of IUserProfileQueryingService to query user profile data.</param>
-    /// <param name="trackingClient">An instance of ITrackingRestClient for sending tracking information to the server for logging and analysis.</param>
-    /// <param name="logger">A logger instance for logging information within the UserProfileWritingService.</param>
-    /// <param name="userRepository">An instance of IUserRepository used for managing user data in the repository.</param>
-    public UserProfileWritingService(IMediator mediator, ICustomWebResourceService customWebResource, ICivilityService civilityService, IUserProfileQueryingService userQueryService, ITrackingRestClient trackingClient, ILogger<IUserProfileWritingService> logger, IUserRepository userRepository)
+    /// <param name="mediator">Mediator object for handling and dispatching messages or requests within the application.</param>
+    /// <param name="customWebResource">Service to manage custom web resources, potentially for loading configurations or resources.</param>
+    /// <param name="civilityService">Service handling operations related to civilities, such as titles or salutations.</param>
+    /// <param name="userQueryService">Service for querying user profiles, facilitating access to user information.</param>
+    /// <param name="trackingClient">Client to send tracking information to a specified endpoint.</param>
+    /// <param name="logger">Logging service for recording runtime information, errors, and actions related to the user profile writing service.</param>
+    /// <param name="userRepository">Repository interface for performing CRUD operations on user data within the database.</param>
+        public UserProfileWritingService(IMediator mediator, ICustomWebResourceService customWebResource, ICivilityService civilityService, IUserProfileQueryingService userQueryService, ITrackingRestClient trackingClient, ILogger<IUserProfileWritingService> logger, IUserRepository userRepository)
         {
             _mediator = mediator ?? throw new ArgumentNullException();
             _trackingClient = trackingClient;
@@ -52,12 +52,12 @@ namespace Studi.Api.Lms.User.Application.Services
             _userRepository = userRepository;
         }
 
-    
+
     /// <summary>
-    /// Upload a CSV file to check payment reliability. Deserialize the CSV file content, validate its structure, and process the valid data entries to update the existing payment reliability records. Handle any exceptions that may occur during the process and log the pertinent error messages.
+    /// Analyze the content of a CSV file related to payment reliability, ensure data validation, and upload it to the server logging any issues encountered.
     /// </summary>
-    /// <param name="file">The CSV file that contains the payment reliability data to be uploaded for tracking information.</param>
-    public async Task UploadCsvFilePaymentReliabilityAsync(IFormFile file)
+    /// <param name="file">The CSV file containing the tracking information that needs to be uploaded.</param>
+        public async Task UploadCsvFilePaymentReliabilityAsync(IFormFile file)
         {
             try
             {
@@ -94,14 +94,14 @@ namespace Studi.Api.Lms.User.Application.Services
             }
         }
 
-    
+
     /// <summary>
-    /// Update the payment reliability status based on the provided Salesforce ID.
+    /// Update the reliability status of a payment based on the provided Salesforce ID, ensuring the ID is not null or empty and retrieving the corresponding user ID for further validation.
     /// </summary>
-    /// <param name="salesforceId">The unique identifier for a Salesforce entity, used to track and reference specific records.</param>
-    /// <param name="code">The unique code associated with the payment reliability update, which may correspond to a specific transaction or operation.</param>
-    /// <param name="isCsvUpload">Indicates whether the data being sent is part of a CSV upload (true) or not (false).</param>
-    public async Task UpdatePaymentReliabilityAsync(string salesforceId, string code, bool isCsvUpload)
+    /// <param name="salesforceId">The unique identifier associated with the Salesforce record. This parameter is used to identify the specific record within Salesforce to update.</param>
+    /// <param name="code">The code associated with the payment reliability update. This parameter specifies the type or category of the update being sent.</param>
+    /// <param name="isCsvUpload">A boolean value that indicates whether the data is being uploaded in CSV format. True if uploading CSV data, otherwise false.</param>
+        public async Task UpdatePaymentReliabilityAsync(string salesforceId, string code, bool isCsvUpload)
         {
             Guard.Against.NullOrEmpty(salesforceId, ErrorCode.Api.Lms.User.DataValidation.Common.SalesforceId.NullOrEmpty);
 
@@ -125,175 +125,175 @@ namespace Studi.Api.Lms.User.Application.Services
             }
         }
 
-    
+
     /// <summary>
-    /// Update the profile review date for a specified user.
+    /// Update the review date of a user's profile to a specified timestamp.
     /// </summary>
-    /// <param name="userId">The unique identifier of the user whose profile review date is to be updated. This parameter is required and should be an integer.</param>
-    /// <param name="reviewDateUtc">The DateTime value representing the new review date in Coordinated Universal Time (UTC). This parameter is optional and can be null.</param>
-    public async Task UpdateUserProfileReviewDateAsync(int userId, DateTime? reviewDateUtc = null)
+    /// <param name="userId">The unique identifier of the user for whom the profile review date is to be updated. This parameter is mandatory.</param>
+    /// <param name="reviewDateUtc">The date and time of the review in UTC. This parameter is optional and defaults to null if not provided.</param>
+        public async Task UpdateUserProfileReviewDateAsync(int userId, DateTime? reviewDateUtc = null)
         {
             await _mediator.Send(new UserProfileReviewDateUpdateCommand(userId, reviewDateUtc));
         }
 
-    
+
     /// <summary>
-    /// Update the profile picture for a specified user by using their user ID and file GUID.
+    /// Update the profile picture for a specified user using the provided file identifier.
     /// </summary>
-    /// <param name="userId">The unique identifier of the user. This is used to specify which user's profile picture is being updated.</param>
-    /// <param name="fileGuid">The globally unique identifier of the file. This is used to specify the new profile picture file to be uploaded and updated for the user.</param>
-    public async Task UpdateProfilePictureAsync(int userId, Guid fileGuid)
+    /// <param name="userId">An integer representing the unique user identifier for whom the profile picture is being updated.</param>
+    /// <param name="fileGuid">A globally unique identifier (GUID) representing the file associated with the user's profile picture.</param>
+        public async Task UpdateProfilePictureAsync(int userId, Guid fileGuid)
         {
             await _mediator.Send(new UserProfilePictureUpdateCommand(userId, fileGuid));
         }
 
-    
+
     /// <summary>
-    /// Update the header picture for a specific user using their ID and the provided file identifier.
+    /// Update the header picture for a specified user.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user. This parameter is used to specify which user's data is to be retrieved or manipulated.</param>
-    /// <param name="fileGuid">The globally unique identifier for the file. This parameter is used to identify the specific file for which the header picture is being updated.</param>
-    public async Task UpdateHeaderPictureAsync(int userId, Guid fileGuid)
+    /// <param name="userId">The unique identifier for the user whose header picture is to be updated.</param>
+    /// <param name="fileGuid">The unique identifier (GUID) of the file representing the new header picture.</param>
+        public async Task UpdateHeaderPictureAsync(int userId, Guid fileGuid)
         {
             await _mediator.Send(new UserHeaderPictureUpdateCommand(userId, fileGuid));
         }
 
-    
+
     /// <summary>
-    /// Update basic information for a specified user including LinkedIn URL and personal description.
+    /// Update basic information for a specified user based on given parameters.
     /// </summary>
-    /// <param name="userId">An integer representing the unique identifier of the user whose information is being updated.</param>
-    /// <param name="linkedInUrl">An optional string containing the URL of the user's LinkedIn profile. This may be null if no URL is provided.</param>
-    /// <param name="aboutMe">An optional string containing a brief description or biography about the user. This may be null if no description is provided.</param>
-    public async Task UpdateBasicInfoAsync(int userId, string? linkedInUrl, string? aboutMe)
+    /// <param name="userId">The unique identifier of the user. This is an integer value.</param>
+    /// <param name="linkedInUrl">The LinkedIn profile URL of the user. This is a nullable string value.</param>
+    /// <param name="aboutMe">A brief description or bio about the user. This is a nullable string value.</param>
+        public async Task UpdateBasicInfoAsync(int userId, string? linkedInUrl, string? aboutMe)
         {
             await _mediator.Send(new UserBasicInfoUpdateCommand(userId, linkedInUrl, aboutMe));
         }
 
-    
+
     /// <summary>
-    /// Update the ranking status for a specified user within a specified school.
+    /// Update user ranking status based on provided user ID, school ID, and appearance indicator.
     /// </summary>
-    /// <param name="userId">The unique identifier of the user. It is used to distinguish between different users in the system.</param>
-    /// <param name="schoolId">The unique identifier of the school. It helps in identifying the specific school to which the data pertains.</param>
-    /// <param name="doesAppearInRanking">A boolean value that indicates whether the ranking should be displayed for the user in the system or not.</param>
-    public async Task UpdateDoesAppearInRankingAsync(int userId, int schoolId, bool doesAppearInRanking)
+    /// <param name="userId">The unique identifier for the user. This is used to specify the user whose tracking information is being updated.</param>
+    /// <param name="schoolId">The unique identifier for the school. This parameter helps in identifying the school associated with the user.</param>
+    /// <param name="doesAppearInRanking">A boolean value indicating whether the user appears in the ranking. True if the user appears in the ranking, false otherwise.</param>
+        public async Task UpdateDoesAppearInRankingAsync(int userId, int schoolId, bool doesAppearInRanking)
         {
             await _mediator.Send(new UserAppearsInRankingUpdateCommand(userId, schoolId, doesAppearInRanking));
         }
 
-    
+
     /// <summary>
-    /// Update the learner directory status and collaboration openness for a specified user within a particular school.
+    /// Update the user's appearance in the learner directory based on specified parameters.
     /// </summary>
     /// <param name="userId">The unique identifier for the user.</param>
     /// <param name="schoolId">The unique identifier for the school.</param>
-    /// <param name="doesAppearInLearnerDirectory">Indicates whether the user appears in the learner directory.</param>
-    /// <param name="isOpenToCollaboration">Indicates whether the user is open to collaboration.</param>
-    public async Task UpdateDoesAppearInLearnerDirectoryAsync(int userId, int schoolId, bool doesAppearInLearnerDirectory, bool isOpenToCollaboration)
+    /// <param name="doesAppearInLearnerDirectory">A boolean flag indicating whether the user should appear in the learner directory.</param>
+    /// <param name="isOpenToCollaboration">A boolean flag indicating whether the user is open to collaboration.</param>
+        public async Task UpdateDoesAppearInLearnerDirectoryAsync(int userId, int schoolId, bool doesAppearInLearnerDirectory, bool isOpenToCollaboration)
         {
             await _mediator.Send(new UserAppearsInLearnerDirectoryUpdateCommand(userId, schoolId, doesAppearInLearnerDirectory, isOpenToCollaboration));
         }
 
-    
+
     /// <summary>
-    /// Update the actual location for a specified user based on their user ID, country code, and timezone ID.
+    /// Update the actual location for a specified user, including country and timezone details.
     /// </summary>
-    /// <param name="userId">The unique identifier of the user whose location is being tracked.</param>
-    /// <param name="countryCode">An optional string parameter representing the country code where the user is located. It may be null.</param>
-    /// <param name="timezoneId">An optional string parameter representing the timezone ID of the user's current location. It may be null.</param>
-    public async Task UpdateActualLocationAsync(int userId, string? countryCode, string? timezoneId)
+    /// <param name="userId">The identifier for the user. This value is required to specify which user's location is being updated.</param>
+    /// <param name="countryCode">An optional parameter representing the country code. This can be used to tailor the location update based on regional settings.</param>
+    /// <param name="timezoneId">An optional parameter representing the timezone ID. This assists in adjusting the tracking information to the correct time zone context.</param>
+        public async Task UpdateActualLocationAsync(int userId, string? countryCode, string? timezoneId)
         {
             await _mediator.Send(new UserActualLocationUpdateCommand(userId, countryCode, timezoneId));
         }
 
-    
+
     /// <summary>
-    /// Add a new professional experience entry for a specified user.
+    /// Add a professional experience for a specified user using a command to handle the operation.
     /// </summary>
-    /// <param name="professionalExperienceIto">The ProfessionalExperienceIto object that contains the details of the user's professional experience to be added.</param>
-    /// <param name="userId">The unique identifier of the user for whom the professional experience is being added.</param>
-    /// <returns>Returns a Task representing the asynchronous operation of adding a professional experience.</returns>
-    public async Task<int> AddUserProfessionalExperienceAsync(ProfessionalExperienceIto professionalExperienceIto, int userId)
+    /// <param name="professionalExperienceIto">An object that contains the professional experience details of the user, including fields like company, role, duration, and other relevant information.</param>
+    /// <param name="userId">The unique identifier of the user to whom the professional experience details will be associated.</param>
+    /// <returns>Returns a task indicating the operation's success status.</returns>
+        public async Task<int> AddUserProfessionalExperienceAsync(ProfessionalExperienceIto professionalExperienceIto, int userId)
         {
             return await _mediator.Send(new UserProfessionalExperienceCreateCommand(professionalExperienceIto, userId));
         }
 
-    
+
     /// <summary>
-    /// Update a user's professional experience details using the provided experience ID and data.
+    /// Update a user's professional experience.
     /// </summary>
-    /// <param name="professionalExperienceId">The unique identifier for the professional experience that needs to be updated.</param>
-    /// <param name="professionalExperienceIto">The object containing the updated details of the professional experience.</param>
-    /// <param name="userId">The unique identifier of the user whose professional experience is being updated.</param>
-    public async Task UpdateUserProfessionalExperienceAsync(int professionalExperienceId, ProfessionalExperienceIto professionalExperienceIto, int userId)
+    /// <param name="professionalExperienceId">The unique identifier for the professional experience entry that needs to be updated.</param>
+    /// <param name="professionalExperienceIto">An object containing the details and information of the professional experience to be updated.</param>
+    /// <param name="userId">The unique identifier for the user whose professional experience is being updated.</param>
+        public async Task UpdateUserProfessionalExperienceAsync(int professionalExperienceId, ProfessionalExperienceIto professionalExperienceIto, int userId)
         {
             await _mediator.Send(new UserProfessionalExperienceUpdateCommand(professionalExperienceId, professionalExperienceIto, userId));
         }
 
-    
+
     /// <summary>
-    /// Remove a professional experience record for a specified user.
+    /// Delete a specified user's professional experience by providing the professional experience ID and user ID.
     /// </summary>
-    /// <param name="professionalExperienceId">The unique identifier for the user's professional experience that should be removed.</param>
-    /// <param name="userId">The unique identifier of the user for whom the professional experience should be removed.</param>
-    public async Task RemoveUserProfessionalExperienceAsync(int professionalExperienceId, int userId)
+    /// <param name="professionalExperienceId">The unique identifier for the professional experience to be removed.</param>
+    /// <param name="userId">The unique identifier for the user whose professional experience is to be removed.</param>
+        public async Task RemoveUserProfessionalExperienceAsync(int professionalExperienceId, int userId)
         {
             await _mediator.Send(new UserProfessionalExperienceDeleteCommand(professionalExperienceId, userId));
         }
 
-    
+
     /// <summary>
-    /// Update the latest study information for a specified user.
+    /// Update the most recent study information for a specific user.
     /// </summary>
-    /// <param name="userId">The unique identifier of the user whose tracking information is being managed.</param>
-    /// <param name="studyInfos">The detailed study information to be logged and analyzed for the user.</param>
-    public async Task ReplaceLatestStudyInformationsAsync(int userId, StudyIto studyInfos)
+    /// <param name="userId">An integer representing the unique identifier of the user.</param>
+    /// <param name="studyInfos">An object of type StudyIto containing detailed study information relevant to the user.</param>
+        public async Task ReplaceLatestStudyInformationsAsync(int userId, StudyIto studyInfos)
         {
             await _mediator.Send(new UserLatestStudyInformationsReplaceCommand(studyInfos, userId));
         }
 
-    
+
     /// <summary>
-    /// Update the notification preferences for a specified user based on various parameters.
+    /// Update the notification registration settings for a specified user based on user ID, school ID, notification type, and subscription status for email and push notifications.
     /// </summary>
-    /// <param name="userId">The ID of the user who will have their notification settings updated.</param>
-    /// <param name="schoolId">The ID of the school associated with the user's notification settings.</param>
-    /// <param name="notificationTypeCode">The code representing the type of notification to update (e.g., email, push).</param>
-    /// <param name="isEmailSubscriptionActive">A flag indicating whether the email subscription is active (null if no change).</param>
-    /// <param name="isPushSubscriptionActive">A flag indicating whether the push subscription is active (null if no change).</param>
-    public async Task UpdateNotificationRegistration(int userId, int schoolId, string notificationTypeCode, bool? isEmailSubscriptionActive, bool? isPushSubscriptionActive)
+    /// <param name="userId">The unique identifier for the user for whom the notification settings are being updated.</param>
+    /// <param name="schoolId">The identifier for the school associated with the user.</param>
+    /// <param name="notificationTypeCode">A code that specifies the type of notification to be tracked and updated.</param>
+    /// <param name="isEmailSubscriptionActive">Indicates whether the email subscription for notifications is active. This is an optional parameter.</param>
+    /// <param name="isPushSubscriptionActive">Indicates whether the push subscription for notifications is active. This is an optional parameter.</param>
+        public async Task UpdateNotificationRegistration(int userId, int schoolId, string notificationTypeCode, bool? isEmailSubscriptionActive, bool? isPushSubscriptionActive)
         {
             await _mediator.Send(new UserNotificationRegistrationUpdateCommand(userId, schoolId, notificationTypeCode, isEmailSubscriptionActive, isPushSubscriptionActive));
         }
 
-    
+
     /// <summary>
     /// Update the first connection date for a specified user.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user. It is a required integer parameter used to identify the user in the system.</param>
-    /// <param name="connectionDateUtc">The date and time of the user's first connection in UTC. This parameter is optional and, if not provided, will default to null.</param>
-    public async Task UpdateUserFirstConnectionDateAsync(int userId, DateTime? connectionDateUtc = null)
+    /// <param name="userId">An integer representing the unique identifier of the user whose connection date is being updated.</param>
+    /// <param name="connectionDateUtc">An optional DateTime value representing the UTC date and time of the user's first connection. If not provided, defaults to null.</param>
+        public async Task UpdateUserFirstConnectionDateAsync(int userId, DateTime? connectionDateUtc = null)
         {
             await _mediator.Send(new UserFirstConnectionDateUpdateCommand(userId, connectionDateUtc));
         }
 
-    
+
     /// <summary>
-    /// Create a user profile with specified details, ensuring civility and generating a pseudo if not provided.
+    /// Create a user profile with specified personal and optional details, ensuring pseudo generation if not provided.
     /// </summary>
-    /// <param name="civilityId">Identifier representing the civility of the user (e.g., Mr, Ms).</param>
+    /// <param name="civilityId">A unique identifier representing the civility (e.g., Mr., Mrs., Ms., etc.) of the user.</param>
     /// <param name="lastName">The last name of the user.</param>
     /// <param name="firstName">The first name of the user.</param>
     /// <param name="birthDate">The birth date of the user.</param>
-    /// <param name="email">The email address of the user.</param>
-    /// <param name="pseudo">The optional pseudonym or nickname of the user.</param>
-    /// <param name="isOfficial">Indicates if the user is an official user.</param>
-    /// <param name="isTester">Indicates if the user is a tester.</param>
-    /// <param name="maidenName">The optional maiden name of the user.</param>
-    /// <param name="createBy">Identifier of the user or process that created this profile.</param>
-    /// <returns>Returns a Task<UserProfile> representing the newly created user profile.</returns>
-    public async Task<int> CreateUserProfileAsync(int civilityId, string lastName, string firstName, DateOnly birthDate, string email, string? pseudo, bool isOfficial, bool isTester, string? maidenName, string createBy)
+    /// <param name="email">The user's email address.</param>
+    /// <param name="pseudo">The user's optional pseudonym or nickname. Can be null.</param>
+    /// <param name="isOfficial">A boolean indicating if the profile is official.</param>
+    /// <param name="isTester">A boolean indicating if the user is a beta tester.</param>
+    /// <param name="maidenName">The maiden name of the user, if applicable. Can be null.</param>
+    /// <param name="createBy">The identifier of the entity or user who created the profile.</param>
+    /// <returns>Returns the newly created user profile.</returns>
+        public async Task<int> CreateUserProfileAsync(int civilityId, string lastName, string firstName, DateOnly birthDate, string email, string? pseudo, bool isOfficial, bool isTester, string? maidenName, string createBy)
         {
             var civility = _civilityService.GetCivility(civilityId);
 
@@ -303,14 +303,14 @@ namespace Studi.Api.Lms.User.Application.Services
             return await _mediator.Send(new UserProfileCreateCommand(civility!.Name, lastName, firstName, birthDate, email, pseudo!, isOfficial, isTester, _customWebResource.DefaultAvatarUrl, _customWebResource.DefaultHeaderProfileBackgroundUrl, maidenName, createBy));
         }
 
-     
+
     /// <summary>
-    /// Check if the provided code is not null or empty.
+    /// Retrieve comments embedded within a code snippet if the provided code is not null or empty.
     /// </summary>
-    /// <param name="code">The string code that identifies the specific tracking information to be sent to the server.</param>
-    /// <param name="userReliability">The optional IUserReliabilityIto object which provides additional user reliability data for more detailed logging and analysis purposes.</param>
-    /// <returns>Returns extracted comments from the provided code string.</returns>
-   private string GetCommentsFromCode(string code, IUserReliabilityIto? userReliability)
+    /// <param name="code">The code string representing the tracking information to be sent to the specified endpoint.</param>
+    /// <param name="userReliability">An optional IUserReliability object that provides reliability information about the user associated with the tracking information.</param>
+    /// <returns>Returns the extracted comments from a non-null or non-empty code snippet.</returns>
+        private string GetCommentsFromCode(string code, IUserReliabilityIto? userReliability)
         {
             string sentenceCode = string.Empty;
 
@@ -333,15 +333,15 @@ namespace Studi.Api.Lms.User.Application.Services
             return $"{sentenceCode} Veuillez contacter le service Recouvrement.";
         }
 
-     
+
     /// <summary>
-    /// Get and send tracking information to the server for logging and analysis purposes.
+    /// Send tracking information to a specified endpoint based on certain parameters.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user. This is used to associate the tracking information with a specific user.</param>
-    /// <param name="title">The title or name associated with the tracking event. This provides a brief, recognizable label for the event.</param>
-    /// <param name="comments">Additional comments or details about the tracking event. This is used to provide more context or information about what is being tracked.</param>
-    /// <param name="createBy">The identifier or name of the person or system that created the tracking information. This helps to track the origin of the data.</param>
-   private async Task SendTrackingAsync(int userId, string title, string comments, string createBy)
+    /// <param name="userId">An integer representing the unique identifier for the user.</param>
+    /// <param name="title">A string specifying the title associated with the tracking information.</param>
+    /// <param name="comments">A string containing any additional comments or notes regarding the tracking information.</param>
+    /// <param name="createBy">A string indicating the creator or author of the tracking information.</param>
+        private async Task SendTrackingAsync(int userId, string title, string comments, string createBy)
         {
             try
             {

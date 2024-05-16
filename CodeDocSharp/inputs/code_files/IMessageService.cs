@@ -4,80 +4,80 @@ using Studi.Api.Core.ListingSelector.Untyped;
 
 namespace Studi.Api.Lms.Messenger.Application.Services.MessageService;
 
-public interface IM
-    /// <summary>
-    /// Retrieve the date of the last message in a specified conversation, excluding messages sent by a particular user.
-    /// </summary>
-    /// <param name="conversationId">The unique identifier of the conversation for which the last message date is being fetched.</param>
-    /// <param name="userId">The unique identifier of the user for whom the archived status is to be ignored.</param>
-    /// <returns>Returns the last message date in the conversation, excluding specified user's messages.</returns>
-essageService
+public interface IMessageService
 {
-    Task<DateTime?> GetLastMessageDateByConversationIdExceptUserIdAsync(int conversationI
-    /// <summary>
-    /// Analyze and return the total number of messages present in a specified collection.
-    /// </summary>
-    /// <param name="userId">The unique identifier for the specified user whose archived status is being updated.</param>
-    /// <param name="schoolsIds">A collection of unique identifiers representing the schools in scope for the update operation.</param>
-    /// <param name="listingSelector">An object that defines criteria for selecting which listings or conversations to update for the specified user.</param>
-    /// <returns>Returns the total number of messages in the specified collection.</returns>
-d, int userId);
 
-    Task<int> CountMessagesAsync(int userId, IEnumerable<int> schoolsIds, IUntypedListingSelector li
     /// <summary>
-    /// Count messages that meet specified filter criteria within a particular conversation.
+    /// Retrieve the date of the most recent message in a specific conversation, excluding messages sent by a specified user.
     /// </summary>
-    /// <param name="conversationId">The unique identifier for the conversation.</param>
-    /// <param name="listingSelector">An optional parameter used to select listings; can be null.</param>
-    /// <returns>Returns the count of filtered messages within the specified conversation.</returns>
-stingSelector);
-    Task<int> CountFilteredMessagesByConversationIdAsync(int conversationId, IUntypedListingSelector? listingSe
+    /// <param name="conversationId">The unique identifier for the conversation under which the archival status needs to be updated.</param>
+    /// <param name="userId">The unique identifier of the user whose archival status is being updated.</param>
+    /// <returns>Returns the date of the latest message excluding the specified user.</returns>
+    Task<DateTime?> GetLastMessageDateByConversationIdExceptUserIdAsync(int conversationId, int userId);
+
+    /// <summary>
+    /// Count the messages for a specified user with given filters and sorting criteria.
+    /// </summary>
+    /// <param name="userId">The unique identifier for the user for whom the archival status is to be updated.</param>
+    /// <param name="schoolsIds">A collection of school IDs across which the conversation archival status will be updated.</param>
+    /// <param name="listingSelector">The listing selector that determines which listings (or conversations) are to be considered for the archival update.</param>
+    /// <returns>Returns the total number of filtered and sorted messages for a specified user.</returns>
+
+    Task<int> CountMessagesAsync(int userId, IEnumerable<int> schoolsIds, IUntypedListingSelector listingSelector);
+
+    /// <summary>
+    /// Count the filtered messages within a specified conversation.
+    /// </summary>
+    /// <param name="conversationId">The unique identifier of the conversation for which the messages will be counted.</param>
+    /// <param name="listingSelector">An optional filter used to select and count specific types of messages within the conversation.</param>
+    /// <returns>Returns the count of filtered messages in a specified conversation.</returns>
+    Task<int> CountFilteredMessagesByConversationIdAsync(int conversationId, IUntypedListingSelector? listingSelector = null);
+
     /// <summary>
     /// Get the count of unread messages for a specified user and school.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user whose unread message count is to be retrieved.</param>
-    /// <param name="schoolId">The unique identifier for the school associated with the user.</param>
-    /// <returns>Returns the number of unread messages for a specific user and school.</returns>
-lector = null);
+    /// <param name="userId">The unique identifier representing a specific user whose unread message count needs to be fetched.</param>
+    /// <param name="schoolId">The unique identifier representing the school associated with the user.</param>
+    /// <returns>Returns the number of unread messages for a specified user and school.</returns>
 
-    Task<IUnreadMessageCountAto> GetUnreadMessageCountByUserIdAndSchoolIdAsync(int userId,
-    /// <summary>
-    /// Retrieve messages for a specified conversation, segmented into pages.
-    /// </summary>
-    /// <param name="conversationId">The unique identifier for the conversation to retrieve messages from.</param>
-    /// <param name="userId">The unique identifier for the user whose messages' archived status is being updated.</param>
-    /// <param name="schoolIds">A list of unique identifiers for the schools related to the conversations.</param>
-    /// <param name="pageNumber">The number representing the page of results to retrieve, used for pagination.</param>
-    /// <param name="pageSize">The number of items per page, used for pagination.</param>
-    /// <returns>Returns paginated messages for a specified conversation.</returns>
- int schoolId);
+    Task<IUnreadMessageCountAto> GetUnreadMessageCountByUserIdAndSchoolIdAsync(int userId, int schoolId);
 
-    Task<PaginedData<IMessageRAto>> GetPaginatedMessagesByConversationIdAsync(int conversationId, int userId, List<int> schoolIds, int pageNumber,
     /// <summary>
-    /// Add a new message to a designated storage medium with necessary details.
+    /// Retrieve paginated messages for a specified conversation, ensuring the conversation exists and the user is a valid participant.
     /// </summary>
-    /// <param name="messageWAto">The IMessageWAto object containing the message information that needs to be updated for the specified user.</param>
-    /// <param name="enableNotification">A boolean flag indicating whether or not to enable notifications for the update operation. Defaults to true.</param>
-    /// <returns>Returns a boolean indicating the success of adding the message.</returns>
- int pageSize);
+    /// <param name="conversationId">The ID of the conversation for which to retrieve paginated messages.</param>
+    /// <param name="userId">The ID of the user for whom to update the archival status.</param>
+    /// <param name="schoolIds">A list of school IDs associated with the conversations.</param>
+    /// <param name="pageNumber">The page number to retrieve in the paginated results.</param>
+    /// <param name="pageSize">The number of messages per page in the paginated results.</param>
+    /// <returns>Returns paginated list of messages for a given conversation and user.</returns>
 
-    Task<IMessageRAto> AddMessageAsync(IMessageWAto messageWAto, bool enableNotifi
-    /// <summary>
-    /// Get a message by its unique identifier, allowing access to specific message data.
-    /// </summary>
-    /// <param name="messageId">The unique identifier for the message that needs to be updated.</param>
-    /// <param name="currentUserId">The unique identifier for the user whose archived status is being updated.</param>
-    /// <returns>Returns a message object identified by a unique identifier.</returns>
-cation = true);
+    Task<PaginedData<IMessageRAto>> GetPaginatedMessagesByConversationIdAsync(int conversationId, int userId, List<int> schoolIds, int pageNumber, int pageSize);
 
-    Task<IMessageRAto> GetMessageByIdAsync(int messageId, int 
     /// <summary>
-    /// Update the archived status for a specified user across multiple conversations.
+    /// Add a message to the system, involving user verification and registration of necessary repositories.
     /// </summary>
-    /// <param name="conversationIds">A list of conversation IDs for which the archived status needs to be updated.</param>
-    /// <param name="archived">A boolean value indicating whether to archive (true) or unarchive (false) the specified conversations for the user.</param>
-    /// <param name="userId">The unique identifier of the user whose archived status is being updated across multiple conversations.</param>
-currentUserId);
+    /// <param name="messageWAto">An instance of the IMessageWAto class containing the details of the archival status update to be performed.</param>
+    /// <param name="enableNotification">A boolean flag indicating whether notifications should be enabled for this operation. Defaults to true.</param>
+    /// <returns>Returns a Task representing the asynchronous operation.</returns>
+
+    Task<IMessageRAto> AddMessageAsync(IMessageWAto messageWAto, bool enableNotification = true);
+
+    /// <summary>
+    /// Retrieve a message by its identifier, including relevant sender and recipient details as well as any associated attachment and audio file identifiers.
+    /// </summary>
+    /// <param name="messageId">The unique identifier of the message that needs to be updated.</param>
+    /// <param name="currentUserId">The unique identifier of the user for whom the archival status is being updated.</param>
+    /// <returns>Returns the message with sender, recipient details, and any associated attachments and audio files.</returns>
+
+    Task<IMessageRAto> GetMessageByIdAsync(int messageId, int currentUserId);
+
+    /// <summary>
+    /// Update an archival status for a specified user across multiple conversation IDs.
+    /// </summary>
+    /// <param name="conversationIds">A list of conversation IDs for which the archival status will be updated.</param>
+    /// <param name="archived">A boolean flag indicating whether the conversations should be archived (true) or unarchived (false).</param>
+    /// <param name="userId">The ID of the user for whom the archival status is to be updated.</param>
 
     Task UpdateIsArchivedForUserIdByConversationsIdsAsync(int[] conversationIds, bool archived, int userId);
 }

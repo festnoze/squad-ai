@@ -16,6 +16,17 @@ import re
 
 class CSharpCodeStructureAnalyser:
     @staticmethod
+    def extract_code_structures_from_code_files(llm, paths_and_codes):
+        csharp_files_count = len(paths_and_codes)
+        t = txt.print_with_spinner(f"Parsing all {csharp_files_count} files for code structure:")
+        all_parsed_structs = []
+        for file_path, code in paths_and_codes.items():
+            structure_description: StructureDesc = CSharpCodeStructureAnalyser.get_code_structure(llm, file_path, code)
+            all_parsed_structs.append(structure_description)
+        txt.stop_spinner_replace_text(f"{csharp_files_count} files parsed successfully for code.")
+        return all_parsed_structs
+    
+    @staticmethod
     def get_code_structure(llm: BaseChatModel, file_path: str, code: str, chunk_size:int = 8000, chunk_overlap: int = 0) -> BaseDesc:
         found_struct_separators, separator_indexes, splitted_struct_contents = CSharpCodeStructureAnalyser.split_by_class_interface_enum_definition(code)
         
@@ -33,14 +44,14 @@ class CSharpCodeStructureAnalyser:
         if first_chunk_has_usings:
             usings = re.findall(r'using\s+([\w.]+)[\s;]*', splitted_struct_contents[0]) 
 
-        if struct_type == 'class':
-            struct_desc = CSharpCodeStructureAnalyser.extract_class_methods_and_props(file_path, separator_indexes[0], namespace_name, usings, access_modifier, struct_type, splitted_struct_contents[-1])
+        if struct_type == StructureType.Class.value:
+            struct_desc = CSharpCodeStructureAnalyser.class_extract_methods_and_props(file_path, separator_indexes[0], namespace_name, usings, access_modifier, splitted_struct_contents[-1])
             # split each method into chunks adapted to the LLM context window size
             CSharpCodeStructureAnalyser.split_class_methods_and_add_to_class_desc(struct_desc, chunk_size, chunk_overlap)
-        elif struct_type == 'interface':
-            struct_desc = CSharpCodeStructureAnalyser.extract_interface_methods_and_props(llm, file_path, separator_indexes[0], namespace_name, usings, access_modifier, struct_type, splitted_struct_contents[-1])
-        elif struct_type == 'enum':
-            pass        
+        elif struct_type == StructureType.Interface.value:
+            struct_desc = CSharpCodeStructureAnalyser.interface_extract_methods_and_props(llm, file_path, separator_indexes[0], namespace_name, usings, access_modifier, splitted_struct_contents[-1])
+        elif struct_type == StructureType.Enum.value:
+            pass
         return struct_desc
     
     def split_class_methods_and_add_to_class_desc(class_desc: StructureDesc, chunk_size:int = 8000, chunk_overlap: int = 0):
@@ -64,8 +75,8 @@ class CSharpCodeStructureAnalyser:
         struct_separators_pattern = f'({struct_separators})'
 
         found_struct_separators = re.findall(struct_separators_pattern, code)  
-        before_separators_indexes = [m.start() for m in re.finditer(struct_separators_pattern, code)]
-        #before_separators_indexes = [index - len(found_struct_separators[i]) for i, index in enumerate(after_separators_indexes)] # remove the separator length from indexes
+        separators_indexes = [m.start() for m in re.finditer(struct_separators_pattern, code)]
+        separators_indexes = [index + len(found_struct_separators[i]) for i, index in enumerate(separators_indexes)] # remove the separator length from indexes
         splitted_contents = re.split(struct_separators, code, flags=re.MULTILINE)
         first_chunk_has_usings =  'using' in splitted_contents[0]
         first_chunk_has_namespace = 'namespace' in splitted_contents[0]
@@ -74,13 +85,13 @@ class CSharpCodeStructureAnalyser:
         if len(found_struct_separators) + no_content_chunks != len(splitted_contents):
             raise Exception('Found class/interface/enum count does not match found contents count')
         
-        return found_struct_separators, before_separators_indexes, splitted_contents
+        return found_struct_separators, separators_indexes, splitted_contents
     
-    def extract_class_methods_and_props(file_path: str, index_shift_code: int, namespace_name: str, usings: list[str], access_modifier: str, structure_type: str, code: str) -> StructureDesc:
+    def class_extract_methods_and_props(file_path: str, index_shift_code: int, namespace_name: str, usings: list[str], access_modifier: str, code: str) -> StructureDesc:
         separators = ['public ', 'protected ', 'private ', 'internal ']
         pattern = '|'.join(map(re.escape, separators))
         code_chunks = re.split(pattern, code, flags=re.MULTILINE)
-        separator_indexes = [m.start() + len(m.group()) for m in re.finditer(pattern, code)]
+        separator_indexes = [m.start() for m in re.finditer(pattern, code)]
 
         # Segregate methods from properies        
         methods: list[MethodDesc] = []
@@ -102,9 +113,21 @@ class CSharpCodeStructureAnalyser:
                     properties.append(PropertyDesc.get_property_desc_from_code(code_chunk))
                 else: # is method
                     methods.append(MethodDesc.factory_for_class_code(code_chunk, separator_indexes[chunk_index - 1], code_chunks[chunk_index - 1], class_name))
-        return StructureDesc(file_path=file_path, index_shift_code=index_shift_code, structure_type=StructureType.Class, namespace_name=namespace_name, usings=usings, class_name=class_name, access_modifier=access_modifier, interfaces_names=interfaces_names, methods=methods, properties=properties)
+        
+        return StructureDesc(
+                    file_path=file_path, 
+                    index_shift_code=index_shift_code, 
+                    struct_type=StructureType.Class, 
+                    namespace_name=namespace_name, 
+                    usings=usings, 
+                    struct_name=class_name, 
+                    access_modifier=access_modifier, 
+                    interfaces_names=interfaces_names,
+                    base_class_name= None,
+                    methods=methods, 
+                    properties=properties)
 
-    def extract_interface_methods_and_props(llm, file_path: str, index_shift_code: int, namespace_name: str, usings: list[str], access_modifier: str, structure_type: str, code: str) -> StructureDesc:
+    def interface_extract_methods_and_props(llm, file_path: str, index_shift_code: int, namespace_name: str, usings: list[str], access_modifier: str, code: str) -> StructureDesc:
         # TODO: Implement automatic code parsing for interfaces
         # chains = []
         # prompt = CSharpCodeStructureParser.get_prompt_for_interface_parsing(code)        
@@ -114,13 +137,14 @@ class CSharpCodeStructureAnalyser:
         # interfaces_summaries = Llm.invoke_parallel_chains({Llm.output_parser_instructions_name: format_instructions}, *chains)
         # for i in range(len(interfaces_summaries)):
         #     interfaces_summaries[i] = StructureDesc(**interfaces_summaries[i])
-        separators = ['{\n']
-        for i in range(6):
-            separators.append(';' + i*' ' +'\n')
+
+        separators = [';' + i*' ' +'\n' for i in range(6)]
         pattern = '|'.join(map(re.escape, separators))
-        code_chunks = [line.strip() for line in re.split(pattern, code, flags=re.MULTILINE)]
+        # for line in re.split(pattern, code, flags=re.MULTILINE):
+        #     code_chunks.append(line.strip())
         separator_indexes = [m.start() + len(m.group()) for m in re.finditer(pattern, code)]
-        separator_indexes = [code.rfind('\n', 0, index) for index in separator_indexes] # get the previous NL as separator
+        #separator_indexes = [code.rfind('\n', 0, index) for index in separator_indexes] # get the previous NL as separator
+        separator_indexes.insert(0, code.find('{') + 2) #add the first line index
         code_lines = code.split('\n')
         # Segregate methods from properies        
         methods: list[MethodDesc] = []
@@ -130,23 +154,33 @@ class CSharpCodeStructureAnalyser:
             code_line = code_line.strip()
             if code_line in ['{', '}', '']:
                 continue
-            if chunk_index == -1: # line desc. interface signature
+            if chunk_index == -1: # first line describe interface signature
                 if CSharpCodeStructureAnalyser.has_interfaces(code_line):
                     interface_name = code_line.split(':')[0].strip()
-                    inherits_from = [name.strip() for name in code_line.split(':')[1].split(',')]
+                    interfaces_names = [name.strip() for name in code_line.split(':')[1].split(',')]
                 else:
                     interface_name = code_line
-                    inherits_from = []
+                    interfaces_names = []
                 chunk_index += 1
                 continue
-
             if CSharpCodeStructureAnalyser.is_property(StructureType.Interface, code_line):
                 properties.append(PropertyDesc.get_property_desc_from_code(code_line))
             else: # is method
                 methods.append(MethodDesc.factory_for_interface_code(code_line, separator_indexes[chunk_index], interface_name))
             chunk_index += 1
 
-        return StructureDesc(file_path=file_path, index_shift_code=index_shift_code, structure_type=StructureType.Interface, namespace_name=namespace_name, usings=usings, class_name=interface_name, access_modifier=access_modifier, interfaces_names=inherits_from, methods=methods, properties=properties)
+        return StructureDesc(
+                    file_path=file_path, 
+                    index_shift_code=index_shift_code, 
+                    struct_type=StructureType.Interface, 
+                    namespace_name=namespace_name, 
+                    usings=usings, 
+                    struct_name=interface_name, 
+                    access_modifier=access_modifier,
+                    base_class_name= None, 
+                    interfaces_names=interfaces_names, 
+                    methods=methods, 
+                    properties=properties)
 
     def is_property(struct_type: StructureType, first_line) -> bool:
         if struct_type == StructureType.Class:
