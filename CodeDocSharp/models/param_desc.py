@@ -26,6 +26,9 @@ class ParameterDesc(BaseDesc):
         else:
             return f"{self.param_type} {self.param_name}"
 
+class ParameterDescPydantic:
+    pass
+
 class ParamDescEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, ParameterDesc):

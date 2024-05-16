@@ -8,7 +8,6 @@ from langchain.schema.runnable import RunnableParallel
 
 from helpers.llm_helper import Llm
 from helpers.tools_helpers import ToolsContainer
-from models.params_doc import MethodParametersDocumentation
 
 def test_agent_executor_with_tools(llm):
     tools = [ToolsContainer.multiply, ToolsContainer.divide, ToolsContainer.add, ToolsContainer.subtract, ToolsContainer.power, ToolsContainer.root, ToolsContainer.get_random_string, ToolsContainer.get_random_number]

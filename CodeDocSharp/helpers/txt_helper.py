@@ -1,3 +1,9 @@
+import sys
+import threading
+import time
+from helpers.python_helpers import staticproperty
+
+
 class txt:
     def indent(indent_level: int, code: str) -> str:
         indent_str = '    '
@@ -26,3 +32,47 @@ class txt:
             return object[prop_to_find]
         else:
             return None
+    
+    _activate_print = True
+    
+    @staticproperty
+    def activate_print(cls):
+        return cls._activate_print
+
+    @activate_print.setter
+    def activate_print(cls, value):
+        cls._activate_print = value
+    
+    @staticmethod
+    def print(text: str):
+        if txt.activate_print:
+            print(text)
+
+    def print_with_spinner(text: str):
+        if txt.activate_print == False:
+            return None
+        
+        thread = threading.Thread(target=txt.wait_spinner, args=(text,))
+        thread.daemon = True
+        thread.start()
+        return thread
+
+    stop_animation = True
+    def wait_spinner(prefix):  # Optional prefix text
+        chars = "-\|/"
+        txt.stop_animation = False
+        while not txt.stop_animation:
+            for char in chars:
+                sys.stdout.write('\r' + prefix + ' ' + char + ' ')
+                sys.stdout.flush()
+                time.sleep(0.5)
+
+    def stop_spinner(thread, text=None):
+        if txt.activate_print == False:
+            return None
+        if not text:
+            text = 50 * ' '
+        sys.stdout.write(f'\r{text}\n')
+        sys.stdout.flush()
+        txt.stop_animation = True
+        thread.join()

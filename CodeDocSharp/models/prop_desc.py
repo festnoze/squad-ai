@@ -29,6 +29,9 @@ class PropertyDesc(BaseDesc):
     def to_json(self):
         return json.dumps(self.__dict__, cls=PropDescEncoder)
 
+class PropertyDescPydantic:
+    pass
+
 class PropDescEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, PropertyDesc):

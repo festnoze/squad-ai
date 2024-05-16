@@ -6,12 +6,6 @@ namespace Studi.Api.Lms.Messenger.Application.Services.MessageService;
 
 public interface IMessageService
 {
-    /// <summary>
-    /// Gets the date of the last message in a conversation excluding messages from a specific user.
-    /// </summary>
-    /// <param name="conversationId">The ID of the conversation.</param>
-    /// <param name="userId">The ID of the user to exclude messages from.</param>
-    /// <returns>The date of the last message or null if no message found.</returns>
     Task<DateTime?> GetLastMessageDateByConversationIdExceptUserIdAsync(int conversationId, int userId);
 
     /// <summary>
@@ -20,17 +14,10 @@ public interface IMessageService
     /// <param name="filtersCompositions">Optional filters to apply.</param>
     /// <returns>The count of messages.</returns>
     Task<int> CountMessagesAsync(int userId, IEnumerable<int> schoolsIds, IUntypedListingSelector listingSelector);
-
-    /// <summary>
-    /// Counts the messages in a conversation, optionally applying filters.
-    /// </summary>
-    /// <param name="conversationId">The ID of the conversation.</param>
-    /// <param name="listingSelector">Optional filters to apply.</param>
-    /// <returns>The count of messages.</returns>
     Task<int> CountFilteredMessagesByConversationIdAsync(int conversationId, IUntypedListingSelector? listingSelector = null);
 
     /// <summary>
-    /// Retrieves the count of unread messages for a user within a school.
+    /// 
     /// </summary>
     /// <param name="userId">The ID of the user.</param>
     /// <param name="schoolId">The ID of the school.</param>

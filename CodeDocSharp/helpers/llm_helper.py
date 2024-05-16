@@ -160,19 +160,35 @@ class Llm:
         agent_executor = AgentExecutor(agent=agent, tools=tools)
         res = agent_executor.invoke({"input": input})
         return res["output"]
-    
+        
+    def invoke_method_mesuring_openai_tokens_consumption(method_handler, *args, **kwargs):
+        """
+        Invokes the provided method handler within an OpenAI callback context 
+        and displays the token consumption.
+        
+        Args:
+            method_handler (callable): The method to be executed.
+            *args: Variable length argument list for the method_handler.
+            **kwargs: Arbitrary keyword arguments for the method_handler.
+        """
+        with get_openai_callback() as openai_callback:
+            method_handler(*args, **kwargs)
+            Llm.display_tokens_consumption(openai_callback)
+
     def get_eur_usd_rate():
         ticker = yf.Ticker("EURUSD=X")
         data = ticker.history(period="1d")
         rate = data["Close"].iloc[-1]
         return rate
-
-    def display_tokens_consumtion(cb: OpenAICallbackHandler):
+    
+    def display_tokens_consumption(cb: OpenAICallbackHandler):
         max_len = max(len(str(cb.completion_tokens)), len(str(cb.prompt_tokens)), len(str(cb.total_tokens)))
-        print(f"Prompt Tokens:       {cb.prompt_tokens}")
-        print(f"Completion Tokens: + {cb.completion_tokens}")    
-        print(f"                     " + "-" * max_len)
-        print(f"Total Tokens:        {cb.total_tokens}")
-        print(f"Cost:                {cb.total_cost / Llm.get_eur_usd_rate():.3f}€ ({cb.total_cost:.3f}$)")
-        print(f"(Cost by 1M token:   {(1000000 * cb.total_cost / cb.total_tokens):.3f}$)") 
+        print("Prompt consumption:")
+        print(f"Prompt:       {cb.prompt_tokens}")
+        print(f"Completion: + {cb.completion_tokens}")    
+        print(f"              " + "-" * max_len)
+        print(f"Total:        {cb.total_tokens}")
+        print(f"Cost:       {cb.total_cost / Llm.get_eur_usd_rate():.3f}€ ({cb.total_cost:.3f}$)")
+        if cb.total_tokens > 0:
+            print(f"(Cost by 1M tokens: {(1000000 * cb.total_cost / cb.total_tokens):.3f}$)") 
         

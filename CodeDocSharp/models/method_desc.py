@@ -60,7 +60,7 @@ class MethodDesc(BaseDesc):
         return self.has_attributs and len(self.attributs) > 0
 
     @staticmethod
-    def factory_from_code(code: str, start_index: int, previous_chunk:str, class_name: str) -> 'MethodDesc':
+    def factory_for_class_code(code: str, start_index: int, previous_chunk:str, class_name: str) -> 'MethodDesc':
         #retrieve summary and attributs from previous chunk
         previous_chunk_last_double_newline_index = previous_chunk.rfind('\n\n')
         previous_chunk_last_brace_index = previous_chunk.rfind('}')
@@ -72,7 +72,7 @@ class MethodDesc(BaseDesc):
             summary_lines = [line.strip().replace('///', '').strip() for line in previous_chunk_last_part.split('\n') if '///' in line]
         
         # get method infos from main code chunk
-        method_sign = code.split(')')[0]
+        method_sign = code.split(')')[0] + ')'
         is_ctor = class_name == method_sign.split('(')[0].strip()
         is_task = 'Task<' in method_sign
         is_async = 'async ' in method_sign
@@ -98,7 +98,46 @@ class MethodDesc(BaseDesc):
             method_return_type = None
 
         method_params = MethodDesc.get_method_parameters(method_sign)
-        method_code = code.split('{')[1].rsplit('}', 1)[0]
+        if '{' and '}' in code:
+            method_code = code.split('{')[1].rsplit('}', 1)[0].strip()
+        return MethodDesc(start_index, summary_lines, attributs, method_name, method_return_type, method_params, method_code, is_async, is_task, is_ctor, is_static, is_abstract, is_override, is_virtual, is_sealed, is_new)
+    
+    def factory_for_interface_code(code: str, start_index: int, interface_name: str) -> 'MethodDesc':
+        summary_lines: list[str] = []
+        attributs: list[str] = []
+        # if previous_chunk_last_double_newline_index > previous_chunk_last_brace_index:
+        #     previous_chunk_last_part = previous_chunk[previous_chunk_last_double_newline_index:]
+        #     attributs = MethodDesc.detect_attributes(previous_chunk_last_part)
+        #     summary_lines = [line.strip().replace('///', '').strip() for line in previous_chunk_last_part.split('\n') if '///' in line]
+        
+        # get method infos from main code chunk
+        method_sign = code.split(')')[0] + ')'
+        is_ctor = False
+        is_task = 'Task<' in method_sign
+        is_async = False
+        is_override = 'override ' in method_sign
+        is_new = 'new ' in method_sign
+        is_static = 'static ' in method_sign
+        is_abstract = 'abstract ' in method_sign
+        is_virtual = 'virtual ' in method_sign
+        is_sealed = 'sealed ' in method_sign
+
+        if not is_ctor:
+            if is_async or is_override or is_new or is_static or is_abstract or is_virtual or is_sealed:
+                method_sign = method_sign.replace('override ', '').replace('new ', '').replace('async ','').replace('static ','').replace('abstract ','').replace('virtual ','').replace('sealed ','').strip() 
+
+            if is_task:
+                method_return_type = method_sign.split(' ')[0].replace('Task<', '').rsplit('>', 1)[0]
+            else:
+                method_return_type = method_sign.split(' ')[0]
+            method_name = method_sign.split(' ')[1].split('(')[0]
+
+        method_params = MethodDesc.get_method_parameters(method_sign)
+        if '{' and '}' in code:
+            method_code = code.split('{')[1].rsplit('}', 1)[0].strip()
+        else:
+            method_code = ''
+            
         return MethodDesc(start_index, summary_lines, attributs, method_name, method_return_type, method_params, method_code, is_async, is_task, is_ctor, is_static, is_abstract, is_override, is_virtual, is_sealed, is_new)
     
     def has_return_type(self) -> bool:
@@ -124,6 +163,9 @@ class MethodDesc(BaseDesc):
     
     def to_json(self):
         return json.dumps(self.__dict__, cls=MethodDescEncoder)
+
+class MethodDescPydantic:
+    pass
 
 class MethodDescEncoder(json.JSONEncoder):
     def default(self, obj):

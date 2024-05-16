@@ -1,10 +1,15 @@
 
 from groq import Groq
+from langchains.langchain_adapter_type import LangChainAdapterType
 from models.llm_info import LlmInfo
 
 class GroqHelper:
     @staticmethod
     def test_query(llm_info: LlmInfo):
+        if llm_info.type != LangChainAdapterType.Groq:
+            print("This method is only for Groq models.")
+            return
+        
         groq = Groq(api_key=llm_info.api_key)
         chat_completion = groq.chat.completions.create(
             messages=[

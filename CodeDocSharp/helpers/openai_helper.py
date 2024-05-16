@@ -158,14 +158,7 @@ class ai:
         openai.beta.assistants.delete(assistant_id= assistant.assistant.id)
         openai.beta.threads.delete(thread_id= assistant.thread.id)
 
-    def delete_all_assistants():
-        assistants_ids_str = file.get_as_str("assistants_to_delete.txt")
-        assistants_ids_str_split = assistants_ids_str.split('\n')
-        assistants_ids_list = [line.strip() for line in assistants_ids_str_split if line.strip()] # remove empty lines
-        for assistant_id in assistants_ids_list:
-            openai.beta.assistants.delete(assistant_id= assistant_id)
-
-    def print_models():
+    def print_openai_models():
         models = openai.models.list()
         for model in models:
             print(model.id)

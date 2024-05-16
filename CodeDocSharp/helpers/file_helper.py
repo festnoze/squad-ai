@@ -3,7 +3,7 @@ import shutil
 import glob
 
 class file:
-    def get_as_str(filename):
+    def get_as_str(filepath):
         """
         Get the specified file content as string
 
@@ -11,17 +11,17 @@ class file:
             filename (str): the name of the file in the current directory
         """
         try:
-            with open(f"inputs\\{filename}", 'r', encoding='utf-8') as file_reader:
+            with open(f"{filepath}", 'r', encoding='utf-8') as file_reader:
                 content = file_reader.read()
                 return content
         except FileNotFoundError:
-            print(f"file: {filename} cannot be found.")
+            print(f"file: {filepath} cannot be found.")
             return None
         except Exception as e:
-            print(f"Error happends while reading file: {filename}: {e}")
+            print(f"Error happends while reading file: {filepath}: {e}")
             return None
         
-    def write_file(content, path, filename):
+    def write_file(content, filepath):
         """
         Writes content to a file specified by path and filename.
 
@@ -31,15 +31,11 @@ class file:
             filename (str): The name of the file, including its extension.
         """
         # Ensure the directory exists
-        os.makedirs(path, exist_ok=True)
-        
-        # Construct the full path
-        full_path = os.path.join(path, filename)
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
         
         # Write the content to the file
-        with open(full_path, 'w', encoding='utf-8') as file:
+        with open(filepath, 'w', encoding='utf-8') as file:
             file.write(content)
-
 
     def delete_all_files_with_extension(extension, folder_path):
         files_to_delete = glob.glob(os.path.join(folder_path, f"{extension}"))
@@ -68,3 +64,17 @@ class file:
                         shutil.rmtree(file_path)
                 except Exception as e:
                     print(f'{file_path} deletion failed: {e}')
+
+    def get_folder_all_files_and_subfolders(path):
+        file_list = []
+        dir_list = []
+        
+        if not os.path.exists(path):
+            return file_list, dir_list
+        if os.path.isfile(path):
+            return file_list, dir_list
+        
+        for root, dirs, files in os.walk(path):
+            for file in files: file_list.append(os.path.join(root, file))
+            for dir in dirs: dir_list.append(os.path.join(root, dir))
+        return file_list, dir_list
