@@ -63,7 +63,7 @@ class SummaryGenerationService:
 
     @staticmethod
     def generate_summaries_for_all_classes_methods(llm, known_structures):
-        t = txt.print_with_spinner(f"Generate all summaries:")
+        t = txt.print_with_spinner(f"Ongoing parallel summaries generation for {SummaryGenerationService.methods_count(known_structures)} methods in {len(known_structures)} code files:")
         
         for class_struct in [s for s in known_structures if s.struct_type == StructureType.Class]:
             SummaryGenerationService.generate_methods_summaries_for_class(llm, class_struct, True)
@@ -72,6 +72,14 @@ class SummaryGenerationService:
             SummaryGenerationService.apply_interface_generated_summaries_of_classes(interface_struct, known_structures)
 
         txt.stop_spinner_replace_text("Summaries generated successfully.")
+
+    @staticmethod
+    def methods_count(known_structures: list[StructureDesc]):
+        count = 0
+        for struct in known_structures:
+            if struct.struct_type == StructureType.Class:
+                count += len(struct.methods)
+        return count
 
     @staticmethod
     def apply_interface_generated_summaries_of_classes(interface_structure: StructureDesc, known_structures: list[StructureDesc]):

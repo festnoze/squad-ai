@@ -20,10 +20,21 @@ class txt:
     def single_line(text: str) -> str:
         return ' '.join([line.strip() for line in text.split('\n')])
         
-    def display_elapsed(start_time, end_time):
-        elapsed_minutes = int((end_time - start_time) / 60)
-        elapsed_seconds = int((end_time - start_time) % 60)
-        print(f">> {elapsed_minutes}m {elapsed_seconds}s elapsed")
+    def get_elapsed_str(start_time, end_time):
+        if not start_time or not end_time:
+            return ''
+        elapsed_sec = int(end_time - start_time)
+        elapsed_minutes = int(elapsed_sec / 60)
+        elapsed_seconds = int(elapsed_sec % 60)
+
+        if elapsed_sec == 0:
+            return ''
+        
+        elapsed_str = ''
+        if elapsed_minutes != 0:
+            elapsed_str += f"{elapsed_minutes}m "
+        elapsed_str +=  f"{elapsed_seconds}s"
+        return '(' + elapsed_str + ')'
 
     def get_prop_or_key(object, prop_to_find):
         if hasattr(object, prop_to_find):
@@ -47,11 +58,13 @@ class txt:
             print(text)
 
     waiting_spinner_thread = None
+    start_time: float = None
     @staticmethod
     def print_with_spinner(text: str) -> Thread:
         if not txt.activate_print:
             return None
-        
+        txt.start_time = time.time()
+
         # Ensure only one spinner thread is running at a time
         if txt.waiting_spinner_thread is not None and txt.waiting_spinner_thread.is_alive():
             txt.stop_spinner()
@@ -74,7 +87,7 @@ class txt:
                 sys.stdout.write('\r' + prefix + ' ' + char + ' ')
                 sys.stdout.flush()
                 time.sleep(0.1)
-                
+
     @staticmethod
     def stop_spinner():
         txt.stop_animation = True
@@ -86,13 +99,19 @@ class txt:
     def stop_spinner_replace_text(text=None):
         if not txt.activate_print:
             return None
-
-        empty = 80 * ' '
         
+        empty = 120 * ' '
+        
+
         if not text:
             text = empty
             sys.stdout.write(f'\r{empty}')
         else:
-            text = '✓ ' + text
+            elapsed_str = ''
+            if txt.start_time:
+                elapsed_str += txt.get_elapsed_str(txt.start_time, time.time())                
+                txt.start_time = None
+
+            text = f"✓ {text} {elapsed_str}" 
             sys.stdout.write(f'\r{empty}')
             sys.stdout.write(f'\r{text}\r\n')
