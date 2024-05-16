@@ -2,7 +2,10 @@ import os
 import shutil
 import glob
 
+from helpers.txt_helper import txt
+
 class file:
+    @staticmethod
     def get_as_str(filepath):
         """
         Get the specified file content as string
@@ -21,6 +24,7 @@ class file:
             print(f"Error happends while reading file: {filepath}: {e}")
             return None
         
+    @staticmethod
     def write_file(content, filepath):
         """
         Writes content to a file specified by path and filename.
@@ -35,25 +39,38 @@ class file:
         
         # Write the content to the file
         with open(filepath, 'w', encoding='utf-8') as file:
-            file.write(content)
+            file.write(content)    
+    
+    @staticmethod
+    def save_contents_within_files(paths_and_new_codes: list):
+        csharp_files_count = len(paths_and_new_codes)
+        t = txt.print_with_spinner(f"Saving and override the {csharp_files_count} files:")
+        for path_and_code in paths_and_new_codes:
+            file.write_file(path_and_code.file_path, path_and_code.code)
+        txt.stop_spinner_replace_text(t, f"{csharp_files_count} files overrided and saved successfully.")
 
+    @staticmethod
     def delete_all_files_with_extension(extension, folder_path):
         files_to_delete = glob.glob(os.path.join(folder_path, f"{extension}"))
         for file_to_delete in files_to_delete:
             os.remove(file_to_delete)
     
+    @staticmethod
     def delete_file(path_and_name):
         if file.file_exists(path_and_name):
             os.remove(path_and_name)
     
+    @staticmethod
     def file_exists(filepath):
         return os.path.exists(filepath)
     
+    @staticmethod
     def delete_folder(folder_path):
         if os.path.exists(folder_path):
             shutil.rmtree(folder_path) # Delete the folder and all its contents
 
-    def delete_folder_contents(folder_path):
+    @staticmethod
+    def delete_files_in_folder(folder_path):
         if os.path.exists(folder_path):
             for filename in os.listdir(folder_path):
                 file_path = os.path.join(folder_path, filename)
@@ -64,17 +81,24 @@ class file:
                         shutil.rmtree(file_path)
                 except Exception as e:
                     print(f'{file_path} deletion failed: {e}')
-
-    def get_folder_all_files_and_subfolders(path):
-        file_list = []
-        dir_list = []
-        
+    
+    @staticmethod
+    def get_all_folder_and_subfolders_files(path, extension=None):
         if not os.path.exists(path):
-            return file_list, dir_list
+            return []
         if os.path.isfile(path):
-            return file_list, dir_list
-        
+            return [path]
+        file_list = []  
         for root, dirs, files in os.walk(path):
-            for file in files: file_list.append(os.path.join(root, file))
-            for dir in dirs: dir_list.append(os.path.join(root, dir))
-        return file_list, dir_list
+            for file in files:
+                if extension is None or file.endswith(extension):
+                    file_list.append(os.path.join(root, file))
+            for dir in dirs:
+                file_list.append(file.get_all_folder_and_subfolders_files(dir, extension))
+        return file_list
+    
+    def copy_folder_files_to_folder(source_folder, destination_folder):
+        if not os.path.exists(destination_folder):
+            os.makedirs(destination_folder)
+        for filename in os.listdir(source_folder):
+            shutil.copy(os.path.join(source_folder, filename), destination_folder)

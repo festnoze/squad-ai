@@ -18,6 +18,20 @@ import os
 class SummaryGenerationService:
     @staticmethod
     def generate_summaries_for_csharp_files_and_save(file_path: str, llm_infos: LlmInfo):
+       
+        llm = SummaryGenerationService.get_llm(llm_infos)
+        paths_and_codes = SummaryGenerationService.load_csharp_files(file_path)
+        SummaryGenerationService.remove_existing_summaries_from_all_files(paths_and_codes)
+        structures_descriptions = SummaryGenerationService.extract_code_structures_from_code_files(llm, paths_and_codes)
+        SummaryGenerationService.generate_summaries_for_all_methods_from_code_files(llm, structures_descriptions)
+        paths_and_new_codes = SummaryGenerationService.including_generated_summaries_to_codes(paths_and_codes, structures_descriptions)
+        file.save_contents_within_files(paths_and_new_codes)
+
+        txt.print("\nDone.")
+        txt.print("---------------------------")
+
+    @staticmethod
+    def get_llm(llm_infos):
         t = txt.print_with_spinner(f"Loading LLM model ...")
         llm = LangChainFactory.create_llm(
             adapter_type= llm_infos.type,
@@ -25,43 +39,58 @@ class SummaryGenerationService:
             timeout_seconds= llm_infos.timeout,
             temperature= 1.0,
             api_key= llm_infos.api_key)
-        txt.stop_spinner(t, "LLM model loaded successfully.")
+        txt.stop_spinner_replace_text("LLM model loaded successfully.")
+        return llm
 
-        # Load C# file code
+    
+    @staticmethod
+    def load_csharp_files(file_path):
         t = txt.print_with_spinner(f"Loading C# files ...")
-        files, dirs = file.get_folder_all_files_and_subfolders(file_path)
+        paths_and_codes = {}
+        files = file.get_all_folder_and_subfolders_files(file_path, '.cs')
         for file_path in files:
-            if file_path.endswith('.cs'):
-                code = file.get_as_str(file_path)
-                txt.stop_spinner(t, "Files loaded successfully.")
-
-            # Remove existing summaries from code
+            paths_and_codes[file_path] = file.get_as_str(file_path)
+        txt.stop_spinner_replace_text(f"{len(paths_and_codes)} C# files loaded successfully.")
+        return paths_and_codes
+        
+    @staticmethod
+    def remove_existing_summaries_from_all_files(paths_and_codes):
+        for file_path, code in paths_and_codes.items():
             lines = code.splitlines()
             lines = [line for line in lines if not line.strip().startswith('///')]
-            code = '\n'.join(lines)
+            paths_and_codes[file_path] = '\n'.join(lines)
 
-            # Extract code structure from C# file
-            t = txt.print_with_spinner(f"Parsing code structure:")
-            class_description: StructureDesc = CSharpCodeStructureAnalyser.get_code_structure(llm, file_path, code)
-            txt.stop_spinner(t, "Files code parsed successfully.")
+    @staticmethod
+    def extract_code_structures_from_code_files(llm, paths_and_codes):
+        csharp_files_count = len(paths_and_codes)
+        t = txt.print_with_spinner(f"Parsing all {csharp_files_count} files for code structure:")
+        structures_descriptions = []
+        for file_path, code in paths_and_codes.items():
+            structure_description: StructureDesc = CSharpCodeStructureAnalyser.get_code_structure(llm, file_path, code)
+            structures_descriptions.append(structure_description)
+        txt.stop_spinner_replace_text(f"{csharp_files_count} files parsed successfully for code.")
+        return structures_descriptions
 
-            # Generate summaries for all methods for the current class
-            t = txt.print_with_spinner(f"Generate all summaries:")
-            SummaryGenerationService.generate_all_methods_summaries(llm, class_description, True)
-            txt.stop_spinner(t, "Summaries generated successfully.")
+    @staticmethod
+    def generate_summaries_for_all_methods_from_code_files(llm, structures_descriptions):
+        t = txt.print_with_spinner(f"Generate all summaries:")
+        for structure_description in structures_descriptions:
+            SummaryGenerationService.generate_all_methods_summaries(llm, structure_description, True)
+        txt.stop_spinner_replace_text("Summaries generated successfully.")
 
-            # Including generated summaries to class code
-            t = txt.print_with_spinner(f"Include summaries into existing code:")
-            new_code = SummaryGenerationService.generate_code_with_generated_summaries_from_initial_code(class_description, code)
-            txt.stop_spinner(t, "Summaries successfully included in initial code.")
-
-            # Save file with modified code
-            t = txt.print_with_spinner(f"Saving files:")
-            new_file_path = file_path.replace('.cs', '_modif.cs')
-            file.write_file(new_code, new_file_path)
-            txt.stop_spinner(t, "Files overrided and saved successfully.")
-            txt.print("\nDone.")
-            txt.print("---------------------------")
+    @staticmethod
+    def including_generated_summaries_to_codes(paths_and_codes, structures_descriptions):
+        t = txt.print_with_spinner(f"Include summaries into the existing {len(paths_and_codes)} code files:")
+        paths_and_codes_list = [(path, code) for path, code in paths_and_codes.items()]
+        paths_and_new_codes = {}
+        
+        for structure_description, (file_path, code) in zip(structures_descriptions, paths_and_codes_list):
+            if structure_description.file_path != file_path: raise Exception("Mismatch between lists")
+            new_code = SummaryGenerationService.generate_code_with_generated_summaries_from_initial_code(structure_description, code)
+            paths_and_new_codes[file_path] = new_code
+            
+        txt.stop_spinner_replace_text("Summaries successfully included in initial files code.")
+        return paths_and_new_codes
 
     @staticmethod
     def generate_code_with_generated_summaries_from_initial_code(class_description, initial_code: str):
