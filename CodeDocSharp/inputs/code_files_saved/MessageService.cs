@@ -79,7 +79,7 @@ public class MessageService : IMessageService
     }
     
 	[Obsolete("This method is deprecated, use CountMessagesAsync instead.")]
-    [Obsolete("This method is soon deprecated, use CountMessagesAsync instead.")]
+    [Obsolete("GetUnreadMessageCountByUserIdAndSchoolIdAsync")]
     public async Task<IUnreadMessageCountAto> GetUnreadMessageCountByUserIdAndSchoolIdAsync(int userId, int schoolId)
     {
         var unreadMessageCountByConversation = await _messageRepository.GetUnreadMessagesByUserIdAndSchoolIdAsync(userId, schoolId);

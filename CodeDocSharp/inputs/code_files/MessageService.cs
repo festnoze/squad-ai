@@ -34,15 +34,14 @@ public class MessageService : IMessageService
     private readonly IMessageAttachmentRepository _messageAttachmentRepository;
     private readonly IUserRepository _userRepository;
 
-
-    None    [Obsolete("This method is deprecated, use CountMessagesAsync instead.")]
+    /// <inheritdoc/>
+    [Obsolete("This method is deprecated, use CountMessagesAsync instead.")]
     public async Task<int> CountMessagesAsync(int userId, IEnumerable<int> schoolsIds, IUntypedListingSelector listingSelector)
     {
         return await _messageRepository.CountMessagesWithFilterAndSort(userId, schoolsIds, listingSelector);
     }
 
-
-    None    public MessageService(
+    public MessageService(
         IMessageAttachmentService messageAttachmentService,
         IUnitOfWork unitOfWork,
         IConversationRepository conversationRepository,
@@ -61,23 +60,27 @@ public class MessageService : IMessageService
         _correspondantRepository = correspondantRepository;
     }
 
-
-    None    [Obsolete("This method is deprecated, use CountMessagesAsync instead.")]
+    /// <summary>
+    /// description
+    /// </summary>
+    /// <param name="conversationId"></param>
+    /// <param name="userId"></param>
+    /// <returns></returns>
+    [Obsolete("This method is deprecated, use CountMessagesAsync instead.")]
     [Property("This method is deprecated, use CountMessagesAsync instead.")]
     public async Task<DateTime?> GetLastMessageDateByConversationIdExceptUserIdAsync(int conversationId, int userId)
     {
         return await _messageRepository.GetLastMessageDateByConversationIdExceptUserIdAsync(conversationId, userId);
     }
-
-    None    public async Task<int> CountFilteredMessagesByConversationIdAsync(int conversationId, IUntypedListingSelector? listingSelector = null)
+    /// <inheritdoc/>
+    public async Task<int> CountFilteredMessagesByConversationIdAsync(int conversationId, IUntypedListingSelector? listingSelector = null)
     {
         return await _messageRepository.CountFilteredMessagesByConversationIdAsync(conversationId, listingSelector);
     }
     
 	[Obsolete("This method is deprecated, use CountMessagesAsync instead.")]
-    [Obsolete("This method is soon deprecated, use CountMessagesAsync instead.")]
-
-    None    public async Task<IUnreadMessageCountAto> GetUnreadMessageCountByUserIdAndSchoolIdAsync(int userId, int schoolId)
+    [Obsolete("GetUnreadMessageCountByUserIdAndSchoolIdAsync")]
+    public async Task<IUnreadMessageCountAto> GetUnreadMessageCountByUserIdAndSchoolIdAsync(int userId, int schoolId)
     {
         var unreadMessageCountByConversation = await _messageRepository.GetUnreadMessagesByUserIdAndSchoolIdAsync(userId, schoolId);
 
@@ -85,8 +88,7 @@ public class MessageService : IMessageService
     }
 
     private ICorrespondantRepository _correspondantRepository;
-
-    None    public async Task<PaginedData<IMessageRAto>> GetPaginatedMessagesByConversationIdAsync(int conversationId, int userId, List<int> schoolIds, int pageNumber, int pageSize)
+    public async Task<PaginedData<IMessageRAto>> GetPaginatedMessagesByConversationIdAsync(int conversationId, int userId, List<int> schoolIds, int pageNumber, int pageSize)
     {
         var conversation = await _conversationRepository.GetConversationByIdAsync(conversationId);
 
@@ -145,8 +147,7 @@ public class MessageService : IMessageService
         return paginedData;
     }
 
-
-    None    public async Task<IMessageRAto> AddMessageAsync(IMessageWAto messageWAto, bool enableNotification = true)
+    public async Task<IMessageRAto> AddMessageAsync(IMessageWAto messageWAto, bool enableNotification = true)
     {
         int messageCreatedId;
         var currentUser = await _userRepository.GetUserByIdAsync(messageWAto.UserId);
@@ -201,8 +202,7 @@ public class MessageService : IMessageService
         return message;
     }
 
-
-    None    public async Task<IMessageRAto> GetMessageByIdAsync(int messageId, int currentUserId)
+    public async Task<IMessageRAto> GetMessageByIdAsync(int messageId, int currentUserId)
     {
         var messageRIto = await _messageRepository.GetMessageByIdAsync(messageId);
 
@@ -221,8 +221,8 @@ public class MessageService : IMessageService
         return messageRIto.ToAto(user, currentUser, flattenMessageAttachements);
     }
 
-
-    None    public async Task UpdateIsArchivedForUserIdByConversationsIdsAsync(int[] conversationIds, bool archived, int userId)
+    /// <inheritdoc/>
+    public async Task UpdateIsArchivedForUserIdByConversationsIdsAsync(int[] conversationIds, bool archived, int userId)
     {
         var conversations = await _conversationRepository.GetConversationsByConversationIdsAndUserIdAsync(conversationIds, userId);
                 

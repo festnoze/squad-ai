@@ -9,69 +9,91 @@ namespace Studi.Api.Lms.User.Application.Interfaces
     public interface IUserProfileQueryingService
     {
 
-    None
+        /// <summary>
+        /// Get payment reliability
+        /// </summary>
+        /// <param name="userId"></param>
+        /// <returns></returns>
         Task<string> GetPaymentReliabilityAsync(int userId);
 
-    None
         Task<UserModel> GetUserWithPersonalInfosAsync(int userId);
 
-    None
         Task<UserModel> GetUserWithBasicInfoAsync(int userId, int schoolId, bool loadSchoolOptions = false);
 
-    None
         Task<UserModel> GetUserWithPublicInfoAsync(int userId, int schoolId);
 
-    None
         Task<UserSchoolOptionsModel> GetUserSchoolOptions(int userId, int schoolId);
 
-    None
         Task<IEnumerable<ProfessionalExperienceModel>> GetUserProfessionalExperiencesAsync(int userId);
 
-    None
         Task<DateTime?> GetUserProfileReviewDateAsync(int userId);
 
-    None
         Task<StudyModel?> GetUserLastStudyInfosAsync(int userId);
 
-    None
         Task<IEnumerable<ContractTypeIto>> GetContractTypesListForProfessionalExperiencesAsync();
+        Task<IEnumerable<TrainingModel>> GetUserTrainingsAsync(int userId, int schoolId);
 
-    None        Task<IEnumerable<TrainingModel>> GetUserTrainingsAsync(int userId, int schoolId);
-
-    None
         Task<UserModel> GetUserNotificationsByIdAndSchoolIdAsync(int userId, int schoolId);
 
-    None
         Task<string> GetUserTimeZoneAsync(int userId);
 
-    None
         Task<UserConfigInfosIto?> GetUserConfigInfosAsync(int userId, int schoolId);
 
-    None
         Task<LastSessionInfosModel> GetLastSessionInfosAsync(int userId, int schoolId);
 
-    None
         Task<DateTime?> GetUserFirstConnectionDateAsync(int userId);
 
-    None
+        /// <summary>
+        /// Get avatar url
+        /// </summary>
+        /// <param name="userId">User Id</param>
+        /// <returns></returns>
         Task<string> GetAvatarUrlAsync(int userId);
 
-    None
+        /// <summary>
+        /// Exist user by email
+        /// </summary>
+        /// <param name="email">Email</param>
+        /// <returns></returns>
         Task<bool> ExistUserByEmailAsync(string email);
 
-    None
+        /// <summary>
+        /// Exist user by pseudo
+        /// </summary>
+        /// <param name="pseudo">Pseudo</param>
+        /// <returns></returns>
         Task<bool> ExistUserByPseudoAsync(string pseudo);
 
-    None
+        /// <summary>
+        /// Generate pseudo
+        /// </summary>
+        /// <param name="firstName">First name</param>
+        /// <param name="lastName">Last name</param>
+        /// <returns></returns>
         Task<string> GeneratePseudoAsync(string firstName, string lastName);
 
-    None
+        /// <summary>
+        /// Count profiles
+        /// </summary>
+        /// <param name="filtersCompositions">Filters compositions</param>
+        /// <returns></returns>
         Task<int> CountProfilesAsync(IEnumerable<IFiltersComposition<object>>? filtersCompositions = null);
 
-    None
+        /// <summary>
+        /// Get suer profiles
+        /// </summary>
+        /// <param name="skip">Skip</param>
+        /// <param name="take">Take</param>
+        /// <param name="filtersCompositions">Filters compositions</param>
+        /// <param name="sort">Sort</param>
+        /// <returns></returns>
         Task<IEnumerable<IUserProfileRAto>> GetUserProfilesAsync(int skip, int take, IEnumerable<IFiltersComposition<object>>? filtersCompositions = null, ISort? sort = null);
 
-    None
+        /// <summary>
+        /// Get user profile
+        /// </summary>
+        /// <param name="userId">User id</param>
+        /// <returns></returns>
         Task<IUserProfileRAto> GetUserProfileAsync(int userId);
     }
 }

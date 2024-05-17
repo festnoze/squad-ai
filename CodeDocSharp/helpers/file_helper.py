@@ -103,3 +103,13 @@ class file:
             os.makedirs(destination_folder)
         for filename in os.listdir(source_folder):
             shutil.copy(os.path.join(source_folder, filename), destination_folder)
+    
+    @staticmethod
+    def load_csharp_files(file_path):
+        t = txt.print_with_spinner(f"Loading C# files ...")
+        paths_and_codes = {}
+        files = file.get_all_folder_and_subfolders_files(file_path, '.cs')
+        for file_path in files:
+            paths_and_codes[file_path] = file.get_as_str(file_path)
+        txt.stop_spinner_replace_text(f"{len(paths_and_codes)} C# files loaded successfully.")
+        return paths_and_codes

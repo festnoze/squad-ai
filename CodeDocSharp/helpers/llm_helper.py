@@ -12,6 +12,8 @@ from langchain_community.callbacks import get_openai_callback, OpenAICallbackHan
 import inspect
 from typing import TypeVar, Generic, Any
 
+from helpers.txt_helper import txt
+
 class Llm:
     @staticmethod
     def get_llm_answer_content(response: any) -> str:
@@ -122,18 +124,21 @@ class Llm:
     @staticmethod
     def invoke_parallel_chains(inputs: dict = None, *chains: Chain) -> list[str]:        
         # Combine chains for parallel execution
-        combined = RunnableParallel(**{f"invoke_{i}": chain for i, chain in enumerate(chains)})
+        combined = RunnableParallel(**{f"invoke_{i}": chain.with_fallbacks([chain]) for i, chain in enumerate(chains)})
 
         # Invoke the combined chain with specific inputs for each chain if specified
         if not inputs:
             inputs = {"input": ""}
-        responses = combined.invoke(inputs)
+        responses = combined.with_error_handler(Llm.handle_parallel_invoke_error).invoke(inputs)
 
         # Retrieve and print the output from each chain
         responses_list = [responses[key] for key in responses.keys()]
         answers = [Llm.get_llm_answer_content(response) for response in responses_list]
         return answers
     
+    def handle_error(e):
+        txt.print(f"Error occurred: {str(e)}. Using fallback.")
+
     @staticmethod
     def invoke_llm_with_tools(llm: BaseChatModel, tools: list[any], input: str) -> str:
         #prompt = hub.pull("hwchase17/openai-tools-agent")

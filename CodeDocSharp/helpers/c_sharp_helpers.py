@@ -1,5 +1,12 @@
-
 from models.params_doc import MethodParametersDocumentation
+
+class CSharpHelper:    
+    @staticmethod
+    def remove_existing_summaries_from_all_files(paths_and_codes: dict):
+        for file_path, code in paths_and_codes.items():
+            lines = code.splitlines()
+            lines = [line for line in lines if not line.strip().startswith('///')]
+            paths_and_codes[file_path] = '\n'.join(lines)
     
 # class CSharpXMLDocumentationInput(BaseModel):
 #     summary: str = Field(description="A string representing the summary section.")
@@ -46,12 +53,11 @@ class CSharpXMLDocumentation:
             pass
         return doc_str
     
-    @staticmethod
-    def get_xml(summary: str, params: MethodParametersDocumentation, returns: str = None, example: str = None):
+    def to_xml(self):
         """
         Create a C# style XML documentation string from the provided parameters.
         """        
-        return str(CSharpXMLDocumentation(summary, params, returns, example))
+        return str(self)
 
 # class CSharpXMLDocumentationFactory:
 #     @tool

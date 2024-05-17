@@ -2,10 +2,25 @@ from langchain_openai import ChatOpenAI
 from langchain_community.chat_models import ChatOllama
 from langchain_groq import ChatGroq
 from langchain_core.language_models import BaseChatModel
+from helpers.txt_helper import txt
 from langchains.langchain_adapter_type import LangChainAdapterType
 import uuid
 
+from models.llm_info import LlmInfo
+
 class LangChainFactory():
+    @staticmethod
+    def create_llm_from_info(llm_infos: LlmInfo, print_loading: bool = True):
+        txt.activate_print = print_loading
+        t = txt.print_with_spinner(f"Loading LLM model ...")
+        llm = LangChainFactory.create_llm(
+            adapter_type= llm_infos.type,
+            llm_model_name= llm_infos.model,
+            timeout_seconds= llm_infos.timeout,
+            temperature= 1.0,
+            api_key= llm_infos.api_key)
+        txt.stop_spinner_replace_text("LLM model loaded successfully.")
+        return llm
 
     @staticmethod
     def create_llm(adapter_type: LangChainAdapterType, llm_model_name: str, timeout_seconds: int = 50, temperature: float = 0.1, api_key: str = None) -> BaseChatModel:

@@ -27,8 +27,7 @@ public class UserProfileQueryingService : IUserProfileQueryingService
     private readonly ICivilityService _civilityService;
     private readonly IUserRepository _userRepository;
 
-
-    None    public UserProfileQueryingService(IMediator mediator, ICustomWebResourceService customWebResource, ICivilityService civilityService, IUserRepository userRepository)
+    public UserProfileQueryingService(IMediator mediator, ICustomWebResourceService customWebResource, ICivilityService civilityService, IUserRepository userRepository)
     {
         _mediator = mediator ?? throw new ArgumentNullException();
         _customWebResource = customWebResource ?? throw new ArgumentNullException();
@@ -36,16 +35,14 @@ public class UserProfileQueryingService : IUserProfileQueryingService
         _userRepository = userRepository;
     }
 
-
-    None    public async Task<string?> GetPaymentReliabilityAsync(int userId)
+    public async Task<string?> GetPaymentReliabilityAsync(int userId)
     {
         Guard.Against.NegativeOrZero(userId, ErrorCode.Api.Lms.User.DataValidation.Common.UserId.NegativeOrZero);
         return await _userRepository.GetPaymentReliabilityAsync(userId);
     }
 
 
-
-    None    public async Task<UserModel> GetUserWithBasicInfoAsync(int userId, int schoolId, bool loadSchoolOptions = false)
+    public async Task<UserModel> GetUserWithBasicInfoAsync(int userId, int schoolId, bool loadSchoolOptions = false)
     {
         var user = await _mediator.Send(new UserBaseQuery(userId));
         Guard.Against.Null(user, ErrorCode.Api.Lms.User.DataValidation.Query.User.NotFoundByUserId, ErrorKind.BadRequest, userId.ToString());
@@ -64,8 +61,7 @@ public class UserProfileQueryingService : IUserProfileQueryingService
         return user!;
     }
 
-
-    None    public async Task<UserModel> GetUserWithPublicInfoAsync(int userId, int schoolId)
+    public async Task<UserModel> GetUserWithPublicInfoAsync(int userId, int schoolId)
     {
         var user = await _mediator.Send(new UserPublicInfoQuery(userId));
         Guard.Against.Null(user, ErrorCode.Api.Lms.User.DataValidation.Query.PublicInfo.NotFoundByUserId, ErrorKind.BadRequest, userId.ToString()); //TODO Localize
@@ -86,16 +82,14 @@ public class UserProfileQueryingService : IUserProfileQueryingService
         return user!;
     }
 
-
-    None    //[Obsolete("replaced by Trainings")]
+    //[Obsolete("replaced by Trainings")]
     //public async Task<UserModel> GetUserWithCoursesRegistrationsAsync(int userId, int schoolId)
     //{
     //    var user = await _mediator.Send(new UserCoursesRegistrationsQuery(userId, schoolId));
     //    return user.UserCoursesRegistrations.First().ToIto();
     //}
 
-
-    None    public async Task<UserModel> GetUserWithPersonalInfosAsync(int userId)
+    public async Task<UserModel> GetUserWithPersonalInfosAsync(int userId)
     {
         var userWPersonalInfos = await _mediator.Send(new UserPersonnalInformationsQuery(userId));
         Guard.Against.Null(userWPersonalInfos, ErrorCode.Api.Lms.User.DataValidation.Query.PersonnalInfos.NotFoundByUserId, ErrorKind.BadRequest, userId.ToString());
@@ -103,8 +97,7 @@ public class UserProfileQueryingService : IUserProfileQueryingService
         return userWPersonalInfos!;
     }
 
-
-    None    public async Task<UserSchoolOptionsModel> GetUserSchoolOptions(int userId, int schoolId)
+    public async Task<UserSchoolOptionsModel> GetUserSchoolOptions(int userId, int schoolId)
     {
         var userWSchoolOptions = await _mediator.Send(new UserSchoolOptionsQuery(userId, schoolId));
         Guard.Against.Null(userWSchoolOptions, ErrorCode.Api.Lms.User.DataValidation.Query.SchoolOptions.NotFoundByUserIdAndSchoolId, ErrorKind.BadRequest, userId.ToString(), schoolId.ToString());
@@ -112,32 +105,27 @@ public class UserProfileQueryingService : IUserProfileQueryingService
         return UserSchoolOptionsModel.CreateExisting(userWSchoolOptions!);
     }
 
-
-    None    public async Task<IEnumerable<ProfessionalExperienceModel>> GetUserProfessionalExperiencesAsync(int userId)
+    public async Task<IEnumerable<ProfessionalExperienceModel>> GetUserProfessionalExperiencesAsync(int userId)
     {
         return (await _mediator.Send(new UserProfessionalExperiencesQuery(userId))).ProfessionalExperiences;
     }
 
-
-    None    public async Task<DateTime?> GetUserProfileReviewDateAsync(int userId)
+    public async Task<DateTime?> GetUserProfileReviewDateAsync(int userId)
     {
         return await _mediator.Send(new UserProfileReviewDateQuery(userId));
     }
 
-
-    None    public async Task<StudyModel?> GetUserLastStudyInfosAsync(int userId)
+    public async Task<StudyModel?> GetUserLastStudyInfosAsync(int userId)
     {
         return await _mediator.Send(new UserLastStudyInfosQuery(userId));
     }
 
-
-    None    public async Task<IEnumerable<ContractTypeIto>> GetContractTypesListForProfessionalExperiencesAsync()
+    public async Task<IEnumerable<ContractTypeIto>> GetContractTypesListForProfessionalExperiencesAsync()
     {
         return await _mediator.Send(new AllContractTypesForProfessionalExperiencesQuery());
     }
 
-
-    None    public async Task<IEnumerable<TrainingModel>> GetUserTrainingsAsync(int userId, int schoolId)
+    public async Task<IEnumerable<TrainingModel>> GetUserTrainingsAsync(int userId, int schoolId)
     {
         var userTrainingsItos = await _mediator.Send(new UserTrainingsQuery(userId, schoolId));
         Guard.Against.Null(userTrainingsItos, ErrorCode.Api.Lms.User.DataValidation.Query.Trainings.NotFoundByUserIdAndSchoolId);
@@ -145,38 +133,32 @@ public class UserProfileQueryingService : IUserProfileQueryingService
         return TrainingModel.CreateExistingList(userTrainingsItos);
     }
 
-
-    None    public async Task<UserModel> GetUserNotificationsByIdAndSchoolIdAsync(int userId, int schoolId)
+    public async Task<UserModel> GetUserNotificationsByIdAndSchoolIdAsync(int userId, int schoolId)
     {
         return await _mediator.Send(new UserNotificationsSettingsQuery(userId, schoolId));
     }
 
-
-    None    public async Task<string> GetUserTimeZoneAsync(int userId)
+    public async Task<string> GetUserTimeZoneAsync(int userId)
     {
         return await _mediator.Send(new UserTimeZoneQuery(userId));
     }
 
-
-    None    public async Task<UserConfigInfosIto?> GetUserConfigInfosAsync(int userId, int schoolId)
+    public async Task<UserConfigInfosIto?> GetUserConfigInfosAsync(int userId, int schoolId)
     {
         return await _mediator.Send(new UserConfigInfosQuery(userId, schoolId));
     }
 
-
-    None    public async Task<LastSessionInfosModel> GetLastSessionInfosAsync(int userId, int schoolId)
+    public async Task<LastSessionInfosModel> GetLastSessionInfosAsync(int userId, int schoolId)
     {
         return await _mediator.Send(new UserLastSessionInfosQuery(userId, schoolId));
     }
 
-
-    None    public async Task<DateTime?> GetUserFirstConnectionDateAsync(int userId)
+    public async Task<DateTime?> GetUserFirstConnectionDateAsync(int userId)
     {
         return await _mediator.Send(new UserFirstConnectionDateQuery(userId));
     }
 
-
-    None    public async Task<string> GetAvatarUrlAsync(int userId)
+    public async Task<string> GetAvatarUrlAsync(int userId)
     {
         var url = await _mediator.Send(new UserAvatarUrlQuery(userId));
 
@@ -187,26 +169,22 @@ public class UserProfileQueryingService : IUserProfileQueryingService
         return _customWebResource.DefaultAvatarUrl;
     }
 
-
-    None    public async Task<bool> ExistUserByEmailAsync(string email)
+    public async Task<bool> ExistUserByEmailAsync(string email)
     {
         return await _mediator.Send(new UserExistByEmailQuery(email));
     }
 
-
-    None    public async Task<bool> ExistUserByPseudoAsync(string pseudo)
+    public async Task<bool> ExistUserByPseudoAsync(string pseudo)
     {
         return await _mediator.Send(new UserExistByPseudoQuery(pseudo));
     }
 
-
-    None    public async Task<string> GeneratePseudoAsync(string firstName, string lastName)
+    public async Task<string> GeneratePseudoAsync(string firstName, string lastName)
     {
         return await _mediator.Send(new UserGeneratePseudoQuery(firstName, lastName));
     }
 
-
-    None    public async Task<int> CountProfilesAsync(IEnumerable<IFiltersComposition<object>>? filtersCompositions = null)
+    public async Task<int> CountProfilesAsync(IEnumerable<IFiltersComposition<object>>? filtersCompositions = null)
     {
         var fieldNameDecorator = new TransformTextFromMappingDecorator(FilterableFieldMapper.UserPorfileRAtoToRItoDicoMapping);
         PaginationTools.TransformFilterFieldName(filtersCompositions, fieldNameDecorator);
@@ -214,8 +192,7 @@ public class UserProfileQueryingService : IUserProfileQueryingService
         return await _mediator.Send(new UserProfilesCountQuery(filtersCompositions));
     }
 
-
-    None    public async Task<IEnumerable<IUserProfileRAto>> GetUserProfilesAsync(int skip, int take, IEnumerable<IFiltersComposition<object>>? filtersCompositions = null, ISort? sort = null)
+    public async Task<IEnumerable<IUserProfileRAto>> GetUserProfilesAsync(int skip, int take, IEnumerable<IFiltersComposition<object>>? filtersCompositions = null, ISort? sort = null)
     {
         var fieldNameDecorator = new TransformTextFromMappingDecorator(FilterableFieldMapper.UserPorfileRAtoToRItoDicoMapping);
         PaginationTools.TransformFilterFieldName(filtersCompositions, fieldNameDecorator);
@@ -230,8 +207,7 @@ public class UserProfileQueryingService : IUserProfileQueryingService
         return data.Select(q => ItoToAtoMapper.ToUserProfileRAto(q, civilities.FirstOrDefault(c => c.Name == q.Civility)?.Id));
     }
 
-
-    None    public async Task<IUserProfileRAto> GetUserProfileAsync(int userId)
+    public async Task<IUserProfileRAto> GetUserProfileAsync(int userId)
     {
         var data = await _mediator.Send(new UserProfileQuery(userId));
         var civility = !string.IsNullOrEmpty(data.Civility) ? this._civilityService.GetCivilityByName(data.Civility!) : null;
