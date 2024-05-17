@@ -35,15 +35,15 @@ namespace Studi.Api.Lms.User.Application.Services
 
 
     /// <summary>
-    /// Initialize dependencies, ensuring mediator, tracking client, logger, and user repository are set for handling user profile writing tasks.
+    /// Initialize the service by assigning the provided mediator, tracking client, logger, and user repository, ensuring the mediator is not null.
     /// </summary>
-    /// <param name="mediator">An instance of IMediator to handle mediator pattern operations between objects.</param>
-    /// <param name="customWebResource">An instance of ICustomWebResourceService to manage custom web resources for the application.</param>
-    /// <param name="civilityService">An instance of ICivilityService to handle user civility related operations.</param>
-    /// <param name="userQueryService">An instance of IUserProfileQueryingService to query user profile information.</param>
-    /// <param name="trackingClient">An instance of ITrackingRestClient to send tracking data to a specified endpoint.</param>
-    /// <param name="logger">An instance of ILogger<IUserProfileWritingService> to log information and errors for the UserProfileWritingService.</param>
-    /// <param name="userRepository">An instance of IUserRepository to handle user data persistence and retrieval.</param>
+    /// <param name="mediator">Facilitate communication between different parts of the application.</param>
+    /// <param name="customWebResource">Handle custom web resource operations.</param>
+    /// <param name="civilityService">Manage operations related to user civility.</param>
+    /// <param name="userQueryService">Query user profiles and retrieve user-related information.</param>
+    /// <param name="trackingClient">Send tracking data to the external tracking service.</param>
+    /// <param name="logger">Log information and errors related to the user profile writing service.</param>
+    /// <param name="userRepository">Interact with the database to perform operations on user data.</param>
         public UserProfileWritingService(IMediator mediator, ICustomWebResourceService customWebResource, ICivilityService civilityService, IUserProfileQueryingService userQueryService, ITrackingRestClient trackingClient, ILogger<IUserProfileWritingService> logger, IUserRepository userRepository)
         {
             _mediator = mediator ?? throw new ArgumentNullException();
@@ -54,9 +54,9 @@ namespace Studi.Api.Lms.User.Application.Services
 
 
     /// <summary>
-    /// Upload a CSV file that contains data related to payment reliability, and process the file to handle and extract the relevant information.
+    /// Upload the contents of a CSV file containing payment reliability data to a designated storage or processing system.
     /// </summary>
-    /// <param name="file">The CSV file containing the payment reliability data to be uploaded.</param>
+    /// <param name="file">The IFormFile representing the CSV file to be uploaded</param>
         public async Task UploadCsvFilePaymentReliabilityAsync(IFormFile file)
         {
             try
@@ -96,11 +96,11 @@ namespace Studi.Api.Lms.User.Application.Services
 
 
     /// <summary>
-    /// Update payment reliability for a user identified by a specified Salesforce ID.
+    /// Update the payment reliability for a given user based on their Salesforce ID.
     /// </summary>
-    /// <param name="salesforceId">The unique identifier for the Salesforce record.</param>
-    /// <param name="code">A specific code required by the endpoint to process the data.</param>
-    /// <param name="isCsvUpload">A boolean flag indicating whether the data is being uploaded via CSV.</param>
+    /// <param name="salesforceId">The Salesforce identifier used to associate the payment reliability update with the correct record in Salesforce.</param>
+    /// <param name="code">A unique code representing the specific operation or transaction for which the payment reliability is being updated.</param>
+    /// <param name="isCsvUpload">Indicates whether the payment reliability update is being uploaded via a CSV file.</param>
         public async Task UpdatePaymentReliabilityAsync(string salesforceId, string code, bool isCsvUpload)
         {
             Guard.Against.NullOrEmpty(salesforceId, ErrorCode.Api.Lms.User.DataValidation.Common.SalesforceId.NullOrEmpty);
@@ -127,10 +127,10 @@ namespace Studi.Api.Lms.User.Application.Services
 
 
     /// <summary>
-    /// Update the review date for a specified user's profile.
+    /// Update the review date of the user profile with the specified user ID and UTC review date.
     /// </summary>
-    /// <param name="userId">The ID of the user whose profile review date is being updated. It is an integer value.</param>
-    /// <param name="reviewDateUtc">The date and time (in UTC) of the review. This is an optional parameter; if not specified, it defaults to null.</param>
+    /// <param name="userId">The unique identifier of the user to be analyzed or updated.</param>
+    /// <param name="reviewDateUtc">The date and time of the review in UTC. If not provided, defaults to null.</param>
         public async Task UpdateUserProfileReviewDateAsync(int userId, DateTime? reviewDateUtc = null)
         {
             await _mediator.Send(new UserProfileReviewDateUpdateCommand(userId, reviewDateUtc));
@@ -138,10 +138,10 @@ namespace Studi.Api.Lms.User.Application.Services
 
 
     /// <summary>
-    /// Update the user's profile picture using the specified user identifier and file reference.
+    /// Update the profile picture for a specified user using the provided file identifier.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user whose profile picture is being updated.</param>
-    /// <param name="fileGuid">The globally unique identifier (GUID) of the file representing the new profile picture.</param>
+    /// <param name="userId">The unique identifier of the user whose profile picture is to be updated.</param>
+    /// <param name="fileGuid">The unique identifier of the file that will be used to update the user's profile picture.</param>
         public async Task UpdateProfilePictureAsync(int userId, Guid fileGuid)
         {
             await _mediator.Send(new UserProfilePictureUpdateCommand(userId, fileGuid));
@@ -149,10 +149,10 @@ namespace Studi.Api.Lms.User.Application.Services
 
 
     /// <summary>
-    /// Update the header picture of a specified user using a given file identifier.
+    /// Update the header picture for a specified user using a unique file identifier.
     /// </summary>
-    /// <param name="userId">An integer representing the unique identifier of the user whose header picture is to be updated.</param>
-    /// <param name="fileGuid">A GUID representing the unique identifier of the file containing the new header picture.</param>
+    /// <param name="userId">The unique identifier for a user to update the header picture.</param>
+    /// <param name="fileGuid">The unique identifier for the file representing the new header picture.</param>
         public async Task UpdateHeaderPictureAsync(int userId, Guid fileGuid)
         {
             await _mediator.Send(new UserHeaderPictureUpdateCommand(userId, fileGuid));
@@ -160,11 +160,11 @@ namespace Studi.Api.Lms.User.Application.Services
 
 
     /// <summary>
-    /// Update basic information for a specified user with provided LinkedIn URL and about me details.
+    /// Update basic information for a specified user by sending a command with user ID, LinkedIn URL, and about me details.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user.</param>
-    /// <param name="linkedInUrl">The LinkedIn profile URL of the user. This parameter is optional.</param>
-    /// <param name="aboutMe">A brief description or information about the user. This parameter is optional.</param>
+    /// <param name="userId">The unique identifier for a user.</param>
+    /// <param name="linkedInUrl">The optional LinkedIn profile URL for the user.</param>
+    /// <param name="aboutMe">The optional personal information or biography for the user.</param>
         public async Task UpdateBasicInfoAsync(int userId, string? linkedInUrl, string? aboutMe)
         {
             await _mediator.Send(new UserBasicInfoUpdateCommand(userId, linkedInUrl, aboutMe));
@@ -172,11 +172,11 @@ namespace Studi.Api.Lms.User.Application.Services
 
 
     /// <summary>
-    /// Update the visibility status of a user in the ranking for a specified school.
+    /// Update a user's ranking appearance status based on specified conditions.
     /// </summary>
-    /// <param name="userId">The unique identifier of the user for whom the tracking data is being sent.</param>
-    /// <param name="schoolId">The unique identifier of the school associated with the user.</param>
-    /// <param name="doesAppearInRanking">A boolean value indicating whether the user appears in the ranking or not.</param>
+    /// <param name="userId">The unique identifier of a user.</param>
+    /// <param name="schoolId">The unique identifier of a school.</param>
+    /// <param name="doesAppearInRanking">A boolean value indicating whether it appears in the ranking.</param>
         public async Task UpdateDoesAppearInRankingAsync(int userId, int schoolId, bool doesAppearInRanking)
         {
             await _mediator.Send(new UserAppearsInRankingUpdateCommand(userId, schoolId, doesAppearInRanking));
@@ -184,12 +184,12 @@ namespace Studi.Api.Lms.User.Application.Services
 
 
     /// <summary>
-    /// Update the status of a user's appearance in the learner directory for a specified school.
+    /// Update the learner directory status for a specified user within a specified school.
     /// </summary>
-    /// <param name="userId">The unique identifier of the user whose tracking data is being updated.</param>
-    /// <param name="schoolId">The unique identifier of the school associated with the user.</param>
-    /// <param name="doesAppearInLearnerDirectory">Boolean value indicating whether the user appears in the learner directory.</param>
-    /// <param name="isOpenToCollaboration">Boolean value indicating whether the user is open to collaborate with others.</param>
+    /// <param name="userId">The unique identifier of the user.</param>
+    /// <param name="schoolId">The unique identifier of the school.</param>
+    /// <param name="doesAppearInLearnerDirectory">A boolean value indicating whether the user appears in the learner directory.</param>
+    /// <param name="isOpenToCollaboration">A boolean value indicating whether the user is open to collaboration.</param>
         public async Task UpdateDoesAppearInLearnerDirectoryAsync(int userId, int schoolId, bool doesAppearInLearnerDirectory, bool isOpenToCollaboration)
         {
             await _mediator.Send(new UserAppearsInLearnerDirectoryUpdateCommand(userId, schoolId, doesAppearInLearnerDirectory, isOpenToCollaboration));
@@ -197,11 +197,11 @@ namespace Studi.Api.Lms.User.Application.Services
 
 
     /// <summary>
-    /// Update the actual location for a specified user, including the country code and timezone ID.
+    /// Update the actual location of a specified user with new country and timezone data.
     /// </summary>
-    /// <param name="userId">An integer representing the unique identifier of the user whose location data is being updated.</param>
-    /// <param name="countryCode">An optional string representing the ISO country code where the user is currently located. Can be null if the country code is unknown.</param>
-    /// <param name="timezoneId">An optional string representing the time zone ID in which the user is located. Can be null if the timezone ID is unknown.</param>
+    /// <param name="userId">The identifier for the user for whom the location is being updated.</param>
+    /// <param name="countryCode">The code representing the user's country, which is optional.</param>
+    /// <param name="timezoneId">The identifier for the user's timezone, which is optional.</param>
         public async Task UpdateActualLocationAsync(int userId, string? countryCode, string? timezoneId)
         {
             await _mediator.Send(new UserActualLocationUpdateCommand(userId, countryCode, timezoneId));
@@ -209,11 +209,11 @@ namespace Studi.Api.Lms.User.Application.Services
 
 
     /// <summary>
-    /// Add a new professional experience entry for a specified user.
+    /// Add a professional experience entry for a specified user.
     /// </summary>
-    /// <param name="professionalExperienceIto">An object containing all the details of the user's professional experience, which is to be sent to the endpoint for tracking.</param>
-    /// <param name="userId">The unique identifier of the user whose professional experience is being tracked and sent to the endpoint.</param>
-    /// <returns>Returns a Task indicating the asynchronous operation status.</returns>
+    /// <param name="professionalExperienceIto">The professional experience information object that holds the details of the user's professional experience.</param>
+    /// <param name="userId">The unique identifier of the user to whom the professional experience is being added.</param>
+    /// <returns>Returns a task indicating the completion of the professional experience addition.</returns>
         public async Task<int> AddUserProfessionalExperienceAsync(ProfessionalExperienceIto professionalExperienceIto, int userId)
         {
             return await _mediator.Send(new UserProfessionalExperienceCreateCommand(professionalExperienceIto, userId));
@@ -221,11 +221,11 @@ namespace Studi.Api.Lms.User.Application.Services
 
 
     /// <summary>
-    /// Update the professional experience details for a specified user.
+    /// Update professional experience details for a specified user.
     /// </summary>
-    /// <param name="professionalExperienceId">The unique identifier of the professional experience to be updated.</param>
-    /// <param name="professionalExperienceIto">An object containing the updated details of the professional experience.</param>
-    /// <param name="userId">The unique identifier of the user whose professional experience is being updated.</param>
+    /// <param name="professionalExperienceId">The unique identifier for the professional experience being updated.</param>
+    /// <param name="professionalExperienceIto">The data transfer object containing the updated details of the professional experience.</param>
+    /// <param name="userId">The unique identifier for the user whose professional experience is being updated.</param>
         public async Task UpdateUserProfessionalExperienceAsync(int professionalExperienceId, ProfessionalExperienceIto professionalExperienceIto, int userId)
         {
             await _mediator.Send(new UserProfessionalExperienceUpdateCommand(professionalExperienceId, professionalExperienceIto, userId));
@@ -233,10 +233,10 @@ namespace Studi.Api.Lms.User.Application.Services
 
 
     /// <summary>
-    /// Remove a user's professional experience based on provided identifiers.
+    /// Remove a specified professional experience for a given user.
     /// </summary>
-    /// <param name="professionalExperienceId">The unique identifier for the professional experience that is to be removed.</param>
-    /// <param name="userId">The unique identifier of the user from whom the professional experience is being removed.</param>
+    /// <param name="professionalExperienceId">The unique identifier of the professional experience record to be removed.</param>
+    /// <param name="userId">The unique identifier of the user associated with the professional experience.</param>
         public async Task RemoveUserProfessionalExperienceAsync(int professionalExperienceId, int userId)
         {
             await _mediator.Send(new UserProfessionalExperienceDeleteCommand(professionalExperienceId, userId));
@@ -244,10 +244,10 @@ namespace Studi.Api.Lms.User.Application.Services
 
 
     /// <summary>
-    /// Replace the latest study information for a specified user.
+    /// Update the latest study information for a specified user.
     /// </summary>
-    /// <param name="userId">The unique identifier of the user.</param>
-    /// <param name="studyInfos">The study information to be sent to the specified endpoint.</param>
+    /// <param name="userId">An integer representing the unique identifier of the user.</param>
+    /// <param name="studyInfos">An object of type StudyIto containing the information related to the study.</param>
         public async Task ReplaceLatestStudyInformationsAsync(int userId, StudyIto studyInfos)
         {
             await _mediator.Send(new UserLatestStudyInformationsReplaceCommand(studyInfos, userId));
@@ -255,13 +255,13 @@ namespace Studi.Api.Lms.User.Application.Services
 
 
     /// <summary>
-    /// Update the notification registration details for a specified user and school, considering email and push subscription preferences.
+    /// Update notification registration details for a user, considering their school ID, notification type, and preferences for email and push subscriptions.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user.</param>
-    /// <param name="schoolId">The unique identifier for the school.</param>
-    /// <param name="notificationTypeCode">The code representing the type of notification to be updated.</param>
-    /// <param name="isEmailSubscriptionActive">A nullable boolean indicating whether the email subscription is active.</param>
-    /// <param name="isPushSubscriptionActive">A nullable boolean indicating whether the push subscription is active.</param>
+    /// <param name="userId">The identifier of the user</param>
+    /// <param name="schoolId">The identifier of the school</param>
+    /// <param name="notificationTypeCode">The code representing the type of notification</param>
+    /// <param name="isEmailSubscriptionActive">Indicates whether the email subscription is active</param>
+    /// <param name="isPushSubscriptionActive">Indicates whether the push subscription is active</param>
         public async Task UpdateNotificationRegistration(int userId, int schoolId, string notificationTypeCode, bool? isEmailSubscriptionActive, bool? isPushSubscriptionActive)
         {
             await _mediator.Send(new UserNotificationRegistrationUpdateCommand(userId, schoolId, notificationTypeCode, isEmailSubscriptionActive, isPushSubscriptionActive));
@@ -269,11 +269,10 @@ namespace Studi.Api.Lms.User.Application.Services
 
 
     /// <summary>
-    /// Update the first connection date for a specified user using the provided connection date in UTC.
-    /// 
+    /// Update the first connection date for a specified user.
     /// </summary>
-    /// <param name="userId">The unique identifier of the user. This parameter is required and should be of type int.</param>
-    /// <param name="connectionDateUtc">The optional date and time of the user's first connection in UTC. If not provided, it defaults to null and the current time will be used.</param>
+    /// <param name="userId">The unique identifier of the user</param>
+    /// <param name="connectionDateUtc">The optional UTC date and time of the user's connection; defaults to null if not provided</param>
         public async Task UpdateUserFirstConnectionDateAsync(int userId, DateTime? connectionDateUtc = null)
         {
             await _mediator.Send(new UserFirstConnectionDateUpdateCommand(userId, connectionDateUtc));
@@ -281,19 +280,19 @@ namespace Studi.Api.Lms.User.Application.Services
 
 
     /// <summary>
-    /// Create a user profile by retrieving the civility information, generating a pseudo if not provided, and sending the necessary data through a command.
+    /// Create a new user profile with generated pseudo if not provided, including personal details, official status, tester status, and default resources.
     /// </summary>
-    /// <param name="civilityId">The unique identifier representing the user's civility status.</param>
-    /// <param name="lastName">The user's last name.</param>
-    /// <param name="firstName">The user's first name.</param>
-    /// <param name="birthDate">The user's date of birth.</param>
-    /// <param name="email">The user's email address.</param>
-    /// <param name="pseudo">The user's pseudonym or nickname, which may be null.</param>
-    /// <param name="isOfficial">A boolean value indicating whether the user is an official member.</param>
-    /// <param name="isTester">A boolean value indicating whether the user is a tester.</param>
-    /// <param name="maidenName">The user's maiden name, which may be null.</param>
-    /// <param name="createBy">The identifier of the creator of the user profile.</param>
-    /// <returns>Returns a task representing the asynchronous operation of creating a user profile.</returns>
+    /// <param name="civilityId">The unique identifier representing the individual's civility title.</param>
+    /// <param name="lastName">The surname of the user.</param>
+    /// <param name="firstName">The given name of the user.</param>
+    /// <param name="birthDate">The birth date of the user.</param>
+    /// <param name="email">The email address of the user.</param>
+    /// <param name="pseudo">The optional pseudonym of the user.</param>
+    /// <param name="isOfficial">Determines if the user is an official member.</param>
+    /// <param name="isTester">Determines if the user is a tester.</param>
+    /// <param name="maidenName">The optional maiden name of the user.</param>
+    /// <param name="createBy">The identifier of the entity that created the user profile.</param>
+    /// <returns>Returns a Task containing the newly created user profile object.</returns>
         public async Task<int> CreateUserProfileAsync(int civilityId, string lastName, string firstName, DateOnly birthDate, string email, string? pseudo, bool isOfficial, bool isTester, string? maidenName, string createBy)
         {
             var civility = _civilityService.GetCivility(civilityId);
@@ -306,11 +305,11 @@ namespace Studi.Api.Lms.User.Application.Services
 
 
     /// <summary>
-    /// Check if a given code is not null or empty.
+    /// Get comments from a provided code string. Ensure the code string is not empty or null.
     /// </summary>
-    /// <param name="code">The code in string format that will be used to send tracking data.</param>
-    /// <param name="userReliability">The IUserReliabilityIto object that provides user reliability information, used optionally in the tracking process.</param>
-    /// <returns>Returns comments extracted from the given code.</returns>
+    /// <param name="code">The code that will be analyzed to summarize its functional purpose and behavior.</param>
+    /// <param name="userReliability">An optional user reliability interface used to evaluate the trustworthiness of the user related to the code being analyzed.</param>
+    /// <returns>Returns extracted comments from the provided code string.</returns>
         private string GetCommentsFromCode(string code, IUserReliabilityIto? userReliability)
         {
             string sentenceCode = string.Empty;
@@ -336,12 +335,12 @@ namespace Studi.Api.Lms.User.Application.Services
 
 
     /// <summary>
-    /// Send tracking data to a specified endpoint.
+    /// Send information about user activity to a tracking system.
     /// </summary>
-    /// <param name="userId">The unique identifier of the user. This parameter is an integer.</param>
-    /// <param name="title">The title associated with the tracking data. This parameter is a string.</param>
-    /// <param name="comments">Additional comments or notes related to the tracking data. This parameter is a string.</param>
-    /// <param name="createBy">The name of the person or system who created the tracking data. This parameter is a string.</param>
+    /// <param name="userId">The unique identifier of the user.</param>
+    /// <param name="title">The title related to the tracking operation.</param>
+    /// <param name="comments">The comments or remarks regarding the tracking operation.</param>
+    /// <param name="createBy">The user who created the tracking entry.</param>
         private async Task SendTrackingAsync(int userId, string title, string comments, string createBy)
         {
             try
