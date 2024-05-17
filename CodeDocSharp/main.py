@@ -12,11 +12,6 @@ import openai
 import os
 from dotenv import find_dotenv, load_dotenv
 
-# Text splitters
-from langchain.text_splitter import CharacterTextSplitter
-from langchain_community.document_loaders import TextLoader
-from langchain_community.callbacks import get_openai_callback, OpenAICallbackHandler
-
 print("Starting...")
 load_dotenv(find_dotenv())
 

@@ -118,18 +118,18 @@ class Llm:
         for prompt in prompts:
             chain = ChatPromptTemplate.from_template(prompt) | llm
             chains.append(chain)
-        answers = Llm.invoke_parallel_chains(None, *chains)
+        answers = Llm.invoke_parallel_chains_with_fallback(None, *chains)
         return answers
 
     @staticmethod
-    def invoke_parallel_chains(inputs: dict = None, *chains: Chain) -> list[str]:        
+    def invoke_parallel_chains_with_fallback(inputs: dict = None, *chains: Chain) -> list[str]:        
         # Combine chains for parallel execution
         combined = RunnableParallel(**{f"invoke_{i}": chain.with_fallbacks([chain]) for i, chain in enumerate(chains)})
 
         # Invoke the combined chain with specific inputs for each chain if specified
         if not inputs:
             inputs = {"input": ""}
-        responses = combined.with_error_handler(Llm.handle_parallel_invoke_error).invoke(inputs)
+        responses = combined.invoke(inputs)
 
         # Retrieve and print the output from each chain
         responses_list = [responses[key] for key in responses.keys()]
