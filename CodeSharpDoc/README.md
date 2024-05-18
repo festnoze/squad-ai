@@ -1,6 +1,6 @@
-<img src="file:///./CodeDocSharp-logo.png" title="" alt="logo" data-align="center">
+<img src="file:///./CodeSharpDoc-logo.png" title="" alt="logo" data-align="center">
 
-<H2>Welcome to CodeDocSharp</H2>
+<H2>Welcome to CodeSharpDoc</H2>
 
 
 *This tool is powered by AI agents (and the LLM of your choice)

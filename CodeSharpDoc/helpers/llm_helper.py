@@ -113,55 +113,14 @@ class Llm:
         return chain, parser.get_format_instructions()
 
     @staticmethod
-    def invoke_parallel_prompts(llm: BaseChatModel, with_fallback: bool = True, *prompts: str) -> list[str]:        
+    def invoke_parallel_prompts(llm: BaseChatModel, batch_size: int = None, with_fallback: bool = True, *prompts: str) -> list[str]:        
         # Define different chains, assume both use {input} in their templates
         chains = []
         for prompt in prompts:
             chain = ChatPromptTemplate.from_template(prompt) | llm
             chains.append(chain)
-        answers = Llm.invoke_parallel_chains(None, None, with_fallback, *chains)
+        answers = Llm.invoke_parallel_chains(None, batch_size, with_fallback, *chains)
         return answers
-
-    # @staticmethod
-    # def invoke_parallel_chains(inputs: dict = None, batch_size: int = None, with_fallback: bool = True, *chains: Chain) -> list[str]:  
-    #     if with_fallback:
-    #         chains = [chain.with_fallbacks([chain]) for chain in chains]
-            
-    #     # Step 1: Create sequences from chains
-    #     sequences = [RunnableSequence(chain) for chain in chains]
-
-    #     # Step 2: Combine sequences in RunnableParallel
-    #     parallel_sequences = RunnableParallel(**{f"sequence_{i}": seq for i, seq in enumerate(sequences)})
-
-    #     # Step 3: Batch processing 
-    #     if not batch_size:           
-    #         return parallel_sequences.invoke(inputs)
-        
-    #     batches = [inputs[i:i + batch_size] for i in range(0, len(inputs), batch_size)]
-        
-    #     all_responses = []
-    #     for batch in batches:
-    #         # Prepare the inputs for parallel invocation
-    #         batch_inputs = {"input": batch}
-    #         responses = parallel_sequences.batch(batch_inputs)
-    #         all_responses.extend(responses)
-
-    #     return all_responses
-        # parallel_sequence = RunnableParallel(sequence=RunnableSequence(*chains))
-
-        # if not inputs:
-        #     inputs = {"input": ""}
-
-        # if not batch_size:
-        #     results = parallel_sequence.invoke(inputs)
-        # else:
-        #     results = []
-        #     batches = list(Lists.chunk_dict_to_fixed_size_lists(inputs, batch_size))
-        #     for batch in batches:
-        #         batch_results = parallel_sequence.batch(batch)
-        #         results.extend(batch_results)
-
-        # return results
 
     @staticmethod
     def invoke_parallel_chains(inputs: dict = None, batch_size: int = None, with_fallback: bool = True, *chains: Chain) -> list[str]:        

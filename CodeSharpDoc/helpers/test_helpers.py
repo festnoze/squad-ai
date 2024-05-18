@@ -51,7 +51,7 @@ def test_parallel_invocations_with_homemade_parallel_prompts_invocations(llm: Ba
         "Write a short poem about darkness",
         "Write a short rebus about fruits"
     ]
-    answers = Llm.invoke_parallel_prompts(llm, True, *prompts)
+    answers = Llm.invoke_parallel_prompts(llm, None, True, *prompts)
     for i, answer in enumerate(answers):
         print(f"Answer to prompt n°{i+1}: {Llm.get_llm_answer_content(answer)}")
         print("--------------------------------------------------")

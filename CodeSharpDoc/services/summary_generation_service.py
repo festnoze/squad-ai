@@ -35,7 +35,9 @@ class SummaryGenerationService:
     def generate_all_summaries_for_all_classes_methods(llm, known_structures):
         t = txt.print_with_spinner(f"Ongoing parallel summaries generation for {SummaryGenerationService.methods_count(known_structures)} methods in {len(known_structures)} code files:")
         
-        SummaryGenerationService.generate_methods_summaries_for_all_classes(llm, known_structures, True)
+        batch_size = 30
+        with_json_output_parsing = True
+        SummaryGenerationService.generate_methods_summaries_for_all_classes(llm, known_structures, batch_size, with_json_output_parsing)
         
         SummaryGenerationService.apply_to_interfaces_the_classes_generated_summaries(known_structures)
 
@@ -98,25 +100,18 @@ class SummaryGenerationService:
         return initial_code
 
     @staticmethod
-    def get_classes_flatten_prompts_until_max(max_threads: int, all_classes: list[StructureDesc], classes_methods_summaries_prompts: dict, start_classes_index: int):
-        prompts_count = 0
+    def get_classes_flatten_prompts(all_classes: list[StructureDesc], classes_methods_summaries_prompts: dict):
         flatten_prompts = []
-        for class_struct in all_classes[start_classes_index:]:
-            start_classes_index += 1
-            if prompts_count >= max_threads:
-                break
+        for class_struct in all_classes:
             for prompt in classes_methods_summaries_prompts[class_struct.struct_name]:
-                prompts_count += 1
                 flatten_prompts.append(prompt)
-        return flatten_prompts, start_classes_index
+        return flatten_prompts
 
     @staticmethod
-    def generate_methods_summaries_for_all_classes(llm: BaseChatModel, known_structures: list[StructureDesc], with_json_output_parsing: bool):
-        max_threads = 200
+    def generate_methods_summaries_for_all_classes(llm: BaseChatModel, known_structures: list[StructureDesc], batch_size: int = 500, with_json_output_parsing: bool = True):
         all_classes = [s for s in known_structures if s.struct_type == StructureType.Class]
-        class_index: int = 0
         
-        SummaryGenerationService.generate_methods_summaries_only_all_classes(llm, known_structures, max_threads, all_classes, class_index)
+        SummaryGenerationService.generate_methods_summaries_only_all_classes(llm, known_structures, batch_size, all_classes)
         SummaryGenerationService.generate_methods_parameters_desc_all_classes(llm, all_classes, with_json_output_parsing)
         SummaryGenerationService.generate_methods_return_summaries_for_all_classes(llm, all_classes)
 
@@ -128,13 +123,11 @@ class SummaryGenerationService:
                 method.generated_xml_summary = xml_doc.to_xml()
 
     @staticmethod
-    def generate_methods_summaries_only_all_classes(llm, known_structures, max_threads, all_classes, class_index):
+    def generate_methods_summaries_only_all_classes(llm, known_structures, batch_size: int, all_classes):
         methods_summaries_prompts_by_classes =  SummaryGenerationService.generate_methods_summary_prompts_by_class(all_classes)
-        
-        while class_index < len(all_classes):
-            prompts, class_index = SummaryGenerationService.get_classes_flatten_prompts_until_max(max_threads, all_classes, methods_summaries_prompts_by_classes, class_index)
-            methods_summaries = Llm.invoke_parallel_prompts(llm, True, *prompts)
-            SummaryGenerationService.apply_generated_summaries_to_classes_methods(known_structures, methods_summaries_prompts_by_classes, methods_summaries)
+        prompts = SummaryGenerationService.get_classes_flatten_prompts(all_classes, methods_summaries_prompts_by_classes)
+        methods_summaries = Llm.invoke_parallel_prompts(llm, batch_size, True, *prompts)
+        SummaryGenerationService.apply_generated_summaries_to_classes_methods(known_structures, methods_summaries_prompts_by_classes, methods_summaries)
 
     @staticmethod
     def generate_methods_parameters_desc_all_classes(llm, all_classes, with_json_output_parsing):
@@ -156,7 +149,7 @@ class SummaryGenerationService:
                     if type(methods_parameters_summaries[i]) is list: methods_parameters_summaries[i] = {'params_list': methods_parameters_summaries[i]}
                     methods_parameters_summaries[i] = MethodParametersDocumentation(**methods_parameters_summaries[i])
             else:
-                methods_parameters_summaries = Llm.invoke_parallel_prompts(llm, True, *prompts_or_chains)
+                methods_parameters_summaries = Llm.invoke_parallel_prompts(llm, None, True, *prompts_or_chains)
 
             if with_json_output_parsing:
                 for method, method_params_summaries in zip(class_struct.methods, methods_parameters_summaries):
@@ -173,7 +166,7 @@ class SummaryGenerationService:
             class_prompts = []
             for method in [met for met in class_struct.methods if met.has_return_type()]:
                 class_prompts.append(SummaryGenerationService.get_prompt_for_method_return_summary(method))
-            methods_return_summaries_only = Llm.invoke_parallel_prompts(llm, True, *class_prompts)
+            methods_return_summaries_only = Llm.invoke_parallel_prompts(llm, None, True, *class_prompts)
             
             # Apply return method summary only to methods with a return type
             return_index = 0
@@ -194,17 +187,15 @@ class SummaryGenerationService:
         return classes_methods_summaries_prompts
     
     @staticmethod
-    def apply_generated_summaries_to_classes_methods(known_structures, classes_methods_summaries_prompts, methods_summaries):
+    def apply_generated_summaries_to_classes_methods(known_structures, classes_methods_summaries_prompts: dict, methods_summaries):
         i = 0
-        for class_name, class_prompts in classes_methods_summaries_prompts.items():
+        for class_name in classes_methods_summaries_prompts.keys():
             class_struct = next((s for s in known_structures if s.struct_name == class_name), None)
             if class_struct is None: raise Exception(f"Class {class_name} not found in loaded files")
 
             for method in class_struct.methods:
                 method.generated_summary = methods_summaries[i]
                 i += 1
-
-        classes_methods_summaries_prompts = {}
 
 
     ctor_txt = "Take into account that this method is a constructor for the containing class of the same name."

@@ -37,11 +37,11 @@ llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout
 #llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "nous-hermes2", timeout= 200, api_key= None)
 #llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "openhermes", timeout= 200, api_key= None)
 
-file.delete_files_in_folder("inputs\\code_files")
-file.copy_folder_files_to_folder("inputs\\code_files_saved", "inputs\\code_files")
+file.delete_files_in_folder("inputs\\code_files_generated")
+file.copy_folder_files_to_folder("inputs\\code_files_saved", "inputs\\code_files_generated")
 txt.activate_print = True # Activate print each step advancement
 
 Llm.invoke_method_mesuring_openai_tokens_consumption(
     SummaryGenerationService.generate_all_summaries_for_all_csharp_files_and_save, 
-        "inputs\\code_files", llm_infos #\\UserProfileQueryingService.cs \\IMessageService.cs
+        "inputs\\code_files_generated", llm_infos #\\UserProfileQueryingService.cs \\IMessageService.cs
 )
