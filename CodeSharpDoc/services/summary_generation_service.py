@@ -16,33 +16,44 @@ from models.structure_types import StructureType
 from services.csharp_code_analyser_service import CSharpCodeStructureAnalyser
 import os
 
-class SummaryGenerationService:
+class SummaryGenerationService:    
+    batch_size = 30
+    using_json_output_parsing = True
+
     @staticmethod
-    def generate_all_summaries_for_all_csharp_files_and_save(file_path: str, llm_infos: LlmInfo):      
-        llm = LangChainFactory.create_llm_from_info(llm_infos)        
+    def generate_all_summaries_for_all_csharp_files_and_save(file_path: str, llm_infos: LlmInfo):  
+        txt.activate_print = True
+        print = txt()
+        t = print.print_with_spinner(f"Loading LLM model ...")    
+        llm = LangChainFactory.create_llm_from_info(llm_infos)
+        print.stop_spinner_replace_text("LLM model loaded successfully.")
+        
+        t = print.print_with_spinner(f"Loading C# files ...")      
         paths_and_codes = file.load_csharp_files(file_path)
+        print.stop_spinner_replace_text(f"{len(paths_and_codes)} C# files loaded successfully.")
+
         CSharpHelper.remove_existing_summaries_from_all_files(paths_and_codes)
 
-        structures_descriptions = CSharpCodeStructureAnalyser.extract_code_structures_from_code_files(llm, paths_and_codes)
-        SummaryGenerationService.generate_all_summaries_for_all_classes_methods(llm, structures_descriptions)
-        paths_and_new_codes = SummaryGenerationService.including_generated_summaries_to_codes(paths_and_codes, structures_descriptions)
+        t = print.print_with_spinner(f"Parsing all {len(paths_and_codes)} files for code structure:")
+        known_structures = CSharpCodeStructureAnalyser.extract_code_structures_from_code_files(llm, paths_and_codes)
+        print.stop_spinner_replace_text(f"{len(paths_and_codes)} files parsed successfully for code.")
+
+        t = print.print_with_spinner(f"Ongoing parallel summaries generation for {SummaryGenerationService.methods_count(known_structures)} methods in {len(known_structures)} code files:")
+        SummaryGenerationService.generate_methods_summaries_for_all_classes(llm, known_structures)        
+        SummaryGenerationService.apply_to_interfaces_the_classes_generated_summaries(known_structures)
+        print.stop_spinner_replace_text("All methods' summaries generated successfully")
+
+        t = print.print_with_spinner(f"Include summaries into the existing {len(paths_and_codes)} code files:")
+        paths_and_new_codes = SummaryGenerationService.including_generated_summaries_to_codes(paths_and_codes, known_structures)
+        print.stop_spinner_replace_text("Summaries successfully included in initial files code.")
+
+        t = print.print_with_spinner(f"Saving and override the {len(paths_and_new_codes)} files:")
+        file.save_contents_within_files(paths_and_new_codes)        
+        print.stop_spinner_replace_text(f"{len(paths_and_new_codes)} files overrided and saved successfully.")
         
-        file.save_contents_within_files(paths_and_new_codes)
         txt.print("\nDone.")
         txt.print("---------------------------")
     
-    @staticmethod
-    def generate_all_summaries_for_all_classes_methods(llm, known_structures):
-        t = txt.print_with_spinner(f"Ongoing parallel summaries generation for {SummaryGenerationService.methods_count(known_structures)} methods in {len(known_structures)} code files:")
-        
-        batch_size = 30
-        with_json_output_parsing = True
-        SummaryGenerationService.generate_methods_summaries_for_all_classes(llm, known_structures, batch_size, with_json_output_parsing)
-        
-        SummaryGenerationService.apply_to_interfaces_the_classes_generated_summaries(known_structures)
-
-        txt.stop_spinner_replace_text("All methods' summaries generated successfully")
-
     @staticmethod
     def methods_count(known_structures: list[StructureDesc]):
         count = 0
@@ -72,7 +83,6 @@ class SummaryGenerationService:
 
     @staticmethod
     def including_generated_summaries_to_codes(paths_and_codes, structures_descriptions):
-        t = txt.print_with_spinner(f"Include summaries into the existing {len(paths_and_codes)} code files:")
         paths_and_codes_list = [(path, code) for path, code in paths_and_codes.items()]
         paths_and_new_codes = {}
         
@@ -80,8 +90,6 @@ class SummaryGenerationService:
             if structure_description.file_path != file_path: raise Exception("Mismatch between lists")
             new_code = SummaryGenerationService.add_generated_summaries_to_initial_code(structure_description, code)
             paths_and_new_codes[file_path] = new_code
-
-        txt.stop_spinner_replace_text("Summaries successfully included in initial files code.")
         return paths_and_new_codes
 
     @staticmethod
@@ -108,11 +116,16 @@ class SummaryGenerationService:
         return flatten_prompts
 
     @staticmethod
-    def generate_methods_summaries_for_all_classes(llm: BaseChatModel, known_structures: list[StructureDesc], batch_size: int = 500, with_json_output_parsing: bool = True):
+    def generate_methods_summaries_for_all_classes(llm: BaseChatModel, known_structures: list[StructureDesc]):
         all_classes = [s for s in known_structures if s.struct_type == StructureType.Class]
         
-        SummaryGenerationService.generate_methods_summaries_only_all_classes(llm, known_structures, batch_size, all_classes)
-        SummaryGenerationService.generate_methods_parameters_desc_all_classes(llm, all_classes, with_json_output_parsing)
+        SummaryGenerationService.generate_methods_summaries_only_all_classes(llm, known_structures, all_classes)
+        
+        if SummaryGenerationService.using_json_output_parsing:
+            SummaryGenerationService.generate_all_classes_methods_parameters_desc_json_from_output_parser(llm, all_classes)
+        else:
+            SummaryGenerationService.generate_all_classes_methods_parameters_desc_json_from_llm(llm, all_classes)
+            
         SummaryGenerationService.generate_methods_return_summaries_for_all_classes(llm, all_classes)
 
         # Assign to all methods a generated summary including method description, parameters description, and return type description
@@ -123,42 +136,46 @@ class SummaryGenerationService:
                 method.generated_xml_summary = xml_doc.to_xml()
 
     @staticmethod
-    def generate_methods_summaries_only_all_classes(llm, known_structures, batch_size: int, all_classes):
+    def generate_methods_summaries_only_all_classes(llm, known_structures, all_classes):
         methods_summaries_prompts_by_classes =  SummaryGenerationService.generate_methods_summary_prompts_by_class(all_classes)
         prompts = SummaryGenerationService.get_classes_flatten_prompts(all_classes, methods_summaries_prompts_by_classes)
-        methods_summaries = Llm.invoke_parallel_prompts(llm, batch_size, True, *prompts)
+        methods_summaries = Llm.invoke_parallel_prompts(llm, SummaryGenerationService.batch_size, *prompts)
         SummaryGenerationService.apply_generated_summaries_to_classes_methods(known_structures, methods_summaries_prompts_by_classes, methods_summaries)
 
     @staticmethod
-    def generate_methods_parameters_desc_all_classes(llm, all_classes, with_json_output_parsing):
+    def generate_all_classes_methods_parameters_desc_json_from_output_parser(llm, all_classes):
         for class_struct in all_classes:
             prompts_or_chains = []
             format_instructions = ''
             for method in class_struct.methods:
-                method_prompt, json_formatting_spec_prompt = SummaryGenerationService.get_prompt_for_parameters_summaries(method)        
-                if with_json_output_parsing:
-                    prompt_or_chain, format_instructions = Llm.get_chain_for_json_output_parser(llm, method_prompt, MethodParametersDocumentationPydantic, MethodParametersDocumentation)
-                else:
-                    prompt_or_chain = method_prompt + json_formatting_spec_prompt
+                method_prompt, json_formatting_spec_prompt = SummaryGenerationService.get_prompt_for_parameters_summaries(method)
+                prompt_or_chain, format_instructions = Llm.get_chain_for_json_output_parser(llm, method_prompt, MethodParametersDocumentationPydantic, MethodParametersDocumentation)
                 prompts_or_chains.append(prompt_or_chain)
 
-            if with_json_output_parsing:
-                inputs = {Llm.output_parser_instructions_name: format_instructions}
-                methods_parameters_summaries = Llm.invoke_parallel_chains(inputs, None, True, *prompts_or_chains)
-                for i in range(len(methods_parameters_summaries)):
-                    if type(methods_parameters_summaries[i]) is list: methods_parameters_summaries[i] = {'params_list': methods_parameters_summaries[i]}
-                    methods_parameters_summaries[i] = MethodParametersDocumentation(**methods_parameters_summaries[i])
-            else:
-                methods_parameters_summaries = Llm.invoke_parallel_prompts(llm, None, True, *prompts_or_chains)
+            inputs = {Llm.output_parser_instructions_name: format_instructions}
+            methods_parameters_summaries = Llm._invoke_parallel_chains(inputs, None, *prompts_or_chains)
+            for i in range(len(methods_parameters_summaries)):
+                if type(methods_parameters_summaries[i]) is list:
+                    methods_parameters_summaries[i] = {'params_list': methods_parameters_summaries[i]}
+                methods_parameters_summaries[i] = MethodParametersDocumentation(**methods_parameters_summaries[i])
 
-            if with_json_output_parsing:
-                for method, method_params_summaries in zip(class_struct.methods, methods_parameters_summaries):
-                    method.generated_parameters_summaries = method_params_summaries
-            else:            
-                for method, method_params_summaries in zip(class_struct.methods, methods_parameters_summaries):
-                    method_params_summaries_str = Llm.get_llm_answer_content(method_params_summaries)
-                    method_params_summaries_str = Llm.extract_json_from_llm_response(method_params_summaries_str)
-                    method.generated_parameters_summaries = MethodParametersDocumentation.from_json(method_params_summaries_str)
+            for method, method_params_summaries in zip(class_struct.methods, methods_parameters_summaries):
+                method.generated_parameters_summaries = method_params_summaries
+
+    @staticmethod
+    def generate_all_classes_methods_parameters_desc_json_from_llm(llm, all_classes):
+        for class_struct in all_classes:
+            prompts_or_chains = []
+            for method in class_struct.methods:
+                method_prompt, json_formatting_spec_prompt = SummaryGenerationService.get_prompt_for_parameters_summaries(method)
+                prompt_or_chain = method_prompt + json_formatting_spec_prompt
+                prompts_or_chains.append(prompt_or_chain)
+
+            methods_parameters_summaries = Llm.invoke_parallel_prompts(llm, None, *prompts_or_chains)
+            for method, method_params_summaries in zip(class_struct.methods, methods_parameters_summaries):
+                method_params_summaries_str = Llm.get_llm_answer_content(method_params_summaries)
+                method_params_summaries_str = Llm.extract_json_from_llm_response(method_params_summaries_str)
+                method.generated_parameters_summaries = MethodParametersDocumentation.from_json(method_params_summaries_str)
 
     @staticmethod
     def generate_methods_return_summaries_for_all_classes(llm, all_classes):
@@ -166,7 +183,7 @@ class SummaryGenerationService:
             class_prompts = []
             for method in [met for met in class_struct.methods if met.has_return_type()]:
                 class_prompts.append(SummaryGenerationService.get_prompt_for_method_return_summary(method))
-            methods_return_summaries_only = Llm.invoke_parallel_prompts(llm, None, True, *class_prompts)
+            methods_return_summaries_only = Llm.invoke_parallel_prompts(llm, None, *class_prompts)
             
             # Apply return method summary only to methods with a return type
             return_index = 0

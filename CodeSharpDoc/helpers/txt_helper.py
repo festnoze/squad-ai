@@ -22,13 +22,13 @@ class txt:
         
     def get_elapsed_str(start_time, end_time):
         if not start_time or not end_time:
-            return ''
+            return None
         elapsed_sec = int(end_time - start_time)
         elapsed_minutes = int(elapsed_sec / 60)
         elapsed_seconds = int(elapsed_sec % 60)
 
         if elapsed_sec == 0:
-            return ''
+            return None
         
         elapsed_str = ''
         if elapsed_minutes != 0:
@@ -57,46 +57,49 @@ class txt:
         if txt.activate_print:
             print(text)
 
-    waiting_spinner_thread = None
-    start_time: float = None
-    @staticmethod
-    def print_with_spinner(text: str) -> Thread:
+    def __init__(self):
+        self.waiting_spinner_thread = None
+        self.start_time: float = None
+        self.stop_animation = True
+
+    def print_with_spinner(self, text: str) -> Thread:
         if not txt.activate_print:
             return None
         txt.start_time = time.time()
 
         # Ensure only one spinner thread is running at a time
-        if txt.waiting_spinner_thread is not None and txt.waiting_spinner_thread.is_alive():
-            txt.stop_spinner()
+        if self.waiting_spinner_thread and self.waiting_spinner_thread.is_alive():
+            raise Exception("Previous waiting spinner thread wasn't halt before creating a new one")
 
-        txt.waiting_spinner_thread = Thread(target=txt.wait_spinner, args=(text,))
-        txt.waiting_spinner_thread.daemon = True
-        txt.waiting_spinner_thread.start()
-        return txt.waiting_spinner_thread
+        self.waiting_spinner_thread = Thread(target=self.wait_spinner, args=(text,))
+        self.waiting_spinner_thread.daemon = True
+        self.waiting_spinner_thread.start()
+        return self.waiting_spinner_thread
 
-    @staticmethod
-    def wait_spinner(prefix):  # Optional prefix text
+
+    def wait_spinner(self, prefix):  # Optional prefix text
         # Spinner characters
         chars = "⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹"
 
-        txt.stop_animation = False
-        while not txt.stop_animation:
+        self.stop_animation = False
+        while not self.stop_animation:
             for char in chars:
-                if txt.stop_animation:
+                if self.stop_animation:
                     break
                 sys.stdout.write('\r' + prefix + ' ' + char + ' ')
                 sys.stdout.flush()
                 time.sleep(0.1)
 
-    @staticmethod
-    def stop_spinner():
-        txt.stop_animation = True
-        if txt.waiting_spinner_thread:
-            txt.waiting_spinner_thread.join()
-            txt.waiting_spinner_thread = None
 
-    @staticmethod
-    def stop_spinner_replace_text(text=None):
+    def stop_spinner(self):
+        self.stop_animation = True
+        if self.waiting_spinner_thread:
+            self.waiting_spinner_thread.join()
+            self.waiting_spinner_thread = None
+
+
+    def stop_spinner_replace_text(self, text=None):
+        self.stop_spinner()
         if not txt.activate_print:
             return None
         
@@ -107,9 +110,11 @@ class txt:
         else:
             elapsed_str = ''
             if txt.start_time:
-                elapsed_str += txt.get_elapsed_str(txt.start_time, time.time())                
+                elapsed_str = txt.get_elapsed_str(self.start_time, time.time())
+                if elapsed_str:
+                    elapsed_str = f" {elapsed_str}."             
                 txt.start_time = None
 
-            text = f"✓ {text} {elapsed_str}." 
+            text = f"✓ {text}{elapsed_str}" 
             sys.stdout.write(f'\r{empty}')
             sys.stdout.write(f'\r{text}\r\n')

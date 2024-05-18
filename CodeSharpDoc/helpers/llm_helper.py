@@ -10,10 +10,7 @@ import yfinance as yf
 from langchain_community.callbacks import get_openai_callback, OpenAICallbackHandler
 #
 import inspect
-from typing import TypeVar, Generic, Any
-
-from helpers.lists_helper import Lists
-from helpers.txt_helper import txt
+from typing import TypeVar, Generic, Any, Union
 
 class Llm:
     @staticmethod
@@ -66,6 +63,7 @@ class Llm:
 
         if start_index == -1 or end_index == -1:
             raise Exception("No JSON content found in response")
+        
         return content[start_index:end_index]
     
     @staticmethod
@@ -85,20 +83,6 @@ class Llm:
     output_parser_instructions_name: str = 'output_parser_instructions'
 
     @staticmethod
-    def invoke_llm_with_json_output_parser(llm: BaseChatModel, prompt_str: str, json_type: TPydanticModel, output_type: TOutputModel, max_retries= None) -> TOutputModel:
-        chain = Llm.get_chain_for_json_output_parser(llm, prompt_str, json_type, output_type)
-
-        if max_retries:
-            result = Llm.invoke_llm_with_retry(chain, "", max_retries)
-        else:
-            result = chain.invoke({'input': ''})
-
-        # transform the result's dict into the awaited type
-        # the awaited type must have an 'init' method that takes the dict as kwargs
-        result_obj = output_type(**result)
-        return result_obj
-
-    @staticmethod
     def get_chain_for_json_output_parser(llm: BaseChatModel, prompt_str: str, json_type: TPydanticModel, output_type: TOutputModel):
         assert issubclass(json_type, BaseModel), "json_type must inherit from BaseModel"
         assert inspect.isclass(output_type), "output_type must be a class"
@@ -113,19 +97,21 @@ class Llm:
         return chain, parser.get_format_instructions()
 
     @staticmethod
-    def invoke_parallel_prompts(llm: BaseChatModel, batch_size: int = None, with_fallback: bool = True, *prompts: str) -> list[str]:        
-        # Define different chains, assume both use {input} in their templates
+    def invoke_parallel_prompts(llms_with_fallbacks: Union[BaseChatModel, list[BaseChatModel]], batch_size: int = None, *prompts: str) -> list[str]:        
+        if not isinstance(llms_with_fallbacks, list):
+            llms_with_fallbacks = [llms_with_fallbacks]
         chains = []
         for prompt in prompts:
-            chain = ChatPromptTemplate.from_template(prompt) | llm
+            chain = ChatPromptTemplate.from_template(prompt) | llms_with_fallbacks[0]
+            if len(llms_with_fallbacks) > 1:
+                for llm_for_fallback in llms_with_fallbacks[1:]:
+                    chain = chain.with_fallbacks(ChatPromptTemplate.from_template(prompt) | llm_for_fallback)
             chains.append(chain)
-        answers = Llm.invoke_parallel_chains(None, batch_size, with_fallback, *chains)
+        answers = Llm._invoke_parallel_chains(None, batch_size, *chains)
         return answers
 
     @staticmethod
-    def invoke_parallel_chains(inputs: dict = None, batch_size: int = None, with_fallback: bool = True, *chains: Chain) -> list[str]:        
-        if with_fallback:
-            chains = [chain.with_fallbacks([chain]) for chain in chains]
+    def _invoke_parallel_chains(inputs: dict = None, batch_size: int = None, *chains: Chain) -> list[str]:
         if not batch_size:
             batch_size = len(chains)        
         if not inputs:
@@ -144,9 +130,6 @@ class Llm:
             answers.extend(batch_answers)
 
         return answers
-    
-    def handle_error(e):
-        txt.print(f"Error occurred: {str(e)}. Using fallback.")
 
     @staticmethod
     def invoke_llm_with_tools(llm: BaseChatModel, tools: list[any], input: str) -> str:

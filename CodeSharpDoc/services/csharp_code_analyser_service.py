@@ -17,13 +17,10 @@ import re
 class CSharpCodeStructureAnalyser:
     @staticmethod
     def extract_code_structures_from_code_files(llm, paths_and_codes):
-        csharp_files_count = len(paths_and_codes)
-        t = txt.print_with_spinner(f"Parsing all {csharp_files_count} files for code structure:")
         all_parsed_structs = []
         for file_path, code in paths_and_codes.items():
             structure_description: StructureDesc = CSharpCodeStructureAnalyser.get_code_structure(llm, file_path, code)
             all_parsed_structs.append(structure_description)
-        txt.stop_spinner_replace_text(f"{csharp_files_count} files parsed successfully for code.")
         return all_parsed_structs
     
     @staticmethod

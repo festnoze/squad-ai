@@ -10,16 +10,13 @@ from models.llm_info import LlmInfo
 
 class LangChainFactory():
     @staticmethod
-    def create_llm_from_info(llm_infos: LlmInfo, print_loading: bool = True):
-        txt.activate_print = print_loading
-        t = txt.print_with_spinner(f"Loading LLM model ...")
+    def create_llm_from_info(llm_infos: LlmInfo):
         llm = LangChainFactory.create_llm(
             adapter_type= llm_infos.type,
             llm_model_name= llm_infos.model,
             timeout_seconds= llm_infos.timeout,
             temperature= 1.0,
             api_key= llm_infos.api_key)
-        txt.stop_spinner_replace_text("LLM model loaded successfully.")
         return llm
 
     @staticmethod
