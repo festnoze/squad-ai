@@ -8,6 +8,9 @@ site-packages/
 /Scripts
 /__pycache__
 
+# CodeSharpDoc
+code_files_generated/
+
 # VS files and dir to ignore
 
 # User-specific files
