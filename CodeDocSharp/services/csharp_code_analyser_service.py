@@ -134,7 +134,7 @@ class CSharpCodeStructureAnalyser:
         # chain, format_instructions = Llm.get_chain_for_json_output_parser(llm, prompt, StructureDescPydantic, StructureDesc)
         # chains.append(chain)
 
-        # interfaces_summaries = Llm.invoke_parallel_chains({Llm.output_parser_instructions_name: format_instructions}, True, *chains)
+        # interfaces_summaries = Llm.invoke_parallel_chains({Llm.output_parser_instructions_name: format_instructions}, None, True, *chains)
         # for i in range(len(interfaces_summaries)):
         #     interfaces_summaries[i] = StructureDesc(**interfaces_summaries[i])
 

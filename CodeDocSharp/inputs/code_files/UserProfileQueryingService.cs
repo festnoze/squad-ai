@@ -29,12 +29,12 @@ public class UserProfileQueryingService : IUserProfileQueryingService
 
 
     /// <summary>
-    /// Initialize the class by assigning and validating essential services and resources.
+    /// Set up dependencies for querying user profiles, ensuring none of the required components are null.
     /// </summary>
-    /// <param name="mediator">The mediator instance used to coordinate requests and responses between different components.</param>
-    /// <param name="customWebResource">A service to handle custom web resources necessary for the application.</param>
-    /// <param name="civilityService">A service that provides operations related to user civility data.</param>
-    /// <param name="userRepository">A repository that manages user data and interactions with the data source.</param>
+    /// <param name="mediator">The IMediator instance to send and publish domain events.</param>
+    /// <param name="customWebResource">The ICustomWebResourceService instance to manage custom web resources.</param>
+    /// <param name="civilityService">The ICivilityService instance to handle civil-related services.</param>
+    /// <param name="userRepository">The IUserRepository instance to interact with the user database.</param>
     public UserProfileQueryingService(IMediator mediator, ICustomWebResourceService customWebResource, ICivilityService civilityService, IUserRepository userRepository)
     {
         _mediator = mediator ?? throw new ArgumentNullException();
@@ -45,10 +45,10 @@ public class UserProfileQueryingService : IUserProfileQueryingService
 
 
     /// <summary>
-    /// Check the validity of a specified user's ID and retrieve their payment reliability status.
+    /// Check the payment reliability for a specified user.
     /// </summary>
-    /// <param name="userId">The unique identifier of the user whose payment reliability status is to be checked.</param>
-    /// <returns>Returns a user's payment reliability status.</returns>
+    /// <param name="userId">The unique identifier for the user whose payment reliability is being checked.</param>
+    /// <returns>Returns the reliability score of the specified user's payment history.</returns>
     public async Task<string?> GetPaymentReliabilityAsync(int userId)
     {
         Guard.Against.NegativeOrZero(userId, ErrorCode.Api.Lms.User.DataValidation.Common.UserId.NegativeOrZero);
@@ -58,12 +58,12 @@ public class UserProfileQueryingService : IUserProfileQueryingService
 
 
     /// <summary>
-    /// Retrieve basic information for a specified user and verify the existence of user data before associating additional information.
+    /// Retrieve a user's basic information, ensuring the user exists and handling errors if the user is not found.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user whose basic information is being retrieved.</param>
-    /// <param name="schoolId">The identifier for the school to which the user is associated.</param>
-    /// <param name="loadSchoolOptions">A boolean flag indicating whether additional options associated with the school should be loaded. Default is false.</param>
-    /// <returns>Returns basic user information with verification and optional school data.</returns>
+    /// <param name="userId">The unique identifier of the user to retrieve information for. It must be an integer representing the user's ID in the system.</param>
+    /// <param name="schoolId">The unique identifier of the school associated with the user. It must be an integer representing the school's ID within the system.</param>
+    /// <param name="loadSchoolOptions">A boolean flag indicating whether to load additional school options. If set to true, additional school-related information will be retrieved.</param>
+    /// <returns>Returns a task with user's basic info or error if not found.</returns>
     public async Task<UserModel> GetUserWithBasicInfoAsync(int userId, int schoolId, bool loadSchoolOptions = false)
     {
         var user = await _mediator.Send(new UserBaseQuery(userId));
@@ -85,11 +85,11 @@ public class UserProfileQueryingService : IUserProfileQueryingService
 
 
     /// <summary>
-    /// Retrieve the public information of a user, ensuring the user exists, then verify if there are school options for the user in a specified school.
+    /// Retrieve a user's public information and associated school options, verifying the user's existence and handling missing data appropriately.
     /// </summary>
-    /// <param name="userId">The unique identifier of the user. This parameter is used to retrieve and verify the public information of the user ensuring they exist.</param>
-    /// <param name="schoolId">The unique identifier of the school. This parameter is used to check if there are school options available for the user in the specified school.</param>
-    /// <returns>Returns the user's public info and school options asynchronously.</returns>
+    /// <param name="userId">The unique identifier for the user whose public information is to be retrieved. This parameter ensures that the system retrieves the correct user's data.</param>
+    /// <param name="schoolId">The unique identifier for the school associated with the user. This parameter helps in fetching the appropriate school options related to the user.</param>
+    /// <returns>Returns a user's verified public info and associated school options.</returns>
     public async Task<UserModel> GetUserWithPublicInfoAsync(int userId, int schoolId)
     {
         var user = await _mediator.Send(new UserPublicInfoQuery(userId));
@@ -113,11 +113,11 @@ public class UserProfileQueryingService : IUserProfileQueryingService
 
 
     /// <summary>
-    /// Retrieve a user's course registration details for a specified user and school, then return the first course registration.
+    /// Retrieve the first course registration details for a specified user in a particular school.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user whose course registration details need to be retrieved.</param>
-    /// <param name="schoolId">The unique identifier for the school to filter the user's course registrations.</param>
-    /// <returns>Returns the first course registration for the specified user and school.</returns>
+    /// <param name="userId">The unique identifier of the user for whom the first course registration details are being retrieved.</param>
+    /// <param name="schoolId">The unique identifier of the school where the user's course registration is being checked.</param>
+    /// <returns>Returns the first course registration details for the specified user at the specified school.</returns>
     //[Obsolete("replaced by Trainings")]
     //public async Task<UserModel> GetUserWithCoursesRegistrationsAsync(int userId, int schoolId)
     //{
@@ -127,10 +127,10 @@ public class UserProfileQueryingService : IUserProfileQueryingService
 
 
     /// <summary>
-    /// Retrieve detailed personal information for a specified user and ensure the data is not null, returning the verified personal information.
+    /// Retrieve personal information for a specified user.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user whose personal information is to be retrieved. It ensures that the correct user's data is fetched.</param>
-    /// <returns>Returns verified personal details of a specified user.</returns>
+    /// <param name="userId">The unique identifier for the user whose personal information is being retrieved. This should be an integer value.</param>
+    /// <returns>Returns user personal information in an asynchronous operation.</returns>
     public async Task<UserModel> GetUserWithPersonalInfosAsync(int userId)
     {
         var userWPersonalInfos = await _mediator.Send(new UserPersonnalInformationsQuery(userId));
@@ -141,11 +141,11 @@ public class UserProfileQueryingService : IUserProfileQueryingService
 
 
     /// <summary>
-    /// Retrieve school options for a specific user and school.
+    /// Retrieve school options for a specified user and school, ensuring the data exists and returning a correctly formatted model.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user. This parameter is used to specify the user for whom the school options need to be retrieved.</param>
-    /// <param name="schoolId">The unique identifier for the school. This parameter is used to specify the school options related to the provided school ID.</param>
-    /// <returns>Returns available school options for the specified user and school.</returns>
+    /// <param name="userId">The unique identifier for the user for whom the school options are being retrieved.</param>
+    /// <param name="schoolId">The unique identifier for the school whose data is being retrieved for the specified user.</param>
+    /// <returns>Returns a formatted model with school options for the specified user and school.</returns>
     public async Task<UserSchoolOptionsModel> GetUserSchoolOptions(int userId, int schoolId)
     {
         var userWSchoolOptions = await _mediator.Send(new UserSchoolOptionsQuery(userId, schoolId));
@@ -158,8 +158,8 @@ public class UserProfileQueryingService : IUserProfileQueryingService
     /// <summary>
     /// Retrieve professional experiences for a specified user.
     /// </summary>
-    /// <param name="userId">The ID of the user whose professional experiences are to be retrieved. This should be an integer.</param>
-    /// <returns>Returns a list of user's professional experiences.</returns>
+    /// <param name="userId">The ID of the user for whom to retrieve professional experiences.</param>
+    /// <returns>Returns a list of the user's professional experiences.</returns>
     public async Task<IEnumerable<ProfessionalExperienceModel>> GetUserProfessionalExperiencesAsync(int userId)
     {
         return (await _mediator.Send(new UserProfessionalExperiencesQuery(userId))).ProfessionalExperiences;
@@ -169,8 +169,8 @@ public class UserProfileQueryingService : IUserProfileQueryingService
     /// <summary>
     /// Retrieve the review date of the user profile for a specified user.
     /// </summary>
-    /// <param name="userId">The ID of the user whose profile review date is to be retrieved.</param>
-    /// <returns>Returns the review date of the user's profile.</returns>
+    /// <param name="userId">The identifier of the user whose profile review date is to be retrieved.</param>
+    /// <returns>Returns the review date of the specified user's profile.</returns>
     public async Task<DateTime?> GetUserProfileReviewDateAsync(int userId)
     {
         return await _mediator.Send(new UserProfileReviewDateQuery(userId));
@@ -178,10 +178,10 @@ public class UserProfileQueryingService : IUserProfileQueryingService
 
 
     /// <summary>
-    /// Retrieve the most recent study information for a specific user.
+    /// Retrieve the latest study information for a specified user.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user whose most recent study information is being retrieved.</param>
-    /// <returns>Returns the latest study information of the specified user.</returns>
+    /// <param name="userId">A unique identifier representing the user for whom the latest study information is to be retrieved. This parameter should be an integer.</param>
+    /// <returns>Returns the user's latest study information asynchronously.</returns>
     public async Task<StudyModel?> GetUserLastStudyInfosAsync(int userId)
     {
         return await _mediator.Send(new UserLastStudyInfosQuery(userId));
@@ -189,7 +189,7 @@ public class UserProfileQueryingService : IUserProfileQueryingService
 
 
     /// <summary>
-    /// Retrieve a list of contract types applicable to professional experiences.
+    /// Retrieve the list of all contract types for professional experiences.
     /// </summary>
     /// <returns>Returns a list of contract types for professional experiences.</returns>
     public async Task<IEnumerable<ContractTypeIto>> GetContractTypesListForProfessionalExperiencesAsync()
@@ -199,11 +199,11 @@ public class UserProfileQueryingService : IUserProfileQueryingService
 
 
     /// <summary>
-    /// Retrieve a list of existing training models for a specified user and school.
+    /// Retrieve the list of training sessions for a specified user from a given school.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user whose training models are being retrieved.</param>
-    /// <param name="schoolId">The unique identifier for the school to which the user belongs.</param>
-    /// <returns>Returns a list of the user's training models.</returns>
+    /// <param name="userId">The unique identifier of the user for whom the training sessions are being retrieved.</param>
+    /// <param name="schoolId">The unique identifier of the school from which the training sessions are being retrieved.</param>
+    /// <returns>Returns a list of training sessions for a specified user from a given school.</returns>
     public async Task<IEnumerable<TrainingModel>> GetUserTrainingsAsync(int userId, int schoolId)
     {
         var userTrainingsItos = await _mediator.Send(new UserTrainingsQuery(userId, schoolId));
@@ -214,11 +214,11 @@ public class UserProfileQueryingService : IUserProfileQueryingService
 
 
     /// <summary>
-    /// Retrieve the notification settings for a specified user and school.
+    /// Get user notifications based on a specified user ID and school ID.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user whose notification settings are to be retrieved.</param>
-    /// <param name="schoolId">The unique identifier for the school to which the user belongs.</param>
-    /// <returns>Returns a list of user's notification settings for the specified school.</returns>
+    /// <param name="userId">The unique identifier for the user whose notifications are being retrieved. This parameter is necessary to specify the user in the 'GetUserNotificationsByIdAndSchoolIdAsync' method.</param>
+    /// <param name="schoolId">The unique identifier for the school to filter notifications by. This parameter is used alongside 'userId' in the 'GetUserNotificationsByIdAndSchoolIdAsync' method to specify notifications related to a particular school.</param>
+    /// <returns>Returns user notifications filtered by user and school ID.</returns>
     public async Task<UserModel> GetUserNotificationsByIdAndSchoolIdAsync(int userId, int schoolId)
     {
         return await _mediator.Send(new UserNotificationsSettingsQuery(userId, schoolId));
@@ -228,8 +228,8 @@ public class UserProfileQueryingService : IUserProfileQueryingService
     /// <summary>
     /// Retrieve the time zone information for a specified user.
     /// </summary>
-    /// <param name="userId">The unique identifier of the user whose time zone information needs to be retrieved.</param>
-    /// <returns>Returns the user's time zone information asynchronously.</returns>
+    /// <param name="userId">The unique identifier for the user whose time zone information is being retrieved.</param>
+    /// <returns>Returns the user's time zone information.</returns>
     public async Task<string> GetUserTimeZoneAsync(int userId)
     {
         return await _mediator.Send(new UserTimeZoneQuery(userId));
@@ -237,11 +237,11 @@ public class UserProfileQueryingService : IUserProfileQueryingService
 
 
     /// <summary>
-    /// Retrieve configuration information for a specified user and school.
+    /// Retrieve user configuration information based on specified user and school identifiers.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user whose configuration information is being retrieved.</param>
-    /// <param name="schoolId">The unique identifier for the school associated with the user.</param>
-    /// <returns>Returns a task with user's school-specific configuration details.</returns>
+    /// <param name="userId">The identifier of the user whose configuration information is to be retrieved. This is an integer value that uniquely identifies the user in the system.</param>
+    /// <param name="schoolId">The identifier of the school associated with the user. This is an integer value that uniquely identifies the school in the system.</param>
+    /// <returns>Returns user configuration details for specified user and school.</returns>
     public async Task<UserConfigInfosIto?> GetUserConfigInfosAsync(int userId, int schoolId)
     {
         return await _mediator.Send(new UserConfigInfosQuery(userId, schoolId));
@@ -249,11 +249,11 @@ public class UserProfileQueryingService : IUserProfileQueryingService
 
 
     /// <summary>
-    /// Retrieve the latest session information for a specific user in a designated school.
+    /// Retrieve the last session information for a specified user and school.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user for whom the latest session information is being retrieved.</param>
-    /// <param name="schoolId">The unique identifier for the school where the session information is being fetched.</param>
-    /// <returns>Returns the latest session details for the specified user in a given school.</returns>
+    /// <param name="userId">The unique identifier of the user for whom the last session information is to be retrieved.</param>
+    /// <param name="schoolId">The unique identifier of the school associated with the user.</param>
+    /// <returns>Returns the last session information for a user at a specified school.</returns>
     public async Task<LastSessionInfosModel> GetLastSessionInfosAsync(int userId, int schoolId)
     {
         return await _mediator.Send(new UserLastSessionInfosQuery(userId, schoolId));
@@ -263,8 +263,8 @@ public class UserProfileQueryingService : IUserProfileQueryingService
     /// <summary>
     /// Retrieve the first connection date for a specified user.
     /// </summary>
-    /// <param name="userId">An integer representing the unique identifier of the user whose first connection date is to be retrieved.</param>
-    /// <returns>Returns the user's first connection date as an asynchronous task.</returns>
+    /// <param name="userId">The unique identifier of the user for whom the first connection date is being retrieved.</param>
+    /// <returns>Returns the user's initial connection date asynchronously.</returns>
     public async Task<DateTime?> GetUserFirstConnectionDateAsync(int userId)
     {
         return await _mediator.Send(new UserFirstConnectionDateQuery(userId));
@@ -272,10 +272,10 @@ public class UserProfileQueryingService : IUserProfileQueryingService
 
 
     /// <summary>
-    /// Retrieve the avatar URL for a specified user, returning a default URL if no specific URL is found or if the found URL is invalid.
+    /// Retrieve the URL of a user's avatar, or return a default avatar URL if the user-specific URL is invalid or empty.
     /// </summary>
-    /// <param name="userId">The ID of the user for whom the avatar URL is to be retrieved.</param>
-    /// <returns>Returns the avatar URL for the specified user.</returns>
+    /// <param name="userId">The unique identifier of the user whose avatar URL is being retrieved.</param>
+    /// <returns>Returns the URL of the user's avatar or a default avatar URL.</returns>
     public async Task<string> GetAvatarUrlAsync(int userId)
     {
         var url = await _mediator.Send(new UserAvatarUrlQuery(userId));
@@ -289,10 +289,10 @@ public class UserProfileQueryingService : IUserProfileQueryingService
 
 
     /// <summary>
-    /// Check if a user exists by a specified email address.
+    /// Check the existence of a user by their email address.
     /// </summary>
-    /// <param name="email">The email address of the user to check. This parameter is required to identify which user's existence needs to be verified.</param>
-    /// <returns>Returns a boolean indicating if the user exists by the given email address.</returns>
+    /// <param name="email">The email address to check for user existence.</param>
+    /// <returns>Returns a boolean indicating if the user exists by given email.</returns>
     public async Task<bool> ExistUserByEmailAsync(string email)
     {
         return await _mediator.Send(new UserExistByEmailQuery(email));
@@ -300,10 +300,10 @@ public class UserProfileQueryingService : IUserProfileQueryingService
 
 
     /// <summary>
-    /// Check the existence of a user by their pseudo.
+    /// Check if a user exists based on their pseudonym.
     /// </summary>
-    /// <param name="pseudo">The pseudo of the user whose existence is being checked in the method ExistUserByPseudoAsync.</param>
-    /// <returns>Returns a boolean indicating if a user exists by their pseudo.</returns>
+    /// <param name="pseudo">The pseudonym of the user to check for existence.</param>
+    /// <returns>Returns a boolean indicating user existence by pseudonym.</returns>
     public async Task<bool> ExistUserByPseudoAsync(string pseudo)
     {
         return await _mediator.Send(new UserExistByPseudoQuery(pseudo));
@@ -311,11 +311,11 @@ public class UserProfileQueryingService : IUserProfileQueryingService
 
 
     /// <summary>
-    /// Generate a pseudo name by sending a query with the specified first and last names.
+    /// Generate a pseudonym based on the provided first and last name.
     /// </summary>
-    /// <param name="firstName">The first name to be used in generating a pseudo name.</param>
-    /// <param name="lastName">The last name to be used in generating a pseudo name.</param>
-    /// <returns>Returns the generated pseudo name based on the given first and last names.</returns>
+    /// <param name="firstName">The first name of the individual for whom the pseudonym is being generated.</param>
+    /// <param name="lastName">The last name of the individual for whom the pseudonym is being generated.</param>
+    /// <returns>Returns a pseudonym based on the first and last name provided.</returns>
     public async Task<string> GeneratePseudoAsync(string firstName, string lastName)
     {
         return await _mediator.Send(new UserGeneratePseudoQuery(firstName, lastName));
@@ -323,10 +323,10 @@ public class UserProfileQueryingService : IUserProfileQueryingService
 
 
     /// <summary>
-    /// Count the number of user profiles, applying specified filtering conditions.
+    /// Retrieve the count of user profiles based on specified filter conditions.
     /// </summary>
-    /// <param name="filtersCompositions">Optional. A collection of filter compositions to apply when counting user profiles. If no filters are provided, the count will cover all profiles.</param>
-    /// <returns>Returns the total count of user profiles matching the specified filters.</returns>
+    /// <param name="filtersCompositions">An enumerable collection of filter compositions that specify the conditions to count user profiles. Each filter composition contains a set of criteria used to match profiles.</param>
+    /// <returns>Returns the number of user profiles matching the specified filter conditions.</returns>
     public async Task<int> CountProfilesAsync(IEnumerable<IFiltersComposition<object>>? filtersCompositions = null)
     {
         var fieldNameDecorator = new TransformTextFromMappingDecorator(FilterableFieldMapper.UserPorfileRAtoToRItoDicoMapping);
@@ -337,13 +337,14 @@ public class UserProfileQueryingService : IUserProfileQueryingService
 
 
     /// <summary>
-    /// Retrieve user profiles based on pagination and filtering criteria, and map associated civility information.
+    /// Retrieve user profiles based on specified filters and sort criteria, including civilities mapping.
     /// </summary>
-    /// <param name="skip">The number of records to skip in the pagination. Used for retrieving the next set of records.</param>
-    /// <param name="take">The number of records to take in the pagination. This controls the size of the data set retrieved.</param>
-    /// <param name="filtersCompositions">A collection of filters to apply to the data retrieval. These filters help in narrowing down the data based on certain criteria.</param>
-    /// <param name="sort">The sorting criteria for ordering the user profiles. It allows the data to be sorted based on specific fields.</param>
-    /// <returns>Returns a list of user profiles with associated civility information.</returns>
+    /// <param name="skip">The number of user profiles to skip. Useful for paging through large sets of data.</param>
+    /// <param name="take">The number of user profiles to take. This determines the maximum number of profiles to retrieve in a single operation.</param>
+    /// <param name="filtersCompositions">An optional collection of filter compositions used to narrow down the search results based on specific criteria.</param>
+    /// <param name="sort">An optional sorting criterion to order the retrieved user profiles by specified properties.</param>
+    /// <returns>Returns a task of ordered, filtered user profiles list.
+    </returns>
     public async Task<IEnumerable<IUserProfileRAto>> GetUserProfilesAsync(int skip, int take, IEnumerable<IFiltersComposition<object>>? filtersCompositions = null, ISort? sort = null)
     {
         var fieldNameDecorator = new TransformTextFromMappingDecorator(FilterableFieldMapper.UserPorfileRAtoToRItoDicoMapping);
@@ -361,10 +362,10 @@ public class UserProfileQueryingService : IUserProfileQueryingService
 
 
     /// <summary>
-    /// Retrieve the user profile along with the associated civility information if available.
+    /// Retrieve user profile information, optionally including civility data.
     /// </summary>
-    /// <param name="userId">The ID of the user whose profile is to be retrieved.</param>
-    /// <returns>Returns the user profile with optional civility details.</returns>
+    /// <param name="userId">The unique identifier of the user whose profile information is being retrieved.</param>
+    /// <returns>Returns a user's profile information, optionally with civility data.</returns>
     public async Task<IUserProfileRAto> GetUserProfileAsync(int userId)
     {
         var data = await _mediator.Send(new UserProfileQuery(userId));

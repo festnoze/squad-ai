@@ -67,7 +67,7 @@ def test_parallel_invocations_with_homemade_parallel_chains_invocations(llm: Bas
     for prompt in prompts:
         chain = ChatPromptTemplate.from_template(prompt) | llm
         chains.append(chain)
-    answers = Llm.invoke_parallel_chains(None, True, *chains)
+    answers = Llm.invoke_parallel_chains(None, None, True, *chains)
     for i, answer in enumerate(answers):
         print(f"Answer to prompt n°{i+1}: {Llm.get_llm_answer_content(answer)}")
         print("--------------------------------------------------")
@@ -84,7 +84,7 @@ def test_parallel_chains_invocations_with_imputs(llm: BaseChatModel):
         chain = ChatPromptTemplate.from_template(prompt) | llm
         chains.append(chain)
     inputs = {"input_1": "flowers", "input_2": "darkness", "input_3": "fruits"}
-    answers = Llm.invoke_parallel_chains(inputs, True, *chains)
+    answers = Llm.invoke_parallel_chains(inputs, None, True, *chains)
     for i, answer in enumerate(answers):
         print(f"Answer to prompt n°{i+1}: {Llm.get_llm_answer_content(answer)}")
         print("--------------------------------------------------")

@@ -119,40 +119,71 @@ class Llm:
         for prompt in prompts:
             chain = ChatPromptTemplate.from_template(prompt) | llm
             chains.append(chain)
-        answers = Llm.invoke_parallel_chains(None, with_fallback, *chains)
+        answers = Llm.invoke_parallel_chains(None, None, with_fallback, *chains)
         return answers
 
+    # @staticmethod
+    # def invoke_parallel_chains(inputs: dict = None, batch_size: int = None, with_fallback: bool = True, *chains: Chain) -> list[str]:  
+    #     if with_fallback:
+    #         chains = [chain.with_fallbacks([chain]) for chain in chains]
+            
+    #     # Step 1: Create sequences from chains
+    #     sequences = [RunnableSequence(chain) for chain in chains]
+
+    #     # Step 2: Combine sequences in RunnableParallel
+    #     parallel_sequences = RunnableParallel(**{f"sequence_{i}": seq for i, seq in enumerate(sequences)})
+
+    #     # Step 3: Batch processing 
+    #     if not batch_size:           
+    #         return parallel_sequences.invoke(inputs)
+        
+    #     batches = [inputs[i:i + batch_size] for i in range(0, len(inputs), batch_size)]
+        
+    #     all_responses = []
+    #     for batch in batches:
+    #         # Prepare the inputs for parallel invocation
+    #         batch_inputs = {"input": batch}
+    #         responses = parallel_sequences.batch(batch_inputs)
+    #         all_responses.extend(responses)
+
+    #     return all_responses
+        # parallel_sequence = RunnableParallel(sequence=RunnableSequence(*chains))
+
+        # if not inputs:
+        #     inputs = {"input": ""}
+
+        # if not batch_size:
+        #     results = parallel_sequence.invoke(inputs)
+        # else:
+        #     results = []
+        #     batches = list(Lists.chunk_dict_to_fixed_size_lists(inputs, batch_size))
+        #     for batch in batches:
+        #         batch_results = parallel_sequence.batch(batch)
+        #         results.extend(batch_results)
+
+        # return results
+
     @staticmethod
-    def invoke_parallel_batch_chains(inputs: dict = None, batch_size: int = 1, with_fallback: bool = True, *chains: Chain) -> list[str]:  
+    def invoke_parallel_chains(inputs: dict = None, batch_size: int = None, with_fallback: bool = True, *chains: Chain) -> list[str]:        
         if with_fallback:
             chains = [chain.with_fallbacks([chain]) for chain in chains]
-        parallel_sequence = RunnableParallel(sequence=RunnableSequence(*chains))
-
+        if not batch_size:
+            batch_size = len(chains)        
         if not inputs:
             inputs = {"input": ""}
-        batches = list(Lists.chunk_dict_to_fixed_size_lists(inputs, batch_size))
 
-        results = []
-        for batch in batches:
-            batch_results = parallel_sequence.batch(batch)
-            results.extend(batch_results)
-        return results
+        chains_batches = []
+        for i in range(0, len(chains), batch_size):
+            chains_batches.append(chains[i:i + batch_size])
 
-    @staticmethod
-    def invoke_parallel_chains(inputs: dict = None, with_fallback: bool = True, *chains: Chain) -> list[str]:        
-        if with_fallback:
-            chains = [chain.with_fallbacks([chain]) for chain in chains]
+        answers = []
+        for chains_batch in chains_batches:
+            combined = RunnableParallel(**{f"invoke_{i}": chain for i, chain in enumerate(chains_batch)})
+            responses = combined.invoke(inputs)            
+            responses_list = [responses[key] for key in responses.keys()]
+            batch_answers = [Llm.get_llm_answer_content(response) for response in responses_list]
+            answers.extend(batch_answers)
 
-        combined = RunnableParallel(**{f"invoke_{i}": chain for i, chain in enumerate(chains)})
-
-        # Invoke the combined chain with specific inputs for each chain if specified
-        if not inputs:
-            inputs = {"input": ""}
-        responses = combined.invoke(inputs)
-
-        # Retrieve and print the output from each chain
-        responses_list = [responses[key] for key in responses.keys()]
-        answers = [Llm.get_llm_answer_content(response) for response in responses_list]
         return answers
     
     def handle_error(e):

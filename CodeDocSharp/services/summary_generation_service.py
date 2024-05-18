@@ -150,7 +150,8 @@ class SummaryGenerationService:
                 prompts_or_chains.append(prompt_or_chain)
 
             if with_json_output_parsing:
-                methods_parameters_summaries = Llm.invoke_parallel_chains({Llm.output_parser_instructions_name: format_instructions}, True, *prompts_or_chains)
+                inputs = {Llm.output_parser_instructions_name: format_instructions}
+                methods_parameters_summaries = Llm.invoke_parallel_chains(inputs, None, True, *prompts_or_chains)
                 for i in range(len(methods_parameters_summaries)):
                     if type(methods_parameters_summaries[i]) is list: methods_parameters_summaries[i] = {'params_list': methods_parameters_summaries[i]}
                     methods_parameters_summaries[i] = MethodParametersDocumentation(**methods_parameters_summaries[i])
