@@ -2,7 +2,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langchain_core.output_parsers import StrOutputParser, ListOutputParser, MarkdownListOutputParser, JsonOutputParser
-from langchain.schema.runnable import RunnableParallel
+from langchain.schema.runnable import Runnable, RunnableParallel, RunnableSequence
 from langchain.chains.base import Chain
 from langchain.agents import AgentExecutor, create_tool_calling_agent, create_json_chat_agent, tool
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -12,6 +12,7 @@ from langchain_community.callbacks import get_openai_callback, OpenAICallbackHan
 import inspect
 from typing import TypeVar, Generic, Any
 
+from helpers.lists_helper import Lists
 from helpers.txt_helper import txt
 
 class Llm:
@@ -112,19 +113,37 @@ class Llm:
         return chain, parser.get_format_instructions()
 
     @staticmethod
-    def invoke_parallel_prompts(llm: BaseChatModel, *prompts: str) -> list[str]:        
+    def invoke_parallel_prompts(llm: BaseChatModel, with_fallback: bool = True, *prompts: str) -> list[str]:        
         # Define different chains, assume both use {input} in their templates
         chains = []
         for prompt in prompts:
             chain = ChatPromptTemplate.from_template(prompt) | llm
             chains.append(chain)
-        answers = Llm.invoke_parallel_chains_with_fallback(None, *chains)
+        answers = Llm.invoke_parallel_chains(None, with_fallback, *chains)
         return answers
 
     @staticmethod
-    def invoke_parallel_chains_with_fallback(inputs: dict = None, *chains: Chain) -> list[str]:        
-        # Combine chains for parallel execution
-        combined = RunnableParallel(**{f"invoke_{i}": chain.with_fallbacks([chain]) for i, chain in enumerate(chains)})
+    def invoke_parallel_batch_chains(inputs: dict = None, batch_size: int = 1, with_fallback: bool = True, *chains: Chain) -> list[str]:  
+        if with_fallback:
+            chains = [chain.with_fallbacks([chain]) for chain in chains]
+        parallel_sequence = RunnableParallel(sequence=RunnableSequence(*chains))
+
+        if not inputs:
+            inputs = {"input": ""}
+        batches = list(Lists.chunk_dict_to_fixed_size_lists(inputs, batch_size))
+
+        results = []
+        for batch in batches:
+            batch_results = parallel_sequence.batch(batch)
+            results.extend(batch_results)
+        return results
+
+    @staticmethod
+    def invoke_parallel_chains(inputs: dict = None, with_fallback: bool = True, *chains: Chain) -> list[str]:        
+        if with_fallback:
+            chains = [chain.with_fallbacks([chain]) for chain in chains]
+
+        combined = RunnableParallel(**{f"invoke_{i}": chain for i, chain in enumerate(chains)})
 
         # Invoke the combined chain with specific inputs for each chain if specified
         if not inputs:

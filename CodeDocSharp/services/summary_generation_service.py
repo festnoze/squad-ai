@@ -6,7 +6,7 @@ from langchains.langchain_factory import LangChainFactory
 #
 from helpers.file_helper import file
 from helpers.txt_helper import txt
-from helpers.c_sharp_helpers import CSharpHelper, CSharpXMLDocumentation
+from helpers.c_sharp_helper import CSharpHelper, CSharpXMLDocumentation
 from helpers.llm_helper import Llm
 from models.llm_info import LlmInfo
 from models.method_desc import MethodDesc
@@ -133,7 +133,7 @@ class SummaryGenerationService:
         
         while class_index < len(all_classes):
             prompts, class_index = SummaryGenerationService.get_classes_flatten_prompts_until_max(max_threads, all_classes, methods_summaries_prompts_by_classes, class_index)
-            methods_summaries = Llm.invoke_parallel_prompts(llm, *prompts)
+            methods_summaries = Llm.invoke_parallel_prompts(llm, True, *prompts)
             SummaryGenerationService.apply_generated_summaries_to_classes_methods(known_structures, methods_summaries_prompts_by_classes, methods_summaries)
 
     @staticmethod
@@ -150,12 +150,12 @@ class SummaryGenerationService:
                 prompts_or_chains.append(prompt_or_chain)
 
             if with_json_output_parsing:
-                methods_parameters_summaries = Llm.invoke_parallel_chains_with_fallback({Llm.output_parser_instructions_name: format_instructions}, *prompts_or_chains)
+                methods_parameters_summaries = Llm.invoke_parallel_chains({Llm.output_parser_instructions_name: format_instructions}, True, *prompts_or_chains)
                 for i in range(len(methods_parameters_summaries)):
                     if type(methods_parameters_summaries[i]) is list: methods_parameters_summaries[i] = {'params_list': methods_parameters_summaries[i]}
                     methods_parameters_summaries[i] = MethodParametersDocumentation(**methods_parameters_summaries[i])
             else:
-                methods_parameters_summaries = Llm.invoke_parallel_prompts(llm, *prompts_or_chains)
+                methods_parameters_summaries = Llm.invoke_parallel_prompts(llm, True, *prompts_or_chains)
 
             if with_json_output_parsing:
                 for method, method_params_summaries in zip(class_struct.methods, methods_parameters_summaries):
@@ -172,7 +172,7 @@ class SummaryGenerationService:
             class_prompts = []
             for method in [met for met in class_struct.methods if met.has_return_type()]:
                 class_prompts.append(SummaryGenerationService.get_prompt_for_method_return_summary(method))
-            methods_return_summaries_only = Llm.invoke_parallel_prompts(llm, *class_prompts)
+            methods_return_summaries_only = Llm.invoke_parallel_prompts(llm, True, *class_prompts)
             
             # Apply return method summary only to methods with a return type
             return_index = 0

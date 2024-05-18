@@ -8,148 +8,148 @@ namespace Studi.Api.Lms.User.Application.Interfaces
     {
 
     /// <summary>
-    /// Update the reliability status of a payment using a specific Salesforce ID as a reference. Ensure the provided Salesforce ID is valid, retrieve the associated user ID, and proceed if a valid user ID is found.
+    /// Update the reliability status of a user's payment based on their Salesforce ID.
     /// </summary>
-    /// <param name="salesforceId">The Salesforce ID used to identify and update the reliability status of a payment. Ensure the provided Salesforce ID is valid.</param>
-    /// <param name="code">A unique code associated with the payment process. This code is necessary for identifying the specific action to be taken on the payment.</param>
-    /// <param name="isCsvUpload">A boolean flag indicating whether the payment update is being performed via a CSV upload. Set to true if the update is from a CSV file, otherwise false.</param>
+    /// <param name="salesforceId">The Salesforce ID of the user whose payment reliability status is being updated.</param>
+    /// <param name="code">A unique code associated with the payment reliability status update.</param>
+    /// <param name="isCsvUpload">A boolean indicating whether the update is being uploaded via CSV.</param>
         Task UpdatePaymentReliabilityAsync(string salesforceId, string code, bool isCsvUpload);
 
     /// <summary>
-    /// Attempt to upload a payment reliability data in CSV format.
+    /// Upload a CSV file containing payment reliability data.
     /// </summary>
     /// <param name="file">The CSV file containing payment reliability data to be uploaded.</param>
 
         Task UploadCsvFilePaymentReliabilityAsync(IFormFile file);
 
     /// <summary>
-    /// Update the review date of a user's profile based on the provided user ID and review date.
+    /// Update the review date of a user's profile.
     /// </summary>
-    /// <param name="userId">The unique identifier of the user whose profile review date needs to be updated.</param>
-    /// <param name="reviewDateUtc">The updated review date of the user's profile in UTC. If null, the current date and time will be used.</param>
+    /// <param name="userId">The unique identifier of the user whose profile's review date is being updated.</param>
+    /// <param name="reviewDateUtc">The UTC date and time when the review is to be updated. This parameter is optional and can be null.</param>
 
         Task UpdateUserProfileReviewDateAsync(int userId, DateTime? reviewDate = null);
 
     /// <summary>
-    /// Update a user's profile picture using a given file identifier.
+    /// Update the profile picture for a specified user.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user whose profile picture is to be updated.</param>
-    /// <param name="fileGuid">The unique file identifier for the new profile picture to be set.</param>
+    /// <param name="userId">The unique identifier of the user whose profile picture is being updated.</param>
+    /// <param name="fileGuid">The globally unique identifier of the file representing the new profile picture.</param>
 
         Task UpdateProfilePictureAsync(int userId, Guid fileGuid);
 
     /// <summary>
-    /// Update the header picture for a specified user with the provided file identifier.
+    /// Update the header picture for a specified user using the provided file identifier.
     /// </summary>
-    /// <param name="userId">The unique identifier of the user whose header picture is to be updated.</param>
-    /// <param name="fileGuid">The unique identifier of the file that contains the new header picture.</param>
+    /// <param name="userId">The unique identifier for the user whose header picture is being updated.</param>
+    /// <param name="fileGuid">The unique identifier for the file that will be used as the new header picture.</param>
 
         Task UpdateHeaderPictureAsync(int userId, Guid fileGuid);
 
     /// <summary>
-    /// Update basic information for a user with provided LinkedIn URL and description.
+    /// Update the basic information of a user based on their ID, LinkedIn URL, and description.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user whose basic information needs to be updated.</param>
+    /// <param name="userId">The unique identifier of the user whose basic information is to be updated.</param>
     /// <param name="linkedInUrl">The LinkedIn profile URL of the user. This parameter is optional and can be null.</param>
-    /// <param name="aboutMe">A brief description or biography about the user. This parameter is optional and can be null.</param>
+    /// <param name="aboutMe">A brief description or bio of the user. This parameter is optional and can be null.</param>
 
         Task UpdateBasicInfoAsync(int userId, string? linkedInUrl, string? aboutMe);
 
     /// <summary>
-    /// Update the ranking status for a specified user in a particular school.
+    /// Update the ranking status for a specified user in a specific school.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user whose ranking status is to be updated.</param>
-    /// <param name="schoolId">The unique identifier for the school in which the user's ranking status is to be updated.</param>
-    /// <param name="doesAppearInRanking">A boolean flag indicating whether the user should appear in the ranking (true) or not (false).</param>
+    /// <param name="userId">The ID of the user whose ranking status needs to be updated.</param>
+    /// <param name="schoolId">The ID of the school where the user's ranking status will be updated.</param>
+    /// <param name="doesAppearInRanking">Specifies whether the user should appear in the ranking (true) or not (false).</param>
 
         Task UpdateDoesAppearInRankingAsync(int userId, int schoolId, bool doesAppearInRanking);
 
     /// <summary>
-    /// Update the learner directory status for a specified user to reflect visibility and collaboration settings.
+    /// Update the appearance status of a user in the learner directory based on provided parameters such as user ID, school ID, appearance status, and collaboration openness.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user whose learner directory status is being updated.</param>
-    /// <param name="schoolId">The unique identifier of the school to which the user belongs.</param>
-    /// <param name="doesAppearInLearnerDirectory">A boolean indicating whether the user should appear in the learner directory.</param>
-    /// <param name="isOpenToCollaboration">A boolean indicating whether the user is open to collaboration with other learners.</param>
+    /// <param name="userId">The unique identifier of the user whose appearance status is to be updated in the learner directory.</param>
+    /// <param name="schoolId">The unique identifier of the school associated with the user.</param>
+    /// <param name="doesAppearInLearnerDirectory">A boolean flag indicating whether the user should appear in the learner directory.</param>
+    /// <param name="isOpenToCollaboration">A boolean flag indicating whether the user is open to collaboration with others.</param>
 
         Task UpdateDoesAppearInLearnerDirectoryAsync(int userId, int schoolId, bool doesAppearInLearnerDirectory, bool isOpenToCollaboration);
 
     /// <summary>
-    /// Update the current location details for a specified user, including country and timezone information.
+    /// Update the current geographic location and timezone information for a specified user.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user whose location details are being updated.</param>
-    /// <param name="countryCode">The code representing the country for the user's current location. It can be null if the country is not specified.</param>
-    /// <param name="timezoneId">The identifier for the timezone of the user's current location. It can be null if the timezone is not specified.</param>
+    /// <param name="userId">The unique identifier for the user whose geographic location and timezone information is being updated. This is a required parameter and should be an integer.</param>
+    /// <param name="countryCode">The optional two-letter country code representing the user's current country. This parameter is a string and can be null if the country information is not available.</param>
+    /// <param name="timezoneId">The optional identifier for the user's current timezone. This parameter is a string and may be null if the timezone information is not available.</param>
 
         Task UpdateActualLocationAsync(int userId, string? countryCode, string? timezoneId);
 
     /// <summary>
-    /// Add a new professional experience for a specified user.
+    /// Add a user's professional experience.
     /// </summary>
-    /// <param name="professionalExperienceIto">An instance containing the professional experience information to be added for the specified user.</param>
-    /// <param name="userId">The unique identifier of the user for whom the professional experience is being added.</param>
-    /// <returns>Returns a Task representing the asynchronous operation.</returns>
+    /// <param name="professionalExperienceIto">An object containing the professional experience details to be added for the user.</param>
+    /// <param name="userId">The unique identifier of the user for whom the professional experience is to be added.</param>
+    /// <returns>Returns a task representing the asynchronous operation.</returns>
 
         Task<int> AddUserProfessionalExperienceAsync(ProfessionalExperienceIto professionalExperience, int userId);
 
     /// <summary>
-    /// Update a user's professional experience based on provided details.
+    /// Update the professional experience information for a specified user.
     /// </summary>
-    /// <param name="professionalExperienceId">The unique identifier for the professional experience entry to be updated.</param>
-    /// <param name="professionalExperienceIto">An object containing the new details of the professional experience to update.</param>
+    /// <param name="professionalExperienceId">The unique identifier of the professional experience to be updated.</param>
+    /// <param name="professionalExperienceIto">The object containing updated information about the professional experience.</param>
     /// <param name="userId">The unique identifier of the user whose professional experience is being updated.</param>
 
         Task UpdateUserProfessionalExperienceAsync(int professionalExperienceId, ProfessionalExperienceIto professionalExperienceIto, int userId);
 
     /// <summary>
-    /// Remove a specified professional experience for a user.
+    /// Remove a user’s professional experience based on the provided experience ID and user ID.
     /// </summary>
     /// <param name="professionalExperienceId">The unique identifier of the professional experience to be removed.</param>
-    /// <param name="userId">The unique identifier of the user from whom the professional experience will be removed.</param>
+    /// <param name="userId">The unique identifier of the user whose professional experience is to be removed.</param>
 
         Task RemoveUserProfessionalExperienceAsync(int id, int userId);
 
     /// <summary>
-    /// Replace the latest study information for a specified user.
+    /// Update the latest study information for a specified user.
     /// </summary>
-    /// <param name="userId">The unique identifier for the user whose study information is to be replaced.</param>
-    /// <param name="studyInfos">The new study information that will replace the existing information for the specified user.</param>
+    /// <param name="userId">The unique identifier for the user whose study information is to be updated.</param>
+    /// <param name="studyInfos">A StudyIto object that contains the latest study information to be updated for the specified user.</param>
 
         Task ReplaceLatestStudyInformationsAsync(int userId, StudyIto studyInfos);
 
     /// <summary>
-    /// Update notification registration for a specified user based on provided parameters.
+    /// Update the notification preferences for a specified user based on provided parameters such as school ID, notification type code, and subscription statuses for email and push notifications.
     /// </summary>
-    /// <param name="userId">The unique identifier of the user for whom the notification registration is to be updated.</param>
-    /// <param name="schoolId">The unique identifier of the school associated with the user.</param>
-    /// <param name="notificationTypeCode">The code representing the type of notification to be updated (e.g., email, push).</param>
-    /// <param name="isEmailSubscriptionActive">A nullable boolean indicating whether the email subscription is active. If null, no changes will be made.</param>
-    /// <param name="isPushSubscriptionActive">A nullable boolean indicating whether the push subscription is active. If null, no changes will be made.</param>
+    /// <param name="userId">The unique identifier of the user whose notification preferences are being updated.</param>
+    /// <param name="schoolId">The unique identifier of the school associated with the user's notification preferences.</param>
+    /// <param name="notificationTypeCode">The code representing the type of notification (e.g., email, SMS, push notification) that the user is subscribed to.</param>
+    /// <param name="isEmailSubscriptionActive">A boolean value indicating whether the user's email subscription is active. This can be null if there is no change to the email subscription status.</param>
+    /// <param name="isPushSubscriptionActive">A boolean value indicating whether the user's push notification subscription is active. This can be null if there is no change to the push subscription status.</param>
 
         Task UpdateNotificationRegistration(int userId, int schoolId, string notificationTypeCode, bool? isEmailSubscriptionActive, bool? isPushSubscriptionActive);
 
     /// <summary>
-    /// Update the first connection date for a specified user using the UTC date provided.
+    /// Update the first connection date for a specified user.
     /// </summary>
-    /// <param name="userId">An integer representing the ID of the user whose first connection date is to be updated.</param>
-    /// <param name="connectionDateUtc">An optional DateTime representing the UTC date of the user's first connection. If not provided, the current date and time may be used.</param>
+    /// <param name="userId">The ID of the user for whom the first connection date is to be updated. It is an integer and cannot be null.</param>
+    /// <param name="connectionDateUtc">The first connection date and time for the user, in UTC. This is optional and can be null. If not provided, the current date and time will be used.</param>
 
         Task UpdateUserFirstConnectionDateAsync(int userId, DateTime? connectionDate = null);
 
     /// <summary>
-    /// Create a user profile by fetching necessary details including civility, pseudo, and other personal information, and then sending a command to create the profile with default avatar and background URLs.
+    /// Create a user profile by obtaining the civility information, generating a pseudo name if none is provided, and then sending the user profile creation command with the provided details and default values for the avatar URL and header profile background URL.
     /// </summary>
-    /// <param name="civilityId">An integer representing the user's civility identifier.</param>
-    /// <param name="lastName">A string representing the user's last name.</param>
-    /// <param name="firstName">A string representing the user's first name.</param>
-    /// <param name="birthDate">A DateOnly object representing the user's date of birth.</param>
-    /// <param name="email">A string representing the user's email address.</param>
-    /// <param name="pseudo">An optional string representing the user's pseudonym or nickname.</param>
-    /// <param name="isOfficial">A boolean indicating if the user is an official.</param>
-    /// <param name="isTester">A boolean indicating if the user is a tester.</param>
-    /// <param name="maidenName">An optional string representing the user's maiden name.</param>
-    /// <param name="createBy">A string identifying who created the user profile.</param>
-    /// <returns>Returns a Task representing the asynchronous creation of a user profile.</returns>
+    /// <param name="civilityId">The unique identifier representing the user's civility status. It is an integer value that determines the salutation, such as Mr., Ms., etc.</param>
+    /// <param name="lastName">The last name of the user. This is a required string field that stores the user's family name.</param>
+    /// <param name="firstName">The first name of the user. This is a required string field that stores the user's given name.</param>
+    /// <param name="birthDate">The birth date of the user. This field stores the user's date of birth and is of type DateOnly, which represents a date without time.</param>
+    /// <param name="email">The user's email address. This is a required string field used for user identification and communication.</param>
+    /// <param name="pseudo">An optional pseudonym for the user. This string field allows the user to have a nickname or handle, distinct from their first and last name.</param>
+    /// <param name="isOfficial">A boolean flag indicating whether the user profile is marked as an official profile. This helps differentiate official entities from regular users.</param>
+    /// <param name="isTester">A boolean flag that signifies whether the user is a tester. This can be used to grant specific permissions or access for testing environments.</param>
+    /// <param name="maidenName">An optional field for the user's maiden name if applicable. This string allows storage of the user's last name prior to marriage.</param>
+    /// <param name="createBy">The identifier of the entity that created the user profile. This string stores information about who or what process initiated the profile creation.</param>
+    /// <returns>Returns a Task containing the created UserProfile object.</returns>
 
         Task<int> CreateUserProfileAsync(int civilityId, string lastName, string firstName, DateOnly birthDate, string email, string? pseudo, bool isOfficial, bool isTester, string? maidenName, string createBy);
     }
