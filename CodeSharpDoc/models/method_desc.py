@@ -72,7 +72,7 @@ class MethodDesc(BaseDesc):
             summary_lines = [line.strip().replace('///', '').strip() for line in previous_chunk_last_part.split('\n') if '///' in line]
         
         # get method infos from main code chunk
-        method_sign = code.split(')')[0] + ')'
+        method_sign = code.split('{')[0].strip()
         is_ctor = class_name == method_sign.split('(')[0].strip()
         is_task = 'Task<' in method_sign
         is_async = 'async ' in method_sign
@@ -148,8 +148,12 @@ class MethodDesc(BaseDesc):
     
     @staticmethod
     def get_method_parameters(method_sign: str) -> list[ParameterDesc]:
-        params = [param.strip() for param in method_sign.split('(')[1].split(')')[0].split(',') if param.strip()]
-        return [ParameterDesc.get_param_desc_from_code(param) for param in params]
+        params_start_index = method_sign.index('(') + 1
+        params_end_index = method_sign.rindex(')')
+        params_str = method_sign[params_start_index:params_end_index]
+        params = [param.strip() for param in params_str.split(',') if param.strip()]
+        params_desc = [ParameterDesc.factory_param_desc_from_code(param) for param in params]
+        return params_desc
 
     @staticmethod
     def detect_attributes(code: str) -> list[str]:

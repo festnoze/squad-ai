@@ -61,7 +61,6 @@ class txt:
         self.waiting_spinner_thread = None
         self.start_time: float = None
         self.stop_event = Event()
-        print("\rinit txt - " + str(self.stop_animation))
 
     def print_with_spinner(self, text: str) -> Thread:
         if not txt.activate_print:
@@ -70,37 +69,29 @@ class txt:
 
         # Ensure only one spinner thread is running at a time
         if self.waiting_spinner_thread and self.waiting_spinner_thread.is_alive():
-            raise Exception("Previous waiting spinner thread wasn't halt before creating a new one")
+            raise Exception("Previous waiting spinner thread wasn't halted before creating a new one")
 
+        self.stop_event.clear()
         self.waiting_spinner_thread = Thread(target=self.wait_spinner, args=(text,))
         self.waiting_spinner_thread.daemon = True
         self.waiting_spinner_thread.start()
         return self.waiting_spinner_thread
 
-
-    def wait_spinner(self, prefix):  # Optional prefix text
-        # Spinner characters
+    def wait_spinner(self, prefix):
         chars = "⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹"
-
-        self.stop_animation = False
-        print("\rwaiting_spinner_thread started - " + str(self.stop_animation))
-        while not self.stop_animation:
+        while not self.stop_event.is_set():
             for char in chars:
-                if self.stop_animation:
+                if self.stop_event.is_set():
                     break
                 sys.stdout.write('\r' + prefix + ' ' + char + ' ')
                 sys.stdout.flush()
                 time.sleep(0.1)
 
-
     def stop_spinner(self):
-        self.stop_animation = True
-        print("\rwaiting_spinner_thread stopped - " + str(self.stop_animation))
+        self.stop_event.set()  # Signal the thread to stop
         if self.waiting_spinner_thread:
-            self.stop_animation = True
             self.waiting_spinner_thread.join()
             self.waiting_spinner_thread = None
-
 
     def stop_spinner_replace_text(self, text=None):
         self.stop_spinner()
@@ -114,7 +105,7 @@ class txt:
         else:
             elapsed_str = ''
             if txt.start_time:
-                elapsed_str = txt.get_elapsed_str(self.start_time, time.time())
+                elapsed_str = txt.get_elapsed_str(txt.start_time, time.time())
                 if elapsed_str:
                     elapsed_str = f" {elapsed_str}."             
                 txt.start_time = None
