@@ -61,6 +61,7 @@ class txt:
         self.waiting_spinner_thread = None
         self.start_time: float = None
         self.stop_animation = True
+        print("\rinit txt - " + str(self.stop_animation))
 
     def print_with_spinner(self, text: str) -> Thread:
         if not txt.activate_print:
@@ -82,6 +83,7 @@ class txt:
         chars = "⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹"
 
         self.stop_animation = False
+        print("\rwaiting_spinner_thread started - " + str(self.stop_animation))
         while not self.stop_animation:
             for char in chars:
                 if self.stop_animation:
@@ -93,6 +95,7 @@ class txt:
 
     def stop_spinner(self):
         self.stop_animation = True
+        print("\rwaiting_spinner_thread stopped - " + str(self.stop_animation))
         if self.waiting_spinner_thread:
             self.waiting_spinner_thread.join()
             self.waiting_spinner_thread = None

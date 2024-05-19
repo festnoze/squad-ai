@@ -1,7 +1,7 @@
 from langchain_core.language_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.pydantic_v1 import BaseModel, Field
-from langchain_core.output_parsers import StrOutputParser, ListOutputParser, MarkdownListOutputParser, JsonOutputParser
+from langchain_core.output_parsers import StrOutputParser, ListOutputParser, MarkdownListOutputParser, JsonOutputParser, BaseTransformOutputParser
 from langchain.schema.runnable import Runnable, RunnableParallel, RunnableSequence
 from langchain.chains.base import Chain
 from langchain.agents import AgentExecutor, create_tool_calling_agent, create_json_chat_agent, tool
@@ -66,16 +66,16 @@ class Llm:
         
         return content[start_index:end_index]
     
-    @staticmethod
-    def invoke_llm_with_retry(llm: BaseChatModel, input: str = "", max_retries: int = 3):
-        for i in range(max_retries):
-            try:
-                result = llm.invoke(input)
-                return Llm.get_llm_answer_content(result)
-            except Exception as e:
-                print(f"Error: {e}")
-                print(f"Retrying... {i+1}/{max_retries}")
-        raise Exception(f"LLM failed. Stopped after {max_retries} retries")
+    # @staticmethod
+    # def invoke_llm_with_retry(llm: BaseChatModel, input: str = "", max_retries: int = 3):
+    #     for i in range(max_retries):
+    #         try:
+    #             result = llm.invoke(input)
+    #             return Llm.get_llm_answer_content(result)
+    #         except Exception as e:
+    #             print(f"Error: {e}")
+    #             print(f"Retrying... {i+1}/{max_retries}")
+    #     raise Exception(f"LLM failed. Stopped after {max_retries} retries")
 
 
     TPydanticModel = TypeVar('TPydanticModel', bound=BaseModel)    
@@ -83,7 +83,7 @@ class Llm:
     output_parser_instructions_name: str = 'output_parser_instructions'
 
     @staticmethod
-    def get_chain_for_json_output_parser(llm: BaseChatModel, prompt_str: str, json_type: TPydanticModel, output_type: TOutputModel):
+    def get_prompt_and_json_output_parser(llm: BaseChatModel, prompt_str: str, json_type: TPydanticModel, output_type: TOutputModel):
         assert issubclass(json_type, BaseModel), "json_type must inherit from BaseModel"
         assert inspect.isclass(output_type), "output_type must be a class"
         prompt = ChatPromptTemplate.from_messages(
@@ -93,23 +93,47 @@ class Llm:
             ]
         )    
         parser = JsonOutputParser(pydantic_object=json_type)
-        chain = prompt | llm | parser
-        return chain, parser.get_format_instructions()
+        return prompt, parser
 
     @staticmethod
-    def invoke_parallel_prompts(llms_with_fallbacks: Union[BaseChatModel, list[BaseChatModel]], batch_size: int = None, *prompts: str) -> list[str]:        
+    def invoke_parallel_prompts(llm: BaseChatModel, *prompts: Union[str, ChatPromptTemplate]) -> list[str]:
+        return Llm.invoke_parallel_prompts_with_batchs([llm], None, None, *prompts)
+    
+    @staticmethod
+    def invoke_parallel_prompts_with_parser_batchs_fallbacks(llms_with_fallbacks: Union[BaseChatModel, list[BaseChatModel]], output_parser: BaseTransformOutputParser, batch_size: int = None, *prompts: Union[str, ChatPromptTemplate]) -> list[str]:        
         if not isinstance(llms_with_fallbacks, list):
             llms_with_fallbacks = [llms_with_fallbacks]
         chains = []
         for prompt in prompts:
-            chain = ChatPromptTemplate.from_template(prompt) | llms_with_fallbacks[0]
-            if len(llms_with_fallbacks) > 1:
-                for llm_for_fallback in llms_with_fallbacks[1:]:
-                    chain = chain.with_fallbacks(ChatPromptTemplate.from_template(prompt) | llm_for_fallback)
-            chains.append(chain)
-        answers = Llm._invoke_parallel_chains(None, batch_size, *chains)
-        return answers
+            # create chain out of str prompt transformed to  ChatPromptTemplate and specified LLM
+            chain = Llm.prompt_as_chat_prompt_template(prompt) | llms_with_fallbacks[0]
+            # add output parser to the chain if specified
+            if output_parser: chain = chain | output_parser
 
+            # add fallbacks to the chain if more than one LLMs are specified
+            if len(llms_with_fallbacks) > 1:
+                fallback_chains = [
+                    Llm.prompt_as_chat_prompt_template(prompt) | llm_for_fallback | output_parser 
+                    if output_parser else ChatPromptTemplate.from_template(prompt) | llm_for_fallback
+                    for llm_for_fallback in llms_with_fallbacks[1:]
+                ]
+                chain = chain.with_fallbacks(fallback_chains)
+            chains.append(chain)
+
+        # If output parser is JsonOutputParser, add the instructions to the input
+        inputs = None
+        if output_parser and isinstance(output_parser, JsonOutputParser):
+            inputs = {Llm.output_parser_instructions_name: output_parser.get_instructions()}
+        
+        answers = Llm._invoke_parallel_chains(inputs, batch_size, *chains)
+
+        return answers
+    
+    @staticmethod
+    def prompt_as_chat_prompt_template(prompt: str) -> ChatPromptTemplate:
+        if isinstance(prompt, ChatPromptTemplate):
+            return prompt
+        return ChatPromptTemplate.from_template(prompt)
     @staticmethod
     def _invoke_parallel_chains(inputs: dict = None, batch_size: int = None, *chains: Chain) -> list[str]:
         if not batch_size:

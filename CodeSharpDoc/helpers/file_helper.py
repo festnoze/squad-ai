@@ -81,24 +81,17 @@ class file:
     
     @staticmethod
     def get_all_folder_and_subfolders_files(path, extension=None):
-        if not os.path.exists(path):
-            return []
-        if os.path.isfile(path):
-            return [path]
-        file_list = []  
+        all_files = []        
         for root, dirs, files in os.walk(path):
             for file in files:
                 if extension is None or file.endswith(extension):
-                    file_list.append(os.path.join(root, file))
-            for dir in dirs:
-                file_list.append(file.get_all_folder_and_subfolders_files(dir, extension))
-        return file_list
+                    all_files.append(os.path.join(root, file))        
+        return all_files
     
-    def copy_folder_files_to_folder(source_folder, destination_folder):
+    def copy_folder_files_and_folders_to_folder(source_folder, destination_folder):
         if not os.path.exists(destination_folder):
             os.makedirs(destination_folder)
-        for filename in os.listdir(source_folder):
-            shutil.copy(os.path.join(source_folder, filename), destination_folder)
+        shutil.copytree(source_folder, destination_folder, dirs_exist_ok=True)
     
     @staticmethod
     def load_csharp_files(file_path):

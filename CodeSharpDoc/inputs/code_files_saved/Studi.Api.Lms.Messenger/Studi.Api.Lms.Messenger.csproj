@@ -1,0 +1,44 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+	<TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+	<GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+	<ItemGroup>
+    <PackageReference Include="Hangfire" Version="1.8.5" />
+    <PackageReference Include="Hangfire.Core" Version="1.8.5" />
+    <PackageReference Include="Hangfire.MemoryStorage" Version="1.8.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="6.0.18" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="6.0.16">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="6.0.16">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.19.4" />
+    <PackageReference Include="Studi.Api.Core" Version="1.18.2" />
+    <PackageReference Include="Studi.Api.Lms.Messenger.ExchangeDataContract" Version="0.1.1" />
+    <PackageReference Include="System.ComponentModel.TypeConverter" Version="4.3.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Studi.Api.Lms.Messenger.Application\Studi.Api.Lms.Messenger.Application.csproj" />
+    <ProjectReference Include="..\Studi.Api.Lms.Messenger.Localization.Error\Studi.Api.Lms.Messenger.Localization.Error.csproj" />
+    <ProjectReference Include="..\Studi.Api.Lms.Messenger.Shared\Studi.Api.Lms.Messenger.Shared.csproj" />
+    <ProjectReference Include="..\Studi.Api.Lms.Messenger.Utils\Studi.Api.Lms.Messenger.Utils.csproj" />
+  </ItemGroup>
+
+	<Target Name="_ResolveCopyLocalNuGetPkgXmls" AfterTargets="ResolveReferences">
+		<ItemGroup>
+			<!-- Copy XML files from all PackageReferences to output dir -->
+			<ReferenceCopyLocalPaths Include="@(ReferenceCopyLocalPaths->'%(RootDir)%(Directory)%(Filename).xml')" Condition="'%(ReferenceCopyLocalPaths.NuGetPackageId)'!='' and Exists('%(RootDir)%(Directory)%(Filename).xml')" />
+		</ItemGroup>
+	</Target>
+
+</Project>

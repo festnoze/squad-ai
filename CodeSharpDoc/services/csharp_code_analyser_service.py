@@ -20,13 +20,16 @@ class CSharpCodeStructureAnalyser:
         all_parsed_structs = []
         for file_path, code in paths_and_codes.items():
             structure_description: StructureDesc = CSharpCodeStructureAnalyser.get_code_structure(llm, file_path, code)
-            all_parsed_structs.append(structure_description)
+            if structure_description:
+                all_parsed_structs.append(structure_description)
         return all_parsed_structs
     
     @staticmethod
     def get_code_structure(llm: BaseChatModel, file_path: str, code: str, chunk_size:int = 8000, chunk_overlap: int = 0) -> BaseDesc:
         found_struct_separators, separator_indexes, splitted_struct_contents = CSharpCodeStructureAnalyser.split_by_class_interface_enum_definition(code)
         
+        if len(found_struct_separators) == 0:
+            return None
         # TODO: don't yet handle files with multiple class/interface/enum definitions (can happened, especially in transfert objects files)
         if len(splitted_struct_contents) > 2:
             raise Exception('Multiple class/interface/enum definitions per file are not yet supported')
