@@ -9,7 +9,9 @@ site-packages/
 /__pycache__
 
 # CodeSharpDoc
-code_files_generated/
+/code_files_generated
+/code_files_saved
+
 
 # VS files and dir to ignore
 
