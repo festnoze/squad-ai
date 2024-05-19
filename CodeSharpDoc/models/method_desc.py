@@ -60,7 +60,7 @@ class MethodDesc(BaseDesc):
         return self.has_attributs and len(self.attributs) > 0
 
     @staticmethod
-    def factory_for_class_code(code: str, start_index: int, previous_chunk:str, class_name: str) -> 'MethodDesc':
+    def factory_for_method_from_class_code(code: str, start_index: int, previous_chunk:str, class_name: str) -> 'MethodDesc':
         #retrieve summary and attributs from previous chunk
         previous_chunk_last_double_newline_index = previous_chunk.rfind('\n\n')
         previous_chunk_last_brace_index = previous_chunk.rfind('}')

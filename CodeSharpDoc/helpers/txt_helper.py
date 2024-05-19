@@ -2,7 +2,7 @@ import sys
 import threading
 import time
 from helpers.python_helpers import staticproperty
-from threading import Thread
+from threading import Event, Thread
 
 class txt:
     def indent(indent_level: int, code: str) -> str:
@@ -60,7 +60,7 @@ class txt:
     def __init__(self):
         self.waiting_spinner_thread = None
         self.start_time: float = None
-        self.stop_animation = True
+        self.stop_event = Event()
         print("\rinit txt - " + str(self.stop_animation))
 
     def print_with_spinner(self, text: str) -> Thread:
@@ -97,6 +97,7 @@ class txt:
         self.stop_animation = True
         print("\rwaiting_spinner_thread stopped - " + str(self.stop_animation))
         if self.waiting_spinner_thread:
+            self.stop_animation = True
             self.waiting_spinner_thread.join()
             self.waiting_spinner_thread = None
 

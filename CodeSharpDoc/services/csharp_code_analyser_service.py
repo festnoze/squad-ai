@@ -112,7 +112,7 @@ class CSharpCodeStructureAnalyser:
                 if CSharpCodeStructureAnalyser.is_property(StructureType.Class, first_line):
                     properties.append(PropertyDesc.get_property_desc_from_code(code_chunk))
                 else: # is method
-                    methods.append(MethodDesc.factory_for_class_code(code_chunk, separator_indexes[chunk_index - 1], code_chunks[chunk_index - 1], class_name))
+                    methods.append(MethodDesc.factory_for_method_from_class_code(code_chunk, separator_indexes[chunk_index - 1], code_chunks[chunk_index - 1], class_name))
         
         return StructureDesc(
                     file_path=file_path, 
