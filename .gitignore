@@ -12,6 +12,10 @@ site-packages/
 /code_files_generated
 /code_files_saved
 
+/inputs/code_files_generated/
+/inputs/code_files_saved/
+inputs/code_files_generated/
+inputs/code_files_saved/
 
 # VS files and dir to ignore
 
