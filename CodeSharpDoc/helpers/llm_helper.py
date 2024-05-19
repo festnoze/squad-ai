@@ -83,7 +83,7 @@ class Llm:
     output_parser_instructions_name: str = 'output_parser_instructions'
 
     @staticmethod
-    def get_prompt_and_json_output_parser(llm: BaseChatModel, prompt_str: str, json_type: TPydanticModel, output_type: TOutputModel):
+    def get_prompt_and_json_output_parser(prompt_str: str, json_type: TPydanticModel, output_type: TOutputModel):
         assert issubclass(json_type, BaseModel), "json_type must inherit from BaseModel"
         assert inspect.isclass(output_type), "output_type must be a class"
         prompt = ChatPromptTemplate.from_messages(
@@ -96,11 +96,13 @@ class Llm:
         return prompt, parser
 
     @staticmethod
-    def invoke_parallel_prompts(llm: BaseChatModel, *prompts: Union[str, ChatPromptTemplate]) -> list[str]:
-        return Llm.invoke_parallel_prompts_with_batchs([llm], None, None, *prompts)
+    def invoke_parallel_prompts(llms: Union[BaseChatModel, list[BaseChatModel]], *prompts: Union[str, ChatPromptTemplate]) -> list[str]:
+        return Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(llms, None, None, *prompts)
     
     @staticmethod
-    def invoke_parallel_prompts_with_parser_batchs_fallbacks(llms_with_fallbacks: Union[BaseChatModel, list[BaseChatModel]], output_parser: BaseTransformOutputParser, batch_size: int = None, *prompts: Union[str, ChatPromptTemplate]) -> list[str]:        
+    def invoke_parallel_prompts_with_parser_batchs_fallbacks(llms_with_fallbacks: Union[BaseChatModel, list[BaseChatModel]], output_parser: BaseTransformOutputParser, batch_size: int = None, *prompts: Union[str, ChatPromptTemplate]) -> list[str]:
+        if len(prompts) == 0:
+            return []        
         if not isinstance(llms_with_fallbacks, list):
             llms_with_fallbacks = [llms_with_fallbacks]
         chains = []
@@ -123,10 +125,9 @@ class Llm:
         # If output parser is JsonOutputParser, add the instructions to the input
         inputs = None
         if output_parser and isinstance(output_parser, JsonOutputParser):
-            inputs = {Llm.output_parser_instructions_name: output_parser.get_instructions()}
+            inputs = {Llm.output_parser_instructions_name: output_parser.get_format_instructions()}
         
         answers = Llm._invoke_parallel_chains(inputs, batch_size, *chains)
-
         return answers
     
     @staticmethod
@@ -136,6 +137,8 @@ class Llm:
         return ChatPromptTemplate.from_template(prompt)
     @staticmethod
     def _invoke_parallel_chains(inputs: dict = None, batch_size: int = None, *chains: Chain) -> list[str]:
+        if len(chains) == 0:
+            return []
         if not batch_size:
             batch_size = len(chains)        
         if not inputs:
@@ -207,14 +210,16 @@ class Llm:
         return rate
     
     def display_tokens_consumption(cb: OpenAICallbackHandler):
-        max_len = max(len(str(cb.completion_tokens)), len(str(cb.prompt_tokens)), len(str(cb.total_tokens))) + 2
+        max_len = len(Llm.format_number(cb.total_tokens)) + 2
         cost_eur = cb.total_cost / Llm.get_eur_usd_rate()
         print("Token consumption:")
-        print(f"Input prompt: {cb.prompt_tokens}")
-        print(f"Completion: + {cb.completion_tokens}")    
+        print(f"Input prompt: {Llm.format_number(cb.prompt_tokens)}")
+        print(f"Completion: + {Llm.format_number(cb.completion_tokens)}")    
         print(f"            " + "-" * max_len)
-        print(f"Total tokens: {cb.total_tokens}")
+        print(f"Total tokens: {Llm.format_number(cb.total_tokens)}")
         print(f"Total cost:   {cost_eur:.3f}€ ({cb.total_cost:.3f}$)")
         if cb.total_tokens > 0:
             print(f"(Cost by 1M tokens: {(1000000 * cb.total_cost / cb.total_tokens):.3f}$)\n") 
-        
+    
+    def format_number(number: int) -> str:
+        return "{:,}".format(number).replace(",", " ")

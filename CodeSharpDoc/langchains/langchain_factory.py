@@ -10,20 +10,23 @@ from models.llm_info import LlmInfo
 
 class LangChainFactory():
     @staticmethod
-    def create_llms_from_info(llms_infos: list[LlmInfo]):
+    def create_llms_from_infos(llms_infos: list[LlmInfo]) -> list[BaseChatModel]:
         if len(llms_infos) == 0:
             raise ValueError("No LLM info provided.")
         if isinstance(llms_infos, LlmInfo):
             llms_infos = [llms_infos]
-            
-        for llm_info in llms_infos:
-            yield LangChainFactory.create_llm(
-            adapter_type= llm_info.type,
-            llm_model_name= llm_info.model,
-            timeout_seconds= llm_info.timeout,
-            temperature= llm_info.temperature,
-            api_key= llm_info.api_key)
 
+        llms: list[BaseChatModel] = []
+        for llm_info in llms_infos:
+            llm = LangChainFactory.create_llm(
+                adapter_type= llm_info.type,
+                llm_model_name= llm_info.model,
+                timeout_seconds= llm_info.timeout,
+                temperature= llm_info.temperature,
+                api_key= llm_info.api_key)
+            llms.append(llm)
+        return llms
+    
     @staticmethod
     def create_llm(adapter_type: LangChainAdapterType, llm_model_name: str, timeout_seconds: int = 50, temperature: float = 0.1, api_key: str = None) -> BaseChatModel:
         llm: BaseChatModel = None

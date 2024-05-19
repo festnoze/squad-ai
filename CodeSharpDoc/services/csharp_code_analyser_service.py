@@ -100,15 +100,14 @@ class CSharpCodeStructureAnalyser:
         for code_chunk in code_chunks:
             chunk_index += 1
             first_line = code_chunk.split('\n')[0]
-            if chunk_index == 0:
-                # detect if inherit from an interface
+            if chunk_index == 0: # describe class signature
                 if CSharpCodeStructureAnalyser.has_interfaces(first_line):
                     class_name = first_line.split(':')[0].strip()
                     interfaces_names = [name.strip() for name in first_line.split(':')[1].split(',')]
                 else:
-                    class_name = first_line[0].split('(')
+                    class_name = first_line.strip()
                     interfaces_names = []
-            else:
+            else: # describe class content, like: methods and properties
                 if CSharpCodeStructureAnalyser.is_property(StructureType.Class, first_line):
                     properties.append(PropertyDesc.get_property_desc_from_code(code_chunk))
                 else: # is method
