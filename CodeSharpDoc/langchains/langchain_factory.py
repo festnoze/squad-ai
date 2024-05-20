@@ -61,7 +61,7 @@ class LangChainFactory():
         )
         
     @staticmethod     
-    def create_llm_groq(self, llm_model_name: str, api_key: str, timeout_seconds: int = 50, temperature:float = 0.1) -> ChatGroq:
+    def create_llm_groq(llm_model_name: str, api_key: str, timeout_seconds: int = 50, temperature:float = 0.1) -> ChatGroq:
         return ChatGroq(    
             name= f"chat_groq_{str(uuid.uuid4())}",
             model_name= llm_model_name,

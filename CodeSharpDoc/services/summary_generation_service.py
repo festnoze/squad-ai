@@ -231,8 +231,8 @@ class SummaryGenerationService:
                 For example: 'Retrieve the last message for a specified user' is a good formated answer, where as:
                 'This method retrieves the last message by user ID' is not formated correctly.""")
         prompt = txt.single_line(f"""
-                Analyse method name and the method code to produce a summary of it's functionnal purpose and behavior 
-                without any mention to the method name or any technicalities, nor any mention whether it's asynchronous. 
+                Analyse method name and the method code to produce a single sentence summary of it's functionnal purpose and behavior 
+                without any mention to the method name or any technicalities, nor any mention whether it's asynchronous, nor to its parameter, unless itmake sense to explain the method purpose. 
                 {SummaryGenerationService.ctor_txt if method.is_ctor else ""} {output_format}             
                 The method name is: '{method.method_name}' and its full code is: """)
         
