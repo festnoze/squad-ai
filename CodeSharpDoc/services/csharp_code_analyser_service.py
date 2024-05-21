@@ -39,6 +39,8 @@ class CSharpCodeStructureAnalyser:
         access_modifier = found_struct_separators[-1].split()[0]
         struct_type: str = found_struct_separators[-1].split()[-1]
 
+        namespace_name = ''
+        usings = []
         if first_chunk_has_namespace:
             namespace_name = re.search(r'namespace\s+([\w.]+)[\s;]*', splitted_struct_contents[0]).group(1)
         if first_chunk_has_usings:
@@ -51,7 +53,7 @@ class CSharpCodeStructureAnalyser:
         elif struct_type == StructureType.Interface.value:
             struct_desc = CSharpCodeStructureAnalyser.interface_extract_methods_and_props(llm, file_path, separator_indexes[0], namespace_name, usings, access_modifier, splitted_struct_contents[-1])
         elif struct_type == StructureType.Enum.value:
-            pass
+            return None
         return struct_desc
     
     def split_class_methods_and_add_to_class_desc(class_desc: StructureDesc, chunk_size:int = 8000, chunk_overlap: int = 0):

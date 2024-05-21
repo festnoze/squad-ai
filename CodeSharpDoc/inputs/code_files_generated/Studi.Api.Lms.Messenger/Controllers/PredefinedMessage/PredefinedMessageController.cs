@@ -9,6 +9,9 @@ using System.Net;
 
 namespace Studi.Api.Lms.Messenger.Controllers.PredefinedMessage
 {
+    /// <summary>
+    /// Controller for managing predefined messages and related operations.
+    /// </summary>
     [ApiController]
     [Route("v{version:apiVersion}/predefined-messages")]
     [Authorize]
@@ -16,24 +19,21 @@ namespace Studi.Api.Lms.Messenger.Controllers.PredefinedMessage
     {
         private readonly IPredefinedMessageService _predefinedMessageService;
 
-
-    /// <summary>
-    /// Create a message with specified content, audio, and attachments for a conversation involving a user at a specific school.
-    /// </summary>
-    /// <param name="predefinedMessageService">The IPredefinedMessageService instance used to access predefined messages.</param>
-    /// <param name="PredefinedMessageController">The constructor method for the PredefinedMessageController class.</param>
+        /// <summary>
+        /// Initializes a new instance of the <see cref="PredefinedMessageController"/> class.
+        /// </summary>
+        /// <param name="predefinedMessageService">The predefined message service to be injected.</param>
         public PredefinedMessageController(IPredefinedMessageService predefinedMessageService)
         {
             _predefinedMessageService = predefinedMessageService;
         }
 
-
-    /// <summary>
-    /// Initialize the predefined message service for the controller.
-    /// </summary>
-    /// <param name="userId">The ID of the user.</param>
-    /// <param name="schoolIds">A list of IDs representing the schools.</param>
-    /// <returns>Returns a list of predefined messages for the specified user and schools.</returns>
+        /// <summary>
+        /// Retrieves predefined messages.
+        /// </summary>
+        /// <param name="userId">The user ID</param>
+        /// <param name="schoolIds">The list of school IDs</param>
+        /// <returns>A collection of predefined messages.</returns>
         [HttpGet]
         [SwaggerResponse((int)HttpStatusCode.OK, Type = typeof(List<PredefinedMessageResponseModel>))]
         [ApiVersion("1")]
@@ -45,19 +45,18 @@ namespace Studi.Api.Lms.Messenger.Controllers.PredefinedMessage
             return predefinedMessages;
         }
 
+        /// <summary>
+        /// Retrieves predefined message content by its ID.
+        /// </summary>
+        /// <param name="id">The ID of the predefined message.</param>
+        /// <param name="userId">The user ID</param>
+        /// <param name="schoolIds">The list of school IDs</param>
+        /// <returns>The content of the predefined message.</returns>
         [HttpGet]
         [Route("{id:int}")]
         [SwaggerResponse((int)HttpStatusCode.OK, Type = typeof(string))]
         [ApiVersion("1")]
         [SkipCheckParamsAgainstLmsToken]
-
-    /// <summary>
-    /// Retrieve predefined messages asynchronously and convert them to predefined message response models.
-    /// </summary>
-    /// <param name="id">The ID of the predefined message content to retrieve.</param>
-    /// <param name="userId">The ID of the user for whom the predefined messages are being retrieved.</param>
-    /// <param name="schoolIds">A list of IDs representing the schools for which predefined messages are requested.</param>
-    /// <returns>Returns predefined message content based on ID, user ID, and school IDs.</returns>
         public async Task<PredefinedMessageContentResponseModel> GetPredefinedMessageContentByIdAsync(int id, [FromQuery(Name = "user-id")] int userId, [FromQuery(Name = "school-id")] List<int> schoolIds)
         {
             var predefinedMessageContentStr = await _predefinedMessageService.GetPredefinedMessageContentByIdAsync(id);

@@ -22,6 +22,9 @@ using Studi.Api.Core.ListingSelector.Filtering.AvailableFilters;
 
 namespace Studi.Api.Lms.Messenger.Controllers.Conversation;
 
+/// <summary>
+/// Controller for managing conversations and related operations.
+/// </summary>
 [ApiController]
 [Route("v{version:apiVersion}/conversations")]
 [Authorize]
@@ -31,13 +34,12 @@ public class ConversationController : ControllerBase
     private readonly IMessageService _messageService;
     private readonly IAvailableFilters<IConversationListing> _availableFiltersForConversation;
 
-
     /// <summary>
-    /// Initialize a ConversationController with the necessary services and filters.
+    /// Initializes a new instance of the <see cref="ConversationController"/> class.
     /// </summary>
-    /// <param name="conversationService">This parameter is of type IConversationService and represents the service responsible for managing conversations.</param>
-    /// <param name="messageService">This parameter is of type IMessageService and represents the service responsible for managing messages within conversations.</param>
-    /// <param name="availableFiltersForConversation">This parameter is of type IAvailableFilters<IConversationListing> and represents the available filters that can be applied to conversation listings.</param>
+    /// <param name="conversationService">The conversation service.</param>
+    /// <param name="messageService">The message service.</param>
+    /// <param name="availableFiltersForConversation">The available filters for conversations.</param>
     public ConversationController(IConversationService conversationService, IMessageService messageService, IAvailableFilters<IConversationListing> availableFiltersForConversation)
     {
         _conversationService = conversationService;
@@ -45,15 +47,14 @@ public class ConversationController : ControllerBase
         _availableFiltersForConversation = availableFiltersForConversation;
     }
 
-
     /// <summary>
-    /// Create a conversation with specified parameters and enable notifications if necessary.
+    /// Creates a new conversation.
     /// </summary>
-    /// <param name="conversationBM">The ConversationRequestModel object containing the details of the conversation to be created.</param>
-    /// <param name="userId">The integer representing the unique identifier of the user initiating the conversation.</param>
-    /// <param name="schoolIds">The list of integers representing the unique identifiers of the schools associated with the conversation.</param>
-    /// <param name="enableNotification">The boolean indicating whether notifications for the created conversation should be enabled. Defaults to true if not specified.</param>
-    /// <returns>Returns a Task representing the asynchronous creation of a conversation.</returns>
+    /// <param name="conversationBM">The conversation request model.</param>
+    /// <param name="userId">The user ID.</param>
+    /// <param name="schoolIds">The school IDs.</param>
+    /// <param name="enableNotification">Indicates whether to enable notification.</param>
+    /// <returns>The response model of the created conversation.</returns>
     [HttpPost]
     [HttpCode(HttpStatusCode.Created)]
     [SwaggerOperation("CreateConversation")]
@@ -70,12 +71,11 @@ public class ConversationController : ControllerBase
         return conversation.ToResponseModel(userId);
     }
 
-
     /// <summary>
-    /// Create a list of conversations asynchronously based on specified parameters, returning the result as view models.
+    /// Creates a list of conversations.
     /// </summary>
-    /// <param name="conversationBMs">The IEnumerable of ConversationRequestModel instances representing conversation business models. These models will be used to create a list of conversations asynchronously.</param>
-    /// <returns>Returns a Task<List<ConversationViewModel>> representing a list of conversations view models.</returns>
+    /// <param name="conversationBMs">The conversation request models.</param>
+    /// <returns>The list of response models indicating if each conversation was created or not.</returns>
     [HttpPost]
     [HttpCode(HttpStatusCode.Created)]
     [Route("range")]
@@ -94,14 +94,13 @@ public class ConversationController : ControllerBase
         return conversationCreatedOrNotVMs;
     }
 
-
     /// <summary>
-    /// Retrieve the count of conversations for a specified user, considering various conditions like user type and school IDs.
+    /// Count conversations based on provided criteria.
     /// </summary>
-    /// <param name="listingSelector">IListingSelector<IConversationListing> listingSelector: The parameter represents a selector for conversation listings. It allows specifying the type of conversation listing to retrieve.</param>
-    /// <param name="userId">int userId: The parameter holds the unique identifier of the user for whom the conversation count is being retrieved.</param>
-    /// <param name="schoolIds">List<int> schoolIds: The parameter contains a list of unique identifiers representing the schools for which the conversations count is calculated. Multiple school IDs can be provided to consider conversations across multiple schools.</param>
-    /// <returns>Returns the count of conversations for a specified user.</returns>
+    /// <param name="listingSelector">The listing selector for filtering and pagination.</param>
+    /// <param name="userId">The user ID.</param>
+    /// <param name="schoolIds">The school IDs.</param>
+    /// <returns>number of Conversations</returns>
     [HttpPost]
     [Route("count")]
     [SwaggerOperation("CountConversations")]
@@ -118,14 +117,13 @@ public class ConversationController : ControllerBase
         return countConversation;
     }
 
-
     /// <summary>
-    /// Retrieve paginated conversations based on specified criteria and user ID, taking into account whether the request is from an intranet or LMS user.
+    /// Searches for paginated conversations based on provided criteria.
     /// </summary>
-    /// <param name="listingSelector">An object of type IListingSelector<IConversationListing> representing the criteria for selecting conversations.</param>
-    /// <param name="userId">An integer representing the unique identifier of the user for whom conversations are being retrieved.</param>
-    /// <param name="schoolIds">A list of integers containing the unique identifiers of schools for which conversations are being retrieved.</param>
-    /// <returns>Returns paginated conversations based on specified criteria and user ID.</returns>
+    /// <param name="listingSelector">The listing selector for filtering and pagination.</param>
+    /// <param name="userId">The user ID.</param>
+    /// <param name="schoolIds">The school IDs.</param>
+    /// <returns>The paginated data of conversation response models.</returns>
     [HttpPost]
     [Route("get")]
     [SwaggerOperation("SearchPaginatedConversations")]
@@ -150,19 +148,18 @@ public class ConversationController : ControllerBase
         return paginedData;
     }
 
+    /// <summary>
+    /// Retrieves general information about a conversation based on its identifier.
+    /// </summary>
+    /// <param name="conversationId">The identifier of the conversation.</param>
+    /// <param name="userId">The user identifier.</param>
+    /// <param name="schoolId">The school identifier, if applicable.</param>
+    /// <returns>The general information about the specified conversation.</returns>
     [HttpGet]
     [Route("{conversationId:int}")]
     [SwaggerOperation("GetConversationGeneralInfos")]
     [SwaggerResponse((int)HttpStatusCode.OK, Type = typeof(ConversationResponseModel))]
     [ApiVersion("1")]
-
-    /// <summary>
-    /// Retrieve general information for a conversation involving multiple schools asynchronously.
-    /// </summary>
-    /// <param name="conversationId">The identifier of the conversation for which general information is to be retrieved.</param>
-    /// <param name="userId">The identifier of the user requesting the general information.</param>
-    /// <param name="schoolId">The identifier of the school to which the conversation belongs. This parameter is optional as it may not be applicable for conversations involving multiple schools.</param>
-    /// <returns>Returns general information for a conversation involving multiple schools asynchronously.</returns>
     public async Task<ConversationResponseModel> GetConversationGeneralInfosAsync(int conversationId, [FromQuery(Name = "user-id")] int userId, [FromQuery(Name = "school-id")] int? schoolId)
     {
         var schoolIds = schoolId != null ? new List<int> { (int)schoolId } : new List<int>();
@@ -174,20 +171,19 @@ public class ConversationController : ControllerBase
         return conversationAto.ToResponseModel(userId);
     }
 
+    /// <summary>
+    /// Retrieves paginated messages associated with a specific conversation.
+    /// </summary>
+    /// <param name="conversationId">The identifier of the conversation.</param>
+    /// <param name="listingSelector">The selector to specify pagination and other listing parameters.</param>
+    /// <param name="userId">The user identifier.</param>
+    /// <param name="schoolIds">List of school identifiers.</param>
+    /// <returns>A paginated list of messages for the specified conversation.</returns>
     [HttpPost]
     [Route("{conversationId:int}/messages/get")]
     [SwaggerOperation("SearchPaginatedMessagesByConversation")]
     [SwaggerResponse((int)HttpStatusCode.OK, Type = typeof(MessageResponseModel))]
     [ApiVersion("1")]
-
-    /// <summary>
-    /// Retrieve paginated conversation messages asynchronously based on the specified page number and page size, ensuring the page number and page size are valid.
-    /// </summary>
-    /// <param name="conversationId">The ID of the conversation for which messages are to be retrieved. It should be an integer.</param>
-    /// <param name="listingSelector">The selector object that specifies the criteria for listing conversations. It should implement the IListingSelector interface with a type of IConversationListing.</param>
-    /// <param name="userId">The ID of the user for whom the conversation messages are being retrieved. It should be an integer.</param>
-    /// <param name="schoolIds">A list of IDs representing the schools for which messages are to be retrieved. Each ID in the list should be an integer.</param>
-    /// <returns>Returns paginated conversation messages asynchronously.</returns>
     public async Task<PaginedData<MessageResponseModel>> GetPaginatedConversationMessagesAsync(int conversationId, [FromBody] IListingSelector<IConversationListing> listingSelector, [FromQuery(Name = "user-id")] int userId, [FromQuery(Name = "school-id")] List<int> schoolIds)
     {
         var pageNumber = listingSelector.Pagination?.PageNumber ?? 1;
@@ -209,13 +205,12 @@ public class ConversationController : ControllerBase
         return paginedData;
     }
 
-
     /// <summary>
-    /// Update the 'isArchived' status for multiple conversations by user ID.
+    /// Archives or unarchives multiple conversations based on the provided details (relative to the user making the request).
     /// </summary>
-    /// <param name="body">The model representing the request body for patching multiple conversations in the archive. It contains information necessary to update the 'isArchived' status.</param>
-    /// <param name="userId">The ID of the user for whom the conversations need to be updated. It is an integer value.</param>
-    /// <param name="schoolIds">A list of integer values representing the IDs of the schools whose conversations are to be updated in the archive. Multiple school IDs can be provided in the list.</param>
+    /// <param name="body">Details of the conversations to be archived or unarchived.</param>
+    /// <param name="userId">The user identifier.</param>
+    /// <param name="schoolIds">List of school identifiers.</param>
     [HttpPatch]
     [HttpCode(HttpStatusCode.NoContent)]
     [Route("is-archived")]
@@ -227,13 +222,12 @@ public class ConversationController : ControllerBase
         await _messageService.UpdateIsArchivedForUserIdByConversationsIdsAsync(body.Ids, body.IsArchived, userId);
     }
 
-
     /// <summary>
-    /// Update the status of multiple conversations asynchronously based on the provided IDs, conversation status, user ID, and school ID.
+    /// Updates the status for multiple conversations based on the provided details (only for official).
     /// </summary>
-    /// <param name="body">The model containing the data to update the status of multiple conversations.</param>
-    /// <param name="userId">The ID of the user for whom the conversations' status needs to be updated.</param>
-    /// <param name="schoolId">The ID of the school to which the conversations belong and for which the status needs to be updated.</param>
+    /// <param name="body">Details of the conversations whose status is to be updated.</param>
+    /// <param name="userId">The user identifier.</param>
+    /// <param name="schoolId">The school identifier.</param>
     [HttpPatch]
     [HttpCode(HttpStatusCode.NoContent)]
     [Route("status")]
@@ -245,13 +239,12 @@ public class ConversationController : ControllerBase
         await _conversationService.ChangeMultipleConversationStatusAsync(body.Ids, (EConversationStatusRAto)body.ConversationStatus, userId, schoolId);
     }
 
-
     /// <summary>
-    /// Update the read date of a conversation for a specified user and school.
+    /// Updates the reading status for conversations based on the provided details (relative to the user making the request).
     /// </summary>
-    /// <param name="markConversationAsReadOrUnread">The MarkConversationAsReadOrUnreadRequestModel parameter is used to specify whether the conversation should be marked as read or unread.</param>
-    /// <param name="userId">The userId parameter represents the unique identifier of the user for whom the read date of the conversation will be updated.</param>
-    /// <param name="schoolIds">The schoolIds parameter is a list of integer values representing the identifiers of the schools for which the read date of the conversation will be updated.</param>
+    /// <param name="markConversationAsReadOrUnread">Details to mark conversations as read or unread.</param>
+    /// <param name="userId">The user identifier.</param>
+    /// <param name="schoolIds">List of school identifiers.</param>
     [HttpPatch]
     [HttpCode(HttpStatusCode.NoContent)]
     [Route("reading-status")]
@@ -262,20 +255,19 @@ public class ConversationController : ControllerBase
         await _conversationService.ChangeReadedDateAsync(markConversationAsReadOrUnread.Ids, markConversationAsReadOrUnread.MarkAsRead, userId, schoolIds.ToArray());
     }
 
+    /// <summary>
+    /// Adds recipients to a conversation based on the provided details.
+    /// </summary>
+    /// <param name="newRecipientsUsersIds">List of user identifiers to be added as recipients.</param>
+    /// <param name="userId">The user identifier.</param>
+    /// <param name="schoolIds">List of school identifiers.</param>
+    /// <param name="id">The identifier of the conversation.</param>
+    /// <returns>A list of correspondents that were added.</returns>
     [HttpPost]
     [Route("{id}/correspondants")]
     [SwaggerResponse((int)HttpStatusCode.OK, Type = typeof(ConversationCorrespondantResponseModel[]))]
     [SwaggerOperation("AddRecipients")]
     [ApiVersion("1")]
-
-    /// <summary>
-    /// Add recipients to a conversation asynchronously, based on specified conditions and data, and return the added recipients as response models.
-    /// </summary>
-    /// <param name="newRecipientsUsersIds">The list of new recipient user IDs to be added to the conversation. It should be of type IEnumerable<int>.</param>
-    /// <param name="userId">The ID of the user initiating the addition of recipients to the conversation. It should be of type int.</param>
-    /// <param name="schoolIds">The list of school IDs associated with the recipients. It should be of type List<int>.</param>
-    /// <param name="id">The unique identifier for the conversation to which recipients are being added. It should be of type int.</param>
-    /// <returns>Returns added recipients as response models asynchronously.</returns>
     public async Task<IEnumerable<ConversationCorrespondantResponseModel>> AddRecipientsAsync(
         [FromBody] IEnumerable<int> newRecipientsUsersIds,
         [FromQuery(Name = "user-id")] int userId,
@@ -290,20 +282,19 @@ public class ConversationController : ControllerBase
         return addedCorrespondents;
     }
 
+    /// <summary>
+    /// Removes recipients from a conversation based on the provided details.
+    /// </summary>
+    /// <param name="recipientsUsersIds">List of user identifiers to be removed as recipients.</param>
+    /// <param name="userId">The user identifier.</param>
+    /// <param name="schoolIds">List of school identifiers.</param>
+    /// <param name="id">The identifier of the conversation.</param>
     [HttpDelete]
     [HttpCode(HttpStatusCode.NoContent)]
     [Route("{id}/correspondants")]
     [SwaggerResponse((int)HttpStatusCode.NoContent)]
     [SwaggerOperation("RemoveRecipients")]
     [ApiVersion("1")]
-
-    /// <summary>
-    /// Remove recipients from a conversation asynchronously, taking into account the source of the request.
-    /// </summary>
-    /// <param name="recipientsUsersIds">The list of user IDs representing the recipients to be removed from the conversation.</param>
-    /// <param name="userId">The ID of the user initiating the removal of recipients from the conversation.</param>
-    /// <param name="schoolIds">The list of school IDs associated with the recipients to be removed.</param>
-    /// <param name="id">The unique identifier of the conversation from which recipients are being removed.</param>
     public async Task RemoveRecipientsAsync(
         [FromBody] IEnumerable<int> recipientsUsersIds,
         [FromQuery(Name = "user-id")] int userId,
@@ -315,21 +306,20 @@ public class ConversationController : ControllerBase
         await _conversationService.RemoveRecipientsAsync(id, userId, schoolIds, recipientsUsersIds, isRequestFromIntranet);
     }
 
+    /// <summary>
+    /// Adds a new message to an existing conversation.
+    /// </summary>
+    /// <param name="conversationId">The identifier of the conversation.</param>
+    /// <param name="newMessage">The content and details of the new message.</param>
+    /// <param name="userId">The user identifier.</param>
+    /// <param name="schoolId">The school identifier.</param>
+    /// <param name="enableNotification">Flag to determine if notifications should be enabled for this message.</param>
+    /// <returns>The created message details.</returns>
     [HttpPost]
     [Route("{conversationId:int}/messages")]
     [SwaggerOperation("AddMessageToExistingConversation")]
     [SwaggerResponse((int)HttpStatusCode.OK, Type = typeof(MessageResponseModel))]
     [ApiVersion("1")]
-
-    /// <summary>
-    /// Add a new message to an existing conversation asynchronously.
-    /// </summary>
-    /// <param name="conversationId">The ID of the conversation to which the new message will be added.</param>
-    /// <param name="newMessage">The model representing the new message that will be added to the conversation.</param>
-    /// <param name="userId">The ID of the user who is adding the new message to the conversation.</param>
-    /// <param name="schoolId">The ID of the school to which the conversation belongs.</param>
-    /// <param name="enableNotification">A boolean flag indicating whether to send a notification for the new message. Default value is true.</param>
-    /// <returns>Returns a Task representing the result of adding a new message asynchronously.</returns>
     public async Task<MessageResponseModel> AddNewMessageToConversationAsync(
         int conversationId,
         [FromBody] MessageRequestModel newMessage,

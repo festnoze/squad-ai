@@ -9,6 +9,9 @@ using System.Net;
 
 namespace Studi.Api.Lms.Messenger.Controllers.ConversationObject;
 
+/// <summary>
+/// Controller for managing ConversationObjects and related operations.
+/// </summary>
 [ApiController]
 [Route("v{version:apiVersion}/conversation-objects")]
 [Authorize]
@@ -16,60 +19,51 @@ public class ConversationObjectController : ControllerBase
 {
     private readonly IConversationObjectService _conversationObjectService;
 
-
     /// <summary>
-    /// Instantiate a ConversationObjectController object with a ConversationObjectService dependency for managing conversation objects.
+    /// Initializes a new instance of the <see cref="ConversationObjectController"/> class.
     /// </summary>
-    /// <param name="conversationObjectService">The IConversationObjectService parameter represents an instance of the IConversationObjectService interface, which is used for managing conversation objects.</param>
-    /// <param name="ConversationObjectController">The ConversationObjectController parameter represents an instance of the ConversationObjectController class, which serves as a constructor for the containing class of the same name. This method is used to instantiate a ConversationObjectController object with a ConversationObjectService dependency for managing conversation objects.</param>
+    /// <param name="conversationObjectService">The conversation object service to be injected.</param>
     public ConversationObjectController(IConversationObjectService conversationObjectService)
     {
         _conversationObjectService = conversationObjectService;
     }
 
+    /// <summary>
+    /// Retrieves ConversationObjects associated with a specific interne service.
+    /// </summary>
+    /// <param name="internalServiceCode">The code of the interne service.</param>
+    /// <returns>A collection of ConversationObjectResponseModel.</returns>
     [HttpGet("internal-services/{internalServiceCode}")]
     [ApiVersion("1")]
     [SwaggerOperation("Retrieves ConversationObjects associated with a specific interne service.")]
     [SwaggerResponse((int)HttpStatusCode.OK, Type = typeof(IEnumerable<ConversationObjectResponseModel>))]
     [SkipCheckParamsAgainstLmsToken]
-
-    /// <summary>
-    /// Retrieve conversation objects asynchronously and convert them to response models.
-    /// </summary>
-    /// <param name="string">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>
-    /// <param name="internalServiceCode">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>
-    /// <param name="GetConversationObjectsAsync">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>
-    /// <param name="Retrieve conversation objects asynchronously and convert them to response models.">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>
-    /// <returns>Returns converted response models retrieved asynchronously from conversation objects.</returns>
     public async Task<IEnumerable<ConversationObjectResponseModel>> GetConversationObjectsAsync(string internalServiceCode)
     {
         var conversationObjects = await _conversationObjectService.GetConversationObjectsAsync(internalServiceCode);
         return conversationObjects.Select(co => co.ToResponseModel());
     }
 
+    /// <summary>
+    /// Retrieves ConversationSubObjects associated with a specific ConversationObject.
+    /// </summary>
+    /// <param name="conversationObjectCode">The code of the ConversationObject.</param>
+    /// <returns>A collection of ConversationSubObjectResponseModel.</returns>
     [HttpGet("{conversationObjectCode}/conversation-sub-objects")]
     [ApiVersion("1")]
     [SwaggerOperation("Retrieves ConversationSubObjects associated with a specific ConversationObject.")]
     [SwaggerResponse((int)HttpStatusCode.OK, Type = typeof(IEnumerable<ConversationSubObjectResponseModel>))]
     [SkipCheckParamsAgainstLmsToken]
-
-    /// <summary>
-    /// Retrieve conversation sub objects asynchronously based on the conversation object code and return them as response models.
-    /// </summary>
-    /// <param name="conversationObjectCode">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>
-    /// <param name="methodPurpose">The generated description for the parameter</param>
-    /// <returns>Returns a list of conversation sub objects as response models.</returns>
     public async Task<IEnumerable<ConversationSubObjectResponseModel>> GetConversationSubObjectsAsync(string conversationObjectCode)
     {
         var conversationSubObjects = await _conversationObjectService.GetConversationSubObjectsAsync(conversationObjectCode);
         return conversationSubObjects.Select(cso => cso.ToResponseModel());
     }
 
-
     /// <summary>
-    /// Retrieve internal services asynchronously and convert them to response models.
+    /// Retrieves the list of interne services (support team).
     /// </summary>
-    /// <returns>Returns a collection of internal services as response models.</returns>
+    /// <returns>A collection of InternalServiceResponseModel.</returns>
     [HttpGet("internal-services")]
     [ApiVersion("1")]
     [SwaggerOperation("Retrieves the list of interne services.")]
