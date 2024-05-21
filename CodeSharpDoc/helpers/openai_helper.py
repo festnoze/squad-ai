@@ -1,3 +1,4 @@
+import time
 import openai
 import uuid
 from datetime import datetime, timedelta
@@ -71,7 +72,7 @@ class ai:
                     assistant_set.run = run
                     return ai.RunResult.SUCCESS
                 
-                misc.pause(sleep_interval)
+                time.sleep(1)
                 
                 if run.status != "completed" and ai.has_allowed_time_elapsed(assistant_set, start_time):
                     return ai.RunResult.TIMEOUT
