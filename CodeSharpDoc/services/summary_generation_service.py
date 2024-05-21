@@ -164,7 +164,10 @@ class SummaryGenerationService:
             for i in range(len(methods_parameters_summaries)):
                 if type(methods_parameters_summaries[i]) is list:
                     methods_parameters_summaries[i] = {'params_list': methods_parameters_summaries[i]}
-                methods_parameters_summaries[i] = MethodParametersDocumentation(**methods_parameters_summaries[i])
+                if methods_parameters_summaries[i]:
+                    methods_parameters_summaries[i] = MethodParametersDocumentation(**methods_parameters_summaries[i])
+                else:
+                    methods_parameters_summaries[i] = MethodParametersDocumentation(params_list=[])
 
             for method, method_params_summaries in zip(class_struct.methods, methods_parameters_summaries):
                 method.generated_parameters_summaries = method_params_summaries
