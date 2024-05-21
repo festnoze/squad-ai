@@ -11,6 +11,7 @@ from models.llm_info import LlmInfo
 class LangChainFactory():
     @staticmethod
     def create_llms_from_infos(llms_infos: list[LlmInfo]) -> list[BaseChatModel]:
+        txt.print_with_spinner(f"Loading LLM model ...")
         if len(llms_infos) == 0:
             raise ValueError("No LLM info provided.")
         if isinstance(llms_infos, LlmInfo):
@@ -25,6 +26,7 @@ class LangChainFactory():
                 temperature= llm_info.temperature,
                 api_key= llm_info.api_key)
             llms.append(llm)
+        txt.stop_spinner_replace_text("LLM model loaded successfully.")
         return llms
     
     @staticmethod

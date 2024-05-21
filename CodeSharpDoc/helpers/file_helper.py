@@ -43,8 +43,10 @@ class file:
     
     @staticmethod
     def save_contents_within_files(paths_and_new_codes: list):
+        txt.print_with_spinner(f"Saving and override the {len(paths_and_new_codes)} files:")
         for file_path in paths_and_new_codes:
             file.write_file(paths_and_new_codes[file_path], file_path)
+        txt.stop_spinner_replace_text(f"{len(paths_and_new_codes)} files overrided and saved successfully.")
 
     @staticmethod
     def delete_all_files_with_extension(extension, folder_path):
@@ -95,8 +97,10 @@ class file:
     
     @staticmethod
     def load_csharp_files(file_path):
+        txt.print_with_spinner(f"Loading C# files ...")
         paths_and_codes = {}
         files = file.get_all_folder_and_subfolders_files(file_path, '.cs')
         for file_path in files:
             paths_and_codes[file_path] = file.get_as_str(file_path)
+        txt.stop_spinner_replace_text(f"{len(paths_and_codes)} C# files loaded successfully.")
         return paths_and_codes

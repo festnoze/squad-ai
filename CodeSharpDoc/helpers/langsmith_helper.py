@@ -14,7 +14,7 @@ def initialize_langsmith():
     client = Client(api_key=langsmith_api_key)
 
     # langsmith_project = str(os.getenv("LANGCHAIN_PROJECT")) # Use the generic LangSmith project
-    langsmith_project = str(os.getenv("LANGCHAIN_PROJECT") + str(uuid.uuid4())) # Add a specific LangSmith projetc for this session
+    langsmith_project = str(os.getenv("LANGCHAIN_PROJECT") + '_' + str(uuid.uuid4())) # Add a specific LangSmith projetc for this session
     session = client.create_project(
         project_name=langsmith_project,
         description=f"Session of project '{os.getenv('LANGCHAIN_PROJECT')}' began on: {datetime.datetime.now().strftime('%d/%m/%Y at: %H:%M:%S')}",

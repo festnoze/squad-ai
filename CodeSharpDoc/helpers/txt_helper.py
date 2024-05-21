@@ -4,7 +4,10 @@ import time
 from helpers.python_helpers import staticproperty
 from threading import Event, Thread
 
-class txt:
+class txt:    
+    waiting_spinner_thread = None
+    start_time: float = None
+    stop_event = Event()
     def indent(indent_level: int, code: str) -> str:
         indent_str = '    '
         lines = code.split('\n')
@@ -57,44 +60,39 @@ class txt:
         if txt.activate_print:
             print(text)
 
-    def __init__(self):
-        self.waiting_spinner_thread = None
-        self.start_time: float = None
-        self.stop_event = Event()
-
-    def print_with_spinner(self, text: str) -> Thread:
+    def print_with_spinner(text: str) -> Thread:
         if not txt.activate_print:
             return None
         txt.start_time = time.time()
 
         # Ensure only one spinner thread is running at a time
-        if self.waiting_spinner_thread and self.waiting_spinner_thread.is_alive():
+        if txt.waiting_spinner_thread and txt.waiting_spinner_thread.is_alive():
             raise Exception("Previous waiting spinner thread wasn't halted before creating a new one")
 
-        self.stop_event.clear()
-        self.waiting_spinner_thread = Thread(target=self.wait_spinner, args=(text,))
-        self.waiting_spinner_thread.daemon = True
-        self.waiting_spinner_thread.start()
-        return self.waiting_spinner_thread
+        txt.stop_event.clear()
+        txt.waiting_spinner_thread = Thread(target=txt.wait_spinner, args=(text,))
+        txt.waiting_spinner_thread.daemon = True
+        txt.waiting_spinner_thread.start()
+        return txt.waiting_spinner_thread
 
-    def wait_spinner(self, prefix):
+    def wait_spinner(prefix):
         chars = "⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹"
-        while not self.stop_event.is_set():
+        while not txt.stop_event.is_set():
             for char in chars:
-                if self.stop_event.is_set():
+                if txt.stop_event.is_set():
                     break
                 sys.stdout.write('\r' + prefix + ' ' + char + ' ')
                 sys.stdout.flush()
                 time.sleep(0.1)
 
-    def stop_spinner(self):
-        self.stop_event.set()  # Signal the thread to stop
-        if self.waiting_spinner_thread:
-            self.waiting_spinner_thread.join()
-            self.waiting_spinner_thread = None
+    def stop_spinner():
+        txt.stop_event.set()  # Signal the thread to stop
+        if txt.waiting_spinner_thread:
+            txt.waiting_spinner_thread.join()
+            txt.waiting_spinner_thread = None
 
-    def stop_spinner_replace_text(self, text=None):
-        self.stop_spinner()
+    def stop_spinner_replace_text(text=None):
+        txt.stop_spinner()
         if not txt.activate_print:
             return None
         

@@ -1,7 +1,6 @@
 import os
 import time
 from langchain_core.language_models import BaseChatModel
-from helpers.display_helper import display
 from langchains.langchain_factory import LangChainFactory
 from langsmith import traceable
 #
@@ -25,34 +24,20 @@ class SummaryGenerationService:
     @staticmethod
     def generate_all_summaries_for_all_csharp_files_and_save(file_path: str, llms_infos: list[LlmInfo]):  
         txt.activate_print = True
-        print = txt()
 
-        print.print_with_spinner(f"Loading LLM model ...")    
-        llms = LangChainFactory.create_llms_from_infos(llms_infos)
-        print.stop_spinner_replace_text("LLM model loaded successfully.")
-        
-        print.print_with_spinner(f"Loading C# files ...")      
+        llms = LangChainFactory.create_llms_from_infos(llms_infos)       
+         
         paths_and_codes = file.load_csharp_files(file_path)
-        print.stop_spinner_replace_text(f"{len(paths_and_codes)} C# files loaded successfully.")
 
         CSharpHelper.remove_existing_summaries_from_all_files(paths_and_codes)
 
-        print.print_with_spinner(f"Parsing all {len(paths_and_codes)} files for code structure:")
         known_structures = CSharpCodeStructureAnalyser.extract_code_structures_from_code_files(llms, paths_and_codes)
-        print.stop_spinner_replace_text(f"{len(paths_and_codes)} files were parsed successfully. Found {len(known_structures)} files containing structures (like class, interface, record, enum ...)")
 
-        print.print_with_spinner(f"Ongoing parallel summaries generation for {SummaryGenerationService.methods_count(known_structures)} methods in {len(known_structures)} code files:")
-        SummaryGenerationService.generate_methods_summaries_for_all_classes(llms, known_structures)        
-        SummaryGenerationService.apply_to_interfaces_the_classes_generated_summaries(known_structures)
-        print.stop_spinner_replace_text("All methods' summaries generated successfully")
-
-        print.print_with_spinner(f"Include summaries into the existing {len(paths_and_codes)} code files:")
+        SummaryGenerationService.generate_methods_summaries_for_all_structures(llms, known_structures)
+        
         paths_and_new_codes = SummaryGenerationService.including_generated_summaries_to_codes(paths_and_codes, known_structures)
-        print.stop_spinner_replace_text("Summaries successfully included in initial files code.")
 
-        print.print_with_spinner(f"Saving and override the {len(paths_and_new_codes)} files:")
-        file.save_contents_within_files(paths_and_new_codes)        
-        print.stop_spinner_replace_text(f"{len(paths_and_new_codes)} files overrided and saved successfully.")
+        file.save_contents_within_files(paths_and_new_codes)
         
         txt.print("\nDone.")
         txt.print("---------------------------")
@@ -85,7 +70,8 @@ class SummaryGenerationService:
                     method.generated_xml_summary = class_method.generated_xml_summary
 
     @staticmethod
-    def including_generated_summaries_to_codes(paths_and_codes, structures_descriptions):
+    def including_generated_summaries_to_codes(paths_and_codes, structures_descriptions):        
+        txt.print_with_spinner(f"Include summaries into the existing {len(paths_and_codes)} code files:")
         paths_and_codes_list = [(path, code) for path, code in paths_and_codes.items()]
         paths_and_new_codes = {}
         
@@ -93,6 +79,8 @@ class SummaryGenerationService:
             code = paths_and_codes[structure_description.file_path]
             new_code = SummaryGenerationService.add_generated_summaries_to_initial_code(structure_description, code)
             paths_and_new_codes[structure_description.file_path] = new_code
+        
+        txt.stop_spinner_replace_text("Summaries successfully included in initial files code.")
         return paths_and_new_codes
 
     @staticmethod
@@ -117,6 +105,13 @@ class SummaryGenerationService:
             for prompt in classes_methods_summaries_prompts[class_struct.struct_name]:
                 flatten_prompts.append(prompt)
         return flatten_prompts
+
+    @staticmethod
+    def generate_methods_summaries_for_all_structures(llms: list[BaseChatModel], known_structures: list[StructureDesc]):
+        txt.print_with_spinner(f"Ongoing parallel summaries generation for {SummaryGenerationService.methods_count(known_structures)} methods in {len(known_structures)} code files:")
+        SummaryGenerationService.generate_methods_summaries_for_all_classes(llms, known_structures)        
+        SummaryGenerationService.apply_to_interfaces_the_classes_generated_summaries(known_structures)
+        txt.stop_spinner_replace_text("All methods' summaries generated successfully")
 
     @staticmethod
     def generate_methods_summaries_for_all_classes(llm: BaseChatModel, known_structures: list[StructureDesc]):
