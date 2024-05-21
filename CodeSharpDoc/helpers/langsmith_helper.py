@@ -22,13 +22,13 @@ def initialize_langsmith():
     os.environ["LANGCHAIN_PROJECT"] = langsmith_project
 
     # Add a database to LangSmith
-    dl_dataset = client.create_dataset(
-    dataset_name="dataset_" + langsmith_project,
-    description="A set containing tests samples for the project",
-    data_type="kv",  # ls_schemas.DataType.kv/chat/llm
-    )
-    client.create_example(
-        inputs={"input": "test1"},
-        outputs={"output": "res1"},
-        dataset_id=dl_dataset.id,
-    )
+    # dl_dataset = client.create_dataset(
+    # dataset_name="dataset_" + langsmith_project,
+    # description="A set containing tests samples for the project",
+    # data_type="kv",  # ls_schemas.DataType.kv/chat/llm
+    # )
+    # client.create_example(
+    #     inputs={"input": "test1"},
+    #     outputs={"output": "res1"},
+    #     dataset_id=dl_dataset.id,
+    # )

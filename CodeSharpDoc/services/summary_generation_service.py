@@ -145,7 +145,7 @@ class SummaryGenerationService:
         action_name = "Generate methods description"
         methods_summaries_prompts_by_classes =  SummaryGenerationService.generate_methods_summary_prompts_by_class(all_classes)
         prompts = SummaryGenerationService.get_classes_flatten_prompts(all_classes, methods_summaries_prompts_by_classes)
-        methods_summaries = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(llms, None, SummaryGenerationService.batch_size, *prompts)
+        methods_summaries = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(action_name, llms, None, SummaryGenerationService.batch_size, *prompts)
         SummaryGenerationService.apply_generated_summaries_to_classes_methods(known_structures, methods_summaries_prompts_by_classes, methods_summaries)
 
     @staticmethod
@@ -159,7 +159,7 @@ class SummaryGenerationService:
                 prompt, output_parser = Llm.get_prompt_and_json_output_parser(method_prompt, MethodParametersDocumentationPydantic, MethodParametersDocumentation)
                 prompts.append(prompt)
 
-            methods_parameters_summaries = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(llms, output_parser, SummaryGenerationService.batch_size, *prompts)
+            methods_parameters_summaries = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(action_name, llms, output_parser, SummaryGenerationService.batch_size, *prompts)
 
             for i in range(len(methods_parameters_summaries)):
                 if type(methods_parameters_summaries[i]) is list:
@@ -179,7 +179,7 @@ class SummaryGenerationService:
                 prompt_or_chain = method_prompt + json_formatting_spec_prompt
                 prompts_or_chains.append(prompt_or_chain)
 
-            methods_parameters_summaries = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(llms, None, SummaryGenerationService.batch_size, *prompts_or_chains)
+            methods_parameters_summaries = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(action_name, llms, None, SummaryGenerationService.batch_size, *prompts_or_chains)
             for method, method_params_summaries in zip(class_struct.methods, methods_parameters_summaries):
                 method_params_summaries_str = Llm.get_llm_answer_content(method_params_summaries)
                 method_params_summaries_str = Llm.extract_json_from_llm_response(method_params_summaries_str)
@@ -192,7 +192,7 @@ class SummaryGenerationService:
             class_prompts = []
             for method in [met for met in class_struct.methods if met.has_return_type()]:
                 class_prompts.append(SummaryGenerationService.get_prompt_for_method_return_summary(method))
-            methods_return_summaries_only = Llm.invoke_parallel_prompts(llms, *class_prompts)
+            methods_return_summaries_only = Llm.invoke_parallel_prompts(action_name, llms, *class_prompts)
             
             # Apply return method summary only to methods with a return type
             return_index = 0

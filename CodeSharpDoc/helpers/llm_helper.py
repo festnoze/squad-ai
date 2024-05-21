@@ -96,11 +96,11 @@ class Llm:
         return prompt, parser
 
     @staticmethod
-    def invoke_parallel_prompts(llms: Union[BaseChatModel, list[BaseChatModel]], *prompts: Union[str, ChatPromptTemplate]) -> list[str]:
-        return Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(llms, None, None, *prompts)
+    def invoke_parallel_prompts(action_name: str, llms: Union[BaseChatModel, list[BaseChatModel]], *prompts: Union[str, ChatPromptTemplate]) -> list[str]:
+        return Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(action_name, llms, None, None, *prompts)
     
     @staticmethod
-    def invoke_parallel_prompts_with_parser_batchs_fallbacks(llms_with_fallbacks: Union[BaseChatModel, list[BaseChatModel]], output_parser: BaseTransformOutputParser, batch_size: int = None, *prompts: Union[str, ChatPromptTemplate]) -> list[str]:
+    def invoke_parallel_prompts_with_parser_batchs_fallbacks(action_name, llms_with_fallbacks: Union[BaseChatModel, list[BaseChatModel]], output_parser: BaseTransformOutputParser, batch_size: int = None, *prompts: Union[str, ChatPromptTemplate]) -> list[str]:
         if len(prompts) == 0:
             return []        
         if not isinstance(llms_with_fallbacks, list):
@@ -127,7 +127,7 @@ class Llm:
         if output_parser and isinstance(output_parser, JsonOutputParser):
             inputs = {Llm.output_parser_instructions_name: output_parser.get_format_instructions()}
         
-        answers = Llm._invoke_parallel_chains(inputs, batch_size, *chains)
+        answers = Llm._invoke_parallel_chains(action_name, inputs, batch_size, *chains)
         return answers
     
     @staticmethod
@@ -136,7 +136,7 @@ class Llm:
             return prompt
         return ChatPromptTemplate.from_template(prompt)
     @staticmethod
-    def _invoke_parallel_chains(inputs: dict = None, batch_size: int = None, *chains: Chain) -> list[str]:
+    def _invoke_parallel_chains(action_name: str = "", inputs: dict = None, batch_size: int = None, *chains: Chain) -> list[str]:
         if len(chains) == 0:
             return []
         if not batch_size:
@@ -150,7 +150,7 @@ class Llm:
 
         answers = []
         for chains_batch in chains_batches:
-            combined = RunnableParallel(**{f"invoke_{i}": chain for i, chain in enumerate(chains_batch)})
+            combined = RunnableParallel(**{f"invoke_{i}": chain for i, chain in enumerate(chains_batch)}).with_config({"run_name": action_name})
             responses = combined.invoke(inputs)            
             responses_list = [responses[key] for key in responses.keys()]
             batch_answers = [Llm.get_llm_answer_content(response) for response in responses_list]
