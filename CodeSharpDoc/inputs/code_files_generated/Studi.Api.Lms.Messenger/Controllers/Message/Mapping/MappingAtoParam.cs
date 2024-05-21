@@ -6,6 +6,8 @@ namespace Studi.Api.Lms.Messenger.Controllers.Message.Mapping
 {
     internal class MappingAtoParam
     {
+
+
         public static IMessageWAto CreateMessageAtoParam(MessageRequestModel newMessageAddingToExistingConversation, int userId, int conversationId, int schoolId)
         {
             return MessageWAto.Create(

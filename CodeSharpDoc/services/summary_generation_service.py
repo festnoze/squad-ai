@@ -142,6 +142,7 @@ class SummaryGenerationService:
 
     @staticmethod
     def generate_methods_summaries_only_all_classes(llms: list[BaseChatModel], known_structures, all_classes):
+        action_name = "Generate methods description"
         methods_summaries_prompts_by_classes =  SummaryGenerationService.generate_methods_summary_prompts_by_class(all_classes)
         prompts = SummaryGenerationService.get_classes_flatten_prompts(all_classes, methods_summaries_prompts_by_classes)
         methods_summaries = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(llms, None, SummaryGenerationService.batch_size, *prompts)
@@ -149,6 +150,7 @@ class SummaryGenerationService:
 
     @staticmethod
     def generate_all_classes_methods_parameters_desc_json_from_output_parser(llms: list[BaseChatModel], all_classes):
+        action_name = 'Generate parameters descriptions (output parser)'
         for class_struct in all_classes:
             prompts = []
             format_instructions = ''
@@ -169,6 +171,7 @@ class SummaryGenerationService:
 
     @staticmethod
     def generate_all_classes_methods_parameters_desc_json_from_llm(llms: list[BaseChatModel], all_classes):
+        action_name = 'Generate parameters descriptions (direct LLM json output)'
         for class_struct in all_classes:
             prompts_or_chains = []
             for method in class_struct.methods:
@@ -184,6 +187,7 @@ class SummaryGenerationService:
 
     @staticmethod
     def generate_methods_return_summaries_for_all_classes(llms: list[BaseChatModel], all_classes):
+        action_name = 'Generate methods return descriptions'
         for class_struct in all_classes:
             class_prompts = []
             for method in [met for met in class_struct.methods if met.has_return_type()]:

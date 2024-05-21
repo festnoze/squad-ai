@@ -15,9 +15,6 @@ using System.Net;
 
 namespace Studi.Api.Lms.Messenger.Controllers.Message
 {
-    /// <summary>
-    /// Controller for managing messages and related operations.
-    /// </summary>
     [ApiController]
     [Route("v{version:apiVersion}/messages")]
     [Authorize]
@@ -25,21 +22,24 @@ namespace Studi.Api.Lms.Messenger.Controllers.Message
     {
         private readonly IMessageService _messageService;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="MessageController"/> class.
-        /// </summary>
-        /// <param name="messageService">The message service to be injected.</param>
+
+    /// <summary>
+    /// Initialize the message service for the MessageController.
+    /// </summary>
+    /// <param name="messageService">The message service used by the MessageController to handle messages.</param>
+    /// <param name="MessageController">The constructor method for the containing class, used to initialize the message service.</param>
         public MessageController(IMessageService messageService)
         {
             _messageService = messageService;
         }
 
-        /// <summary>
-        /// Retrieves the count of unread messages for a user in a school.
-        /// </summary>
-        /// <param name="userId">The user ID for whom unread messages are counted.</param>
-        /// <param name="schoolId">The school ID where the user belongs.</param>
-        /// <returns>The count of unread messages.</returns>
+
+    /// <summary>
+    /// Retrieve the unread message count for a specified user and school.
+    /// </summary>
+    /// <param name="userId">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>
+    /// <param name="schoolId">The generated description for the parameter</param>
+    /// <returns>Returns the unread message count for a specified user and school.</returns>
         [HttpGet]
         [Route("unread-infos")]
         [SwaggerResponse((int)HttpStatusCode.OK, Type = typeof(UnreadMessageCountResponseModel))]
@@ -51,12 +51,13 @@ namespace Studi.Api.Lms.Messenger.Controllers.Message
             return unreadMessageCount.ToResponseModel();
         }
 
-        /// <summary>
-        /// Send notification for messages (used to catch up on failed notifications)
-        /// </summary>
-        /// <param name="ids">Ids of the messages to send the notification</param>
-        /// <param name="maxPerSecond">Throttle queue to limit the number of notification sent per second</param>
-        /// <returns>Ok</returns>
+
+    /// <summary>
+    /// Check if the user is an intranet user and guard against negative or zero values, then iterate through a list of IDs.
+    /// </summary>
+    /// <param name="ids">Collection of integers representing the IDs to be processed. It is recommended to provide a non-empty collection.</param>
+    /// <param name="maxPerSecond">An integer representing the maximum number of operations allowed per second. The default value is 10.</param>
+    /// <returns>Returns boolean indicating if notification was successfully sent.</returns>
         [HttpPost]
         [Route("notifications")]
         [ApiVersion("1")]
@@ -74,13 +75,14 @@ namespace Studi.Api.Lms.Messenger.Controllers.Message
             return Ok();
         }
 
-        /// <summary>
-        /// Count messages on function applying filters
-        /// </summary>
-        /// <param name="listingSelector">The listing selector for filtering and pagination.</param>
-        /// <param name="userId">The user ID.</param>
-        /// <param name="schoolIds">The school IDs.</param>
-        /// <returns>The count of messages.</returns>
+
+    /// <summary>
+    /// Retrieve the count of messages for a specified user and school, based on a given listing selector.
+    /// </summary>
+    /// <param name="listingSelector">The listing selector used to filter and specify the type of message listing to retrieve.</param>
+    /// <param name="userId">The unique identifier of the user for whom the message count is being retrieved.</param>
+    /// <param name="schoolIds">The list of unique identifiers representing the schools for which the message count is being retrieved.</param>
+    /// <returns>Returns the count of messages for a specified user and school.</returns>
         [HttpPost]
         [Route("count")]
         [SwaggerResponse((int)HttpStatusCode.OK, Type = typeof(int))]
