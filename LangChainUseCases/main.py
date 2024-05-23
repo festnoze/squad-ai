@@ -1,7 +1,9 @@
 # internal import
-import time
 from helpers.file_helper import file
+from helpers.langgraph_tests import LangGraphTest1
+from helpers.llm_helper import Llm
 from helpers.test_helpers import test_agent_executor_with_tools, test_parallel_chains_invocations_with_imputs, test_parallel_invocations_with_homemade_parallel_chains_invocations, test_parallel_invocations_with_homemade_parallel_prompts_invocations
+from helpers.tools_helpers import MathToolBox, RandomToolBox, WordsToolBox
 from helpers.txt_helper import txt
 from langchains.langchain_factory import LangChainFactory
 from langchains.langchain_adapter_type import LangChainAdapterType
@@ -36,9 +38,9 @@ openai.api_key = openai_api_key
 # exit()
 
 # Select the LLM to be used
-#llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0613",  timeout= 60, api_key= openai_api_key)
+llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0613",  timeout= 60, api_key= openai_api_key)
 #llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo-2024-04-09",  timeout= 120, api_key= openai_api_key)
-llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout= 60, api_key= openai_api_key)
+#llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout= 60, api_key= openai_api_key)
 
 #llm_infos = LlmInfo(type= LangChainAdapterType.Groq, model= "mixtral-8x7b-32768",  timeout= 20, api_key= groq_api_key)
 #llm_infos = LlmInfo(type= LangChainAdapterType.Groq, model= "llama3-8b-8192",  timeout= 10, api_key= groq_api_key)
@@ -62,6 +64,38 @@ def run_main():
         temperature= 1.0,
         api_key= llm_infos.api_key)
     
+    prompt = """get a random number, add 7 to it, divide the result be three, round it to the nearest integer, convert this number in french word, 
+    then integrate this french word into a leet sentence speaking of giving a defined quantity of flowers to a beloved one.
+    The number of flowers is the previous number in french word. output the sentence in lower snake case."""
+
+    # Resolve directly in LLM
+    result = llm.invoke(prompt) 
+
+    print('Direct LLM resolution:')
+    print(Llm.get_llm_answer_content(result))
+    print('-----------------------------------')
+
+    # Resolve using tools
+    tools = [WordsToolBox.to_lowercase, RandomToolBox.get_random_number, WordsToolBox.number_to_french_words, WordsToolBox.text_to_leet, WordsToolBox.to_upper_snake_case, WordsToolBox.translate_in_spanish, MathToolBox.add, MathToolBox.divide, MathToolBox.round_int]
+    WordsToolBox.llm = LangGraphTest1.llm # set the llm to be used by the tools
+
+    print('Resolution with LLM and tools:')
+    result = Llm.invoke_llm_with_tools(LangGraphTest1.llm, tools, prompt)    
+    print(Llm.get_llm_answer_content(result))
+    print('-----------------------------------')
+
+    # Resolve using graph
+    LangGraphTest1.llm = llm
+    graph = LangGraphTest1.get_graph_1()
+
+    print('Resolution with LLM workflow (graph):')    
+    result = graph.invoke(prompt)
+    
+    print(Llm.get_llm_answer_content(result))
+    print('-----------------------------------')
+
+    exit()
+
     # Test Groq through its own client (no langchain)
     GroqHelper.test_query(llm_infos)
 

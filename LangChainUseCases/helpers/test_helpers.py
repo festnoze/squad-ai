@@ -7,10 +7,10 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain.schema.runnable import RunnableParallel
 
 from helpers.llm_helper import Llm
-from helpers.tools_helpers import ToolsContainer
+from helpers.tools_helpers import MathToolBox
 
 def test_agent_executor_with_tools(llm):
-    tools = [ToolsContainer.multiply, ToolsContainer.divide, ToolsContainer.add, ToolsContainer.subtract, ToolsContainer.power, ToolsContainer.root, ToolsContainer.get_random_string, ToolsContainer.get_random_number]
+    tools = [MathToolBox.multiply, MathToolBox.divide, MathToolBox.add, MathToolBox.subtract, MathToolBox.power, MathToolBox.root, MathToolBox.get_random_string, MathToolBox.get_random_number]
     question = "Take 3 to the fifth power and multiply that by the sum of twelve and three, then square root the whole result"
     answer = Llm.invoke_llm_with_tools(llm, tools, question)
     print(answer)
@@ -107,7 +107,7 @@ def test_parallel_invocations_no_template(llm: BaseChatModel):
 
 def test_tool_bind(llm):
     """Test binding tools w/ direct binding to LLM - !! works only with few llm providers !! """
-    tools = [ToolsContainer.multiply, ToolsContainer.divide, ToolsContainer.add, ToolsContainer.subtract, ToolsContainer.power, ToolsContainer.root]
+    tools = [MathToolBox.multiply, MathToolBox.divide, MathToolBox.add, MathToolBox.subtract, MathToolBox.power, MathToolBox.root]
     llm_with_tools = llm.bind_tools(tools)
     res = llm_with_tools.invoke("Calculate: 3 x 4")
     print(res)

@@ -2,11 +2,33 @@ from langchain_openai import ChatOpenAI
 from langchain_community.chat_models import ChatOllama
 from langchain_groq import ChatGroq
 from langchain_core.language_models import BaseChatModel
+from helpers.txt_helper import txt
 from langchains.langchain_adapter_type import LangChainAdapterType
 import uuid
 
-class LangChainFactory():
+from models.llm_info import LlmInfo
 
+class LangChainFactory():
+    @staticmethod
+    def create_llms_from_infos(llms_infos: list[LlmInfo]) -> list[BaseChatModel]:
+        txt.print_with_spinner(f"Loading LLM model ...")
+        if len(llms_infos) == 0:
+            raise ValueError("No LLM info provided.")
+        if isinstance(llms_infos, LlmInfo):
+            llms_infos = [llms_infos]
+
+        llms: list[BaseChatModel] = []
+        for llm_info in llms_infos:
+            llm = LangChainFactory.create_llm(
+                adapter_type= llm_info.type,
+                llm_model_name= llm_info.model,
+                timeout_seconds= llm_info.timeout,
+                temperature= llm_info.temperature,
+                api_key= llm_info.api_key)
+            llms.append(llm)
+        txt.stop_spinner_replace_text("LLM model loaded successfully.")
+        return llms
+    
     @staticmethod
     def create_llm(adapter_type: LangChainAdapterType, llm_model_name: str, timeout_seconds: int = 50, temperature: float = 0.1, api_key: str = None) -> BaseChatModel:
         llm: BaseChatModel = None
@@ -41,7 +63,7 @@ class LangChainFactory():
         )
         
     @staticmethod     
-    def create_llm_groq(self, llm_model_name: str, api_key: str, timeout_seconds: int = 50, temperature:float = 0.1) -> ChatGroq:
+    def create_llm_groq(llm_model_name: str, api_key: str, timeout_seconds: int = 50, temperature:float = 0.1) -> ChatGroq:
         return ChatGroq(    
             name= f"chat_groq_{str(uuid.uuid4())}",
             model_name= llm_model_name,
