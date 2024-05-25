@@ -38,7 +38,15 @@ class StructureDesc(BaseDesc):
                         raise ValueError('Invalid argument type')
         else:
             for key, value in kwargs.items():
-                setattr(self, key, value)
+                key = txt.to_python_case(key)
+                if key == 'struct_type':
+                    self.struct_type: str = StructureType(value)
+                elif key == 'methods':
+                    self.methods: list[MethodDesc] = [MethodDesc(**method) for method in value]
+                elif key == 'properties':
+                    self.properties: list[PropertyDesc] = [PropertyDesc(**prop) for prop in value]
+                else:
+                    setattr(self, key, value)
     
     def to_json(self):
         return json.dumps(self.__dict__, cls=StructureDescEncoder, indent=4)

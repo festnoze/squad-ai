@@ -1,4 +1,7 @@
+import re
+from helpers.txt_helper import txt
 from models.base_desc import BaseDesc
+from typing import List, Tuple, Optional
 import json
 
 class ParameterDesc(BaseDesc):
@@ -10,17 +13,65 @@ class ParameterDesc(BaseDesc):
         self.description = description
         self.extra_infos = extra_infos
 
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            key = txt.to_python_case(key)
+            setattr(self, key, value)
+
     @staticmethod
     def factory_param_desc_from_code(param_code) -> 'ParameterDesc':
-        extra_infos: str = None
-        if '[' and ']' in param_code:
-            extra_infos = param_code[param_code.index('[')+1: param_code.rindex(']')].strip()
-            param_code = param_code.replace(f"[{extra_infos}]", "").strip()
-        param_type = param_code.split(' ')[0]
-        param_name = param_code.split(' ')[1].split('=')[0].strip()
+        attributes: Optional[str] = None
+        default_value: Optional[str] = None
+        has_attributes = False
+
+        param_code = param_code.strip()
+        if param_code.startswith('['):
+            has_attributes = True
+            attributes = param_code[1 : param_code.find(']')].strip()
+            param_code = param_code[param_code.find(']') + 1:].strip()
+        param_parts = param_code.split(' ')
+        param_parts = [part.strip() for part in param_parts if part.strip() != '']
+
         has_default_value = '=' in param_code
-        default_value = param_code.split('=')[1].strip() if has_default_value else None
-        return ParameterDesc(param_name, param_type, has_default_value, default_value, extra_infos)
+
+        if has_default_value:
+            default_value = param_code.split('=')[1].strip()
+
+        if len(param_parts) != 2 + 2 * has_default_value:
+            raise ValueError(f"Invalid parameter code: {param_code}")
+
+        param_type = param_parts[0]
+        param_name = param_parts[1].split('=')[0].strip()
+
+        return ParameterDesc(param_name, param_type, has_default_value, default_value, attributes)
+
+        
+    def parse_parameter_signature(param: str) -> Tuple[Optional[List[str]], str, str, Optional[str]]:
+        # Regular expression to parse the parameter string
+        pattern = re.compile(
+            r'(?:\[(.*?)\]\s*)?'  # Match attributes, if any
+            r'(?P<type>\w+(\<.*?\>)?)\s+'  # Match the type
+            r'(?P<name>\w+)'  # Match the name
+            r'(?:\s*=\s*(?P<default_value>.+))?'  # Match the default value, if any
+        )
+        match = pattern.match(param.strip())
+
+        if not match:
+            raise ValueError(f"Invalid parameter signature: {param}")
+
+        # Extract the matched groups
+        attributes = match.group(1)
+        param_type = match.group('type')
+        param_name = match.group('name')
+        default_value = match.group('default_value')
+
+        # Split attributes if they exist
+        if attributes:
+            attributes = attributes.split()
+        else:
+            attributes = None
+
+        return attributes, param_type, param_name, default_value
     
     def to_json(self):
         return json.dumps(self.__dict__, cls=ParamDescEncoder)

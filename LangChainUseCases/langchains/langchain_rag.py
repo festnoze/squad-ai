@@ -2,12 +2,13 @@ from langchain_community.embeddings.openai import OpenAIEmbeddings
 from langchain_core.embeddings import Embeddings
 from langchain_core.pydantic_v1 import Field, root_validator
 
-
+# RAG imports
+from langchain_community.callbacks import get_openai_callback, OpenAICallbackHandler
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.document_loaders import TextLoader
-from langchain_community.callbacks import get_openai_callback, OpenAICallbackHandler
+from langchain_community.vectorstores import FAISS
+from langchain_openai import OpenAIEmbeddings
 
-# Convert txt into chunks 
 def chunkify_txt(txt):
 
     txt_splitter = CharacterTextSplitter(
@@ -18,7 +19,6 @@ def chunkify_txt(txt):
     )
 
     chunks = txt_splitter.split_text(txt)
-
     return chunks
 
 ## Obtain the vector store
@@ -31,8 +31,6 @@ def get_vector(chunks):
 
 ## Retrieve useful info similar to user query
 def retrieve(vectorstore, question):
-    logging.basicConfig()
-    logging.getLogger("langchain.retrievers.multi_query").setLevel(logging.INFO)
 
     retriever_from_llm = MultiQueryRetriever.from_llm(
         retriever=vectorstore.as_retriever(), llm=ChatOpenAI(temperature=0)

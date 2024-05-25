@@ -74,6 +74,9 @@ class txt:
         txt.waiting_spinner_thread.daemon = True
         txt.waiting_spinner_thread.start()
         return txt.waiting_spinner_thread
+    
+    def to_python_case(text: str) -> str:
+        return ''.join(['_' + c.lower() if c.isupper() else c for c in text]).lstrip('_')
 
     def wait_spinner(prefix):
         chars = "⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹"

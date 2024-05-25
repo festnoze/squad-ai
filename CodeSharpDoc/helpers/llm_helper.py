@@ -6,8 +6,10 @@ from langchain.schema.runnable import Runnable, RunnableParallel, RunnableSequen
 from langchain.chains.base import Chain
 from langchain.agents import AgentExecutor, create_tool_calling_agent, create_json_chat_agent, tool
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-import yfinance as yf
 from langchain_community.callbacks import get_openai_callback, OpenAICallbackHandler
+from langchain.schema.messages import HumanMessage, AIMessage, SystemMessage
+#
+import yfinance as yf
 #
 import inspect
 from typing import TypeVar, Generic, Any, Union
@@ -114,11 +116,11 @@ class Llm:
 
             # add fallbacks to the chain if more than one LLMs are specified
             if len(llms_with_fallbacks) > 1:
-                fallback_chains = [
-                    Llm.prompt_as_chat_prompt_template(prompt) | llm_for_fallback | output_parser 
-                    if output_parser else ChatPromptTemplate.from_template(prompt) | llm_for_fallback
-                    for llm_for_fallback in llms_with_fallbacks[1:]
-                ]
+                fallback_chains = []
+                for llm_for_fallback in llms_with_fallbacks[1:]:
+                    fallback_chain = Llm.prompt_as_chat_prompt_template(prompt) | llm_for_fallback
+                    if output_parser: fallback_chain = fallback_chain | output_parser
+                    fallback_chains.append(fallback_chain)
                 chain = chain.with_fallbacks(fallback_chains)
             chains.append(chain)
 
@@ -134,7 +136,7 @@ class Llm:
     def prompt_as_chat_prompt_template(prompt: str) -> ChatPromptTemplate:
         if isinstance(prompt, ChatPromptTemplate):
             return prompt
-        return ChatPromptTemplate.from_template(prompt)
+        return ChatPromptTemplate.from_messages([HumanMessage(prompt)])
     @staticmethod
     def _invoke_parallel_chains(action_name: str = "", inputs: dict = None, batch_size: int = None, *chains: Chain) -> list[str]:
         if len(chains) == 0:

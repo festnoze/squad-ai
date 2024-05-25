@@ -38,6 +38,14 @@ class MethodDesc(BaseDesc):
         self.generated_return_summary: str = None
         self.generated_xml_summary: str = None
 
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            key = txt.to_python_case(key)
+            if key == 'params':
+                self.params: list[ParameterDesc] = [ParameterDesc(**param) for param in value]
+            else:
+                setattr(self, key, value)
+                
     def to_code(self, indent_level: int = 1, include_summary: bool = False):
         method_code: str = ""
         # Add summary (generated or existing)

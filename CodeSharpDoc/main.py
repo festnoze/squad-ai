@@ -38,9 +38,11 @@ llms_infos = []
 #llms_infos.append(LlmInfo(type= LangChainAdapterType.Groq, model= "llama3-8b-8192",  timeout= 10, temperature = 0.5, api_key= groq_api_key))
 #llms_infos.append(LlmInfo(type= LangChainAdapterType.Groq, model= "llama3-70b-8192",  timeout= 20, temperature = 0.5, api_key= groq_api_key))
 
-llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo",  timeout= 60, temperature = 0.5, api_key= openai_api_key))
-#llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo",  timeout= 120, temperature = 0.5, api_key= openai_api_key))
-llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout= 60, temperature = 0.5, api_key= openai_api_key))
+llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0125",  timeout= 60, temperature = 0.5, api_key= openai_api_key))
+#llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo",  timeout= 60, temperature = 0.5, api_key= openai_api_key))
+llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo",  timeout= 120, temperature = 0.5, api_key= openai_api_key))
+#llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout= 60, temperature = 1, api_key= openai_api_key))
+llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout= 80, temperature = 0.1, api_key= openai_api_key))
 
 # Speed test
 # llms = LangChainFactory.create_llms_from_infos(llms_infos)
@@ -49,11 +51,13 @@ llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  t
 # exit()
 
 # Re-init. files which will be touched
-file.delete_files_in_folder("inputs\\code_files_generated\\")
-file.copy_folder_files_and_folders_to_folder("inputs\\code_files_saved\\", "inputs\\code_files_generated\\")
+folder_path = "C:\Dev\squad-ai\CodeSharpDoc\inputs\code_files_generated"
+file.delete_files_in_folder(folder_path)
+file.copy_folder_files_and_folders_to_folder("inputs\code_files_saved", folder_path)
 txt.activate_print = True # Activate print each step advancement
 
-SummaryGenerationService.generate_all_summaries_for_all_csharp_files_and_save("inputs\\code_files_generated", llms_infos)
+SummaryGenerationService.generate_all_summaries_for_all_csharp_files_and_save(folder_path, llms_infos)
+
 # Llm.invoke_method_mesuring_openai_tokens_consumption(
 #     SummaryGenerationService.generate_all_summaries_for_all_csharp_files_and_save, 
 #         "inputs\\code_files_generated", llms_infos #\\UserProfileQueryingService.cs \\IMessageService.cs

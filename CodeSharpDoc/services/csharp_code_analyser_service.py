@@ -20,21 +20,18 @@ class CSharpCodeStructureAnalyser:
         txt.print_with_spinner(f"Parsing all {len(paths_and_codes)} files for code structure:")
         all_parsed_structs = []
         for file_path, code in paths_and_codes.items():
-            structure_description: StructureDesc = CSharpCodeStructureAnalyser.get_code_structure(llm, file_path, code)
-            if structure_description:
-                all_parsed_structs.append(structure_description)
+            structures_descriptions: list[StructureDesc] = CSharpCodeStructureAnalyser.get_structures_from_code_file(llm, file_path, code)
+            if structures_descriptions and len(structures_descriptions) > 0:
+                all_parsed_structs.extend(structures_descriptions)
         txt.stop_spinner_replace_text(f"{len(paths_and_codes)} files were parsed successfully. Found {len(paths_and_codes)} files containing structures (like class, interface, record, enum ...)")
         return all_parsed_structs
     
     @staticmethod
-    def get_code_structure(llm: BaseChatModel, file_path: str, code: str, chunk_size:int = 8000, chunk_overlap: int = 0) -> BaseDesc:
+    def get_structures_from_code_file(llm: BaseChatModel, file_path: str, code: str, chunk_size:int = 8000, chunk_overlap: int = 0) -> list[StructureDesc]:
         found_struct_separators, separator_indexes, splitted_struct_contents = CSharpCodeStructureAnalyser.split_by_class_interface_enum_definition(code)
         
-        if len(found_struct_separators) == 0:
+        if len(found_struct_separators) == 0 or len(splitted_struct_contents) < 2:
             return None
-        # TODO: don't yet handle files with multiple class/interface/enum definitions (can happened, especially in transfert objects files)
-        if len(splitted_struct_contents) > 2:
-            raise Exception('Multiple class/interface/enum definitions per file are not yet supported')
         
         first_chunk_has_usings = 'using' in splitted_struct_contents[0]
         first_chunk_has_namespace = 'namespace' in splitted_struct_contents[0]
@@ -48,15 +45,19 @@ class CSharpCodeStructureAnalyser:
         if first_chunk_has_usings:
             usings = re.findall(r'using\s+([\w.]+)[\s;]*', splitted_struct_contents[0]) 
 
-        if struct_type == StructureType.Class.value:
-            struct_desc = CSharpCodeStructureAnalyser.class_extract_methods_and_props(file_path, separator_indexes[0], namespace_name, usings, access_modifier, splitted_struct_contents[-1])
-            # split each method into chunks adapted to the LLM context window size
-            CSharpCodeStructureAnalyser.split_class_methods_and_add_to_class_desc(struct_desc, chunk_size, chunk_overlap)
-        elif struct_type == StructureType.Interface.value:
-            struct_desc = CSharpCodeStructureAnalyser.interface_extract_methods_and_props(llm, file_path, separator_indexes[0], namespace_name, usings, access_modifier, splitted_struct_contents[-1])
-        elif struct_type == StructureType.Enum.value:
-            return None
-        return struct_desc
+        # Handle files with multiple class/interface/enum definitions (can happened, especially in transfert objects files)
+        structs_descs: list[StructureDesc] = []
+        for i in range(len(found_struct_separators) - 1):
+            if struct_type == StructureType.Class.value:
+                struct_desc = CSharpCodeStructureAnalyser.class_extract_methods_and_props(file_path, separator_indexes[i], namespace_name, usings, access_modifier, splitted_struct_contents[i+1])
+                CSharpCodeStructureAnalyser.split_class_methods_and_add_to_class_desc(struct_desc, chunk_size, chunk_overlap) # split each method into chunks adapted to the LLM context window size
+            elif struct_type == StructureType.Interface.value:
+                struct_desc = CSharpCodeStructureAnalyser.interface_extract_methods_and_props(llm, file_path, separator_indexes[i], namespace_name, usings, access_modifier, splitted_struct_contents[i+1])
+            elif struct_type == StructureType.Enum.value:
+                return None
+            structs_descs.append(struct_desc)
+
+        return structs_descs
     
     def split_class_methods_and_add_to_class_desc(class_desc: StructureDesc, chunk_size:int = 8000, chunk_overlap: int = 0):
         # split each method into chunks adapted to the LLM context window size
@@ -91,7 +92,16 @@ class CSharpCodeStructureAnalyser:
         
         return found_struct_separators, separators_indexes, splitted_contents
     
+    def replace_csharp_accessors(code: str) -> str:
+        accessor_pattern = re.compile(r'\{\s*(get|set)(;\s*(get|set))?\s*;\s*\}')
+        cleaned_code = re.sub(accessor_pattern, ';', code)
+        
+        accessor_pattern2 = re.compile(r'\{\s*(get|set)(;\s*(public|protected|private|internal)\s*(get|set))?\s*;\s*\}')
+        cleaned_code = re.sub(accessor_pattern2, ';', cleaned_code)
+        return cleaned_code.strip()
+
     def class_extract_methods_and_props(file_path: str, index_shift_code: int, namespace_name: str, usings: list[str], access_modifier: str, code: str) -> StructureDesc:
+        code = CSharpCodeStructureAnalyser.replace_csharp_accessors(code)
         separators = ['public ', 'protected ', 'private ', 'internal ']
         pattern = '|'.join(map(re.escape, separators))
         code_chunks = re.split(pattern, code, flags=re.MULTILINE)

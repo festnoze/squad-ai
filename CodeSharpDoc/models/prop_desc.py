@@ -1,3 +1,4 @@
+from helpers.txt_helper import txt
 from models.base_desc import BaseDesc
 import json
 
@@ -8,6 +9,11 @@ class PropertyDesc(BaseDesc):
         self.prop_type = prop_type
         self.is_property = is_property
         self.is_field = not is_property
+
+    def __init__(self, **kwargs):
+        for key, value in kwargs.items():
+            key = txt.to_python_case(key)
+            setattr(self, key, value)
 
     def __str__(self):
         str = f"{self.prop_type} {self.prop_name};" 

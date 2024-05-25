@@ -1,6 +1,7 @@
 import os
 import time
 from langchain_core.language_models import BaseChatModel
+from helpers.json_helper import JsonHelper
 from langchains.langchain_factory import LangChainFactory
 from langsmith import traceable
 #
@@ -13,8 +14,10 @@ from models.method_desc import MethodDesc
 from models.params_doc import MethodParametersDocumentation, MethodParametersDocumentationPydantic
 from models.structure_desc import StructureDesc
 from models.structure_types import StructureType
+from services.code_analyser_client import code_analyser_client
 from services.csharp_code_analyser_service import CSharpCodeStructureAnalyser
 import os
+import json
 
 class SummaryGenerationService:    
     batch_size = 200
@@ -31,7 +34,8 @@ class SummaryGenerationService:
 
         CSharpHelper.remove_existing_summaries_from_all_files(paths_and_codes)
 
-        known_structures = CSharpCodeStructureAnalyser.extract_code_structures_from_code_files(llms, paths_and_codes)
+        #known_structures = CSharpCodeStructureAnalyser.extract_code_structures_from_code_files(llms, paths_and_codes)
+        known_structures = code_analyser_client.post_analyse_folder_code_files(file_path)
 
         SummaryGenerationService.generate_methods_summaries_for_all_structures(llms, known_structures)
         
@@ -111,6 +115,7 @@ class SummaryGenerationService:
         txt.print_with_spinner(f"Ongoing parallel summaries generation for {SummaryGenerationService.methods_count(known_structures)} methods in {len(known_structures)} code files:")
         SummaryGenerationService.generate_methods_summaries_for_all_classes(llms, known_structures)        
         SummaryGenerationService.apply_to_interfaces_the_classes_generated_summaries(known_structures)
+        JsonHelper.save_as_json_files(known_structures, 'outputs\\structures_descriptions')
         txt.stop_spinner_replace_text("All methods' summaries generated successfully")
 
     @staticmethod
