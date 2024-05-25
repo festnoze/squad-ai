@@ -58,9 +58,10 @@ public static class CSharpCodeAnalyserService
     private static StructureDesc CreateStructureDesc(SyntaxNode decl, string filePath, StructureType structType)
     {
         var namespaceName = decl.Ancestors().OfType<NamespaceDeclarationSyntax>().FirstOrDefault()?.Name.ToString() ?? string.Empty;
-        var usings = decl.SyntaxTree.GetCompilationUnitRoot().Usings.Select(u => u.Name.ToString()).ToList();
+        var usings = decl.SyntaxTree.GetCompilationUnitRoot().Usings.Select(u => u.Name!.ToString()).ToList();
         var structName = decl.ChildTokens().FirstOrDefault(t => t.IsKind(SyntaxKind.IdentifierToken)).ValueText;
         string accessModifier = GetAccessModifiers(decl);
+
         var baseClassName = string.Empty;
         var interfacesNames = new List<string>();
         var methods = new List<MethodDesc>();

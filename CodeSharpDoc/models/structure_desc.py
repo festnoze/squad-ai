@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 from helpers.txt_helper import txt
 from models.base_desc import BaseDesc
 from models.method_desc import MethodDesc, MethodDescPydantic
+from models.param_desc import ParameterDesc
 from models.param_doc import ParameterDocumentation
 from models.prop_desc import PropertyDesc, PropertyDescPydantic
 from models.structure_types import StructureType
@@ -51,6 +52,9 @@ class StructureDesc(BaseDesc):
     def to_json(self):
         return json.dumps(self.__dict__, cls=StructureDescEncoder, indent=4)
     
+    def __repr__(self):
+        return f"StructureDesc(name={self.name}, type={self.type})"
+    
     def generate_code_from_class_desc(self):
         class_file = ""
         # Using statements
@@ -75,14 +79,10 @@ class StructureDesc(BaseDesc):
     
 class StructureDescEncoder(json.JSONEncoder):
     def default(self, obj):
-        if isinstance(obj, StructureDesc):
-            return obj.__dict__
-        elif isinstance(obj, MethodDesc):
-            return obj.__dict__
-        elif isinstance(obj, PropertyDesc):
-            return obj.__dict__
+        if isinstance(obj, StructureType):
+            return obj.name
         else:
-            raise TypeError("Object of type ClassDesc is not an instance and cannot be serialized")
+            return obj.__dict__
 
 class StructureDescPydantic(BaseModel):
     pass

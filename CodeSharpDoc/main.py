@@ -1,6 +1,6 @@
 # internal import
 from helpers.file_helper import file
-from helpers.langsmith_helper import initialize_langsmith
+from helpers.langsmith_helper import Langsmith
 from helpers.llm_helper import Llm
 from helpers.txt_helper import txt
 from helpers.groq_helper import GroqHelper
@@ -21,7 +21,9 @@ groq_api_key = os.getenv("GROQ_API_KEY")
 openai_api_key = os.getenv("OPEN_API_KEY")
 openai.api_key = openai_api_key
 
-initialize_langsmith()
+langsmith = Langsmith()
+langsmith.delete_all_projects()
+langsmith.create_project()
 
 # Select the LLMs to be used for first and fallbacks uses
 llms_infos = []

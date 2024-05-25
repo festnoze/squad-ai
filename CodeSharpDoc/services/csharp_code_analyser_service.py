@@ -16,18 +16,18 @@ import re
 
 class CSharpCodeStructureAnalyser:
     @staticmethod
-    def extract_code_structures_from_code_files(llm, paths_and_codes):
+    def extract_code_structures_from_code_files(paths_and_codes):
         txt.print_with_spinner(f"Parsing all {len(paths_and_codes)} files for code structure:")
         all_parsed_structs = []
         for file_path, code in paths_and_codes.items():
-            structures_descriptions: list[StructureDesc] = CSharpCodeStructureAnalyser.get_structures_from_code_file(llm, file_path, code)
+            structures_descriptions: list[StructureDesc] = CSharpCodeStructureAnalyser.get_structures_from_code_file(file_path, code)
             if structures_descriptions and len(structures_descriptions) > 0:
                 all_parsed_structs.extend(structures_descriptions)
         txt.stop_spinner_replace_text(f"{len(paths_and_codes)} files were parsed successfully. Found {len(paths_and_codes)} files containing structures (like class, interface, record, enum ...)")
         return all_parsed_structs
     
     @staticmethod
-    def get_structures_from_code_file(llm: BaseChatModel, file_path: str, code: str, chunk_size:int = 8000, chunk_overlap: int = 0) -> list[StructureDesc]:
+    def get_structures_from_code_file(file_path: str, code: str, chunk_size:int = 8000, chunk_overlap: int = 0) -> list[StructureDesc]:
         found_struct_separators, separator_indexes, splitted_struct_contents = CSharpCodeStructureAnalyser.split_by_class_interface_enum_definition(code)
         
         if len(found_struct_separators) == 0 or len(splitted_struct_contents) < 2:
@@ -52,7 +52,7 @@ class CSharpCodeStructureAnalyser:
                 struct_desc = CSharpCodeStructureAnalyser.class_extract_methods_and_props(file_path, separator_indexes[i], namespace_name, usings, access_modifier, splitted_struct_contents[i+1])
                 CSharpCodeStructureAnalyser.split_class_methods_and_add_to_class_desc(struct_desc, chunk_size, chunk_overlap) # split each method into chunks adapted to the LLM context window size
             elif struct_type == StructureType.Interface.value:
-                struct_desc = CSharpCodeStructureAnalyser.interface_extract_methods_and_props(llm, file_path, separator_indexes[i], namespace_name, usings, access_modifier, splitted_struct_contents[i+1])
+                struct_desc = CSharpCodeStructureAnalyser.interface_extract_methods_and_props(file_path, separator_indexes[i], namespace_name, usings, access_modifier, splitted_struct_contents[i+1])
             elif struct_type == StructureType.Enum.value:
                 return None
             structs_descs.append(struct_desc)
@@ -73,6 +73,7 @@ class CSharpCodeStructureAnalyser:
     def split_by_class_interface_enum_definition(code: str) -> tuple[list[str], list[str], list[int]]:
         struct_separators_array = [
             'public class ', 'protected class ', 'private class ', 'internal class ', 
+            'public static class ', 'protected static class ', 'private static class ', 'internal static class ',
             'public interface ', 'protected interface ', 'private interface ', 'internal interface' , 
             'public enum ', 'protected enum ', 'private enum ', 'internal enum '
             ]
@@ -140,17 +141,7 @@ class CSharpCodeStructureAnalyser:
                     methods=methods, 
                     properties=properties)
 
-    def interface_extract_methods_and_props(llm, file_path: str, index_shift_code: int, namespace_name: str, usings: list[str], access_modifier: str, code: str) -> StructureDesc:
-        # TODO: Implement automatic code parsing for interfaces
-        # chains = []
-        # prompt = CSharpCodeStructureParser.get_prompt_for_interface_parsing(code)        
-        # chain, format_instructions = Llm.get_chain_for_json_output_parser(llm, prompt, StructureDescPydantic, StructureDesc)
-        # chains.append(chain)
-
-        # interfaces_summaries = Llm.invoke_parallel_chains({Llm.output_parser_instructions_name: format_instructions}, None, True, *chains)
-        # for i in range(len(interfaces_summaries)):
-        #     interfaces_summaries[i] = StructureDesc(**interfaces_summaries[i])
-
+    def interface_extract_methods_and_props(file_path: str, index_shift_code: int, namespace_name: str, usings: list[str], access_modifier: str, code: str) -> StructureDesc:
         separators = [';' + i*' ' +'\n' for i in range(6)]
         pattern = '|'.join(map(re.escape, separators))
         # for line in re.split(pattern, code, flags=re.MULTILINE):

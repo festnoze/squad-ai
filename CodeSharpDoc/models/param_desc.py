@@ -20,14 +20,14 @@ class ParameterDesc(BaseDesc):
 
     @staticmethod
     def factory_param_desc_from_code(param_code) -> 'ParameterDesc':
-        attributes: Optional[str] = None
+        attributs: Optional[str] = None
         default_value: Optional[str] = None
-        has_attributes = False
+        has_attributs = False
 
         param_code = param_code.strip()
         if param_code.startswith('['):
-            has_attributes = True
-            attributes = param_code[1 : param_code.find(']')].strip()
+            has_attributs = True
+            attributs = param_code[1 : param_code.find(']')].strip()
             param_code = param_code[param_code.find(']') + 1:].strip()
         param_parts = param_code.split(' ')
         param_parts = [part.strip() for part in param_parts if part.strip() != '']
@@ -43,7 +43,7 @@ class ParameterDesc(BaseDesc):
         param_type = param_parts[0]
         param_name = param_parts[1].split('=')[0].strip()
 
-        return ParameterDesc(param_name, param_type, has_default_value, default_value, attributes)
+        return ParameterDesc(param_name, param_type, has_default_value, default_value, attributs)
 
         
     def parse_parameter_signature(param: str) -> Tuple[Optional[List[str]], str, str, Optional[str]]:
@@ -60,18 +60,18 @@ class ParameterDesc(BaseDesc):
             raise ValueError(f"Invalid parameter signature: {param}")
 
         # Extract the matched groups
-        attributes = match.group(1)
+        attributs = match.group(1)
         param_type = match.group('type')
         param_name = match.group('name')
         default_value = match.group('default_value')
 
         # Split attributes if they exist
-        if attributes:
-            attributes = attributes.split()
+        if attributs:
+            attributs = attributs.split()
         else:
-            attributes = None
+            attributs = None
 
-        return attributes, param_type, param_name, default_value
+        return attributs, param_type, param_name, default_value
     
     def to_json(self):
         return json.dumps(self.__dict__, cls=ParamDescEncoder)

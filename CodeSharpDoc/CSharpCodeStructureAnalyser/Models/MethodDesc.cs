@@ -9,10 +9,11 @@ namespace CSharpCodeStructureAnalyser.Models;
 public record MethodDesc : BaseDesc
 {
     public int CodeStartIndex { get; set; }
-    public List<string> SummaryLines { get; set; }
+    public string ExistingSummary { get; set; }
     public List<string> Attributes { get; set; }
     public string ReturnType { get; set; }
     public List<ParameterDesc> Params { get; set; }
+    public int IndentLevel { get; set; }
     public string Code { get; set; }
     public bool IsAsync { get; set; }
     public bool IsTask { get; set; }
@@ -31,11 +32,12 @@ public record MethodDesc : BaseDesc
 
     public MethodDesc(
         int codeStartIndex,
-        List<string> summaryLines,
+        string existingSummary,
         List<string> attributes,
         string methodName,
         string methodReturnType,
         List<ParameterDesc> methodParams,
+        int indentLevel,
         string code,
         bool isAsync = false,
         bool isTask = false,
@@ -49,11 +51,12 @@ public record MethodDesc : BaseDesc
         : base(methodName)
     {
         CodeStartIndex = codeStartIndex;
-        SummaryLines = summaryLines;
+        ExistingSummary = existingSummary;
         Attributes = attributes;
         MethodName = methodName;
         ReturnType = methodReturnType;
         Params = methodParams;
+        IndentLevel = indentLevel;
         Code = code;
         IsAsync = isAsync;
         IsTask = isTask;
@@ -99,57 +102,6 @@ public record MethodDesc : BaseDesc
         return new string(' ', level * 4);
     }
 
-    public static MethodDesc FactoryForMethodFromClassCode(string code, int startIndex, string previousChunk, string className)
-    {
-        var previousChunkLastDoubleNewlineIndex = previousChunk.LastIndexOf("\n\n");
-        var previousChunkLastBraceIndex = previousChunk.LastIndexOf('}');
-        var summaryLines = new List<string>();
-        var attributes = new List<string>();
-
-        if (previousChunkLastDoubleNewlineIndex > previousChunkLastBraceIndex)
-        {
-            var previousChunkLastPart = previousChunk.Substring(previousChunkLastDoubleNewlineIndex);
-            attributes = DetectAttributes(previousChunkLastPart);
-            summaryLines = previousChunkLastPart.Split('\n').Where(line => line.Contains("///")).Select(line => line.Trim().Replace("///", "").Trim()).ToList();
-        }
-
-        var methodSign = code.Split('{')[0].Trim();
-        var isCtor = className == methodSign.Split('(')[0].Trim();
-        var isTask = methodSign.Contains("Task<");
-        var isAsync = methodSign.Contains("async ");
-        var isOverride = methodSign.Contains("override ");
-        var isNew = methodSign.Contains("new ");
-        var isStatic = methodSign.Contains("static ");
-        var isAbstract = methodSign.Contains("abstract ");
-        var isVirtual = methodSign.Contains("virtual ");
-        var isSealed = methodSign.Contains("sealed ");
-
-        if (!isCtor)
-        {
-            if (isAsync || isOverride || isNew || isStatic || isAbstract || isVirtual || isSealed)
-            {
-                methodSign = methodSign.Replace("override ", "").Replace("new ", "").Replace("async ", "").Replace("static ", "").Replace("abstract ", "").Replace("virtual ", "").Replace("sealed ", "").Trim();
-            }
-
-            var methodReturnType = isAsync ? methodSign.Split(' ')[0].Replace("Task<", "").Split('>')[0] : methodSign.Split(' ')[0];
-            var methodName = methodSign.Split(' ')[1].Split('(')[0];
-
-            var methodParams = GetMethodParameters(methodSign);
-            var methodCode = code;
-            if (methodCode.Contains("{") && methodCode.Contains("}"))
-            {
-                methodCode = code.Split('{')[1].Split('}', 2)[0].Trim();
-            }
-            if (methodCode.Contains("{") && methodCode.Contains("}"))
-            {
-                methodCode = methodCode.Replace("{", "{{}").Replace("}", "}}");
-            }
-            return new MethodDesc(startIndex, summaryLines, attributes, methodName, methodReturnType, methodParams, methodCode, isAsync, isTask, isCtor, isStatic, isAbstract, isOverride, isVirtual, isSealed, isNew);
-        }
-
-        return null;
-    }
-
     public static MethodDesc CreateMethodDescFromSyntax(MethodDeclarationSyntax method)
     {
         var paramList = method.ParameterList.Parameters.Select(p => new ParameterDesc(
@@ -159,14 +111,18 @@ public record MethodDesc : BaseDesc
             p.Default?.Value.ToString()
         )).ToList();
 
+        // detect the indentation level of the method 
+        var indentLevel = method.GetLeadingTrivia().ToString().Split('\n').Last().Count(c => c == ' ')/4;
+
         return new MethodDesc(
-            method.Span.Start,
-            method.GetLeadingTrivia().ToString().Split('\n').Where(l => l.Trim().StartsWith("///")).Select(l => l.Trim().Replace("///", "").Trim()).ToList(),
+            method.FullSpan.Start,
+            method.GetLeadingTrivia().ToString(),
             method.AttributeLists.SelectMany(a => a.Attributes).Select(a => a.ToString()).ToList(),
             method.Identifier.Text,
             method.ReturnType.ToString(),
             paramList,
-            method.Body?.ToString() ?? method.ExpressionBody?.Expression.ToString(),
+            indentLevel,
+            method.Body?.ToString() ?? method.ExpressionBody?.Expression.ToString() ?? string.Empty,
             method.Modifiers.Any(m => m.IsKind(SyntaxKind.AsyncKeyword)),
             method.ReturnType.ToString().Contains("Task"),
             false,

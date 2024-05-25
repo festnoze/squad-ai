@@ -3,32 +3,50 @@ import os
 import datetime
 import uuid
 from langsmith import Client
+import requests
 
-def initialize_langsmith():
-    langsmith_api_key = os.getenv("LANGCHAIN_API_KEY")
+class Langsmith:
+    def __init__(self):
+        self.langsmith_api_key = os.getenv("LANGCHAIN_API_KEY")
+        self.langsmith_project_name = str(os.getenv("LANGCHAIN_PROJECT"))
+        self.langsmith_host_uri = "https://api.smith.langchain.com"
+        self.headers = {
+            'Authorization': f'Bearer {self.langsmith_api_key}',
+            'Content-Type': 'application/json'
+        }
+        os.environ["LANGCHAIN_API_KEY"] = self.langsmith_api_key
+        os.environ["LANGCHAIN_TRACING_V2"] = "true"
+        os.environ["LANGCHAIN_ENDPOINT"] = self.langsmith_host_uri
+        self.client = Client(api_key=self.langsmith_api_key)
 
-    # Setup and activate LangSmith 
-    os.environ["LANGCHAIN_API_KEY"] = langsmith_api_key
-    os.environ["LANGCHAIN_TRACING_V2"] = "true"
-    os.environ["LANGCHAIN_ENDPOINT"] = "https://api.smith.langchain.com"
-    client = Client(api_key=langsmith_api_key)
+    def create_project(self):
+        self.langsmith_project_session = self.langsmith_project_name + '_' + str(uuid.uuid4().hex[0:5]) # Add a specific LangSmith project for this session
+        self.session = self.client.create_project(
+            project_name= self.langsmith_project_session,
+            description= f"Session of project '{self.langsmith_project_name}' began on: {datetime.datetime.now().strftime('%d/%m/%Y at: %H:%M:%S')}",
+        )
 
-    # langsmith_project = str(os.getenv("LANGCHAIN_PROJECT")) # Use the generic LangSmith project
-    langsmith_project = str(os.getenv("LANGCHAIN_PROJECT") + '_' + str(uuid.uuid4())) # Add a specific LangSmith projetc for this session
-    session = client.create_project(
-        project_name=langsmith_project,
-        description=f"Session of project '{os.getenv('LANGCHAIN_PROJECT')}' began on: {datetime.datetime.now().strftime('%d/%m/%Y at: %H:%M:%S')}",
-    )
-    os.environ["LANGCHAIN_PROJECT"] = langsmith_project
+    def create_dataset(self):
+        self.dl_dataset = self.client.create_dataset(
+            dataset_name="dataset_" + self.langsmith_project_session,
+            description="A set containing tests samples for the project",
+            data_type="kv",  # ls_schemas.DataType.kv/chat/llm
+        )
+        self.client.create_example(
+            inputs={"input": "test1"},
+            outputs={"output": "res1"},
+            dataset_id=self.dl_dataset.id,
+        )
 
-    # Add a database to LangSmith
-    # dl_dataset = client.create_dataset(
-    # dataset_name="dataset_" + langsmith_project,
-    # description="A set containing tests samples for the project",
-    # data_type="kv",  # ls_schemas.DataType.kv/chat/llm
-    # )
-    # client.create_example(
-    #     inputs={"input": "test1"},
-    #     outputs={"output": "res1"},
-    #     dataset_id=dl_dataset.id,
-    # )
+    def get_all_projects(self):
+        return list(self.client.list_projects())
+        
+    # Function to delete a project by ID
+    def delete_project(self, project_name):
+        self.client.delete_project(project_name=project_name)
+
+    # Main function to delete all projects
+    def delete_all_projects(self):
+        projects = self.get_all_projects()
+        for project in projects:
+            self.delete_project(project.name)

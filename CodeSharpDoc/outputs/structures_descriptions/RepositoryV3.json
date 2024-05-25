@@ -1,0 +1,1591 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/RepositoryV3.cs",
+    "index_shift_code": 498,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers",
+    "usings": [
+        "System",
+        "System.Collections.Generic",
+        "System.Data.Entity",
+        "System.Linq",
+        "System.Linq.Expressions",
+        "System.Threading.Tasks",
+        "LMS.Controllers.V2",
+        "LMS.Data",
+        "LMS.Models.CommonModels.EventModels",
+        "LMS.Models.ViewModels.V2.Newsfeed",
+        "LMS.Models.CommonModels.EventModels",
+        "LMS.ModelsDTOs.Forum",
+        "LMS.Models.ViewModels.V3.Newsfeed",
+        "LMS.Models.ViewModels.V3.Signalr",
+        "Serilog"
+    ],
+    "access_modifier": "internal static",
+    "struct_name": "RepositoryV3",
+    "base_class_name": null,
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "code_start_index": 541,
+            "existing_summary": "        ",
+            "attributes": [],
+            "return_type": "List<int>",
+            "params": [
+                {
+                    "param_name": "posts",
+                    "param_type": "List<NewsfeedPostV3ViewModel>",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "posts"
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var usersIds = posts.Select(p => p.User).ToList();\r\n            usersIds.AddRange(posts.SelectMany(p => p.Likers));\r\n            usersIds.AddRange(posts.SelectMany(p => p.Comments).Select(c => c.User));\r\n            usersIds.AddRange(posts.SelectMany(p => p.Comments).SelectMany(c => c.Likers));\r\n            return usersIds.Distinct().ToList();\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the unique user IDs from posts, likers, and commenters.\n/// </summary>\n/// <param name=\"List<NewsfeedPostV3ViewModel>\">The list of NewsfeedPostV3ViewModel objects containing posts.</param>\n/// <param name=\"posts\">The unique user IDs extracted from the posts, likers, and commenters.</param>\n/// <returns>Returns a list of unique user IDs extracted from posts, likers, and commenters.</returns>\n",
+            "summary": null,
+            "method_name": "GetUsersIds",
+            "code_chunks": [
+                "{\r\n            var usersIds = posts.Select(p => p.User).ToList();\r\n            usersIds.AddRange(posts.SelectMany(p => p.Likers));\r\n            usersIds.AddRange(posts.SelectMany(p => p.Comments).Select(c => c.User));\r\n            usersIds.AddRange(posts.SelectMany(p => p.Comments).SelectMany(c => c.Likers));\r\n            return usersIds.Distinct().ToList();\r\n        }"
+            ],
+            "name": "GetUsersIds",
+            "generated_summary": "Retrieve the unique user IDs from posts, likers, and commenters.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "List<NewsfeedPostV3ViewModel>",
+                        "param_name": "List<NewsfeedPostV3ViewModel>",
+                        "param_desc": "The list of NewsfeedPostV3ViewModel objects containing posts."
+                    },
+                    {
+                        "name": "posts",
+                        "param_name": "posts",
+                        "param_desc": "The unique user IDs extracted from the posts, likers, and commenters."
+                    }
+                ]
+            },
+            "generated_return_summary": "Returns a list of unique user IDs extracted from posts, likers, and commenters."
+        },
+        {
+            "code_start_index": 1004,
+            "existing_summary": "\r\n        ",
+            "attributes": [],
+            "return_type": "IQueryable<Post>",
+            "params": [
+                {
+                    "param_name": "db",
+                    "param_type": "IStudiDbCtx",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "db"
+                },
+                {
+                    "param_name": "organismeId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "organismeId"
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            return db.Posts\r\n                .AsNoTracking()\r\n                .Include(p => p.Ecole)\r\n                .Include(p => p.PostObjects)\r\n                .Include(p => p.PostObjects.Select(po => po.UploadedFile))\r\n                .Include(p => p.PostTags)\r\n                .Include(p => p.PostLikes)\r\n                .Include(p => p.PostWorkgroups)\r\n                .Include(p => p.Comments.Select(c => c.CommentObjects))\r\n                .Include(p => p.Comments.Select(c => c.CommentLikes))\r\n                .Where(p => p.DateDelete == null || p.DateDelete >= DateTime.Now)\r\n                .Where(p => p.Ecole.OrganismeId == organismeId);\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve all posts related to a specific organization that are not deleted.\n/// </summary>\n/// <param name=\"db\">IStudiDbCtx db - The database context used to query data.</param>\n/// <param name=\"organismeId\">int organismeId - The unique identifier of the organization for which posts are to be retrieved.</param>\n/// <returns>Returns a list of posts related to a specific organization.</returns>\n",
+            "summary": null,
+            "method_name": "GetPosts",
+            "code_chunks": [
+                "{\r\n            return db.Posts\r\n                .AsNoTracking()\r\n                .Include(p => p.Ecole)\r\n                .Include(p => p.PostObjects)\r\n                .Include(p => p.PostObjects.Select(po => po.UploadedFile))\r\n                .Include(p => p.PostTags)\r\n                .Include(p => p.PostLikes)\r\n                .Include(p => p.PostWorkgroups)\r\n                .Include(p => p.Comments.Select(c => c.CommentObjects))\r\n                .Include(p => p.Comments.Select(c => c.CommentLikes))\r\n                .Where(p => p.DateDelete == null || p.DateDelete >= DateTime.Now)\r\n                .Where(p => p.Ecole.OrganismeId == organismeId);\r\n        }"
+            ],
+            "name": "GetPosts",
+            "generated_summary": "Retrieve all posts related to a specific organization that are not deleted.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "db",
+                        "param_name": "db",
+                        "param_desc": "IStudiDbCtx db - The database context used to query data."
+                    },
+                    {
+                        "name": "organismeId",
+                        "param_name": "organismeId",
+                        "param_desc": "int organismeId - The unique identifier of the organization for which posts are to be retrieved."
+                    }
+                ]
+            },
+            "generated_return_summary": "Returns a list of posts related to a specific organization."
+        },
+        {
+            "code_start_index": 1763,
+            "existing_summary": "\r\n        ",
+            "attributes": [],
+            "return_type": "IQueryable<User>",
+            "params": [
+                {
+                    "param_name": "db",
+                    "param_type": "IStudiDbCtx",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "db"
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            return db.Users\r\n                .AsNoTracking()\r\n                .Include(u => u.UploadedFile_FileIdPhotoProfil)\r\n                .Include(u => u.UploadedFile_FileIdHeaderProfil)\r\n                .Include(u => u.EcoleUsers.Select(eu => eu.UserType))\r\n                .Include(u => u.InscriptionPromotions.Select(ip => ip.Promotion.Parcour));\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve all users with their associated uploaded profile photos, school information, and promotion details.\n/// </summary>\n/// <param name=\"db\">The IStudiDbCtx instance used to interact with the database.</param>\n/// <returns>Returns a list of users with profile photos, school info, and promotion details.</returns>\n",
+            "summary": null,
+            "method_name": "GetUsers",
+            "code_chunks": [
+                "{\r\n            return db.Users\r\n                .AsNoTracking()\r\n                .Include(u => u.UploadedFile_FileIdPhotoProfil)\r\n                .Include(u => u.UploadedFile_FileIdHeaderProfil)\r\n                .Include(u => u.EcoleUsers.Select(eu => eu.UserType))\r\n                .Include(u => u.InscriptionPromotions.Select(ip => ip.Promotion.Parcour));\r\n        }"
+            ],
+            "name": "GetUsers",
+            "generated_summary": "Retrieve all users with their associated uploaded profile photos, school information, and promotion details.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "db",
+                        "param_name": "db",
+                        "param_desc": "The IStudiDbCtx instance used to interact with the database."
+                    }
+                ]
+            },
+            "generated_return_summary": "Returns a list of users with profile photos, school info, and promotion details."
+        },
+        {
+            "code_start_index": 2210,
+            "existing_summary": "\r\n        ",
+            "attributes": [],
+            "return_type": "Task<List<Tag>>",
+            "params": [
+                {
+                    "param_name": "db",
+                    "param_type": "IStudiDbCtx",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "db"
+                },
+                {
+                    "param_name": "bodyTags",
+                    "param_type": "List<string>",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "bodyTags"
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            // Distinct tags to prevent violation of UNIQUE KEY in dbo.Tags\r\n            bodyTags = bodyTags.Distinct().ToList();\r\n\r\n            var existingTags = await db.Tags.AsNoTracking().Where(t => bodyTags.Contains(t.Libelle)).ToListAsync();\r\n\r\n            var tagsToCreate = new List<Tag>();\r\n\r\n            foreach (var bTag in bodyTags)\r\n            {\r\n                if (!existingTags.Any(et => string.Equals(et.Libelle, bTag, StringComparison.InvariantCultureIgnoreCase)))\r\n                {\r\n                    tagsToCreate.Add(new Tag\r\n                    {\r\n                        Code = bTag,\r\n                        Libelle = bTag,\r\n                        IsPublic = true\r\n                    });\r\n                }\r\n            }\r\n\r\n            db.Tags.AddRange(tagsToCreate);\r\n            try\r\n            {\r\n                await db.SaveChangesAsync();\r\n                existingTags.AddRange(tagsToCreate);\r\n                return existingTags;\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error trying to add new tags\");\r\n                return new List<Tag>();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "generated_xml_summary": "/// <summary>\n/// Create new tags if they do not exist in the database and return the list of existing tags.\n/// </summary>\n/// <param name=\"db\">IStudiDbCtx: The database context used to interact with the Studi database.</param>\n/// <param name=\"bodyTags\">List<string>: A list of strings representing the tags to be created or checked for existence in the database.</param>\n/// <returns>Returns a list of integer IDs representing existing tags in the database.</returns>\n",
+            "summary": null,
+            "method_name": "GetTagsIdsAsync",
+            "code_chunks": [
+                "{\r\n            // Distinct tags to prevent violation of UNIQUE KEY in dbo.Tags\r\n            bodyTags = bodyTags.Distinct().ToList();\r\n\r\n            var existingTags = await db.Tags.AsNoTracking().Where(t => bodyTags.Contains(t.Libelle)).ToListAsync();\r\n\r\n            var tagsToCreate = new List<Tag>();\r\n\r\n            foreach (var bTag in bodyTags)\r\n            {\r\n                if (!existingTags.Any(et => string.Equals(et.Libelle, bTag, StringComparison.InvariantCultureIgnoreCase)))\r\n                {\r\n                    tagsToCreate.Add(new Tag\r\n                    {\r\n                        Code = bTag,\r\n                        Libelle = bTag,\r\n                        IsPublic = true\r\n                    });\r\n                }\r\n            }\r\n\r\n            db.Tags.AddRange(tagsToCreate);\r\n            try\r\n            {\r\n                await db.SaveChangesAsync();\r\n                existingTags.AddRange(tagsToCreate);\r\n                return existingTags;\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error trying to add new tags\");\r\n                return new List<Tag>();\r\n            }\r\n        }"
+            ],
+            "name": "GetTagsIdsAsync",
+            "generated_summary": "Create new tags if they do not exist in the database and return the list of existing tags.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "db",
+                        "param_name": "db",
+                        "param_desc": "IStudiDbCtx: The database context used to interact with the Studi database."
+                    },
+                    {
+                        "name": "bodyTags",
+                        "param_name": "bodyTags",
+                        "param_desc": "List<string>: A list of strings representing the tags to be created or checked for existence in the database."
+                    }
+                ]
+            },
+            "generated_return_summary": "Returns a list of integer IDs representing existing tags in the database."
+        },
+        {
+            "code_start_index": 3486,
+            "existing_summary": "\r\n        #region Linq Select Expressions for Comment\r\n        ",
+            "attributes": [],
+            "return_type": "Expression<Func<Comment, NewsfeedCommentV3ViewModel>>",
+            "params": [
+                {
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "userId"
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            return comment => new NewsfeedCommentV3ViewModel\r\n            {\r\n                CommentId = comment.Id,\r\n                Created = comment.DateCreate,\r\n                Body = comment.Text,\r\n                Liked = comment.CommentLikes\r\n                    .Any(cl => cl.UserId == userId),\r\n                Likers = comment.CommentLikes\r\n                    .Select(cl => cl.User.Id)\r\n                    .ToList(),\r\n                User = comment.User.Id,\r\n                CommentObjects = comment.CommentObjects.Select(co => new NewsfeedAttachmentV3ViewModel()\r\n                {\r\n                    Filename = (co.FileId != null) ? co.UploadedFile.FileUrl : co.Filename,\r\n                    Label = (co.FileId != null) ? co.UploadedFile.FileName : co.Libelle\r\n                })\r\n            };\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "generated_xml_summary": "/// <summary>\n/// Create a view model for a newsfeed comment with specified properties and attachments.\n/// </summary>\n/// <param name=\"userId\">The ID of the user for whom the comment map expression is being retrieved.</param>\n/// <returns>Returns a view model for a newsfeed comment.</returns>\n",
+            "summary": null,
+            "method_name": "GetCommentMapExpression",
+            "code_chunks": [
+                "{\r\n            return comment => new NewsfeedCommentV3ViewModel\r\n            {\r\n                CommentId = comment.Id,\r\n                Created = comment.DateCreate,\r\n                Body = comment.Text,\r\n                Liked = comment.CommentLikes\r\n                    .Any(cl => cl.UserId == userId),\r\n                Likers = comment.CommentLikes\r\n                    .Select(cl => cl.User.Id)\r\n                    .ToList(),\r\n                User = comment.User.Id,\r\n                CommentObjects = comment.CommentObjects.Select(co => new NewsfeedAttachmentV3ViewModel()\r\n                {\r\n                    Filename = (co.FileId != null) ? co.UploadedFile.FileUrl : co.Filename,\r\n                    Label = (co.FileId != null) ? co.UploadedFile.FileName : co.Libelle\r\n                })\r\n            };\r\n        }"
+            ],
+            "name": "GetCommentMapExpression",
+            "generated_summary": "Create a view model for a newsfeed comment with specified properties and attachments.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The ID of the user for whom the comment map expression is being retrieved."
+                    }
+                ]
+            },
+            "generated_return_summary": "Returns a view model for a newsfeed comment."
+        },
+        {
+            "code_start_index": 4491,
+            "existing_summary": "\r\n        #endregion\r\n\r\n        #region Linq Select Expressions for EventUserEcole\r\n\r\n        ",
+            "attributes": [],
+            "return_type": "Expression<Func<EventUserEcole, ParticipatingUserViewModel>>",
+            "params": [
+                {
+                    "param_name": "ecoleId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "ecoleId"
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            return eue => new ParticipatingUserViewModel\r\n            {\r\n                UserId = eue.User.Id,\r\n                Pseudo = eue.User.Pseudo,\r\n                ProfilePicture = (eue.User.FileIdPhotoProfil != null) ? eue.User.UploadedFile_FileIdPhotoProfil.FileUrl : eue.User.PhotoProfil,\r\n                CoverPicture = (eue.User.FileIdHeaderProfil != null) ? eue.User.UploadedFile_FileIdHeaderProfil.FileUrl : eue.User.HeaderProfil,\r\n                Internal = eue.User.Interne,\r\n                UserType = eue.User.EcoleUsers.Where(eu => eu.EcoleId == ecoleId)\r\n                                            .Select(eux => new NewsfeedUserTypeV3ViewModel\r\n                                            {\r\n                                                Code = eux.UserType.Code,\r\n                                                Label = eux.UserType.Libelle\r\n                                            }).FirstOrDefault(),\r\n                Promotions = eue.User.InscriptionPromotions\r\n                                              .Where(inscPromo =>\r\n                                                         (inscPromo.DateDelete == null || inscPromo.DateDelete > DateTime.Now)\r\n                                                         && ((inscPromo.DateFinAcces == null\r\n                                                              && inscPromo.Promotion.DateFinPromo > DateTime.Now)\r\n                                                             || inscPromo.DateFinAcces > DateTime.Now))\r\n                                              .Select(ip => new NewsfeedUserPromotionV3ViewModel\r\n                                              {\r\n                                                  PromotionId = ip.PromotionId,\r\n                                                  Promotion = ip.Promotion.Libelle,\r\n                                                  Parcours = ip.Promotion.Parcour.Titre,\r\n                                                  CodeParcours = ip.Promotion.Parcour.Code,\r\n                                                  Session = ip.Promotion.Session\r\n                                              }).ToList(),\r\n                Attendance = eue.Presence\r\n            };\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "generated_xml_summary": "/// <summary>\n/// Create a view model representing a participating user with their basic information, profile and cover pictures, user type, promotions, and attendance status.\n/// </summary>\n/// <param name=\"ecoleId\">The ID of the school that is associated with the user.</param>\n/// <returns>Returns a view model representing a user's information, pictures, type, promotions, and attendance.</returns>\n",
+            "summary": null,
+            "method_name": "GetUserMapEventExpression",
+            "code_chunks": [
+                "{\r\n            return eue => new ParticipatingUserViewModel\r\n            {\r\n                UserId = eue.User.Id,\r\n                Pseudo = eue.User.Pseudo,\r\n                ProfilePicture = (eue.User.FileIdPhotoProfil != null) ? eue.User.UploadedFile_FileIdPhotoProfil.FileUrl : eue.User.PhotoProfil,\r\n                CoverPicture = (eue.User.FileIdHeaderProfil != null) ? eue.User.UploadedFile_FileIdHeaderProfil.FileUrl : eue.User.HeaderProfil,\r\n                Internal = eue.User.Interne,\r\n                UserType = eue.User.EcoleUsers.Where(eu => eu.EcoleId == ecoleId)\r\n                                            .Select(eux => new NewsfeedUserTypeV3ViewModel\r\n                                            {\r\n                                                Code = eux.UserType.Code,\r\n                                                Label = eux.UserType.Libelle\r\n                                            }).FirstOrDefault(),\r\n                Promotions = eue.User.InscriptionPromotions\r\n                                              .Where(inscPromo =>\r\n                                                         (inscPromo.DateDelete == null || inscPromo.DateDelete > DateTime.Now)\r\n                                                         && ((inscPromo.DateFinAcces == null\r\n                                                              && inscPromo.Promotion.DateFinPromo > DateTime.Now)\r\n                                                             || inscPromo.DateFinAcces > DateTime.Now))\r\n                                              .Select(ip => new NewsfeedUserPromotionV3ViewModel\r\n                                              {\r\n                                                  PromotionId = ip.PromotionId,\r\n                                                  Promotion = ip.Promotion.Libelle,\r\n                                                  Parcours = ip.Promotion.Parcour.Titre,\r\n                                                  CodeParcours = ip.Promotion.Parcour.Code,\r\n                                                  Session = ip.Promotion.Session\r\n                                              }).ToList(),\r\n                Attendance = eue.Presence\r\n            };\r\n        }"
+            ],
+            "name": "GetUserMapEventExpression",
+            "generated_summary": "Create a view model representing a participating user with their basic information, profile and cover pictures, user type, promotions, and attendance status.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "ecoleId",
+                        "param_name": "ecoleId",
+                        "param_desc": "The ID of the school that is associated with the user."
+                    }
+                ]
+            },
+            "generated_return_summary": "Returns a view model representing a user's information, pictures, type, promotions, and attendance."
+        },
+        {
+            "code_start_index": 6922,
+            "existing_summary": "\r\n        #endregion\r\n\r\n        #region Linq Select Expressions for Post\r\n\r\n        ",
+            "attributes": [],
+            "return_type": "Expression<Func<Post, NewsfeedPostViewModel>>",
+            "params": [
+                {
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "userId"
+                },
+                {
+                    "param_name": "ecoleId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "ecoleId"
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            return post => new NewsfeedPostViewModel\r\n            {\r\n                PostId = post.Id,\r\n                Created = post.DateCreate,\r\n                Body = post.Body,\r\n                IsPinned = post.IsSticky,\r\n                Likers = post.PostLikes.Select(postLike => new NewsfeedUserViewModel\r\n                {\r\n                    UserId = postLike.User.Id,\r\n                    Pseudo = postLike.User.Pseudo,\r\n                    ProfilePicture = (postLike.User.FileIdPhotoProfil != null) ? postLike.User.UploadedFile_FileIdPhotoProfil.FileUrl : postLike.User.PhotoProfil,\r\n                    CoverPicture = (postLike.User.FileIdHeaderProfil != null) ? postLike.User.UploadedFile_FileIdHeaderProfil.FileUrl : postLike.User.HeaderProfil,\r\n                    Internal = postLike.User.Interne,\r\n                    UserType = postLike.User.EcoleUsers.Where(eu => eu.EcoleId == ecoleId)\r\n                        .Select(eu => new NewsfeedUserTypeViewModel\r\n                        {\r\n                            Code = eu.UserType.Code,\r\n                            Label = eu.UserType.Libelle\r\n                        }).FirstOrDefault(),\r\n                    Promotions = postLike.User.InscriptionPromotions\r\n                        .Where(inscPromo => inscPromo.EcoleId == ecoleId\r\n                                            && (inscPromo.DateDelete == null || inscPromo.DateDelete > DateTime.Now)\r\n                                            && ((inscPromo.DateFinAcces == null && inscPromo.Promotion.DateFinPromo > DateTime.Now) || inscPromo.DateFinAcces > DateTime.Now))\r\n                        .Select(ip => new NewsfeedUserPromotionViewModel\r\n                        {\r\n                            PromotionId = ip.PromotionId,\r\n                            Promotion = ip.Promotion.Libelle,\r\n                            Parcours = ip.Promotion.Parcour.Titre,\r\n                            CodeParcours = ip.Promotion.Parcour.Code,\r\n                            Session = ip.Promotion.Session\r\n                        })\r\n                }),\r\n                Liked = post.PostLikes.Any(pl => pl.UserId == userId),\r\n                User = new NewsfeedUserViewModel\r\n                {\r\n                    UserId = post.User.Id,\r\n                    Pseudo = post.User.Pseudo,\r\n                    ProfilePicture = (post.User.FileIdPhotoProfil != null) ? post.User.UploadedFile_FileIdPhotoProfil.FileUrl : post.User.PhotoProfil,\r\n                    CoverPicture = (post.User.FileIdHeaderProfil != null) ? post.User.UploadedFile_FileIdHeaderProfil.FileUrl : post.User.HeaderProfil,\r\n                    Internal = post.User.Interne,\r\n                    UserType =\r\n                        post.User.EcoleUsers.Where(eu => eu.EcoleId == ecoleId)\r\n                            .Select(eux => new NewsfeedUserTypeViewModel\r\n                            {\r\n                                Code = eux.UserType.Code,\r\n                                Label = eux.UserType.Libelle\r\n                            }).FirstOrDefault(),\r\n                    Promotions =\r\n                        post.User.InscriptionPromotions\r\n                            .Where(inscPromo => inscPromo.EcoleId == ecoleId\r\n                                                && (inscPromo.DateDelete == null || inscPromo.DateDelete > DateTime.Now)\r\n                                                && ((inscPromo.DateFinAcces == null && inscPromo.Promotion.DateFinPromo > DateTime.Now) || inscPromo.DateFinAcces > DateTime.Now))\r\n                            .Select(ip => new NewsfeedUserPromotionViewModel\r\n                            {\r\n                                PromotionId = ip.PromotionId,\r\n                                Promotion = ip.Promotion.Libelle,\r\n                                Parcours = ip.Promotion.Parcour.Titre,\r\n                                CodeParcours = ip.Promotion.Parcour.Code,\r\n                                Session = ip.Promotion.Session\r\n                            })\r\n                },\r\n                PostObjects = post.PostObjects.Select(po => new NewsfeedAttachmentViewModel\r\n                {\r\n                    Filename = (po.FileId != null) ? po.UploadedFile.FileUrl : po.Filename,\r\n                    Label = (po.FileId != null) ? po.UploadedFile.FileName : po.Libelle\r\n                }),\r\n                Comments = post.Comments.Select(c => new NewsfeedCommentViewModel\r\n                {\r\n                    CommentId = c.Id,\r\n                    Created = c.DateCreate,\r\n                    Body = c.Text,\r\n                    Liked = c.CommentLikes.Any(cl => cl.UserId == userId),\r\n                    Likers = c.CommentLikes.Select(cl => new NewsfeedUserViewModel\r\n                    {\r\n                        UserId = cl.User.Id,\r\n                        Pseudo = cl.User.Pseudo,\r\n                        ProfilePicture = (cl.User.FileIdPhotoProfil != null) ? cl.User.UploadedFile_FileIdPhotoProfil.FileUrl : cl.User.PhotoProfil,\r\n                        CoverPicture = (cl.User.FileIdHeaderProfil != null) ? cl.User.UploadedFile_FileIdHeaderProfil.FileUrl : cl.User.HeaderProfil,\r\n                        Internal = cl.User.Interne,\r\n                        UserType = cl.User.EcoleUsers.Where(eu => eu.EcoleId == ecoleId)\r\n                            .Select(eu => new NewsfeedUserTypeViewModel\r\n                            {\r\n                                Code = eu.UserType.Code,\r\n                                Label = eu.UserType.Libelle\r\n                            }).FirstOrDefault(),\r\n                        Promotions = cl.User.InscriptionPromotions\r\n                            .Where(inscriptionPromotion =>\r\n                                inscriptionPromotion.EcoleId == ecoleId\r\n                                && (inscriptionPromotion.DateDelete == null || inscriptionPromotion.DateDelete > DateTime.Now)\r\n                                && ((inscriptionPromotion.DateFinAcces == null\r\n                                     && inscriptionPromotion.Promotion.DateFinPromo > DateTime.Now)\r\n                                    || inscriptionPromotion.DateFinAcces > DateTime.Now))\r\n                            .Select(ip => new NewsfeedUserPromotionViewModel\r\n                            {\r\n                                PromotionId = ip.PromotionId,\r\n                                Promotion = ip.Promotion.Libelle,\r\n                                Parcours = ip.Promotion.Parcour.Titre,\r\n                                CodeParcours = ip.Promotion.Parcour.Code,\r\n                                Session = ip.Promotion.Session\r\n                            })\r\n                    }),\r\n                    User = new NewsfeedUserViewModel\r\n                    {\r\n                        UserId = c.User.Id,\r\n                        Pseudo = c.User.Pseudo,\r\n                        ProfilePicture = (c.User.FileIdPhotoProfil != null) ? c.User.UploadedFile_FileIdPhotoProfil.FileUrl : c.User.PhotoProfil,\r\n                        CoverPicture = (c.User.FileIdHeaderProfil != null) ? c.User.UploadedFile_FileIdHeaderProfil.FileUrl : c.User.HeaderProfil,\r\n                        Internal = c.User.Interne,\r\n                        UserType =\r\n                            c.User.EcoleUsers.Where(eu => eu.EcoleId == ecoleId)\r\n                                .Select(eux => new NewsfeedUserTypeViewModel\r\n                                {\r\n                                    Code = eux.UserType.Code,\r\n                                    Label = eux.UserType.Libelle\r\n                                }).FirstOrDefault(),\r\n                        Promotions =\r\n                            c.User.InscriptionPromotions\r\n                                .Where(inscriptionPromotion =>\r\n                                    inscriptionPromotion.EcoleId == ecoleId\r\n                                    && (inscriptionPromotion.DateDelete == null || inscriptionPromotion.DateDelete > DateTime.Now)\r\n                                    && ((inscriptionPromotion.DateFinAcces == null\r\n                                         && inscriptionPromotion.Promotion.DateFinPromo > DateTime.Now)\r\n                                        || inscriptionPromotion.DateFinAcces > DateTime.Now))\r\n                                .Select(ip => new NewsfeedUserPromotionViewModel\r\n                                {\r\n                                    PromotionId = ip.PromotionId,\r\n                                    Promotion = ip.Promotion.Libelle,\r\n                                    Parcours = ip.Promotion.Parcour.Titre,\r\n                                    CodeParcours = ip.Promotion.Parcour.Code,\r\n                                    Session = ip.Promotion.Session\r\n                                })\r\n                    },\r\n                    CommentObjects = c.CommentObjects.Select(co => new NewsfeedAttachmentViewModel\r\n                    {\r\n                        Filename = (co.FileId != null) ? co.UploadedFile.FileUrl : co.Filename,\r\n                        Label = (co.FileId != null) ? co.UploadedFile.FileName : co.Libelle\r\n                    })\r\n                }).OrderBy(c => c.Created),\r\n                HTP = post.HideToProspects\r\n            };\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "generated_xml_summary": "/// <summary>\n/// Create a mapped expression for a newsfeed post, including post details, likers, comments, and attachments, with specific user and promotion information.\n/// </summary>\n/// <param name=\"userId\">The ID of the user for whom the mapped expression is being created.</param>\n/// <param name=\"ecoleId\">The ID of the school for which the mapped expression is being generated.</param>\n/// <returns>Returns a mapped expression for a newsfeed post with user and promotion info.</returns>\n",
+            "summary": null,
+            "method_name": "GetPostV2MapExpression",
+            "code_chunks": [
+                "{\r\n            return post => new NewsfeedPostViewModel\r\n            {\r\n                PostId = post.Id,\r\n                Created = post.DateCreate,\r\n                Body = post.Body,\r\n                IsPinned = post.IsSticky,\r\n                Likers = post.PostLikes.Select(postLike => new NewsfeedUserViewModel\r\n                {\r\n                    UserId = postLike.User.Id,\r\n                    Pseudo = postLike.User.Pseudo,\r\n                    ProfilePicture = (postLike.User.FileIdPhotoProfil != null) ? postLike.User.UploadedFile_FileIdPhotoProfil.FileUrl : postLike.User.PhotoProfil,\r\n                    CoverPicture = (postLike.User.FileIdHeaderProfil != null) ? postLike.User.UploadedFile_FileIdHeaderProfil.FileUrl : postLike.User.HeaderProfil,\r\n                    Internal = postLike.User.Interne,\r\n                    UserType = postLike.User.EcoleUsers.Where(eu => eu.EcoleId == ecoleId)\r\n                        .Select(eu => new NewsfeedUserTypeViewModel\r\n                        {\r\n                            Code = eu.UserType.Code,\r\n                            Label = eu.UserType.Libelle\r\n                        }).FirstOrDefault(),\r\n                    Promotions = postLike.User.InscriptionPromotions\r\n                        .Where(inscPromo => inscPromo.EcoleId == ecoleId\r\n                                            && (inscPromo.DateDelete == null || inscPromo.DateDelete > DateTime.Now)\r\n                                            && ((inscPromo.DateFinAcces == null && inscPromo.Promotion.DateFinPromo > DateTime.Now) || inscPromo.DateFinAcces > DateTime.Now))\r\n                        .Select(ip => new NewsfeedUserPromotionViewModel\r\n                        {\r\n                            PromotionId = ip.PromotionId,\r\n                            Promotion = ip.Promotion.Libelle,\r\n                            Parcours = ip.Promotion.Parcour.Titre,\r\n                            CodeParcours = ip.Promotion.Parcour.Code,\r\n                            Session = ip.Promotion.Session\r\n                        })\r\n                }),\r\n                Liked = post.PostLikes.Any(pl => pl.UserId == userId),\r\n                User = new NewsfeedUserViewModel\r\n                {\r\n                    UserId = post.User.Id,\r\n                    Pseudo = post.User.Pseudo,\r\n                    ProfilePicture = (post.User.FileIdPhotoProfil != null) ? post.User.UploadedFile_FileIdPhotoProfil.FileUrl : post.User.PhotoProfil,\r\n                    CoverPicture = (post.User.FileIdHeaderProfil != null) ? post.User.UploadedFile_FileIdHeaderProfil.FileUrl : post.User.HeaderProfil,\r\n                    Internal = post.User.Interne,\r\n                    UserType =\r\n                        post.User.EcoleUsers.Where(eu => eu.EcoleId == ecoleId)\r\n                            .Select(eux => new NewsfeedUserTypeViewModel\r\n                            {\r\n                                Code = eux.UserType.Code,\r\n                                Label = eux.UserType.Libelle\r\n                            }).FirstOrDefault(),\r\n                    Promotions =\r\n                        post.User.InscriptionPromotions\r\n                            .Where(inscPromo => inscPromo.EcoleId == ecoleId\r\n                                                && (inscPromo.DateDelete == null || inscPromo.DateDelete > DateTime.Now)\r\n                                                && ((inscPromo.DateFinAcces == null && inscPromo.Promotion.DateFinPromo > DateTime.Now) || inscPromo.DateFinAcces > DateTime.Now))\r\n                            .Select(ip => new NewsfeedUserPromotionViewModel\r\n                            {\r\n                                PromotionId = ip.PromotionId,\r\n                                Promotion = ip.Promotion.Libelle,\r\n                                Parcours = ip.Promotion.Parcour.Titre,\r\n                                CodeParcours = ip.Promotion.Parcour.Code,\r\n                                Session = ip.Promotion.Session\r\n                            })\r\n                },\r\n                PostObjects = post.PostObjects.Select(po => new NewsfeedAttachmentViewModel\r\n                {\r\n                    Filename = (po.FileId != null) ? po.UploadedFile.FileUrl : po.Filename,\r\n                    Label = (po.FileId != null) ? po.UploadedFile.FileName : po.Libelle\r\n                }),\r\n                Comments = post.Comments.Select(c => new NewsfeedCommentViewModel\r\n                {\r\n                    CommentId = c.Id,\r\n                    Created = c.DateCreate,\r\n                    Body = c.Text,\r\n                    Liked = c.CommentLikes.Any(cl => cl.UserId == userId),\r\n                    Likers = c.CommentLikes.Select(cl => new NewsfeedUserViewModel\r\n                    {\r\n                        UserId = cl.User.Id,\r\n                        Pseudo = cl.User.Pseudo,\r\n                        ProfilePicture = (cl.User.FileIdPhotoProfil != null) ? cl.User.UploadedFile_FileIdPhotoProfil.FileUrl : cl.User.PhotoProfil,\r\n                        CoverPicture = (cl.User.FileIdHeaderProfil != null) ? cl.User.UploadedFile_FileIdHeaderProfil.FileUrl : cl.User.HeaderProfil,\r\n                        Internal = cl.User.Interne,\r\n                        UserType = cl.User.EcoleUsers.Where(eu => eu.EcoleId == ecoleId)\r\n                            .Select(eu => new NewsfeedUserTypeViewModel\r\n                            {\r\n                                Code = eu.UserType.Code,\r\n                                Label = eu.UserType.Libelle\r\n                            }).FirstOrDefault(),\r\n                        Promotions = cl.User.InscriptionPromotions\r\n                            .Where(inscriptionPromotion =>\r\n                                inscriptionPromotion.EcoleId == ecoleId\r\n                                && (inscriptionPromotion.DateDelete == null || inscriptionPromotion.DateDelete > DateTime.Now)\r\n                                && ((inscriptionPromotion.DateFinAcces == null\r\n                                     && inscriptionPromotion.Promotion.DateFinPromo > DateTime.Now)\r\n                                    || inscriptionPromotion.DateFinAcces > DateTime.Now))\r\n                            .Select(ip => new NewsfeedUserPromotionViewModel\r\n                            {\r\n                                PromotionId = ip.PromotionId,\r\n                                Promotion = ip.Promotion.Libelle,\r\n                                Parcours = ip.Promotion.Parcour.Titre,\r\n                                CodeParcours = ip.Promotion.Parcour.Code,\r\n                                Session = ip.Promotion.Session\r\n                            })\r\n                    }),\r\n                    User = new NewsfeedUserViewModel\r\n                    {\r\n                        UserId = c.User.Id,\r\n                        Pseudo = c.User.Pseudo,\r\n                        ProfilePicture = (c.User.FileIdPhotoProfil != null) ? c.User.UploadedFile_FileIdPhotoProfil.FileUrl : c.User.PhotoProfil,\r\n                        CoverPicture = (c.User.FileIdHeaderProfil != null) ? c.User.UploadedFile_FileIdHeaderProfil.FileUrl : c.User.HeaderProfil,\r\n                        Internal = c.User.Interne,\r\n                        UserType =\r\n                            c.User.EcoleUsers.Where(eu => eu.EcoleId == ecoleId)\r\n                                .Select(eux => new NewsfeedUserTypeViewModel\r\n                                {\r\n                                    Code = eux.UserType.Code,\r\n                                    Label = eux.UserType.Libelle\r\n                                }).FirstOrDefault(),\r\n                        Promotions =\r\n                            c.User.InscriptionPromotions\r\n                                .Where(inscriptionPromotion =>\r\n                                    inscriptionPromotion.EcoleId == ecoleId\r\n                                    && (inscriptionPromotion.DateDelete == null || inscriptionPromotion.DateDelete > DateTime.Now)\r\n                                    && ((inscriptionPromotion.DateFinAcces == null\r\n                                         && inscriptionPromotion.Promotion.DateFinPromo > DateTime.Now)\r\n                                        || inscriptionPromotion.DateFinAcces > DateTime.Now))\r\n                                .Select(ip => new NewsfeedUserPromotionViewModel\r\n                                {\r\n                                    PromotionId = ip.PromotionId,\r\n                                    Promotion = ip.Promotion.Libelle,\r\n                                    Parcours = ip.Promotion.Parcour.Titre,\r\n                                    CodeParcours = ip.Promotion.Parcour.Code,\r\n                                    Session = ip.Promotion.Session\r\n                                })\r\n                    },\r\n                    CommentObjects = c.CommentObjects.Select(co => new NewsfeedAttachmentViewModel\r\n                    {\r\n                        Filename = (co.FileId != null) ? co.UploadedFile.FileUrl : co.Filename,\r\n                        Label = (co.FileId != null) ? co.UploadedFile.FileName : co.Libelle\r\n                    })\r\n                }).OrderBy(c => c.Created),\r\n                HTP = post.HideToProspects\r\n            };\r\n        }"
+            ],
+            "name": "GetPostV2MapExpression",
+            "generated_summary": "Create a mapped expression for a newsfeed post, including post details, likers, comments, and attachments, with specific user and promotion information.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The ID of the user for whom the mapped expression is being created."
+                    },
+                    {
+                        "name": "ecoleId",
+                        "param_name": "ecoleId",
+                        "param_desc": "The ID of the school for which the mapped expression is being generated."
+                    }
+                ]
+            },
+            "generated_return_summary": "Returns a mapped expression for a newsfeed post with user and promotion info."
+        },
+        {
+            "code_start_index": 16365,
+            "existing_summary": "\r\n        ",
+            "attributes": [],
+            "return_type": "Expression<Func<Post, NewsfeedPostV3ViewModel>>",
+            "params": [
+                {
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "userId"
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            return post => new NewsfeedPostV3ViewModel\r\n            {\r\n                PostId = post.Id,\r\n                Created = post.DateCreate,\r\n                Updated = post.DateUpdate,\r\n\r\n                //Audience = post.PostWorkgroups.Select(pw => pw.WorkgroupId).ToList(),\r\n                IsPublic = !post.PostWorkgroups.Any() || post.PostWorkgroups.Count == 1 && post.PostWorkgroups.FirstOrDefault().Workgroup.Ecoles.Any(),\r\n                Body = post.Body,\r\n                IsPinned = post.IsSticky,\r\n                IsFormationTab = post.IsFormationTab,\r\n                Likers = post.PostLikes\r\n                    .Select(pl => pl.UserId)\r\n                    .ToList(),\r\n                Liked = post.PostLikes\r\n                    .Any(pl => pl.UserId == userId),\r\n                User = post.User.Id,\r\n                Views = post.ViewsCount,\r\n                Seen = post.PostViews\r\n                    .Any(pl => pl.UserId == userId),\r\n                PostObjects = post.PostObjects\r\n                    .Select(po => new NewsfeedAttachmentV3ViewModel\r\n                    {\r\n                        Filename = (po.FileId != null) ? po.UploadedFile.FileUrl : po.Filename,\r\n                        Label = (po.FileId != null) ? po.UploadedFile.FileName : po.Libelle\r\n                    })\r\n                    .ToList(),\r\n                Comments = post.Comments\r\n                    .Where(c => c.DateDelete == null || c.DateDelete > DateTime.Now)\r\n                    .Select(c => new NewsfeedCommentV3ViewModel\r\n                    {\r\n                        CommentId = c.Id,\r\n                        Created = c.DateCreate,\r\n                        Body = c.Text,\r\n                        Liked = c.CommentLikes\r\n                            .Any(cl => cl.UserId == userId),\r\n                        Likers = c.CommentLikes\r\n                            .Select(cl => cl.UserId)\r\n                            .ToList(),\r\n                        User = c.UserId,\r\n                        CommentObjects = c.CommentObjects\r\n                            .Select(co => new NewsfeedAttachmentV3ViewModel\r\n                            {\r\n                                Filename = (co.FileId != null) ? co.UploadedFile.FileUrl : co.Filename,\r\n                                Label = (co.FileId != null) ? co.UploadedFile.FileName : co.Libelle\r\n                            })\r\n                            .ToList()\r\n                    })\r\n                    .OrderBy(c => c.Created)\r\n                    .ToList(),\r\n                HTP = post.HideToProspects\r\n            };\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "generated_xml_summary": "/// <summary>\n/// Create a view model for a newsfeed post with various properties such as post ID, creation date, updated date, body, likers, comments, attachments, and visibility settings.\n/// </summary>\n/// <param name=\"userId\">The ID of the user for whom the newsfeed post view model will be created.</param>\n/// <param name=\"GetPostMapExpression\">The method used to create a view model for a newsfeed post with properties like post ID, creation date, updated date, body, likers, comments, attachments, and visibility settings.</param>\n/// <returns>Returns a view model for a newsfeed post with various properties.</returns>\n",
+            "summary": null,
+            "method_name": "GetPostMapExpression",
+            "code_chunks": [
+                "{\r\n            return post => new NewsfeedPostV3ViewModel\r\n            {\r\n                PostId = post.Id,\r\n                Created = post.DateCreate,\r\n                Updated = post.DateUpdate,\r\n\r\n                //Audience = post.PostWorkgroups.Select(pw => pw.WorkgroupId).ToList(),\r\n                IsPublic = !post.PostWorkgroups.Any() || post.PostWorkgroups.Count == 1 && post.PostWorkgroups.FirstOrDefault().Workgroup.Ecoles.Any(),\r\n                Body = post.Body,\r\n                IsPinned = post.IsSticky,\r\n                IsFormationTab = post.IsFormationTab,\r\n                Likers = post.PostLikes\r\n                    .Select(pl => pl.UserId)\r\n                    .ToList(),\r\n                Liked = post.PostLikes\r\n                    .Any(pl => pl.UserId == userId),\r\n                User = post.User.Id,\r\n                Views = post.ViewsCount,\r\n                Seen = post.PostViews\r\n                    .Any(pl => pl.UserId == userId),\r\n                PostObjects = post.PostObjects\r\n                    .Select(po => new NewsfeedAttachmentV3ViewModel\r\n                    {\r\n                        Filename = (po.FileId != null) ? po.UploadedFile.FileUrl : po.Filename,\r\n                        Label = (po.FileId != null) ? po.UploadedFile.FileName : po.Libelle\r\n                    })\r\n                    .ToList(),\r\n                Comments = post.Comments\r\n                    .Where(c => c.DateDelete == null || c.DateDelete > DateTime.Now)\r\n                    .Select(c => new NewsfeedCommentV3ViewModel\r\n                    {\r\n                        CommentId = c.Id,\r\n                        Created = c.DateCreate,\r\n                        Body = c.Text,\r\n                        Liked = c.CommentLikes\r\n                            .Any(cl => cl.UserId == userId),\r\n                        Likers = c.CommentLikes\r\n                            .Select(cl => cl.UserId)\r\n                            .ToList(),\r\n                        User = c.UserId,\r\n                        CommentObjects = c.CommentObjects\r\n                            .Select(co => new NewsfeedAttachmentV3ViewModel\r\n                            {\r\n                                Filename = (co.FileId != null) ? co.UploadedFile.FileUrl : co.Filename,\r\n                                Label = (co.FileId != null) ? co.UploadedFile.FileName : co.Libelle\r\n                            })\r\n                            .ToList()\r\n                    })\r\n                    .OrderBy(c => c.Created)\r\n                    .ToList(),\r\n                HTP = post.HideToProspects\r\n            };\r\n        }"
+            ],
+            "name": "GetPostMapExpression",
+            "generated_summary": "Create a view model for a newsfeed post with various properties such as post ID, creation date, updated date, body, likers, comments, attachments, and visibility settings.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The ID of the user for whom the newsfeed post view model will be created."
+                    },
+                    {
+                        "name": "GetPostMapExpression",
+                        "param_name": "GetPostMapExpression",
+                        "param_desc": "The method used to create a view model for a newsfeed post with properties like post ID, creation date, updated date, body, likers, comments, attachments, and visibility settings."
+                    }
+                ]
+            },
+            "generated_return_summary": "Returns a view model for a newsfeed post with various properties."
+        },
+        {
+            "code_start_index": 19085,
+            "existing_summary": "\r\n        #endregion\r\n\r\n        #region Linq Select Expressions for User\r\n\r\n        ",
+            "attributes": [],
+            "return_type": "Expression<Func<User, NewsfeedUserV3ViewModel>>",
+            "params": [
+                {
+                    "param_name": "ecoleId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "ecoleId"
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            return GetUserMapExpression(new List<int> { ecoleId });\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the map expression for a specified user.\n/// </summary>\n/// <param name=\"ecoleId\">The ID of the school for which the map expression is to be retrieved.</param>\n/// <returns>Returns the map expression for a specified user.</returns>\n",
+            "summary": null,
+            "method_name": "GetUserMapExpression",
+            "code_chunks": [
+                "{\r\n            return GetUserMapExpression(new List<int> { ecoleId });\r\n        }"
+            ],
+            "name": "GetUserMapExpression",
+            "generated_summary": "Retrieve the map expression for a specified user.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "ecoleId",
+                        "param_name": "ecoleId",
+                        "param_desc": "The ID of the school for which the map expression is to be retrieved."
+                    }
+                ]
+            },
+            "generated_return_summary": "Returns the map expression for a specified user."
+        },
+        {
+            "code_start_index": 19357,
+            "existing_summary": "\r\n        ",
+            "attributes": [],
+            "return_type": "Expression<Func<User, NewsfeedUserV3ViewModel>>",
+            "params": [
+                {
+                    "param_name": "schoolIdsList",
+                    "param_type": "IList<int>",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "schoolIdsList"
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            return user => new NewsfeedUserV3ViewModel\r\n            {\r\n                UserId = user.Id,\r\n                Pseudo = user.Pseudo,\r\n                ProfilePicture = (user.FileIdPhotoProfil != null) ? user.UploadedFile_FileIdPhotoProfil.FileUrl : user.PhotoProfil,\r\n                CoverPicture = (user.FileIdHeaderProfil != null) ? user.UploadedFile_FileIdHeaderProfil.FileUrl : user.HeaderProfil,\r\n                Internal = user.Interne,\r\n                UserType = user.EcoleUsers\r\n                    .OrderByDescending(eu => schoolIdsList.Contains(eu.EcoleId)) // Permet de prendre en premier l'EcoleUsers de l'\u00e9cole courante, sinon une autre\r\n                    .Select(eux => new NewsfeedUserTypeV3ViewModel\r\n                    {\r\n                        Code = eux.UserType.Code,\r\n                        Label = eux.UserType.Libelle\r\n                    })\r\n                    .FirstOrDefault(),\r\n                Promotions = user.InscriptionPromotions\r\n                    .Where(inscPromo => schoolIdsList.Contains(inscPromo.EcoleId)\r\n                        && (inscPromo.DateDelete == null || inscPromo.DateDelete > DateTime.Now)\r\n                        && ((inscPromo.DateFinAcces == null\r\n                        && inscPromo.Promotion.DateFinPromo > DateTime.Now)\r\n                        || inscPromo.DateFinAcces > DateTime.Now))\r\n                    .Select(ip => new NewsfeedUserPromotionV3ViewModel\r\n                    {\r\n                        PromotionId = ip.PromotionId,\r\n                        Promotion = ip.Promotion.Libelle,\r\n                        Parcours = ip.Promotion.Parcour.Titre,\r\n                        CodeParcours = ip.Promotion.Parcour.Code,\r\n                        Session = ip.Promotion.Session\r\n                    })\r\n                    .ToList(),\r\n                IsFromCurrentSchool = user.EcoleUsers\r\n                    .Any(eu => schoolIdsList.Contains(eu.EcoleId))\r\n            };\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "generated_xml_summary": "/// <summary>\n/// Create a view model for a user with specific properties and relationships, including user type, promotions, and school affiliation.\n/// </summary>\n/// <param name=\"schoolIdsList\">The list of school IDs that the method will use to retrieve information.</param>\n/// <param name=\"GetUserMapExpression\">The method name used to create a view model for a user with specific properties and relationships, including user type, promotions, and school affiliation.</param>\n/// <returns>Returns a view model for a user with specific properties and relationships.</returns>\n",
+            "summary": null,
+            "method_name": "GetUserMapExpression",
+            "code_chunks": [
+                "{\r\n            return user => new NewsfeedUserV3ViewModel\r\n            {\r\n                UserId = user.Id,\r\n                Pseudo = user.Pseudo,\r\n                ProfilePicture = (user.FileIdPhotoProfil != null) ? user.UploadedFile_FileIdPhotoProfil.FileUrl : user.PhotoProfil,\r\n                CoverPicture = (user.FileIdHeaderProfil != null) ? user.UploadedFile_FileIdHeaderProfil.FileUrl : user.HeaderProfil,\r\n                Internal = user.Interne,\r\n                UserType = user.EcoleUsers\r\n                    .OrderByDescending(eu => schoolIdsList.Contains(eu.EcoleId)) // Permet de prendre en premier l'EcoleUsers de l'\u00e9cole courante, sinon une autre\r\n                    .Select(eux => new NewsfeedUserTypeV3ViewModel\r\n                    {\r\n                        Code = eux.UserType.Code,\r\n                        Label = eux.UserType.Libelle\r\n                    })\r\n                    .FirstOrDefault(),\r\n                Promotions = user.InscriptionPromotions\r\n                    .Where(inscPromo => schoolIdsList.Contains(inscPromo.EcoleId)\r\n                        && (inscPromo.DateDelete == null || inscPromo.DateDelete > DateTime.Now)\r\n                        && ((inscPromo.DateFinAcces == null\r\n                        && inscPromo.Promotion.DateFinPromo > DateTime.Now)\r\n                        || inscPromo.DateFinAcces > DateTime.Now))\r\n                    .Select(ip => new NewsfeedUserPromotionV3ViewModel\r\n                    {\r\n                        PromotionId = ip.PromotionId,\r\n                        Promotion = ip.Promotion.Libelle,\r\n                        Parcours = ip.Promotion.Parcour.Titre,\r\n                        CodeParcours = ip.Promotion.Parcour.Code,\r\n                        Session = ip.Promotion.Session\r\n                    })\r\n                    .ToList(),\r\n                IsFromCurrentSchool = user.EcoleUsers\r\n                    .Any(eu => schoolIdsList.Contains(eu.EcoleId))\r\n            };\r\n        }"
+            ],
+            "name": "GetUserMapExpression",
+            "generated_summary": "Create a view model for a user with specific properties and relationships, including user type, promotions, and school affiliation.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "schoolIdsList",
+                        "param_name": "schoolIdsList",
+                        "param_desc": "The list of school IDs that the method will use to retrieve information."
+                    },
+                    {
+                        "name": "GetUserMapExpression",
+                        "param_name": "GetUserMapExpression",
+                        "param_desc": "The method name used to create a view model for a user with specific properties and relationships, including user type, promotions, and school affiliation."
+                    }
+                ]
+            },
+            "generated_return_summary": "Returns a view model for a user with specific properties and relationships."
+        },
+        {
+            "code_start_index": 21456,
+            "existing_summary": "\r\n        ",
+            "attributes": [],
+            "return_type": "Expression<Func<User, NewsfeedUserV3ViewModel>>",
+            "params": [
+                {
+                    "param_name": "ecoleId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "ecoleId"
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            return user => new NewsfeedUserV3ViewModel\r\n            {\r\n                UserId = user.Id,\r\n                Pseudo = user.Pseudo,\r\n                ProfilePicture = (user.FileIdPhotoProfil != null) ? user.UploadedFile_FileIdPhotoProfil.FileUrl : user.PhotoProfil,\r\n                CoverPicture = (user.FileIdHeaderProfil != null) ? user.UploadedFile_FileIdHeaderProfil.FileUrl : user.HeaderProfil,\r\n                Internal = user.Interne,\r\n                UserType = user.EcoleUsers.Where(eu => eu.EcoleId == ecoleId)\r\n                                              .Select(eux => new NewsfeedUserTypeV3ViewModel\r\n                                              {\r\n                                                  Code = eux.UserType.Code,\r\n                                                  Label = eux.UserType.Libelle\r\n                                              }).FirstOrDefault(),\r\n            };\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "generated_xml_summary": "/// <summary>\n/// Create a view model for a newsfeed user without promotions, including user ID, username, profile picture, cover picture, internal status, and user type for a specific school.\n/// </summary>\n/// <param name=\"ecoleId\">The ID of the school for which the user map expression is being retrieved.</param>\n/// <returns>Returns a view model for a newsfeed user without promotions.</returns>\n",
+            "summary": null,
+            "method_name": "GetUserMapExpressionWithoutPromotions",
+            "code_chunks": [
+                "{\r\n            return user => new NewsfeedUserV3ViewModel\r\n            {\r\n                UserId = user.Id,\r\n                Pseudo = user.Pseudo,\r\n                ProfilePicture = (user.FileIdPhotoProfil != null) ? user.UploadedFile_FileIdPhotoProfil.FileUrl : user.PhotoProfil,\r\n                CoverPicture = (user.FileIdHeaderProfil != null) ? user.UploadedFile_FileIdHeaderProfil.FileUrl : user.HeaderProfil,\r\n                Internal = user.Interne,\r\n                UserType = user.EcoleUsers.Where(eu => eu.EcoleId == ecoleId)\r\n                                              .Select(eux => new NewsfeedUserTypeV3ViewModel\r\n                                              {\r\n                                                  Code = eux.UserType.Code,\r\n                                                  Label = eux.UserType.Libelle\r\n                                              }).FirstOrDefault(),\r\n            };\r\n        }"
+            ],
+            "name": "GetUserMapExpressionWithoutPromotions",
+            "generated_summary": "Create a view model for a newsfeed user without promotions, including user ID, username, profile picture, cover picture, internal status, and user type for a specific school.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "ecoleId",
+                        "param_name": "ecoleId",
+                        "param_desc": "The ID of the school for which the user map expression is being retrieved."
+                    }
+                ]
+            },
+            "generated_return_summary": "Returns a view model for a newsfeed user without promotions."
+        },
+        {
+            "code_start_index": 22519,
+            "existing_summary": "\r\n        ",
+            "attributes": [],
+            "return_type": "Expression<Func<User, ConnectionHubUser>>",
+            "params": [
+                {
+                    "param_name": "ecoleId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "ecoleId"
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            return user => new ConnectionHubUser\r\n            {\r\n                UserId = user.Id,\r\n                Pseudo = user.Pseudo,\r\n                ProfilePicture = (user.FileIdPhotoProfil != null) ? user.UploadedFile_FileIdPhotoProfil.FileUrl : user.PhotoProfil,\r\n                CoverPicture = (user.FileIdHeaderProfil != null) ? user.UploadedFile_FileIdHeaderProfil.FileUrl : user.HeaderProfil,\r\n                Internal = user.Interne,\r\n                UserType = user.EcoleUsers.Where(eu => eu.EcoleId == ecoleId)\r\n                                              .Select(eux => new NewsfeedUserTypeV3ViewModel\r\n                                              {\r\n                                                  Code = eux.UserType.Code,\r\n                                                  Label = eux.UserType.Libelle\r\n                                              }).FirstOrDefault(),\r\n                LastConnectionDate = user.EcoleUsers.Where(eu => eu.EcoleId == ecoleId)\r\n                                                        .Select(eux => eux.LastConnectionDate).FirstOrDefault(),\r\n                LastDisconnectionDate = user.EcoleUsers.Where(eu => eu.EcoleId == ecoleId)\r\n                                                           .Select(eux => eux.LastDisconnectionDate).FirstOrDefault(),\r\n                PromotionsV2 = user.InscriptionPromotions\r\n                                    .Where(inscPromo => inscPromo.EcoleId == ecoleId\r\n                                        && (inscPromo.DateDelete == null || inscPromo.DateDelete > DateTime.Now)\r\n                                        && ((inscPromo.DateFinAcces == null\r\n                                        && inscPromo.Promotion.DateFinPromo > DateTime.Now)\r\n                                        || inscPromo.DateFinAcces > DateTime.Now))\r\n                                    .Select(ip => new NewsfeedUserPromotionV3ViewModel\r\n                                    {\r\n                                        PromotionId = ip.PromotionId,\r\n                                        Promotion = ip.Promotion.Libelle,\r\n                                        Parcours = ip.Promotion.Parcour.Titre,\r\n                                        CodeParcours = ip.Promotion.Parcour.Code,\r\n                                        Session = ip.Promotion.Session\r\n                                    })\r\n                                    .ToList(),\r\n            };\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "generated_xml_summary": "/// <summary>\n/// Create a ConnectionHubUser object with specific user information, including profile and cover pictures, user type, last connection and disconnection dates, and promotions.\n/// </summary>\n/// <param name=\"ecoleId\">The ID of the ecole (school) for which the ConnectionHubUser object will be created.</param>\n/// <returns>Returns a ConnectionHubUser object with specific user information for a school.</returns>\n",
+            "summary": null,
+            "method_name": "GetConnectionHubV2UserMapExpression",
+            "code_chunks": [
+                "{\r\n            return user => new ConnectionHubUser\r\n            {\r\n                UserId = user.Id,\r\n                Pseudo = user.Pseudo,\r\n                ProfilePicture = (user.FileIdPhotoProfil != null) ? user.UploadedFile_FileIdPhotoProfil.FileUrl : user.PhotoProfil,\r\n                CoverPicture = (user.FileIdHeaderProfil != null) ? user.UploadedFile_FileIdHeaderProfil.FileUrl : user.HeaderProfil,\r\n                Internal = user.Interne,\r\n                UserType = user.EcoleUsers.Where(eu => eu.EcoleId == ecoleId)\r\n                                              .Select(eux => new NewsfeedUserTypeV3ViewModel\r\n                                              {\r\n                                                  Code = eux.UserType.Code,\r\n                                                  Label = eux.UserType.Libelle\r\n                                              }).FirstOrDefault(),\r\n                LastConnectionDate = user.EcoleUsers.Where(eu => eu.EcoleId == ecoleId)\r\n                                                        .Select(eux => eux.LastConnectionDate).FirstOrDefault(),\r\n                LastDisconnectionDate = user.EcoleUsers.Where(eu => eu.EcoleId == ecoleId)\r\n                                                           .Select(eux => eux.LastDisconnectionDate).FirstOrDefault(),\r\n                PromotionsV2 = user.InscriptionPromotions\r\n                                    .Where(inscPromo => inscPromo.EcoleId == ecoleId\r\n                                        && (inscPromo.DateDelete == null || inscPromo.DateDelete > DateTime.Now)\r\n                                        && ((inscPromo.DateFinAcces == null\r\n                                        && inscPromo.Promotion.DateFinPromo > DateTime.Now)\r\n                                        || inscPromo.DateFinAcces > DateTime.Now))\r\n                                    .Select(ip => new NewsfeedUserPromotionV3ViewModel\r\n                                    {\r\n                                        PromotionId = ip.PromotionId,\r\n                                        Promotion = ip.Promotion.Libelle,\r\n                                        Parcours = ip.Promotion.Parcour.Titre,\r\n                                        CodeParcours = ip.Promotion.Parcour.Code,\r\n                                        Session = ip.Promotion.Session\r\n                                    })\r\n                                    .ToList(),\r\n            };\r\n        }"
+            ],
+            "name": "GetConnectionHubV2UserMapExpression",
+            "generated_summary": "Create a ConnectionHubUser object with specific user information, including profile and cover pictures, user type, last connection and disconnection dates, and promotions.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "ecoleId",
+                        "param_name": "ecoleId",
+                        "param_desc": "The ID of the ecole (school) for which the ConnectionHubUser object will be created."
+                    }
+                ]
+            },
+            "generated_return_summary": "Returns a ConnectionHubUser object with specific user information for a school."
+        },
+        {
+            "code_start_index": 25092,
+            "existing_summary": "\r\n        #endregion\r\n\r\n        #region Linq Where Expressions for Events\r\n\r\n        /// <summary>\r\n        /// This method allows to retrieve all the events that are on the user favorites when \"selectOnlyFavorites\" is at true. \r\n        /// Else we get all events, not considering either it's a favorite or not\r\n        /// </summary>\r\n        /// <param name=\"userId\"></param>\r\n        /// <param name=\"selectOnlyFavorites\"></param>\r\n        /// <returns>Expression usable only in Linq Where Conditions with objects Event</returns>\r\n        ",
+            "attributes": [],
+            "return_type": "Expression<Func<Event, bool>>",
+            "params": [
+                {
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "userId"
+                },
+                {
+                    "param_name": "selectOnlyFavorites",
+                    "param_type": "bool",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "selectOnlyFavorites"
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            if (selectOnlyFavorites)\r\n            {\r\n                return e => e.EventUserEcoles\r\n                             .Any(eue => eue.UserId == userId\r\n                                      && eue.Favorited\r\n                                      && (eue.DateDelete == null || eue.DateDelete > DateTime.Now));\r\n            }\r\n            else\r\n            {\r\n                return e => 1 == 1;\r\n            }\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "generated_xml_summary": "/// <summary>\n/// Check if the event is favorited by the specified user.\n/// </summary>\n/// <param name=\"userId\">The ID of the user for whom we want to check if the event is favorited.</param>\n/// <param name=\"selectOnlyFavorites\">A boolean flag indicating whether only the favorites should be considered in the check.</param>\n/// <returns>Returns a boolean indicating if the event is favorited by the specified user.</returns>\n",
+            "summary": null,
+            "method_name": "EventIsOnUserFavorites",
+            "code_chunks": [
+                "{\r\n            if (selectOnlyFavorites)\r\n            {\r\n                return e => e.EventUserEcoles\r\n                             .Any(eue => eue.UserId == userId\r\n                                      && eue.Favorited\r\n                                      && (eue.DateDelete == null || eue.DateDelete > DateTime.Now));\r\n            }\r\n            else\r\n            {\r\n                return e => 1 == 1;\r\n            }\r\n        }"
+            ],
+            "name": "EventIsOnUserFavorites",
+            "generated_summary": "Check if the event is favorited by the specified user.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The ID of the user for whom we want to check if the event is favorited."
+                    },
+                    {
+                        "name": "selectOnlyFavorites",
+                        "param_name": "selectOnlyFavorites",
+                        "param_desc": "A boolean flag indicating whether only the favorites should be considered in the check."
+                    }
+                ]
+            },
+            "generated_return_summary": "Returns a boolean indicating if the event is favorited by the specified user."
+        },
+        {
+            "code_start_index": 26186,
+            "existing_summary": "\r\n        /// <summary>\r\n        /// This method allows to retrieve all the events that are in the interval [startdate,endDate]\r\n        /// Also, it gets the events depending of the sort value \"orderbyDateDesc\"\r\n        /// </summary>\r\n        /// <param name=\"startDate\"></param>\r\n        /// <param name=\"endDate\"></param>\r\n        /// <param name=\"orderbyDateDesc\"></param>\r\n        /// <returns>Expression usable only in Linq Where Conditions with objects Event</returns>\r\n        ",
+            "attributes": [],
+            "return_type": "Expression<Func<Event, bool>>",
+            "params": [
+                {
+                    "param_name": "startDate",
+                    "param_type": "DateTime?",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "startDate"
+                },
+                {
+                    "param_name": "endDate",
+                    "param_type": "DateTime?",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "endDate"
+                },
+                {
+                    "param_name": "orderbyDateDesc",
+                    "param_type": "bool",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "orderbyDateDesc"
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            if (startDate != null && endDate != null)\r\n            {\r\n                if (orderbyDateDesc)\r\n                {\r\n                    return e => e.DateDebut >= startDate\r\n                         && e.DateDebut <= endDate\r\n                         && e.DateFin <= endDate;\r\n                }\r\n                return e => e.DateDebut >= startDate\r\n                         && e.DateDebut <= endDate;\r\n            }\r\n            else if (startDate != null && endDate == null)\r\n            {\r\n                return e => e.DateDebut >= startDate;\r\n            }\r\n            else if (startDate == null && endDate != null)\r\n            {\r\n                if (orderbyDateDesc)\r\n                {\r\n                    return e => e.DateDebut <= endDate\r\n                             && e.DateFin <= endDate;\r\n                }\r\n                return e => e.DateDebut <= endDate;\r\n            }\r\n            else\r\n            {\r\n                return e => 1 == 1;\r\n            }\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "generated_xml_summary": "/// <summary>\n/// Filter events that fall within a specified date range, with the option to order them by date in descending order if needed.\n/// </summary>\n/// <param name=\"startDate\">The start date to filter events. It is an optional parameter that allows specifying the starting date of the range. If not provided, the filter will include events from the beginning.</param>\n/// <param name=\"endDate\">The end date to filter events. It is an optional parameter that allows specifying the ending date of the range. If not provided, the filter will include events till the latest date available.</param>\n/// <param name=\"orderbyDateDesc\">A boolean flag to determine the order of events. If set to true, the events will be ordered by date in descending order. If set to false or not provided, the events will be ordered by date in ascending order.</param>\n/// <returns>Returns filtered events within specified date range, ordered by date if needed.</returns>\n",
+            "summary": null,
+            "method_name": "EventIsBetweenTheseDatesWhenTheyExists",
+            "code_chunks": [
+                "{\r\n            if (startDate != null && endDate != null)\r\n            {\r\n                if (orderbyDateDesc)\r\n                {\r\n                    return e => e.DateDebut >= startDate\r\n                         && e.DateDebut <= endDate\r\n                         && e.DateFin <= endDate;\r\n                }\r\n                return e => e.DateDebut >= startDate\r\n                         && e.DateDebut <= endDate;\r\n            }\r\n            else if (startDate != null && endDate == null)\r\n            {\r\n                return e => e.DateDebut >= startDate;\r\n            }\r\n            else if (startDate == null && endDate != null)\r\n            {\r\n                if (orderbyDateDesc)\r\n                {\r\n                    return e => e.DateDebut <= endDate\r\n                             && e.DateFin <= endDate;\r\n                }\r\n                return e => e.DateDebut <= endDate;\r\n            }\r\n            else\r\n            {\r\n                return e => 1 == 1;\r\n            }\r\n        }"
+            ],
+            "name": "EventIsBetweenTheseDatesWhenTheyExists",
+            "generated_summary": "Filter events that fall within a specified date range, with the option to order them by date in descending order if needed.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "startDate",
+                        "param_name": "startDate",
+                        "param_desc": "The start date to filter events. It is an optional parameter that allows specifying the starting date of the range. If not provided, the filter will include events from the beginning."
+                    },
+                    {
+                        "name": "endDate",
+                        "param_name": "endDate",
+                        "param_desc": "The end date to filter events. It is an optional parameter that allows specifying the ending date of the range. If not provided, the filter will include events till the latest date available."
+                    },
+                    {
+                        "name": "orderbyDateDesc",
+                        "param_name": "orderbyDateDesc",
+                        "param_desc": "A boolean flag to determine the order of events. If set to true, the events will be ordered by date in descending order. If set to false or not provided, the events will be ordered by date in ascending order."
+                    }
+                ]
+            },
+            "generated_return_summary": "Returns filtered events within specified date range, ordered by date if needed."
+        },
+        {
+            "code_start_index": 27831,
+            "existing_summary": "\r\n        /// <summary>\r\n        /// This method allows to get the available lives\r\n        /// </summary>\r\n        /// <returns>Expression usable only in Linq Where Conditions with objects Event</returns>\r\n        ",
+            "attributes": [],
+            "return_type": "Expression<Func<Event, bool>>",
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            return e => (e.DateDelete == null || e.DateDelete > DateTime.Now)\r\n                     && e.Draft == false\r\n                     && e.EventType.Code == \"LIVE BBB\"\r\n                     && (!e.AvailableUntil.HasValue || e.AvailableUntil.Value > DateTime.Now);\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "generated_xml_summary": "/// <summary>\n/// Check if an event is available for live viewing.\n/// </summary>\n/// <returns>Returns a boolean indicating if the event is available for live viewing.</returns>\n",
+            "summary": null,
+            "method_name": "EventIsAnAvailableLive",
+            "code_chunks": [
+                "{\r\n            return e => (e.DateDelete == null || e.DateDelete > DateTime.Now)\r\n                     && e.Draft == false\r\n                     && e.EventType.Code == \"LIVE BBB\"\r\n                     && (!e.AvailableUntil.HasValue || e.AvailableUntil.Value > DateTime.Now);\r\n        }"
+            ],
+            "name": "EventIsAnAvailableLive",
+            "generated_summary": "Check if an event is available for live viewing.",
+            "generated_parameters_summaries": {
+                "params_list": []
+            },
+            "generated_return_summary": "Returns a boolean indicating if the event is available for live viewing."
+        },
+        {
+            "code_start_index": 28413,
+            "existing_summary": "\r\n        /// <summary>\r\n        /// This method allows to take all events that are linked to the \"matieresIds\" list,\r\n        /// First case : If the current user has selected a matiere in the filters, we retrieve only the events linked to the matiere selected.\r\n        /// In that case matieresIds contains only the matiere selected. \r\n        /// But they can be more than one, if the currentUser hasn't selected a parcours, the matiere selected can have the same name in several parcours. \r\n        /// So here, we have several ids.\r\n        /// Else case : If the current user has not selected a matiere in the filters, \r\n        /// We retrieve all the events linked to the matieresIds or the events that are not linked to any matiereId at all.\r\n        /// Also, if the current user is a teacher that leads the event, we take it.\r\n        /// </summary>\r\n        /// <param name=\"matieresIds\"></param>\r\n        /// <param name=\"currentUserHasSelectedAMatiere\"></param>\r\n        /// <param name=\"currentUserIdThatCouldLeadALive\"></param>\r\n        /// <returns>Expression usable only in Linq Where Conditions with objects Event</returns>\r\n        ",
+            "attributes": [],
+            "return_type": "Expression<Func<Event, bool>>",
+            "params": [
+                {
+                    "param_name": "matieresIds",
+                    "param_type": "List<int>",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "matieresIds"
+                },
+                {
+                    "param_name": "currentUserHasSelectedAMatiere",
+                    "param_type": "bool",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "currentUserHasSelectedAMatiere"
+                },
+                {
+                    "param_name": "currentUserIdThatCouldLeadALive",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "currentUserIdThatCouldLeadALive"
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            if (!currentUserHasSelectedAMatiere)\r\n            {\r\n                return e => e.EventMatieres\r\n                             .Any(em => (em.DateDelete == null || em.DateDelete > DateTime.Now)\r\n                                     && matieresIds.Contains(em.MatiereId))\r\n                         || !e.EventMatieres\r\n                              .Any(em => em.DateDelete == null || em.DateDelete > DateTime.Now)\r\n                         || e.OwnerUserId == currentUserIdThatCouldLeadALive;\r\n            }\r\n            else\r\n            {\r\n                return e => e.EventMatieres\r\n                                 .Any(em => (em.DateDelete == null || em.DateDelete > DateTime.Now)\r\n                                         && matieresIds.Contains(em.MatiereId));\r\n            }\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "generated_xml_summary": "/// <summary>\n/// Check if an event is linked to specific matiere IDs or if a user is the owner.\n/// </summary>\n/// <param name=\"matieresIds\">List of integers representing the IDs of the matieres (subjects).</param>\n/// <param name=\"currentUserHasSelectedAMatiere\">Boolean flag indicating whether the current user has selected a matiere.</param>\n/// <param name=\"currentUserIdThatCouldLeadALive\">Integer representing the ID of the current user who could lead a live event.</param>\n/// <returns>Returns a boolean value indicating if the event is linked to specified matiere IDs or user.</returns>\n",
+            "summary": null,
+            "method_name": "EventIsLinkedToTheseMatieresIdsOrThisUserIdIsOwner",
+            "code_chunks": [
+                "{\r\n            if (!currentUserHasSelectedAMatiere)\r\n            {\r\n                return e => e.EventMatieres\r\n                             .Any(em => (em.DateDelete == null || em.DateDelete > DateTime.Now)\r\n                                     && matieresIds.Contains(em.MatiereId))\r\n                         || !e.EventMatieres\r\n                              .Any(em => em.DateDelete == null || em.DateDelete > DateTime.Now)\r\n                         || e.OwnerUserId == currentUserIdThatCouldLeadALive;\r\n            }\r\n            else\r\n            {\r\n                return e => e.EventMatieres\r\n                                 .Any(em => (em.DateDelete == null || em.DateDelete > DateTime.Now)\r\n                                         && matieresIds.Contains(em.MatiereId));\r\n            }\r\n        }"
+            ],
+            "name": "EventIsLinkedToTheseMatieresIdsOrThisUserIdIsOwner",
+            "generated_summary": "Check if an event is linked to specific matiere IDs or if a user is the owner.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "matieresIds",
+                        "param_name": "matieresIds",
+                        "param_desc": "List of integers representing the IDs of the matieres (subjects)."
+                    },
+                    {
+                        "name": "currentUserHasSelectedAMatiere",
+                        "param_name": "currentUserHasSelectedAMatiere",
+                        "param_desc": "Boolean flag indicating whether the current user has selected a matiere."
+                    },
+                    {
+                        "name": "currentUserIdThatCouldLeadALive",
+                        "param_name": "currentUserIdThatCouldLeadALive",
+                        "param_desc": "Integer representing the ID of the current user who could lead a live event."
+                    }
+                ]
+            },
+            "generated_return_summary": "Returns a boolean value indicating if the event is linked to specified matiere IDs or user."
+        },
+        {
+            "code_start_index": 30580,
+            "existing_summary": "\r\n        /// <summary>\r\n        /// This method allows to take all events that are linked to the \"promotionsIds\" list or the \"parcoursIds\" list,\r\n        /// First case : If the current user has selected a parcours in the filters, we retrieve only the events linked to the parcours selected and the active promotions of the user.\r\n        /// Else case : If the current user has not selected a parcours in the filters, \r\n        /// We retrieve all the active parcours and promotions\r\n        /// Also, if the current user is a teacher that leads the event, we take it.\r\n        /// </summary>\r\n        /// <param name=\"promotionsIds\"></param>\r\n        /// <param name=\"parcoursIds\"></param>\r\n        /// <param name=\"selectedParcoursId\"></param>\r\n        /// <param name=\"currentUserIdThatCouldLeadALive\"></param>\r\n        /// <returns>Expression usable only in Linq Where Conditions with objects Event</returns>\r\n        ",
+            "attributes": [],
+            "return_type": "Expression<Func<Event, bool>>",
+            "params": [
+                {
+                    "param_name": "promotionsIds",
+                    "param_type": "List<int>",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "promotionsIds"
+                },
+                {
+                    "param_name": "parcoursIds",
+                    "param_type": "List<int>",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "parcoursIds"
+                },
+                {
+                    "param_name": "selectedParcoursId",
+                    "param_type": "int?",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "selectedParcoursId"
+                },
+                {
+                    "param_name": "currentUserIdThatCouldLeadALive",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "currentUserIdThatCouldLeadALive"
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            if (selectedParcoursId == 0 || selectedParcoursId == null)\r\n            {\r\n                return e => e.EventPromotions\r\n                             .Any(ep => (ep.DateDelete == null || ep.DateDelete > DateTime.Now)\r\n                                     && (\r\n                                          (\r\n                                            ep.PromotionId != null\r\n                                            && ep.ParcoursId != null\r\n                                            && promotionsIds.Contains(ep.PromotionId.Value)\r\n                                            && parcoursIds.Contains(ep.ParcoursId.Value)\r\n                                          )\r\n                                          ||\r\n                                          ( ////// partie \u00e0 supprimer surement dans l'avenir car en base de prod, il n'existe que 3 lignes correspondant \u00e0 ce cas\r\n                                               ep.PromotionId != null\r\n                                               && ep.ParcoursId == null\r\n                                               && promotionsIds.Contains(ep.PromotionId.Value)\r\n                                          ) //////\r\n                                          ||\r\n                                          (\r\n                                               ep.PromotionId == null\r\n                                               && ep.ParcoursId != null\r\n                                               && parcoursIds.Contains(ep.ParcoursId.Value)\r\n                                          )\r\n                                        )\r\n                                 )\r\n                         || !e.EventPromotions\r\n                              .Any(ep => ep.DateDelete == null || ep.DateDelete > DateTime.Now)\r\n                         || e.OwnerUserId == currentUserIdThatCouldLeadALive;\r\n            }\r\n            else\r\n            {\r\n                return e => e.EventPromotions\r\n                             .Any(ep => (ep.DateDelete == null || ep.DateDelete > DateTime.Now)\r\n                                     && (\r\n                                          (\r\n                                            ep.PromotionId != null\r\n                                            && ep.ParcoursId != null\r\n                                            && promotionsIds.Contains(ep.PromotionId.Value)\r\n                                            && parcoursIds.Contains(ep.ParcoursId.Value)\r\n                                          )\r\n                                          ||\r\n                                          ( ////// partie \u00e0 supprimer surement dans l'avenir car en base de prod, il n'existe que 3 lignes correspondant \u00e0 ce cas\r\n                                               ep.PromotionId != null\r\n                                               && ep.ParcoursId == null\r\n                                               && promotionsIds.Contains(ep.PromotionId.Value)\r\n                                          ) //////\r\n                                          ||\r\n                                          (\r\n                                               ep.PromotionId == null\r\n                                               && ep.ParcoursId != null\r\n                                               && parcoursIds.Contains(ep.ParcoursId.Value)\r\n                                          )\r\n                                        )\r\n                                 );\r\n            }\r\n\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "generated_xml_summary": "/// <summary>\n/// Check if the event is linked to specific promotions and parcours IDs or if a specific user is the owner.\n/// </summary>\n/// <param name=\"promotionsIds\">The list of integer IDs representing promotions.</param>\n/// <param name=\"parcoursIds\">The list of integer IDs representing parcours.</param>\n/// <param name=\"selectedParcoursId\">An optional integer representing the selected parcours ID.</param>\n/// <param name=\"currentUserIdThatCouldLeadALive\">An integer representing the current user ID that could lead a live event.</param>\n/// <returns>Returns a boolean indicating if the event is linked to specific promotions and parcours IDs or if a specific user is the owner.</returns>\n",
+            "summary": null,
+            "method_name": "EventIsLinkedToThesePromotionsIdsAndParcoursIdsOrThisUserIdIsOwner",
+            "code_chunks": [
+                "{\r\n            if (selectedParcoursId == 0 || selectedParcoursId == null)\r\n            {\r\n                return e => e.EventPromotions\r\n                             .Any(ep => (ep.DateDelete == null || ep.DateDelete > DateTime.Now)\r\n                                     && (\r\n                                          (\r\n                                            ep.PromotionId != null\r\n                                            && ep.ParcoursId != null\r\n                                            && promotionsIds.Contains(ep.PromotionId.Value)\r\n                                            && parcoursIds.Contains(ep.ParcoursId.Value)\r\n                                          )\r\n                                          ||\r\n                                          ( ////// partie \u00e0 supprimer surement dans l'avenir car en base de prod, il n'existe que 3 lignes correspondant \u00e0 ce cas\r\n                                               ep.PromotionId != null\r\n                                               && ep.ParcoursId == null\r\n                                               && promotionsIds.Contains(ep.PromotionId.Value)\r\n                                          ) //////\r\n                                          ||\r\n                                          (\r\n                                               ep.PromotionId == null\r\n                                               && ep.ParcoursId != null\r\n                                               && parcoursIds.Contains(ep.ParcoursId.Value)\r\n                                          )\r\n                                        )\r\n                                 )\r\n                         || !e.EventPromotions\r\n                              .Any(ep => ep.DateDelete == null || ep.DateDelete > DateTime.Now)\r\n                         || e.OwnerUserId == currentUserIdThatCouldLeadALive;\r\n            }\r\n            else\r\n            {\r\n                return e => e.EventPromotions\r\n                             .Any(ep => (ep.DateDelete == null || ep.DateDelete > DateTime.Now)\r\n                                     && (\r\n                                          (\r\n                                            ep.PromotionId != null\r\n                                            && ep.ParcoursId != null\r\n                                            && promotionsIds.Contains(ep.PromotionId.Value)\r\n                                            && parcoursIds.Contains(ep.ParcoursId.Value)\r\n                                          )\r\n                                          ||\r\n                                          ( ////// partie \u00e0 supprimer surement dans l'avenir car en base de prod, il n'existe que 3 lignes correspondant \u00e0 ce cas\r\n                                               ep.PromotionId != null\r\n                                               && ep.ParcoursId == null\r\n                                               && promotionsIds.Contains(ep.PromotionId.Value)\r\n                                          ) //////\r\n                                          ||\r\n                                          (\r\n                                               ep.PromotionId == null\r\n                                               && ep.ParcoursId != null\r\n                                               && parcoursIds.Contains(ep.ParcoursId.Value)\r\n                                          )\r\n                                        )\r\n                                 );\r\n            }\r\n\r\n        }"
+            ],
+            "name": "EventIsLinkedToThesePromotionsIdsAndParcoursIdsOrThisUserIdIsOwner",
+            "generated_summary": "Check if the event is linked to specific promotions and parcours IDs or if a specific user is the owner.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "promotionsIds",
+                        "param_name": "promotionsIds",
+                        "param_desc": "The list of integer IDs representing promotions."
+                    },
+                    {
+                        "name": "parcoursIds",
+                        "param_name": "parcoursIds",
+                        "param_desc": "The list of integer IDs representing parcours."
+                    },
+                    {
+                        "name": "selectedParcoursId",
+                        "param_name": "selectedParcoursId",
+                        "param_desc": "An optional integer representing the selected parcours ID."
+                    },
+                    {
+                        "name": "currentUserIdThatCouldLeadALive",
+                        "param_name": "currentUserIdThatCouldLeadALive",
+                        "param_desc": "An integer representing the current user ID that could lead a live event."
+                    }
+                ]
+            },
+            "generated_return_summary": "Returns a boolean indicating if the event is linked to specific promotions and parcours IDs or if a specific user is the owner."
+        },
+        {
+            "code_start_index": 35229,
+            "existing_summary": "\r\n        /// <summary>\r\n        /// The contrary of the methods EventIsLinkedToThesePromotionsIdsAndParcoursIdsOrThisUserIdIsOwner And EventIsLinkedToTheseMatieresIdsOrThisUserIdIsOwner together\r\n        /// </summary>\r\n        /// <param name=\"inProgressPromotionsIds\"></param>\r\n        /// <param name=\"userParcoursIds\"></param>\r\n        /// <param name=\"inProgressMatieresIds\"></param>\r\n        /// <param name=\"currentUserIdThatCouldLeadALive\">If the current user is a teacher that leads a live</param>\r\n        /// <returns>Expression usable only in Linq Where Conditions with objects Event</returns>\r\n        ",
+            "attributes": [],
+            "return_type": "Expression<Func<Event, bool>>",
+            "params": [
+                {
+                    "param_name": "inProgressPromotionsIds",
+                    "param_type": "List<int>",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "inProgressPromotionsIds"
+                },
+                {
+                    "param_name": "userParcoursIds",
+                    "param_type": "List<int>",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "userParcoursIds"
+                },
+                {
+                    "param_name": "inProgressMatieresIds",
+                    "param_type": "List<int>",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "inProgressMatieresIds"
+                },
+                {
+                    "param_name": "currentUserIdThatCouldLeadALive",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "currentUserIdThatCouldLeadALive"
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            return e => e.OwnerUserId != currentUserIdThatCouldLeadALive\r\n                     && (!(\r\n                            e.EventMatieres\r\n                             .Any(em => (em.DateDelete == null || em.DateDelete > DateTime.Now)\r\n                                     && inProgressMatieresIds.Contains(em.MatiereId))\r\n                            || !e.EventMatieres\r\n                              .Any(em => em.DateDelete == null || em.DateDelete > DateTime.Now)\r\n                          )\r\n                         ||\r\n                         !(\r\n                                  e.EventPromotions\r\n                                   .Any(ep => (ep.DateDelete == null || ep.DateDelete > DateTime.Now)\r\n                                           && (\r\n                                                   (\r\n                                                     ep.PromotionId != null\r\n                                                     && ep.ParcoursId != null\r\n                                                     && inProgressPromotionsIds.Contains(ep.PromotionId.Value)\r\n                                                     && userParcoursIds.Contains(ep.ParcoursId.Value)\r\n                                                   )\r\n                                                   ||\r\n                                                   ( ////// partie \u00e0 supprimer surement dans l'avenir car en base de prod, il n'existe que 3 lignes correspondant \u00e0 ce cas\r\n                                                        ep.PromotionId != null\r\n                                                        && ep.ParcoursId == null\r\n                                                        && inProgressPromotionsIds.Contains(ep.PromotionId.Value)\r\n                                                   ) //////\r\n                                                   ||\r\n                                                   (\r\n                                                        ep.PromotionId == null\r\n                                                        && ep.ParcoursId != null\r\n                                                        && userParcoursIds.Contains(ep.ParcoursId.Value)\r\n                                                   )\r\n                                                 )\r\n                                          )\r\n                               || !e.EventPromotions\r\n                                     .Any(ep => ep.DateDelete == null || ep.DateDelete > DateTime.Now)\r\n                          )\r\n                        );\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "generated_xml_summary": "/// <summary>\n/// Check if the event is not linked to specified promotions, courses, subjects, and the current user is not the owner.\n/// </summary>\n/// <param name=\"inProgressPromotionsIds\">List of integers representing the IDs of promotions that are currently in progress.</param>\n/// <param name=\"userParcoursIds\">List of integers representing the IDs of user parcours (courses) that are currently in progress.</param>\n/// <param name=\"inProgressMatieresIds\">List of integers representing the IDs of subjects (matieres) that are currently in progress.</param>\n/// <param name=\"currentUserIdThatCouldLeadALive\">Integer representing the ID of the current user who could potentially lead a live event.</param>\n/// <returns>Returns true if event is not linked to specified promotions, courses, subjects, and user is not owner.</returns>\n",
+            "summary": null,
+            "method_name": "EventIsNotLinkedToThesePromotionsIdsAndParcoursIdsAndMatieresIdsAndThisUserIsNotOwner",
+            "code_chunks": [
+                "{\r\n            return e => e.OwnerUserId != currentUserIdThatCouldLeadALive\r\n                     && (!(\r\n                            e.EventMatieres\r\n                             .Any(em => (em.DateDelete == null || em.DateDelete > DateTime.Now)\r\n                                     && inProgressMatieresIds.Contains(em.MatiereId))\r\n                            || !e.EventMatieres\r\n                              .Any(em => em.DateDelete == null || em.DateDelete > DateTime.Now)\r\n                          )\r\n                         ||\r\n                         !(\r\n                                  e.EventPromotions\r\n                                   .Any(ep => (ep.DateDelete == null || ep.DateDelete > DateTime.Now)\r\n                                           && (\r\n                                                   (\r\n                                                     ep.PromotionId != null\r\n                                                     && ep.ParcoursId != null\r\n                                                     && inProgressPromotionsIds.Contains(ep.PromotionId.Value)\r\n                                                     && userParcoursIds.Contains(ep.ParcoursId.Value)\r\n                                                   )\r\n                                                   ||\r\n                                                   ( ////// partie \u00e0 supprimer surement dans l'avenir car en base de prod, il n'existe que 3 lignes correspondant \u00e0 ce cas\r\n                                                        ep.PromotionId != null\r\n                                                        && ep.ParcoursId == null\r\n                                                        && inProgressPromotionsIds.Contains(ep.PromotionId.Value)\r\n                                                   ) //////\r\n                                                   ||\r\n                                                   (\r\n                                                        ep.PromotionId == null\r\n                                                        && ep.ParcoursId != null\r\n                                                        && userParcoursIds.Contains(ep.ParcoursId.Value)\r\n                                                   )\r\n                                                 )\r\n                                          )\r\n                               || !e.EventPromotions\r\n                                     .Any(ep => ep.DateDelete == null || ep.DateDelete > DateTime.Now)\r\n                          )\r\n                        );\r\n        }"
+            ],
+            "name": "EventIsNotLinkedToThesePromotionsIdsAndParcoursIdsAndMatieresIdsAndThisUserIsNotOwner",
+            "generated_summary": "Check if the event is not linked to specified promotions, courses, subjects, and the current user is not the owner.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "inProgressPromotionsIds",
+                        "param_name": "inProgressPromotionsIds",
+                        "param_desc": "List of integers representing the IDs of promotions that are currently in progress."
+                    },
+                    {
+                        "name": "userParcoursIds",
+                        "param_name": "userParcoursIds",
+                        "param_desc": "List of integers representing the IDs of user parcours (courses) that are currently in progress."
+                    },
+                    {
+                        "name": "inProgressMatieresIds",
+                        "param_name": "inProgressMatieresIds",
+                        "param_desc": "List of integers representing the IDs of subjects (matieres) that are currently in progress."
+                    },
+                    {
+                        "name": "currentUserIdThatCouldLeadALive",
+                        "param_name": "currentUserIdThatCouldLeadALive",
+                        "param_desc": "Integer representing the ID of the current user who could potentially lead a live event."
+                    }
+                ]
+            },
+            "generated_return_summary": "Returns true if event is not linked to specified promotions, courses, subjects, and user is not owner."
+        },
+        {
+            "code_start_index": 38689,
+            "existing_summary": "\r\n        /// <summary>\r\n        /// This method allows to retrieve all the events linked to the \"schoolsIds\" list\r\n        /// In the case that the event is not linked to any school at all, we get it too\r\n        /// </summary>\r\n        /// <param name=\"schoolsIds\"></param>\r\n        /// <returns>Expression usable only in Linq Where Conditions with objects Event</returns>\r\n        ",
+            "attributes": [],
+            "return_type": "Expression<Func<Event, bool>>",
+            "params": [
+                {
+                    "param_name": "schoolsIds",
+                    "param_type": "int[]",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "schoolsIds"
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            return e => e.EventsEcoles\r\n                         .Any(ee => (ee.DateDelete == null || ee.DateDelete > DateTime.Now)\r\n                                 && schoolsIds.Contains(ee.EcoleId))\r\n                     || !e.EventsEcoles\r\n                          .Any(ee => ee.DateDelete == null || ee.DateDelete > DateTime.Now);\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "generated_xml_summary": "/// <summary>\n/// Check if an event is linked to specific school IDs.\n/// </summary>\n/// <param name=\"schoolsIds\">The array of integers representing the IDs of schools that are being checked for their linkage to the event.</param>\n/// <returns>Returns true if event is linked to any of the specified school IDs.</returns>\n",
+            "summary": null,
+            "method_name": "EventIsLinkedToTheseSchoolsIds",
+            "code_chunks": [
+                "{\r\n            return e => e.EventsEcoles\r\n                         .Any(ee => (ee.DateDelete == null || ee.DateDelete > DateTime.Now)\r\n                                 && schoolsIds.Contains(ee.EcoleId))\r\n                     || !e.EventsEcoles\r\n                          .Any(ee => ee.DateDelete == null || ee.DateDelete > DateTime.Now);\r\n        }"
+            ],
+            "name": "EventIsLinkedToTheseSchoolsIds",
+            "generated_summary": "Check if an event is linked to specific school IDs.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "schoolsIds",
+                        "param_name": "schoolsIds",
+                        "param_desc": "The array of integers representing the IDs of schools that are being checked for their linkage to the event."
+                    }
+                ]
+            },
+            "generated_return_summary": "Returns true if event is linked to any of the specified school IDs."
+        },
+        {
+            "code_start_index": 39529,
+            "existing_summary": "\r\n        /// <summary>\r\n        /// This method allows to get all the events linked to the \"userTypeid\"\r\n        /// In the case that the event is not linked to any usertype at all, we get it\r\n        /// The userType corresponds in the intranet to the \"Audience\" section where you create a live\r\n        /// For example, formateur, prospect, administrateur, eleve....\r\n        /// We also get the event if the current user is the owner of the event\r\n        /// </summary>\r\n        /// <param name=\"userTypeId\"></param>\r\n        /// <param name=\"currentUserId\"></param>\r\n        /// <returns>Expression usable only in Linq Where Conditions with objects Event</returns>\r\n        ",
+            "attributes": [],
+            "return_type": "Expression<Func<Event, bool>>",
+            "params": [
+                {
+                    "param_name": "userTypeId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "userTypeId"
+                },
+                {
+                    "param_name": "currentUserId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "currentUserId"
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            return e => e.EventsUserTypes\r\n                         .Any(eut => (eut.DateDelete == null || eut.DateDelete > DateTime.Now)\r\n                                  && eut.UserTypeId == userTypeId)\r\n                     || !e.EventsUserTypes\r\n                          .Any(eut => eut.DateDelete == null || eut.DateDelete > DateTime.Now)\r\n                     || e.OwnerUserId == currentUserId;\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "generated_xml_summary": "/// <summary>\n/// Check if an event is linked to a specific user type ID, taking into account certain conditions related to user types and ownership.\n/// </summary>\n/// <param name=\"userTypeId\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"currentUserId\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <returns>Returns true if event is linked to user type ID, false otherwise.</returns>\n",
+            "summary": null,
+            "method_name": "EventIsLinkedToThisUserTypeId",
+            "code_chunks": [
+                "{\r\n            return e => e.EventsUserTypes\r\n                         .Any(eut => (eut.DateDelete == null || eut.DateDelete > DateTime.Now)\r\n                                  && eut.UserTypeId == userTypeId)\r\n                     || !e.EventsUserTypes\r\n                          .Any(eut => eut.DateDelete == null || eut.DateDelete > DateTime.Now)\r\n                     || e.OwnerUserId == currentUserId;\r\n        }"
+            ],
+            "name": "EventIsLinkedToThisUserTypeId",
+            "generated_summary": "Check if an event is linked to a specific user type ID, taking into account certain conditions related to user types and ownership.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userTypeId",
+                        "param_name": "userTypeId",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "currentUserId",
+                        "param_name": "currentUserId",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": "Returns true if event is linked to user type ID, false otherwise."
+        },
+        {
+            "code_start_index": 40747,
+            "existing_summary": "\r\n        /// <summary>\r\n        /// This method allows to retrieve the events linked to a search value.\r\n        /// The search value corresponds either to the owner of the event (Nom, Prenom, Pseudo)\r\n        /// Or to the title of the event.\r\n        /// </summary>\r\n        /// <param name=\"searchValue\"></param>\r\n        /// <returns>Expression usable only in Linq Where Conditions with objects Event</returns>\r\n        ",
+            "attributes": [],
+            "return_type": "Expression<Func<Event, bool>>",
+            "params": [
+                {
+                    "param_name": "searchValue",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "searchValue"
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            // Code Moche pour corriger la recherche des lives\r\n            // Trouver quelque chose de plus propre\r\n            // L'id\u00e9al serait de changer la collation des colonnes requ\u00eat\u00e9es directement en base de donn\u00e9es\r\n            // Cela impliquerait le passage d'une migration depuis le projet LMS Database\r\n            if (!string.IsNullOrEmpty(searchValue))\r\n            {\r\n                return e => (e.User.Nom).ToLower()\r\n                                        .Replace(\"\u00e0\", \"a\")\r\n                                        .Replace(\"\u00e2\", \"a\")\r\n                                        .Replace(\"\u00e7\", \"c\")\r\n                                        .Replace(\"\u00e9\", \"e\")\r\n                                        .Replace(\"\u00e8\", \"e\")\r\n                                        .Replace(\"\u00eb\", \"e\")\r\n                                        .Replace(\"\u00ea\", \"e\")\r\n                                        .Replace(\"\u00ee\", \"i\")\r\n                                        .Replace(\"\u00ef\", \"i\")\r\n                                        .Replace(\"\u00f6\", \"o\")\r\n                                        .Replace(\"\u00f4\", \"o\")\r\n                                        .Replace(\"\u00f9\", \"u\")\r\n                                        .Contains(searchValue)\r\n                         || (e.User.Prenom).ToLower()\r\n                                           .Replace(\"\u00e0\", \"a\")\r\n                                           .Replace(\"\u00e2\", \"a\")\r\n                                           .Replace(\"\u00e7\", \"c\")\r\n                                           .Replace(\"\u00e9\", \"e\")\r\n                                           .Replace(\"\u00e8\", \"e\")\r\n                                           .Replace(\"\u00eb\", \"e\")\r\n                                           .Replace(\"\u00ea\", \"e\")\r\n                                           .Replace(\"\u00ee\", \"i\")\r\n                                           .Replace(\"\u00ef\", \"i\")\r\n                                           .Replace(\"\u00f6\", \"o\")\r\n                                           .Replace(\"\u00f4\", \"o\")\r\n                                           .Replace(\"\u00f9\", \"u\")\r\n                                           .Contains(searchValue)\r\n                         || (e.User.Pseudo).ToLower()\r\n                                           .Replace(\"\u00e0\", \"a\")\r\n                                           .Replace(\"\u00e2\", \"a\")\r\n                                           .Replace(\"\u00e7\", \"c\")\r\n                                           .Replace(\"\u00e9\", \"e\")\r\n                                           .Replace(\"\u00e8\", \"e\")\r\n                                           .Replace(\"\u00eb\", \"e\")\r\n                                           .Replace(\"\u00ea\", \"e\")\r\n                                           .Replace(\"\u00ee\", \"i\")\r\n                                           .Replace(\"\u00ef\", \"i\")\r\n                                           .Replace(\"\u00f6\", \"o\")\r\n                                           .Replace(\"\u00f4\", \"o\")\r\n                                           .Replace(\"\u00f9\", \"u\")\r\n                                           .Contains(searchValue)\r\n                         || ((e.User.Nom + \" \" + e.User.Prenom)).ToLower()\r\n                                                                .Replace(\"\u00e0\", \"a\")\r\n                                                                .Replace(\"\u00e2\", \"a\")\r\n                                                                .Replace(\"\u00e7\", \"c\")\r\n                                                                .Replace(\"\u00e9\", \"e\")\r\n                                                                .Replace(\"\u00e8\", \"e\")\r\n                                                                .Replace(\"\u00eb\", \"e\")\r\n                                                                .Replace(\"\u00ea\", \"e\")\r\n                                                                .Replace(\"\u00ee\", \"i\")\r\n                                                                .Replace(\"\u00ef\", \"i\")\r\n                                                                .Replace(\"\u00f6\", \"o\")\r\n                                                                .Replace(\"\u00f4\", \"o\")\r\n                                                                .Replace(\"\u00f9\", \"u\")\r\n                                                                .Contains(searchValue)\r\n                         || ((e.User.Prenom + \" \" + e.User.Nom)).ToLower()\r\n                                                                .Replace(\"\u00e0\", \"a\")\r\n                                                                .Replace(\"\u00e2\", \"a\")\r\n                                                                .Replace(\"\u00e7\", \"c\")\r\n                                                                .Replace(\"\u00e9\", \"e\")\r\n                                                                .Replace(\"\u00e8\", \"e\")\r\n                                                                .Replace(\"\u00eb\", \"e\")\r\n                                                                .Replace(\"\u00ea\", \"e\")\r\n                                                                .Replace(\"\u00ee\", \"i\")\r\n                                                                .Replace(\"\u00ef\", \"i\")\r\n                                                                .Replace(\"\u00f6\", \"o\")\r\n                                                                .Replace(\"\u00f4\", \"o\")\r\n                                                                .Replace(\"\u00f9\", \"u\")\r\n                                                                .Contains(searchValue)\r\n                         || e.Titre.ToLower()\r\n                                   .Replace(\"\u00e0\", \"a\")\r\n                                   .Replace(\"\u00e2\", \"a\")\r\n                                   .Replace(\"\u00e7\", \"c\")\r\n                                   .Replace(\"\u00e9\", \"e\")\r\n                                   .Replace(\"\u00e8\", \"e\")\r\n                                   .Replace(\"\u00eb\", \"e\")\r\n                                   .Replace(\"\u00ea\", \"e\")\r\n                                   .Replace(\"\u00ee\", \"i\")\r\n                                   .Replace(\"\u00ef\", \"i\")\r\n                                   .Replace(\"\u00f6\", \"o\")\r\n                                   .Replace(\"\u00f4\", \"o\")\r\n                                   .Replace(\"\u00f9\", \"u\")\r\n                                   .Contains(searchValue);\r\n\r\n\r\n                //return e => e.User.Nom.ToLower().Contains(searchValue)\r\n                //         || e.User.Prenom.ToLower().Contains(searchValue)\r\n                //         || e.User.Pseudo.ToLower().Contains(searchValue)\r\n                //         || (e.User.Nom + \" \" + e.User.Prenom).ToLower().Contains(searchValue)\r\n                //         || (e.User.Prenom + \" \" + e.User.Nom).ToLower().Contains(searchValue)\r\n                //         || e.Titre.ToLower().Contains(searchValue);\r\n            }\r\n\r\n            return e => 1 == 1;\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "generated_xml_summary": "/// <summary>\n/// Filter events based on the search value matching event owner's name, surname, pseudonym, or event title after replacing special characters.\n/// </summary>\n/// <param name=\"string\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"searchValue\">The generated description for the parameter</param>\n/// <returns>Returns filtered events based on search value matching event title or owner's name.</returns>\n",
+            "summary": null,
+            "method_name": "SearchValueCorrespondsIfItExistsToTheEventTitleOrEventOwners",
+            "code_chunks": [
+                "{\r\n            // Code Moche pour corriger la recherche des lives\r\n            // Trouver quelque chose de plus propre\r\n            // L'id\u00e9al serait de changer la collation des colonnes requ\u00eat\u00e9es directement en base de donn\u00e9es\r\n            // Cela impliquerait le passage d'une migration depuis le projet LMS Database\r\n            if (!string.IsNullOrEmpty(searchValue))\r\n            {\r\n                return e => (e.User.Nom).ToLower()\r\n                                        .Replace(\"\u00e0\", \"a\")\r\n                                        .Replace(\"\u00e2\", \"a\")\r\n                                        .Replace(\"\u00e7\", \"c\")\r\n                                        .Replace(\"\u00e9\", \"e\")\r\n                                        .Replace(\"\u00e8\", \"e\")\r\n                                        .Replace(\"\u00eb\", \"e\")\r\n                                        .Replace(\"\u00ea\", \"e\")\r\n                                        .Replace(\"\u00ee\", \"i\")\r\n                                        .Replace(\"\u00ef\", \"i\")\r\n                                        .Replace(\"\u00f6\", \"o\")\r\n                                        .Replace(\"\u00f4\", \"o\")\r\n                                        .Replace(\"\u00f9\", \"u\")\r\n                                        .Contains(searchValue)\r\n                         || (e.User.Prenom).ToLower()\r\n                                           .Replace(\"\u00e0\", \"a\")\r\n                                           .Replace(\"\u00e2\", \"a\")\r\n                                           .Replace(\"\u00e7\", \"c\")\r\n                                           .Replace(\"\u00e9\", \"e\")\r\n                                           .Replace(\"\u00e8\", \"e\")\r\n                                           .Replace(\"\u00eb\", \"e\")\r\n                                           .Replace(\"\u00ea\", \"e\")\r\n                                           .Replace(\"\u00ee\", \"i\")\r\n                                           .Replace(\"\u00ef\", \"i\")\r\n                                           .Replace(\"\u00f6\", \"o\")\r\n                                           .Replace(\"\u00f4\", \"o\")\r\n                                           .Replace(\"\u00f9\", \"u\")\r\n                                           .Contains(searchValue)\r\n                         || (e.User.Pseudo).ToLower()\r\n                                           .Replace(\"\u00e0\", \"a\")\r\n                                           .Replace(\"\u00e2\", \"a\")\r\n                                           .Replace(\"\u00e7\", \"c\")\r\n                                           .Replace(\"\u00e9\", \"e\")\r\n                                           .Replace(\"\u00e8\", \"e\")\r\n                                           .Replace(\"\u00eb\", \"e\")\r\n                                           .Replace(\"\u00ea\", \"e\")\r\n                                           .Replace(\"\u00ee\", \"i\")\r\n                                           .Replace(\"\u00ef\", \"i\")\r\n                                           .Replace(\"\u00f6\", \"o\")\r\n                                           .Replace(\"\u00f4\", \"o\")\r\n                                           .Replace(\"\u00f9\", \"u\")\r\n                                           .Contains(searchValue)\r\n                         || ((e.User.Nom + \" \" + e.User.Prenom)).ToLower()\r\n                                                                .Replace(\"\u00e0\", \"a\")\r\n                                                                .Replace(\"\u00e2\", \"a\")\r\n                                                                .Replace(\"\u00e7\", \"c\")\r\n                                                                .Replace(\"\u00e9\", \"e\")\r\n                                                                .Replace(\"\u00e8\", \"e\")\r\n                                                                .Replace(\"\u00eb\", \"e\")\r\n                                                                .Replace(\"\u00ea\", \"e\")\r\n                                                                .Replace(\"\u00ee\", \"i\")\r\n                                                                .Replace(\"\u00ef\", \"i\")\r\n                                                                .Replace(\"\u00f6\", \"o\")\r\n                                                                .Replace(\"\u00f4\", \"o\")\r\n                                                                .Replace(\"\u00f9\", \"u\")\r\n                                                                .Contains(searchValue)\r\n                         || ((e.User.Prenom + \" \" + e.User.Nom)).ToLower()\r\n                                                                .Replace(\"\u00e0\", \"a\")\r\n                                                                .Replace(\"\u00e2\", \"a\")\r\n                                                                .Replace(\"\u00e7\", \"c\")\r\n                                                                .Replace(\"\u00e9\", \"e\")\r\n                                                                .Replace(\"\u00e8\", \"e\")\r\n                                                                .Replace(\"\u00eb\", \"e\")\r\n                                                                .Replace(\"\u00ea\", \"e\")\r\n                                                                .Replace(\"\u00ee\", \"i\")\r\n                                                                .Replace(\"\u00ef\", \"i\")\r\n                                                                .Replace(\"\u00f6\", \"o\")\r\n                                                                .Replace(\"\u00f4\", \"o\")\r\n                                                                .Replace(\"\u00f9\", \"u\")\r\n                                                                .Contains(searchValue)\r\n                         || e.Titre.ToLower()\r\n                                   .Replace(\"\u00e0\", \"a\")\r\n                                   .Replace(\"\u00e2\", \"a\")\r\n                                   .Replace(\"\u00e7\", \"c\")\r\n                                   .Replace(\"\u00e9\", \"e\")\r\n                                   .Replace(\"\u00e8\", \"e\")\r\n                                   .Replace(\"\u00eb\", \"e\")\r\n                                   .Replace(\"\u00ea\", \"e\")\r\n                                   .Replace(\"\u00ee\", \"i\")\r\n                                   .Replace(\"\u00ef\", \"i\")\r\n                                   .Replace(\"\u00f6\", \"o\")\r\n                                   .Replace(\"\u00f4\", \"o\")\r\n                                   .Replace(\"\u00f9\", \"u\")\r\n                                   .Contains(searchValue);\r\n\r\n\r\n                //return e => e.User.Nom.ToLower().Contains(searchValue)\r\n                //         || e.User.Prenom.ToLower().Contains(searchValue)\r\n                //         || e.User.Pseudo.ToLower().Contains(searchValue)\r\n                //         || (e.User.Nom + \" \" + e.User.Prenom).ToLower().Contains(searchValue)\r\n                //         || (e.User.Prenom + \" \" + e.User.Nom).ToLower().Contains(searchValue)\r\n                //         || e.Titre.ToLower().Contains(searchValue);\r\n            }\r\n\r\n            return e => 1 == 1;\r\n        }"
+            ],
+            "name": "SearchValueCorrespondsIfItExistsToTheEventTitleOrEventOwners",
+            "generated_summary": "Filter events based on the search value matching event owner's name, surname, pseudonym, or event title after replacing special characters.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "string",
+                        "param_name": "string",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "searchValue",
+                        "param_name": "searchValue",
+                        "param_desc": "The generated description for the parameter"
+                    }
+                ]
+            },
+            "generated_return_summary": "Returns filtered events based on search value matching event title or owner's name."
+        },
+        {
+            "code_start_index": 47960,
+            "existing_summary": "\r\n        /// <summary>\r\n        /// This method allow to retrieve all the events seen or not, depending of the enum \"currentEventViewType\"\r\n        /// If the enum has the value \"Viewed\", we retrieve only the lives that already have been flaggued as Viewed by the user\r\n        /// If the enum has the value \"NotViewed\", we retrieve only the lives that already have not been flaggued as Viewed by the user\r\n        /// Else, if the enum has the value \"All\", we retrieve all the events, not considering either the current user has already seen the event or not.\r\n        /// </summary>\r\n        /// <param name=\"currentEventViewType\"></param>\r\n        /// <param name=\"userId\"></param>\r\n        /// <returns>Expression usable only in Linq Where Conditions with objects Event</returns>\r\n        ",
+            "attributes": [],
+            "return_type": "Expression<Func<Event, bool>>",
+            "params": [
+                {
+                    "param_name": "currentEventViewType",
+                    "param_type": "EventViewType",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "currentEventViewType"
+                },
+                {
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "userId"
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            if (currentEventViewType == EventViewType.Viewed)\r\n            {\r\n                return e => e.EventUserEcoles.Any(eue => eue.UserId == userId\r\n                                                      && eue.Viewed\r\n                                                      && (eue.DateDelete == null || eue.DateDelete > DateTime.Now));\r\n            }\r\n            else if (currentEventViewType == EventViewType.NotViewed)\r\n            {\r\n                return e => !e.EventUserEcoles.Any(eue => eue.UserId == userId\r\n                                                      && eue.Viewed\r\n                                                      && (eue.DateDelete == null || eue.DateDelete > DateTime.Now));\r\n            }\r\n            return e => 1 == 1;\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "generated_xml_summary": "/// <summary>\n/// Filter events based on the event view type and user ID.\n/// </summary>\n/// <param name=\"currentEventViewType\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"userId\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <returns>Returns filtered events based on view type and user ID.</returns>\n",
+            "summary": null,
+            "method_name": "EventCorrespondsToTheEventViewType",
+            "code_chunks": [
+                "{\r\n            if (currentEventViewType == EventViewType.Viewed)\r\n            {\r\n                return e => e.EventUserEcoles.Any(eue => eue.UserId == userId\r\n                                                      && eue.Viewed\r\n                                                      && (eue.DateDelete == null || eue.DateDelete > DateTime.Now));\r\n            }\r\n            else if (currentEventViewType == EventViewType.NotViewed)\r\n            {\r\n                return e => !e.EventUserEcoles.Any(eue => eue.UserId == userId\r\n                                                      && eue.Viewed\r\n                                                      && (eue.DateDelete == null || eue.DateDelete > DateTime.Now));\r\n            }\r\n            return e => 1 == 1;\r\n        }"
+            ],
+            "name": "EventCorrespondsToTheEventViewType",
+            "generated_summary": "Filter events based on the event view type and user ID.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "currentEventViewType",
+                        "param_name": "currentEventViewType",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": "Returns filtered events based on view type and user ID."
+        },
+        {
+            "code_start_index": 49666,
+            "existing_summary": "\r\n        ",
+            "attributes": [],
+            "return_type": "Expression<Func<Event, bool>>",
+            "params": [
+                {
+                    "param_name": "lastEventsShownIdsList",
+                    "param_type": "List<int>",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "lastEventsShownIdsList"
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            if (lastEventsShownIdsList != null && lastEventsShownIdsList.Count > 0)\r\n            {\r\n                return e => !lastEventsShownIdsList.Contains(e.Id);\r\n            }\r\n            return e => 1 == 1;\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "generated_xml_summary": "/// <summary>\n/// Filter out events that are not in the specified list of IDs.\n/// </summary>\n/// <param name=\"lastEventsShownIdsList\">The list of integers representing the IDs of the last events shown. It is expected to be of type List<int>.</param>\n/// <param name=\"EventIsNotInThisList\">The method name representing the purpose of filtering out events that are not in the specified list of IDs.</param>\n/// <returns>Returns a boolean indicating if the event is not in the specified list of IDs.</returns>\n",
+            "summary": null,
+            "method_name": "EventIsNotInThisList",
+            "code_chunks": [
+                "{\r\n            if (lastEventsShownIdsList != null && lastEventsShownIdsList.Count > 0)\r\n            {\r\n                return e => !lastEventsShownIdsList.Contains(e.Id);\r\n            }\r\n            return e => 1 == 1;\r\n        }"
+            ],
+            "name": "EventIsNotInThisList",
+            "generated_summary": "Filter out events that are not in the specified list of IDs.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "lastEventsShownIdsList",
+                        "param_name": "lastEventsShownIdsList",
+                        "param_desc": "The list of integers representing the IDs of the last events shown. It is expected to be of type List<int>."
+                    },
+                    {
+                        "name": "EventIsNotInThisList",
+                        "param_name": "EventIsNotInThisList",
+                        "param_desc": "The method name representing the purpose of filtering out events that are not in the specified list of IDs."
+                    }
+                ]
+            },
+            "generated_return_summary": "Returns a boolean indicating if the event is not in the specified list of IDs."
+        },
+        {
+            "code_start_index": 50017,
+            "existing_summary": "\r\n        /// <summary>\r\n        /// This method allows to retrieve all the events thats start after the \"lastEventDateDebut\" date when it exists.\r\n        /// If not, it will retrieve all the events without caring about \"lastEventDateDebut\"\r\n        /// </summary>\r\n        /// <param name=\"lastEventDateDebut\"></param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": [],
+            "return_type": "Expression<Func<Event, bool>>",
+            "params": [
+                {
+                    "param_name": "lastEventDateDebut",
+                    "param_type": "DateTime?",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "lastEventDateDebut"
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            if (lastEventDateDebut != null)\r\n            {\r\n                return e => e.DateDebut >= lastEventDateDebut;\r\n            }\r\n            return e => 1 == 1;\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "generated_xml_summary": "/// <summary>\n/// Filter events based on whether their start date is greater than or equal to the last event's start date shown.\n/// </summary>\n/// <param name=\"DateTime?\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"lastEventDateDebut\">The generated description for the parameter</param>\n/// <returns>Returns true if event start date is greater than or equal to last event shown.</returns>\n",
+            "summary": null,
+            "method_name": "DateDebutSuperiorOrEqualToLastEventShown",
+            "code_chunks": [
+                "{\r\n            if (lastEventDateDebut != null)\r\n            {\r\n                return e => e.DateDebut >= lastEventDateDebut;\r\n            }\r\n            return e => 1 == 1;\r\n        }"
+            ],
+            "name": "DateDebutSuperiorOrEqualToLastEventShown",
+            "generated_summary": "Filter events based on whether their start date is greater than or equal to the last event's start date shown.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "DateTime?",
+                        "param_name": "DateTime?",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "lastEventDateDebut",
+                        "param_name": "lastEventDateDebut",
+                        "param_desc": "The generated description for the parameter"
+                    }
+                ]
+            },
+            "generated_return_summary": "Returns true if event start date is greater than or equal to last event shown."
+        },
+        {
+            "code_start_index": 50692,
+            "existing_summary": "\r\n        /// <summary>\r\n        /// This method allows to retrieve all the events that begins before the \"lastEventDateDebut\" date\r\n        /// </summary>\r\n        /// <param name=\"lastEventDateDebut\"></param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": [],
+            "return_type": "Expression<Func<Event, bool>>",
+            "params": [
+                {
+                    "param_name": "lastEventDateDebut",
+                    "param_type": "DateTime?",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "lastEventDateDebut"
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            if (lastEventDateDebut != null)\r\n            {\r\n                return e => e.DateDebut <= lastEventDateDebut;\r\n            }\r\n            return e => 1 == 1;\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "generated_xml_summary": "/// <summary>\n/// Check if the date of an event is inferior or equal to the last event date shown.\n/// </summary>\n/// <param name=\"DateTime?\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"lastEventDateDebut\">The generated description for the parameter</param>\n/// <returns>Returns a boolean indicating if the event date is before or equal to last shown.</returns>\n",
+            "summary": null,
+            "method_name": "DateDebutInferiorOrEqualToLastEventShown",
+            "code_chunks": [
+                "{\r\n            if (lastEventDateDebut != null)\r\n            {\r\n                return e => e.DateDebut <= lastEventDateDebut;\r\n            }\r\n            return e => 1 == 1;\r\n        }"
+            ],
+            "name": "DateDebutInferiorOrEqualToLastEventShown",
+            "generated_summary": "Check if the date of an event is inferior or equal to the last event date shown.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "DateTime?",
+                        "param_name": "DateTime?",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "lastEventDateDebut",
+                        "param_name": "lastEventDateDebut",
+                        "param_desc": "The generated description for the parameter"
+                    }
+                ]
+            },
+            "generated_return_summary": "Returns a boolean indicating if the event date is before or equal to last shown."
+        },
+        {
+            "code_start_index": 51257,
+            "existing_summary": "\r\n        #endregion\r\n\r\n        #region Linq Where Expressions for Inscriptions_promotions\r\n\r\n        /// <summary>\r\n        /// This method allow to take all the active inscriptionsPromotions for this user in this school,\r\n        /// </summary>\r\n        /// <param name=\"userId\">int value corresponding to the current user id</param>\r\n        /// <param name=\"schoolId\">int value corresponding to the current school id</param>\r\n        /// <returns>Expression usable only in Linq Where Conditions with objects InscriptionPromotion</returns>\r\n        ",
+            "attributes": [],
+            "return_type": "Expression<Func<InscriptionPromotion, bool>>",
+            "params": [
+                {
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "userId"
+                },
+                {
+                    "param_name": "schoolId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "schoolId"
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            return InscriptionsPromotionsAreInProgressForThisUserAndSchool(userId, new List<int> { schoolId });\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "generated_xml_summary": "/// <summary>\n/// Check if there are any ongoing promotions or inscriptions for the specified user at the given school.\n/// </summary>\n/// <param name=\"userId\">The ID of the user for whom we want to check if there are any ongoing promotions or inscriptions at the specified school.</param>\n/// <param name=\"schoolId\">The ID of the school where we want to check if there are any ongoing promotions or inscriptions for the specified user.</param>\n/// <returns>Returns true if promotions or inscriptions are in progress for user at school.</returns>\n",
+            "summary": null,
+            "method_name": "InscriptionsPromotionsAreInProgressForThisUserAndSchool",
+            "code_chunks": [
+                "{\r\n            return InscriptionsPromotionsAreInProgressForThisUserAndSchool(userId, new List<int> { schoolId });\r\n        }"
+            ],
+            "name": "InscriptionsPromotionsAreInProgressForThisUserAndSchool",
+            "generated_summary": "Check if there are any ongoing promotions or inscriptions for the specified user at the given school.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The ID of the user for whom we want to check if there are any ongoing promotions or inscriptions at the specified school."
+                    },
+                    {
+                        "name": "schoolId",
+                        "param_name": "schoolId",
+                        "param_desc": "The ID of the school where we want to check if there are any ongoing promotions or inscriptions for the specified user."
+                    }
+                ]
+            },
+            "generated_return_summary": "Returns true if promotions or inscriptions are in progress for user at school."
+        },
+        {
+            "code_start_index": 52088,
+            "existing_summary": "\r\n        ",
+            "attributes": [],
+            "return_type": "Expression<Func<InscriptionPromotion, bool>>",
+            "params": [
+                {
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "userId"
+                },
+                {
+                    "param_name": "schoolIdsList",
+                    "param_type": "IList<int>",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "schoolIdsList"
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            return ip => ip.UserId == userId\r\n                      && schoolIdsList.Contains(ip.EcoleId)\r\n                      && (ip.DateDelete == null || ip.DateDelete > DateTime.Now)\r\n                      && ((ip.DateFinAcces == null && ip.Promotion.DateFinPromo > DateTime.Now) || ip.DateFinAcces > DateTime.Now);\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "generated_xml_summary": "/// <summary>\n/// Check if there are ongoing promotions and inscriptions for a specific user at certain schools.\n/// </summary>\n/// <param name=\"userId\">The ID of the user for whom we want to check ongoing promotions and inscriptions.</param>\n/// <param name=\"schoolIdsList\">A list of IDs representing the schools for which we want to check ongoing promotions and inscriptions.</param>\n/// <returns>Returns a boolean indicating if promotions and inscriptions are in progress.</returns>\n",
+            "summary": null,
+            "method_name": "InscriptionsPromotionsAreInProgressForThisUserAndSchool",
+            "code_chunks": [
+                "{\r\n            return ip => ip.UserId == userId\r\n                      && schoolIdsList.Contains(ip.EcoleId)\r\n                      && (ip.DateDelete == null || ip.DateDelete > DateTime.Now)\r\n                      && ((ip.DateFinAcces == null && ip.Promotion.DateFinPromo > DateTime.Now) || ip.DateFinAcces > DateTime.Now);\r\n        }"
+            ],
+            "name": "InscriptionsPromotionsAreInProgressForThisUserAndSchool",
+            "generated_summary": "Check if there are ongoing promotions and inscriptions for a specific user at certain schools.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The ID of the user for whom we want to check ongoing promotions and inscriptions."
+                    },
+                    {
+                        "name": "schoolIdsList",
+                        "param_name": "schoolIdsList",
+                        "param_desc": "A list of IDs representing the schools for which we want to check ongoing promotions and inscriptions."
+                    }
+                ]
+            },
+            "generated_return_summary": "Returns a boolean indicating if promotions and inscriptions are in progress."
+        },
+        {
+            "code_start_index": 52598,
+            "existing_summary": "\r\n        ",
+            "attributes": [],
+            "return_type": "Expression<Func<InscriptionPromotion, bool>>",
+            "params": [
+                {
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": null,
+                    "description": null,
+                    "extra_infos": null,
+                    "name": "userId"
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            return ip => ip.UserId == userId\r\n                      && (ip.DateDelete == null || ip.DateDelete > DateTime.Now)\r\n                      && ((ip.DateFinAcces == null && ip.Promotion.DateFinPromo > DateTime.Now) || ip.DateFinAcces > DateTime.Now);\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "generated_xml_summary": "/// <summary>\n/// Check if there are ongoing promotions or inscriptions for a specific user.\n/// </summary>\n/// <param name=\"userId\">The ID of the user for whom we want to check if there are ongoing promotions or inscriptions.</param>\n/// <returns>Returns true if there are ongoing promotions or inscriptions for the user.</returns>\n",
+            "summary": null,
+            "method_name": "InscriptionsPromotionsAreInProgressForThisUser",
+            "code_chunks": [
+                "{\r\n            return ip => ip.UserId == userId\r\n                      && (ip.DateDelete == null || ip.DateDelete > DateTime.Now)\r\n                      && ((ip.DateFinAcces == null && ip.Promotion.DateFinPromo > DateTime.Now) || ip.DateFinAcces > DateTime.Now);\r\n        }"
+            ],
+            "name": "InscriptionsPromotionsAreInProgressForThisUser",
+            "generated_summary": "Check if there are ongoing promotions or inscriptions for a specific user.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The ID of the user for whom we want to check if there are ongoing promotions or inscriptions."
+                    }
+                ]
+            },
+            "generated_return_summary": "Returns true if there are ongoing promotions or inscriptions for the user."
+        }
+    ],
+    "properties": [],
+    "name": "RepositoryV3"
+}

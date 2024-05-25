@@ -7,14 +7,15 @@ from models.param_desc import ParameterDesc
 from models.params_doc import MethodParametersDocumentation
 
 class MethodDesc(BaseDesc):
-    def __init__(self, code_start_index: int, summary_lines: list[str], attributs: list[str], method_name: str, method_return_type: str, method_params: list[ParameterDesc], code: str, is_async: bool = False, is_task: bool = False, is_ctor: bool = False, is_static: bool = False, is_abstract: bool = False, is_override: bool = False, is_virtual: bool = False, is_sealed: bool = False, is_new: bool = False):
+    def __init__(self, code_start_index: int, existing_summary: str, attributs: list[str], method_name: str, method_return_type: str, method_params: list[ParameterDesc], indent_level: int, code: str, is_async: bool = False, is_task: bool = False, is_ctor: bool = False, is_static: bool = False, is_abstract: bool = False, is_override: bool = False, is_virtual: bool = False, is_sealed: bool = False, is_new: bool = False):
         super().__init__(name=method_name)
         self.code_start_index: int = code_start_index
         self.method_name: str = method_name
-        self.summary_lines: list[str] = summary_lines
-        self.attributs: list[str] = attributs
+        self.existing_summary: str = existing_summary
+        self.attributes: list[str] = attributs
         self.return_type: str = method_return_type
         self.params: list[ParameterDesc] = method_params
+        self.indent_level: int = indent_level
         self.code: str = code
         self.is_async: bool = is_async
         self.is_task: bool = is_task
@@ -45,7 +46,7 @@ class MethodDesc(BaseDesc):
                 self.params: list[ParameterDesc] = [ParameterDesc(**param) for param in value]
             else:
                 setattr(self, key, value)
-                
+
     def to_code(self, indent_level: int = 1, include_summary: bool = False):
         method_code: str = ""
         # Add summary (generated or existing)
@@ -64,9 +65,6 @@ class MethodDesc(BaseDesc):
         method_code += txt.indent(indent_level, "}\n\n")
         return method_code
     
-    def has_attributs(self) -> bool:
-        return self.has_attributs and len(self.attributs) > 0
-
     @staticmethod
     def factory_for_method_from_class_code(code: str, start_index: int, previous_chunk:str, class_name: str) -> 'MethodDesc':
         #retrieve summary and attributs from previous chunk
@@ -76,8 +74,8 @@ class MethodDesc(BaseDesc):
         attributs: list[str] = []
         if previous_chunk_last_double_newline_index > previous_chunk_last_brace_index:
             previous_chunk_last_part = previous_chunk[previous_chunk_last_double_newline_index:]
-            attributs = MethodDesc.detect_attributes(previous_chunk_last_part)
-            summary_lines = [line.strip().replace('///', '').strip() for line in previous_chunk_last_part.split('\n') if '///' in line]
+            attributs = MethodDesc.detect_attributs(previous_chunk_last_part)
+            summary_lines = [line.strip()for line in previous_chunk_last_part.split('\n') if '///' in line]
         
         # get method infos from main code chunk
         method_sign = code.split('{')[0].strip()
@@ -111,7 +109,7 @@ class MethodDesc(BaseDesc):
             method_code = code.split('{')[1].rsplit('}', 1)[0].strip()
         if '{' and '}' in method_code: # write others brackets {} as litteral (no to be confond with formating brackets)
             method_code = method_code.replace('{', '{{}').replace('}', '}}')
-        return MethodDesc(start_index, summary_lines, attributs, method_name, method_return_type, method_params, method_code, is_async, is_task, is_ctor, is_static, is_abstract, is_override, is_virtual, is_sealed, is_new)
+        return MethodDesc(start_index, '\n'.join(summary_lines), attributs, method_name, method_return_type, method_params, 1, method_code, is_async, is_task, is_ctor, is_static, is_abstract, is_override, is_virtual, is_sealed, is_new)
     
     def factory_for_interface_code(code: str, start_index: int, interface_name: str) -> 'MethodDesc':
         summary_lines: list[str] = []
@@ -119,7 +117,7 @@ class MethodDesc(BaseDesc):
         # if previous_chunk_last_double_newline_index > previous_chunk_last_brace_index:
         #     previous_chunk_last_part = previous_chunk[previous_chunk_last_double_newline_index:]
         #     attributs = MethodDesc.detect_attributes(previous_chunk_last_part)
-        #     summary_lines = [line.strip().replace('///', '').strip() for line in previous_chunk_last_part.split('\n') if '///' in line]
+        #     summary_lines = [line.strip() for line in previous_chunk_last_part.split('\n') if '///' in line]
         
         # get method infos from main code chunk
         method_sign = code.split(')')[0] + ')'
@@ -149,7 +147,7 @@ class MethodDesc(BaseDesc):
         else:
             method_code = ''
 
-        return MethodDesc(start_index, summary_lines, attributs, method_name, method_return_type, method_params, method_code, is_async, is_task, is_ctor, is_static, is_abstract, is_override, is_virtual, is_sealed, is_new)
+        return MethodDesc(start_index, '\n'.join(summary_lines), attributs, method_name, method_return_type, method_params, 1, method_code, is_async, is_task, is_ctor, is_static, is_abstract, is_override, is_virtual, is_sealed, is_new)
     
     def has_return_type(self) -> bool:
         return self.return_type is not None and self.return_type != 'void' and self.return_type != 'Task' and not self.is_ctor
@@ -164,16 +162,16 @@ class MethodDesc(BaseDesc):
         return params_desc
 
     @staticmethod
-    def detect_attributes(code: str) -> list[str]:
-        attributes: list[str] = []
+    def detect_attributs(code: str) -> list[str]:
+        attributs_list: list[str] = []
         attribute_pattern = r'\[.*?\]'
         lines = code.split('\n')
         for line in lines:
             if '[' in line:
                 line_attributes = re.findall(attribute_pattern, line)
                 if len(line_attributes) > 0:
-                    attributes.extend(line_attributes)
-        return attributes
+                    attributs_list.extend(line_attributes)
+        return attributs_list
     
     def to_json(self):
         return json.dumps(self.__dict__, cls=MethodDescEncoder)

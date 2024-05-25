@@ -38,7 +38,7 @@ class file:
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         
         # Write the content to the file
-        with open(filepath, 'w', encoding='utf-8') as file:
+        with open(filepath, 'w', encoding='utf-8-sig') as file:
             file.write(content)    
     
     @staticmethod

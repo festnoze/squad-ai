@@ -27,14 +27,10 @@ class SummaryGenerationService:
     @staticmethod
     def generate_all_summaries_for_all_csharp_files_and_save(file_path: str, llms_infos: list[LlmInfo]):  
         txt.activate_print = True
-
         llms = LangChainFactory.create_llms_from_infos(llms_infos)       
-         
         paths_and_codes = file.load_csharp_files(file_path)
-
-        CSharpHelper.remove_existing_summaries_from_all_files(paths_and_codes)
-
-        #known_structures = CSharpCodeStructureAnalyser.extract_code_structures_from_code_files(llms, paths_and_codes)
+        #CSharpHelper.remove_existing_summaries_from_all_files(paths_and_codes)
+        #structures_from_python = CSharpCodeStructureAnalyser.extract_code_structures_from_code_files(paths_and_codes)
         known_structures = code_analyser_client.post_analyse_folder_code_files(file_path)
 
         SummaryGenerationService.generate_methods_summaries_for_all_structures(llms, known_structures)
@@ -80,7 +76,7 @@ class SummaryGenerationService:
         paths_and_new_codes = {}
         
         for structure_description in structures_descriptions:
-            code = paths_and_codes[structure_description.file_path]
+            code = paths_and_codes[structure_description.file_path.replace('/', '\\')]
             new_code = SummaryGenerationService.add_generated_summaries_to_initial_code(structure_description, code)
             paths_and_new_codes[structure_description.file_path] = new_code
         
@@ -92,13 +88,13 @@ class SummaryGenerationService:
         for method_desc in struct_desc.methods[::-1]:
             index = method_desc.code_start_index + struct_desc.index_shift_code
 
-            if method_desc.has_attributs():
-                index = initial_code[:index].rfind(method_desc.attributs[0])
+            if len(method_desc.attributes) > 0: # has attributes
+                index = initial_code[:index].rfind(method_desc.attributes[0])
 
             special_shift = 1# if struct_desc.structure_type == StructureType.Class.value else 2
             index = initial_code[:index].rfind('\n') + special_shift
 
-            method_summary = '\n' + txt.indent(1, method_desc.generated_xml_summary)
+            method_summary = '\n' + txt.indent(method_desc.indent_level, method_desc.generated_xml_summary)
             initial_code = initial_code[:index] + method_summary + initial_code[index:]
         return initial_code
 

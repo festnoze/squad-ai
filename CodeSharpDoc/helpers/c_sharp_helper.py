@@ -7,16 +7,6 @@ class CSharpHelper:
             lines = code.splitlines()
             lines = [line for line in lines if not line.strip().startswith('///')]
             paths_and_codes[file_path] = '\n'.join(lines)
-    
-# class CSharpXMLDocumentationInput(BaseModel):
-#     summary: str = Field(description="A string representing the summary section.")
-#     params: int = Field(description="A dictionary representing parameter names and descriptions if any, or None if method has no input parameters.")
-#     returns: str = Field(description="A string representing the description of the return value or None is not applicable.")
-#     example: str = Field(description="A string representing the example section or None is not applicable.")
-
-# class MultiplyInput(BaseModel):
-#     a: int = Field(description="first number")
-#     b: int = Field(description="second number")
 
 class CSharpXMLDocumentation:    
     summary: str = ""

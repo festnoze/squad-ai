@@ -10,8 +10,8 @@ public static class CodeLoaderService
     {
         List<KeyValuePair<string, string>> csFilesCode = new List<KeyValuePair<string, string>>();
         var files = GetCsFiles(folderPath);
-        foreach (var file in files)
-            csFilesCode.Add(new KeyValuePair<string, string>(file, LoadFile(file)));
+        foreach (var filePath in files)
+            csFilesCode.Add(new KeyValuePair<string, string>(filePath, LoadFile(filePath)));
         
         return csFilesCode;
     }
@@ -21,7 +21,7 @@ public static class CodeLoaderService
         List<string> csFiles = new List<string>();
         foreach (var file in Directory.GetFiles(rootDirectory, "*.cs", SearchOption.AllDirectories))
         {
-            csFiles.Add(file);
+            csFiles.Add(file.Replace("\\", "/"));
         }
         return csFiles;
     }

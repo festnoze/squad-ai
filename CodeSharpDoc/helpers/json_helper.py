@@ -31,10 +31,11 @@ class JsonHelper:
         for struct in structs:
             JsonHelper.save_as_json_file(struct, path, struct.name)
 
-    def save_as_json_file(obj: any, file_path: str, file_name: str):
+    def save_as_json_file(struct: StructureDesc, file_path: str, file_name: str):
             file_full_path = os.path.join(file_path, file_name + ".json")
             with open(file_full_path, 'w') as file:
-                json.dump(obj, file, indent=4)
+                json_struct = struct.to_json()
+                file.write(json_struct)
 
     def load_structures_from_json(file_path: str):
         with open(file_path, 'r') as file:
