@@ -27,25 +27,30 @@ class StructureDesc(BaseDesc):
         self.properties: list[PropertyDesc] = properties
     
     def __init__(self, **kwargs):
-        if len(kwargs) == 1:
+        if len(kwargs) == 1 and 'params_list' in kwargs:
             self.params_list: List[ParameterDocumentation] = []
-            if 'params_list' in kwargs:      
-                for param in kwargs['params_list']:
-                    if type(param) is dict:
-                        self.params_list.append(ParameterDocumentation(param['param_name'], param['param_desc']))
-                    elif type(param) is ParameterDocumentation:
-                        self.params_list.append(param)
-                    else:
-                        raise ValueError('Invalid argument type')
+            for param in kwargs['params_list']:
+                if type(param) is dict:
+                    self.params_list.append(ParameterDocumentation(param['param_name'], param['param_desc']))
+                elif type(param) is ParameterDocumentation:
+                    self.params_list.append(param)
+                else:
+                    raise ValueError('Invalid argument type')
         else:
             for key, value in kwargs.items():
                 key = txt.to_python_case(key)
                 if key == 'struct_type':
                     self.struct_type: str = StructureType(value)
                 elif key == 'methods':
-                    self.methods: list[MethodDesc] = [MethodDesc(**method) for method in value]
+                    if type(value) is list and len(value) > 0 and type(value[0]) is MethodDesc:
+                        self.methods: list[MethodDesc] = value
+                    else:
+                        self.methods: list[MethodDesc] = [MethodDesc.factory_from_kwargs(**method) for method in value]                    
                 elif key == 'properties':
-                    self.properties: list[PropertyDesc] = [PropertyDesc(**prop) for prop in value]
+                    if type(value) is list and len(value) > 0 and type(value[0]) is PropertyDesc:
+                        self.properties: list[PropertyDesc] = value
+                    else:
+                         self.properties: list[PropertyDesc] = [PropertyDesc.factory_from_kwargs(**prop) for prop in value]
                 else:
                     setattr(self, key, value)
     

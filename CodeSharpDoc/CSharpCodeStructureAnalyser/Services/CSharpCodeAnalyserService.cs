@@ -33,7 +33,7 @@ public static class CSharpCodeAnalyserService
         {
             var structType = GetStructType(decl);
             if (structType != null)
-                structures.Add(CreateStructureDesc(decl, filePath, structType!.Value));
+                structures.Add(CreateStructureDesc(decl, fileCode, filePath, structType!.Value));
         }
 
         return structures;
@@ -55,7 +55,7 @@ public static class CSharpCodeAnalyserService
         return structType;
     }
 
-    private static StructureDesc CreateStructureDesc(SyntaxNode decl, string filePath, StructureType structType)
+    private static StructureDesc CreateStructureDesc(SyntaxNode decl, string fullCode, string filePath, StructureType structType)
     {
         var namespaceName = decl.Ancestors().OfType<NamespaceDeclarationSyntax>().FirstOrDefault()?.Name.ToString() ?? string.Empty;
         var usings = decl.SyntaxTree.GetCompilationUnitRoot().Usings.Select(u => u.Name!.ToString()).ToList();
@@ -69,10 +69,27 @@ public static class CSharpCodeAnalyserService
 
         if (decl is ClassDeclarationSyntax classDecl)
         {
-            baseClassName = classDecl.BaseList?.Types.FirstOrDefault()?.ToString();
-            interfacesNames = classDecl.BaseList?.Types.Skip(1).Select(t => t.ToString()).ToList() ?? new List<string>();
+            interfacesNames = classDecl.BaseList?.Types.Select(t => t.ToString()).ToList() ?? new List<string>();
+            // Determine if inheritance list begins with a base class rather than an interface
+            if (interfacesNames.Count > 0 && !interfacesNames[0].StartsWith("I"))
+            {
+                baseClassName = interfacesNames[0];
+                interfacesNames.RemoveAt(0);
+            }
             methods = classDecl.Members.OfType<MethodDeclarationSyntax>().Select(m => MethodDesc.CreateMethodDescFromSyntax(m)).ToList();
             properties = classDecl.Members.OfType<PropertyDeclarationSyntax>().Select(p => PropertyDesc.GetPropertyDescFromSynthax(p)).ToList();
+        }
+        else if (decl is RecordDeclarationSyntax recordDecl)
+        {
+            interfacesNames = recordDecl.BaseList?.Types.Select(t => t.ToString()).ToList() ?? new List<string>();
+            // Determine if inheritance list begins with a base class rather than an interface
+            if (interfacesNames.Count > 0 && !interfacesNames[0].StartsWith("I"))
+            {
+                baseClassName = interfacesNames[0];
+                interfacesNames.RemoveAt(0);
+            }
+            methods = recordDecl.Members.OfType<MethodDeclarationSyntax>().Select(m => MethodDesc.CreateMethodDescFromSyntax(m)).ToList();
+            properties = recordDecl.Members.OfType<PropertyDeclarationSyntax>().Select(p => PropertyDesc.GetPropertyDescFromSynthax(p)).ToList();
         }
         else if (decl is InterfaceDeclarationSyntax interfaceDecl)
         {
@@ -84,13 +101,11 @@ public static class CSharpCodeAnalyserService
         {
             // Handle Enum
         }
-        else if (decl is RecordDeclarationSyntax recordDecl)
-        {
-            baseClassName = recordDecl.BaseList?.Types.FirstOrDefault()?.ToString();
-            interfacesNames = recordDecl.BaseList?.Types.Skip(1).Select(t => t.ToString()).ToList() ?? new List<string>();
-            methods = recordDecl.Members.OfType<MethodDeclarationSyntax>().Select(m => MethodDesc.CreateMethodDescFromSyntax(m)).ToList();
-            properties = recordDecl.Members.OfType<PropertyDeclarationSyntax>().Select(p => PropertyDesc.GetPropertyDescFromSynthax(p)).ToList();
-        }
+
+        //foreach (var method in methods)
+        //{
+        //    method.CodeStartIndex = fullCode.IndexOf($"{method.AccessModifier} {method.ReturnType} {method.MethodName}(".Trim());// + method.Params.Join();
+        //}
 
         return new StructureDesc(
             filePath,

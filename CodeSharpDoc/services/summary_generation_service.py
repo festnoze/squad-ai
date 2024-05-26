@@ -29,9 +29,19 @@ class SummaryGenerationService:
         txt.activate_print = True
         llms = LangChainFactory.create_llms_from_infos(llms_infos)       
         paths_and_codes = file.load_csharp_files(file_path)
-        #CSharpHelper.remove_existing_summaries_from_all_files(paths_and_codes)
-        #structures_from_python = CSharpCodeStructureAnalyser.extract_code_structures_from_code_files(paths_and_codes)
+        CSharpHelper.remove_existing_summaries_from_all_files(paths_and_codes)
+        structures_from_python = CSharpCodeStructureAnalyser.extract_code_structures_from_code_files(paths_and_codes)
         known_structures = code_analyser_client.post_analyse_folder_code_files(file_path)
+
+        # Copy code_start_index from python structures methods to csharp structures methods
+        for struct in known_structures:
+            for method in struct.methods:
+                for python_struct in structures_from_python:
+                    if python_struct.struct_name == struct.struct_name:
+                        for python_method in python_struct.methods:
+                            if python_method.method_name == method.method_name:
+                                method.code_start_index = python_method.code_start_index
+                                break
 
         SummaryGenerationService.generate_methods_summaries_for_all_structures(llms, known_structures)
         
@@ -86,12 +96,12 @@ class SummaryGenerationService:
     @staticmethod
     def add_generated_summaries_to_initial_code(struct_desc: StructureDesc, initial_code: str):
         for method_desc in struct_desc.methods[::-1]:
-            index = method_desc.code_start_index + struct_desc.index_shift_code
+            index = method_desc.code_start_index
 
-            if len(method_desc.attributes) > 0: # has attributes
+            if method_desc.attributes and len(method_desc.attributes) > 0: # has attributes
                 index = initial_code[:index].rfind(method_desc.attributes[0])
 
-            special_shift = 1# if struct_desc.structure_type == StructureType.Class.value else 2
+            special_shift = 1
             index = initial_code[:index].rfind('\n') + special_shift
 
             method_summary = '\n' + txt.indent(method_desc.indent_level, method_desc.generated_xml_summary)
@@ -249,8 +259,11 @@ class SummaryGenerationService:
         # return method_summary
     
     @staticmethod
-    def get_prompt_for_parameters_summaries(method: MethodDesc):      
-        method_params_str = ', '.join([item.to_str() for item in method.params])
+    def get_prompt_for_parameters_summaries(method: MethodDesc): 
+        if not method.params or len(method.params) == 0:
+            method_params_str = 'no parameters'
+        else:
+            method_params_str = ', '.join([item.to_str() for item in method.params])
 
         # Base prompt w/o json output format spec. (used alone in case of further use of an output parser to convert the LLM response to the specified pydantic json object)
         method_params_summaries_prompt = txt.single_line(f"""\

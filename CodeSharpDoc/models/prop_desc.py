@@ -10,10 +10,14 @@ class PropertyDesc(BaseDesc):
         self.is_property = is_property
         self.is_field = not is_property
 
-    def __init__(self, **kwargs):
-        for key, value in kwargs.items():
-            key = txt.to_python_case(key)
-            setattr(self, key, value)
+    @staticmethod
+    def factory_from_kwargs(**kwargs):
+        kwargs = {txt.to_python_case(key): value for key, value in kwargs.items()} # Handle PascalCase names from C#
+        prop_name = kwargs.get('prop_name')
+        prop_type = kwargs.get('prop_type')
+        is_property = kwargs.get('is_property', False)
+        return PropertyDesc(prop_name, prop_type, is_property)
+        
 
     def __str__(self):
         str = f"{self.prop_type} {self.prop_name};" 

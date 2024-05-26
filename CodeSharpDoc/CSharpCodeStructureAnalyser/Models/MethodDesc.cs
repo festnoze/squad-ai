@@ -10,6 +10,7 @@ public record MethodDesc : BaseDesc
 {
     public int CodeStartIndex { get; set; }
     public string ExistingSummary { get; set; }
+    public string AccessModifier { get; set; }
     public List<string> Attributes { get; set; }
     public string ReturnType { get; set; }
     public List<ParameterDesc> Params { get; set; }
@@ -25,7 +26,7 @@ public record MethodDesc : BaseDesc
     public bool IsSealed { get; set; }
     public bool IsNew { get; set; }
 
-    private List<string> _codeChunks;
+    public List<string> CodeChunks;
     public string GeneratedXmlSummary { get; set; }
     public string Summary { get; set; }
     public string MethodName { get; set; }
@@ -33,6 +34,7 @@ public record MethodDesc : BaseDesc
     public MethodDesc(
         int codeStartIndex,
         string existingSummary,
+        string accessModifier,
         List<string> attributes,
         string methodName,
         string methodReturnType,
@@ -52,6 +54,7 @@ public record MethodDesc : BaseDesc
     {
         CodeStartIndex = codeStartIndex;
         ExistingSummary = existingSummary;
+        AccessModifier = accessModifier;
         Attributes = attributes;
         MethodName = methodName;
         ReturnType = methodReturnType;
@@ -67,10 +70,9 @@ public record MethodDesc : BaseDesc
         IsVirtual = isVirtual;
         IsSealed = isSealed;
         IsNew = isNew;
-        _codeChunks = null;
+        CodeChunks = new List<string>();
     }
 
-    public List<string> CodeChunks => _codeChunks ?? new List<string> { Code };
 
     public string ToCode(int indentLevel = 1, bool includeSummary = false)
     {
@@ -106,17 +108,21 @@ public record MethodDesc : BaseDesc
     {
         var paramList = method.ParameterList.Parameters.Select(p => new ParameterDesc(
             p.Identifier.Text,
-            p.Type.ToString(),
+            p.Type!.ToString(),
             p.Default != null,
-            p.Default?.Value.ToString()
+            p.Default?.Value.ToString() ?? string.Empty,
+            null,
+            null
         )).ToList();
 
         // detect the indentation level of the method 
         var indentLevel = method.GetLeadingTrivia().ToString().Split('\n').Last().Count(c => c == ' ')/4;
-
+        var accessModifier = method.Modifiers.FirstOrDefault(m => m.IsKind(SyntaxKind.PublicKeyword) || m.IsKind(SyntaxKind.ProtectedKeyword) || m.IsKind(SyntaxKind.PrivateKeyword) || m.IsKind(SyntaxKind.InternalKeyword)).ToString() ?? SyntaxKind.PrivateKeyword.ToString();
+ 
         return new MethodDesc(
             method.FullSpan.Start,
             method.GetLeadingTrivia().ToString(),
+            accessModifier,
             method.AttributeLists.SelectMany(a => a.Attributes).Select(a => a.ToString()).ToList(),
             method.Identifier.Text,
             method.ReturnType.ToString(),
@@ -133,16 +139,6 @@ public record MethodDesc : BaseDesc
             method.Modifiers.Any(m => m.IsKind(SyntaxKind.SealedKeyword)),
             method.Modifiers.Any(m => m.IsKind(SyntaxKind.NewKeyword))
         );
-    }
-
-    private static List<ParameterDesc> GetMethodParameters(string methodSign)
-    {
-        var paramsStartIndex = methodSign.IndexOf('(') + 1;
-        var paramsEndIndex = methodSign.LastIndexOf(')');
-        var paramsStr = methodSign.Substring(paramsStartIndex, paramsEndIndex - paramsStartIndex);
-        var paramsList = paramsStr.Split(',').Select(param => param.Trim()).Where(param => !string.IsNullOrEmpty(param)).ToList();
-        var paramsDesc = paramsList.Select(param => ParameterDesc.FactoryParamDescFromCode(param)).ToList();
-        return paramsDesc;
     }
 
     private static List<string> DetectAttributes(string code)

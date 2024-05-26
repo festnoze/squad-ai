@@ -47,13 +47,13 @@ class CSharpCodeStructureAnalyser:
 
         # Handle files with multiple class/interface/enum definitions (can happened, especially in transfert objects files)
         structs_descs: list[StructureDesc] = []
-        for i in range(len(found_struct_separators) - 1):
-            if struct_type == StructureType.Class.value:
+        for i in range(len(found_struct_separators)):
+            if struct_type == 'class':
                 struct_desc = CSharpCodeStructureAnalyser.class_extract_methods_and_props(file_path, separator_indexes[i], namespace_name, usings, access_modifier, splitted_struct_contents[i+1])
                 CSharpCodeStructureAnalyser.split_class_methods_and_add_to_class_desc(struct_desc, chunk_size, chunk_overlap) # split each method into chunks adapted to the LLM context window size
-            elif struct_type == StructureType.Interface.value:
+            elif struct_type == 'interface':
                 struct_desc = CSharpCodeStructureAnalyser.interface_extract_methods_and_props(file_path, separator_indexes[i], namespace_name, usings, access_modifier, splitted_struct_contents[i+1])
-            elif struct_type == StructureType.Enum.value:
+            elif struct_type == 'enum':
                 return None
             structs_descs.append(struct_desc)
 
@@ -126,7 +126,7 @@ class CSharpCodeStructureAnalyser:
                 if CSharpCodeStructureAnalyser.is_property(StructureType.Class, first_line):
                     properties.append(PropertyDesc.get_property_desc_from_code(code_chunk))
                 else: # is method
-                    methods.append(MethodDesc.factory_for_method_from_class_code(code_chunk, separator_indexes[chunk_index - 1], code_chunks[chunk_index - 1], class_name))
+                    methods.append(MethodDesc.factory_for_method_from_class_code(code_chunk, separator_indexes[chunk_index - 1] + index_shift_code, code_chunks[chunk_index - 1], class_name))
         
         return StructureDesc(
                     file_path=file_path, 
@@ -170,7 +170,7 @@ class CSharpCodeStructureAnalyser:
             if CSharpCodeStructureAnalyser.is_property(StructureType.Interface, code_line):
                 properties.append(PropertyDesc.get_property_desc_from_code(code_line))
             else: # is method
-                methods.append(MethodDesc.factory_for_interface_code(code_line, separator_indexes[chunk_index], interface_name))
+                methods.append(MethodDesc.factory_for_interface_code(code_line, separator_indexes[chunk_index] + index_shift_code, interface_name))
             chunk_index += 1
 
         return StructureDesc(

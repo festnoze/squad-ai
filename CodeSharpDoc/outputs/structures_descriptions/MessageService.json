@@ -1,0 +1,347 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/MessageService.cs",
+    "index_shift_code": 1355,
+    "struct_type": "Class",
+    "namespace_name": "",
+    "usings": [
+        "Hangfire",
+        "Studi.Api.Core.Exceptions.Guards",
+        "Studi.Api.Core.Infrastructure.Repository.UnitOfWork",
+        "Studi.Api.Core.Services.DependencyInjection.Attributes",
+        "Studi.Api.Lms.Messenger.Application.Services.ConversationService.Ato",
+        "Studi.Api.Lms.Messenger.Application.Services.MessageAttachmentService",
+        "Studi.Api.Lms.Messenger.Application.Services.MessageService.Ato",
+        "Studi.Api.Lms.Messenger.Application.Services.MessageService.Mapping",
+        "Studi.Api.Lms.Messenger.Application.Services.NotificationService",
+        "Studi.Api.Lms.Messenger.Infra.Data.Repositories.ConversationRepository",
+        "Studi.Api.Lms.Messenger.Infra.Data.Repositories.CorrespondantRepository",
+        "Studi.Api.Lms.Messenger.Infra.Data.Repositories.MessageAttachmentRepository",
+        "Studi.Api.Lms.Messenger.Infra.Data.Repositories.MessageRepository",
+        "Studi.Api.Lms.Messenger.Infra.Data.Repositories.MessageRepository.Ito",
+        "Studi.Api.Lms.Messenger.Infra.Data.Repositories.MessageRepository.Ito.Implementation",
+        "Studi.Api.Lms.Messenger.Infra.External.Data.Repositories.UserRepository",
+        "Studi.Api.Lms.Messenger.Localization.Error.GeneratedClasses",
+        "Studi.Api.Core.ListingSelector.Untyped",
+        "Studi.Api.Core.ListingSelector"
+    ],
+    "access_modifier": "public",
+    "struct_name": "MessageService",
+    "base_class_name": "",
+    "interfaces_names": [
+        "IMessageService"
+    ],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetLastMessageDateByConversationIdExceptUserIdAsync",
+            "code_start_index": 2658,
+            "method_name": "GetLastMessageDateByConversationIdExceptUserIdAsync",
+            "existing_summary": "\r\n    /// <summary>\r\n    /// description\r\n    /// </summary>\r\n    /// <param name=\"conversationId\"></param>\r\n    /// <param name=\"userId\"></param>\r\n    /// <returns></returns>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": null,
+            "indent_level": 1,
+            "code": "{\r\n        return await _messageRepository.GetLastMessageDateByConversationIdExceptUserIdAsync(conversationId, userId);\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the date of the last message in a conversation, excluding a specific user.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "conversationId",
+                        "param_name": "conversationId",
+                        "param_desc": "The ID of the conversation for which to retrieve the last message date."
+                    },
+                    {
+                        "name": "userIdToExclude",
+                        "param_name": "userIdToExclude",
+                        "param_desc": "The ID of the user whose messages should be excluded while determining the last message date."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the date of the last message in a conversation, excluding a specific user.\n/// </summary>\n/// <param name=\"conversationId\">The ID of the conversation for which to retrieve the last message date.</param>\n/// <param name=\"userIdToExclude\">The ID of the user whose messages should be excluded while determining the last message date.</param>\n"
+        },
+        {
+            "name": "CountMessagesAsync",
+            "code_start_index": 2982,
+            "method_name": "CountMessagesAsync",
+            "existing_summary": "\r\n    /// <inheritdoc/>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": null,
+            "indent_level": 1,
+            "code": "{\r\n        return await _messageRepository.CountMessagesWithFilterAndSort(userId, schoolsIds, listingSelector);\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the count of messages based on specified filters and sorting criteria.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "methodName",
+                        "param_name": "methodName",
+                        "param_desc": "The name of the method (e.g., 'CountMessagesAsync')"
+                    },
+                    {
+                        "name": "methodPurpose",
+                        "param_name": "methodPurpose",
+                        "param_desc": "The purpose of the method (e.g., 'Retrieve the count of messages based on specified filters and sorting criteria.')"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the count of messages based on specified filters and sorting criteria.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"methodName\">The name of the method (e.g., 'CountMessagesAsync')</param>\n/// <param name=\"methodPurpose\">The purpose of the method (e.g., 'Retrieve the count of messages based on specified filters and sorting criteria.')</param>\n"
+        },
+        {
+            "name": "CountFilteredMessagesByConversationIdAsync",
+            "code_start_index": 3232,
+            "method_name": "CountFilteredMessagesByConversationIdAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": null,
+            "indent_level": 1,
+            "code": "{\r\n        return await _messageRepository.CountFilteredMessagesByConversationIdAsync(conversationId, listingSelector);\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the number of filtered messages based on a conversation ID.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "conversationId",
+                        "param_name": "conversationId",
+                        "param_desc": "The ID of the conversation for which the number of filtered messages will be retrieved."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the number of filtered messages based on a conversation ID.\n/// </summary>\n/// <param name=\"conversationId\">The ID of the conversation for which the number of filtered messages will be retrieved.</param>\n"
+        },
+        {
+            "name": "GetUnreadMessageCountByUserIdAndSchoolIdAsync",
+            "code_start_index": 3501,
+            "method_name": "GetUnreadMessageCountByUserIdAndSchoolIdAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": null,
+            "indent_level": 1,
+            "code": "{\r\n        var unreadMessageCountByConversation = await _messageRepository.GetUnreadMessagesByUserIdAndSchoolIdAsync(userId, schoolId);\r\n\r\n        return unreadMessageCountByConversation.ToAto();\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the unread message count for a specific user and school ID asynchronously.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The ID of the user for whom the unread message count is to be retrieved."
+                    },
+                    {
+                        "name": "schoolId",
+                        "param_name": "schoolId",
+                        "param_desc": "The ID of the school for which the unread message count is to be retrieved."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the unread message count for a specific user and school ID asynchronously.\n/// </summary>\n/// <param name=\"userId\">The ID of the user for whom the unread message count is to be retrieved.</param>\n/// <param name=\"schoolId\">The ID of the school for which the unread message count is to be retrieved.</param>\n"
+        },
+        {
+            "name": "GetPaginatedMessagesByConversationIdAsync",
+            "code_start_index": 3823,
+            "method_name": "GetPaginatedMessagesByConversationIdAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": null,
+            "indent_level": 1,
+            "code": "{\r\n        var conversation = await _conversationRepository.GetConversationByIdAsync(conversationId);\r\n\r\n        Guard.Against.Null(conversation, ErrorCode.Api.Lms.Messenger.DataValidation.Query.Conversation.NotFoundById, paramsValues: conversationId.ToString());\r\n\r\n        var conversationUserIds = await _conversationRepository.GetCorrespondantsUserIdsByConversationIdAsync(conversationId);\r\n\r\n        Guard.Against.False(conversationUserIds.Contains(userId), ErrorCode.Api.Lms.Messenger.DataValidation.Query.Conversation.UserNotInCorrespondants, paramsValues: new string[] { userId.ToString(), conversationId.ToString() });\r\n\r\n        // Get total\r\n        var total = await CountFilteredMessagesByConversationIdAsync(conversationId);\r\n\r\n        var take = pageSize;\r\n        var skip = (pageNumber - 1) * take;\r\n\r\n        IEnumerable<IMessageRIto> messages = Enumerable.Empty<IMessageRIto>();\r\n\r\n        if (total > 0)\r\n        {\r\n            messages = (await _messageRepository.GetPaginatedMessagesByConversationIdAsync(conversationId, skip, take));\r\n        }\r\n\r\n        var usersIds = messages.Select(m => m.SenderCorrespondant.UserId).Distinct().ToList();\r\n\r\n        var users = await _userRepository.GetUsersByIdsAsync(usersIds);\r\n\r\n        var flattenUploadedFileGuids = messages\r\n            .SelectMany(m =>\r\n            {\r\n                var guids = new List<Guid>();\r\n\r\n                guids.AddRange(m.AttachmentsUploadedFiles.Select(a => a.UploadedFileGuid));\r\n\r\n                if (m.AudioMessageUploadedFile != null)\r\n                {\r\n                    guids.Add(m.AudioMessageUploadedFile.UploadedFileGuid);\r\n                }\r\n\r\n                return guids;\r\n            }).Distinct();\r\n\r\n        var flattenMessageAttachements = await _messageAttachmentService.GetMultipleMessageAttachmentbyGuidsAsync(flattenUploadedFileGuids);\r\n\r\n        var currentUser = await _userRepository.GetUserByIdAsync(userId);\r\n        Guard.Against.Null(currentUser, ErrorCode.Api.Lms.Messenger.DataValidation.Query.User.NotFoundById, paramsValues: userId.ToString());\r\n\r\n        // pagined data\r\n        var paginedData = new PaginedData<IMessageRAto>\r\n        {\r\n            Data = messages.Select(m => m.ToAto(users.Single(u => u.Id == m.SenderCorrespondant.UserId), currentUser, flattenMessageAttachements)),\r\n            PageNumber = pageNumber,\r\n            PageSize = pageSize,\r\n            Total = total,\r\n        };\r\n\r\n        return paginedData;\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve paginated messages by conversation ID, ensuring user is part of the conversation and returning the data along with user and attachment details.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "method_name",
+                        "param_name": "method_name",
+                        "param_desc": "The name of the existing method for which parameter descriptions are being generated."
+                    },
+                    {
+                        "name": "method_purpose",
+                        "param_name": "method_purpose",
+                        "param_desc": "The purpose of the existing method, providing context for the parameters."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve paginated messages by conversation ID, ensuring user is part of the conversation and returning the data along with user and attachment details.\n/// </summary>\n/// <param name=\"method_name\">The name of the existing method for which parameter descriptions are being generated.</param>\n/// <param name=\"method_purpose\">The purpose of the existing method, providing context for the parameters.</param>\n"
+        },
+        {
+            "name": "AddMessageAsync",
+            "code_start_index": 6418,
+            "method_name": "AddMessageAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": null,
+            "indent_level": 1,
+            "code": "{\r\n        int messageCreatedId;\r\n        var currentUser = await _userRepository.GetUserByIdAsync(messageWAto.UserId);\r\n\r\n        await _unitOfWork.RegisterRepositoryAsync(_messageRepository);\r\n        await _unitOfWork.RegisterRepositoryAsync(_messageAttachmentRepository);\r\n        await _unitOfWork.RegisterRepositoryAsync(_correspondantRepository);\r\n\r\n        try\r\n        {\r\n            var conversationCorrespondants = (await _conversationRepository.GetCorrespondantsByConversationIdAsync(messageWAto.ConversationId));\r\n\r\n            Guard.Against.False(conversationCorrespondants.Any(corr => corr.UserId == messageWAto.UserId), ErrorCode.Api.Lms.Messenger.DataValidation.Query.Correspondant.MissingCorrespondantForMessageSender, paramsValues: messageWAto.UserId.ToString());\r\n\r\n            var senderCorrespondantId = conversationCorrespondants.First(corr => corr.UserId == messageWAto.UserId).CorrespondantId;\r\n\r\n            var messageWIto = MessageWIto.Create(messageWAto.ConversationId, senderCorrespondantId, messageWAto.MessageContent);\r\n\r\n            var messageRIto = await _messageRepository.AddMessageAsync(messageWIto, currentUser.Email);\r\n\r\n            await _messageAttachmentService.AddMessageAttachmentsAsync(messageRIto.Id, messageWAto.AttachmentsUploadedFilesGuids, messageWAto.AudioMessageGuid, currentUser.Email);\r\n\r\n            await _correspondantRepository.UpdateIsArchivedForAllCorrespondantsByConversationsIdsAsync(new int[] { messageWAto.ConversationId }, false, currentUser.Email);\r\n\r\n            messageCreatedId = messageRIto.Id;\r\n\r\n            await _unitOfWork.CommitAsync();\r\n        }\r\n        catch (Exception)\r\n        {\r\n            await _unitOfWork.RollbackAsync();\r\n            throw;\r\n        }\r\n\r\n        var guids = messageWAto.AttachmentsUploadedFilesGuids.ToList();\r\n        if (messageWAto.AudioMessageGuid != null)\r\n        {\r\n            guids.Add((Guid)messageWAto.AudioMessageGuid);\r\n        }\r\n\r\n        var flattenMessageAttachements = await _messageAttachmentService.GetMultipleMessageAttachmentbyGuidsAsync(guids);\r\n\r\n        var message = (await _messageRepository.GetMessageByIdAsync(messageCreatedId)).ToAto(currentUser, currentUser, flattenMessageAttachements);\r\n\r\n        if (enableNotification)\r\n        {\r\n            BackgroundJob.Enqueue<INotificationService>(service => service.SendNewMessageWebsocketsEventAsync(message.Id));\r\n\r\n            BackgroundJob.Enqueue<INotificationService>(service => service.SendNewMessageNotificationAsync(message.Id));\r\n        }\r\n\r\n        return message;\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Add a new message to a conversation, including attachments, and notify users if enabled.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "method",
+                        "param_name": "method",
+                        "param_desc": "AddMessageAsync"
+                    },
+                    {
+                        "name": "purpose",
+                        "param_name": "purpose",
+                        "param_desc": "Add a new message to a conversation, including attachments, and notify users if enabled."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Add a new message to a conversation, including attachments, and notify users if enabled.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"method\">AddMessageAsync</param>\n/// <param name=\"purpose\">Add a new message to a conversation, including attachments, and notify users if enabled.</param>\n"
+        },
+        {
+            "name": "GetMessageByIdAsync",
+            "code_start_index": 9047,
+            "method_name": "GetMessageByIdAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": null,
+            "indent_level": 1,
+            "code": "{\r\n        var messageRIto = await _messageRepository.GetMessageByIdAsync(messageId);\r\n\r\n        var currentUser = await _userRepository.GetUserByIdAsync(currentUserId);\r\n\r\n        var user = await _userRepository.GetUserByIdAsync(messageRIto.SenderCorrespondant.UserId);\r\n\r\n        var guids = messageRIto.AttachmentsUploadedFiles.Select(a => a.UploadedFileGuid).ToList();\r\n        if (messageRIto.AudioMessageUploadedFile != null)\r\n        {\r\n            guids.Add(messageRIto.AudioMessageUploadedFile.UploadedFileGuid);\r\n        }\r\n\r\n        var flattenMessageAttachements = await _messageAttachmentService.GetMultipleMessageAttachmentbyGuidsAsync(guids);\r\n\r\n        return messageRIto.ToAto(user, currentUser, flattenMessageAttachements);\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve a message by its ID, along with sender and recipient information and any attachments associated with it.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "method",
+                        "param_name": "method",
+                        "param_desc": "Retrieve a message by its ID, along with sender and recipient information and any attachments associated with it."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve a message by its ID, along with sender and recipient information and any attachments associated with it.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"method\">Retrieve a message by its ID, along with sender and recipient information and any attachments associated with it.</param>\n"
+        },
+        {
+            "name": "UpdateIsArchivedForUserIdByConversationsIdsAsync",
+            "code_start_index": 9876,
+            "method_name": "UpdateIsArchivedForUserIdByConversationsIdsAsync",
+            "existing_summary": "\r\n    /// <inheritdoc/>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": null,
+            "indent_level": 1,
+            "code": "{\r\n        var conversations = await _conversationRepository.GetConversationsByConversationIdsAndUserIdAsync(conversationIds, userId);\r\n                \r\n        List<string> conversationsIdsWhereUserIdDontBelongs = new();\r\n\r\n        foreach (var conversation in conversations)\r\n        {\r\n            var correspondants = await _conversationRepository.GetCorrespondantsByConversationIdAsync(conversation.Id);\r\n            if (!correspondants.Any(cor => cor.UserId == userId))\r\n                conversationsIdsWhereUserIdDontBelongs.Add(conversation.Id.ToString());\r\n        }\r\n\r\n        // Check if the user belongs to all the conversations he want to update\r\n        Guard.Against.NotEmpty(\r\n            conversationsIdsWhereUserIdDontBelongs, \r\n            ErrorCode.Api.Lms.Messenger.DataValidation.Command.Conversation.Archive.MissingRightOnEntity, \r\n            paramsValues: string.Join(\", \", conversationsIdsWhereUserIdDontBelongs));\r\n \r\n        // Check if the number of records persisted in the database correspond to the number of conversations to update\r\n        Guard.Against.NotEqual(conversationIds.Count(), conversations.Count(), ErrorCode.Api.Lms.Messenger.DataValidation.Command.Conversation.Archive.WrongEntityCount);\r\n\r\n        var currentUser = await _userRepository.GetUserByIdAsync(userId);\r\n\r\n        await _correspondantRepository.UpdateIsArchivedForUserIdByConversationsIdsAsync(conversationIds, userId, archived, currentUser.Email);\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the 'IsArchived' status for conversations based on user ID and conversation IDs, ensuring the user has the right to update and the correct number of conversations are being updated.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The ID of the user who is performing the update."
+                    },
+                    {
+                        "name": "conversationIds",
+                        "param_name": "conversationIds",
+                        "param_desc": "The list of conversation IDs for which the 'IsArchived' status needs to be updated."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the 'IsArchived' status for conversations based on user ID and conversation IDs, ensuring the user has the right to update and the correct number of conversations are being updated.\n/// </summary>\n/// <param name=\"userId\">The ID of the user who is performing the update.</param>\n/// <param name=\"conversationIds\">The list of conversation IDs for which the 'IsArchived' status needs to be updated.</param>\n"
+        }
+    ],
+    "properties": [],
+    "name": "MessageService"
+}

@@ -39,13 +39,27 @@ class MethodDesc(BaseDesc):
         self.generated_return_summary: str = None
         self.generated_xml_summary: str = None
 
-    def __init__(self, **kwargs):
-        for key, value in kwargs.items():
-            key = txt.to_python_case(key)
-            if key == 'params':
-                self.params: list[ParameterDesc] = [ParameterDesc(**param) for param in value]
-            else:
-                setattr(self, key, value)
+    @staticmethod
+    def factory_from_kwargs(**kwargs):
+        kwargs = {txt.to_python_case(key): value for key, value in kwargs.items()} # Handle PascalCase names from C#
+        code_start_index = kwargs.get('code_start_index')
+        existing_summary = kwargs.get('existing_summary')
+        attributs = kwargs.get('attributs')
+        method_name = kwargs.get('method_name')
+        method_return_type = kwargs.get('method_return_type')
+        method_params = kwargs.get('method_params')
+        indent_level = kwargs.get('indent_level')
+        code = kwargs.get('code')
+        is_async = kwargs.get('is_async', False)
+        is_task = kwargs.get('is_task', False)
+        is_ctor = kwargs.get('is_ctor', False)
+        is_static = kwargs.get('is_static', False)
+        is_abstract = kwargs.get('is_abstract', False)
+        is_override = kwargs.get('is_override', False)
+        is_virtual = kwargs.get('is_virtual', False)
+        is_sealed = kwargs.get('is_sealed', False)
+        is_new = kwargs.get('is_new', False)
+        return MethodDesc(code_start_index, existing_summary, attributs, method_name, method_return_type, method_params, indent_level, code, is_async, is_task, is_ctor, is_static, is_abstract, is_override, is_virtual, is_sealed, is_new)
 
     def to_code(self, indent_level: int = 1, include_summary: bool = False):
         method_code: str = ""

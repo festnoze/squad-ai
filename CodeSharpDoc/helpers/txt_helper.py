@@ -8,6 +8,7 @@ class txt:
     waiting_spinner_thread = None
     start_time: float = None
     stop_event = Event()
+    
     def indent(indent_level: int, code: str) -> str:
         indent_str = '    '
         lines = code.split('\n')

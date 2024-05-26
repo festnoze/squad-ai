@@ -9,14 +9,21 @@ class ParameterDesc(BaseDesc):
         super().__init__(name=param_name)
         self.param_name = param_name
         self.param_type = param_type
+        self.has_default_value = has_default_value
         self.default_value = default_value
         self.description = description
         self.extra_infos = extra_infos
 
-    def __init__(self, **kwargs):
-        for key, value in kwargs.items():
-            key = txt.to_python_case(key)
-            setattr(self, key, value)
+    @staticmethod
+    def factory_from_kwargs(**kwargs) -> 'ParameterDesc':
+        kwargs = {txt.to_python_case(key): value for key, value in kwargs.items()} # Handle PascalCase names from C#
+        param_name = kwargs.get('param_name')
+        param_type = kwargs.get('param_type')
+        has_default_value = kwargs.get('has_default_value', False)
+        default_value = kwargs.get('default_value')
+        description = kwargs.get('description')
+        extra_infos = kwargs.get('extra_infos')
+        return ParameterDesc(param_name, param_type, has_default_value, default_value, description, extra_infos)
 
     @staticmethod
     def factory_param_desc_from_code(param_code) -> 'ParameterDesc':
@@ -43,7 +50,7 @@ class ParameterDesc(BaseDesc):
         param_type = param_parts[0]
         param_name = param_parts[1].split('=')[0].strip()
 
-        return ParameterDesc(param_name, param_type, has_default_value, default_value, attributs)
+        return ParameterDesc(param_name, param_type, has_default_value, default_value, attributs, None)
 
         
     def parse_parameter_signature(param: str) -> Tuple[Optional[List[str]], str, str, Optional[str]]:
