@@ -12,7 +12,7 @@ class code_analyser_client:
     #endpoints
     analyse_folder_files_post = "from-folder"
 
-    def post_analyse_folder_code_files(folder_path: str):
+    def get_folder_code_files_structures(folder_path: str) -> list[StructureDesc]:
         url = f"{code_analyser_client.host_uri}/{code_analyser_client.controller_subpath}/{code_analyser_client.analyse_folder_files_post}"        
         headers = {
             'accept': 'text/plain',

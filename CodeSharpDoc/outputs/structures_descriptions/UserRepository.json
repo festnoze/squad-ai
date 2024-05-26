@@ -1,0 +1,568 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/UserRepository.cs",
+    "index_shift_code": 827,
+    "struct_type": "Class",
+    "namespace_name": "",
+    "usings": [
+        "Microsoft.EntityFrameworkCore",
+        "Studi.Api.Core.Infrastructure.Repository.EntityFramework.Helper",
+        "Studi.Api.Core.Services.DependencyInjection.Attributes",
+        "Studi.Api.Lms.Messenger.Infra.External.Data.Repositories.UserRepository.Filters",
+        "Studi.Api.Lms.Messenger.Infra.External.Data.Repositories.UserRepository.Ito",
+        "Studi.Api.Lms.Messenger.Infra.External.Data.Repositories.UserRepository.ListingSelector.Filtering",
+        "Studi.Api.Lms.Messenger.Infra.External.Data.Repositories.UserRepository.Mapping",
+        "Studi.Api.Core.ListingSelector.Filtering.FilterPredicateProvider.Implementation",
+        "Studi.Api.Core.ListingSelector.Untyped",
+        "Studi.LmsDatabase.Models",
+        "System.Linq.Expressions"
+    ],
+    "access_modifier": "public",
+    "struct_name": "UserRepository",
+    "base_class_name": "",
+    "interfaces_names": [
+        "IUserRepository"
+    ],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "DoesUserExistByIdAsync",
+            "code_start_index": 1322,
+            "method_name": "DoesUserExistByIdAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": null,
+            "indent_level": 1,
+            "code": "{\r\n        return await _db.Users.AsNoTracking()\r\n            .Where(EntityHelper.IsntDeletedEntity<Users>())\r\n            .AnyAsync(u => u.Id == id);\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Check if a user exists in the database based on their ID.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "methodName",
+                        "param_name": "methodName",
+                        "param_desc": "DoesUserExistByIdAsync"
+                    },
+                    {
+                        "name": "methodPurpose",
+                        "param_name": "methodPurpose",
+                        "param_desc": "Check if a user exists in the database based on their ID."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Check if a user exists in the database based on their ID.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"methodName\">DoesUserExistByIdAsync</param>\n/// <param name=\"methodPurpose\">Check if a user exists in the database based on their ID.</param>\n"
+        },
+        {
+            "name": "IsUserOfficialByUserIdAsync",
+            "code_start_index": 1540,
+            "method_name": "IsUserOfficialByUserIdAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": null,
+            "indent_level": 1,
+            "code": "{\r\n        return await _db.Users.AsNoTracking()\r\n            .Where(EntityHelper.IsntDeletedEntity<Users>())\r\n            .Where(u => u.Id == userId)\r\n            .Where(u => u.Interne == true)\r\n            .AnyAsync();\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Check if a user with a specific ID is marked as official in the database.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The ID of the user to check if marked as official in the database."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Check if a user with a specific ID is marked as official in the database.\n/// </summary>\n/// <param name=\"userId\">The ID of the user to check if marked as official in the database.</param>\n"
+        },
+        {
+            "name": "GetUserByIdAsync",
+            "code_start_index": 1835,
+            "method_name": "GetUserByIdAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": null,
+            "indent_level": 1,
+            "code": "{\r\n        var user = await _db.Users.AsNoTracking()\r\n            .Where(EntityHelper.IsntDeletedEntity<Users>())\r\n            .Include(u => u.UserHandicaps).ThenInclude(uh => uh.Handicap)\r\n            .Include(u => u.FileIdPhotoProfilNavigation)\r\n            .SingleAsync(u => u.Id == id);\r\n\r\n        return MappingIto.ToUserRIto(user.Id, user.Email, user.Pseudo, user.FileIdPhotoProfilNavigation != null ? user.FileIdPhotoProfilNavigation.FileUrl : user.PhotoProfil, user.UserHandicaps, user.Interne);\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve a user by their ID, including their handicaps and profile photo, if available.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "method",
+                        "param_name": "method",
+                        "param_desc": "Retrieve a user by their ID, including their handicaps and profile photo, if available."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve a user by their ID, including their handicaps and profile photo, if available.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"method\">Retrieve a user by their ID, including their handicaps and profile photo, if available.</param>\n"
+        },
+        {
+            "name": "GetUserByMailAsync",
+            "code_start_index": 2401,
+            "method_name": "GetUserByMailAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": null,
+            "indent_level": 1,
+            "code": "{\r\n        var user = await _db.Users.AsNoTracking()\r\n            .Where(EntityHelper.IsntDeletedEntity<Users>())\r\n            .Include(u => u.UserHandicaps).ThenInclude(uh => uh.Handicap)\r\n            .Include(u => u.FileIdPhotoProfilNavigation)\r\n            .SingleAsync(u => u.Email == mail);\r\n\r\n        return MappingIto.ToUserRIto(user.Id, user.Email, user.Pseudo, user.FileIdPhotoProfilNavigation != null ? user.FileIdPhotoProfilNavigation.FileUrl : user.PhotoProfil, user.UserHandicaps, user.Interne);\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve a user by their email address and return relevant user information.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "method",
+                        "param_name": "method",
+                        "param_desc": "GetUserByMailAsync"
+                    },
+                    {
+                        "name": "purpose",
+                        "param_name": "purpose",
+                        "param_desc": "Retrieve a user by their email address and return relevant user information."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve a user by their email address and return relevant user information.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"method\">GetUserByMailAsync</param>\n/// <param name=\"purpose\">Retrieve a user by their email address and return relevant user information.</param>\n"
+        },
+        {
+            "name": "GetUsersByIdsAsync",
+            "code_start_index": 3162,
+            "method_name": "GetUsersByIdsAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": null,
+            "indent_level": 1,
+            "code": "{\r\n        var users = await _db.Users.AsNoTracking()\r\n            .Where(EntityHelper.IsntDeletedEntity<Users>())\r\n            .Include(u => u.UserHandicaps).ThenInclude(uh => uh.Handicap)\r\n            .Include(u => u.FileIdPhotoProfilNavigation)\r\n            .Where(u => userIds.Contains(u.Id))\r\n            .ToArrayAsync();\r\n\r\n        return users.ToUsersRItoList();\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve users by their IDs in an asynchronous manner, including related handicaps and profile photos, and return a list of users in a specific format.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "parameters",
+                        "param_name": "parameters",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "existing",
+                        "param_name": "existing",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "method",
+                        "param_name": "method",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "GetUsersByIdsAsync",
+                        "param_name": "GetUsersByIdsAsync",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "context",
+                        "param_name": "context",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "Retrieve",
+                        "param_name": "Retrieve",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "users",
+                        "param_name": "users",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "IDs",
+                        "param_name": "IDs",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "asynchronous",
+                        "param_name": "asynchronous",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "manner",
+                        "param_name": "manner",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "related",
+                        "param_name": "related",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "handicaps",
+                        "param_name": "handicaps",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "profile",
+                        "param_name": "profile",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "photos",
+                        "param_name": "photos",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "list",
+                        "param_name": "list",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "users",
+                        "param_name": "users",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "specific",
+                        "param_name": "specific",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "format",
+                        "param_name": "format",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve users by their IDs in an asynchronous manner, including related handicaps and profile photos, and return a list of users in a specific format.\n/// </summary>\n/// <param name=\"no\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"parameters\">The generated description for the parameter</param>\n/// <param name=\"existing\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"method\">The generated description for the parameter</param>\n/// <param name=\"GetUsersByIdsAsync\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"context\">The generated description for the parameter</param>\n/// <param name=\"Retrieve\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"users\">The generated description for the parameter</param>\n/// <param name=\"IDs\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"asynchronous\">The generated description for the parameter</param>\n/// <param name=\"manner\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"related\">The generated description for the parameter</param>\n/// <param name=\"handicaps\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"profile\">The generated description for the parameter</param>\n/// <param name=\"photos\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"list\">The generated description for the parameter</param>\n/// <param name=\"users\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"specific\">The generated description for the parameter</param>\n/// <param name=\"format\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n"
+        },
+        {
+            "name": "GetUserWithTypeByUserIdAndSchoolIdAsync",
+            "code_start_index": 3626,
+            "method_name": "GetUserWithTypeByUserIdAndSchoolIdAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": null,
+            "indent_level": 1,
+            "code": "{\r\n        var userWithType = await _db.Users.AsNoTracking()\r\n            .Where(EntityHelper.IsntDeletedEntity<Users>())\r\n            .Include(u => u.EcolesUsers)\r\n            .Include(u => u.UserElectionDelegates)\r\n            .ThenInclude(eud => eud.Parcours)\r\n            .Include(u => u.UserHandicaps)\r\n            .ThenInclude(uh => uh.Handicap)\r\n            .Include(u => u.FileIdPhotoProfilNavigation)\r\n            .SingleAsync(u => u.Id == userId);\r\n\r\n        return MappingIto.ToUserWithTypeRIto(\r\n            userWithType.Id,\r\n            schoolId,\r\n            userWithType.Email,\r\n            userWithType.Pseudo,\r\n            userWithType.FileIdPhotoProfilNavigation != null ? userWithType.FileIdPhotoProfilNavigation.FileUrl : userWithType.PhotoProfil,\r\n            userWithType.UserHandicaps,\r\n            userWithType.Interne,\r\n            userWithType.EcolesUsers,\r\n            userWithType.UserElectionDelegates\r\n        );\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve a user with their type, associated with a specified school ID, by user ID, including relevant information such as email, pseudo, profile photo, handicaps, internal status, schools, and election delegates.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "user ID",
+                        "param_name": "user ID",
+                        "param_desc": "The ID of the user for whom the information is being retrieved."
+                    },
+                    {
+                        "name": "school ID",
+                        "param_name": "school ID",
+                        "param_desc": "The ID of the school to which the user is associated."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve a user with their type, associated with a specified school ID, by user ID, including relevant information such as email, pseudo, profile photo, handicaps, internal status, schools, and election delegates.\n/// </summary>\n/// <param name=\"user ID\">The ID of the user for whom the information is being retrieved.</param>\n/// <param name=\"school ID\">The ID of the school to which the user is associated.</param>\n"
+        },
+        {
+            "name": "GetUserWithTypeByUserIdsAndSchoolIdAsync",
+            "code_start_index": 4666,
+            "method_name": "GetUserWithTypeByUserIdsAndSchoolIdAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": null,
+            "indent_level": 1,
+            "code": "{\r\n        var tmp = _db.UsersType.ToList();\r\n        return await _db.Users.AsNoTracking()\r\n            .Where(EntityHelper.IsntDeletedEntity<Users>())\r\n            .Include(u => u.EcolesUsers).ThenInclude(eu => eu.UserType)\r\n            .Include(u => u.UserElectionDelegates)\r\n            .ThenInclude(eud => eud.Parcours)\r\n            .Include(u => u.UserHandicaps)\r\n            .ThenInclude(uh => uh.Handicap)\r\n            .Include(u => u.FileIdPhotoProfilNavigation)\r\n            .Where(u => userIds.Contains(u.Id))\r\n            .Select(userWithType =>\r\n                MappingIto.ToUserWithTypeRIto(\r\n                    userWithType.Id,\r\n                    schoolId,\r\n                    userWithType.Email,\r\n                    userWithType.Pseudo,\r\n                    userWithType.FileIdPhotoProfilNavigation != null ? userWithType.FileIdPhotoProfilNavigation.FileUrl : userWithType.PhotoProfil,\r\n                    userWithType.UserHandicaps,\r\n                    userWithType.Interne,\r\n                    userWithType.EcolesUsers,\r\n                    userWithType.UserElectionDelegates\r\n                )\r\n            ).ToListAsync();\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve users with their types based on specified user IDs and school ID asynchronously, including additional related data such as handicaps, elections delegates, and profile photos.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userIds",
+                        "param_name": "userIds",
+                        "param_desc": "The IDs of the users for whom the details need to be retrieved. It should be a list of integers."
+                    },
+                    {
+                        "name": "schoolId",
+                        "param_name": "schoolId",
+                        "param_desc": "The ID of the school from which the users are associated. It should be an integer."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve users with their types based on specified user IDs and school ID asynchronously, including additional related data such as handicaps, elections delegates, and profile photos.\n/// </summary>\n/// <param name=\"userIds\">The IDs of the users for whom the details need to be retrieved. It should be a list of integers.</param>\n/// <param name=\"schoolId\">The ID of the school from which the users are associated. It should be an integer.</param>\n"
+        },
+        {
+            "name": "CountFilteredUsersAsync",
+            "code_start_index": 5940,
+            "method_name": "CountFilteredUsersAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": null,
+            "indent_level": 1,
+            "code": "{\r\n        var query = _db.Users.AsNoTracking()\r\n                    .Where(EntityHelper.IsntDeletedEntity<Users>());\r\n\r\n        if (withinSchoolIdsList is not null)\r\n        {\r\n            query = query.Where(u => u.EcolesUsers.Any(eu => \r\n                withinSchoolIdsList.Contains(eu.EcoleId) && \r\n                eu.UserStatutId == 1 // User status is active\r\n            ));\r\n        }\r\n\r\n        // Exclude current user\r\n        if (connectedUserId is not null)\r\n        {\r\n            query = query.Where(u => u.Id != connectedUserId.Value);\r\n        }\r\n\r\n        var filtersExp = _contactFiltersPredicateProviders.GetAgglomeratedFiltersExpression(listingSelector, new UserAndSchoolsFilter(connectedUserId ?? 0, withinSchoolIdsList));\r\n        query = query.Where(filtersExp);\r\n\r\n        return await query.CountAsync();\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the count of filtered active users excluding the current user based on specified criteria.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no parameters",
+                        "param_name": "no parameters",
+                        "param_desc": "The list of parameters is 'no parameters'."
+                    },
+                    {
+                        "name": "method name",
+                        "param_name": "method name",
+                        "param_desc": "The name of the method is 'CountFilteredUsersAsync'."
+                    },
+                    {
+                        "name": "method purpose",
+                        "param_name": "method purpose",
+                        "param_desc": "The purpose of the method is 'Retrieve the count of filtered active users excluding the current user based on specified criteria'."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the count of filtered active users excluding the current user based on specified criteria.\n/// </summary>\n/// <param name=\"no parameters\">The list of parameters is 'no parameters'.</param>\n/// <param name=\"method name\">The name of the method is 'CountFilteredUsersAsync'.</param>\n/// <param name=\"method purpose\">The purpose of the method is 'Retrieve the count of filtered active users excluding the current user based on specified criteria'.</param>\n"
+        },
+        {
+            "name": "GetUsersListFilteredSortedPaginatedAsync",
+            "code_start_index": 7017,
+            "method_name": "GetUsersListFilteredSortedPaginatedAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": null,
+            "indent_level": 1,
+            "code": "{\r\n        var query = _db.Users.AsNoTracking()\r\n            .Include(u => u.EcolesUsers)\r\n            .Include(u => u.UserElectionDelegates)\r\n            .ThenInclude(eud => eud.Parcours)\r\n            .Include(u => u.UserHandicaps)\r\n            .ThenInclude(uh => uh.Handicap)\r\n            .Where(EntityHelper.IsntDeletedEntity<Users>());\r\n\r\n        var filtersExp = _contactFiltersPredicateProviders.GetAgglomeratedFiltersExpression(listingSelector, new UserAndSchoolsFilter(connectedUserId ?? 0, withinSchoolIdsList));\r\n        query = query.Where(filtersExp);\r\n\r\n        if (withinSchoolIdsList is not null)\r\n        {\r\n            query = query.Where(u => u.EcolesUsers.Any(eu => \r\n                withinSchoolIdsList.Contains(eu.EcoleId) && \r\n                eu.UserStatutId == 1 // User status is active\r\n            ));\r\n        }\r\n\r\n        //TODO ETM: move sorting into ListingSelector\r\n        // 2 new classes: AvailableSortings<IContactListing> and SortingProvidersForContact : SortingsProviders<IContactListing>\r\n        // Issue with variables transmission to sorting not handle for now: userCoursesIds\r\n        if (connectedUserId is not null)\r\n        {\r\n            query = query.Where(u => u.Id != connectedUserId!.Value);\r\n\r\n            if (userCoursesIds is null)\r\n            {\r\n                userCoursesIds = await GetUserCoursesIdsAsync(connectedUserId!.Value);\r\n            }\r\n\r\n            // Sorting\r\n            query = query.OrderByDescending(u => u.Interne)\r\n            // Then delegate of the user's courses\r\n            .ThenByDescending(u => u.UserElectionDelegates.Count(eud => !eud.IsSubstitute && userCoursesIds!.Contains(eud.CourseId)))\r\n            // Then substitute delegate of the user's courses\r\n            .ThenByDescending(u => u.UserElectionDelegates.Count(eud => eud.IsSubstitute && userCoursesIds!.Contains(eud.CourseId)))\r\n            // Finally order by pseudo\r\n            .ThenBy(u => u.Pseudo);\r\n        }\r\n        else\r\n        {\r\n            query = query.OrderByDescending(u => u.Interne).ThenBy(u => u.Pseudo);\r\n        }\r\n\r\n        var returnedSchoolId = withinSchoolIdsList?.FirstOrDefault() ?? default;\r\n\r\n        // Limit by pagination params\r\n        query = query.Skip(listingSelector.Pagination.Skip).Take(listingSelector.Pagination.Take);\r\n\r\n        return await query\r\n                        .Select(u => MappingIto.ToUserWithTypeRIto(\r\n                            u.Id,\r\n                            returnedSchoolId,\r\n                            u.Email,\r\n                            u.Pseudo,\r\n                            u.PhotoProfil,\r\n                            u.UserHandicaps,\r\n                            u.Interne,\r\n                            u.EcolesUsers,\r\n                            u.UserElectionDelegates\r\n                        ))\r\n                        .ToListAsync();\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve a list of users filtered, sorted, and paginated, including specific user details, based on various conditions such as user status and user courses.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "methodName",
+                        "param_name": "methodName",
+                        "param_desc": "GetUsersListFilteredSortedPaginatedAsync - Retrieve a list of users filtered, sorted, and paginated, including specific user details, based on various conditions such as user status and user courses."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve a list of users filtered, sorted, and paginated, including specific user details, based on various conditions such as user status and user courses.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"methodName\">GetUsersListFilteredSortedPaginatedAsync - Retrieve a list of users filtered, sorted, and paginated, including specific user details, based on various conditions such as user status and user courses.</param>\n"
+        },
+        {
+            "name": "GetUserCoursesIdsAsync",
+            "code_start_index": 10312,
+            "method_name": "GetUserCoursesIdsAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": null,
+            "indent_level": 1,
+            "code": "{\r\n        return await _db.InscriptionsParcours\r\n            .AsNoTracking()\r\n            .Where(EntityHelper.IsntDeletedEntity<InscriptionsParcours>())\r\n            .Where(ip => ip.UserId == userId)\r\n            .Select(ip => ip.ParcoursId)\r\n            .ToListAsync();\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the course IDs for a specified user asynchronously.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "methodName",
+                        "param_name": "methodName",
+                        "param_desc": "The name of the method ('GetUserCoursesIdsAsync')"
+                    },
+                    {
+                        "name": "methodPurpose",
+                        "param_name": "methodPurpose",
+                        "param_desc": "The purpose of the method ('Retrieve the course IDs for a specified user asynchronously.')"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the course IDs for a specified user asynchronously.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"methodName\">The name of the method ('GetUserCoursesIdsAsync')</param>\n/// <param name=\"methodPurpose\">The purpose of the method ('Retrieve the course IDs for a specified user asynchronously.')</param>\n"
+        },
+        {
+            "name": "GetOfficialCoachFromActiveTeamUserIdsByUserIdAsync",
+            "code_start_index": 10664,
+            "method_name": "GetOfficialCoachFromActiveTeamUserIdsByUserIdAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": null,
+            "indent_level": 1,
+            "code": "{\r\n        return await _db.Teams\r\n            .AsNoTracking()\r\n            .Include(team => team.TeamEnrollments)\r\n            .ThenInclude(te => te.User)\r\n            .Where(team => !team.IsDisabled)\r\n            .Where(team => team.DatePublished < DateTime.Now && team.HasReachedMinAllowedMembersOnce)\r\n            .Where(team => team.TeamEnrollments.Where(te => !te.IsDisabled).Any(te => te.UserId == userId))\r\n            .Where(team => team.TeamEnrollments.Any())\r\n            .Where(team => team.TeamEnrollments.Where(te => te.User.Interne).Select(te => te.User).Any())\r\n            .SelectMany(team => team.TeamEnrollments.Select(te => te.User.Id))\r\n            .ToListAsync();\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the official coach from the active team user IDs by user ID asynchronously.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "method_name",
+                        "param_name": "method_name",
+                        "param_desc": "The name of the method (e.g., GetOfficialCoachFromActiveTeamUserIdsByUserIdAsync)"
+                    },
+                    {
+                        "name": "method_purpose",
+                        "param_name": "method_purpose",
+                        "param_desc": "The purpose of the method (e.g., Retrieve the official coach from the active team user IDs by user ID asynchronously.)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the official coach from the active team user IDs by user ID asynchronously.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"method_name\">The name of the method (e.g., GetOfficialCoachFromActiveTeamUserIdsByUserIdAsync)</param>\n/// <param name=\"method_purpose\">The purpose of the method (e.g., Retrieve the official coach from the active team user IDs by user ID asynchronously.)</param>\n"
+        }
+    ],
+    "properties": [
+        {
+            "name": "Db",
+            "prop_name": "Db",
+            "prop_type": "StudiLmsContext",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "GenericDb",
+            "prop_name": "GenericDb",
+            "prop_type": "DbContext",
+            "is_property": true,
+            "is_field": false
+        }
+    ],
+    "name": "UserRepository"
+}

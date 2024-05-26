@@ -56,19 +56,19 @@
             "generated_parameters_summaries": {
                 "params_list": [
                     {
-                        "name": "conversationId",
-                        "param_name": "conversationId",
-                        "param_desc": "The ID of the conversation for which to retrieve the last message date."
+                        "name": "GetLastMessageDateByConversationIdExceptUserIdAsync",
+                        "param_name": "GetLastMessageDateByConversationIdExceptUserIdAsync",
+                        "param_desc": "Retrieve the date of the last message in a conversation, excluding a specific user."
                     },
                     {
-                        "name": "userIdToExclude",
-                        "param_name": "userIdToExclude",
-                        "param_desc": "The ID of the user whose messages should be excluded while determining the last message date."
+                        "name": "no parameters",
+                        "param_name": "no parameters",
+                        "param_desc": "N/A"
                     }
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Retrieve the date of the last message in a conversation, excluding a specific user.\n/// </summary>\n/// <param name=\"conversationId\">The ID of the conversation for which to retrieve the last message date.</param>\n/// <param name=\"userIdToExclude\">The ID of the user whose messages should be excluded while determining the last message date.</param>\n"
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the date of the last message in a conversation, excluding a specific user.\n/// </summary>\n/// <param name=\"GetLastMessageDateByConversationIdExceptUserIdAsync\">Retrieve the date of the last message in a conversation, excluding a specific user.</param>\n/// <param name=\"no parameters\">N/A</param>\n"
         },
         {
             "name": "CountMessagesAsync",
@@ -90,28 +90,28 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Retrieve the count of messages based on specified filters and sorting criteria.",
+            "generated_summary": "Count the number of messages for a specified user with optional filters and sorting.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
-                        "name": "no",
-                        "param_name": "no",
-                        "param_desc": "no parameters"
+                        "name": "no parameters",
+                        "param_name": "no parameters",
+                        "param_desc": "The list of parameters is 'no parameters'."
                     },
                     {
-                        "name": "methodName",
-                        "param_name": "methodName",
-                        "param_desc": "The name of the method (e.g., 'CountMessagesAsync')"
+                        "name": "method name",
+                        "param_name": "method name",
+                        "param_desc": "The name of the method is 'CountMessagesAsync'."
                     },
                     {
-                        "name": "methodPurpose",
-                        "param_name": "methodPurpose",
-                        "param_desc": "The purpose of the method (e.g., 'Retrieve the count of messages based on specified filters and sorting criteria.')"
+                        "name": "method purpose",
+                        "param_name": "method purpose",
+                        "param_desc": "The purpose of the method is to 'Count the number of messages for a specified user with optional filters and sorting.'."
                     }
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Retrieve the count of messages based on specified filters and sorting criteria.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"methodName\">The name of the method (e.g., 'CountMessagesAsync')</param>\n/// <param name=\"methodPurpose\">The purpose of the method (e.g., 'Retrieve the count of messages based on specified filters and sorting criteria.')</param>\n"
+            "generated_xml_summary": "/// <summary>\n/// Count the number of messages for a specified user with optional filters and sorting.\n/// </summary>\n/// <param name=\"no parameters\">The list of parameters is 'no parameters'.</param>\n/// <param name=\"method name\">The name of the method is 'CountMessagesAsync'.</param>\n/// <param name=\"method purpose\">The purpose of the method is to 'Count the number of messages for a specified user with optional filters and sorting.'.</param>\n"
         },
         {
             "name": "CountFilteredMessagesByConversationIdAsync",
@@ -133,18 +133,28 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Retrieve the number of filtered messages based on a conversation ID.",
+            "generated_summary": "Retrieve the count of filtered messages by conversation ID asynchronously.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
-                        "name": "conversationId",
-                        "param_name": "conversationId",
-                        "param_desc": "The ID of the conversation for which the number of filtered messages will be retrieved."
+                        "name": "method_name",
+                        "param_name": "method_name",
+                        "param_desc": "The name of the existing method ('CountFilteredMessagesByConversationIdAsync')."
+                    },
+                    {
+                        "name": "method_purpose",
+                        "param_name": "method_purpose",
+                        "param_desc": "The purpose of the existing method ('Retrieve the count of filtered messages by conversation ID asynchronously.')."
+                    },
+                    {
+                        "name": "parameters",
+                        "param_name": "parameters",
+                        "param_desc": "The list of parameters for the method (in this case, 'no parameters')."
                     }
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Retrieve the number of filtered messages based on a conversation ID.\n/// </summary>\n/// <param name=\"conversationId\">The ID of the conversation for which the number of filtered messages will be retrieved.</param>\n"
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the count of filtered messages by conversation ID asynchronously.\n/// </summary>\n/// <param name=\"method_name\">The name of the existing method ('CountFilteredMessagesByConversationIdAsync').</param>\n/// <param name=\"method_purpose\">The purpose of the existing method ('Retrieve the count of filtered messages by conversation ID asynchronously.').</param>\n/// <param name=\"parameters\">The list of parameters for the method (in this case, 'no parameters').</param>\n"
         },
         {
             "name": "GetUnreadMessageCountByUserIdAndSchoolIdAsync",
@@ -204,23 +214,28 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Retrieve paginated messages by conversation ID, ensuring user is part of the conversation and returning the data along with user and attachment details.",
+            "generated_summary": "Retrieve paginated messages for a conversation, including user information and message attachments, based on conversation ID, page number, and page size.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
-                        "name": "method_name",
-                        "param_name": "method_name",
-                        "param_desc": "The name of the existing method for which parameter descriptions are being generated."
+                        "name": "conversationId",
+                        "param_name": "conversationId",
+                        "param_desc": "The ID of the conversation for which messages are being retrieved."
                     },
                     {
-                        "name": "method_purpose",
-                        "param_name": "method_purpose",
-                        "param_desc": "The purpose of the existing method, providing context for the parameters."
+                        "name": "pageNumber",
+                        "param_name": "pageNumber",
+                        "param_desc": "The page number of the paginated results to retrieve."
+                    },
+                    {
+                        "name": "pageSize",
+                        "param_name": "pageSize",
+                        "param_desc": "The number of messages to include per page in the paginated results."
                     }
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Retrieve paginated messages by conversation ID, ensuring user is part of the conversation and returning the data along with user and attachment details.\n/// </summary>\n/// <param name=\"method_name\">The name of the existing method for which parameter descriptions are being generated.</param>\n/// <param name=\"method_purpose\">The purpose of the existing method, providing context for the parameters.</param>\n"
+            "generated_xml_summary": "/// <summary>\n/// Retrieve paginated messages for a conversation, including user information and message attachments, based on conversation ID, page number, and page size.\n/// </summary>\n/// <param name=\"conversationId\">The ID of the conversation for which messages are being retrieved.</param>\n/// <param name=\"pageNumber\">The page number of the paginated results to retrieve.</param>\n/// <param name=\"pageSize\">The number of messages to include per page in the paginated results.</param>\n"
         },
         {
             "name": "AddMessageAsync",
@@ -242,28 +257,103 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Add a new message to a conversation, including attachments, and notify users if enabled.",
+            "generated_summary": "Create and add a new message to a conversation, including attachments, and send notifications if enabled.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
                         "name": "no",
                         "param_name": "no",
-                        "param_desc": "no parameters"
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "parameters",
+                        "param_name": "parameters",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "existing",
+                        "param_name": "existing",
+                        "param_desc": "The generated description for the parameter"
                     },
                     {
                         "name": "method",
                         "param_name": "method",
-                        "param_desc": "AddMessageAsync"
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "named",
+                        "param_name": "named",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "AddMessageAsync",
+                        "param_name": "AddMessageAsync",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "context",
+                        "param_name": "context",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "method",
+                        "param_name": "method",
+                        "param_desc": "The generated description for the parameter"
                     },
                     {
                         "name": "purpose",
                         "param_name": "purpose",
-                        "param_desc": "Add a new message to a conversation, including attachments, and notify users if enabled."
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "Create",
+                        "param_name": "Create",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "add",
+                        "param_name": "add",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "new",
+                        "param_name": "new",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "message",
+                        "param_name": "message",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "conversation",
+                        "param_name": "conversation",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "attachments",
+                        "param_name": "attachments",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "send",
+                        "param_name": "send",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "notifications",
+                        "param_name": "notifications",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "enabled",
+                        "param_name": "enabled",
+                        "param_desc": "The generated description for the parameter"
                     }
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Add a new message to a conversation, including attachments, and notify users if enabled.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"method\">AddMessageAsync</param>\n/// <param name=\"purpose\">Add a new message to a conversation, including attachments, and notify users if enabled.</param>\n"
+            "generated_xml_summary": "/// <summary>\n/// Create and add a new message to a conversation, including attachments, and send notifications if enabled.\n/// </summary>\n/// <param name=\"no\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"parameters\">The generated description for the parameter</param>\n/// <param name=\"existing\">The generated description for the parameter</param>\n/// <param name=\"method\">The generated description for the parameter</param>\n/// <param name=\"named\">The generated description for the parameter</param>\n/// <param name=\"AddMessageAsync\">The generated description for the parameter</param>\n/// <param name=\"context\">The generated description for the parameter</param>\n/// <param name=\"method\">The generated description for the parameter</param>\n/// <param name=\"purpose\">The generated description for the parameter</param>\n/// <param name=\"Create\">The generated description for the parameter</param>\n/// <param name=\"add\">The generated description for the parameter</param>\n/// <param name=\"new\">The generated description for the parameter</param>\n/// <param name=\"message\">The generated description for the parameter</param>\n/// <param name=\"conversation\">The generated description for the parameter</param>\n/// <param name=\"attachments\">The generated description for the parameter</param>\n/// <param name=\"send\">The generated description for the parameter</param>\n/// <param name=\"notifications\">The generated description for the parameter</param>\n/// <param name=\"enabled\">The generated description for the parameter</param>\n"
         },
         {
             "name": "GetMessageByIdAsync",
@@ -285,23 +375,38 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Retrieve a message by its ID, along with sender and recipient information and any attachments associated with it.",
+            "generated_summary": "Retrieve a message by its ID asynchronously, along with its sender and attachments, and format it for display.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
                         "name": "no",
                         "param_name": "no",
-                        "param_desc": "no parameters"
+                        "param_desc": "The number of parameters"
+                    },
+                    {
+                        "name": "parameters",
+                        "param_name": "parameters",
+                        "param_desc": "The list of parameters"
+                    },
+                    {
+                        "name": "existing",
+                        "param_name": "existing",
+                        "param_desc": "Indicates whether the method exists"
                     },
                     {
                         "name": "method",
                         "param_name": "method",
-                        "param_desc": "Retrieve a message by its ID, along with sender and recipient information and any attachments associated with it."
+                        "param_desc": "The name of the existing method"
+                    },
+                    {
+                        "name": "purpose",
+                        "param_name": "purpose",
+                        "param_desc": "The purpose of the method"
                     }
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Retrieve a message by its ID, along with sender and recipient information and any attachments associated with it.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"method\">Retrieve a message by its ID, along with sender and recipient information and any attachments associated with it.</param>\n"
+            "generated_xml_summary": "/// <summary>\n/// Retrieve a message by its ID asynchronously, along with its sender and attachments, and format it for display.\n/// </summary>\n/// <param name=\"no\">The number of parameters</param>\n/// <param name=\"parameters\">The list of parameters</param>\n/// <param name=\"existing\">Indicates whether the method exists</param>\n/// <param name=\"method\">The name of the existing method</param>\n/// <param name=\"purpose\">The purpose of the method</param>\n"
         },
         {
             "name": "UpdateIsArchivedForUserIdByConversationsIdsAsync",
@@ -323,23 +428,28 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Update the 'IsArchived' status for conversations based on user ID and conversation IDs, ensuring the user has the right to update and the correct number of conversations are being updated.",
+            "generated_summary": "Update the 'IsArchived' status for conversations by conversation IDs, ensuring the user has the necessary rights and validating the number of conversations to be updated.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
-                        "name": "userId",
-                        "param_name": "userId",
-                        "param_desc": "The ID of the user who is performing the update."
+                        "name": "method_name",
+                        "param_name": "method_name",
+                        "param_desc": "The name of the existing method being documented. In this case, 'UpdateIsArchivedForUserIdByConversationsIdsAsync'."
                     },
                     {
-                        "name": "conversationIds",
-                        "param_name": "conversationIds",
-                        "param_desc": "The list of conversation IDs for which the 'IsArchived' status needs to be updated."
+                        "name": "method_purpose",
+                        "param_name": "method_purpose",
+                        "param_desc": "The purpose of the existing method being documented. In this case, 'Update the 'IsArchived' status for conversations by conversation IDs, ensuring the user has the necessary rights and validating the number of conversations to be updated.'."
+                    },
+                    {
+                        "name": "params_list",
+                        "param_name": "params_list",
+                        "param_desc": "The list of parameters passed to the method. In this case, 'no parameters'."
                     }
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Update the 'IsArchived' status for conversations based on user ID and conversation IDs, ensuring the user has the right to update and the correct number of conversations are being updated.\n/// </summary>\n/// <param name=\"userId\">The ID of the user who is performing the update.</param>\n/// <param name=\"conversationIds\">The list of conversation IDs for which the 'IsArchived' status needs to be updated.</param>\n"
+            "generated_xml_summary": "/// <summary>\n/// Update the 'IsArchived' status for conversations by conversation IDs, ensuring the user has the necessary rights and validating the number of conversations to be updated.\n/// </summary>\n/// <param name=\"method_name\">The name of the existing method being documented. In this case, 'UpdateIsArchivedForUserIdByConversationsIdsAsync'.</param>\n/// <param name=\"method_purpose\">The purpose of the existing method being documented. In this case, 'Update the 'IsArchived' status for conversations by conversation IDs, ensuring the user has the necessary rights and validating the number of conversations to be updated.'.</param>\n/// <param name=\"params_list\">The list of parameters passed to the method. In this case, 'no parameters'.</param>\n"
         }
     ],
     "properties": [],

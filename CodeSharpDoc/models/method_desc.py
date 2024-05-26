@@ -47,7 +47,8 @@ class MethodDesc(BaseDesc):
         attributs = kwargs.get('attributs')
         method_name = kwargs.get('method_name')
         method_return_type = kwargs.get('method_return_type')
-        method_params = kwargs.get('method_params')
+        params = kwargs.get('params')
+        params = [ParameterDesc.factory_from_kwargs(**param) for param in params]
         indent_level = kwargs.get('indent_level')
         code = kwargs.get('code')
         is_async = kwargs.get('is_async', False)
@@ -59,7 +60,7 @@ class MethodDesc(BaseDesc):
         is_virtual = kwargs.get('is_virtual', False)
         is_sealed = kwargs.get('is_sealed', False)
         is_new = kwargs.get('is_new', False)
-        return MethodDesc(code_start_index, existing_summary, attributs, method_name, method_return_type, method_params, indent_level, code, is_async, is_task, is_ctor, is_static, is_abstract, is_override, is_virtual, is_sealed, is_new)
+        return MethodDesc(code_start_index, existing_summary, attributs, method_name, method_return_type, params, indent_level, code, is_async, is_task, is_ctor, is_static, is_abstract, is_override, is_virtual, is_sealed, is_new)
 
     def to_code(self, indent_level: int = 1, include_summary: bool = False):
         method_code: str = ""

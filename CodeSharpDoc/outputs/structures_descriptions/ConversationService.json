@@ -1,0 +1,1965 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/ConversationService.cs",
+    "index_shift_code": 2470,
+    "struct_type": "Class",
+    "namespace_name": "",
+    "usings": [
+        "Hangfire",
+        "Newtonsoft.Json.Linq",
+        "Studi.Api.Core.Exceptions.ErrorCodesLocalization.Base",
+        "Studi.Api.Core.Exceptions.Guards",
+        "Studi.Api.Core.Infrastructure.Repository.UnitOfWork",
+        "Studi.Api.Core.Linq",
+        "Studi.Api.Core.Services.DependencyInjection.Attributes",
+        "Studi.Api.Lms.Messenger.Application.Services.ContactService",
+        "Studi.Api.Lms.Messenger.Application.Services.ContactService.Ato",
+        "Studi.Api.Lms.Messenger.Application.Services.ConversationObjectService",
+        "Studi.Api.Lms.Messenger.Application.Services.ConversationService.Ato",
+        "Studi.Api.Lms.Messenger.Application.Services.ConversationService.Ato.Implementation",
+        "Studi.Api.Lms.Messenger.Application.Services.ConversationService.Mapping",
+        "Studi.Api.Lms.Messenger.Application.Services.MessageAttachmentService",
+        "Studi.Api.Lms.Messenger.Application.Services.MessageAttachmentService.Mapping",
+        "Studi.Api.Lms.Messenger.Application.Services.MessageService",
+        "Studi.Api.Lms.Messenger.Application.Services.MessageService.Mapping",
+        "Studi.Api.Lms.Messenger.Application.Services.NotificationService",
+        "Studi.Api.Lms.Messenger.Infra.Data.Repositories.ConversationRepository",
+        "Studi.Api.Lms.Messenger.Infra.Data.Repositories.ConversationRepository.Ito",
+        "Studi.Api.Lms.Messenger.Infra.Data.Repositories.ConversationRepository.Ito.Implementation",
+        "Studi.Api.Lms.Messenger.Infra.Data.Repositories.CorrespondantRepository",
+        "Studi.Api.Lms.Messenger.Infra.Data.Repositories.MessageAttachmentRepository.Enums",
+        "Studi.Api.Lms.Messenger.Infra.Data.Repositories.MessageRepository",
+        "Studi.Api.Lms.Messenger.Infra.Data.Repositories.MessageRepository.Ito.Implementation",
+        "Studi.Api.Lms.Messenger.Infra.External.Data.Repositories.UserRepository",
+        "Studi.Api.Lms.Messenger.Infra.External.Data.Repositories.UserRepository.Ito",
+        "Studi.Api.Lms.Messenger.Localization.Error.GeneratedClasses",
+        "Studi.Api.Lms.Messenger.Shared.ConversationListing",
+        "Studi.Api.Lms.Messenger.Shared.ConversationListing.AllowedValuesByFilter",
+        "Studi.Api.Core.ListingSelector.Filtering.CompositionOperators",
+        "Studi.Api.Core.ListingSelector.Filtering.Operators",
+        "Studi.Api.Core.ListingSelector.Untyped",
+        "Studi.Api.Core.ListingSelector.Untyped.Implementation",
+        "System.Linq.Expressions"
+    ],
+    "access_modifier": "public",
+    "struct_name": "ConversationService",
+    "base_class_name": "",
+    "interfaces_names": [
+        "IConversationService"
+    ],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetConversationByIdWithChecksAsync",
+            "code_start_index": 4153,
+            "method_name": "GetConversationByIdWithChecksAsync",
+            "existing_summary": "\r\n    #region V1\r\n\r\n    #region Get Conversation\r\n\r\n    /// <inheritdoc/>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "conversationId",
+                    "param_name": "conversationId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "schoolIds",
+                    "param_name": "schoolIds",
+                    "param_type": "List<int>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "isRequestFromIntranet",
+                    "param_name": "isRequestFromIntranet",
+                    "param_type": "bool",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        // Check whether the conversation exists.\r\n        var conversationRIto = await _conversationRepository.GetConversationByIdAsync(conversationId);\r\n        Guard.Against.Null(\r\n            conversationRIto,\r\n            ErrorCode.Api.Lms.Messenger.DataValidation.Query.Conversation.NotFoundById,\r\n            paramsValues: conversationId.ToString());\r\n\r\n        // Retrieve all correspondants' user infos in order to build the ATO\r\n        var conversationRAto = await BuildConversationAto(conversationRIto!, userId);\r\n\r\n        CheckSchoolUserRightToAccessConversation(conversationRAto, userId, schoolIds, isRequestFromIntranet);\r\n\r\n        return conversationRAto;\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": true,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve a conversation by its ID, perform necessary checks to ensure its existence, retrieve user information for all participants, and verify the user's right to access the conversation.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "conversationId",
+                        "param_name": "conversationId",
+                        "param_desc": "The ID of the conversation to retrieve."
+                    },
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The ID of the user requesting the conversation."
+                    },
+                    {
+                        "name": "schoolIds",
+                        "param_name": "schoolIds",
+                        "param_desc": "A list of IDs representing the schools related to the conversation."
+                    },
+                    {
+                        "name": "isRequestFromIntranet",
+                        "param_name": "isRequestFromIntranet",
+                        "param_desc": "A boolean flag indicating whether the request is coming from the intranet."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve a conversation by its ID, perform necessary checks to ensure its existence, retrieve user information for all participants, and verify the user's right to access the conversation.\n/// </summary>\n/// <param name=\"conversationId\">The ID of the conversation to retrieve.</param>\n/// <param name=\"userId\">The ID of the user requesting the conversation.</param>\n/// <param name=\"schoolIds\">A list of IDs representing the schools related to the conversation.</param>\n/// <param name=\"isRequestFromIntranet\">A boolean flag indicating whether the request is coming from the intranet.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "CreateConversationAsync",
+            "code_start_index": 5059,
+            "method_name": "CreateConversationAsync",
+            "existing_summary": "\r\n    #endregion Get Conversation\r\n\r\n    #region Create Conversation\r\n\r\n    /// <inheritdoc/>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "parameter",
+                    "param_name": "parameter",
+                    "param_type": "IConversationWAto",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "isRequestFromIntranet",
+                    "param_name": "isRequestFromIntranet",
+                    "param_type": "bool",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "cancellationToken",
+                    "param_name": "cancellationToken",
+                    "param_type": "CancellationToken",
+                    "has_default_value": true,
+                    "default_value": "default",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "enableNotification",
+                    "param_name": "enableNotification",
+                    "param_type": "bool",
+                    "has_default_value": true,
+                    "default_value": "true",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        await _unitOfWork.RegisterRepositoryAsync(_conversationRepository);\r\n        await _unitOfWork.RegisterRepositoryAsync(_messageRepository);\r\n\r\n        try\r\n        {\r\n            int? internalServiceId = null;\r\n            int? conversationObjectId = null;\r\n            int? conversationSubObjectId = null;\r\n\r\n            // If InternalServiceCode exists: fetch associated UserId, gather subjects from ConversationObject and SubObject codes, then update parameter's Subject.\r\n            if (parameter.InternalServiceCode != null)\r\n            {\r\n                var internalService = await _conversationObjectService.GetInternalServiceByCodeAsync(parameter.InternalServiceCode);\r\n                internalServiceId = internalService.Id;\r\n\r\n                var internalServiceUser = await _contactService.GetInternalServiceUserBySchoolId(internalService, parameter.SchoolId);\r\n\r\n                var subjects = new List<string>();\r\n                parameter.RecipientsUsersIds = Enumerable.Append(parameter.RecipientsUsersIds, internalServiceUser.Id);\r\n\r\n                if (parameter.ConversationObjectCode != null)\r\n                {\r\n                    var conversationObject = await _conversationObjectService.GetConversationObjectByCodeAsync(parameter.ConversationObjectCode);\r\n                    conversationObjectId = conversationObject.Id;\r\n                    subjects.Add(conversationObject.Libelle);\r\n                }\r\n\r\n                if (parameter.ConversationSubObjectCode != null)\r\n                {\r\n                    var conversationSubObject = await _conversationObjectService.GetConversationSubObjectByCodeAsync(parameter.ConversationSubObjectCode);\r\n                    conversationSubObjectId = conversationSubObject.Id;\r\n                    subjects.Add(conversationSubObject.Libelle);\r\n                }\r\n\r\n                if (!string.IsNullOrEmpty(parameter.Subject))\r\n                {\r\n                    subjects.Add(parameter.Subject!);\r\n                }\r\n\r\n                parameter.Subject = string.Join(\" - \", subjects);\r\n            }\r\n\r\n            IConversationRIto? conversation = null;\r\n\r\n            // If join last conversation (same sender, school, recipients and subject) then get conversation id\r\n            if (parameter.JoinLastConversation)\r\n            {\r\n                conversation = await _conversationRepository.GetLastConversationAsync(parameter.SenderUserId, parameter.SchoolId, parameter.RecipientsUsersIds, parameter.Subject, null);\r\n            }\r\n\r\n            var currentUser = await _userRepository.GetUserByIdAsync(parameter.SenderUserId);\r\n\r\n            if (parameter.InternalServiceCode is null)\r\n            {\r\n                await ValidateRecipientsAsync(currentUser, parameter.RecipientsUsersIds, parameter.SchoolId);\r\n            }\r\n\r\n            // if no conversation id, then create new\r\n            if (conversation == null)\r\n            {\r\n                // Get all the users IDs (sender + recipents).\r\n                var usersIds = new List<int>(parameter.RecipientsUsersIds) { parameter.SenderUserId }.Distinct().ToArray();\r\n\r\n                // Get all the users and their type.\r\n                var users = await _userRepository.GetUserWithTypeByUserIdsAndSchoolIdAsync(usersIds, parameter.SchoolId);\r\n\r\n                foreach (var user in users)\r\n                {\r\n                    await CheckForRecipientAdditionDuringConversationCreationErrorsAsync(user);\r\n                }\r\n\r\n                // Create the correspondents with their roles.\r\n                var sender = CorrespondantWIto.Create(parameter.SenderUserId, GetCorrespondantRoles(isSender: true, parameter.SenderUserId, users));\r\n                var recipents = parameter.RecipientsUsersIds.Select(uid => CorrespondantWIto.Create(uid, GetCorrespondantRoles(isSender: false, uid, users))).ToArray();\r\n                var correspondants = new List<ICorrespondantWIto>(recipents) { sender };\r\n\r\n                // Create the conversation with its type.\r\n                var conversationTypeRAto = GetConversationType(users);\r\n                var conversationType = (EConversationTypeIto)conversationTypeRAto;\r\n\r\n                var conversationWIto = ConversationWIto.Create(\r\n                    schoolId: parameter.SchoolId,\r\n                    subject: parameter.Subject ?? string.Empty,\r\n                    conversationStatus: null,\r\n                    conversationType: conversationType,\r\n                    isReadOnly: parameter.IsReadOnly,\r\n                    correspondants: correspondants,\r\n                    internalServiceId: internalServiceId,\r\n                    conversationObjectId: conversationObjectId,\r\n                    conversationSubObjectId: conversationSubObjectId\r\n                );\r\n\r\n                conversation = await _conversationRepository.CreateConversationAsync(\r\n                    conversationWIto,\r\n                    currentUser.Email\r\n                );\r\n            }\r\n\r\n            var correspondantsRIto = await _conversationRepository.GetCorrespondantsByConversationIdAsync(conversation.Id);\r\n\r\n            var message = MessageWIto.Create(\r\n                conversation.Id,\r\n                correspondantsRIto.Single(c => c.Roles.Contains(ECorrespondantRoleIto.Sender)).CorrespondantId,\r\n                parameter.MessageContent\r\n            );\r\n\r\n            var messageRIto = await _messageRepository.AddMessageAsync(message, currentUser.Email);\r\n\r\n            if (parameter.AttachmentsUploadedFilesGuids?.Any() == true)\r\n            {\r\n                await _messageAttachmentService.AddMessageAttachmentsAsync(messageRIto.Id, parameter.AttachmentsUploadedFilesGuids, null, currentUser.Email);\r\n            }\r\n\r\n            var conversationRAto = await GetConversationByIdWithChecksAsync(conversation.Id, parameter.SenderUserId, new List<int> { parameter.SchoolId }, isRequestFromIntranet);\r\n\r\n            await _unitOfWork.CommitAsync();\r\n\r\n            if (enableNotification)\r\n            {\r\n                BackgroundJob.Enqueue<INotificationService>(service => service.SendNewConversationWebsocketsEventAsync(conversationRAto.Id, messageRIto.Id));\r\n\r\n                BackgroundJob.Enqueue<INotificationService>(service => service.SendNewMessageNotificationAsync(messageRIto.Id));\r\n            }\r\n\r\n            return conversationRAto;\r\n        }\r\n        catch (Exception)\r\n        {\r\n            await _unitOfWork.RollbackAsync();\r\n            throw;\r\n        }\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a new conversation with specified recipients, subject, and message content, including handling internal service codes and attachments, and sending notifications if enabled.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "IConversationWAto",
+                        "param_name": "IConversationWAto",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "isRequestFromIntranet",
+                        "param_name": "isRequestFromIntranet",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "cancellationToken",
+                        "param_name": "cancellationToken",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "enableNotification",
+                        "param_name": "enableNotification",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a new conversation with specified recipients, subject, and message content, including handling internal service codes and attachments, and sending notifications if enabled.\n/// </summary>\n/// <param name=\"IConversationWAto\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"isRequestFromIntranet\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"cancellationToken\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"enableNotification\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ValidateRecipientsAsync",
+            "code_start_index": 11627,
+            "method_name": "ValidateRecipientsAsync",
+            "existing_summary": "\r\n    /// <summary>\r\n    /// Check for every scenario if the recipient is a valid recipient for the current user\r\n    /// A student can't send direct messages to an official or a trainer\r\n    /// A trainer can't send a direct message to an official but can send one to another trainer\r\n    /// An official can send a direct message to anyone\r\n    /// </summary>\r\n    /// <param name=\"currentUser\">user trying to add recipients</param>\r\n    /// <param name=\"recipientsUsersIds\">list of ids of the users to add</param>\r\n    /// <exception cref=\"NotImplementedException\"></exception>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "currentUser",
+                    "param_name": "currentUser",
+                    "param_type": "IUserRIto",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "recipientsUsersIds",
+                    "param_name": "recipientsUsersIds",
+                    "param_type": "IEnumerable<int>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "schoolId",
+                    "param_name": "schoolId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        var recipients = await _userRepository.GetUserWithTypeByUserIdsAndSchoolIdAsync(recipientsUsersIds, schoolId);\r\n        var formateurTypes = new[] { EUserTypeRIto.Formateur, EUserTypeRIto.FormateurBlended };\r\n\r\n        if (currentUser.IsOfficial)\r\n        {\r\n            return;\r\n        }\r\n\r\n        var currentUserWithType = await _userRepository.GetUserWithTypeByUserIdAndSchoolIdAsync(currentUser.Id, schoolId);\r\n        var guard = Guard.Against.All();\r\n\r\n        // If is trainer\r\n        if (formateurTypes.Contains(currentUserWithType.Type))\r\n        {\r\n            foreach (var recipient in recipients)\r\n            {\r\n                guard.Add(Guard.Against.True, recipient.IsOfficial, ErrorCode.Api.Lms.Messenger.DataValidation.Command.Conversation.Recipients.Add.UserIsOfficial, ErrorKind.BadRequest, recipient.Id.ToString());\r\n            }\r\n            return;\r\n        }\r\n\r\n        // If not official and not trainer\r\n        foreach (var recipient in recipients)\r\n        {\r\n            guard.Add(Guard.Against.True, recipient.IsOfficial, ErrorCode.Api.Lms.Messenger.DataValidation.Command.Conversation.Recipients.Add.UserIsOfficial, ErrorKind.BadRequest, recipient.Id.ToString());\r\n            guard.Add(Guard.Against.True, formateurTypes.Contains(recipient.Type), ErrorCode.Api.Lms.Messenger.DataValidation.Command.Conversation.Recipients.Add.UserIsTrainer, ErrorKind.BadRequest, recipient.Id.ToString());\r\n        }\r\n\r\n        guard.ValidateAll();\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Validate recipients based on user types and school ID, with different validation rules for official users and trainers.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "currentUser",
+                        "param_name": "currentUser",
+                        "param_desc": "The current user who is performing the validation."
+                    },
+                    {
+                        "name": "recipientsUsersIds",
+                        "param_name": "recipientsUsersIds",
+                        "param_desc": "The list of user IDs for whom the validation is being performed."
+                    },
+                    {
+                        "name": "schoolId",
+                        "param_name": "schoolId",
+                        "param_desc": "The ID of the school against which the validation is being conducted."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Validate recipients based on user types and school ID, with different validation rules for official users and trainers.\n/// </summary>\n/// <param name=\"currentUser\">The current user who is performing the validation.</param>\n/// <param name=\"recipientsUsersIds\">The list of user IDs for whom the validation is being performed.</param>\n/// <param name=\"schoolId\">The ID of the school against which the validation is being conducted.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "CreateRangeConversationAsync",
+            "code_start_index": 13208,
+            "method_name": "CreateRangeConversationAsync",
+            "existing_summary": "\r\n    /// <inheritdoc/>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "parameters",
+                    "param_name": "parameters",
+                    "param_type": "IEnumerable<IConversationWAto>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "isRequestFromIntranet",
+                    "param_name": "isRequestFromIntranet",
+                    "param_type": "bool",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        var conversationCreatedOrNotList = new List<IConversationCreatedOrNotAto>();\r\n\r\n        foreach (var parameter in parameters)\r\n        {\r\n            try\r\n            {\r\n                var conversation = await CreateConversationAsync(parameter, isRequestFromIntranet);\r\n\r\n                conversationCreatedOrNotList.Add(ConversationCreatedOrNotAto.Create(\r\n                    conversation.Id,\r\n                    parameter.SenderUserId,\r\n                    parameter.RecipientsUsersIds,\r\n                    parameter.SchoolId\r\n                ));\r\n            }\r\n            catch (Exception)\r\n            {\r\n                conversationCreatedOrNotList.Add(ConversationCreatedOrNotAto.Create(\r\n                    null,\r\n                    parameter.SenderUserId,\r\n                    parameter.RecipientsUsersIds,\r\n                    parameter.SchoolId\r\n                ));\r\n            }\r\n        }\r\n\r\n        return conversationCreatedOrNotList;\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create multiple conversations asynchronously and return a list indicating whether each conversation was successfully created or not.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "parameters",
+                        "param_name": "parameters",
+                        "param_desc": "The list of conversations to be created. It should be of type IEnumerable<IConversationWAto>."
+                    },
+                    {
+                        "name": "isRequestFromIntranet",
+                        "param_name": "isRequestFromIntranet",
+                        "param_desc": "A boolean flag indicating whether the request is coming from an intranet or not."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create multiple conversations asynchronously and return a list indicating whether each conversation was successfully created or not.\n/// </summary>\n/// <param name=\"parameters\">The list of conversations to be created. It should be of type IEnumerable<IConversationWAto>.</param>\n/// <param name=\"isRequestFromIntranet\">A boolean flag indicating whether the request is coming from an intranet or not.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ChangeReadedDateAsync",
+            "code_start_index": 14395,
+            "method_name": "ChangeReadedDateAsync",
+            "existing_summary": "\r\n    #endregion Create Conversation\r\n\r\n    #region Update Conversation\r\n\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "conversationIds",
+                    "param_name": "conversationIds",
+                    "param_type": "int[]",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "markAsRead",
+                    "param_name": "markAsRead",
+                    "param_type": "bool",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "schoolIds",
+                    "param_name": "schoolIds",
+                    "param_type": "int[]",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        var currentUser = await _userRepository.GetUserByIdAsync(userId);\r\n        await _conversationRepository.ChangeReadedDateAsync(conversationIds, markAsRead, userId, schoolIds, currentUser.Email);\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the readed date for conversations based on specified criteria and user information.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "conversationIds",
+                        "param_name": "conversationIds",
+                        "param_desc": "An array of integers representing the unique identifiers of conversations for which the readed date will be updated."
+                    },
+                    {
+                        "name": "markAsRead",
+                        "param_name": "markAsRead",
+                        "param_desc": "A boolean value indicating whether the conversations should be marked as read after updating the readed date."
+                    },
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "An integer representing the unique identifier of the user for whom the readed date of conversations will be updated."
+                    },
+                    {
+                        "name": "schoolIds",
+                        "param_name": "schoolIds",
+                        "param_desc": "An array of integers representing the unique identifiers of schools associated with the conversations, used as criteria for updating the readed date."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the readed date for conversations based on specified criteria and user information.\n/// </summary>\n/// <param name=\"conversationIds\">An array of integers representing the unique identifiers of conversations for which the readed date will be updated.</param>\n/// <param name=\"markAsRead\">A boolean value indicating whether the conversations should be marked as read after updating the readed date.</param>\n/// <param name=\"userId\">An integer representing the unique identifier of the user for whom the readed date of conversations will be updated.</param>\n/// <param name=\"schoolIds\">An array of integers representing the unique identifiers of schools associated with the conversations, used as criteria for updating the readed date.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "AddRecipientsAsync",
+            "code_start_index": 14783,
+            "method_name": "AddRecipientsAsync",
+            "existing_summary": "\r\n    #endregion Update Conversation\r\n\r\n    #region Recipients\r\n\r\n    /// <inheritdoc/>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "conversationId",
+                    "param_name": "conversationId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "schoolIds",
+                    "param_name": "schoolIds",
+                    "param_type": "List<int>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "newRecipientsUsersIds",
+                    "param_name": "newRecipientsUsersIds",
+                    "param_type": "IEnumerable<int>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "isRequestFromIntranet",
+                    "param_name": "isRequestFromIntranet",
+                    "param_type": "bool",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        Guard.Against.All()\r\n            .Add(Guard.Against.NegativeOrZero, conversationId, ErrorCode.Api.Lms.Messenger.Technical.Exception.ArgumentIsNegativeOrZero, paramsValues: nameof(conversationId))\r\n            .Add(Guard.Against.NegativeOrZero, userId, ErrorCode.Api.Lms.Messenger.Technical.Exception.ArgumentIsNegativeOrZero, paramsValues: nameof(userId))\r\n            .Add(Guard.Against.NullOrEmpty, schoolIds, ErrorCode.Api.Lms.Messenger.Technical.Exception.ArgumentIsNullOrEmptyCollection, paramsValues: nameof(schoolIds))\r\n            .Add(Guard.Against.NullOrEmpty, newRecipientsUsersIds, ErrorCode.Api.Lms.Messenger.Technical.Exception.ArgumentIsNullOrEmptyCollection, paramsValues: nameof(newRecipientsUsersIds))\r\n            .ValidateAll();\r\n\r\n        var currentSchoolId = schoolIds.First();\r\n        newRecipientsUsersIds = newRecipientsUsersIds.Distinct();\r\n\r\n        // Get the conversation and check its existence and access.\r\n        var conversationBeforeUpdate = await GetConversationByIdWithChecksAsync(conversationId, userId, schoolIds, isRequestFromIntranet);\r\n\r\n        // Check whether the user is allowed to add recipients\r\n        CheckUserRightToAddOrRemoveRecipients(userId, conversationBeforeUpdate);\r\n\r\n        // Check whether each recipient can be added.\r\n        foreach (int newRecipientUserId in newRecipientsUsersIds)\r\n        {\r\n            await CheckForRecipientAdditionErrorsAsync(newRecipientUserId, conversationBeforeUpdate);\r\n        }\r\n\r\n        // Get the users (current ones and new ones) and their type.\r\n        var usersIdsBeforeUpdate = conversationBeforeUpdate.Correspondants.Select(c => c.User.Id).ToArray();\r\n        var allUsersIds = newRecipientsUsersIds.Concat(usersIdsBeforeUpdate);\r\n        var allUsersWithType = await _userRepository.GetUserWithTypeByUserIdsAndSchoolIdAsync(allUsersIds, currentSchoolId);\r\n\r\n        // Add the new recipients.\r\n        var currentUser = await _userRepository.GetUserByIdAsync(userId);\r\n        var currentUserCourseIds = await _userRepository.GetUserCoursesIdsAsync(userId);\r\n        var allAddedCorrespondentsIds = new List<int>();\r\n\r\n        foreach (int newRecipientUserId in newRecipientsUsersIds)\r\n        {\r\n            // Define the new recipient roles.\r\n            var roles = GetCorrespondantRoles(isSender: false, newRecipientUserId, allUsersWithType);\r\n\r\n            // Create and save the recipient.\r\n            var newRecipient = CorrespondantWIto.Create(newRecipientUserId, roles, conversationId);\r\n            var addedCorrespondentsIds = await _correspondantRepository.AddCorrespondantAsync(newRecipient, currentUser.Email);\r\n            allAddedCorrespondentsIds.AddRange(addedCorrespondentsIds);\r\n        }\r\n\r\n        // Get the conversation type, after correspondents update. Maybe it needs to be updated.\r\n        var computedConversationType = GetConversationType(allUsersWithType);\r\n        if (computedConversationType != conversationBeforeUpdate.Type)\r\n        {\r\n            await _conversationRepository.UpdateConversationTypeAsync(conversationId, (EConversationTypeIto)computedConversationType, currentUser.Email);\r\n        }\r\n\r\n        // Retrieve all created correspondants users' infos in order to build the ATO\r\n        var addedCorrespondantsItos = await _conversationRepository.GetConversationCorrespondantsByConversationIdAsync(conversationId, allAddedCorrespondentsIds);\r\n        var addedUsersIds = addedCorrespondantsItos.Select(c => c.UserId).Distinct().ToList();\r\n        var addedUsers = await _userRepository.GetUserWithTypeByUserIdsAndSchoolIdAsync(addedUsersIds, conversationBeforeUpdate.AudienceSchoolId);\r\n        Dictionary<int, bool> usersIdsAndTheirBelongingToAnyInternalService = await GetUsersIdsAndTheirBelongingToAnyInternalService(currentSchoolId, addedUsers);\r\n\r\n        var addedCorrespondants = addedCorrespondantsItos.Select(addedCorrespondant => addedCorrespondant.ToAto(addedUsers.Single(au => au.Id == addedCorrespondant.UserId), currentUser, currentUserCourseIds, usersIdsAndTheirBelongingToAnyInternalService[addedCorrespondant.UserId])).ToArray();\r\n\r\n        return addedCorrespondants!;\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": true,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Add recipients to a conversation, checking permissions and user rights before adding each recipient, and updating the conversation type if necessary.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "conversationId",
+                        "param_name": "conversationId",
+                        "param_desc": "The ID of the conversation to which recipients will be added."
+                    },
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The ID of the user initiating the action."
+                    },
+                    {
+                        "name": "schoolIds",
+                        "param_name": "schoolIds",
+                        "param_desc": "A list of IDs representing the schools to which the recipients belong."
+                    },
+                    {
+                        "name": "newRecipientsUsersIds",
+                        "param_name": "newRecipientsUsersIds",
+                        "param_desc": "An enumerable collection of IDs for the new recipients to be added to the conversation."
+                    },
+                    {
+                        "name": "isRequestFromIntranet",
+                        "param_name": "isRequestFromIntranet",
+                        "param_desc": "A boolean flag indicating whether the request is coming from the intranet."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Add recipients to a conversation, checking permissions and user rights before adding each recipient, and updating the conversation type if necessary.\n/// </summary>\n/// <param name=\"conversationId\">The ID of the conversation to which recipients will be added.</param>\n/// <param name=\"userId\">The ID of the user initiating the action.</param>\n/// <param name=\"schoolIds\">A list of IDs representing the schools to which the recipients belong.</param>\n/// <param name=\"newRecipientsUsersIds\">An enumerable collection of IDs for the new recipients to be added to the conversation.</param>\n/// <param name=\"isRequestFromIntranet\">A boolean flag indicating whether the request is coming from the intranet.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "RemoveRecipientsAsync",
+            "code_start_index": 19093,
+            "method_name": "RemoveRecipientsAsync",
+            "existing_summary": "\r\n    /// <inheritdoc/>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "conversationId",
+                    "param_name": "conversationId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "schoolIds",
+                    "param_name": "schoolIds",
+                    "param_type": "List<int>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "recipientsUsersIds",
+                    "param_name": "recipientsUsersIds",
+                    "param_type": "IEnumerable<int>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "isRequestFromIntranet",
+                    "param_name": "isRequestFromIntranet",
+                    "param_type": "bool",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        Guard.Against.All()\r\n            .Add(Guard.Against.NegativeOrZero, conversationId, ErrorCode.Api.Lms.Messenger.Technical.Exception.ArgumentIsNegativeOrZero, paramsValues: nameof(conversationId))\r\n            .Add(Guard.Against.NegativeOrZero, userId, ErrorCode.Api.Lms.Messenger.Technical.Exception.ArgumentIsNegativeOrZero, paramsValues: nameof(userId))\r\n            .Add(Guard.Against.NullOrEmpty, schoolIds, ErrorCode.Api.Lms.Messenger.Technical.Exception.ArgumentIsNullOrEmptyCollection, paramsValues: nameof(schoolIds))\r\n            .Add(Guard.Against.NullOrEmpty, recipientsUsersIds, ErrorCode.Api.Lms.Messenger.Technical.Exception.ArgumentIsNullOrEmptyCollection, paramsValues: nameof(recipientsUsersIds))\r\n            .ValidateAll();\r\n\r\n        // Get the conversation and check its existence and access.\r\n        var conversationBeforeUpdate = await GetConversationByIdWithChecksAsync(conversationId, userId, schoolIds, isRequestFromIntranet);\r\n\r\n        // Check whether the user is allowed to remove recipients.\r\n        CheckUserRightToAddOrRemoveRecipients(userId, conversationBeforeUpdate);\r\n\r\n        // Check whether any recipient can be removed from the conversation.\r\n        CheckForRecipientRemovalErrors(conversationBeforeUpdate, recipientsUsersIds.Count());\r\n\r\n        // Check whether each recipient can be removed.\r\n        foreach (int recipientUserId in recipientsUsersIds)\r\n        {\r\n            CheckForRecipientRemovalErrorsForRecipient(recipientUserId, conversationBeforeUpdate);\r\n        }\r\n\r\n        // Get the remaining users and their type.\r\n        var usersIdsBeforeUpdate = conversationBeforeUpdate.Correspondants.Select(c => c.User.Id).ToArray();\r\n        var remainingUsersIds = usersIdsBeforeUpdate.Except(recipientsUsersIds);\r\n        var remainingUsersWithType = await _userRepository.GetUserWithTypeByUserIdsAndSchoolIdAsync(remainingUsersIds, schoolIds.First());\r\n\r\n        // Remove the recipients.\r\n        var currentUser = await _userRepository.GetUserByIdAsync(userId);\r\n        foreach (int recipientUserId in recipientsUsersIds)\r\n        {\r\n            await _correspondantRepository.DeleteCorrespondantAsync(\r\n                conversationId,\r\n                recipientUserId,\r\n                currentUser.Email\r\n            );\r\n        }\r\n\r\n        // Get the conversation type, after correspondents update. Maybe it needs to be updated.\r\n        var computedConversationType = GetConversationType(remainingUsersWithType);\r\n        if (computedConversationType != conversationBeforeUpdate.Type)\r\n        {\r\n            await _conversationRepository.UpdateConversationTypeAsync(conversationId, (EConversationTypeIto)computedConversationType, currentUser.Email);\r\n        }\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": true,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Remove recipients from a conversation, checking permissions and validity before deleting them, updating the conversation type if necessary.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "conversationId",
+                        "param_name": "conversationId",
+                        "param_desc": "The ID of the conversation from which recipients are to be removed."
+                    },
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The ID of the user who is initiating the removal of recipients."
+                    },
+                    {
+                        "name": "schoolIds",
+                        "param_name": "schoolIds",
+                        "param_desc": "A list of integers representing the IDs of schools associated with the conversation."
+                    },
+                    {
+                        "name": "recipientsUsersIds",
+                        "param_name": "recipientsUsersIds",
+                        "param_desc": "An enumerable collection of integers representing the IDs of users who are recipients in the conversation."
+                    },
+                    {
+                        "name": "isRequestFromIntranet",
+                        "param_name": "isRequestFromIntranet",
+                        "param_desc": "A boolean flag indicating whether the request to remove recipients is coming from an intranet source."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Remove recipients from a conversation, checking permissions and validity before deleting them, updating the conversation type if necessary.\n/// </summary>\n/// <param name=\"conversationId\">The ID of the conversation from which recipients are to be removed.</param>\n/// <param name=\"userId\">The ID of the user who is initiating the removal of recipients.</param>\n/// <param name=\"schoolIds\">A list of integers representing the IDs of schools associated with the conversation.</param>\n/// <param name=\"recipientsUsersIds\">An enumerable collection of integers representing the IDs of users who are recipients in the conversation.</param>\n/// <param name=\"isRequestFromIntranet\">A boolean flag indicating whether the request to remove recipients is coming from an intranet source.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "CheckUserRightToAddOrRemoveRecipients",
+            "code_start_index": 21967,
+            "method_name": "CheckUserRightToAddOrRemoveRecipients",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "conversation",
+                    "param_name": "conversation",
+                    "param_type": "IConversationRAto",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        Guard.Against.All()\r\n            .Add(Guard.Against.NegativeOrZero, userId, ErrorCode.Api.Lms.Messenger.Technical.Exception.ArgumentIsNegativeOrZero, paramsValues: nameof(userId))\r\n            .Add(Guard.Against.Null, conversation, ErrorCode.Api.Lms.Messenger.Technical.Exception.ArgumentIsNull, paramsValues: nameof(conversation))\r\n            .ValidateAll();\r\n\r\n        var correspondants = conversation.Correspondants ?? Enumerable.Empty<ICorrespondantRAto>();\r\n\r\n        // The user has the right to remove recipients only if:\r\n        // - he belongs to conversation's correspondants\r\n        // - he has an official role (as a correspondant of this conversation)\r\n        // Nota: no need to check for conversation type, as if the specified user is official, the conversation type is: 'include official'\r\n        var doesUserBelongsToCorrespondants = IsUserFoundAmongCorrespondants(userId, correspondants);\r\n        Guard.Against.False(doesUserBelongsToCorrespondants, ErrorCode.Api.Lms.Messenger.DataValidation.Command.Conversation.Recipients.AddOrRemove.UserIsNotRecipient);\r\n\r\n        var doesUserBelongsToCorrespondantsWithOfficialRole = IsUserFoundAmongCorrespondantsWithSpecifiedUserRoles(userId, correspondants, EUserRoleRAto.Official);\r\n        Guard.Against.False(doesUserBelongsToCorrespondantsWithOfficialRole, ErrorCode.Api.Lms.Messenger.DataValidation.Command.Conversation.Recipients.AddOrRemove.NonOfficialUserCannotAddOrRemoveRecipient);\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": true,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Check if a user has the right to add or remove recipients from a conversation based on their role and membership in the conversation correspondents.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The ID of the user who is being checked for the right to add or remove recipients from the conversation."
+                    },
+                    {
+                        "name": "conversation",
+                        "param_name": "conversation",
+                        "param_desc": "The object representing the conversation for which the user's right to add or remove recipients is being checked."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Check if a user has the right to add or remove recipients from a conversation based on their role and membership in the conversation correspondents.\n/// </summary>\n/// <param name=\"userId\">The ID of the user who is being checked for the right to add or remove recipients from the conversation.</param>\n/// <param name=\"conversation\">The object representing the conversation for which the user's right to add or remove recipients is being checked.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "CheckForRecipientAdditionDuringConversationCreationErrorsAsync",
+            "code_start_index": 23538,
+            "method_name": "CheckForRecipientAdditionDuringConversationCreationErrorsAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "user",
+                    "param_name": "user",
+                    "param_type": "IUserWithTypeRIto",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        await Task.CompletedTask;\r\n\r\n        // Cannot add a recipient if he is a Tuteur (LMS2-3096)\r\n        Guard.Against.True(\r\n            user.Type == EUserTypeRIto.Tuteur,\r\n            ErrorCode.Api.Lms.Messenger.DataValidation.Command.Conversation.Recipients.Add.UserIsTuteur,\r\n            paramsValues: user.Id.ToString());\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": true,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Prevent addition of Tuteur user as recipient during conversation creation.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "IUserWithTypeRIto",
+                        "param_name": "IUserWithTypeRIto",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "user",
+                        "param_name": "user",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Prevent addition of Tuteur user as recipient during conversation creation.\n/// </summary>\n/// <param name=\"IUserWithTypeRIto\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"user\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "CheckForRecipientAdditionErrorsAsync",
+            "code_start_index": 23994,
+            "method_name": "CheckForRecipientAdditionErrorsAsync",
+            "existing_summary": "\r\n    /// <inheritdoc/>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "newRecipientUserId",
+                    "param_name": "newRecipientUserId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "conversation",
+                    "param_name": "conversation",
+                    "param_type": "IConversationRAto",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        Guard.Against.All()\r\n            .Add(Guard.Against.NegativeOrZero, newRecipientUserId, ErrorCode.Api.Lms.Messenger.Technical.Exception.ArgumentIsNegativeOrZero, paramsValues: nameof(newRecipientUserId))\r\n            .Add(Guard.Against.Null, conversation, ErrorCode.Api.Lms.Messenger.Technical.Exception.ArgumentIsNull, paramsValues: nameof(conversation))\r\n            .ValidateAll();\r\n\r\n        // If the recipient already exists, he can't be added.\r\n        var isRecipientAlreadyFound = IsUserFoundAmongCorrespondantsWithSpecifiedCorrespondantRoles(newRecipientUserId, conversation.Correspondants ?? Enumerable.Empty<ICorrespondantRAto>(), ECorrespondantRoleRAto.Recipient);\r\n        Guard.Against.True(\r\n            isRecipientAlreadyFound,\r\n            ErrorCode.Api.Lms.Messenger.DataValidation.Command.Conversation.Recipients.Add.UserIsAlreadyRecipient,\r\n            paramsValues: new[] { conversation.Id.ToString(), newRecipientUserId.ToString() });\r\n\r\n        var doesUserExist = await _userRepository.DoesUserExistByIdAsync(newRecipientUserId);\r\n        Guard.Against.False(\r\n            doesUserExist,\r\n            ErrorCode.Api.Lms.Messenger.DataValidation.Command.Conversation.Recipients.Add.UserDoesNotExist,\r\n            paramsValues: newRecipientUserId.ToString());\r\n\r\n        // Cannot add a recipient if he is a Tuteur (LMS2-3096)\r\n        var user = await _userRepository.GetUserWithTypeByUserIdAndSchoolIdAsync(newRecipientUserId, conversation.AudienceSchoolId);\r\n        Guard.Against.True(\r\n            user.Type == EUserTypeRIto.Tuteur,\r\n            ErrorCode.Api.Lms.Messenger.DataValidation.Command.Conversation.Recipients.Add.UserIsTuteur,\r\n            paramsValues: newRecipientUserId.ToString());\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": true,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Check for recipient addition errors, ensuring that the new recipient is not already in the conversation, exists in the system, and is not a Tuteur user.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "newRecipientUserId",
+                        "param_name": "newRecipientUserId",
+                        "param_desc": "The ID of the new recipient user. This parameter should be an integer."
+                    },
+                    {
+                        "name": "conversation",
+                        "param_name": "conversation",
+                        "param_desc": "The conversation object representing the conversation where the recipient is being added."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Check for recipient addition errors, ensuring that the new recipient is not already in the conversation, exists in the system, and is not a Tuteur user.\n/// </summary>\n/// <param name=\"newRecipientUserId\">The ID of the new recipient user. This parameter should be an integer.</param>\n/// <param name=\"conversation\">The conversation object representing the conversation where the recipient is being added.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "CheckForRecipientRemovalErrors",
+            "code_start_index": 25840,
+            "method_name": "CheckForRecipientRemovalErrors",
+            "existing_summary": "\r\n    /// <inheritdoc/>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "conversation",
+                    "param_name": "conversation",
+                    "param_type": "IConversationRAto",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "recipientsToRemoveCount",
+                    "param_name": "recipientsToRemoveCount",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        Guard.Against.Null(conversation, ErrorCode.Api.Lms.Messenger.Technical.Exception.ArgumentIsNull, paramsValues: nameof(conversation));\r\n\r\n        // If the minimal number of correspondents is already reached (whatever their roles are), then no recipient can be removed.\r\n        var isMinNumberOfCorrespondentsReached = conversation.Correspondants?.Count() < MinNumberOfCorrespondentsByConversation + recipientsToRemoveCount;\r\n        Guard.Against.True(\r\n            isMinNumberOfCorrespondentsReached,\r\n            ErrorCode.Api.Lms.Messenger.DataValidation.Command.Conversation.Recipients.Remove.MinNumberOfCorrespondentsIsAlreadyReached,\r\n            paramsValues: new[] { conversation.Id.ToString(), MinNumberOfCorrespondentsByConversation.ToString() });\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": true,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Check for errors related to the removal of recipients in a conversation, preventing removal if the minimum number of correspondents has already been reached.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "conversation",
+                        "param_name": "conversation",
+                        "param_desc": "The conversation object on which recipient removal errors are being checked."
+                    },
+                    {
+                        "name": "recipientsToRemoveCount",
+                        "param_name": "recipientsToRemoveCount",
+                        "param_desc": "The number of recipients to be removed from the conversation."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Check for errors related to the removal of recipients in a conversation, preventing removal if the minimum number of correspondents has already been reached.\n/// </summary>\n/// <param name=\"conversation\">The conversation object on which recipient removal errors are being checked.</param>\n/// <param name=\"recipientsToRemoveCount\">The number of recipients to be removed from the conversation.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "CheckForRecipientRemovalErrorsForRecipient",
+            "code_start_index": 26729,
+            "method_name": "CheckForRecipientRemovalErrorsForRecipient",
+            "existing_summary": "\r\n    /// <inheritdoc/>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "recipientUserIdToRemove",
+                    "param_name": "recipientUserIdToRemove",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "conversation",
+                    "param_name": "conversation",
+                    "param_type": "IConversationRAto",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        Guard.Against.All()\r\n            .Add(Guard.Against.NegativeOrZero, recipientUserIdToRemove, ErrorCode.Api.Lms.Messenger.Technical.Exception.ArgumentIsNegativeOrZero, paramsValues: nameof(recipientUserIdToRemove))\r\n            .Add(Guard.Against.Null, conversation, ErrorCode.Api.Lms.Messenger.Technical.Exception.ArgumentIsNull, paramsValues: nameof(conversation))\r\n            .ValidateAll();\r\n\r\n        // If the recipient is the sender, he cannot be removed.\r\n        bool isSender = IsUserFoundAmongCorrespondantsWithSpecifiedCorrespondantRoles(recipientUserIdToRemove, conversation.Correspondants ?? Enumerable.Empty<ICorrespondantRAto>(), ECorrespondantRoleRAto.Sender);\r\n        Guard.Against.True(\r\n            isSender,\r\n            errorCode: ErrorCode.Api.Lms.Messenger.DataValidation.Command.Conversation.Recipients.Remove.UserIsSender,\r\n            paramsValues: new[] { conversation.Id.ToString(), recipientUserIdToRemove.ToString() });\r\n\r\n        // If the recipient isn't found in the correspondants, he cannot be removed.\r\n        bool isRecipientFound = IsUserFoundAmongCorrespondantsWithSpecifiedCorrespondantRoles(recipientUserIdToRemove, conversation.Correspondants ?? Enumerable.Empty<ICorrespondantRAto>(), ECorrespondantRoleRAto.Recipient);\r\n        Guard.Against.False(isRecipientFound, ErrorCode.Api.Lms.Messenger.DataValidation.Command.Conversation.Recipients.AddOrRemove.UserIsNotRecipient);\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": true,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Check for errors related to removing a recipient from a conversation, ensuring the recipient is not the sender and is actually a recipient in the conversation.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "recipientUserIdToRemove",
+                        "param_name": "recipientUserIdToRemove",
+                        "param_desc": "The ID of the recipient user to be removed from the conversation. This parameter should be an integer."
+                    },
+                    {
+                        "name": "conversation",
+                        "param_name": "conversation",
+                        "param_desc": "The conversation object from which the recipient should be removed. This parameter should be of type IConversationRAto."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Check for errors related to removing a recipient from a conversation, ensuring the recipient is not the sender and is actually a recipient in the conversation.\n/// </summary>\n/// <param name=\"recipientUserIdToRemove\">The ID of the recipient user to be removed from the conversation. This parameter should be an integer.</param>\n/// <param name=\"conversation\">The conversation object from which the recipient should be removed. This parameter should be of type IConversationRAto.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "CheckSchoolUserRightToAccessConversation",
+            "code_start_index": 28332,
+            "method_name": "CheckSchoolUserRightToAccessConversation",
+            "existing_summary": "\r\n    #endregion Recipients\r\n\r\n    #region Common\r\n\r\n    /// <inheritdoc/>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "conversation",
+                    "param_name": "conversation",
+                    "param_type": "IConversationRAto",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "schoolIds",
+                    "param_name": "schoolIds",
+                    "param_type": "List<int>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "isRequestFromIntranet",
+                    "param_name": "isRequestFromIntranet",
+                    "param_type": "bool",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        Guard.Against.All()\r\n            .Add(Guard.Against.NegativeOrZero, userId, ErrorCode.Api.Lms.Messenger.Technical.Exception.ArgumentIsNegativeOrZero, paramsValues: nameof(userId))\r\n            .Add(Guard.Against.Null, conversation, ErrorCode.Api.Lms.Messenger.Technical.Exception.ArgumentIsNull, paramsValues: nameof(conversation))\r\n            .ValidateAll();\r\n\r\n        if (isRequestFromIntranet)\r\n        {\r\n            // For Intranet request, Check that:\r\n            // - the requested conversation isn't of type: between students\r\n            // - the requesting schools corresponds to the conversation audience.\r\n            var isConversationBetweenStudents = conversation.Type == EConversationTypeRAto.BetweenStudents;\r\n            var isConversationSchoolAudianceContainedInUserSchools = !schoolIds.Any() || schoolIds.Contains(conversation.AudienceSchoolId);\r\n\r\n            Guard.Against.All()\r\n                .Add(Guard.Against.True, isConversationBetweenStudents, ErrorCode.Api.Lms.Messenger.DataValidation.Query.Conversation.InaccessibleFromIntranetBecauseBetweenStudent)\r\n                .Add(Guard.Against.False, isConversationSchoolAudianceContainedInUserSchools, ErrorCode.Api.Lms.Messenger.DataValidation.Query.Conversation.InaccessibleFromConnectedSchool)\r\n                .ValidateAll();\r\n        }\r\n        else\r\n        {\r\n            // For LMS request (non-intranet request), Check that:\r\n            // - the requesting user belongs to the conversation correspondants (whatever the roles are)\r\n            // - the requesting user's schools on which he is connected corresponds to the conversation audience.\r\n            var isUserFoundAmongCorrespondants = IsUserFoundAmongCorrespondants(userId, conversation.Correspondants ?? Enumerable.Empty<ICorrespondantRAto>());\r\n            var isConversationSchoolAudianceContainedInUserSchools = !schoolIds.Any() || schoolIds.Contains(conversation.AudienceSchoolId);\r\n\r\n            Guard.Against.All()\r\n                .Add(Guard.Against.False, isUserFoundAmongCorrespondants, ErrorCode.Api.Lms.Messenger.DataValidation.Query.Conversation.InaccessibleForUser, ErrorKind.BadRequest, conversation.Id.ToString(), userId.ToString())\r\n                .Add(Guard.Against.False, isConversationSchoolAudianceContainedInUserSchools, ErrorCode.Api.Lms.Messenger.DataValidation.Query.Conversation.InaccessibleFromConnectedSchool)\r\n                .ValidateAll();\r\n        }\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": true,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Validate the user's right to access a conversation based on the user's role and the conversation audience, taking into account whether the request is from an intranet or LMS environment.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "conversation",
+                        "param_name": "conversation",
+                        "param_desc": "The conversation object that the user wants to access."
+                    },
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The unique identifier of the user whose access rights need to be validated."
+                    },
+                    {
+                        "name": "schoolIds",
+                        "param_name": "schoolIds",
+                        "param_desc": "A list of unique identifiers representing the schools associated with the user."
+                    },
+                    {
+                        "name": "isRequestFromIntranet",
+                        "param_name": "isRequestFromIntranet",
+                        "param_desc": "A boolean flag indicating whether the request is coming from an intranet environment."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Validate the user's right to access a conversation based on the user's role and the conversation audience, taking into account whether the request is from an intranet or LMS environment.\n/// </summary>\n/// <param name=\"conversation\">The conversation object that the user wants to access.</param>\n/// <param name=\"userId\">The unique identifier of the user whose access rights need to be validated.</param>\n/// <param name=\"schoolIds\">A list of unique identifiers representing the schools associated with the user.</param>\n/// <param name=\"isRequestFromIntranet\">A boolean flag indicating whether the request is coming from an intranet environment.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "IsUserFoundAmongCorrespondants",
+            "code_start_index": 30914,
+            "method_name": "IsUserFoundAmongCorrespondants",
+            "existing_summary": "\r\n    /// <inheritdoc/>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "correspondants",
+                    "param_name": "correspondants",
+                    "param_type": "IEnumerable<ICorrespondantRAto>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return IsUserFoundAmongCorrespondantsWithSpecifiedCorrespondantRoles(userId, correspondants);\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": true,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Check if a user is found among a list of correspondants with specified roles.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The ID of the user to check for among the list of correspondants."
+                    },
+                    {
+                        "name": "correspondants",
+                        "param_name": "correspondants",
+                        "param_desc": "An IEnumerable of ICorrespondantRAto objects representing the list of correspondants to search through."
+                    },
+                    {
+                        "name": "methodName",
+                        "param_name": "methodName",
+                        "param_desc": "The name of the method being called, in this case, 'IsUserFoundAmongCorrespondants'."
+                    },
+                    {
+                        "name": "methodPurpose",
+                        "param_name": "methodPurpose",
+                        "param_desc": "The purpose of the method 'IsUserFoundAmongCorrespondants' is to check if a user is found among a list of correspondants with specified roles."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Check if a user is found among a list of correspondants with specified roles.\n/// </summary>\n/// <param name=\"userId\">The ID of the user to check for among the list of correspondants.</param>\n/// <param name=\"correspondants\">An IEnumerable of ICorrespondantRAto objects representing the list of correspondants to search through.</param>\n/// <param name=\"methodName\">The name of the method being called, in this case, 'IsUserFoundAmongCorrespondants'.</param>\n/// <param name=\"methodPurpose\">The purpose of the method 'IsUserFoundAmongCorrespondants' is to check if a user is found among a list of correspondants with specified roles.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "IsUserFoundAmongCorrespondantsWithSpecifiedCorrespondantRoles",
+            "code_start_index": 31144,
+            "method_name": "IsUserFoundAmongCorrespondantsWithSpecifiedCorrespondantRoles",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "correspondants",
+                    "param_name": "correspondants",
+                    "param_type": "IEnumerable<ICorrespondantRAto>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "roles",
+                    "param_name": "roles",
+                    "param_type": "ECorrespondantRoleRAto[]?",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        Guard.Against.Null(correspondants, ErrorCode.Api.Lms.Messenger.Technical.Exception.ArgumentIsNull, paramsValues: nameof(correspondants));\r\n\r\n        if (!correspondants!.Any())\r\n        {\r\n            return false;\r\n        }\r\n\r\n        // Build an expression to search for the user ID.\r\n        Expression<Func<ICorrespondantRAto, bool>> anyPredicate = corr => corr != null && corr.User != null && corr.User.Id == userId;\r\n\r\n        // If at least one role is provided, search for the role(s) too.\r\n        // Roles are searched with an \"OR\" condition.\r\n        if (roles is not null && roles.Any())\r\n        {\r\n            anyPredicate = anyPredicate.And(corr => corr.Roles.Any(r => roles.Contains(r)));\r\n        }\r\n\r\n        return correspondants.Any(anyPredicate.Compile());\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": true,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Check if a user with specified roles is found among the correspondants.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The ID of the user to check for among the correspondants."
+                    },
+                    {
+                        "name": "correspondants",
+                        "param_name": "correspondants",
+                        "param_desc": "An IEnumerable of ICorrespondantRAto instances representing the correspondants to search through."
+                    },
+                    {
+                        "name": "roles",
+                        "param_name": "roles",
+                        "param_desc": "An optional array of ECorrespondantRoleRAto instances representing the roles to filter the search by."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Check if a user with specified roles is found among the correspondants.\n/// </summary>\n/// <param name=\"userId\">The ID of the user to check for among the correspondants.</param>\n/// <param name=\"correspondants\">An IEnumerable of ICorrespondantRAto instances representing the correspondants to search through.</param>\n/// <param name=\"roles\">An optional array of ECorrespondantRoleRAto instances representing the roles to filter the search by.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "IsUserFoundAmongCorrespondantsWithSpecifiedUserRoles",
+            "code_start_index": 32113,
+            "method_name": "IsUserFoundAmongCorrespondantsWithSpecifiedUserRoles",
+            "existing_summary": "\r\n    /// <inheritdoc/>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "correspondants",
+                    "param_name": "correspondants",
+                    "param_type": "IEnumerable<ICorrespondantRAto>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "roles",
+                    "param_name": "roles",
+                    "param_type": "EUserRoleRAto[]?",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        Guard.Against.Null(correspondants, ErrorCode.Api.Lms.Messenger.Technical.Exception.ArgumentIsNull, paramsValues: nameof(correspondants));\r\n\r\n        if (!correspondants!.Any())\r\n        {\r\n            return false;\r\n        }\r\n\r\n        // Build an expression to search for the user ID.\r\n        Expression<Func<ICorrespondantRAto, bool>> anyPredicate = corr => corr != null && corr.User != null && corr.User.Id == userId;\r\n\r\n        // If at least one role is provided, search for the role(s) too.\r\n        // Roles are searched with an \"OR\" condition.\r\n        if (roles is not null && roles.Any())\r\n        {\r\n            anyPredicate = anyPredicate.And(corr => corr.User.Roles.Any(r => roles.Contains(r)));\r\n        }\r\n\r\n        return correspondants.Any(anyPredicate.Compile());\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": true,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Check if a user with specified roles is found among the correspondants.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The ID of the user to be checked."
+                    },
+                    {
+                        "name": "correspondants",
+                        "param_name": "correspondants",
+                        "param_desc": "An enumerable collection of correspondants implementing the ICorrespondantRAto interface."
+                    },
+                    {
+                        "name": "roles",
+                        "param_name": "roles",
+                        "param_desc": "An array of EUserRoleRAto type representing user roles. This parameter is optional."
+                    },
+                    {
+                        "name": "methodName",
+                        "param_name": "methodName",
+                        "param_desc": "The name of the existing method: 'IsUserFoundAmongCorrespondantsWithSpecifiedUserRoles'."
+                    },
+                    {
+                        "name": "methodPurpose",
+                        "param_name": "methodPurpose",
+                        "param_desc": "The purpose of the method: 'Check if a user with specified roles is found among the correspondants.'."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Check if a user with specified roles is found among the correspondants.\n/// </summary>\n/// <param name=\"userId\">The ID of the user to be checked.</param>\n/// <param name=\"correspondants\">An enumerable collection of correspondants implementing the ICorrespondantRAto interface.</param>\n/// <param name=\"roles\">An array of EUserRoleRAto type representing user roles. This parameter is optional.</param>\n/// <param name=\"methodName\">The name of the existing method: 'IsUserFoundAmongCorrespondantsWithSpecifiedUserRoles'.</param>\n/// <param name=\"methodPurpose\">The purpose of the method: 'Check if a user with specified roles is found among the correspondants.'.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ChangeMultipleConversationStatusAsync",
+            "code_start_index": 33127,
+            "method_name": "ChangeMultipleConversationStatusAsync",
+            "existing_summary": "\r\n    #endregion Common\r\n\r\n    #endregion V1\r\n\r\n    #region V2\r\n\r\n    /// <inheritdoc/>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "conversationIds",
+                    "param_name": "conversationIds",
+                    "param_type": "int[]",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "conversationStatus",
+                    "param_name": "conversationStatus",
+                    "param_type": "EConversationStatusRAto",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "schoolId",
+                    "param_name": "schoolId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        var conversations = await _conversationRepository.GetConversationsByConversationIdsAndUserIdAsync(conversationIds, userId);\r\n\r\n        // Check if the number of records persisted in the database correspond to the number of conversations to update\r\n        Guard.Against.NotEqual(conversationIds.Length, conversations.Count(), ErrorCode.Api.Lms.Messenger.DataValidation.Command.Conversation.ConversationStatus.Update.WrongEntityCount);\r\n\r\n        var currentUser = await _userRepository.GetUserWithTypeByUserIdAndSchoolIdAsync(userId, schoolId);\r\n\r\n        // Check that the user is official or formator\r\n        Guard.Against.False(currentUser.IsOfficial || currentUser.Type == EUserTypeRIto.Formateur, ErrorCode.Api.Lms.Messenger.DataValidation.Command.Conversation.ConversationStatus.Update.MissingRightOnEntity);\r\n\r\n        await _conversationRepository.ChangeMultipleConversationStatusAsync(conversationIds, (EConversationStatusIto)conversationStatus, currentUser.Email);\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the status of multiple conversations based on specified conversation IDs, while ensuring the correct number of records and user permissions are met.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "conversationIds",
+                        "param_name": "conversationIds",
+                        "param_desc": "An array of integers representing the conversation IDs that need their status changed."
+                    },
+                    {
+                        "name": "conversationStatus",
+                        "param_name": "conversationStatus",
+                        "param_desc": "An enum value representing the new conversation status to be applied."
+                    },
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "An integer representing the user ID who is initiating the status change."
+                    },
+                    {
+                        "name": "schoolId",
+                        "param_name": "schoolId",
+                        "param_desc": "An integer representing the ID of the school where the conversations belong."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the status of multiple conversations based on specified conversation IDs, while ensuring the correct number of records and user permissions are met.\n/// </summary>\n/// <param name=\"conversationIds\">An array of integers representing the conversation IDs that need their status changed.</param>\n/// <param name=\"conversationStatus\">An enum value representing the new conversation status to be applied.</param>\n/// <param name=\"userId\">An integer representing the user ID who is initiating the status change.</param>\n/// <param name=\"schoolId\">An integer representing the ID of the school where the conversations belong.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetFilteredConversationsAndCountByUserIdAsync",
+            "code_start_index": 34267,
+            "method_name": "GetFilteredConversationsAndCountByUserIdAsync",
+            "existing_summary": "\r\n    /// <inheritdoc/>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "schoolsIds",
+                    "param_name": "schoolsIds",
+                    "param_type": "IEnumerable<int>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "listingSelector",
+                    "param_name": "listingSelector",
+                    "param_type": "IUntypedListingSelector",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "isRequestFromIntranet",
+                    "param_name": "isRequestFromIntranet",
+                    "param_type": "bool",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        // Add default filters and transform to generic listing selector\r\n        AddConversationDefaultFilters(userId, schoolsIds, listingSelector, isRequestFromIntranet);\r\n\r\n        var conversationCount = await GetConversationCountByUserIdAsync(userId, schoolsIds, listingSelector, isRequestFromIntranet);\r\n        var conversationsListRAto = Enumerable.Empty<IConversationRAto>();\r\n\r\n        if (conversationCount > 0)\r\n        {\r\n            conversationsListRAto = await GetFilteredConversationsByUserIdAsync(userId, schoolsIds, listingSelector, isRequestFromIntranet);\r\n        }\r\n\r\n        foreach (var conversationRAto in conversationsListRAto)\r\n        {\r\n            CheckSchoolUserRightToAccessConversation(conversationRAto, userId, schoolsIds.ToList(), isRequestFromIntranet);\r\n        }\r\n\r\n        return conversationsListRAto.ToAto(conversationCount);\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve filtered conversations and their count based on user ID, applying default filters and checking user rights before returning the conversations list.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The ID of the user for whom the conversations are being retrieved."
+                    },
+                    {
+                        "name": "schoolsIds",
+                        "param_name": "schoolsIds",
+                        "param_desc": "A collection of IDs representing the schools to filter the conversations by."
+                    },
+                    {
+                        "name": "listingSelector",
+                        "param_name": "listingSelector",
+                        "param_desc": "An object used to select the type of listing to be applied on the conversations."
+                    },
+                    {
+                        "name": "isRequestFromIntranet",
+                        "param_name": "isRequestFromIntranet",
+                        "param_desc": "A flag indicating whether the request is coming from an intranet."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve filtered conversations and their count based on user ID, applying default filters and checking user rights before returning the conversations list.\n/// </summary>\n/// <param name=\"userId\">The ID of the user for whom the conversations are being retrieved.</param>\n/// <param name=\"schoolsIds\">A collection of IDs representing the schools to filter the conversations by.</param>\n/// <param name=\"listingSelector\">An object used to select the type of listing to be applied on the conversations.</param>\n/// <param name=\"isRequestFromIntranet\">A flag indicating whether the request is coming from an intranet.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "AddConversationDefaultFilters",
+            "code_start_index": 35337,
+            "method_name": "AddConversationDefaultFilters",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "schoolsIds",
+                    "param_name": "schoolsIds",
+                    "param_type": "IEnumerable<int>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "listingSelector",
+                    "param_name": "listingSelector",
+                    "param_type": "IUntypedListingSelector",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "isRequestFromIntranet",
+                    "param_name": "isRequestFromIntranet",
+                    "param_type": "bool",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        var defaultFilters = new List<IUntypedFilter>();\r\n\r\n        // Add a default filter on conversations' audience school (if schoolsids is specified)\r\n        if (schoolsIds.Any() && !DoesFilterAlreadyExist(ConversationFiltersEnum.LimitToAudienceSchoolId, listingSelector.FiltersCompositions))\r\n        {\r\n            defaultFilters.Add(new UntypedFilter(ConversationFiltersEnum.LimitToAudienceSchoolId.ToString().ToLowerInvariant(), FilterOperatorEnum.None.ToString(), new JValue((int?)null))); // no need for filter value as schools ids list is gotten elsewhere\r\n        }\r\n\r\n        // Add default filter to limit search conversations which has the specified user id as correspondant\r\n        if (!DoesFilterAlreadyExist(ConversationFiltersEnum.ContainsCorrespondantUserId, listingSelector.FiltersCompositions, userId))\r\n        {\r\n            defaultFilters.Add(new UntypedFilter(ConversationFiltersEnum.ContainsCorrespondantUserId.ToString().ToLowerInvariant(), FilterOperatorEnum.Equal.ToString(), new JValue(userId)));\r\n        }\r\n\r\n        // LMS specific default filters (or other non-intranet origin)\r\n        if (!isRequestFromIntranet)\r\n        {\r\n            // Add a default filter to select only not-archived conversations, if no filter has already been specifed about archived status\r\n            if (!DoesFilterAlreadyExist(ConversationFiltersEnum.IsArchived, listingSelector.FiltersCompositions))\r\n            {\r\n                defaultFilters.Add(new UntypedFilter(ConversationFiltersEnum.IsArchived.ToString().ToLowerInvariant(), FilterOperatorEnum.Equal.ToString(), false));\r\n            }\r\n        }\r\n\r\n        // Intranet specific default filters\r\n        if (isRequestFromIntranet)\r\n        {\r\n            // Add default filter to limit to conversations including formator or official only\r\n            Guard.Against.True(\r\n                DoesFilterAlreadyExist(ConversationFiltersEnum.MessagingType, listingSelector.FiltersCompositions, ConversationTypeFilterValueEnum.BetweenStudents.ToString()),\r\n                ErrorCode.Api.Lms.Messenger.DataValidation.Query.Common.ListingSelector.Filter.Name.UnauthorizedFilterNameForIntranet,\r\n                ErrorKind.BadRequest,\r\n                ConversationFiltersEnum.MessagingType.ToString(), ConversationTypeFilterValueEnum.BetweenStudents.ToString());\r\n\r\n            if (!DoesFilterAlreadyExist(ConversationFiltersEnum.MessagingType, listingSelector.FiltersCompositions, ConversationTypeFilterValueEnum.FormatorOrOfficialIncluded.ToString()))\r\n            {\r\n                defaultFilters.Add(new UntypedFilter(ConversationFiltersEnum.MessagingType.ToString().ToLowerInvariant(), FilterOperatorEnum.Equal.ToString(), ConversationTypeFilterValueEnum.FormatorOrOfficialIncluded.ToString()));\r\n            }\r\n        }\r\n\r\n        // Add a new filter composition with all the default filters\r\n        if (defaultFilters.Any())\r\n        {\r\n            var defaultFiltersComposition = new UntypedFiltersComposition { Logic = LogicalOperatorEnum.And, Filters = defaultFilters };\r\n            listingSelector.FiltersCompositions = listingSelector.FiltersCompositions.Append(defaultFiltersComposition);\r\n        }\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Apply default filters to conversations based on specified conditions, such as school IDs, user ID, archived status, and messaging type, depending on the origin of the request.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "schoolsIds",
+                        "param_name": "schoolsIds",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "listingSelector",
+                        "param_name": "listingSelector",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "isRequestFromIntranet",
+                        "param_name": "isRequestFromIntranet",
+                        "param_desc": "The generated description for the parameter"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Apply default filters to conversations based on specified conditions, such as school IDs, user ID, archived status, and messaging type, depending on the origin of the request.\n/// </summary>\n/// <param name=\"userId\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"schoolsIds\">The generated description for the parameter</param>\n/// <param name=\"listingSelector\">The generated description for the parameter</param>\n/// <param name=\"isRequestFromIntranet\">The generated description for the parameter</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "DoesFilterAlreadyExist",
+            "code_start_index": 38648,
+            "method_name": "DoesFilterAlreadyExist",
+            "existing_summary": "\r\n    /// <summary>\r\n    /// Check filter's names existance in provided filters compositions\r\n    /// </summary>\r\n    /// <param name=\"filterName\"></param>\r\n    /// <param name=\"conversationFilters\"></param>\r\n    /// <param name=\"filterValue\"></param>\r\n    /// <returns></returns>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "filterName",
+                    "param_name": "filterName",
+                    "param_type": "ConversationFiltersEnum",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "conversationFilters",
+                    "param_name": "conversationFilters",
+                    "param_type": "IEnumerable<IUntypedFiltersComposition>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "filterValue",
+                    "param_name": "filterValue",
+                    "param_type": "object?",
+                    "has_default_value": true,
+                    "default_value": "null",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        if (filterValue is null)\r\n            return conversationFilters.SelectMany(fcs => fcs.Filters).Any(f => f.FilterName == filterName.ToString().ToLowerInvariant());\r\n        else\r\n            return conversationFilters.SelectMany(fcs => fcs.Filters).Any(f => f.FilterName == filterName.ToString().ToLowerInvariant() && f.Value.ToString() == filterValue!.ToString());\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Check if a filter with a specified name already exists.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "filterName",
+                        "param_name": "filterName",
+                        "param_desc": "The name of the filter to be checked if it already exists."
+                    },
+                    {
+                        "name": "conversationFilters",
+                        "param_name": "conversationFilters",
+                        "param_desc": "A collection of untyped filters compositions related to conversations."
+                    },
+                    {
+                        "name": "filterValue",
+                        "param_name": "filterValue",
+                        "param_desc": "The value to be used as a filter. It is optional and defaults to null if not provided."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Check if a filter with a specified name already exists.\n/// </summary>\n/// <param name=\"filterName\">The name of the filter to be checked if it already exists.</param>\n/// <param name=\"conversationFilters\">A collection of untyped filters compositions related to conversations.</param>\n/// <param name=\"filterValue\">The value to be used as a filter. It is optional and defaults to null if not provided.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetConversationCountByUserIdAsync",
+            "code_start_index": 39204,
+            "method_name": "GetConversationCountByUserIdAsync",
+            "existing_summary": "\r\n    /// <inheritdoc/>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "schoolsIds",
+                    "param_name": "schoolsIds",
+                    "param_type": "IEnumerable<int>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "listingSelector",
+                    "param_name": "listingSelector",
+                    "param_type": "IUntypedListingSelector",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "isRequestFromIntranet",
+                    "param_name": "isRequestFromIntranet",
+                    "param_type": "bool",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return await _conversationRepository.CountConversationsWithFilterAndSortAsync(userId, schoolsIds, listingSelector);\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the count of conversations for a specific user ID, with optional filters and sorting.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "schoolsIds",
+                        "param_name": "schoolsIds",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "listingSelector",
+                        "param_name": "listingSelector",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "isRequestFromIntranet",
+                        "param_name": "isRequestFromIntranet",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the count of conversations for a specific user ID, with optional filters and sorting.\n/// </summary>\n/// <param name=\"userId\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"schoolsIds\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"listingSelector\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"isRequestFromIntranet\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetFilteredConversationsByUserIdAsync",
+            "code_start_index": 39512,
+            "method_name": "GetFilteredConversationsByUserIdAsync",
+            "existing_summary": "\r\n    /// <inheritdoc/>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "schoolsIds",
+                    "param_name": "schoolsIds",
+                    "param_type": "IEnumerable<int>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "listingSelector",
+                    "param_name": "listingSelector",
+                    "param_type": "IUntypedListingSelector",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "isRequestFromIntranet",
+                    "param_name": "isRequestFromIntranet",
+                    "param_type": "bool",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        var conversationsItos = await _conversationRepository.GetConversationsByUserIdWithFiltersAndSortingAsync(userId, schoolsIds, listingSelector);\r\n\r\n        if (!conversationsItos.Any())\r\n        {\r\n            return Enumerable.Empty<IConversationRAto>();\r\n        }\r\n\r\n        var conversationsRAto = new List<IConversationRAto>();\r\n        foreach (var conversationsIto in conversationsItos)\r\n        {\r\n            conversationsRAto.Add(await BuildConversationAto(conversationsIto, userId));\r\n        }\r\n\r\n        return conversationsRAto;\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve conversations filtered by user ID with specified filters and sorting criteria, returning a list of conversation objects in a different format.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "schoolsIds",
+                        "param_name": "schoolsIds",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "listingSelector",
+                        "param_name": "listingSelector",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "isRequestFromIntranet",
+                        "param_name": "isRequestFromIntranet",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve conversations filtered by user ID with specified filters and sorting criteria, returning a list of conversation objects in a different format.\n/// </summary>\n/// <param name=\"userId\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"schoolsIds\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"listingSelector\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"isRequestFromIntranet\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetConversationType",
+            "code_start_index": 40282,
+            "method_name": "GetConversationType",
+            "existing_summary": "\r\n    #endregion V2\r\n\r\n    /// <summary>\r\n    /// Gets a conversation type depending on its users.\r\n    /// </summary>\r\n    /// <param name=\"conversationUsers\">The conversation users.</param>\r\n    /// <returns>A conversation type.</returns>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "conversationUsers",
+                    "param_name": "conversationUsers",
+                    "param_type": "IEnumerable<IUserWithTypeRIto>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        Guard.Against.NullOrEmpty(conversationUsers, ErrorCode.Api.Lms.Messenger.Technical.Exception.ArgumentIsNullOrEmptyCollection, paramsValues: nameof(conversationUsers));\r\n\r\n        var conversationType = EConversationTypeRAto.BetweenStudents;\r\n\r\n        if (conversationUsers.Any(u => u.IsOfficial))\r\n        {\r\n            conversationType = EConversationTypeRAto.OfficialIncluded;\r\n        }\r\n        else if (conversationUsers.Any(u => u.Type == EUserTypeRIto.Formateur))\r\n        {\r\n            conversationType = EConversationTypeRAto.FormatorIncluded;\r\n        }\r\n\r\n        return conversationType;\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Determine the type of conversation based on the users involved, prioritizing official users and formators.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "conversationUsers",
+                        "param_name": "conversationUsers",
+                        "param_desc": "The list of users involved in the conversation. The type of users must implement the 'IUserWithTypeRIto' interface."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Determine the type of conversation based on the users involved, prioritizing official users and formators.\n/// </summary>\n/// <param name=\"conversationUsers\">The list of users involved in the conversation. The type of users must implement the 'IUserWithTypeRIto' interface.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetCorrespondantRoles",
+            "code_start_index": 41004,
+            "method_name": "GetCorrespondantRoles",
+            "existing_summary": "\r\n    /// <summary>\r\n    /// Defines a correspondant roles.\r\n    /// </summary>\r\n    /// <param name=\"isSender\">Defines whether the correspondant is a sender. True for a sender, false for a recipient.</param>\r\n    /// <param name=\"userId\">The user ID.</param>\r\n    /// <param name=\"usersWithType\">The collection of users with their type.</param>\r\n    /// <returns>A collection of roles.</returns>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "isSender",
+                    "param_name": "isSender",
+                    "param_type": "bool",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "usersWithType",
+                    "param_name": "usersWithType",
+                    "param_type": "IEnumerable<IUserWithTypeRIto>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        Guard.Against.All()\r\n            .Add(Guard.Against.NegativeOrZero, userId, ErrorCode.Api.Lms.Messenger.Technical.Exception.ArgumentIsNegativeOrZero, paramsValues: nameof(userId))\r\n            .Add(Guard.Against.NullOrEmpty, usersWithType, ErrorCode.Api.Lms.Messenger.Technical.Exception.ArgumentIsNull, paramsValues: nameof(usersWithType))\r\n            .ValidateAll();\r\n\r\n        // Define the new recipient roles: sender or recipient.\r\n        return new ECorrespondantRoleIto[] { isSender ? ECorrespondantRoleIto.Sender : ECorrespondantRoleIto.Recipient };\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create an array of roles for a specified user based on whether they are a sender or recipient.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "isSender",
+                        "param_name": "isSender",
+                        "param_desc": "A boolean value indicating whether the user is the sender."
+                    },
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "An integer representing the unique identifier of the user."
+                    },
+                    {
+                        "name": "usersWithType",
+                        "param_name": "usersWithType",
+                        "param_desc": "An enumerable collection of users with their corresponding types."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create an array of roles for a specified user based on whether they are a sender or recipient.\n/// </summary>\n/// <param name=\"isSender\">A boolean value indicating whether the user is the sender.</param>\n/// <param name=\"userId\">An integer representing the unique identifier of the user.</param>\n/// <param name=\"usersWithType\">An enumerable collection of users with their corresponding types.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetUsersIdsAndTheirBelongingToAnyInternalService",
+            "code_start_index": 44799,
+            "method_name": "GetUsersIdsAndTheirBelongingToAnyInternalService",
+            "existing_summary": "\r\n    /// <summary>\r\n    /// Gets a collection that contains users IDs and their belonging to any internal service.\r\n    /// </summary>\r\n    /// <param name=\"currentSchoolId\">The school ID.</param>\r\n    /// <param name=\"users\">Conversation users.</param>\r\n    /// <returns>A dictionary where the key is a user ID, and the value is a flag set to true if the user belongs to any internal service.</returns>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "currentSchoolId",
+                    "param_name": "currentSchoolId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "users",
+                    "param_name": "users",
+                    "param_type": "IEnumerable<IUserRIto>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        Guard.Against.All()\r\n            .Add(Guard.Against.NegativeOrZero, currentSchoolId, ErrorCode.Api.Lms.Messenger.Technical.Exception.ArgumentIsNegativeOrZero, paramsValues: nameof(currentSchoolId))\r\n            .Add(Guard.Against.Null, users, ErrorCode.Api.Lms.Messenger.Technical.Exception.ArgumentIsNull, paramsValues: nameof(users))\r\n            .ValidateAll();\r\n\r\n        var usersBelongToInternalService = new Dictionary<int, bool>();\r\n\r\n        foreach (IUserRIto userWithTypeRIto in users)\r\n        {\r\n            EInternalServiceRAto? userInternalServiceCode = await _contactService.GetUserInternalServiceCodeOrNullAsync(userWithTypeRIto.Email, currentSchoolId);\r\n            usersBelongToInternalService.Add(userWithTypeRIto.Id, userInternalServiceCode != null);\r\n        }\r\n\r\n        return usersBelongToInternalService;\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the users' IDs and whether they belong to any internal service based on their email and current school ID.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "currentSchoolId",
+                        "param_name": "currentSchoolId",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "users",
+                        "param_name": "users",
+                        "param_desc": "The generated description for the parameter"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the users' IDs and whether they belong to any internal service based on their email and current school ID.\n/// </summary>\n/// <param name=\"currentSchoolId\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"users\">The generated description for the parameter</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "BuildConversationAto",
+            "code_start_index": 42713,
+            "method_name": "BuildConversationAto",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "conversationRIto",
+                    "param_name": "conversationRIto",
+                    "param_type": "IConversationRIto",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        // Retrieving conversation and user related details\r\n        var correspondants = await _conversationRepository.GetCorrespondantsByConversationIdAsync(conversationRIto.Id);\r\n        var currentUser = await _userRepository.GetUserByIdAsync(userId);\r\n        var currentCourseIds = await _userRepository.GetUserCoursesIdsAsync(userId);\r\n        var usersIds = correspondants.Select(c => c.UserId).Distinct().ToList();\r\n        var users = await _userRepository.GetUserWithTypeByUserIdsAndSchoolIdAsync(usersIds, conversationRIto.AudienceSchoolId);\r\n        var usersIdsAndTheirBelongingToAnyInternalService = await GetUsersIdsAndTheirBelongingToAnyInternalService(conversationRIto.AudienceSchoolId, users);\r\n        var dateLastMessage = await _conversationRepository.GetLastMessageDateForConversationIdAndUserIdAsync(conversationRIto.Id);\r\n\r\n        // Retrieving conversation reading related details\r\n        var readingDate = await _conversationRepository.GetMaxReadingDateForConversationIdAndUserIdAsync(conversationRIto.Id, userId);\r\n        var othersLastMessageDate = await _conversationRepository.GetDateOfLastMessageFromOthersForConversationIdAndUserIdAsync(conversationRIto.Id, userId);\r\n        var hasUnreadMessage = othersLastMessageDate == null ? false : (readingDate ?? DateTime.MinValue) < othersLastMessageDate;\r\n\r\n        // Checking attachments in the conversation\r\n        var hasAttachments = await _conversationRepository.HasAttachmentsByConversationIdAsync(conversationRIto.Id);\r\n        var hasAudioFiles = await _conversationRepository.HasAttachmentsByConversationIdAsync(conversationRIto.Id, EAttachmentTypeIto.Audio);\r\n\r\n        // Constructing the final ATO object\r\n        return new ConversationRAto(\r\n            id: conversationRIto.Id,\r\n            subject: conversationRIto.Subject,\r\n            correspondants: correspondants.Select(c => c.ToAto(users.Single(ui => ui.Id == c.UserId), currentUser, currentCourseIds, usersIdsAndTheirBelongingToAnyInternalService[c.UserId])!).ToList(),\r\n            type: (EConversationTypeRAto)conversationRIto.ConversationType,\r\n            status: conversationRIto.Status is null ? null : (EConversationStatusRAto)conversationRIto.Status!.Value,\r\n            closingDate: conversationRIto.ClosingDate,\r\n            readingDate: readingDate,\r\n            priority: conversationRIto.Priority,\r\n            isReadOnly: conversationRIto.ReadOnly,\r\n            audienceSchoolId: conversationRIto.AudienceSchoolId,\r\n            hasUnreadMessage: hasUnreadMessage,\r\n            hasAttachments: hasAttachments,\r\n            hasAudioFiles: hasAudioFiles,\r\n            messagesCount: conversationRIto.MessagesCount,\r\n            dateCreate: conversationRIto.DateCreate,\r\n            dateUpdate: conversationRIto.DateUpdate,\r\n            dateLastMessage: dateLastMessage\r\n        );\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Construct a conversation object with all related details, including correspondents, attachments, and reading status, based on the conversation ID and user ID provided.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "conversationRIto",
+                        "param_name": "conversationRIto",
+                        "param_desc": "IConversationRIto conversationRIto"
+                    },
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "int userId"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Construct a conversation object with all related details, including correspondents, attachments, and reading status, based on the conversation ID and user ID provided.\n/// </summary>\n/// <param name=\"conversationRIto\">IConversationRIto conversationRIto</param>\n/// <param name=\"userId\">int userId</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "ConversationService"
+}

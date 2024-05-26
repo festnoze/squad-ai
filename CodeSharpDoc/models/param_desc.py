@@ -38,6 +38,10 @@ class ParameterDesc(BaseDesc):
             param_code = param_code[param_code.find(']') + 1:].strip()
         param_parts = param_code.split(' ')
         param_parts = [part.strip() for part in param_parts if part.strip() != '']
+        
+        # remove keywords like 'params', 'ref', 'out', 'in' from parameter
+        if param_parts[0] == 'params' or param_parts[0] == 'ref' or param_parts[0] == 'out' or param_parts[0] == 'in':
+            param_parts = param_parts[1:]
 
         has_default_value = '=' in param_code
 
@@ -52,7 +56,6 @@ class ParameterDesc(BaseDesc):
 
         return ParameterDesc(param_name, param_type, has_default_value, default_value, attributs, None)
 
-        
     def parse_parameter_signature(param: str) -> Tuple[Optional[List[str]], str, str, Optional[str]]:
         # Regular expression to parse the parameter string
         pattern = re.compile(

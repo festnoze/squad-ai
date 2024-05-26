@@ -7,6 +7,7 @@ from langchain_community.callbacks import get_openai_callback, OpenAICallbackHan
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.document_loaders import TextLoader
 from langchain_community.vectorstores import FAISS
+from langchain.retrievers.multi_query import MultiQueryRetriever
 from langchain_openai import OpenAIEmbeddings
 
 def chunkify_txt(txt):
@@ -22,7 +23,7 @@ def chunkify_txt(txt):
     return chunks
 
 ## Obtain the vector store
-def get_vector(chunks):
+def build_vectorstore(chunks):
     embeddings = OpenAIEmbeddings()
 
     vectorstore = FAISS.from_texts(texts= chunks, embedding = embeddings)
@@ -30,10 +31,10 @@ def get_vector(chunks):
     return vectorstore
 
 ## Retrieve useful info similar to user query
-def retrieve(vectorstore, question):
+def retrieve(llm, vectorstore, question):
 
     retriever_from_llm = MultiQueryRetriever.from_llm(
-        retriever=vectorstore.as_retriever(), llm=ChatOpenAI(temperature=0)
+        retriever=vectorstore.as_retriever(), llm=llm
     )
     unique_docs = retriever_from_llm.get_relevant_documents(query=question)
     

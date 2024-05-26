@@ -19,6 +19,8 @@ from services.csharp_code_analyser_service import CSharpCodeStructureAnalyser
 import os
 import json
 
+from services.rag_service import RAGService
+
 class SummaryGenerationService:    
     batch_size = 200
     using_json_output_parsing = True
@@ -30,10 +32,30 @@ class SummaryGenerationService:
         llms = LangChainFactory.create_llms_from_infos(llms_infos)       
         paths_and_codes = file.load_csharp_files(file_path)
         CSharpHelper.remove_existing_summaries_from_all_files(paths_and_codes)
+        
         structures_from_python = CSharpCodeStructureAnalyser.extract_code_structures_from_code_files(paths_and_codes)
-        known_structures = code_analyser_client.post_analyse_folder_code_files(file_path)
+        known_structures = code_analyser_client.get_folder_code_files_structures(file_path)
+        SummaryGenerationService.copy_missing_infos(structures_from_python, known_structures)
+        CSharpCodeStructureAnalyser.split_classes_methods_code(known_structures) 
 
-        # Copy code_start_index from python structures methods to csharp structures methods
+        SummaryGenerationService.generate_methods_summaries_for_all_structures(llms, known_structures)
+        
+        paths_and_new_codes = SummaryGenerationService.include_generated_summaries_to_codes(paths_and_codes, known_structures)
+        file.save_contents_within_files(paths_and_new_codes)
+        
+        # rag = RAGService(llms[0], known_structures)
+        # query = input("What are you looking for?")
+        # while query != '':
+        #     answer = rag.query(query)
+        #     print(answer)
+        #     query = input("What are you looking for?")
+
+        txt.print("\nDone.")
+        txt.print("---------------------------")
+
+    @staticmethod
+    def copy_missing_infos(structures_from_python, known_structures):        
+        """ Copy all methods' params and code_start_index from python structures to csharp structures methods """
         for struct in known_structures:
             for method in struct.methods:
                 for python_struct in structures_from_python:
@@ -42,15 +64,6 @@ class SummaryGenerationService:
                             if python_method.method_name == method.method_name:
                                 method.code_start_index = python_method.code_start_index
                                 break
-
-        SummaryGenerationService.generate_methods_summaries_for_all_structures(llms, known_structures)
-        
-        paths_and_new_codes = SummaryGenerationService.including_generated_summaries_to_codes(paths_and_codes, known_structures)
-
-        file.save_contents_within_files(paths_and_new_codes)
-        
-        txt.print("\nDone.")
-        txt.print("---------------------------")
     
     @staticmethod
     def methods_count(known_structures: list[StructureDesc]):
@@ -80,7 +93,7 @@ class SummaryGenerationService:
                     method.generated_xml_summary = class_method.generated_xml_summary
 
     @staticmethod
-    def including_generated_summaries_to_codes(paths_and_codes, structures_descriptions):        
+    def include_generated_summaries_to_codes(paths_and_codes, structures_descriptions):        
         txt.print_with_spinner(f"Include summaries into the existing {len(paths_and_codes)} code files:")
         paths_and_codes_list = [(path, code) for path, code in paths_and_codes.items()]
         paths_and_new_codes = {}

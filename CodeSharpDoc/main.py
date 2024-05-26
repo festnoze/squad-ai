@@ -59,8 +59,3 @@ file.copy_folder_files_and_folders_to_folder("inputs\code_files_saved", folder_p
 txt.activate_print = True # Activate print each step advancement
 
 SummaryGenerationService.generate_all_summaries_for_all_csharp_files_and_save(folder_path, llms_infos)
-
-# Llm.invoke_method_mesuring_openai_tokens_consumption(
-#     SummaryGenerationService.generate_all_summaries_for_all_csharp_files_and_save, 
-#         "inputs\\code_files_generated", llms_infos #\\UserProfileQueryingService.cs \\IMessageService.cs
-# )

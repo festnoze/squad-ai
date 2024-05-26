@@ -50,7 +50,7 @@ class CSharpCodeStructureAnalyser:
         for i in range(len(found_struct_separators)):
             if struct_type == 'class':
                 struct_desc = CSharpCodeStructureAnalyser.class_extract_methods_and_props(file_path, separator_indexes[i], namespace_name, usings, access_modifier, splitted_struct_contents[i+1])
-                CSharpCodeStructureAnalyser.split_class_methods_and_add_to_class_desc(struct_desc, chunk_size, chunk_overlap) # split each method into chunks adapted to the LLM context window size
+                CSharpCodeStructureAnalyser.split_class_methods_code(struct_desc, chunk_size, chunk_overlap) # split each method into chunks adapted to the LLM context window size
             elif struct_type == 'interface':
                 struct_desc = CSharpCodeStructureAnalyser.interface_extract_methods_and_props(file_path, separator_indexes[i], namespace_name, usings, access_modifier, splitted_struct_contents[i+1])
             elif struct_type == 'enum':
@@ -59,7 +59,12 @@ class CSharpCodeStructureAnalyser:
 
         return structs_descs
     
-    def split_class_methods_and_add_to_class_desc(class_desc: StructureDesc, chunk_size:int = 8000, chunk_overlap: int = 0):
+    
+    def split_classes_methods_code(classes_desc: list[StructureDesc], chunk_size:int = 8000, chunk_overlap: int = 0):
+        for class_desc in classes_desc:
+            CSharpCodeStructureAnalyser.split_class_methods_code(class_desc, chunk_size, chunk_overlap)
+            
+    def split_class_methods_code(class_desc: StructureDesc, chunk_size:int = 8000, chunk_overlap: int = 0):
         # split each method into chunks adapted to the LLM context window size
         chunk_count = 0
         for method in class_desc.methods:
