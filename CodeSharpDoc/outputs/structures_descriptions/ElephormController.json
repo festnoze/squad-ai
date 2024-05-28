@@ -1,0 +1,166 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Common/ElephormController.cs",
+    "index_shift_code": 467,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.Common",
+    "usings": [
+        "LMS.Attributes",
+        "LMS.Authentication",
+        "LMS.Data",
+        "LMS.Utils",
+        "Newtonsoft.Json",
+        "Serilog",
+        "System",
+        "System.Collections.Generic",
+        "System.Data.Entity",
+        "System.Data.Entity.Infrastructure",
+        "System.IO",
+        "System.Linq",
+        "System.Net.Http",
+        "System.Threading.Tasks",
+        "System.Web.Hosting",
+        "System.Web.Http",
+        "System.Web.Http.Description"
+    ],
+    "access_modifier": "public",
+    "struct_name": "ElephormController",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetCategories",
+            "code_start_index": 1011,
+            "method_name": "GetCategories",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Get Elephorm Catalog\r\n        /// </summary>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var currentUser = this.User.Identity.GetUser();\r\n\r\n            var inscriptionService = await this._db.InscriptionsServices\r\n                        .Where(isvc => isvc.EcoleUserId == currentUser.SchoolUserId && isvc.DateDelete == null && isvc.Service.Code == \"ELEPHORM\")\r\n                        .FirstOrDefaultAsync();\r\n\r\n            if (inscriptionService == null)\r\n            {\r\n                return Content(System.Net.HttpStatusCode.Forbidden, \"Vous n'avez pas d'inscription pour ce service\");\r\n            }\r\n\r\n            if (inscriptionService.DateFinService != null && DateTimeOffset.Now > inscriptionService.DateFinService)\r\n            {\r\n                return Content(System.Net.HttpStatusCode.Forbidden, \"Vous n'avez plus le droit d'utiliser ce service.\");\r\n            }\r\n\r\n            if (inscriptionService.DateActivation == null)\r\n            {\r\n                inscriptionService.DateActivation = DateTimeOffset.Now;\r\n                inscriptionService.DateFinService = DateTimeOffset.Now.AddYears(1);\r\n            }\r\n\r\n            try\r\n            {\r\n                await _db.SaveChangesAsync();\r\n                var result = FilterElephormCatalog(await GetElephormCatalogAsync());\r\n                return Ok(result);\r\n            }\r\n            catch (DbUpdateException e)\r\n            {\r\n                Log.Error(e, \"Error saving the activation date for the elephorm service\");\r\n                return InternalServerError();\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Erreur lors de la r\u00e9cuperation du catalog elephorm\");\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the categories from the Elephorm catalog for the current user, handling activation, expiration, and error cases.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "methodName",
+                        "param_name": "methodName",
+                        "param_desc": "GetCategories - Retrieve the categories from the Elephorm catalog for the current user, handling activation, expiration, and error cases."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the categories from the Elephorm catalog for the current user, handling activation, expiration, and error cases.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"methodName\">GetCategories - Retrieve the categories from the Elephorm catalog for the current user, handling activation, expiration, and error cases.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetElephormCatalogAsync",
+            "code_start_index": 2773,
+            "method_name": "GetElephormCatalogAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            const string url = \"https://eas.elephorm.com/api/v1/categories\";\r\n\r\n            using (var client = new HttpClient())\r\n            {\r\n                var response = await client.GetAsync(url);\r\n                if (response.IsSuccessStatusCode)\r\n                {\r\n                    using (Stream s = await response.Content.ReadAsStreamAsync())\r\n                    {\r\n                        return Helpers.DeserializeJsonFromStream<List<ElephormCategoryViewModel>>(s);\r\n                    }\r\n                }\r\n                else\r\n                {\r\n                    Log.Error(\"Error getting the categories list form elephorm\");\r\n                    throw new HttpResponseException(response);\r\n                }\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the Elephorm catalog asynchronously from a specified URL, deserialize the data into a list of Elephorm categories, handle potential errors by logging and throwing exceptions.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "methodName",
+                        "param_name": "methodName",
+                        "param_desc": "The name of the method for which the parameters are being described (e.g., 'GetElephormCatalogAsync')"
+                    },
+                    {
+                        "name": "methodPurpose",
+                        "param_name": "methodPurpose",
+                        "param_desc": "The purpose of the method (e.g., 'Retrieve the Elephorm catalog asynchronously from a specified URL, deserialize the data into a list of Elephorm categories, handle potential errors by logging and throwing exceptions.')"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the Elephorm catalog asynchronously from a specified URL, deserialize the data into a list of Elephorm categories, handle potential errors by logging and throwing exceptions.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"methodName\">The name of the method for which the parameters are being described (e.g., 'GetElephormCatalogAsync')</param>\n/// <param name=\"methodPurpose\">The purpose of the method (e.g., 'Retrieve the Elephorm catalog asynchronously from a specified URL, deserialize the data into a list of Elephorm categories, handle potential errors by logging and throwing exceptions.')</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "FilterElephormCatalog",
+            "code_start_index": 3627,
+            "method_name": "FilterElephormCatalog",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "catalog",
+                    "param_name": "catalog",
+                    "param_type": "List<ElephormCategoryViewModel>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            string filePath = HostingEnvironment.MapPath(\"~/App_Data/elephorm-whitelist.json\");\r\n            if (filePath == null || !File.Exists(filePath))\r\n            {\r\n                return catalog;\r\n            }\r\n\r\n            List<ElephormCategoryViewModel> whiteList;\r\n\r\n            using (FileStream s = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))\r\n            {\r\n                whiteList = Helpers.DeserializeJsonFromStream<List<ElephormCategoryViewModel>>(s);\r\n            }\r\n\r\n            var remappedWhiteList = whiteList.ToDictionary(c => c.Id, c => c.Subcategories.Select(sc => sc.Id).ToList());\r\n\r\n            var result = catalog.Where(oc => remappedWhiteList.ContainsKey(oc.Id))\r\n                                .Select(oc => new ElephormCategoryViewModel\r\n                                {\r\n                                    Id = oc.Id,\r\n                                    Active = oc.Active,\r\n                                    Description = oc.Description,\r\n                                    Title = oc.Title,\r\n                                    Subcategories = oc.Subcategories\r\n                                                                    .Where(osc => remappedWhiteList[oc.Id].Contains(osc.Id))\r\n                                                                    .ToList()\r\n                                })\r\n                                .ToList();\r\n\r\n            return result;\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Filter the Elephorm catalog based on a whitelist of categories and subcategories.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "List<ElephormCategoryViewModel>",
+                        "param_name": "List<ElephormCategoryViewModel>",
+                        "param_desc": "The list of Elephorm category view models to be used for filtering the catalog."
+                    },
+                    {
+                        "name": "catalog",
+                        "param_name": "catalog",
+                        "param_desc": "The Elephorm catalog to be filtered based on the whitelist of categories and subcategories."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Filter the Elephorm catalog based on a whitelist of categories and subcategories.\n/// </summary>\n/// <param name=\"List<ElephormCategoryViewModel>\">The list of Elephorm category view models to be used for filtering the catalog.</param>\n/// <param name=\"catalog\">The Elephorm catalog to be filtered based on the whitelist of categories and subcategories.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "ElephormController"
+}

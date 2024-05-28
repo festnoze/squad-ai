@@ -1,0 +1,123 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/V3/NotificationV3Controller.cs",
+    "index_shift_code": 389,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V3",
+    "usings": [
+        "LMS.Attributes",
+        "LMS.Attributes.Routing",
+        "LMS.Authentication",
+        "LMS.Models.ViewModels.V1",
+        "LMS.Services.Interfaces",
+        "System",
+        "System.Collections.Generic",
+        "System.Linq",
+        "System.Net",
+        "System.Net.Http",
+        "System.Threading.Tasks",
+        "System.Web.Http",
+        "System.Web.Http.Description"
+    ],
+    "access_modifier": "public",
+    "struct_name": "NotificationV3Controller",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetCurrentUserNotificationPreferencesAsync",
+            "code_start_index": 942,
+            "method_name": "GetCurrentUserNotificationPreferencesAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            try\r\n            {\r\n                var userNotificationPreferences = await _notificationService.GetUserNotificationPreferences(User.Identity.GetUserId(), User.Identity.GetSchoolUserId());\r\n                return Ok(userNotificationPreferences);\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the ranking data for users based on their weekly and trimester points, with additional bonuses for certain criteria, and sort them in descending order for trimester points and then by user ID.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "method_name",
+                        "param_name": "method_name",
+                        "param_desc": "The name of the method which is 'GetCurrentUserNotificationPreferencesAsync'"
+                    },
+                    {
+                        "name": "method_purpose",
+                        "param_name": "method_purpose",
+                        "param_desc": "The purpose of the method is to 'Retrieve the ranking data for users based on their weekly and trimester points, with additional bonuses for certain criteria, and sort them in descending order for trimester points and then by user ID.'"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the ranking data for users based on their weekly and trimester points, with additional bonuses for certain criteria, and sort them in descending order for trimester points and then by user ID.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"method_name\">The name of the method which is 'GetCurrentUserNotificationPreferencesAsync'</param>\n/// <param name=\"method_purpose\">The purpose of the method is to 'Retrieve the ranking data for users based on their weekly and trimester points, with additional bonuses for certain criteria, and sort them in descending order for trimester points and then by user ID.'</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "SetCurrentUserNotificationPreferencesAsync",
+            "code_start_index": 1513,
+            "method_name": "SetCurrentUserNotificationPreferencesAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "notificationUserPreferencesUpdated",
+                    "param_name": "notificationUserPreferencesUpdated",
+                    "param_type": "List<NotificationUserPreferencesUpdatedViewModel>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            try\r\n            {\r\n                await _notificationService.SetUserNotificationPreferences(notificationUserPreferencesUpdated, User.Identity.GetSchoolUserId(), User.Identity.GetUser().Email);\r\n                return Ok();\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve a list of group members, including their profile information and promotions, based on the current user's workgroups and school.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "notificationUserPreferencesUpdated",
+                        "param_name": "notificationUserPreferencesUpdated",
+                        "param_desc": "The list of NotificationUserPreferencesUpdatedViewModel objects representing the updated notification preferences for users."
+                    },
+                    {
+                        "name": "SetCurrentUserNotificationPreferencesAsync",
+                        "param_name": "SetCurrentUserNotificationPreferencesAsync",
+                        "param_desc": "The method that sets the current user's notification preferences asynchronously."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve a list of group members, including their profile information and promotions, based on the current user's workgroups and school.\n/// </summary>\n/// <param name=\"notificationUserPreferencesUpdated\">The list of NotificationUserPreferencesUpdatedViewModel objects representing the updated notification preferences for users.</param>\n/// <param name=\"SetCurrentUserNotificationPreferencesAsync\">The method that sets the current user's notification preferences asynchronously.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "NotificationV3Controller"
+}

@@ -1,0 +1,955 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/V5/NewsfeedV5Controller.cs",
+    "index_shift_code": 909,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V5",
+    "usings": [
+        "System",
+        "System.Collections.Generic",
+        "System.Data.Entity",
+        "System.Data.Entity.Core",
+        "System.Data.Entity.Validation",
+        "System.Linq",
+        "System.Linq.Expressions",
+        "System.Net",
+        "System.Threading.Tasks",
+        "System.Web",
+        "System.Web.Http",
+        "System.Web.Http.Description",
+        "Hangfire",
+        "Lms.Common.Enumerations",
+        "LMS.Attributes",
+        "LMS.Attributes.Routing",
+        "LMS.Authentication",
+        "LMS.Configuration",
+        "LMS.Data",
+        "LMS.Data.Extensions",
+        "LMS.Models.ViewModels",
+        "LMS.Models.ViewModels.V3.Newsfeed",
+        "LMS.Notifications.V2",
+        "LMS.Services",
+        "LMS.Services.Interfaces",
+        "LMS.SignalR.V2",
+        "LMS.Utils",
+        "LMS.Utils.Cache",
+        "Microsoft.AspNet.SignalR",
+        "Serilog"
+    ],
+    "access_modifier": "public",
+    "struct_name": "NewsfeedV5Controller",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetWallPostsAsync",
+            "code_start_index": 2528,
+            "method_name": "GetWallPostsAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Retrieve newsfeed's posts of the genreral or the specified team newsfeed, paginated and filtered\r\n        /// </summary>\r\n        /// <param name=\"tagIds\"></param>\r\n        /// <param name=\"since\"></param>\r\n        /// <param name=\"pagesize\"></param>\r\n        /// <param name=\"filter\"></param>\r\n        /// <param name=\"teamId\"></param>\r\n        /// <param name=\"workgroup\"></param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "tagIds",
+                    "param_name": "tagIds",
+                    "param_type": "int[]",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "filter",
+                    "param_name": "filter",
+                    "param_type": "NewsfeedWallFilterEnum",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "since",
+                    "param_name": "since",
+                    "param_type": "DateTime?",
+                    "has_default_value": true,
+                    "default_value": "null",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "pagesize",
+                    "param_name": "pagesize",
+                    "param_type": "int",
+                    "has_default_value": true,
+                    "default_value": "20",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "teamId",
+                    "param_name": "teamId",
+                    "param_type": "int?",
+                    "has_default_value": true,
+                    "default_value": "null",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "workgroup",
+                    "param_name": "workgroup",
+                    "param_type": "int",
+                    "has_default_value": true,
+                    "default_value": "0",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n\r\n            try\r\n            {\r\n                var wall = await _newsfeedService.GetWall(userId, ecoleId, schoolIdsList, tagIds, since, pagesize, filter, teamId, workgroup);\r\n\r\n                return Ok(wall);\r\n            }\r\n            catch (UnauthorizedAccessException)\r\n            {\r\n                return StatusCode(HttpStatusCode.Forbidden);\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error getting the wall\");\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the batch of user IDs missing traces for internal rules approval.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "tagIds",
+                        "param_name": "tagIds",
+                        "param_desc": "The array of integers representing tag IDs."
+                    },
+                    {
+                        "name": "filter",
+                        "param_name": "filter",
+                        "param_desc": "An enum of type NewsfeedWallFilterEnum representing the filter criteria for the wall posts."
+                    },
+                    {
+                        "name": "since",
+                        "param_name": "since",
+                        "param_desc": "A nullable DateTime indicating the starting point in time for retrieving wall posts. Defaults to null if not provided."
+                    },
+                    {
+                        "name": "pagesize",
+                        "param_name": "pagesize",
+                        "param_desc": "An integer specifying the number of wall posts to retrieve per page. Defaults to 20 if not specified."
+                    },
+                    {
+                        "name": "teamId",
+                        "param_name": "teamId",
+                        "param_desc": "A nullable integer representing the team ID. Defaults to null if not provided."
+                    },
+                    {
+                        "name": "workgroup",
+                        "param_name": "workgroup",
+                        "param_desc": "An integer specifying the workgroup. Defaults to 0 if not specified."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the batch of user IDs missing traces for internal rules approval.\n/// </summary>\n/// <param name=\"tagIds\">The array of integers representing tag IDs.</param>\n/// <param name=\"filter\">An enum of type NewsfeedWallFilterEnum representing the filter criteria for the wall posts.</param>\n/// <param name=\"since\">A nullable DateTime indicating the starting point in time for retrieving wall posts. Defaults to null if not provided.</param>\n/// <param name=\"pagesize\">An integer specifying the number of wall posts to retrieve per page. Defaults to 20 if not specified.</param>\n/// <param name=\"teamId\">A nullable integer representing the team ID. Defaults to null if not provided.</param>\n/// <param name=\"workgroup\">An integer specifying the workgroup. Defaults to 0 if not specified.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "FetchPostAsync",
+            "code_start_index": 3819,
+            "method_name": "FetchPostAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// fetch a single post\r\n        /// </summary>\r\n        /// <param name=\"postId\"></param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "postId",
+                    "param_name": "postId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n            var currentSchool = DataCache.GetSchools(_db).First(e => e.Id == ecoleId);\r\n            var userId = User.Identity.GetUserId();\r\n            var workgroups = await _workgroupService.GetUserWorkgroupsAsync(userId: userId, withPrivacy: true, schoolIdsList: schoolIdsList.ToArray());\r\n\r\n            var dnsList = DataCache.GetSchools(_db)\r\n                .Select(s => s.DnsConfig.Dns)\r\n                .ToList();\r\n\r\n            // Workgroups\r\n            Expression<Func<Post, bool>> workgroupCondition = p => p.PostWorkgroups\r\n                .Any(pw => workgroups\r\n                    .Contains(pw.WorkgroupId)\r\n                    || (pw.Workgroup.WorkgroupParcours.Count() == 0 && schoolIdsList.Contains(pw.Workgroup.SchoolId))\r\n                )\r\n                || p.PostWorkgroups.Count == 0;\r\n\r\n            var post = await RepositoryV3.GetPosts(_db, currentSchool.OrganismeId)\r\n                .Where(p => p.Id == postId)\r\n                .Where(workgroupCondition)\r\n                .Select(RepositoryV3.GetPostMapExpression(userId))\r\n                .TakeDynamic(1)\r\n                .ToListAsync();\r\n\r\n            foreach (var p in post)\r\n            {\r\n                foreach (var dns in dnsList)\r\n                {\r\n                    p.Body = p.Body.Replace(dns, HttpContext.Current.Request.OriginOrRequestHost());\r\n                }\r\n            }\r\n\r\n            if (post.Count != 1)\r\n            {\r\n                return NotFound();\r\n            }\r\n\r\n            var usersIds = RepositoryV3.GetUsersIds(post);\r\n\r\n            var users = await RepositoryV3.GetUsers(this._db)\r\n                                          .Where(user => usersIds.Contains(user.Id))\r\n                                          .Select(RepositoryV3.GetUserMapExpression(schoolIdsList))\r\n                                          .ToListAsync();\r\n\r\n            return Ok(new PaginationV3ViewModel<NewsfeedItemV3ViewModel>(new NewsfeedItemV3ViewModel()\r\n            {\r\n                Posts = post,\r\n                Users = users\r\n            }, false));\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create traces for internal rules approval for a list of users, handling error messages if any user is missing or if trace creation fails.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "postId",
+                        "param_name": "postId",
+                        "param_desc": "The unique identifier of the post for which traces are to be created."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create traces for internal rules approval for a list of users, handling error messages if any user is missing or if trace creation fails.\n/// </summary>\n/// <param name=\"postId\">The unique identifier of the post for which traces are to be created.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "PostAsync",
+            "code_start_index": 6332,
+            "method_name": "PostAsync",
+            "existing_summary": "\r\n        #region POST\r\n\r\n        /// <summary>\r\n        /// Post a new post\r\n        /// </summary>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "newPost",
+                    "param_name": "newPost",
+                    "param_type": "NewsfeedNewPostV3ViewModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            // Current User Info\r\n            var currentUser = User.Identity.GetUser();\r\n            var userId = currentUser.Id;\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n            var currentSchool = DataCache.GetSchools(_db).First(e => e.Id == ecoleId);\r\n            var currentUserWorkgroups = await _workgroupService.GetUserWorkgroupsAsync(userId, false, ecoleId);\r\n\r\n            try\r\n            {\r\n                // Create post\r\n                var post = await _newsfeedService.Post().CreateNewPostAsync(newPost, currentUser.Email, currentUser.Interne, userId, ecoleId, currentUserWorkgroups);\r\n\r\n                // Prepare response view model\r\n                var createPostVM = await this.GetCreatePostVM(userId, ecoleId, currentSchool, post, HttpContext.Current.Request.OriginOrRequestHost());\r\n\r\n                // Notifications for post creation\r\n                await _newsfeedService.Post().NotifyOnPostCreationAsync(newPost, currentUser.Interne, userId, ecoleId, currentSchool, post, createPostVM);\r\n\r\n                return Ok(createPostVM);\r\n            }\r\n            catch (InvalidOperationException ex)\r\n            {\r\n                return Content(HttpStatusCode.BadRequest, ex.Message);\r\n            }\r\n            catch (UnauthorizedAccessException ex)\r\n            {\r\n                return Content(HttpStatusCode.Forbidden, ex.Message);\r\n            }\r\n            catch (DbEntityValidationException ex)\r\n            {\r\n                Log.Error(ex, \"Error trying to save a new post\");\r\n                return BadRequest(\"Error publishing a new post\");\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error trying to save a new post\");\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve wall posts asynchronously based on the user's identity, school ID, school IDs list, tag IDs, time frame, page size, filter, team ID, and workgroup, handling exceptions accordingly.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "newPost",
+                        "param_name": "newPost",
+                        "param_desc": "The NewsfeedNewPostV3ViewModel object containing the new post to be added to the wall."
+                    },
+                    {
+                        "name": "PostAsync",
+                        "param_name": "PostAsync",
+                        "param_desc": "The method used to retrieve wall posts asynchronously based on the user's identity, school ID, school IDs list, tag IDs, time frame, page size, filter, team ID, and workgroup, handling exceptions accordingly."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve wall posts asynchronously based on the user's identity, school ID, school IDs list, tag IDs, time frame, page size, filter, team ID, and workgroup, handling exceptions accordingly.\n/// </summary>\n/// <param name=\"newPost\">The NewsfeedNewPostV3ViewModel object containing the new post to be added to the wall.</param>\n/// <param name=\"PostAsync\">The method used to retrieve wall posts asynchronously based on the user's identity, school ID, school IDs list, tag IDs, time frame, page size, filter, team ID, and workgroup, handling exceptions accordingly.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetPostAudienceAsync",
+            "code_start_index": 8525,
+            "method_name": "GetPostAudienceAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// fetch a single post\r\n        /// </summary>\r\n        /// <param name=\"postId\"></param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "postId",
+                    "param_name": "postId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var schoolId = User.Identity.GetSchoolId();\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n            var userId = User.Identity.GetUserId();\r\n\r\n            try\r\n            {\r\n                var postWorkgroups = await _newsfeedService.Post().GetAudienceAsync(postId, userId, schoolId, schoolIdsList);\r\n\r\n                return Ok(postWorkgroups);\r\n            }\r\n            catch (ObjectNotFoundException)\r\n            {\r\n                return StatusCode(HttpStatusCode.NotFound);\r\n            }\r\n            catch (UnauthorizedAccessException)\r\n            {\r\n                return StatusCode(HttpStatusCode.Forbidden);\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error getting the audience of the post with the id {0} by the user {1}\", postId, userId);\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve a post asynchronously based on specified conditions, including user workgroups and school IDs, and return the post along with associated users in a paginated view model.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "postId",
+                        "param_name": "postId",
+                        "param_desc": "The ID of the post to retrieve."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve a post asynchronously based on specified conditions, including user workgroups and school IDs, and return the post along with associated users in a paginated view model.\n/// </summary>\n/// <param name=\"postId\">The ID of the post to retrieve.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "MakePostPublicAsync",
+            "code_start_index": 9606,
+            "method_name": "MakePostPublicAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "postId",
+                    "param_name": "postId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n\r\n            try\r\n            {\r\n                await _newsfeedService.Post().MakePublicAsync(postId, userId, ecoleId, schoolIdsList);\r\n\r\n                return Ok();\r\n            }\r\n            catch (ObjectNotFoundException)\r\n            {\r\n                return StatusCode(HttpStatusCode.NotFound);\r\n            }\r\n            catch (UnauthorizedAccessException)\r\n            {\r\n                return StatusCode(HttpStatusCode.Forbidden);\r\n            }\r\n            catch (InvalidOperationException ex)\r\n            {\r\n                Log.Error(ex, ex.Message, postId, userId);\r\n                return InternalServerError();\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error making public the post with the id {0} by the user {1}\", postId, userId);\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a new post on the newsfeed, notify users, and return the response view model.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "postId",
+                        "param_name": "postId",
+                        "param_desc": "The ID of the post to be made public. It should be an integer value."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a new post on the newsfeed, notify users, and return the response view model.\n/// </summary>\n/// <param name=\"postId\">The ID of the post to be made public. It should be an integer value.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "LikePostAsync",
+            "code_start_index": 11024,
+            "method_name": "LikePostAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Like a post\r\n        /// </summary>\r\n        /// <param name=\"postId\"></param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "postId",
+                    "param_name": "postId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n\r\n            var post = await _db.Posts\r\n                                .Include(p => p.PostLikes)\r\n                                .Include(p => p.PostWorkgroups)\r\n                                .FirstOrDefaultAsync(p => p.Id == postId && (p.DateDelete == null || p.DateDelete > DateTime.Now));\r\n\r\n            if (post == null)\r\n            {\r\n                return NotFound();\r\n            }\r\n\r\n            if (await _newsfeedRightsService.CheckRight(userId, await _newsfeedService.Post().GetPostTypeAsync(postId, userId, schoolIdsList), Models.NewsfeedTabActionEnum.LIKE) == false)\r\n            {\r\n                throw new UnauthorizedAccessException();\r\n            }\r\n\r\n            if (post.PostLikes.Any(pl => pl.UserId == userId))\r\n            {\r\n                return BadRequest(\"You have already liked this post\");\r\n            }\r\n\r\n            post.PostLikes.Add(new PostLike\r\n            {\r\n                PostId = postId,\r\n                UserId = userId\r\n            });\r\n            post.Score++;\r\n\r\n            try\r\n            {\r\n                await _db.SaveChangesAsync();\r\n\r\n                var liker = await RepositoryV3.GetUsers(_db)\r\n                                              .Where(user => user.Id == userId)\r\n                                              .Select(RepositoryV3.GetUserMapExpression(ecoleId)).FirstOrDefaultAsync();\r\n\r\n                //if (!post.PostWorkgroups.Any())\r\n                //{\r\n                GlobalHost.ConnectionManager.GetHubContext<NewsfeedV2Hub>()\r\n                          .Clients.Group(ecoleId.ToString()).onPostLiked(postId, liker);\r\n\r\n                //}\r\n                //else\r\n                //{\r\n                //    foreach (var pw in post.PostWorkgroups)\r\n                //    {\r\n                //        GlobalHost.ConnectionManager.GetHubContext<NewsfeedV2Hub>()\r\n                //            .Clients.Group($\"w-{pw.WorkgroupId}\").onWorkgroupPostLiked(pw.WorkgroupId, postId, liker);\r\n                //    }\r\n\r\n                //}\r\n\r\n                BackgroundJob.Enqueue(() => NotificationSenderManager.SendWallPostLikeNotificationAsync(userId, ecoleId, postId));\r\n\r\n                return Ok(liker);\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error liking the post with the following ID: {0} by userId: {1}\", postId, userId);\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the audience of a specific post asynchronously, handling various exceptions.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "postId",
+                        "param_name": "postId",
+                        "param_desc": "The ID of the post for which the audience is to be retrieved asynchronously. It should be an integer value."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the audience of a specific post asynchronously, handling various exceptions.\n/// </summary>\n/// <param name=\"postId\">The ID of the post for which the audience is to be retrieved asynchronously. It should be an integer value.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "LikePostUndoAsync",
+            "code_start_index": 13947,
+            "method_name": "LikePostUndoAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Undo post like\r\n        /// </summary>\r\n        /// <param name=\"postId\"></param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "postId",
+                    "param_name": "postId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n\r\n            var post = await _db.Posts\r\n                                .Include(p => p.PostLikes)\r\n                                .Include(p => p.PostWorkgroups)\r\n                                .FirstOrDefaultAsync(p => p.Id == postId && p.DateDelete == null);\r\n\r\n            if (post == null)\r\n            {\r\n                return null;\r\n            }\r\n\r\n            var postlike = post.PostLikes.FirstOrDefault(pl => pl.UserId == userId);\r\n            if (postlike != null)\r\n            {\r\n                _db.PostLikes.Remove(postlike);\r\n                post.Score--;\r\n            }\r\n            else\r\n            {\r\n                return BadRequest(\"You have not yet liked this post\");\r\n            }\r\n\r\n            try\r\n            {\r\n                await _db.SaveChangesAsync();\r\n\r\n                GlobalHost.ConnectionManager.GetHubContext<NewsfeedV2Hub>()\r\n                          .Clients.Group(ecoleId.ToString()).onPostUnliked(postId, userId);\r\n\r\n                //if (!post.PostWorkgroups.Any())\r\n                //{\r\n                //}\r\n                //else\r\n                //{\r\n                //    foreach (var postWorkgroup in post.PostWorkgroups)\r\n                //    {\r\n                //        GlobalHost.ConnectionManager.GetHubContext<NewsfeedV2Hub>()\r\n                //            .Clients.Group($\"w-{postWorkgroup.WorkgroupId}\").onWorkgroupPostUnliked(postWorkgroup.WorkgroupId, postId, userId);\r\n                //    }\r\n                //}\r\n\r\n                return Ok();\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error unliking the post with the following ID: {0} by userId: {1}\", postId, userId);\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Make a post public asynchronously, handling various exceptions and logging errors if necessary.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "postId",
+                        "param_name": "postId",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Make a post public asynchronously, handling various exceptions and logging errors if necessary.\n/// </summary>\n/// <param name=\"postId\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "PinPostAsync",
+            "code_start_index": 16125,
+            "method_name": "PinPostAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Pin a post\r\n        /// </summary>\r\n        /// <param name=\"postId\"></param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "postId",
+                    "param_name": "postId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n\r\n            var post = await _newsfeedService.Post().GetPostByIdAsync(postId);\r\n\r\n            if (post == null)\r\n            {\r\n                return NotFound();\r\n            }\r\n\r\n            if (await _newsfeedRightsService.CheckRight(userId, await _newsfeedService.Post().GetPostTypeAsync(postId, userId, schoolIdsList), Models.NewsfeedTabActionEnum.PINNABLE) == false)\r\n            {\r\n                return StatusCode(HttpStatusCode.Forbidden);\r\n            }\r\n\r\n            if (post.IsSticky)\r\n            {\r\n                return BadRequest(\"You have already pinned this post\");\r\n            }\r\n\r\n            var eventTypeLiveId = DataCache.GetEventTypes(_db).FirstOrDefault(et => et.Code.Contains(nameof(EventTypeEnum.LIVE)))?.Id;\r\n            if (post.EventsPosts != null && post.EventsPosts.Any(ep => ep.Event.EventTypeId == eventTypeLiveId) && post.DateDelete != null)\r\n            {\r\n                post.DateDelete = null;\r\n            }\r\n\r\n            post.IsSticky = true;\r\n\r\n            try\r\n            {\r\n                await _db.SaveChangesAsync();\r\n                return Ok();\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error pinning the post with the following ID: {0} by userId: {1}\", postId, userId);\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Like a post asynchronously, checking user rights and adding the user's like to the post.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "postId",
+                        "param_name": "postId",
+                        "param_desc": "The ID of the post to be liked."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Like a post asynchronously, checking user rights and adding the user's like to the post.\n/// </summary>\n/// <param name=\"postId\">The ID of the post to be liked.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "PinPostUndoAsync",
+            "code_start_index": 17900,
+            "method_name": "PinPostUndoAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Unpin a post\r\n        /// </summary>\r\n        /// <param name=\"postId\"></param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "postId",
+                    "param_name": "postId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n\r\n            var post = await _newsfeedService.Post().GetPostByIdAsync(postId);\r\n\r\n            if (post == null)\r\n            {\r\n                return NotFound();\r\n            }\r\n\r\n            if (await _newsfeedRightsService.CheckRight(userId, await _newsfeedService.Post().GetPostTypeAsync(postId, userId, schoolIdsList), Models.NewsfeedTabActionEnum.PINNABLE) == false)\r\n            {\r\n                return StatusCode(HttpStatusCode.Forbidden);\r\n            }\r\n\r\n            if (!post.IsSticky)\r\n            {\r\n                return BadRequest(\"This post is not pinned\");\r\n            }\r\n\r\n            post.IsSticky = false;\r\n\r\n            try\r\n            {\r\n                await _db.SaveChangesAsync();\r\n                return Ok();\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error unpinning the post with the following ID: {0} by userId: {1}\", postId, userId);\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Undo a like action on a post, updating the post score and notifying users if necessary.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "postId",
+                        "param_name": "postId",
+                        "param_desc": "The ID of the post to perform the undo action on."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Undo a like action on a post, updating the post score and notifying users if necessary.\n/// </summary>\n/// <param name=\"postId\">The ID of the post to perform the undo action on.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "DeletePostAsync",
+            "code_start_index": 19318,
+            "method_name": "DeletePostAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Delete a post\r\n        /// </summary>\r\n        /// <param name=\"postId\"></param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "postId",
+                    "param_name": "postId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var currentUser = User.Identity.GetUser();\r\n            var userId = currentUser.Id;\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n\r\n            try\r\n            {\r\n                await _newsfeedService.Post().DeletePostAsync(postId, userId, ecoleId, schoolIdsList);\r\n\r\n                return Ok();\r\n            }\r\n            catch (ObjectNotFoundException)\r\n            {\r\n                return StatusCode(HttpStatusCode.NotFound);\r\n            }\r\n            catch (UnauthorizedAccessException)\r\n            {\r\n                return StatusCode(HttpStatusCode.Forbidden);\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error deleting the post with the id {0} by the user {1}\", postId, userId);\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Pin a post to the top of the newsfeed if user has the right to do so, otherwise return an error message.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "postId",
+                        "param_name": "postId",
+                        "param_desc": "The unique identifier of the post to be deleted."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Pin a post to the top of the newsfeed if user has the right to do so, otherwise return an error message.\n/// </summary>\n/// <param name=\"postId\">The unique identifier of the post to be deleted.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "HidePostToPropectsAsync",
+            "code_start_index": 20621,
+            "method_name": "HidePostToPropectsAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Hide the post to the prospect\r\n        /// The name is like that to avoid users seeing this action\r\n        /// </summary>\r\n        /// <param name=\"postId\">Post ID</param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "postId",
+                    "param_name": "postId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n\r\n            try\r\n            {\r\n                await _newsfeedService.Post().SetHideToPropectAsync(postId, userId, schoolIdsList, true);\r\n\r\n                return Ok();\r\n            }\r\n            catch (ObjectNotFoundException)\r\n            {\r\n                return StatusCode(HttpStatusCode.NotFound);\r\n            }\r\n            catch (UnauthorizedAccessException)\r\n            {\r\n                return StatusCode(HttpStatusCode.Forbidden);\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error setting the htp of the post with the id {0} by the user {1}\", postId, userId);\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Unpin a post if it is currently pinned, based on user rights and post status.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "postId",
+                        "param_name": "postId",
+                        "param_desc": "The ID of the post to unpin. It should be an integer value."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Unpin a post if it is currently pinned, based on user rights and post status.\n/// </summary>\n/// <param name=\"postId\">The ID of the post to unpin. It should be an integer value.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "HidePostToPropectsUndoAsync",
+            "code_start_index": 21853,
+            "method_name": "HidePostToPropectsUndoAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Undo hide the post to the prospect\r\n        /// The name is like that to avoid users seeing this action\r\n        /// </summary>\r\n        /// <param name=\"postId\">Post ID</param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "postId",
+                    "param_name": "postId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n\r\n            try\r\n            {\r\n                await _newsfeedService.Post().SetHideToPropectAsync(postId, userId, schoolIdsList, false);\r\n\r\n                return Ok();\r\n            }\r\n            catch (ObjectNotFoundException)\r\n            {\r\n                return StatusCode(HttpStatusCode.NotFound);\r\n            }\r\n            catch (UnauthorizedAccessException)\r\n            {\r\n                return StatusCode(HttpStatusCode.Forbidden);\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error setting the htp of the post with the id {0} by the user {1}\", postId, userId);\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Delete a post asynchronously, handling exceptions such as ObjectNotFoundException and UnauthorizedAccessException.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "postId",
+                        "param_name": "postId",
+                        "param_desc": "The ID of the post to be deleted. It should be an integer value."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Delete a post asynchronously, handling exceptions such as ObjectNotFoundException and UnauthorizedAccessException.\n/// </summary>\n/// <param name=\"postId\">The ID of the post to be deleted. It should be an integer value.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "PostCommentAsync",
+            "code_start_index": 23186,
+            "method_name": "PostCommentAsync",
+            "existing_summary": "\r\n        #endregion POST\r\n\r\n        #region COMMENT\r\n\r\n        /// <summary>\r\n        /// Posts a new comment on the given post\r\n        /// </summary>\r\n        /// <param name=\"postId\">Post Id</param>\r\n        /// <param name=\"newMessage\"></param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "postId",
+                    "param_name": "postId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "newMessage",
+                    "param_name": "newMessage",
+                    "param_type": "NewsfeedNewCommentV3ViewModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n\r\n            var post = await _newsfeedService.Post().GetPostByIdAsync(postId);\r\n\r\n            if (post == null)\r\n            {\r\n                return NotFound();\r\n            }\r\n\r\n            if (!await _newsfeedService.Comment().CanPostBeCommentedAsync(userId, ecoleId, post))\r\n                return Content(HttpStatusCode.Forbidden, \"Vous ne pouvez pas commenter sur ce post\");\r\n\r\n            try\r\n            {\r\n                if (string.IsNullOrWhiteSpace(newMessage.CommentText))\r\n                {\r\n                    ModelState.AddModelError(\"comment\", \"Votre commentaire ne peut pas \u00eatre vide\");\r\n                }\r\n\r\n                if (!ModelState.IsValid)\r\n                {\r\n                    return BadRequest(ModelState);\r\n                }\r\n\r\n                if (newMessage.File != null && newMessage.Files == null)\r\n                {\r\n                    newMessage.Files = new List<string>\r\n                    {\r\n                        newMessage.File\r\n                    };\r\n                }\r\n                if (newMessage.Files == null)\r\n                {\r\n                    newMessage.Files = new List<string>();\r\n                }\r\n\r\n                if (newMessage.Files != null && newMessage.Files.Count > 1)\r\n                {\r\n                    ModelState.AddModelError(\"comment\", \"La limite du nombre de fichiers d\u00e9pos\u00e9s pour un commentaire a \u00e9t\u00e9 d\u00e9pass\u00e9\");\r\n                    return BadRequest(ModelState);\r\n                }\r\n\r\n                var commentId = await _newsfeedService.Comment().CreateNewPostCommentAsync(post, newMessage.CommentText, newMessage.Files, userId, User.Identity.GetUser().Email);\r\n\r\n                var completeComment = await _newsfeedService.Comment().NotifyOnCommentCreationAsync(postId, commentId, userId, ecoleId, post);\r\n\r\n                return Ok(completeComment);\r\n            }\r\n            catch (KeyNotFoundException ex)\r\n            {\r\n                Log.Error(ex, \"Error posting a new comment\");\r\n                return NotFound();\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error posting a new comment\");\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Hide a post from prospects asynchronously, based on the current user's identity and school IDs list, with error handling for object not found and unauthorized access.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "postId",
+                        "param_name": "postId",
+                        "param_desc": "The ID of the post that the comment will be added to. It should be an integer value."
+                    },
+                    {
+                        "name": "newMessage",
+                        "param_name": "newMessage",
+                        "param_desc": "The view model containing the new comment to be posted on the newsfeed. It should be of type NewsfeedNewCommentV3ViewModel."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Hide a post from prospects asynchronously, based on the current user's identity and school IDs list, with error handling for object not found and unauthorized access.\n/// </summary>\n/// <param name=\"postId\">The ID of the post that the comment will be added to. It should be an integer value.</param>\n/// <param name=\"newMessage\">The view model containing the new comment to be posted on the newsfeed. It should be of type NewsfeedNewCommentV3ViewModel.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "LikeCommentAsync",
+            "code_start_index": 25948,
+            "method_name": "LikeCommentAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Likes a comment\r\n        /// </summary>\r\n        /// <param name=\"commentId\">Comment Id</param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "commentId",
+                    "param_name": "commentId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n\r\n            var comment = await _db.Comments\r\n                                   .Include(p => p.CommentLikes)\r\n                                   .Include(p => p.Post.PostWorkgroups)\r\n                                   .FirstOrDefaultAsync(c => c.Id == commentId && c.DateDelete == null && c.Post.DateDelete == null);\r\n\r\n            if (comment == null)\r\n            {\r\n                return NotFound();\r\n            }\r\n\r\n            if (comment.CommentLikes.Any(cl => cl.UserId == userId))\r\n            {\r\n                return BadRequest(\"You have already liked this comment\");\r\n            }\r\n\r\n            comment.CommentLikes.Add(new CommentLike\r\n            {\r\n                CommentId = commentId,\r\n                UserId = userId\r\n            });\r\n            comment.Score++;\r\n\r\n            try\r\n            {\r\n                await _db.SaveChangesAsync();\r\n\r\n                var liker = await RepositoryV3.GetUsers(_db)\r\n                                              .Where(user => user.Id == userId)\r\n                                              .Select(RepositoryV3.GetUserMapExpression(ecoleId)).FirstOrDefaultAsync();\r\n\r\n                GlobalHost.ConnectionManager.GetHubContext<NewsfeedV2Hub>()\r\n                          .Clients.Group(ecoleId.ToString()).onCommentLiked(comment.PostId, commentId, liker);\r\n\r\n                BackgroundJob.Enqueue(() => NotificationSenderManager.SendWallCommentLikeNotificationAsync(userId, ecoleId, commentId));\r\n\r\n                return Ok(liker);\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error liking the comment with the following ID: {0} by userId: {1}\", commentId, userId);\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Undo the action of hiding a post to prospects, with error handling for different scenarios.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "int",
+                        "param_name": "int",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "commentId",
+                        "param_name": "commentId",
+                        "param_desc": "The generated description for the parameter"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Undo the action of hiding a post to prospects, with error handling for different scenarios.\n/// </summary>\n/// <param name=\"int\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"commentId\">The generated description for the parameter</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "LikeCommentUndoAsync",
+            "code_start_index": 28158,
+            "method_name": "LikeCommentUndoAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Undo liking a comment\r\n        /// </summary>\r\n        /// <param name=\"commentId\">Comment Id</param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "commentId",
+                    "param_name": "commentId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n\r\n            var comment = await _db.Comments\r\n                                   .Include(p => p.Post.PostWorkgroups)\r\n                                   .Include(p => p.CommentLikes)\r\n                                   .FirstOrDefaultAsync(c => c.Id == commentId && c.DateDelete == null && c.Post.DateDelete == null);\r\n\r\n            if (comment == null)\r\n            {\r\n                return null;\r\n            }\r\n\r\n            var commentLike = comment.CommentLikes.FirstOrDefault(cl => cl.UserId == userId);\r\n            if (commentLike != null)\r\n            {\r\n                _db.CommentLikes.Remove(commentLike);\r\n                comment.Score--;\r\n            }\r\n            else\r\n            {\r\n                return BadRequest(\"You have not yet liked this comment\");\r\n            }\r\n\r\n            try\r\n            {\r\n                await _db.SaveChangesAsync();\r\n\r\n                GlobalHost.ConnectionManager.GetHubContext<NewsfeedV2Hub>().Clients.Group(ecoleId.ToString()).onCommentUnliked(comment.PostId, commentId, userId);\r\n\r\n                return Ok();\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error unliking the comment with the following ID: {0} by userId: {1}\", commentId, userId);\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a new comment on a post, including text and optional files, with validation checks and error handling.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "int",
+                        "param_name": "int",
+                        "param_desc": "The ID of the comment to be liked/unliked."
+                    },
+                    {
+                        "name": "commentId",
+                        "param_name": "commentId",
+                        "param_desc": "The ID of the comment to be liked/unliked."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a new comment on a post, including text and optional files, with validation checks and error handling.\n/// </summary>\n/// <param name=\"int\">The ID of the comment to be liked/unliked.</param>\n/// <param name=\"commentId\">The ID of the comment to be liked/unliked.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "DeleteCommentAsync",
+            "code_start_index": 29928,
+            "method_name": "DeleteCommentAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Delete a comment\r\n        /// </summary>\r\n        /// <param name=\"commentId\">Comment Id</param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "commentId",
+                    "param_name": "commentId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var currentUser = User.Identity.GetUser();\r\n            var userId = currentUser.Id;\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n\r\n            try\r\n            {\r\n                await _newsfeedService.Comment().DeleteCommentAsync(commentId, userId, ecoleId, schoolIdsList);\r\n\r\n                return Ok();\r\n            }\r\n            catch (ObjectNotFoundException)\r\n            {\r\n                return StatusCode(HttpStatusCode.NotFound);\r\n            }\r\n            catch (UnauthorizedAccessException)\r\n            {\r\n                return StatusCode(HttpStatusCode.Forbidden);\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error deleting the comment with the id {0} by the user {1}\", commentId, userId);\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Like a comment asynchronously and handle related operations such as checking if the user has already liked the comment, updating the like count, sending notifications, and logging errors if any.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "int",
+                        "param_name": "int",
+                        "param_desc": "The ID of the comment to be deleted"
+                    },
+                    {
+                        "name": "commentId",
+                        "param_name": "commentId",
+                        "param_desc": "The ID of the comment to be deleted"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Like a comment asynchronously and handle related operations such as checking if the user has already liked the comment, updating the like count, sending notifications, and logging errors if any.\n/// </summary>\n/// <param name=\"int\">The ID of the comment to be deleted</param>\n/// <param name=\"commentId\">The ID of the comment to be deleted</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetCreatePostVM",
+            "code_start_index": 30979,
+            "method_name": "GetCreatePostVM",
+            "existing_summary": "\r\n        #endregion COMMENT\r\n\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "ecoleId",
+                    "param_name": "ecoleId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "currentSchool",
+                    "param_name": "currentSchool",
+                    "param_type": "Ecole",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "post",
+                    "param_name": "post",
+                    "param_type": "Post",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "host",
+                    "param_name": "host",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var dnsList = DataCache.GetDnsConfigs(_db)\r\n                                .Select(s => s.Dns)\r\n                                .ToList();\r\n\r\n            var postVm = await RepositoryV3.GetPosts(_db, currentSchool.OrganismeId)\r\n                .Where(p => p.Id == post.Id)\r\n                .Select(RepositoryV3.GetPostMapExpression(userId))\r\n                .ToListAsync();\r\n\r\n            foreach (var p in postVm)\r\n            {\r\n                foreach (var dns in dnsList)\r\n                {\r\n                    p.Body = p.Body.Replace(dns, host);\r\n                }\r\n            }\r\n\r\n            var usersIds = RepositoryV3.GetUsersIds(postVm);\r\n\r\n            var users = await RepositoryV3.GetUsers(_db)\r\n                .Join(_db.GetIdList(usersIds), u => u.Id, tmp => tmp.Val, (u, tmp) => u)\r\n                .Select(RepositoryV3.GetUserMapExpression(ecoleId))\r\n                .ToListAsync();\r\n\r\n            var item = new NewsfeedItemV3ViewModel\r\n            {\r\n                Posts = postVm,\r\n                Users = users\r\n            };\r\n            return item;\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Undo a like on a comment, updating the database and notifying relevant users if the user has previously liked the comment.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The ID of the user who wants to undo the like on a comment."
+                    },
+                    {
+                        "name": "ecoleId",
+                        "param_name": "ecoleId",
+                        "param_desc": "The ID of the school to which the action is related."
+                    },
+                    {
+                        "name": "currentSchool",
+                        "param_name": "currentSchool",
+                        "param_desc": "An object representing the current school of the user."
+                    },
+                    {
+                        "name": "post",
+                        "param_name": "post",
+                        "param_desc": "An object representing the post for which the like is being undone."
+                    },
+                    {
+                        "name": "host",
+                        "param_name": "host",
+                        "param_desc": "The host address of the request initiating the action."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Undo a like on a comment, updating the database and notifying relevant users if the user has previously liked the comment.\n/// </summary>\n/// <param name=\"userId\">The ID of the user who wants to undo the like on a comment.</param>\n/// <param name=\"ecoleId\">The ID of the school to which the action is related.</param>\n/// <param name=\"currentSchool\">An object representing the current school of the user.</param>\n/// <param name=\"post\">An object representing the post for which the like is being undone.</param>\n/// <param name=\"host\">The host address of the request initiating the action.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "NewsfeedV5Controller"
+}

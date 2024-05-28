@@ -1,0 +1,77 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Studi.Api.Lms.User/Mapper/ItoConverter.cs",
+    "index_shift_code": 121,
+    "struct_type": "Class",
+    "namespace_name": "",
+    "usings": [
+        "Studi.Api.Lms.User.RequestModel"
+    ],
+    "access_modifier": "public static",
+    "struct_name": "ItoConverter",
+    "base_class_name": "",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "ToIto",
+            "code_start_index": 175,
+            "method_name": "ToIto",
+            "existing_summary": "    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "profExpRequestModel",
+                    "param_name": "profExpRequestModel",
+                    "param_type": "ProfessionalExperienceRequestModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        // TODO: transform to service transfert object\r\n        return ProfessionalExperienceIto.CreateNewWithNewCompany(\r\n            position: profExpRequestModel.Position ?? throw new ArgumentException(nameof(profExpRequestModel.Position)),\r\n            companyName: string.IsNullOrWhiteSpace(profExpRequestModel.CompanyName) ? \"N.C\" : profExpRequestModel.CompanyName,\r\n            contractType: new ContractTypeIto(0, profExpRequestModel.ContractTypeCode ?? throw new ArgumentException(nameof(profExpRequestModel.ContractTypeCode)), \"N.C\"),\r\n            activityArea: profExpRequestModel.ActivityArea ?? throw new ArgumentException(nameof(profExpRequestModel.ActivityArea)),\r\n            dateEntry: profExpRequestModel.DateEntry,\r\n            dateRelease: profExpRequestModel.DateRelease);\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a new professional experience transfer object with specified details.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "ProfessionalExperienceRequestModel",
+                        "param_name": "ProfessionalExperienceRequestModel",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "profExpRequestModel",
+                        "param_name": "profExpRequestModel",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "ToIto",
+                        "param_name": "ToIto",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "Create a new professional experience transfer object with specified details.",
+                        "param_name": "Create a new professional experience transfer object with specified details.",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a new professional experience transfer object with specified details.\n/// </summary>\n/// <param name=\"ProfessionalExperienceRequestModel\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"profExpRequestModel\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"ToIto\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"Create a new professional experience transfer object with specified details.\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "ItoConverter"
+}

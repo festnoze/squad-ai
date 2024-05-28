@@ -1,0 +1,162 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/V3/ServiceAccessV3Controller.cs",
+    "index_shift_code": 273,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V3",
+    "usings": [
+        "LMS.Attributes",
+        "LMS.Attributes.Routing",
+        "LMS.Authentication",
+        "LMS.Models.ViewModels",
+        "LMS.Services.Interfaces",
+        "System.Threading.Tasks",
+        "System.Web.Http",
+        "System.Web.Http.Description"
+    ],
+    "access_modifier": "public",
+    "struct_name": "ServiceAccessV3Controller",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetServiceAccessDetail",
+            "code_start_index": 814,
+            "method_name": "GetServiceAccessDetail",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "serviceCode",
+                    "param_name": "serviceCode",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var schoolUserId = User.Identity.GetSchoolUserId();\r\n            return Ok(await serviceAccessService.GetServiceAccessByCodeAndEcoleUserId(serviceCode, schoolUserId));\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the types of resources available for events.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "serviceCode",
+                        "param_name": "serviceCode",
+                        "param_desc": "The code that identifies the service."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the types of resources available for events.\n/// </summary>\n/// <param name=\"serviceCode\">The code that identifies the service.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ActivateService",
+            "code_start_index": 1247,
+            "method_name": "ActivateService",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "serviceCode",
+                    "param_name": "serviceCode",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var schoolUserId = User.Identity.GetSchoolUserId();\r\n            return Ok(await serviceAccessService.ActivateService(serviceCode, schoolUserId));\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the types of resources available for events on campus.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "serviceCode",
+                        "param_name": "serviceCode",
+                        "param_desc": "The service code used to identify the specific service to activate."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the types of resources available for events on campus.\n/// </summary>\n/// <param name=\"serviceCode\">The service code used to identify the specific service to activate.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ReportService",
+            "code_start_index": 1584,
+            "method_name": "ReportService",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "serviceCode",
+                    "param_name": "serviceCode",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var schoolId = User.Identity.GetSchoolId();\r\n            await serviceAccessService.ReportServiceAccess(userId, schoolId, serviceCode);\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the service access detail for the currently authenticated school user.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "serviceCode",
+                        "param_name": "serviceCode",
+                        "param_desc": "The code that uniquely identifies the service."
+                    },
+                    {
+                        "name": "method",
+                        "param_name": "method",
+                        "param_desc": "The name of the method for which the description is generated."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the service access detail for the currently authenticated school user.\n/// </summary>\n/// <param name=\"serviceCode\">The code that uniquely identifies the service.</param>\n/// <param name=\"method\">The name of the method for which the description is generated.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "ServiceAccessV3Controller"
+}

@@ -162,7 +162,7 @@ class Llm:
         #prompt = hub.pull("hwchase17/openai-tools-agent")
         prompt = ChatPromptTemplate.from_messages(
             [
-                ("system", "You're a helpful AI assistant. You know which tools use to solve the given user problem."),
+                ("system", "You're a helpful AI assistant. You know which tools to use to solve the given user problem."),
                 ("human", "{input}"),
                 MessagesPlaceholder("agent_scratchpad")
             ]

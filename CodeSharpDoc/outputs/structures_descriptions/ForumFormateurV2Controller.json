@@ -1,0 +1,186 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/V2/ForumFormateurV2Controller.cs",
+    "index_shift_code": 490,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V2",
+    "usings": [
+        "LMS.Attributes.Routing",
+        "LMS.Authentication",
+        "LMS.Data",
+        "LMS.Models.BindingModels.V2.ForumsFormateurs",
+        "LMS.Models.ViewModels.V2.Forum",
+        "LMS.ModelsDTOs.Forum",
+        "LMS.ModelsDTOs.ForumFormateur",
+        "LMS.Services",
+        "LMS.Utils",
+        "Serilog",
+        "System",
+        "System.Collections.Generic",
+        "System.Net",
+        "System.Threading.Tasks",
+        "System.Web.Http",
+        "System.Web.Http.Description"
+    ],
+    "access_modifier": "public",
+    "struct_name": "ForumFormateurV2Controller",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetAffectationsAsync",
+            "code_start_index": 1345,
+            "method_name": "GetAffectationsAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Retourne la liste des affectations forum pour le formateurs\r\n        /// </summary>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n\r\n            var estFormateur = await this.IsTeacher(_db);\r\n\r\n            if (!estFormateur)\r\n            {\r\n                return StatusCode(HttpStatusCode.Forbidden);\r\n            }\r\n\r\n            var result = await _forumFormateurService.GetAffectations(userId);\r\n\r\n            return Ok(result);\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the affectations for the current user if they are a teacher.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "method",
+                        "param_name": "method",
+                        "param_desc": "GetAffectationsAsync - Retrieve the affectations for the current user if they are a teacher."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the affectations for the current user if they are a teacher.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"method\">GetAffectationsAsync - Retrieve the affectations for the current user if they are a teacher.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetFormateurForumPostsAsync",
+            "code_start_index": 2528,
+            "method_name": "GetFormateurForumPostsAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Retourne les forumPosts associ\u00e9es \u00e0 l'utilisateur en question (doit \u00eatre de type formateur)\r\n        /// </summary>\r\n        /// <param name=\"start\"></param>\r\n        /// <param name=\"sort\"></param>\r\n        /// <param name=\"searchTerms\"></param>\r\n        /// <param name=\"pageSize\"></param>\r\n        /// <param name=\"affectation\"></param>\r\n        /// <param name=\"forumTypeCode\"></param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "start",
+                    "param_name": "start",
+                    "param_type": "string",
+                    "has_default_value": true,
+                    "default_value": "null",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "sort",
+                    "param_name": "sort",
+                    "param_type": "string",
+                    "has_default_value": true,
+                    "default_value": "\"new\"",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "searchTerms",
+                    "param_name": "searchTerms",
+                    "param_type": "string",
+                    "has_default_value": true,
+                    "default_value": "null",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "pageSize",
+                    "param_name": "pageSize",
+                    "param_type": "int",
+                    "has_default_value": true,
+                    "default_value": "40",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "affectation",
+                    "param_name": "affectation",
+                    "param_type": "string",
+                    "has_default_value": true,
+                    "default_value": "null",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "forumTypeCode",
+                    "param_name": "forumTypeCode",
+                    "param_type": "string",
+                    "has_default_value": true,
+                    "default_value": "null",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n\r\n            var estFormateur = await this.IsTeacher(_db);\r\n\r\n            if (!estFormateur)\r\n            {\r\n                return StatusCode(HttpStatusCode.Forbidden);\r\n            }\r\n\r\n            try\r\n            {\r\n                var pagedData = await _forumFormateurService.GetFormateurForumPosts(\r\n                        userId,\r\n                        ecoleId,\r\n                        start,\r\n                        sort,\r\n                        searchTerms,\r\n                        pageSize,\r\n                        affectation,\r\n                        forumTypeCode);\r\n\r\n                return Ok(pagedData);\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                return BadRequest(ex.Message);\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve forum posts for a teacher based on their user ID and school ID, with optional search terms, sorting, and pagination. If the teacher is not found, return a forbidden status code.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "start",
+                        "param_name": "start",
+                        "param_desc": "The starting point for pagination. It defaults to null if not provided."
+                    },
+                    {
+                        "name": "sort",
+                        "param_name": "sort",
+                        "param_desc": "The criteria for sorting the forum posts. It defaults to 'new' if not specified."
+                    },
+                    {
+                        "name": "searchTerms",
+                        "param_name": "searchTerms",
+                        "param_desc": "The terms to search for in the forum posts. It defaults to null if not provided."
+                    },
+                    {
+                        "name": "pageSize",
+                        "param_name": "pageSize",
+                        "param_desc": "The number of forum posts to fetch per page. It defaults to 40 if not specified."
+                    },
+                    {
+                        "name": "affectation",
+                        "param_name": "affectation",
+                        "param_desc": "The assignment or allocation related to the forum posts. It defaults to null if not provided."
+                    },
+                    {
+                        "name": "forumTypeCode",
+                        "param_name": "forumTypeCode",
+                        "param_desc": "The code representing the type of forum. It defaults to null if not provided."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve forum posts for a teacher based on their user ID and school ID, with optional search terms, sorting, and pagination. If the teacher is not found, return a forbidden status code.\n/// </summary>\n/// <param name=\"start\">The starting point for pagination. It defaults to null if not provided.</param>\n/// <param name=\"sort\">The criteria for sorting the forum posts. It defaults to 'new' if not specified.</param>\n/// <param name=\"searchTerms\">The terms to search for in the forum posts. It defaults to null if not provided.</param>\n/// <param name=\"pageSize\">The number of forum posts to fetch per page. It defaults to 40 if not specified.</param>\n/// <param name=\"affectation\">The assignment or allocation related to the forum posts. It defaults to null if not provided.</param>\n/// <param name=\"forumTypeCode\">The code representing the type of forum. It defaults to null if not provided.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "ForumFormateurV2Controller"
+}

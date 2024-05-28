@@ -1,0 +1,497 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Studi.Api.Lms.User/Controllers/Unavailability/UnavailabilityController.cs",
+    "index_shift_code": 740,
+    "struct_type": "Class",
+    "namespace_name": "",
+    "usings": [],
+    "access_modifier": "public",
+    "struct_name": "UnavailabilityController",
+    "base_class_name": "ControllerWithAuthenticationBase",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetUnavailabilityReasonCategoriesAsync",
+            "code_start_index": 1467,
+            "method_name": "GetUnavailabilityReasonCategoriesAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 1,
+            "code": "{\r\n        var data = await this._unavailabilityService.GetUnavailabilityReasonCategoriesAsync();\r\n        return data.Select(q => q.ToResponseModel());\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve unavailability reason categories asynchronously.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no parameters",
+                        "param_name": "no parameters",
+                        "param_desc": "The method 'GetUnavailabilityReasonCategoriesAsync' does not have any parameters."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve unavailability reason categories asynchronously.\n/// </summary>\n/// <param name=\"no parameters\">The method 'GetUnavailabilityReasonCategoriesAsync' does not have any parameters.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetUnavailabilityReasonsAsync",
+            "code_start_index": 1963,
+            "method_name": "GetUnavailabilityReasonsAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "onlyEnabled",
+                    "param_name": "onlyEnabled",
+                    "param_type": "bool",
+                    "has_default_value": true,
+                    "default_value": "false",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "unavailabilityReasonCategoryId",
+                    "param_name": "unavailabilityReasonCategoryId",
+                    "param_type": "int?",
+                    "has_default_value": true,
+                    "default_value": "null",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        var data = await this._unavailabilityService.GetUnavailabilityReasonsAsync(onlyEnabled, unavailabilityReasonCategoryId);\r\n        return data.Select(q => q.ToResponseModel());\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve unavailability reasons asynchronously based on specified conditions and convert them to response models.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "onlyEnabled",
+                        "param_name": "onlyEnabled",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "unavailabilityReasonCategoryId",
+                        "param_name": "unavailabilityReasonCategoryId",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve unavailability reasons asynchronously based on specified conditions and convert them to response models.\n/// </summary>\n/// <param name=\"onlyEnabled\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"unavailabilityReasonCategoryId\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetPeriodEndDateRuleAsync",
+            "code_start_index": 2628,
+            "method_name": "GetPeriodEndDateRuleAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "unavailabilityReasonId",
+                    "param_name": "unavailabilityReasonId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        var data = await this._unavailabilityService.GetPeriodEndDateRuleAsync(unavailabilityReasonId);\r\n        return data.ToResponseModel();\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the period end date rule for a specific unavailability reason asynchronously.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "unavailabilityReasonId",
+                        "param_name": "unavailabilityReasonId",
+                        "param_desc": "The ID of the unavailability reason for which the period end date rule needs to be retrieved. It should be an integer value."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the period end date rule for a specific unavailability reason asynchronously.\n/// </summary>\n/// <param name=\"unavailabilityReasonId\">The ID of the unavailability reason for which the period end date rule needs to be retrieved. It should be an integer value.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetUnavailabilityStatuses",
+            "code_start_index": 3115,
+            "method_name": "GetUnavailabilityStatuses",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 1,
+            "code": "{\r\n        var data = this._unavailabilityService.GetUnavailabilityStatuses();\r\n        return data.Select(q => q.ToResponseModel());\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the unavailability statuses and convert them to response models.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "method",
+                        "param_name": "method",
+                        "param_desc": "GetUnavailabilityStatuses - Retrieve the unavailability statuses and convert them to response models."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the unavailability statuses and convert them to response models.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"method\">GetUnavailabilityStatuses - Retrieve the unavailability statuses and convert them to response models.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetPeriodDatesRules",
+            "code_start_index": 3559,
+            "method_name": "GetPeriodDatesRules",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 1,
+            "code": "{\r\n        var data = this._unavailabilityService.GetPeriodDatesRules();\r\n        return data.Select(q => q.ToResponseModel());\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve period dates rules from the unavailability service and convert them to response models.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "method",
+                        "param_name": "method",
+                        "param_desc": "GetPeriodDatesRules - Retrieve period dates rules from the unavailability service and convert them to response models."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve period dates rules from the unavailability service and convert them to response models.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"method\">GetPeriodDatesRules - Retrieve period dates rules from the unavailability service and convert them to response models.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "SearchUserUnavailabilitiesAsync",
+            "code_start_index": 3989,
+            "method_name": "SearchUserUnavailabilitiesAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "pagination",
+                    "param_name": "pagination",
+                    "param_type": "Pagination<object>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "onlyEnabledFiles",
+                    "param_name": "onlyEnabledFiles",
+                    "param_type": "bool",
+                    "has_default_value": true,
+                    "default_value": "true",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        var fieldNameDecorator = new TransformTextFromMappingDecorator(FilterableFieldMapper.UserUnavailabilityRequestToAtoDicoMapping);\r\n        fieldNameDecorator.SetTranformText(new TransformTextToLower());\r\n        PaginationTools.TransformFilterFieldName(pagination!.FiltersCompositions, fieldNameDecorator);\r\n        PaginationTools.TransformSortFieldName(pagination!.Sort, fieldNameDecorator);\r\n\r\n        // Get total\r\n        var total = await this._unavailabilityService.CountUserUnavailabilitiesAsync(pagination!.FiltersCompositions);\r\n\r\n        var data = Enumerable.Empty<IUserUnavailabilityAto>();\r\n\r\n        if (total > 0)\r\n            data = await this._unavailabilityService.GetUserUnavailabilitiesAsync(pagination.Skip, pagination.Take, pagination!.FiltersCompositions, pagination!.Sort, onlyEnabledFiles);\r\n        \r\n        return new PaginedData<IUserUnavailabilityResponseModel>\r\n        {\r\n            Data = data.Select(q => q.ToResponseModel()),\r\n            Total = total,\r\n        };\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve user unavailabilities with pagination and filtering, returning a paginated list of user unavailability response models.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "pagination",
+                        "param_name": "pagination",
+                        "param_desc": "Pagination object for controlling the page size and number of items to skip. It is of type 'object'."
+                    },
+                    {
+                        "name": "onlyEnabledFiles",
+                        "param_name": "onlyEnabledFiles",
+                        "param_desc": "A boolean flag indicating whether to only consider enabled files. Defaults to 'true'."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve user unavailabilities with pagination and filtering, returning a paginated list of user unavailability response models.\n/// </summary>\n/// <param name=\"pagination\">Pagination object for controlling the page size and number of items to skip. It is of type 'object'.</param>\n/// <param name=\"onlyEnabledFiles\">A boolean flag indicating whether to only consider enabled files. Defaults to 'true'.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "CreateUserUnavailabilitiesAsync",
+            "code_start_index": 5359,
+            "method_name": "CreateUserUnavailabilitiesAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "model",
+                    "param_name": "model",
+                    "param_type": "UserUnavailabilityCRequestModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return await this._unavailabilityService.CreateUserUnavailabilityAsync(model!.UserId, model!.UnavailabilityReasonId, model!.StartDate, model!.EndDate, model!.Description, User.StudiIdentity().IntranetEmail, model!.FilesIds);\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create user unavailabilities with specified details, including reason, start date, end date, description, and optional files.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "model",
+                        "param_name": "model",
+                        "param_desc": "The UserUnavailabilityCRequestModel object containing details such as reason, start date, end date, description, and optional files."
+                    },
+                    {
+                        "name": "method",
+                        "param_name": "method",
+                        "param_desc": "The name of the method which is 'CreateUserUnavailabilitiesAsync'. This method is used to create user unavailabilities with specified details."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create user unavailabilities with specified details, including reason, start date, end date, description, and optional files.\n/// </summary>\n/// <param name=\"model\">The UserUnavailabilityCRequestModel object containing details such as reason, start date, end date, description, and optional files.</param>\n/// <param name=\"method\">The name of the method which is 'CreateUserUnavailabilitiesAsync'. This method is used to create user unavailabilities with specified details.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetUserUnavailabilityAsync",
+            "code_start_index": 5920,
+            "method_name": "GetUserUnavailabilityAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "unavailabilityId",
+                    "param_name": "unavailabilityId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "onlyEnabledFiles",
+                    "param_name": "onlyEnabledFiles",
+                    "param_type": "bool",
+                    "has_default_value": true,
+                    "default_value": "true",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        var data = await this._unavailabilityService.GetUserUnavailabilityAsync(unavailabilityId, onlyEnabledFiles);\r\n        return data!.ToResponseModel();\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve user unavailability data and convert it to a response model.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "unavailabilityId",
+                        "param_name": "unavailabilityId",
+                        "param_desc": "The unique identifier for the unavailability."
+                    },
+                    {
+                        "name": "onlyEnabledFiles",
+                        "param_name": "onlyEnabledFiles",
+                        "param_desc": "A boolean flag indicating whether to retrieve only enabled files. Default value is true."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve user unavailability data and convert it to a response model.\n/// </summary>\n/// <param name=\"unavailabilityId\">The unique identifier for the unavailability.</param>\n/// <param name=\"onlyEnabledFiles\">A boolean flag indicating whether to retrieve only enabled files. Default value is true.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "UpdateUserUnavailabilitiesAsync",
+            "code_start_index": 6431,
+            "method_name": "UpdateUserUnavailabilitiesAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "unavailabilityId",
+                    "param_name": "unavailabilityId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "model",
+                    "param_name": "model",
+                    "param_type": "UserUnavailabilityURequestModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        if (unavailabilityId != model.Id)\r\n            BadRequest();\r\n\r\n        await this._unavailabilityService.UpdateUserUnavailabilityAsync(unavailabilityId, model!.UserId, model!.UnavailabilityReasonId, model!.StartDate, model!.EndDate, model!.Description, User.StudiIdentity().IntranetEmail, model.UnavailabilityFiles?.Select(q => q.ToAto()));\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update user unavailabilities asynchronously with the provided information.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "unavailabilityId",
+                        "param_name": "unavailabilityId",
+                        "param_desc": "The ID of the unavailability to be updated. It should be an integer."
+                    },
+                    {
+                        "name": "model",
+                        "param_name": "model",
+                        "param_desc": "The request model containing the new information for the user unavailability update."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update user unavailabilities asynchronously with the provided information.\n/// </summary>\n/// <param name=\"unavailabilityId\">The ID of the unavailability to be updated. It should be an integer.</param>\n/// <param name=\"model\">The request model containing the new information for the user unavailability update.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "DisableUserUnavailabilitiesAsync",
+            "code_start_index": 7117,
+            "method_name": "DisableUserUnavailabilitiesAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "unavailabilityId",
+                    "param_name": "unavailabilityId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        await this._unavailabilityService.DisableUserUnavailabilityAsync(unavailabilityId, User.StudiIdentity().IntranetEmail);\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Disable user unavailabilities asynchronously.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "unavailabilityId",
+                        "param_name": "unavailabilityId",
+                        "param_desc": "The ID of the unavailability to be disabled. It should be of type integer."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Disable user unavailabilities asynchronously.\n/// </summary>\n/// <param name=\"unavailabilityId\">The ID of the unavailability to be disabled. It should be of type integer.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "UnavailabilityController"
+}

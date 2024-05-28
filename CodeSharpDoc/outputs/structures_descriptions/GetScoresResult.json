@@ -1,0 +1,70 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/V3/HallOfFameV3Controller.cs",
+    "index_shift_code": 13074,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V3",
+    "usings": [
+        "System",
+        "System.Collections.Generic",
+        "System.Data.Entity",
+        "System.Linq",
+        "System.Threading.Tasks",
+        "System.Web",
+        "System.Web.Http",
+        "System.Web.Http.Description",
+        "LMS.Attributes",
+        "LMS.Attributes.Routing",
+        "LMS.Authentication",
+        "Lms.Common.Enumerations",
+        "LMS.Data",
+        "LMS.Domains.ActivityReport",
+        "LMS.Models.ViewModels.V3.HallOfFame",
+        "LMS.Models.ViewModels.V3.Newsfeed",
+        "LMS.Utils",
+        "LMS.Utils.Cache"
+    ],
+    "access_modifier": "private",
+    "struct_name": "GetScoresResult",
+    "base_class_name": "",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [],
+    "properties": [
+        {
+            "name": "EcoleId",
+            "prop_name": "EcoleId",
+            "prop_type": "int",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "UserId",
+            "prop_name": "UserId",
+            "prop_type": "int",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "HasPicture",
+            "prop_name": "HasPicture",
+            "prop_type": "bool",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "DurationQuarter",
+            "prop_name": "DurationQuarter",
+            "prop_type": "int",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "DurationWeek",
+            "prop_name": "DurationWeek",
+            "prop_type": "int",
+            "is_property": true,
+            "is_field": false
+        }
+    ],
+    "name": "GetScoresResult"
+}

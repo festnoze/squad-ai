@@ -1,0 +1,383 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Studi.Api.Lms.User/Controllers/Unavailability/Mapper/AtoToResponseModelMapper.cs",
+    "index_shift_code": 315,
+    "struct_type": "Class",
+    "namespace_name": "",
+    "usings": [
+        "Studi.Api.Lms.User.Application.Services.Unavailability.ATOs",
+        "Studi.Api.Lms.User.ExchangeDataContract.V1.Unavailability.ResponseModels",
+        "Studi.Api.Lms.User.ExchangeDataContract.V1.Unavailability.ResponseModels.Implementations"
+    ],
+    "access_modifier": "public static",
+    "struct_name": "AtoToResponseModelMapper",
+    "base_class_name": "",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "ToResponseModel",
+            "code_start_index": 381,
+            "method_name": "ToResponseModel",
+            "existing_summary": "    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "ato",
+                    "param_name": "ato",
+                    "param_type": "IUnavailabilityStatusAto",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return new UnavailabilityStatusResponseModel(\r\n            ato.Id,\r\n            ato.Code,\r\n            ato.Description);\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": null,
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "IUnavailabilityStatusAto",
+                        "param_name": "IUnavailabilityStatusAto",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "ato",
+                        "param_name": "ato",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "",
+            "code_chunks": null
+        },
+        {
+            "name": "ToResponseModel",
+            "code_start_index": 632,
+            "method_name": "ToResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "ato",
+                    "param_name": "ato",
+                    "param_type": "IPeriodDatesRuleAto",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return new PeriodDatesRuleResponseModel(\r\n            ato.Id,\r\n            ato.Code,\r\n            ato.Description);\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": null,
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "IPeriodDatesRuleAto",
+                        "param_name": "IPeriodDatesRuleAto",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "ato",
+                        "param_name": "ato",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "",
+            "code_chunks": null
+        },
+        {
+            "name": "ToResponseModel",
+            "code_start_index": 868,
+            "method_name": "ToResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "ato",
+                    "param_name": "ato",
+                    "param_type": "IPeriodEndDateRuleAto",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return new PeriodEndDateRuleResponseModel(\r\n            (int) ato.Rule,\r\n            ato.Days);\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": null,
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "IPeriodEndDateRuleAto",
+                        "param_name": "IPeriodEndDateRuleAto",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "ato",
+                        "param_name": "ato",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "",
+            "code_chunks": null
+        },
+        {
+            "name": "ToResponseModel",
+            "code_start_index": 1088,
+            "method_name": "ToResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "ato",
+                    "param_name": "ato",
+                    "param_type": "IUnavailabilityReasonCategoryAto",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return new UnavailabilityReasonCategoryResponseModel(\r\n            ato.Id,\r\n            ato.Code,\r\n            ato.Name,\r\n            ato.Description);\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": null,
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "IUnavailabilityReasonCategoryAto",
+                        "param_name": "IUnavailabilityReasonCategoryAto",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "ato",
+                        "param_name": "ato",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "ToResponseModel",
+                        "param_name": "ToResponseModel",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "None",
+                        "param_name": "None",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "",
+            "code_chunks": null
+        },
+        {
+            "name": "ToResponseModel",
+            "code_start_index": 1386,
+            "method_name": "ToResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "ato",
+                    "param_name": "ato",
+                    "param_type": "IUnavailabilityReasonAto",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return new UnavailabilityReasonResponseModel(\r\n            ato.Id,\r\n            ato.Code,\r\n            ato.Name,\r\n            ato.Description,\r\n            ato.UnavailabilityReasonCategoryId,\r\n            ato.IsDisabled);\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": null,
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "IUnavailabilityReasonAto",
+                        "param_name": "IUnavailabilityReasonAto",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "ato",
+                        "param_name": "ato",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "",
+            "code_chunks": null
+        },
+        {
+            "name": "ToResponseModel",
+            "code_start_index": 1738,
+            "method_name": "ToResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "ato",
+                    "param_name": "ato",
+                    "param_type": "IUserUnavailabilityAto",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return new UserUnavailabilityResponseModel(\r\n            (int) ato.Status,\r\n            ato.Id,\r\n            ato.UserId,\r\n            ato.UnavailabilityReason!.ToResponseModel(),\r\n            ato.StartDate,\r\n            ato.EndDate,\r\n            ato.UnavailabilityFiles!.Select(q => q.ToResponseModel()),\r\n            ato.Description,\r\n            ato.CreateAt,\r\n            ato.CreateBy,\r\n            ato.UpdateAt,\r\n            ato.UpdateBy,\r\n            ato.IsDisabled);\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": null,
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "IUserUnavailabilityAto",
+                        "param_name": "IUserUnavailabilityAto",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "ato",
+                        "param_name": "ato",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "ToResponseModel",
+                        "param_name": "ToResponseModel",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "None",
+                        "param_name": "None",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "",
+            "code_chunks": null
+        },
+        {
+            "name": "ToResponseModel",
+            "code_start_index": 2337,
+            "method_name": "ToResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "ato",
+                    "param_name": "ato",
+                    "param_type": "IUserUnavailabilityFileAto",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return new UserUnavailabilityFileResponseModel(\r\n            ato.Id,\r\n            ato.FileId,\r\n            ato.FileName,\r\n            ato.FileUrl,\r\n            ato.FileHash,\r\n            ato.FileSize,\r\n            ato.CreateAt,\r\n            ato.CreateBy,\r\n            ato.UpdateAt,\r\n            ato.UpdateBy,\r\n            ato.IsDisabled);\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": null,
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "IUserUnavailabilityFileAto",
+                        "param_name": "IUserUnavailabilityFileAto",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "ato",
+                        "param_name": "ato",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "AtoToResponseModelMapper"
+}

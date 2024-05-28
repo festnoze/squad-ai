@@ -1,0 +1,23 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Studi.Api.Lms.User/ResponseModel/PictureResponseModel.cs",
+    "index_shift_code": 118,
+    "struct_type": "Class",
+    "namespace_name": "",
+    "usings": [],
+    "access_modifier": "public",
+    "struct_name": "PictureResponseModel",
+    "base_class_name": "",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [],
+    "properties": [
+        {
+            "name": "PictureUrl",
+            "prop_name": "PictureUrl",
+            "prop_type": "Uri?",
+            "is_property": true,
+            "is_field": false
+        }
+    ],
+    "name": "PictureResponseModel"
+}

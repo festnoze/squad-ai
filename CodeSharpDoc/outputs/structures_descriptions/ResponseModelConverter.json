@@ -1,0 +1,1551 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Studi.Api.Lms.User/Mapper/ResponseModelConverter.cs",
+    "index_shift_code": 704,
+    "struct_type": "Class",
+    "namespace_name": "",
+    "usings": [],
+    "access_modifier": "public static partial",
+    "struct_name": "ResponseModelConverter",
+    "base_class_name": "",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "ToTrainingResponseModel",
+            "code_start_index": 776,
+            "method_name": "ToTrainingResponseModel",
+            "existing_summary": "    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "trainings",
+                    "param_name": "trainings",
+                    "param_type": "IEnumerable<TrainingModel>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return trainings.ToList().AsReadOnly().ToTrainingResponseModel();\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Convert a list of trainings to a read-only training response model.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "trainings",
+                        "param_name": "trainings",
+                        "param_desc": "The list of TrainingModel instances that are to be converted to a read-only training response model."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Convert a list of trainings to a read-only training response model.\n/// </summary>\n/// <param name=\"trainings\">The list of TrainingModel instances that are to be converted to a read-only training response model.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ToTrainingResponseModel",
+            "code_start_index": 776,
+            "method_name": "ToTrainingResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "trainings",
+                    "param_name": "trainings",
+                    "param_type": "ReadOnlyCollection<TrainingModel>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        var result = new List<TrainingResponseModel>();\r\n        foreach (var training in trainings)\r\n        {\r\n            var trainingResponseModel = new TrainingResponseModel(\r\n                promotionId: training.PromotionId,\r\n                courseName: training.CourseName,\r\n                promotionName: training.PromotionName,\r\n                statusCode: training.CourseStatusCode,\r\n                statusName: training.CourseStatusName,\r\n                registrationDate: training.RegistrationDate,\r\n                isSchoolCertificateAvailable: training.IsSchoolCertificateAvailable,\r\n                isTrainingCertificateAvailable: training.IsTrainingCertificateAvailable,\r\n                remainingDays: training.RemainingDays\r\n               );\r\n\r\n            result.Add(trainingResponseModel);\r\n        }\r\n        return result;\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a list of TrainingResponseModel objects based on the provided trainings data.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "trainings",
+                        "param_name": "trainings",
+                        "param_desc": "The list of TrainingModel objects to be used for creating TrainingResponseModel objects."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a list of TrainingResponseModel objects based on the provided trainings data.\n/// </summary>\n/// <param name=\"trainings\">The list of TrainingModel objects to be used for creating TrainingResponseModel objects.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ToPersonalInfosResponseModel",
+            "code_start_index": 1980,
+            "method_name": "ToPersonalInfosResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userModel",
+                    "param_name": "userModel",
+                    "param_type": "UserModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "culture",
+                    "param_name": "culture",
+                    "param_type": "string?",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        if (userModel is null || userModel.Name is null || userModel.PersonalInformations is null)\r\n        {\r\n            return null;\r\n        }\r\n        else\r\n        {\r\n            return new PersonalInformationsResponseModel(\r\n                pseudo: userModel.Name.Pseudo,\r\n                civility: userModel.Name.Civility?.Value ?? string.Empty,\r\n                firstName: userModel.Name.FirstName,\r\n                lastName: userModel.Name.LastName,\r\n                birthName: userModel.Name.BirthName,\r\n                emailAddress: userModel.Email!.Value,\r\n                phoneNumber: userModel.PersonalInformations.PhoneNumbers.FirstOrDefault()?.Number ?? string.Empty,\r\n                birthDate: userModel.PersonalInformations.BirthInfos?.BirthDate,\r\n                birthPlace: userModel.PersonalInformations.BirthInfos?.BirthLocalization.ToString() ?? string.Empty,\r\n                actualLocation: userModel.PersonalInformations.ActualLocation.ToResponseModel(),\r\n                nationality: userModel.PersonalInformations.Nationality ?? string.Empty,\r\n                timezone: new LocationService().GetGmtInfosByTimezoneId(userModel.PersonalInformations.Address?.Timezone?.TimezoneId ?? string.Empty, culture ?? \"fr-FR\") ?? string.Empty,\r\n                address: userModel.PersonalInformations.Address.ToResponseModel());\r\n        }\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a response model with personal information details extracted from a given user model, including name, email, phone number, birth date, nationality, timezone, and address.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "UserModel",
+                        "param_name": "UserModel",
+                        "param_desc": "The user model parameter containing information such as name, email, phone number, birth date, nationality, timezone, and address."
+                    },
+                    {
+                        "name": "culture",
+                        "param_name": "culture",
+                        "param_desc": "The optional parameter representing the culture or language setting for localization purposes."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a response model with personal information details extracted from a given user model, including name, email, phone number, birth date, nationality, timezone, and address.\n/// </summary>\n/// <param name=\"UserModel\">The user model parameter containing information such as name, email, phone number, birth date, nationality, timezone, and address.</param>\n/// <param name=\"culture\">The optional parameter representing the culture or language setting for localization purposes.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ToResponseModel",
+            "code_start_index": 3481,
+            "method_name": "ToResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "actualLocation",
+                    "param_name": "actualLocation",
+                    "param_type": "ActualLocationModel?",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return new ActualLocationResponseModel(\r\n            countryCode: actualLocation?.CountryCode ?? string.Empty,\r\n            timezoneId: actualLocation?.TimezoneId ?? string.Empty);\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a response model based on the actual location data, including country code and timezone ID.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "ActualLocationModel?",
+                        "param_name": "ActualLocationModel?",
+                        "param_desc": "The model representing the actual location data."
+                    },
+                    {
+                        "name": "actualLocation",
+                        "param_name": "actualLocation",
+                        "param_desc": "The actual location data to be used for creating the response model."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a response model based on the actual location data, including country code and timezone ID.\n/// </summary>\n/// <param name=\"ActualLocationModel?\">The model representing the actual location data.</param>\n/// <param name=\"actualLocation\">The actual location data to be used for creating the response model.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ToBasicInfoResponseModel",
+            "code_start_index": 3792,
+            "method_name": "ToBasicInfoResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userModel",
+                    "param_name": "userModel",
+                    "param_type": "UserModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        if (userModel is null) return null;\r\n\r\n        return new BasicInfoResponseModel(\r\n            pseudo: userModel.Name.Pseudo,\r\n            firstName: userModel.Name.FirstName,\r\n            lastName: userModel.Name.LastName,\r\n            aboutMe: userModel.BasicInfo.AboutMe,\r\n            linkedInUrl: userModel.BasicInfo.LinkedInUrl.Uri?.AbsoluteUri,\r\n            doesAppearInRanking: userModel.UserSchoolOptions.DoesAppearInRanking,\r\n            doesAppearInLearnerDirectory: userModel.UserSchoolOptions.DoesAppearInLearnerDirectory,\r\n            isOpenToCollaboration: userModel.UserSchoolOptions.IsOpenToCollaboration,\r\n            backgroundPictureUrl: userModel.BasicInfo.BackgroundPictureUrl,\r\n            profilePictureUrl: userModel.BasicInfo.ProfilePictureUrl);\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a response model with basic information extracted from a user model, including pseudo, first name, last name, about me, LinkedIn URL, appearance in ranking and directory, openness to collaboration, background picture URL, and profile picture URL.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "UserModel",
+                        "param_name": "UserModel",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "userModel",
+                        "param_name": "userModel",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "ToBasicInfoResponseModel",
+                        "param_name": "ToBasicInfoResponseModel",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a response model with basic information extracted from a user model, including pseudo, first name, last name, about me, LinkedIn URL, appearance in ranking and directory, openness to collaboration, background picture URL, and profile picture URL.\n/// </summary>\n/// <param name=\"UserModel\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"userModel\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"ToBasicInfoResponseModel\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ToPublicInfoResponseModel",
+            "code_start_index": 4682,
+            "method_name": "ToPublicInfoResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userModel",
+                    "param_name": "userModel",
+                    "param_type": "UserModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        if (userModel is null) return null;\r\n\r\n        return new PublicInfoResponseModel(\r\n            pseudo: userModel.Name.Pseudo,\r\n            civility: userModel.Name.Civility?.Value,\r\n            firstName: userModel.Name.FirstName,\r\n            lastName: userModel.Name.LastName,\r\n            birthName: userModel.Name.BirthName,\r\n            aboutMe: userModel.BasicInfo.AboutMe,\r\n            linkedInUrl: userModel.BasicInfo.LinkedInUrl.Uri?.AbsoluteUri,\r\n            doesAppearInRanking: userModel.UserSchoolOptionsLoaded() ? userModel.UserSchoolOptions.DoesAppearInRanking : null,\r\n            doesAppearInLearnerDirectory: userModel.UserSchoolOptionsLoaded() ? userModel.UserSchoolOptions.DoesAppearInLearnerDirectory : null,\r\n            isOpenToCollaboration: userModel.UserSchoolOptionsLoaded() ? userModel.UserSchoolOptions.IsOpenToCollaboration : null,\r\n            backgroundPictureUrl: userModel.BasicInfo.BackgroundPictureUrl,\r\n            profilePictureUrl: userModel.BasicInfo.ProfilePictureUrl,\r\n            professionalExperiences: userModel.ProfessionalExperiences.ToResponseModel(),\r\n            trainings: userModel.TrainingsLoaded() ? userModel.Trainings.ToTrainingResponseModel() : new List<TrainingResponseModel>(),\r\n            scores: userModel.UserScoresLoaded() ? userModel.UserScores?.ToResponseModel() : null,\r\n            study: userModel.StudiesLoaded() ? userModel.Studies?.LastOrDefault()?.ToResponseModel() : null\r\n        );\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a response model containing public information based on the provided user model data.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "UserModel",
+                        "param_name": "UserModel",
+                        "param_desc": "The user model data that serves as the input to generate the public information response model."
+                    },
+                    {
+                        "name": "userModel",
+                        "param_name": "userModel",
+                        "param_desc": "The user model data that serves as the input to generate the public information response model."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a response model containing public information based on the provided user model data.\n/// </summary>\n/// <param name=\"UserModel\">The user model data that serves as the input to generate the public information response model.</param>\n/// <param name=\"userModel\">The user model data that serves as the input to generate the public information response model.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ToResponseModel",
+            "code_start_index": 6263,
+            "method_name": "ToResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "professionalExperiences",
+                    "param_name": "professionalExperiences",
+                    "param_type": "IEnumerable<ProfessionalExperienceModel>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return professionalExperiences.Select((professionalExperience, index) => new ProfessionalExperienceResponseModel(\r\n            id: professionalExperience.Id!.Value,\r\n            position: professionalExperience.Position ?? string.Empty,\r\n            companyName: professionalExperience.Company?.Name ?? string.Empty,\r\n            contractType: new ContractTypeForProfessionalExperienceResponseModel(\r\n                professionalExperience.ContractType.Code, professionalExperience.ContractType.Name!),\r\n            activityArea: professionalExperience.ActivityArea?.Name ?? string.Empty,\r\n            dateEntry: professionalExperience.DateEntry.Date,\r\n            dateRelease: professionalExperience.DateRelease?.Date,\r\n            durationInMonths: professionalExperience.DurationInMonths,\r\n            isCurrent: professionalExperience.IsCurrent,\r\n            order: index + 1));\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a response model for a list of professional experiences including relevant details such as position, company name, contract type, activity area, dates, duration, and order.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "professionalExperiences",
+                        "param_name": "professionalExperiences",
+                        "param_desc": "The list of professional experiences of type IEnumerable<ProfessionalExperienceModel>. This parameter contains professional experience data including details such as position, company name, contract type, activity area, dates, duration, and order."
+                    },
+                    {
+                        "name": "ToResponseModel",
+                        "param_name": "ToResponseModel",
+                        "param_desc": "The method named ToResponseModel is responsible for creating a response model for a list of professional experiences. It generates a structured model that includes relevant details of each professional experience such as position, company name, contract type, activity area, dates, duration, and order."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a response model for a list of professional experiences including relevant details such as position, company name, contract type, activity area, dates, duration, and order.\n/// </summary>\n/// <param name=\"professionalExperiences\">The list of professional experiences of type IEnumerable<ProfessionalExperienceModel>. This parameter contains professional experience data including details such as position, company name, contract type, activity area, dates, duration, and order.</param>\n/// <param name=\"ToResponseModel\">The method named ToResponseModel is responsible for creating a response model for a list of professional experiences. It generates a structured model that includes relevant details of each professional experience such as position, company name, contract type, activity area, dates, duration, and order.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ToResponseModel",
+            "code_start_index": 7326,
+            "method_name": "ToResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "studies",
+                    "param_name": "studies",
+                    "param_type": "IEnumerable<StudyModel>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return studies.Select(s => s.ToResponseModel());\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Convert a list of studies into a response model.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "studies",
+                        "param_name": "studies",
+                        "param_desc": "The list of StudyModel objects to be converted into a response model."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Convert a list of studies into a response model.\n/// </summary>\n/// <param name=\"studies\">The list of StudyModel objects to be converted into a response model.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ToResponseModel",
+            "code_start_index": 7509,
+            "method_name": "ToResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "scores",
+                    "param_name": "scores",
+                    "param_type": "UserScoresModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return new UserScoresResponseModel()\r\n        {\r\n            QuarterScore = new UserScoresResponseModel.Score()\r\n            {\r\n                Duration = scores.QuarterScore.Duration,\r\n                Points = scores.QuarterScore.Points,\r\n                Position = scores.QuarterScore.Position\r\n            },\r\n            WeekScore = new UserScoresResponseModel.Score()\r\n            {\r\n                Duration = scores.WeekScore.Duration,\r\n                Points = scores.WeekScore.Points,\r\n                Position = scores.WeekScore.Position\r\n            }\r\n        };\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a response model with quarter and week scores for a user.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "UserScoresModel",
+                        "param_name": "UserScoresModel",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "scores",
+                        "param_name": "scores",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a response model with quarter and week scores for a user.\n/// </summary>\n/// <param name=\"UserScoresModel\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"scores\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ToResponseModel",
+            "code_start_index": 8197,
+            "method_name": "ToResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "study",
+                    "param_name": "study",
+                    "param_type": "StudyModel?",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return new StudyInfoResponseModel(\r\n            studyLevel: study?.HighestDegreeTitle ?? String.Empty,\r\n            lastStudyName: study?.LastFollowedCourseTitle ?? String.Empty,\r\n            highestDegree: new DegreeResponseModel(study?.Degree?.Code ?? String.Empty, study?.Degree?.Name ?? String.Empty),\r\n            graduationYear: study?.GraduationYear);\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a response model with study information, including study level, last followed course name, highest degree details, and graduation year.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "StudyModel?",
+                        "param_name": "StudyModel?",
+                        "param_desc": "The model representing a study, including study level, last followed course name, highest degree details, and graduation year."
+                    },
+                    {
+                        "name": "study",
+                        "param_name": "study",
+                        "param_desc": "The specific study instance to be used to create the response model with study information."
+                    },
+                    {
+                        "name": "ToResponseModel",
+                        "param_name": "ToResponseModel",
+                        "param_desc": "The method responsible for creating a response model with study information, including study level, last followed course name, highest degree details, and graduation year."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a response model with study information, including study level, last followed course name, highest degree details, and graduation year.\n/// </summary>\n/// <param name=\"StudyModel?\">The model representing a study, including study level, last followed course name, highest degree details, and graduation year.</param>\n/// <param name=\"study\">The specific study instance to be used to create the response model with study information.</param>\n/// <param name=\"ToResponseModel\">The method responsible for creating a response model with study information, including study level, last followed course name, highest degree details, and graduation year.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ToResponseModel",
+            "code_start_index": 8663,
+            "method_name": "ToResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "address",
+                    "param_name": "address",
+                    "param_type": "AddressModel?",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return new AddressResponseModel(\r\n            streetNumber: address?.StreetNumber ?? string.Empty,\r\n            streetType: address?.StreetType?.Name ?? string.Empty,\r\n            streetName: address?.StreetName ?? string.Empty,\r\n            complement: address?.Complement ?? string.Empty,\r\n            postCode: address?.PostCode ?? string.Empty,\r\n            city: address?.City ?? string.Empty,\r\n            country: address?.Country?.Name ?? string.Empty);\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a response model based on the provided address information.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "AddressModel?",
+                        "param_name": "AddressModel?",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "address",
+                        "param_name": "address",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a response model based on the provided address information.\n/// </summary>\n/// <param name=\"AddressModel?\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"address\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ToResponseModel",
+            "code_start_index": 9234,
+            "method_name": "ToResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "contractTypes",
+                    "param_name": "contractTypes",
+                    "param_type": "IEnumerable<ContractTypeIto>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        foreach (var contractType in contractTypes)\r\n        {\r\n            yield return new ContractTypeForProfessionalExperienceResponseModel(contractType.Code, contractType.Name!);\r\n        }\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a response model for each contract type in a collection.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "contractTypes",
+                        "param_name": "contractTypes",
+                        "param_desc": "The list of contract types to be converted to response models. It is of type IEnumerable<ContractTypeIto>."
+                    },
+                    {
+                        "name": "ToResponseModel",
+                        "param_name": "ToResponseModel",
+                        "param_desc": "The method that creates a response model for each contract type in the provided collection. It is used for converting contract types to response models."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a response model for each contract type in a collection.\n/// </summary>\n/// <param name=\"contractTypes\">The list of contract types to be converted to response models. It is of type IEnumerable<ContractTypeIto>.</param>\n/// <param name=\"ToResponseModel\">The method that creates a response model for each contract type in the provided collection. It is used for converting contract types to response models.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ToResponseModel",
+            "code_start_index": 9594,
+            "method_name": "ToResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "degrees",
+                    "param_name": "degrees",
+                    "param_type": "IEnumerable<DegreeIto>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return degrees.Select(degree => new DegreeResponseModel(degree.Code, degree?.Name ?? string.Empty));\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a response model based on the degrees provided.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "degrees",
+                        "param_name": "degrees",
+                        "param_desc": "Represents an IEnumerable of objects of type DegreeIto. It is used as input to the method ToResponseModel to create a response model based on the provided degrees."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a response model based on the degrees provided.\n/// </summary>\n/// <param name=\"degrees\">Represents an IEnumerable of objects of type DegreeIto. It is used as input to the method ToResponseModel to create a response model based on the provided degrees.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ToResponseModel",
+            "code_start_index": 9825,
+            "method_name": "ToResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "notificationsSettings",
+                    "param_name": "notificationsSettings",
+                    "param_type": "IEnumerable<NotificationsSettingsModel>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        var userNotificationList = new List<NotificationResponseModel>();\r\n        foreach (var moduleMotifications in notificationsSettings)\r\n            foreach (var notificationSetting in moduleMotifications.Notifications!)\r\n                userNotificationList.Add(new NotificationResponseModel(notificationSetting.NotificationTypeCode!, notificationSetting.Preference!.SendEmail, notificationSetting.Preference!.SendPush));\r\n\r\n        userNotificationList = userNotificationList.OrderBy(n => n.notificationTypeCode).ToList();\r\n\r\n        // Then convert this list into a dictionary\r\n        var result = new Dictionary<string, NotificationValuesResponseModel>(userNotificationList.Count);\r\n        userNotificationList.ForEach(n =>\r\n            result.Add(\r\n                n.notificationTypeCode,\r\n                new NotificationValuesResponseModel(n.isEmailSubscriptionActive, n.isPushSubscriptionActive)));\r\n\r\n        return result;\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a dictionary of notification values based on user preferences for email and push notifications.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "notificationsSettings",
+                        "param_name": "notificationsSettings",
+                        "param_desc": "Represents an IEnumerable of NotificationsSettingsModel which contains the user's preferences for notifications."
+                    },
+                    {
+                        "name": "ToResponseModel",
+                        "param_name": "ToResponseModel",
+                        "param_desc": "Represents the existing method that creates a dictionary of notification values based on user preferences for email and push notifications."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a dictionary of notification values based on user preferences for email and push notifications.\n/// </summary>\n/// <param name=\"notificationsSettings\">Represents an IEnumerable of NotificationsSettingsModel which contains the user's preferences for notifications.</param>\n/// <param name=\"ToResponseModel\">Represents the existing method that creates a dictionary of notification values based on user preferences for email and push notifications.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ToUserProfileReviewResponseModel",
+            "code_start_index": 10938,
+            "method_name": "ToUserProfileReviewResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userProfileReviewDate",
+                    "param_name": "userProfileReviewDate",
+                    "param_type": "DateTime?",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return new UserProfileReviewResponseModel\r\n        {\r\n            HasUserReviewedItsProfile = userProfileReviewDate != null,\r\n            ProfileReviewDate = userProfileReviewDate,\r\n        };\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a response model indicating whether a user has reviewed their profile and the date of the review if available.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "DateTime?",
+                        "param_name": "DateTime?",
+                        "param_desc": "The parameter represents a date and time value. It is optional as indicated by the '?' symbol. This parameter is used to specify the date of the user profile review."
+                    },
+                    {
+                        "name": "userProfileReviewDate",
+                        "param_name": "userProfileReviewDate",
+                        "param_desc": "This parameter represents the date when the user reviewed their profile. It is a required parameter and should be provided in the method call."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a response model indicating whether a user has reviewed their profile and the date of the review if available.\n/// </summary>\n/// <param name=\"DateTime?\">The parameter represents a date and time value. It is optional as indicated by the '?' symbol. This parameter is used to specify the date of the user profile review.</param>\n/// <param name=\"userProfileReviewDate\">This parameter represents the date when the user reviewed their profile. It is a required parameter and should be provided in the method call.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ToResponseModel",
+            "code_start_index": 11272,
+            "method_name": "ToResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "handicapInformation",
+                    "param_name": "handicapInformation",
+                    "param_type": "HandicapInformationModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return new HandicapInformationResponseModel\r\n        {\r\n            Handicaps = handicapInformation.Handicaps.Select(h => h.ToResponseModel()).ToList(),\r\n            Document = handicapInformation.Document.ToResponseModel(),\r\n            ConsentGiven = handicapInformation.ConsentGiven\r\n        };\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a response model based on the given handicap information, including a list of handicaps, a document, and consent status.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "HandicapInformationModel",
+                        "param_name": "HandicapInformationModel",
+                        "param_desc": "The model containing information about the handicaps"
+                    },
+                    {
+                        "name": "handicapInformation",
+                        "param_name": "handicapInformation",
+                        "param_desc": "The specific handicap information to be included in the response model"
+                    },
+                    {
+                        "name": "ToResponseModel",
+                        "param_name": "ToResponseModel",
+                        "param_desc": "The method responsible for creating a response model"
+                    },
+                    {
+                        "name": "purpose",
+                        "param_name": "purpose",
+                        "param_desc": "The purpose of the method ToResponseModel"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a response model based on the given handicap information, including a list of handicaps, a document, and consent status.\n/// </summary>\n/// <param name=\"HandicapInformationModel\">The model containing information about the handicaps</param>\n/// <param name=\"handicapInformation\">The specific handicap information to be included in the response model</param>\n/// <param name=\"ToResponseModel\">The method responsible for creating a response model</param>\n/// <param name=\"purpose\">The purpose of the method ToResponseModel</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ToResponseModel",
+            "code_start_index": 11714,
+            "method_name": "ToResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "handicapModel",
+                    "param_name": "handicapModel",
+                    "param_type": "UserHandicapModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return new HandicapResponseModel(handicapModel.Code, handicapModel.Name ?? String.Empty);\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a response model based on the provided handicap model code and name, with an empty string as default value if the name is null.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "handicapModel",
+                        "param_name": "handicapModel",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "ToResponseModel",
+                        "param_name": "ToResponseModel",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "Create a response model based on the provided handicap model code and name, with an empty string as default value if the name is null.",
+                        "param_name": "Create a response model based on the provided handicap model code and name, with an empty string as default value if the name is null.",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a response model based on the provided handicap model code and name, with an empty string as default value if the name is null.\n/// </summary>\n/// <param name=\"handicapModel\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"ToResponseModel\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"Create a response model based on the provided handicap model code and name, with an empty string as default value if the name is null.\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ToResponseModel",
+            "code_start_index": 11924,
+            "method_name": "ToResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userDocumentModel",
+                    "param_name": "userDocumentModel",
+                    "param_type": "UserDocumentModel?",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        if (userDocumentModel == null)\r\n        {\r\n            return null;\r\n        }\r\n        else\r\n        {\r\n            return new HandicapDocumentResponseModel(\r\n                proofDocumentTypeCode: DocumentTypeConverter.ToDocumentTypeCode(userDocumentModel.DocumentType),\r\n                name: userDocumentModel.Name,\r\n                url: userDocumentModel.FileUrl);\r\n        }\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a response model based on user document data.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "UserDocumentModel?",
+                        "param_name": "UserDocumentModel?",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "userDocumentModel",
+                        "param_name": "userDocumentModel",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a response model based on user document data.\n/// </summary>\n/// <param name=\"UserDocumentModel?\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"userDocumentModel\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ConvertToProfilePictureResponseModel",
+            "code_start_index": 12439,
+            "method_name": "ConvertToProfilePictureResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userModel",
+                    "param_name": "userModel",
+                    "param_type": "UserModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        if (userModel?.BasicInfo?.ProfilePictureUrl is null)\r\n        {\r\n            return null;\r\n        }\r\n\r\n        return new PictureResponseModel\r\n        {\r\n            PictureUrl = userModel.BasicInfo.ProfilePictureUrl\r\n        };\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a response model with a picture URL from a user's basic info if the profile picture URL is not null.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "UserModel",
+                        "param_name": "UserModel",
+                        "param_desc": "The model representing the user's basic information."
+                    },
+                    {
+                        "name": "userModel",
+                        "param_name": "userModel",
+                        "param_desc": "The instance of the UserModel that contains the user's basic information."
+                    },
+                    {
+                        "name": "ConvertToProfilePictureResponseModel",
+                        "param_name": "ConvertToProfilePictureResponseModel",
+                        "param_desc": "The method responsible for creating a response model with a picture URL from a user's basic info if the profile picture URL is not null."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a response model with a picture URL from a user's basic info if the profile picture URL is not null.\n/// </summary>\n/// <param name=\"UserModel\">The model representing the user's basic information.</param>\n/// <param name=\"userModel\">The instance of the UserModel that contains the user's basic information.</param>\n/// <param name=\"ConvertToProfilePictureResponseModel\">The method responsible for creating a response model with a picture URL from a user's basic info if the profile picture URL is not null.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ConvertToHeaderPictureResponseModel",
+            "code_start_index": 12794,
+            "method_name": "ConvertToHeaderPictureResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userModel",
+                    "param_name": "userModel",
+                    "param_type": "UserModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        if (userModel?.BasicInfo?.BackgroundPictureUrl is null)\r\n        {\r\n            return null;\r\n        }\r\n\r\n        return new PictureResponseModel\r\n        {\r\n            PictureUrl = userModel.BasicInfo.BackgroundPictureUrl\r\n        };\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a PictureResponseModel with the background picture URL from the given userModel's basic info, if it exists.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "UserModel",
+                        "param_name": "UserModel",
+                        "param_desc": "The UserModel object containing the basic info of the user."
+                    },
+                    {
+                        "name": "userModel",
+                        "param_name": "userModel",
+                        "param_desc": "The userModel object representing the user's basic info to extract the background picture URL from, if it exists."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a PictureResponseModel with the background picture URL from the given userModel's basic info, if it exists.\n/// </summary>\n/// <param name=\"UserModel\">The UserModel object containing the basic info of the user.</param>\n/// <param name=\"userModel\">The userModel object representing the user's basic info to extract the background picture URL from, if it exists.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ToResponseModel",
+            "code_start_index": 13154,
+            "method_name": "ToResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "convocation",
+                    "param_name": "convocation",
+                    "param_type": "ConvocationIto",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return new ConvocationResponseModel()\r\n        {\r\n            Id = convocation.Id,\r\n            UserId = convocation.UserId,\r\n            SchoolId = convocation.SchoolId,\r\n            PromotionId = convocation.PromotionId,\r\n            CourseName = convocation.CourseName,\r\n            LastName = convocation.LastName,\r\n            MaidenName = convocation.MaidenName,\r\n            FirstName = convocation.FirstName,\r\n            BirthDate = convocation.BirthDate,\r\n            BirthCity = convocation.BirthCity,\r\n            BirthCountryId = convocation.BirthCountryId,\r\n            NationalityId = convocation.NationalityId,\r\n            HasRQTH = convocation.HasRQTH,\r\n            TimezoneId = convocation.TimezoneId,\r\n            ExamsSummonAddressId = convocation.ExamsSummonAddressId,\r\n            NotificationDate = convocation.NotificationDate,\r\n            DownloadDate = convocation.DownloadDate\r\n        };\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a response model based on the Convocation data with specific attributes.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "ConvocationIto",
+                        "param_name": "ConvocationIto",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "convocation",
+                        "param_name": "convocation",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "ToResponseModel",
+                        "param_name": "ToResponseModel",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "Create",
+                        "param_name": "Create",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "response",
+                        "param_name": "response",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "model",
+                        "param_name": "model",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "based",
+                        "param_name": "based",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "Convocation",
+                        "param_name": "Convocation",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "data",
+                        "param_name": "data",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "specific",
+                        "param_name": "specific",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "attributes",
+                        "param_name": "attributes",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a response model based on the Convocation data with specific attributes.\n/// </summary>\n/// <param name=\"ConvocationIto\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"convocation\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"ToResponseModel\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"Create\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"response\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"model\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"based\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"Convocation\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"data\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"specific\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"attributes\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ToResponseModel",
+            "code_start_index": 14190,
+            "method_name": "ToResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "convocations",
+                    "param_name": "convocations",
+                    "param_type": "IEnumerable<ConvocationIto>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return convocations.Select(c => c.ToResponseModel());\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Convert a collection of convocations to response models.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "convocations",
+                        "param_name": "convocations",
+                        "param_desc": "The collection of ConvocationIto objects to be converted to response models."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Convert a collection of convocations to response models.\n/// </summary>\n/// <param name=\"convocations\">The collection of ConvocationIto objects to be converted to response models.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ToResponseModel",
+            "code_start_index": 14389,
+            "method_name": "ToResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "notifications",
+                    "param_name": "notifications",
+                    "param_type": "UserNotificationsUnreadModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return new UserNotificationsUnreadResponseModel()\r\n        {\r\n            ConvocationsUnread = notifications.ConvocationsUnread,\r\n            TotalUnread = notifications.ConvocationsUnread\r\n        };\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a response model for user notifications with unread convocations and total unread notifications.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "UserNotificationsUnreadModel",
+                        "param_name": "UserNotificationsUnreadModel",
+                        "param_desc": "The model representing unread notifications for the user."
+                    },
+                    {
+                        "name": "notifications",
+                        "param_name": "notifications",
+                        "param_desc": "The notifications to be processed for unread convocations and total unread notifications."
+                    },
+                    {
+                        "name": "ToResponseModel",
+                        "param_name": "ToResponseModel",
+                        "param_desc": "The method responsible for creating a response model for user notifications with unread convocations and total unread notifications."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a response model for user notifications with unread convocations and total unread notifications.\n/// </summary>\n/// <param name=\"UserNotificationsUnreadModel\">The model representing unread notifications for the user.</param>\n/// <param name=\"notifications\">The notifications to be processed for unread convocations and total unread notifications.</param>\n/// <param name=\"ToResponseModel\">The method responsible for creating a response model for user notifications with unread convocations and total unread notifications.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ToResponseModel",
+            "code_start_index": 14736,
+            "method_name": "ToResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userConfigInfosIto",
+                    "param_name": "userConfigInfosIto",
+                    "param_type": "UserConfigInfosIto",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return new UserConfigInfosResponseModel()\r\n        {\r\n            MemberType = userConfigInfosIto.MemberType,\r\n            IsCommunityManager = userConfigInfosIto.isCommunityManager,\r\n            IsInternal = userConfigInfosIto.isInternal\r\n        };\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a response model for user configuration information.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "UserConfigInfosIto",
+                        "param_name": "UserConfigInfosIto",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "userConfigInfosIto",
+                        "param_name": "userConfigInfosIto",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a response model for user configuration information.\n/// </summary>\n/// <param name=\"UserConfigInfosIto\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"userConfigInfosIto\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ToViewModel",
+            "code_start_index": 15120,
+            "method_name": "ToViewModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "lastSessionInfosModel",
+                    "param_name": "lastSessionInfosModel",
+                    "param_type": "LastSessionInfosModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return new LastSessionInfosResponseModel()\r\n        {\r\n            LoginDate = lastSessionInfosModel.LoginDate,\r\n            LogoutDate = lastSessionInfosModel.LogoutDate,\r\n            Device = lastSessionInfosModel.Device,\r\n            IpAddress = lastSessionInfosModel.IpAddress,\r\n            Browser = lastSessionInfosModel.Browser,\r\n            TotalTime = lastSessionInfosModel.TotalTime\r\n        };\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a view model containing last session information details.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "LastSessionInfosModel",
+                        "param_name": "LastSessionInfosModel",
+                        "param_desc": "The LastSessionInfosModel parameter represents the model containing information about the last session."
+                    },
+                    {
+                        "name": "lastSessionInfosModel",
+                        "param_name": "lastSessionInfosModel",
+                        "param_desc": "The lastSessionInfosModel parameter is an instance of the LastSessionInfosModel class that holds details about the last session."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a view model containing last session information details.\n/// </summary>\n/// <param name=\"LastSessionInfosModel\">The LastSessionInfosModel parameter represents the model containing information about the last session.</param>\n/// <param name=\"lastSessionInfosModel\">The lastSessionInfosModel parameter is an instance of the LastSessionInfosModel class that holds details about the last session.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ToUserFirstConnectionResponseModel",
+            "code_start_index": 15661,
+            "method_name": "ToUserFirstConnectionResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userFirstConnectionDate",
+                    "param_name": "userFirstConnectionDate",
+                    "param_type": "DateTime?",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return new UserFirstConnectionResponseModel\r\n        {\r\n            FirstConnectionDate = userFirstConnectionDate,\r\n        };\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a response model with the user's first connection date.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "DateTime?",
+                        "param_name": "DateTime?",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "userFirstConnectionDate",
+                        "param_name": "userFirstConnectionDate",
+                        "param_desc": "The generated description for the parameter"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a response model with the user's first connection date.\n/// </summary>\n/// <param name=\"DateTime?\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"userFirstConnectionDate\">The generated description for the parameter</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ToUserProfileResponseModel",
+            "code_start_index": 15935,
+            "method_name": "ToUserProfileResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "ato",
+                    "param_name": "ato",
+                    "param_type": "IUserProfileRAto",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return new UserProfileResponseModel(ato.Id, ato.CivilityId, ato.LastName, ato.FirstName, ato.BirthDate?.ToDateTime(TimeOnly.MinValue), ato.Email, ato.Pseudo, ato.IsOfficial, ato.IsTester, ato.MaidenName);\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a user profile response model with specified attributes.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "IUserProfileRAto",
+                        "param_name": "IUserProfileRAto",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "ato",
+                        "param_name": "ato",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "ToUserProfileResponseModel",
+                        "param_name": "ToUserProfileResponseModel",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "Create",
+                        "param_name": "Create",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "a",
+                        "param_name": "a",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "user",
+                        "param_name": "user",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "profile",
+                        "param_name": "profile",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "response",
+                        "param_name": "response",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "model",
+                        "param_name": "model",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "with",
+                        "param_name": "with",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "specified",
+                        "param_name": "specified",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "attributes",
+                        "param_name": "attributes",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a user profile response model with specified attributes.\n/// </summary>\n/// <param name=\"IUserProfileRAto\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"ato\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"ToUserProfileResponseModel\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"Create\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"a\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"user\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"profile\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"response\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"model\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"with\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"specified\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"attributes\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ToResponseModel",
+            "code_start_index": 16259,
+            "method_name": "ToResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userSideMenuItemModel",
+                    "param_name": "userSideMenuItemModel",
+                    "param_type": "UserSideMenuItemModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return new UserSideMenuItemResponseModel()\r\n        {\r\n            SideMenuItemCode = Enum.Parse<UserSideMenuItemCodeResponseModel>(userSideMenuItemModel.SideMenuItemCode.ToString()),\r\n            SubItems = userSideMenuItemModel?.SubItems?.Select(si => si.ToResponseModel()) ?? Enumerable.Empty<UserSideMenuItemResponseModel>()\r\n        };\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a response model for a user side menu item, including sub-items if available.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "UserSideMenuItemModel",
+                        "param_name": "UserSideMenuItemModel",
+                        "param_desc": "The model representing a user side menu item."
+                    },
+                    {
+                        "name": "userSideMenuItemModel",
+                        "param_name": "userSideMenuItemModel",
+                        "param_desc": "The instance of UserSideMenuItemModel to be converted to a response model."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a response model for a user side menu item, including sub-items if available.\n/// </summary>\n/// <param name=\"UserSideMenuItemModel\">The model representing a user side menu item.</param>\n/// <param name=\"userSideMenuItemModel\">The instance of UserSideMenuItemModel to be converted to a response model.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ToResponseModel",
+            "code_start_index": 16740,
+            "method_name": "ToResponseModel",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "accessRight",
+                    "param_name": "accessRight",
+                    "param_type": "AccessRightEnum",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return (AccessRightEnumResponseModel)accessRight;\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Convert an object to an AccessRightEnumResponseModel.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "AccessRightEnum",
+                        "param_name": "AccessRightEnum",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "accessRight",
+                        "param_name": "accessRight",
+                        "param_desc": "The generated description for the parameter"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Convert an object to an AccessRightEnumResponseModel.\n/// </summary>\n/// <param name=\"AccessRightEnum\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"accessRight\">The generated description for the parameter</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "ResponseModelConverter"
+}

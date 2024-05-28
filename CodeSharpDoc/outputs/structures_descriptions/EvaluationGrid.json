@@ -1,0 +1,54 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/V3/EvaluationsV3Controller.cs",
+    "index_shift_code": 48856,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V3",
+    "usings": [
+        "LMS.Attributes",
+        "LMS.Attributes.Routing",
+        "LMS.Authentication",
+        "LMS.Data",
+        "LMS.Utils",
+        "LMS.Utils.Cache",
+        "Newtonsoft.Json",
+        "Serilog",
+        "System",
+        "System.Collections.Generic",
+        "System.ComponentModel.DataAnnotations",
+        "System.Data.Entity",
+        "System.IO",
+        "System.Linq",
+        "System.Net",
+        "System.Threading.Tasks",
+        "System.Web.Http",
+        "System.Web.Http.Description",
+        "LMS.Configuration",
+        "LMS.Notifications.V2",
+        "Lms.Common.Enumerations",
+        "LMS.Services.Interfaces",
+        "LMS.ModelsDTOs.Evaluation"
+    ],
+    "access_modifier": "public",
+    "struct_name": "EvaluationGrid",
+    "base_class_name": "FileV3ViewModel",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [],
+    "properties": [
+        {
+            "name": "Id",
+            "prop_name": "Id",
+            "prop_type": "int",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "ResourceLabel",
+            "prop_name": "ResourceLabel",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        }
+    ],
+    "name": "EvaluationGrid"
+}

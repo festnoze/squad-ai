@@ -1,0 +1,69 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Common/ElephormController.cs",
+    "index_shift_code": 5210,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.Common",
+    "usings": [
+        "LMS.Attributes",
+        "LMS.Authentication",
+        "LMS.Data",
+        "LMS.Utils",
+        "Newtonsoft.Json",
+        "Serilog",
+        "System",
+        "System.Collections.Generic",
+        "System.Data.Entity",
+        "System.Data.Entity.Infrastructure",
+        "System.IO",
+        "System.Linq",
+        "System.Net.Http",
+        "System.Threading.Tasks",
+        "System.Web.Hosting",
+        "System.Web.Http",
+        "System.Web.Http.Description"
+    ],
+    "access_modifier": "public",
+    "struct_name": "ElephormCategoryViewModel",
+    "base_class_name": "",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [],
+    "properties": [
+        {
+            "name": "Id",
+            "prop_name": "Id",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "Title",
+            "prop_name": "Title",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "Description",
+            "prop_name": "Description",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "Subcategories",
+            "prop_name": "Subcategories",
+            "prop_type": "List<ElephormCategoryViewModel>",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "Active",
+            "prop_name": "Active",
+            "prop_type": "bool",
+            "is_property": true,
+            "is_field": false
+        }
+    ],
+    "name": "ElephormCategoryViewModel"
+}

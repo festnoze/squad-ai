@@ -1,0 +1,64 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Studi.Api.Lms.User/Controllers/Unavailability/Mapper/RequestModelToAToMapper.cs",
+    "index_shift_code": 301,
+    "struct_type": "Class",
+    "namespace_name": "",
+    "usings": [
+        "Studi.Api.Lms.User.Application.Services.Unavailability.ATOs",
+        "Studi.Api.Lms.User.Application.Services.Unavailability.ATOs.Implementations",
+        "Studi.Api.Lms.User.ExchangeDataContract.V1.Unavailability.RequestModels"
+    ],
+    "access_modifier": "public static",
+    "struct_name": "RequestModelToAToMapper",
+    "base_class_name": "",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "ToAto",
+            "code_start_index": 366,
+            "method_name": "ToAto",
+            "existing_summary": "    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "model",
+                    "param_name": "model",
+                    "param_type": "IUserUnavailabilityFileURequestModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return new UserUnavailabilityFileUAto(\r\n            model.UnavailabilityFileId,\r\n            model.FileId,\r\n            model.IsDisabled);\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a response model based on the input data from a PeriodEndDateRule object.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "model",
+                        "param_name": "model",
+                        "param_desc": "The IUserUnavailabilityFileURequestModel parameter represents the input data model for the method ToAto. It is used to create a response model based on the input data from a PeriodEndDateRule object."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a response model based on the input data from a PeriodEndDateRule object.\n/// </summary>\n/// <param name=\"model\">The IUserUnavailabilityFileURequestModel parameter represents the input data model for the method ToAto. It is used to create a response model based on the input data from a PeriodEndDateRule object.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "RequestModelToAToMapper"
+}

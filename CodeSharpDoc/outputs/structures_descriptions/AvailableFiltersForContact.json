@@ -1,0 +1,22 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Studi.Api.Lms.Messenger/Controllers/Contact/ListingSelector/AvailableFiltersForContact.cs",
+    "index_shift_code": 559,
+    "struct_type": "Class",
+    "namespace_name": "Studi.Api.Lms.Messenger.Controllers.Contact.ListingSelector",
+    "usings": [
+        "Studi.Api.Core.Services.DependencyInjection.Attributes",
+        "Studi.Api.Lms.Messenger.Shared.ContactListing",
+        "Studi.Api.Core.ListingSelector.Filtering.AvailableFilters",
+        "Studi.Api.Core.ListingSelector.Filtering.FilterItems",
+        "Studi.Api.Core.ListingSelector.Filtering.FilterItems.Implementation",
+        "Studi.Api.Core.ListingSelector.Filtering.Operators"
+    ],
+    "access_modifier": "public",
+    "struct_name": "AvailableFiltersForContact",
+    "base_class_name": "AvailableFilters<IContactListing>",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [],
+    "properties": [],
+    "name": "AvailableFiltersForContact"
+}

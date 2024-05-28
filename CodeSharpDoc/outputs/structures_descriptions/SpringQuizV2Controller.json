@@ -1,0 +1,328 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/V2/SpringQuizV2Controller.cs",
+    "index_shift_code": 724,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V2",
+    "usings": [
+        "Hangfire",
+        "Jose",
+        "LMS.Attributes.Routing",
+        "LMS.Authentication",
+        "LMS.Data",
+        "LMS.EvaluationQuizParser",
+        "LMS.Models.BindingModels",
+        "LMS.Models.ViewModels.V2.SpringQuiz",
+        "LMS.Notifications.V2",
+        "LMS.PDFGenerator",
+        "LMS.Utils",
+        "LMS.Utils.Cache",
+        "LMS.Configuration",
+        "Newtonsoft.Json",
+        "Serilog",
+        "System",
+        "System.Data.Entity",
+        "System.Globalization",
+        "System.IO",
+        "System.Linq",
+        "System.Net",
+        "System.Net.Http",
+        "System.Threading.Tasks",
+        "System.Web.Http",
+        "LMS.Attributes",
+        "System.Web",
+        "Lms.Common.Enumerations",
+        "Studi.Jwt.Payloads"
+    ],
+    "access_modifier": "public",
+    "struct_name": "SpringQuizV2Controller",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetLastResourceVersionId",
+            "code_start_index": 1131,
+            "method_name": "GetLastResourceVersionId",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "resourceObjectId",
+                    "param_name": "resourceObjectId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var today = DateTimeOffset.Now;\r\n            return await _db.RessourcesObjectRessourcesVersions.AsNoTracking()\r\n                .Include(obj => obj.RessourceVersion)\r\n                .Where(obj => obj.RessourcesObjectId == resourceObjectId && obj.RessourceVersion.DatePublication != null && obj.RessourceVersion.DatePublication <= today)\r\n                .OrderByDescending(obj => obj.RessourceVersion.VersionMajeure)\r\n                .ThenByDescending(obj => obj.RessourceVersion.VersionMineure)\r\n                .ThenByDescending(obj => obj.RessourceVersion.VersionCorrection)\r\n                .Select(obj => obj.RessourcesVersionId)\r\n                .FirstOrDefaultAsync();\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the ID of the latest version of a specific resource object that has been published.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "resourceObjectId",
+                        "param_name": "resourceObjectId",
+                        "param_desc": "The ID of the resource object for which the latest version ID needs to be retrieved."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the ID of the latest version of a specific resource object that has been published.\n/// </summary>\n/// <param name=\"resourceObjectId\">The ID of the resource object for which the latest version ID needs to be retrieved.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "IsAllowedToTakeExamAsync",
+            "code_start_index": 2267,
+            "method_name": "IsAllowedToTakeExamAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Check if the user has already taken the quiz or not\r\n        /// </summary>\r\n        /// <param name=\"resourceObjectId\"></param>\r\n        /// <param name=\"resourceVersionResourceObjectId\"></param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "resourceObjectId",
+                    "param_name": "resourceObjectId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "resourceVersionResourceObjectId",
+                    "param_name": "resourceVersionResourceObjectId",
+                    "param_type": "int",
+                    "has_default_value": true,
+                    "default_value": "0",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var schoolId = this.GetSchoolId(_db);\r\n            int? resourceVersionId = null;\r\n\r\n            // Cas LMS\r\n            if (resourceVersionResourceObjectId != 0)\r\n            {\r\n                resourceVersionId = await _db.RessourcesObjectRessourcesVersions.AsNoTracking().Where(rorv => rorv.Id == resourceVersionResourceObjectId).Select(rorv => rorv.RessourcesVersionId).FirstOrDefaultAsync();\r\n\r\n                // Si on ne trouve bien un resourceVersionId, erreur\r\n                if (resourceVersionId == null)\r\n                {\r\n                    Log.Error(\"Error retrieving resourceVersionId with rorvId {0}\", resourceVersionResourceObjectId);\r\n                    return InternalServerError();\r\n                }\r\n\r\n                bool doneAlready = await HasDoneTheQuizAsync(userId, schoolId, resourceVersionId.Value);\r\n\r\n                if (doneAlready)\r\n                {\r\n                    return StatusCode(HttpStatusCode.Forbidden);\r\n                }\r\n            }\r\n            // Cas mobile\r\n            else\r\n            {\r\n                bool doneAlready = await HasDoneTheQuizAsync(userId, schoolId);\r\n\r\n                if (doneAlready)\r\n                {\r\n                    return StatusCode(HttpStatusCode.Forbidden);\r\n                }\r\n            }\r\n\r\n            var schoolCode = DataCache.GetSchools(_db).Where(e => e.Id == schoolId).Select(e => e.Code).FirstOrDefault();\r\n            if (string.IsNullOrWhiteSpace(schoolCode))\r\n            {\r\n                Log.Error(\"School Id: {0} has an empty, null or whitespace code\", schoolCode);\r\n                return InternalServerError();\r\n            }\r\n\r\n            var qcmKey = _config.GetQcmKey();\r\n\r\n            var qcmKeyBytes = Convert.FromBase64String(qcmKey);\r\n\r\n            var payload = new QcmPayload\r\n            {\r\n                NotBefore = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),\r\n                Expiration = DateTimeOffset.UtcNow.AddHours(6).ToUnixTimeSeconds(),\r\n\r\n                UserId = userId,\r\n                SchoolId = schoolId,\r\n                Host = HttpContext.Current.Request.OriginOrRequestHost(),\r\n                ResourceObjectId = resourceObjectId,\r\n                ResourceVersionId = resourceVersionId\r\n            };\r\n\r\n            var token = JWT.Encode(payload, qcmKeyBytes, JwsAlgorithm.HS256);\r\n            return Ok(token);\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Check if the user is allowed to take an exam asynchronously based on certain conditions, such as whether they have already completed a quiz or if they belong to a specific school, and generate a token for authentication if allowed.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "resourceObjectId",
+                        "param_name": "resourceObjectId",
+                        "param_desc": "An integer representing the unique identifier of the resource object."
+                    },
+                    {
+                        "name": "resourceVersionResourceObjectId",
+                        "param_name": "resourceVersionResourceObjectId",
+                        "param_desc": "An integer representing the version of the resource object identified by resourceObjectId. Defaults to 0 if not provided."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Check if the user is allowed to take an exam asynchronously based on certain conditions, such as whether they have already completed a quiz or if they belong to a specific school, and generate a token for authentication if allowed.\n/// </summary>\n/// <param name=\"resourceObjectId\">An integer representing the unique identifier of the resource object.</param>\n/// <param name=\"resourceVersionResourceObjectId\">An integer representing the version of the resource object identified by resourceObjectId. Defaults to 0 if not provided.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "HasDoneTheQuizAsync",
+            "code_start_index": 4857,
+            "method_name": "HasDoneTheQuizAsync",
+            "existing_summary": "         \r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "schoolId",
+                    "param_name": "schoolId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "resourceVersionId",
+                    "param_name": "resourceVersionId",
+                    "param_type": "int",
+                    "has_default_value": true,
+                    "default_value": "0",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            const string rejectedCode = nameof(CopyStatusCode.REJETEE);\r\n\r\n            var copie = await _db.CopieUsers.AsNoTracking().Include(obj => obj.Copy.CopieAvancements)\r\n                .Where(copyuser => copyuser.EcoleUser.UserId == userId\r\n                                   && copyuser.EcoleUser.EcoleId == schoolId\r\n                                   && copyuser.Copy.EvaluationVersionId == resourceVersionId\r\n                                   && copyuser.Copy.DateDelete ==  null)\r\n                .OrderByDescending(obj => obj.DateCreate)\r\n                .Select(copyuser => copyuser.Copy).FirstOrDefaultAsync();\r\n\r\n            if (copie?.CopieAvancements != null && copie.CopieAvancements.Count > 0)\r\n            {\r\n                var lastCopyAvancementStatusId = copie.CopieAvancements.OrderByDescending(copieAvancement => copieAvancement.DateDebut)\r\n                    .Select(copieAvancement => copieAvancement.CopieStatutId).FirstOrDefault();\r\n\r\n                // retrieve the copy status\r\n                int rejectedStatusId = DataCache.GetCopyStatuses(_db)\r\n                    .Where(cs => cs.Code == rejectedCode)\r\n                    .Select(cs => cs.Id)\r\n                    .FirstOrDefault();\r\n\r\n                if (rejectedCode != copie.LastCopieAvancementCode && lastCopyAvancementStatusId != rejectedStatusId)\r\n                {\r\n                    return false;\r\n                }\r\n\r\n                return true;\r\n            }\r\n\r\n            return false;\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Check if a user has completed a specific quiz asynchronously.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The ID of the user who is being checked for quiz completion."
+                    },
+                    {
+                        "name": "schoolId",
+                        "param_name": "schoolId",
+                        "param_desc": "The ID of the school to which the user belongs."
+                    },
+                    {
+                        "name": "resourceVersionId",
+                        "param_name": "resourceVersionId",
+                        "param_desc": "The ID of the resource version for which the quiz completion is being checked. Defaults to 0 if not provided."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Check if a user has completed a specific quiz asynchronously.\n/// </summary>\n/// <param name=\"userId\">The ID of the user who is being checked for quiz completion.</param>\n/// <param name=\"schoolId\">The ID of the school to which the user belongs.</param>\n/// <param name=\"resourceVersionId\">The ID of the resource version for which the quiz completion is being checked. Defaults to 0 if not provided.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "IsPayloadStillValid",
+            "code_start_index": 6761,
+            "method_name": "IsPayloadStillValid",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Checks if the current datetime is between (token.startDateTime, token.expirationDateTime)\r\n        /// </summary>\r\n        /// <param name=\"payload\">QuizPayload</param>\r\n        /// <returns>true is token is valid, false otherwise</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "payload",
+                    "param_name": "payload",
+                    "param_type": "QcmPayload",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            long utcNow = DateTimeOffset.UtcNow.ToUnixTimeSeconds();\r\n\r\n            // Not yet valid\r\n            if (utcNow < payload.NotBefore)\r\n            {\r\n                return false;\r\n            }\r\n\r\n            // Expired\r\n            if (utcNow > payload.Expiration)\r\n            {\r\n                return false;\r\n            }\r\n\r\n            return true;\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Check if a payload is still within its validity timeframe based on current time.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "QcmPayload",
+                        "param_name": "QcmPayload",
+                        "param_desc": "The payload object that needs to be checked for validity."
+                    },
+                    {
+                        "name": "payload",
+                        "param_name": "payload",
+                        "param_desc": "The payload object that needs to be checked for validity."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Check if a payload is still within its validity timeframe based on current time.\n/// </summary>\n/// <param name=\"QcmPayload\">The payload object that needs to be checked for validity.</param>\n/// <param name=\"payload\">The payload object that needs to be checked for validity.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "SaveQuizResultsAsync",
+            "code_start_index": 7670,
+            "method_name": "SaveQuizResultsAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Save the quiz result\r\n        /// 200: Quiz result saved successfully\r\n        /// 400: Token expired or not valid yet\r\n        /// 403: Used has already done the quiz\r\n        /// 500: Decoding/saving result error\r\n        /// </summary>\r\n        /// <param name=\"model\">Quiz binding model</param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "model",
+                    "param_name": "model",
+                    "param_type": "QuizzBindingModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            string token = model.TakerUsername;\r\n            byte[] signingKey = Convert.FromBase64String(_config.GetQcmKey());\r\n\r\n            try\r\n            {\r\n                // decode the token\r\n                var payload = JWT.Decode<QcmPayload>(token, signingKey, JwsAlgorithm.HS256);\r\n\r\n                //Check if token hasn't expired or is not yet valid\r\n                if (!IsPayloadStillValid(payload))\r\n                {\r\n                    Log.Error(\"QCM save results with invalid payload: {0}\", model.DetailedResults);\r\n                    return Content(HttpStatusCode.Forbidden, \"The token is not valid\");\r\n                }\r\n\r\n                // current user info\r\n                var ecoleId = payload.SchoolId;\r\n                var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == payload.UserId);\r\n\r\n                //check if userId in payload correspond to a user in db\r\n                if (user == null)\r\n                {\r\n                    Log.Error(\"QCM save results user not found {0}\", payload.UserId);\r\n                    return InternalServerError();\r\n                }\r\n\r\n                var ecoleUserId = await _db.EcoleUsers\r\n                    .Where(eu => eu.UserId == user.Id && eu.EcoleId == ecoleId)\r\n                    .Select(eu => eu.EcoleUserId)\r\n                    .FirstOrDefaultAsync();\r\n\r\n                //check if resource version id in payload is not null\r\n                if (payload.ResourceVersionId == null)\r\n                { //if is null get the last resource version id for the resource object in the payload\r\n                    payload.ResourceVersionId = await GetLastResourceVersionId(payload.ResourceObjectId);\r\n                    if (payload.ResourceVersionId < 1)\r\n                    {\r\n                        Log.Error(\"QCM save results resource not specified for user: {0} \", payload.UserId);\r\n                        return InternalServerError();\r\n                    }\r\n                }\r\n\r\n                // If the user has already done the quiz then return a 403 Forbidden status code\r\n                if (await HasDoneTheQuizAsync(payload.UserId, payload.SchoolId, payload.ResourceVersionId ?? 0))\r\n                {\r\n                    Log.Error(\"QCM save results user has already done the quiz user {0} rv {1}\", payload.UserId,payload.ResourceVersionId ?? 0);\r\n                    return Content(HttpStatusCode.Forbidden, \"Vous avez d\u00e9j\u00e0 fait ce quiz\");\r\n                }\r\n\r\n                // parse the detailed results XML\r\n                var quizReport = QuizParser.Parse(model.DetailedResults);\r\n\r\n                // Cr\u00e9ation de la copie corrig\u00e9e \u00e0 partir des r\u00e9sultats\r\n                var pdfGen = new QuizResultsPdfGenerator(quizReport);\r\n\r\n                double percentage = double.Parse(quizReport.Summary.Percent, CultureInfo.InvariantCulture) * 100.0;\r\n\r\n                double userAnswers = double.Parse(quizReport.Summary.Score, CultureInfo.InvariantCulture);\r\n\r\n                double maxScore = double.Parse(quizReport.QuizSettings.MaxScore, CultureInfo.InvariantCulture);\r\n\r\n\r\n\r\n                if (!int.TryParse(quizReport.Summary.Time, NumberStyles.Integer, CultureInfo.InvariantCulture, out var durationInSeconds))\r\n                {\r\n                    Log.Error(\"QCM Save results error parsing the time received from the quiz: {0}\", quizReport.Summary.Time);\r\n                    durationInSeconds = 0;\r\n                }\r\n\r\n\r\n                // R\u00e9cup\u00e9ration de la ressource id from the ressource version\r\n                var ressourceId = await _db.RessourceVersions\r\n                    .Where(rv => rv.Id == payload.ResourceVersionId && rv.DateDelete == null)\r\n                    .Select(rv => rv.RessourceId)\r\n                    .FirstOrDefaultAsync();\r\n\r\n\r\n                // create the activity report and store the results\r\n                var activity = new ReportActivite\r\n                {\r\n                    UserId = payload.UserId,\r\n                    EcoleId = payload.SchoolId,\r\n                    RessourceObjectId = payload.ResourceObjectId,\r\n                    RessourceVersionId = payload.ResourceVersionId,\r\n                    RessourceId = ressourceId,\r\n                    DateCreate = DateTime.Now,\r\n                    DateDebut = DateTimeOffset.Now,\r\n                    QcmXmlResult = model.DetailedResults,\r\n                    Duree = durationInSeconds,\r\n                    Score = (userAnswers * noteMax) / maxScore\r\n                };\r\n\r\n                _db.ReportActivites.Add(activity);\r\n\r\n                try\r\n                {\r\n                    await _db.SaveChangesAsync();\r\n                }\r\n                catch (Exception e)\r\n                {\r\n                    Log.Error(e,\"Error saving the quiz result in the report activities table\");\r\n                    return InternalServerError();\r\n                }\r\n\r\n                // R\u00e9cup\u00e9ration RORVID\r\n                var rorvId = await _db.RessourcesObjectRessourcesVersions\r\n                    .Where(rorv => rorv.DateDelete == null && rorv.RessourcesObjectId == payload.ResourceObjectId && rorv.RessourcesVersionId == payload.ResourceVersionId)\r\n                    .Select(rorv => rorv.Id)\r\n                    .FirstOrDefaultAsync();\r\n\r\n                if (rorvId == 0)\r\n                {\r\n                    Log.Error(\"QCM Save results error getting ressourceObjectRessourceVersion id \");\r\n                    return Content(HttpStatusCode.InternalServerError, \"L'id de la ressourceObjectRessourceVersion n'a pas pu \u00eatre r\u00e9cup\u00e9r\u00e9\");\r\n                }\r\n\r\n                // Create Corrected Copy\r\n\r\n                if (ressourceId == 0)\r\n                {\r\n                    Log.Error(\"QCM Save results error getting the ressource id\");\r\n                    return Content(HttpStatusCode.InternalServerError, \"L'id de l'\u00e9valuation n'a pas pu \u00eatre r\u00e9cup\u00e9r\u00e9\");\r\n                }\r\n\r\n                var userCopy = await _db.CopieUsers\r\n                    .Include(cu => cu.Copy.RessourceVersion.Ressource)\r\n                    .Include(cu => cu.EcoleUser.Ecole.Organisme)\r\n                    //.Include(cu => cu.Copy.CopieOriginales)\r\n                    .Where(cu => cu.Copy.DateDelete == null && cu.Copy.EvaluationVersionId == payload.ResourceVersionId && cu.EcoleUserId == ecoleUserId)\r\n                    .FirstOrDefaultAsync();\r\n\r\n                // On check si l'\u00e9valuation a bien une copie\r\n                if (userCopy == null)\r\n                {\r\n                    Log.Error(\"QCM Save results user hasn't created a copy for this evaluation user {0}, rv {1}\", payload.UserId, payload.ResourceVersionId);\r\n                    return Content(HttpStatusCode.Forbidden, \"L'utilisateur n'as pas encore cr\u00e9e de copie pour cette \u00e9valuation\");\r\n                }\r\n\r\n                userCopy.Copy.TempsPasse = Convert.ToInt32(TimeSpan.FromSeconds(durationInSeconds).TotalMinutes);\r\n\r\n                var copieCorrige = new CopieCorrigee()\r\n                {\r\n                    DateCreate = DateTime.Now,\r\n                    UserCreate = user.Email,\r\n                    DateUpdate = DateTime.Now,\r\n                    UserUpdate = user.Email,\r\n                    //Filename = ,\r\n                    //UploadFileId = ,\r\n                    CorrecteurId = user.Id,\r\n                    DateCorrection = DateTime.Now,\r\n                    QcmXmlResult = model.DetailedResults,\r\n                    Note = (userAnswers * noteMax) / maxScore\r\n                };\r\n\r\n                var typeEnvoiPlateformId = DataCache.GetTypeEnvoi(_db)\r\n                    .Where(te => te.Code == \"PLATEFORME\")\r\n                    .Select(te => te.Id)\r\n                    .FirstOrDefault();\r\n\r\n                if (typeEnvoiPlateformId == 0)\r\n                {\r\n                    Log.Error(\"QCM Save results error getting type envoi\");\r\n                    return InternalServerError();\r\n                }\r\n\r\n                var copieOriginale = new CopieOriginale\r\n                {\r\n                    CopieId = userCopy.CopieId,\r\n                    AudioFileId = null,\r\n                    UserCreate = user.Email,\r\n                    DateCreate = DateTime.Now,\r\n                    RessourceVersionRessourceObjectId = rorvId,\r\n                    DateEnvoi = DateTime.Now,\r\n                    CopieTypeEnvoiId = typeEnvoiPlateformId,\r\n                    CopieCorrigees =\r\n                    {\r\n                        copieCorrige\r\n                    },\r\n                    DateValidation = DateTimeOffset.Now,\r\n                    // change date limite correction a datetime.now + 7 working days\r\n                    // TODO change date limite correction with BD data from each school \r\n                    DateLimiteCorrection = DateTimeOffset.Now.AddWorkingDays(7)\r\n            };\r\n\r\n                var url = _config.GetUploadManagerUrl() +\r\n                                       $\"/api/evaluations/uploadQCMResultsFile?organisme={userCopy.EcoleUser.Ecole.Organisme.Code}&userId={payload.UserId}&school={userCopy.EcoleUser.Ecole.Code}\";\r\n\r\n            // Envoi de la copie corrig\u00e9e\r\n            using (var client = new HttpClient())\r\n            {\r\n                var originalCopyPdf = pdfGen.GeneratePdfByteArrayContent(withCorrection: false);\r\n\r\n                var result = await client.PostAsync(url, originalCopyPdf);\r\n\r\n                result.EnsureSuccessStatusCode();\r\n\r\n                var jsonString = await result.Content.ReadAsStringAsync();\r\n\r\n                var file = JsonConvert.DeserializeObject<UploadedFileV2ViewModel>(jsonString);\r\n                var ext = Path.GetExtension(file.FileUrl);\r\n                var filename = $\"{userCopy.Copy.Reference}_reponses{ext}\";\r\n\r\n                // On rempli les info de la copie originale\r\n                copieOriginale.UploadFile = new UploadedFile\r\n                {\r\n                    FileUrl = file.FileUrl,\r\n                    FileName = filename,\r\n                    FileGuid = Guid.NewGuid(),\r\n                    FileHash = file.FileHash,\r\n                    FileSize = file.FileSize,\r\n                    UserCreate = user.Email,\r\n                    UserUpdate = user.Email,\r\n                    DateCreate = DateTime.Now,\r\n                    DateUpdate = DateTime.Now\r\n                };\r\n\r\n                copieOriginale.Filename = file.FileUrl;\r\n            }\r\n\r\n            //Envoi de la copie originale\r\n            using (var client = new HttpClient())\r\n            {\r\n                var correctedCopyPdf = pdfGen.GeneratePdfByteArrayContent(withCorrection: true);\r\n\r\n                var result = await client.PostAsync(url, correctedCopyPdf);\r\n\r\n                result.EnsureSuccessStatusCode();\r\n\r\n                var jsonString = await result.Content.ReadAsStringAsync();\r\n\r\n                var file = JsonConvert.DeserializeObject<UploadedFileV2ViewModel>(jsonString);\r\n                var ext = Path.GetExtension(file.FileUrl);\r\n                var filename = $\"{userCopy.Copy.Reference}_resultats{ext}\";\r\n\r\n                // on rempli les infos de la copie corrig\u00e9e\r\n                copieCorrige.Filename = file.FileUrl;\r\n                copieCorrige.UploadFile = new UploadedFile\r\n                {\r\n                    FileUrl = file.FileUrl,\r\n                    FileName = filename,\r\n                    FileGuid = Guid.NewGuid(),\r\n                    FileHash = file.FileHash,\r\n                    FileSize = file.FileSize,\r\n                    DateCreate = DateTime.Now,\r\n                    UserCreate = \"PDF Generator\",\r\n                };\r\n            }\r\n\r\n            userCopy.Copy.CopieOriginales.Add(copieOriginale);\r\n\r\n\r\n            // retrieve the copy status\r\n            int commenceStatusId = DataCache.GetCopyStatuses(_db)\r\n                .Where(cs => cs.Code == nameof(CopyStatusCode.COMMENCE))\r\n                .Select(cs => cs.Id)\r\n                .FirstOrDefault();\r\n\r\n            // retrieve the copy status\r\n            int transmittedStatusId = DataCache.GetCopyStatuses(_db)\r\n                .Where(cs => cs.Code == nameof(CopyStatusCode.TRANSMIS))\r\n                .Select(cs => cs.Id)\r\n                .FirstOrDefault();\r\n\r\n            // retrieve the copy status\r\n            int correctionEnCoursStatusId = DataCache.GetCopyStatuses(_db)\r\n                .Where(cs => cs.Code == nameof(CopyStatusCode.ENCOURS))\r\n                .Select(cs => cs.Id)\r\n                .FirstOrDefault();\r\n\r\n            // retrieve the copy status\r\n            int correctedStatusId = DataCache.GetCopyStatuses(_db)\r\n                .Where(cs => cs.Code == nameof(CopyStatusCode.CORRIGE))\r\n                .Select(cs => cs.Id)\r\n                .FirstOrDefault();\r\n\r\n            var affectationCorrecteur = await _db.AffectationCorrecteurs\r\n                .AsNoTracking()\r\n                .Where(ac => ac.RessourceVersionRessourceObjectId == rorvId && ac.DateDelete == null)\r\n                .OrderByDescending(ac => ac.Principal)\r\n                .FirstOrDefaultAsync();\r\n\r\n            // Si on a pas de correcteur affect\u00e9\r\n            if (affectationCorrecteur == null)\r\n            {\r\n                // On corrige automatiquement la copie\r\n                userCopy.Copy.DispoLms = true;\r\n                userCopy.Copy.LastCopieAvancementCode = nameof(CopyStatusCode.CORRIGE);\r\n                userCopy.Copy.ModeBrouillon = false;\r\n                userCopy.Copy.NoteFinale = activity.Score;\r\n\r\n                // Avancement Copie\r\n                userCopy.Copy.CopieAvancements.Add(new CopieAvancement\r\n                {\r\n                    CopieStatutId = transmittedStatusId, // TRANSMIS\r\n                    DateDebut = DateTimeOffset.Now.AddSeconds(1),\r\n                    UserCreate = user.Email,\r\n                    DateCreate = DateTime.Now.AddSeconds(1),\r\n                });\r\n\r\n                userCopy.Copy.CopieAvancements.Add(new CopieAvancement\r\n                {\r\n                    CopieStatutId = correctedStatusId, // CORRIGE\r\n                    DateDebut = DateTimeOffset.Now.AddSeconds(2),\r\n                    UserCreate = user.Email,\r\n                    DateCreate = DateTime.Now.AddSeconds(2),\r\n                });\r\n\r\n                // Avancement Copie originale\r\n                copieOriginale.CopieOriginaleAvancements.Add(new CopieOriginaleAvancement\r\n                {\r\n                    CopieStatutId = commenceStatusId, // COMMENCE\r\n                    DateDebut = DateTimeOffset.Now,\r\n                    UserCreate = user.Email,\r\n                    DateCreate = DateTime.Now,\r\n                });\r\n\r\n                copieOriginale.CopieOriginaleAvancements.Add(new CopieOriginaleAvancement\r\n                {\r\n                    CopieStatutId = transmittedStatusId, // TRANSMIS\r\n                    DateDebut = DateTimeOffset.Now.AddSeconds(1),\r\n                    UserCreate = user.Email,\r\n                    DateCreate = DateTime.Now.AddSeconds(1),\r\n                });\r\n\r\n                copieOriginale.CopieOriginaleAvancements.Add(new CopieOriginaleAvancement\r\n                {\r\n                    CopieStatutId = correctedStatusId, // CORRIGE\r\n                    DateDebut = DateTime.Now.AddSeconds(2),\r\n                    UserCreate = user.Email,\r\n                    DateCreate = DateTime.Now.AddSeconds(2),\r\n                });\r\n            }\r\n            else\r\n            {\r\n                //if RORV have a principal corrector we affect him to correct this qcm\r\n                // change qcm copy status => en cours de correction\r\n                userCopy.Copy.DispoLms = false;\r\n                userCopy.Copy.LastCopieAvancementCode = nameof(CopyStatusCode.ENCOURS);\r\n                userCopy.Copy.ModeBrouillon = false;\r\n                userCopy.Copy.NoteFinale = activity.Score;\r\n                userCopy.Copy.DateReception = DateTimeOffset.Now;\r\n                userCopy.Copy.TypeEnvoiId = typeEnvoiPlateformId;\r\n                userCopy.Copy.UserUpdate = user.Email;\r\n                userCopy.Copy.DateUpdate =DateTime.Now;\r\n\r\n                copieCorrige.CorrecteurId = affectationCorrecteur.CorrecteurId;\r\n\r\n                // Avancement copie\r\n                userCopy.Copy.CopieAvancements.Add(new CopieAvancement\r\n                {\r\n                    CopieStatutId = transmittedStatusId, // TRANSMIS\r\n                    CopieId = userCopy.CopieId,\r\n                    DateDebut = DateTimeOffset.Now.AddSeconds(1),\r\n                    UserCreate = user.Email,\r\n                    DateCreate = DateTime.Now.AddSeconds(1),\r\n                });\r\n\r\n                userCopy.Copy.CopieAvancements.Add(new CopieAvancement\r\n                {\r\n                    CopieStatutId = correctionEnCoursStatusId, // ENCOURS\r\n                    DateDebut = DateTimeOffset.Now.AddSeconds(2),\r\n                    CopieId = userCopy.CopieId,\r\n                    UserCreate = user.Email,\r\n                    DateCreate = DateTime.Now.AddSeconds(2),\r\n                });\r\n\r\n                // change qcm original_copy status => en cours de correction\r\n                copieOriginale.CopieOriginaleAvancements.Add(new CopieOriginaleAvancement\r\n                {\r\n                    CopieStatutId = commenceStatusId, // COMMENCE\r\n                    DateDebut = DateTimeOffset.Now,\r\n                    UserCreate = user.Email,\r\n                    DateCreate = DateTime.Now,\r\n                });\r\n\r\n                copieOriginale.CopieOriginaleAvancements.Add(new CopieOriginaleAvancement\r\n                {\r\n                    CopieStatutId = transmittedStatusId, // TRANSMIS\r\n                    DateDebut = DateTimeOffset.Now.AddSeconds(1),\r\n                    UserCreate = user.Email,\r\n                    DateCreate = DateTime.Now.AddSeconds(1),\r\n                });\r\n\r\n                copieOriginale.CopieOriginaleAvancements.Add(new CopieOriginaleAvancement\r\n                {\r\n                    CopieStatutId = correctionEnCoursStatusId, // ENCOURS\r\n                    DateDebut = DateTimeOffset.Now.AddSeconds(2),\r\n                    UserCreate = user.Email,\r\n                    DateCreate = DateTime.Now.AddSeconds(2),\r\n                });\r\n\r\n            }\r\n\r\n            _db.CopieOriginales.Add(copieOriginale);\r\n            await _db.SaveChangesAsync();\r\n\r\n            //Send a mail if the user failed\r\n            BackgroundJob.Enqueue(() => NotificationSenderManager.SendQuizNotificationAsync(\r\n                    quizReport.Summary.Percent,\r\n                    quizReport.Summary.Time,\r\n                    payload.SchoolId,\r\n                    payload.UserId,\r\n                    payload.ResourceObjectId));\r\n\r\n                return Ok();\r\n            }\r\n            catch (JoseException ex)\r\n            {\r\n                Log.Error(ex, \"Error decoding the quiz token: {0}\", model.TakerUsername);\r\n                return InternalServerError();\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"saving the results to the database: {0}\", model.DetailedResults);\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Save quiz results asynchronously after validating the token and parsing the payload, then store the results in the database and generate PDF files for the corrected copy and original copy if necessary.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "model",
+                        "param_name": "model",
+                        "param_desc": "The QuizzBindingModel parameter represents the data model containing information about the quiz that needs to be saved. It includes details such as the quiz questions, answers, and user responses."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Save quiz results asynchronously after validating the token and parsing the payload, then store the results in the database and generate PDF files for the corrected copy and original copy if necessary.\n/// </summary>\n/// <param name=\"model\">The QuizzBindingModel parameter represents the data model containing information about the quiz that needs to be saved. It includes details such as the quiz questions, answers, and user responses.</param>\n",
+            "code_chunks": [
+                {
+                    "page_content": "{\r\n            string token = model.TakerUsername;\r\n            byte[] signingKey = Convert.FromBase64String(_config.GetQcmKey());\r\n\r\n            try\r\n            {\r\n                // decode the token\r\n                var payload = JWT.Decode<QcmPayload>(token, signingKey, JwsAlgorithm.HS256);\r\n\r\n                //Check if token hasn't expired or is not yet valid\r\n                if (!IsPayloadStillValid(payload))\r\n                {\r\n                    Log.Error(\"QCM save results with invalid payload: {0}\", model.DetailedResults);\r\n                    return Content(HttpStatusCode.Forbidden, \"The token is not valid\");\r\n                }\r\n\r\n                // current user info\r\n                var ecoleId = payload.SchoolId;\r\n                var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == payload.UserId);\r\n\r\n                //check if userId in payload correspond to a user in db\r\n                if (user == null)\r\n                {\r\n                    Log.Error(\"QCM save results user not found {0}\", payload.UserId);\r\n                    return InternalServerError();\r\n                }\r\n\r\n                var ecoleUserId = await _db.EcoleUsers\r\n                    .Where(eu => eu.UserId == user.Id && eu.EcoleId == ecoleId)\r\n                    .Select(eu => eu.EcoleUserId)\r\n                    .FirstOrDefaultAsync();\r\n\r\n                //check if resource version id in payload is not null\r\n                if (payload.ResourceVersionId == null)\r\n                { //if is null get the last resource version id for the resource object in the payload\r\n                    payload.ResourceVersionId = await GetLastResourceVersionId(payload.ResourceObjectId);\r\n                    if (payload.ResourceVersionId < 1)\r\n                    {\r\n                        Log.Error(\"QCM save results resource not specified for user: {0} \", payload.UserId);\r\n                        return InternalServerError();\r\n                    }\r\n                }\r\n\r\n                // If the user has already done the quiz then return a 403 Forbidden status code\r\n                if (await HasDoneTheQuizAsync(payload.UserId, payload.SchoolId, payload.ResourceVersionId ?? 0))\r\n                {\r\n                    Log.Error(\"QCM save results user has already done the quiz user {0} rv {1}\", payload.UserId,payload.ResourceVersionId ?? 0);\r\n                    return Content(HttpStatusCode.Forbidden, \"Vous avez d\u00e9j\u00e0 fait ce quiz\");\r\n                }\r\n\r\n                // parse the detailed results XML\r\n                var quizReport = QuizParser.Parse(model.DetailedResults);\r\n\r\n                // Cr\u00e9ation de la copie corrig\u00e9e \u00e0 partir des r\u00e9sultats\r\n                var pdfGen = new QuizResultsPdfGenerator(quizReport);\r\n\r\n                double percentage = double.Parse(quizReport.Summary.Percent, CultureInfo.InvariantCulture) * 100.0;\r\n\r\n                double userAnswers = double.Parse(quizReport.Summary.Score, CultureInfo.InvariantCulture);\r\n\r\n                double maxScore = double.Parse(quizReport.QuizSettings.MaxScore, CultureInfo.InvariantCulture);\r\n\r\n\r\n\r\n                if (!int.TryParse(quizReport.Summary.Time, NumberStyles.Integer, CultureInfo.InvariantCulture, out var durationInSeconds))\r\n                {\r\n                    Log.Error(\"QCM Save results error parsing the time received from the quiz: {0}\", quizReport.Summary.Time);\r\n                    durationInSeconds = 0;\r\n                }\r\n\r\n\r\n                // R\u00e9cup\u00e9ration de la ressource id from the ressource version\r\n                var ressourceId = await _db.RessourceVersions\r\n                    .Where(rv => rv.Id == payload.ResourceVersionId && rv.DateDelete == null)\r\n                    .Select(rv => rv.RessourceId)\r\n                    .FirstOrDefaultAsync();\r\n\r\n\r\n                // create the activity report and store the results\r\n                var activity = new ReportActivite\r\n                {\r\n                    UserId = payload.UserId,\r\n                    EcoleId = payload.SchoolId,\r\n                    RessourceObjectId = payload.ResourceObjectId,\r\n                    RessourceVersionId = payload.ResourceVersionId,\r\n                    RessourceId = ressourceId,\r\n                    DateCreate = DateTime.Now,\r\n                    DateDebut = DateTimeOffset.Now,\r\n                    QcmXmlResult = model.DetailedResults,\r\n                    Duree = durationInSeconds,\r\n                    Score = (userAnswers * noteMax) / maxScore\r\n                };\r\n\r\n                _db.ReportActivites.Add(activity);\r\n\r\n                try\r\n                {\r\n                    await _db.SaveChangesAsync();\r\n                }\r\n                catch (Exception e)\r\n                {\r\n                    Log.Error(e,\"Error saving the quiz result in the report activities table\");\r\n                    return InternalServerError();\r\n                }\r\n\r\n                // R\u00e9cup\u00e9ration RORVID\r\n                var rorvId = await _db.RessourcesObjectRessourcesVersions\r\n                    .Where(rorv => rorv.DateDelete == null && rorv.RessourcesObjectId == payload.ResourceObjectId && rorv.RessourcesVersionId == payload.ResourceVersionId)\r\n                    .Select(rorv => rorv.Id)\r\n                    .FirstOrDefaultAsync();\r\n\r\n                if (rorvId == 0)\r\n                {\r\n                    Log.Error(\"QCM Save results error getting ressourceObjectRessourceVersion id \");\r\n                    return Content(HttpStatusCode.InternalServerError, \"L'id de la ressourceObjectRessourceVersion n'a pas pu \u00eatre r\u00e9cup\u00e9r\u00e9\");\r\n                }\r\n\r\n                // Create Corrected Copy\r\n\r\n                if (ressourceId == 0)\r\n                {\r\n                    Log.Error(\"QCM Save results error getting the ressource id\");\r\n                    return Content(HttpStatusCode.InternalServerError, \"L'id de l'\u00e9valuation n'a pas pu \u00eatre r\u00e9cup\u00e9r\u00e9\");\r\n                }\r\n\r\n                var userCopy = await _db.CopieUsers\r\n                    .Include(cu => cu.Copy.RessourceVersion.Ressource)\r\n                    .Include(cu => cu.EcoleUser.Ecole.Organisme)\r\n                    //.Include(cu => cu.Copy.CopieOriginales)\r\n                    .Where(cu => cu.Copy.DateDelete == null && cu.Copy.EvaluationVersionId == payload.ResourceVersionId && cu.EcoleUserId == ecoleUserId)\r\n                    .FirstOrDefaultAsync();\r\n\r\n                // On check si l'\u00e9valuation a bien une copie\r\n                if (userCopy == null)\r\n                {\r\n                    Log.Error(\"QCM Save results user hasn't created a copy for this evaluation user {0}, rv {1}\", payload.UserId, payload.ResourceVersionId);\r\n                    return Content(HttpStatusCode.Forbidden, \"L'utilisateur n'as pas encore cr\u00e9e de copie pour cette \u00e9valuation\");\r\n                }\r\n\r\n                userCopy.Copy.TempsPasse = Convert.ToInt32(TimeSpan.FromSeconds(durationInSeconds).TotalMinutes);\r\n\r\n                var copieCorrige = new CopieCorrigee()\r\n                {\r\n                    DateCreate = DateTime.Now,\r\n                    UserCreate = user.Email,\r\n                    DateUpdate = DateTime.Now,\r\n                    UserUpdate = user.Email,\r\n                    //Filename = ,\r\n                    //UploadFileId = ,\r\n                    CorrecteurId = user.Id,\r\n                    DateCorrection = DateTime.Now,\r\n                    QcmXmlResult = model.DetailedResults,\r\n                    Note = (userAnswers * noteMax) / maxScore\r\n                };\r\n\r\n                var typeEnvoiPlateformId = DataCache.GetTypeEnvoi(_db)\r\n                    .Where(te => te.Code == \"PLATEFORME\")\r\n                    .Select(te => te.Id)\r\n                    .FirstOrDefault();\r\n\r\n                if (typeEnvoiPlateformId == 0)\r\n                {\r\n                    Log.Error(\"QCM Save results error getting type envoi\");\r\n                    return InternalServerError();\r\n                }\r\n\r\n                var copieOriginale = new CopieOriginale",
+                    "metadata": {},
+                    "type": "Document"
+                },
+                {
+                    "page_content": "{\r\n                    CopieId = userCopy.CopieId,\r\n                    AudioFileId = null,\r\n                    UserCreate = user.Email,\r\n                    DateCreate = DateTime.Now,\r\n                    RessourceVersionRessourceObjectId = rorvId,\r\n                    DateEnvoi = DateTime.Now,\r\n                    CopieTypeEnvoiId = typeEnvoiPlateformId,\r\n                    CopieCorrigees =\r\n                    {\r\n                        copieCorrige\r\n                    },\r\n                    DateValidation = DateTimeOffset.Now,\r\n                    // change date limite correction a datetime.now + 7 working days\r\n                    // TODO change date limite correction with BD data from each school \r\n                    DateLimiteCorrection = DateTimeOffset.Now.AddWorkingDays(7)\r\n            };\r\n\r\n                var url = _config.GetUploadManagerUrl() +\r\n                                       $\"/api/evaluations/uploadQCMResultsFile?organisme={userCopy.EcoleUser.Ecole.Organisme.Code}&userId={payload.UserId}&school={userCopy.EcoleUser.Ecole.Code}\";\r\n\r\n            // Envoi de la copie corrig\u00e9e\r\n            using (var client = new HttpClient())\r\n            {\r\n                var originalCopyPdf = pdfGen.GeneratePdfByteArrayContent(withCorrection: false);\r\n\r\n                var result = await client.PostAsync(url, originalCopyPdf);\r\n\r\n                result.EnsureSuccessStatusCode();\r\n\r\n                var jsonString = await result.Content.ReadAsStringAsync();\r\n\r\n                var file = JsonConvert.DeserializeObject<UploadedFileV2ViewModel>(jsonString);\r\n                var ext = Path.GetExtension(file.FileUrl);\r\n                var filename = $\"{userCopy.Copy.Reference}_reponses{ext}\";\r\n\r\n                // On rempli les info de la copie originale\r\n                copieOriginale.UploadFile = new UploadedFile\r\n                {\r\n                    FileUrl = file.FileUrl,\r\n                    FileName = filename,\r\n                    FileGuid = Guid.NewGuid(),\r\n                    FileHash = file.FileHash,\r\n                    FileSize = file.FileSize,\r\n                    UserCreate = user.Email,\r\n                    UserUpdate = user.Email,\r\n                    DateCreate = DateTime.Now,\r\n                    DateUpdate = DateTime.Now\r\n                };\r\n\r\n                copieOriginale.Filename = file.FileUrl;\r\n            }\r\n\r\n            //Envoi de la copie originale\r\n            using (var client = new HttpClient())\r\n            {\r\n                var correctedCopyPdf = pdfGen.GeneratePdfByteArrayContent(withCorrection: true);\r\n\r\n                var result = await client.PostAsync(url, correctedCopyPdf);\r\n\r\n                result.EnsureSuccessStatusCode();\r\n\r\n                var jsonString = await result.Content.ReadAsStringAsync();\r\n\r\n                var file = JsonConvert.DeserializeObject<UploadedFileV2ViewModel>(jsonString);\r\n                var ext = Path.GetExtension(file.FileUrl);\r\n                var filename = $\"{userCopy.Copy.Reference}_resultats{ext}\";\r\n\r\n                // on rempli les infos de la copie corrig\u00e9e\r\n                copieCorrige.Filename = file.FileUrl;\r\n                copieCorrige.UploadFile = new UploadedFile\r\n                {\r\n                    FileUrl = file.FileUrl,\r\n                    FileName = filename,\r\n                    FileGuid = Guid.NewGuid(),\r\n                    FileHash = file.FileHash,\r\n                    FileSize = file.FileSize,\r\n                    DateCreate = DateTime.Now,\r\n                    UserCreate = \"PDF Generator\",\r\n                };\r\n            }\r\n\r\n            userCopy.Copy.CopieOriginales.Add(copieOriginale);\r\n\r\n\r\n            // retrieve the copy status\r\n            int commenceStatusId = DataCache.GetCopyStatuses(_db)\r\n                .Where(cs => cs.Code == nameof(CopyStatusCode.COMMENCE))\r\n                .Select(cs => cs.Id)\r\n                .FirstOrDefault();\r\n\r\n            // retrieve the copy status\r\n            int transmittedStatusId = DataCache.GetCopyStatuses(_db)\r\n                .Where(cs => cs.Code == nameof(CopyStatusCode.TRANSMIS))\r\n                .Select(cs => cs.Id)\r\n                .FirstOrDefault();\r\n\r\n            // retrieve the copy status\r\n            int correctionEnCoursStatusId = DataCache.GetCopyStatuses(_db)\r\n                .Where(cs => cs.Code == nameof(CopyStatusCode.ENCOURS))\r\n                .Select(cs => cs.Id)\r\n                .FirstOrDefault();\r\n\r\n            // retrieve the copy status\r\n            int correctedStatusId = DataCache.GetCopyStatuses(_db)\r\n                .Where(cs => cs.Code == nameof(CopyStatusCode.CORRIGE))\r\n                .Select(cs => cs.Id)\r\n                .FirstOrDefault();\r\n\r\n            var affectationCorrecteur = await _db.AffectationCorrecteurs\r\n                .AsNoTracking()\r\n                .Where(ac => ac.RessourceVersionRessourceObjectId == rorvId && ac.DateDelete == null)\r\n                .OrderByDescending(ac => ac.Principal)\r\n                .FirstOrDefaultAsync();\r\n\r\n            // Si on a pas de correcteur affect\u00e9\r\n            if (affectationCorrecteur == null)\r\n            {\r\n                // On corrige automatiquement la copie\r\n                userCopy.Copy.DispoLms = true;\r\n                userCopy.Copy.LastCopieAvancementCode = nameof(CopyStatusCode.CORRIGE);\r\n                userCopy.Copy.ModeBrouillon = false;\r\n                userCopy.Copy.NoteFinale = activity.Score;\r\n\r\n                // Avancement Copie\r\n                userCopy.Copy.CopieAvancements.Add(new CopieAvancement\r\n                {\r\n                    CopieStatutId = transmittedStatusId, // TRANSMIS\r\n                    DateDebut = DateTimeOffset.Now.AddSeconds(1),\r\n                    UserCreate = user.Email,\r\n                    DateCreate = DateTime.Now.AddSeconds(1),\r\n                });\r\n\r\n                userCopy.Copy.CopieAvancements.Add(new CopieAvancement\r\n                {\r\n                    CopieStatutId = correctedStatusId, // CORRIGE\r\n                    DateDebut = DateTimeOffset.Now.AddSeconds(2),\r\n                    UserCreate = user.Email,\r\n                    DateCreate = DateTime.Now.AddSeconds(2),\r\n                });\r\n\r\n                // Avancement Copie originale\r\n                copieOriginale.CopieOriginaleAvancements.Add(new CopieOriginaleAvancement\r\n                {\r\n                    CopieStatutId = commenceStatusId, // COMMENCE\r\n                    DateDebut = DateTimeOffset.Now,\r\n                    UserCreate = user.Email,\r\n                    DateCreate = DateTime.Now,\r\n                });\r\n\r\n                copieOriginale.CopieOriginaleAvancements.Add(new CopieOriginaleAvancement\r\n                {\r\n                    CopieStatutId = transmittedStatusId, // TRANSMIS\r\n                    DateDebut = DateTimeOffset.Now.AddSeconds(1),\r\n                    UserCreate = user.Email,\r\n                    DateCreate = DateTime.Now.AddSeconds(1),\r\n                });\r\n\r\n                copieOriginale.CopieOriginaleAvancements.Add(new CopieOriginaleAvancement\r\n                {\r\n                    CopieStatutId = correctedStatusId, // CORRIGE\r\n                    DateDebut = DateTime.Now.AddSeconds(2),\r\n                    UserCreate = user.Email,\r\n                    DateCreate = DateTime.Now.AddSeconds(2),\r\n                });\r\n            }\r\n            else\r\n            {\r\n                //if RORV have a principal corrector we affect him to correct this qcm\r\n                // change qcm copy status => en cours de correction\r\n                userCopy.Copy.DispoLms = false;\r\n                userCopy.Copy.LastCopieAvancementCode = nameof(CopyStatusCode.ENCOURS);\r\n                userCopy.Copy.ModeBrouillon = false;\r\n                userCopy.Copy.NoteFinale = activity.Score;\r\n                userCopy.Copy.DateReception = DateTimeOffset.Now;\r\n                userCopy.Copy.TypeEnvoiId = typeEnvoiPlateformId;\r\n                userCopy.Copy.UserUpdate = user.Email;",
+                    "metadata": {},
+                    "type": "Document"
+                },
+                {
+                    "page_content": "userCopy.Copy.DateUpdate =DateTime.Now;\r\n\r\n                copieCorrige.CorrecteurId = affectationCorrecteur.CorrecteurId;\r\n\r\n                // Avancement copie\r\n                userCopy.Copy.CopieAvancements.Add(new CopieAvancement\r\n                {\r\n                    CopieStatutId = transmittedStatusId, // TRANSMIS\r\n                    CopieId = userCopy.CopieId,\r\n                    DateDebut = DateTimeOffset.Now.AddSeconds(1),\r\n                    UserCreate = user.Email,\r\n                    DateCreate = DateTime.Now.AddSeconds(1),\r\n                });\r\n\r\n                userCopy.Copy.CopieAvancements.Add(new CopieAvancement\r\n                {\r\n                    CopieStatutId = correctionEnCoursStatusId, // ENCOURS\r\n                    DateDebut = DateTimeOffset.Now.AddSeconds(2),\r\n                    CopieId = userCopy.CopieId,\r\n                    UserCreate = user.Email,\r\n                    DateCreate = DateTime.Now.AddSeconds(2),\r\n                });\r\n\r\n                // change qcm original_copy status => en cours de correction\r\n                copieOriginale.CopieOriginaleAvancements.Add(new CopieOriginaleAvancement\r\n                {\r\n                    CopieStatutId = commenceStatusId, // COMMENCE\r\n                    DateDebut = DateTimeOffset.Now,\r\n                    UserCreate = user.Email,\r\n                    DateCreate = DateTime.Now,\r\n                });\r\n\r\n                copieOriginale.CopieOriginaleAvancements.Add(new CopieOriginaleAvancement\r\n                {\r\n                    CopieStatutId = transmittedStatusId, // TRANSMIS\r\n                    DateDebut = DateTimeOffset.Now.AddSeconds(1),\r\n                    UserCreate = user.Email,\r\n                    DateCreate = DateTime.Now.AddSeconds(1),\r\n                });\r\n\r\n                copieOriginale.CopieOriginaleAvancements.Add(new CopieOriginaleAvancement\r\n                {\r\n                    CopieStatutId = correctionEnCoursStatusId, // ENCOURS\r\n                    DateDebut = DateTimeOffset.Now.AddSeconds(2),\r\n                    UserCreate = user.Email,\r\n                    DateCreate = DateTime.Now.AddSeconds(2),\r\n                });\r\n\r\n            }\r\n\r\n            _db.CopieOriginales.Add(copieOriginale);\r\n            await _db.SaveChangesAsync();\r\n\r\n            //Send a mail if the user failed\r\n            BackgroundJob.Enqueue(() => NotificationSenderManager.SendQuizNotificationAsync(\r\n                    quizReport.Summary.Percent,\r\n                    quizReport.Summary.Time,\r\n                    payload.SchoolId,\r\n                    payload.UserId,\r\n                    payload.ResourceObjectId));\r\n\r\n                return Ok();\r\n            }\r\n            catch (JoseException ex)\r\n            {\r\n                Log.Error(ex, \"Error decoding the quiz token: {0}\", model.TakerUsername);\r\n                return InternalServerError();\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"saving the results to the database: {0}\", model.DetailedResults);\r\n                return InternalServerError();\r\n            }\r\n        }",
+                    "metadata": {},
+                    "type": "Document"
+                }
+            ]
+        }
+    ],
+    "properties": [],
+    "name": "SpringQuizV2Controller"
+}

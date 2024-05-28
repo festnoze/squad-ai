@@ -1,0 +1,82 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Studi.Api.Lms.Messenger/Controllers/Config/ConfigController.cs",
+    "index_shift_code": 524,
+    "struct_type": "Class",
+    "namespace_name": "Studi.Api.Lms.Messenger.Controllers.Config",
+    "usings": [
+        "Microsoft.AspNetCore.Authorization",
+        "Microsoft.AspNetCore.Mvc",
+        "Studi.Api.Lms.Messenger.Application.Services.ConfigService",
+        "Studi.Api.Lms.Messenger.Controllers.Config.Mapping",
+        "Studi.Api.Lms.Messenger.ExchangeDataContract.v1.Config.ResponseModels",
+        "Swashbuckle.AspNetCore.Annotations",
+        "System.Net"
+    ],
+    "access_modifier": "public",
+    "struct_name": "ConfigController",
+    "base_class_name": "ControllerBase",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetAsync",
+            "code_start_index": 1627,
+            "method_name": "GetAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Retrieves inbox configuration settings for a user in a school.\r\n        /// </summary>\r\n        /// <param name=\"userId\">The user ID for whom inbox configuration is retrieved.</param>\r\n        /// <param name=\"schoolId\">The school ID where the user belongs.</param>\r\n        /// <returns>A collection of inbox configuration settings.</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "schoolId",
+                    "param_name": "schoolId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            HttpContext.Request.Headers.TryGetValue(\"Origin\", out var originValue);\r\n\r\n            Uri.TryCreate(originValue, UriKind.Absolute, out var uri);\r\n\r\n            var config = (await _configService.GetInboxesConfig(userId, schoolId, uri?.Host)).Select(ic => ic.ToResponseModel());\r\n\r\n            return config;\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the configuration data for inboxes based on user ID, school ID, and host URI.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "schoolId",
+                        "param_name": "schoolId",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the configuration data for inboxes based on user ID, school ID, and host URI.\n/// </summary>\n/// <param name=\"userId\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"schoolId\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "ConfigController"
+}

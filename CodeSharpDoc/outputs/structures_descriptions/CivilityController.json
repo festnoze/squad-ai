@@ -1,0 +1,61 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Studi.Api.Lms.User/Controllers/Civility/CivilityController.cs",
+    "index_shift_code": 319,
+    "struct_type": "Class",
+    "namespace_name": "",
+    "usings": [
+        "Microsoft.AspNetCore.Mvc",
+        "Studi.Api.Lms.User.Application.Services.Civility",
+        "Studi.Api.Lms.User.Controllers.Civility.Mapper",
+        "Studi.Api.Lms.User.ExchangeDataContract.V1.Civility.ResponseModels",
+        "Swashbuckle.AspNetCore.Annotations"
+    ],
+    "access_modifier": "public",
+    "struct_name": "CivilityController",
+    "base_class_name": "ControllerWithAuthenticationBase",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetCivilities",
+            "code_start_index": 968,
+            "method_name": "GetCivilities",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 1,
+            "code": "{\r\n        var data = this._civilityService.GetCivilities();\r\n        return data.Select(q => AtoToResponseModelMapper.ToCivilityResponseModel(q));\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve civility data and map it to response models.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "GetCivilities",
+                        "param_name": "GetCivilities",
+                        "param_desc": "Retrieve civility data and map it to response models."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve civility data and map it to response models.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"GetCivilities\">Retrieve civility data and map it to response models.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "CivilityController"
+}

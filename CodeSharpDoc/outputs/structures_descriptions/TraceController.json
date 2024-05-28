@@ -1,0 +1,163 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/V4/TraceController.cs",
+    "index_shift_code": 375,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V4",
+    "usings": [
+        "System",
+        "System.Collections.Generic",
+        "System.Linq",
+        "System.Threading.Tasks",
+        "System.Web",
+        "System.Web.Http",
+        "LMS.Attributes",
+        "LMS.Configuration",
+        "LMS.Data",
+        "LMS.Models.BindingModels",
+        "LMS.Services",
+        "LMS.Services.Interfaces",
+        "LMS.Utils.Cache",
+        "Serilog"
+    ],
+    "access_modifier": "public",
+    "struct_name": "TraceController",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetAllUsersIdsMissingTracesForInternalRulesApproval",
+            "code_start_index": 1170,
+            "method_name": "GetAllUsersIdsMissingTracesForInternalRulesApproval",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Renvoie une liste d\u2019ids des utilisateurs pour lesquels un ticket de suivi automatique concernant l\u2019acceptation du r\u00e8glement int\u00e9rieur doit \u00eatre cr\u00e9\u00e9\r\n        /// </summary>\r\n        /// <param name=\"maxUsersCount\">le nombre maximum d'utilisateurs que doit renvoyer la requ\u00e8te</param>\r\n        /// <returns>la liste des ids des utilisateurs concern\u00e9s</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            int maxUsersCount = -1;\r\n            return Ok(traceService.GetUsersIdsMissingTracesForInternalRulesApproval(maxUsersCount));\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve team members for a specific team asynchronously based on the current user's school and identity.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no parameters",
+                        "param_name": "no parameters",
+                        "param_desc": "The list of parameters is 'no parameters'."
+                    },
+                    {
+                        "name": "GetAllUsersIdsMissingTracesForInternalRulesApproval",
+                        "param_name": "GetAllUsersIdsMissingTracesForInternalRulesApproval",
+                        "param_desc": "We have an existing method named 'GetAllUsersIdsMissingTracesForInternalRulesApproval'."
+                    },
+                    {
+                        "name": "Retrieve team members for a specific team asynchronously based on the current user's school and identity.",
+                        "param_name": "Retrieve team members for a specific team asynchronously based on the current user's school and identity.",
+                        "param_desc": "For context, the method purpose is 'Retrieve team members for a specific team asynchronously based on the current user's school and identity.'."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve team members for a specific team asynchronously based on the current user's school and identity.\n/// </summary>\n/// <param name=\"no parameters\">The list of parameters is 'no parameters'.</param>\n/// <param name=\"GetAllUsersIdsMissingTracesForInternalRulesApproval\">We have an existing method named 'GetAllUsersIdsMissingTracesForInternalRulesApproval'.</param>\n/// <param name=\"Retrieve team members for a specific team asynchronously based on the current user's school and identity.\">For context, the method purpose is 'Retrieve team members for a specific team asynchronously based on the current user's school and identity.'.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetBatchUsersIdsMissingTracesForInternalRulesApproval",
+            "code_start_index": 1960,
+            "method_name": "GetBatchUsersIdsMissingTracesForInternalRulesApproval",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Renvoie une liste d\u2019ids des utilisateurs pour lesquels un ticket de suivi automatique concernant l\u2019acceptation du r\u00e8glement int\u00e9rieur doit \u00eatre cr\u00e9\u00e9\r\n        /// </summary>\r\n        /// <param name=\"maxUsersCount\">le nombre maximum d'utilisateurs que doit renvoyer la requ\u00e8te</param>\r\n        /// <returns>la liste des ids des utilisateurs concern\u00e9s</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "maxUsersCount",
+                    "param_name": "maxUsersCount",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            return Ok(traceService.GetUsersIdsMissingTracesForInternalRulesApproval(maxUsersCount));\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the active teams for the currently authenticated user.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "maxUsersCount",
+                        "param_name": "maxUsersCount",
+                        "param_desc": "The maximum number of users count to retrieve."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the active teams for the currently authenticated user.\n/// </summary>\n/// <param name=\"maxUsersCount\">The maximum number of users count to retrieve.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "CreateTracesForUsersInternalRulesApproval",
+            "code_start_index": 2643,
+            "method_name": "CreateTracesForUsersInternalRulesApproval",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Cr\u00e9\u00e9 des tickets de suivi concernant l\u2019acceptation du r\u00e8glement interieur pour tous les utilisateurs du lot dont l\u2019id est pass\u00e9 en param\u00e8tre\r\n        /// </summary>\r\n        /// <param name=\"usersTracesBm\">contient la liste des ids des utilisateurs \u00e0 traiter</param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "usersTracesBm",
+                    "param_name": "usersTracesBm",
+                    "param_type": "CreateTracesForUsersInternalRulesApprovalBindingModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            const string genericErrorMessage = \"Impossible de cr\u00e9er des tickets de suivi pour l'acceptation du r\u00e8glement int\u00e9rieur. Motif : /n\";\r\n            if (usersTracesBm.UsersIds == null || !usersTracesBm.UsersIds.Any())\r\n            {\r\n                var message = genericErrorMessage + \"aucun utilisateur fourni en entr\u00e9e\";\r\n                Log.Error(message);\r\n                return BadRequest(message);\r\n            }\r\n\r\n            var failedMessages = await traceService.CreateTracesForUsersInternalRulesApproval(usersTracesBm.UsersIds);\r\n            if (failedMessages.Any())\r\n            {\r\n                var globalMessage = genericErrorMessage + string.Join(\"/n \u2022 \", failedMessages);\r\n                if (globalMessage.Length > 1000)\r\n                    globalMessage = globalMessage.Substring(0, 1000) + \" ...\";\r\n                Log.Error(globalMessage);\r\n                return BadRequest(globalMessage);\r\n            }\r\n            else\r\n            {\r\n                return Ok(true);\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the user IDs of all users missing traces for internal rules approval.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "usersTracesBm",
+                        "param_name": "usersTracesBm",
+                        "param_desc": "The parameter 'usersTracesBm' is of type 'CreateTracesForUsersInternalRulesApprovalBindingModel'. It represents the binding model for creating traces for users internal rules approval."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the user IDs of all users missing traces for internal rules approval.\n/// </summary>\n/// <param name=\"usersTracesBm\">The parameter 'usersTracesBm' is of type 'CreateTracesForUsersInternalRulesApprovalBindingModel'. It represents the binding model for creating traces for users internal rules approval.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "TraceController"
+}

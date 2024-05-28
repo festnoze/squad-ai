@@ -1,0 +1,403 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/V2/ProfileV2Controller.cs",
+    "index_shift_code": 682,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V2",
+    "usings": [
+        "Lms.Common.Enumerations",
+        "LMS.Attributes",
+        "LMS.Attributes.Routing",
+        "LMS.Authentication",
+        "LMS.Data",
+        "LMS.Models.BindingModels.V2",
+        "LMS.Models.ViewModels.V2.Profile",
+        "LMS.Services",
+        "LMS.Services.Interfaces",
+        "LMS.Utils",
+        "LMS.Utils.Cache",
+        "Microsoft.IdentityModel.Tokens",
+        "Serilog",
+        "Studi.Api.Lms.User.Client.Services",
+        "Studi.Jwt",
+        "System",
+        "System.Collections.Generic",
+        "System.Data.Entity",
+        "System.Linq",
+        "System.Security.Cryptography",
+        "System.Threading.Tasks",
+        "System.Web.Http",
+        "System.Web.Http.Description"
+    ],
+    "access_modifier": "public",
+    "struct_name": "ProfileV2Controller",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetMyUserInfoAsync",
+            "code_start_index": 1821,
+            "method_name": "GetMyUserInfoAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Get the profile information about the logged in user\r\n        /// </summary>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var ecoleId = User.Identity.GetSchoolId(); //this.GetSchoolId(_db);\r\n\r\n            var evalCategories = DataCache.GetEvaluationCategories(_db);\r\n\r\n            var evalOralCategoryId = TCache<int>.Get(\"GetMyUserInfoAsync.evalOralCategoryId\", 12 * 3600, () =>\r\n            {\r\n                return evalCategories.Where(ec => ec.Code == \"EVAL_ORAL\").Select(ec => ec.Id).FirstOrDefault();\r\n            });\r\n\r\n            var finalExamCategoryId = TCache<int>.Get(\"GetMyUserInfoAsync.finalExamCategoryId\", 12 * 3600, () =>\r\n            {\r\n                return evalCategories.Where(ec => ec.Code == \"EVAL_FINAL\")\r\n                .Select(ec => ec.Id).FirstOrDefault();\r\n            });\r\n\r\n            var typeRendu = DataCache.GetEvaluationTypeRendu(_db);\r\n            var oralRenduId = TCache<int>.Get(\"GetMyUserInfoAsync.oralRenduId\", 12 * 3600, () =>\r\n            {\r\n                return typeRendu.Where(ec => ec.Code == \"ORAL\")\r\n                                    .Select(ec => ec.Id)\r\n                                    .FirstOrDefault();\r\n            });\r\n\r\n            var us = await TCache<UserInfoViewModel>.GetAsync($\"GetMyUserInfoAsync.user.{userId}\", 3600, async () =>\r\n                {\r\n                    return await this._db.Users\r\n                    .AsNoTracking()\r\n                    .Include(u => u.UploadedFile_FileIdPhotoProfil)\r\n                    .Include(u => u.UploadedFile_FileIdHeaderProfil)\r\n                    .Where(u => u.Id == userId)\r\n                    .Select(user => new UserInfoViewModel\r\n                    {\r\n                        UserId = user.Id,\r\n                        ContactUnique = user.ContactUnique,\r\n                        Civility = user.Civilite,\r\n                        LastName = user.Nom,\r\n                        FirstName = user.Prenom,\r\n                        DateofBirth = user.DateNaissance,\r\n                        Pseudo = user.Pseudo,\r\n                        ProfilePicture = (user.FileIdPhotoProfil != null) ? user.UploadedFile_FileIdPhotoProfil.FileUrl : user.PhotoProfil,\r\n                        CoverPicture = (user.FileIdHeaderProfil != null) ? user.UploadedFile_FileIdHeaderProfil.FileUrl : user.HeaderProfil,\r\n                        Email = user.Email,\r\n                        Internal = user.Interne,\r\n                        // LastConnection = user.EcoleUsers.Where(eu => eu.EcoleId == ecoleId)\r\n                        //    .Select(eu => eu.LastConnectionDate)\r\n                        //    .FirstOrDefault()?.UtcDateTime,\r\n                        LastConnection = user.EcoleUsers.Where(eu => eu.EcoleId == ecoleId)\r\n                    .Select(eu => eu.LastConnectionDate)\r\n                    .FirstOrDefault(),\r\n\r\n                        TotalConnectionTimeInSeconds = user.EcoleUsers.Where(eu => eu.EcoleId == ecoleId)\r\n                           .Select(eu => eu.TotalConnectionTime)\r\n                           .FirstOrDefault(),\r\n                        MainAddress = new UserInfoAddressViewModel\r\n                        {\r\n                            AddressId = user.AdresseId,\r\n                            NumVoie = user.Adresse.NumeroVoie,\r\n                            NomVoie = user.Adresse.NomVoie,\r\n                            TypeVoieId = user.Adresse.TypeVoieId,\r\n                            CodePostal = user.Adresse.Cp,\r\n                            Ville = user.Adresse.Ville,\r\n                            PaysId = user.Adresse.PaysId,\r\n                            Appartement = user.Adresse.Appartement,\r\n                            Escalier = user.Adresse.Escalier,\r\n                            Etage = user.Adresse.Etage,\r\n                            Batiment = user.Adresse.Batiment,\r\n                            Residence = user.Adresse.Residence,\r\n                            Complement = user.Adresse.Complement,\r\n                        },\r\n                        ShippingAddress = new UserInfoAddressViewModel\r\n                        {\r\n                            AddressId = user.AdresseLivraisonId,\r\n                            NumVoie = user.AdresseLivraison.NumeroVoie,\r\n                            NomVoie = user.AdresseLivraison.NomVoie,\r\n                            TypeVoieId = user.AdresseLivraison.TypeVoieId,\r\n                            CodePostal = user.AdresseLivraison.Cp,\r\n                            Ville = user.AdresseLivraison.Ville,\r\n                            PaysId = user.AdresseLivraison.PaysId,\r\n                            Appartement = user.AdresseLivraison.Appartement,\r\n                            Escalier = user.AdresseLivraison.Escalier,\r\n                            Etage = user.AdresseLivraison.Etage,\r\n                            Batiment = user.AdresseLivraison.Batiment,\r\n                            Residence = user.AdresseLivraison.Residence,\r\n                            Complement = user.AdresseLivraison.Complement,\r\n                        },\r\n                        BillingAddress = new UserInfoAddressViewModel\r\n                        {\r\n                            AddressId = user.AdresseFacturationId,\r\n                            NumVoie = user.AdresseFacturation.NumeroVoie,\r\n                            NomVoie = user.AdresseFacturation.NomVoie,\r\n                            TypeVoieId = user.AdresseFacturation.TypeVoieId,\r\n                            CodePostal = user.AdresseFacturation.Cp,\r\n                            Ville = user.AdresseFacturation.Ville,\r\n                            PaysId = user.AdresseFacturation.PaysId,\r\n                            Appartement = user.AdresseFacturation.Appartement,\r\n                            Escalier = user.AdresseFacturation.Escalier,\r\n                            Etage = user.AdresseFacturation.Etage,\r\n                            Batiment = user.AdresseFacturation.Batiment,\r\n                            Residence = user.AdresseFacturation.Residence,\r\n                            Complement = user.AdresseFacturation.Complement,\r\n                        },\r\n                        UserType = user.EcoleUsers\r\n                                        .Where(eu => eu.EcoleId == ecoleId)\r\n                                        .Select(eu => new UserInfoTypeViewModel\r\n                                        {\r\n                                            Code = eu.UserType.Code,\r\n                                            Label = eu.UserType.Libelle\r\n                                        })\r\n                    .FirstOrDefault(),\r\n                        UserStatus = user.EcoleUsers\r\n                                        .Where(eu => eu.EcoleId == ecoleId)\r\n                                        .Select(eu => new UserInfoStatusViewModel\r\n                                        {\r\n                                            Code = eu.UserStatut.Code,\r\n                                            Label = eu.UserStatut.Libelle\r\n                                        })\r\n                                        .FirstOrDefault(),\r\n                        PhoneNumbers = user.UserPhoneNumbers\r\n                                        .Where(pn => pn.IsDefault)\r\n                                        .Select(pn => new UserInfoPhoneNumberViewModel\r\n                                        {\r\n                                            PhoneNumberId = pn.Id,\r\n                                            Code = pn.PhoneNumberType.Code,\r\n                                            Label = pn.PhoneNumberType.Code,\r\n                                            PhoneNumber = pn.PhoneNumber,\r\n                                            CountryCode = pn.Indicatif\r\n                                        }).ToList(),\r\n                        Promotions = user.InscriptionPromotions\r\n                                        .Where(ip => ip.EcoleId == ecoleId\r\n                                        && (ip.DateDelete == null || ip.DateDelete > DateTime.Now)\r\n                                        && ((ip.DateFinAcces == null && ip.Promotion.DateFinPromo > DateTime.Now) || ip.DateFinAcces > DateTime.Now))\r\n                                        .OrderBy(ip => ip.Promotion.DateDebut)\r\n                                        .Select(ip => new UserInfoPromotionViewModel\r\n                                        {\r\n                                            PromotionId = ip.PromotionId,\r\n                                            ParcoursId = ip.Promotion.ParcoursId,\r\n                                            Code = ip.Promotion.Code,\r\n                                            Libelle = ip.Promotion.Libelle,\r\n                                            Session = ip.Promotion.Session,\r\n                                            CodeParcours = ip.Promotion.Parcour.Code,\r\n                                            TitreParcours = ip.Promotion.Parcour.Titre,\r\n                                            Evaluation = ip.Evaluation,\r\n                                            Partenaires = ip.User.InscriptionMatieres.Where(im => im.EcoleId == ip.EcoleId\r\n                                                                   && im.PromotionId == ip.PromotionId)\r\n                                                               .Select(q => new UserInfoPromotionPartenaireViewModel\r\n                                                               {\r\n                                                                   Id = q.Projet.PartenaireId,\r\n                                                                   Code = q.Projet.PartenaireId.HasValue ? q.Projet.Partenaire.Code : null,\r\n                                                                   HasInternship = q.Projet.PartenaireId.HasValue ? q.Projet.Partenaire.HasInternship : true\r\n                                                               })\r\n                                                               .ToList(),\r\n                                            HasInternship = ip.Promotion.ConventionStagePromotionInfoId != null,\r\n                                            //PartenaireId = ip.User.InscriptionMatieres.Where(im => im.EcoleId == ip.EcoleId\r\n                                            //                                                && im.PromotionId == ip.PromotionId\r\n                                            //                                                && im.ProjetId != null)\r\n                                            //                                            .Select(im => im.Projet.par)\r\n                                        }).ToList(),\r\n                        HasOralEval = user.AffectationCorrecteurs.Any(q => q.RessourcesObjectRessourcesVersion.RessourceVersion.Ressource.EvaluationCategorieId == evalOralCategoryId\r\n                               || (q.RessourcesObjectRessourcesVersion.RessourceVersion.Ressource.EvaluationCategorieId == finalExamCategoryId\r\n                                   && q.RessourcesObjectRessourcesVersion.RessourceVersion.Ressource.EvaluationTypeRenduAutoriseId == oralRenduId))\r\n                    })\r\n                    .FirstOrDefaultAsync();\r\n                });\r\n\r\n            var partnersWithoutForms = new List<string>()\r\n            {\r\n                \"ECOLE_DE_LUCA_BLENDED\",\r\n                \"ECOLE_FRANCOISE_MORICE_BLENDED\",\r\n                \"ECOLE_ISFEC_BLENDED\"\r\n            };\r\n\r\n            if (!us.Promotions.SelectMany(pr => pr.Partenaires.Select(p => p.Code)).Any(c => partnersWithoutForms.Contains(c)))\r\n            {\r\n                var forms = await _formsService.GetFormsAvailableAsync(userId, ecoleId);\r\n\r\n                us.RegistrationFormInfo = forms;\r\n            }\r\n\r\n            #region Addresses\r\n\r\n            if (us.MainAddress?.AddressId != null)\r\n            {\r\n                us.Addresses.Add(us.MainAddress);\r\n            }\r\n\r\n            if (us.ShippingAddress?.AddressId != null)\r\n            {\r\n                us.Addresses.Add(us.ShippingAddress);\r\n            }\r\n\r\n            if (us.BillingAddress?.AddressId != null)\r\n            {\r\n                us.Addresses.Add(us.BillingAddress);\r\n            }\r\n\r\n            #endregion Addresses\r\n\r\n            #region Workgroups\r\n\r\n            if (us.Internal)\r\n            {\r\n                us.Workgroups = await this._db.Workgroups\r\n                    .AsNoTracking()\r\n                    .Where(w => w.SchoolId == ecoleId)\r\n                    .Select(wu => new UserInfoWorkgroupViewModel\r\n                    {\r\n                        Code = wu.Code,\r\n                        Name = wu.Name,\r\n                        WorkgroupId = wu.WorkgroupId,\r\n                        CoverPicture = wu.CoverImageUrl,\r\n                        Description = wu.Description,\r\n                    })\r\n                    .OrderBy(wg => wg.Name)\r\n                    .ToListAsync();\r\n            }\r\n            else if (us.UserType.Code == \"PROSPECT\")\r\n            {\r\n                var defaultSchoolWorkgroupId = DataCache.GetDefaultSchoolWorkgroupId(_db, ecoleId);\r\n\r\n                us.Workgroups = await _db.Workgroups\r\n                    .AsNoTracking()\r\n                    .Where(w => w.WorkgroupId == defaultSchoolWorkgroupId)\r\n                    .Select(w => new UserInfoWorkgroupViewModel\r\n                    {\r\n                        Code = w.Code,\r\n                        Name = w.Name,\r\n                        WorkgroupId = w.WorkgroupId,\r\n                        CoverPicture = w.CoverImageUrl,\r\n                        Description = w.Description,\r\n                    })\r\n                    .ToListAsync();\r\n            }\r\n            else\r\n            {\r\n                var workgroupsIds = await _workgroupService.GetUserWorkgroupsAsync(userId, false, ecoleId);\r\n\r\n                var workgroupQuery = this._db.Workgroups\r\n                    .AsNoTracking()\r\n                    .Where(w => workgroupsIds\r\n                        .Contains(w.WorkgroupId)\r\n                    );\r\n\r\n                workgroupQuery = await _workgroupService\r\n                    .GetDcgDscgWorkgroupFilterAsync(workgroupQuery,\r\n                        us.Promotions\r\n                        .Select(p => p.CodeParcours)\r\n                        .ToList()\r\n                    );\r\n\r\n                us.Workgroups = await workgroupQuery\r\n                    .Select(wu => new UserInfoWorkgroupViewModel\r\n                    {\r\n                        WorkgroupId = wu.WorkgroupId,\r\n                        Code = wu.Code,\r\n                        Name = wu.Name,\r\n                        CoverPicture = wu.CoverImageUrl,\r\n                        Description = wu.Description,\r\n                    })\r\n                    .OrderBy(wg => wg.Name)\r\n                    .ToListAsync();\r\n            }\r\n\r\n            #endregion Workgroups\r\n\r\n            us.HasDownloadedMobileApp = await _db.EcoleUserDevices\r\n                .AnyAsync(eud => eud.UserId == userId\r\n                                && eud.EcoleId == ecoleId\r\n                                && (eud.DeviceType == \"Android\" || eud.DeviceType == \"iOS\"));\r\n\r\n            foreach (var promo in us.Promotions)\r\n            {\r\n                if (promo.HasInternship)\r\n                {\r\n                    promo.HasInternship = promo.Partenaires.Any(p => p.HasInternship);\r\n                }\r\n            }\r\n\r\n            #region AccessRights\r\n\r\n            us.AccessRights = (await _lmsUserServiceByClient.AccessRight.GetAsync(userId, ecoleId)).Select(ar => ar.ToString()).ToList();\r\n\r\n            #endregion AccessRights\r\n\r\n            return Ok(us);\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the user information, including personal details, addresses, promotions, workgroups, and access rights, and return the result.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "methodName",
+                        "param_name": "methodName",
+                        "param_desc": "The name of the method being called. In this case, the method is 'GetMyUserInfoAsync'."
+                    },
+                    {
+                        "name": "methodPurpose",
+                        "param_name": "methodPurpose",
+                        "param_desc": "The purpose of the method 'GetMyUserInfoAsync' is to retrieve the user information, including personal details, addresses, promotions, workgroups, and access rights, and then return the result."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the user information, including personal details, addresses, promotions, workgroups, and access rights, and return the result.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"methodName\">The name of the method being called. In this case, the method is 'GetMyUserInfoAsync'.</param>\n/// <param name=\"methodPurpose\">The purpose of the method 'GetMyUserInfoAsync' is to retrieve the user information, including personal details, addresses, promotions, workgroups, and access rights, and then return the result.</param>\n",
+            "code_chunks": [
+                {
+                    "page_content": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var ecoleId = User.Identity.GetSchoolId(); //this.GetSchoolId(_db);\r\n\r\n            var evalCategories = DataCache.GetEvaluationCategories(_db);\r\n\r\n            var evalOralCategoryId = TCache<int>.Get(\"GetMyUserInfoAsync.evalOralCategoryId\", 12 * 3600, () =>\r\n            {\r\n                return evalCategories.Where(ec => ec.Code == \"EVAL_ORAL\").Select(ec => ec.Id).FirstOrDefault();\r\n            });\r\n\r\n            var finalExamCategoryId = TCache<int>.Get(\"GetMyUserInfoAsync.finalExamCategoryId\", 12 * 3600, () =>\r\n            {\r\n                return evalCategories.Where(ec => ec.Code == \"EVAL_FINAL\")\r\n                .Select(ec => ec.Id).FirstOrDefault();\r\n            });\r\n\r\n            var typeRendu = DataCache.GetEvaluationTypeRendu(_db);\r\n            var oralRenduId = TCache<int>.Get(\"GetMyUserInfoAsync.oralRenduId\", 12 * 3600, () =>\r\n            {\r\n                return typeRendu.Where(ec => ec.Code == \"ORAL\")\r\n                                    .Select(ec => ec.Id)\r\n                                    .FirstOrDefault();\r\n            });\r\n\r\n            var us = await TCache<UserInfoViewModel>.GetAsync($\"GetMyUserInfoAsync.user.{userId}\", 3600, async () =>\r\n                {\r\n                    return await this._db.Users\r\n                    .AsNoTracking()\r\n                    .Include(u => u.UploadedFile_FileIdPhotoProfil)\r\n                    .Include(u => u.UploadedFile_FileIdHeaderProfil)\r\n                    .Where(u => u.Id == userId)\r\n                    .Select(user => new UserInfoViewModel\r\n                    {\r\n                        UserId = user.Id,\r\n                        ContactUnique = user.ContactUnique,\r\n                        Civility = user.Civilite,\r\n                        LastName = user.Nom,\r\n                        FirstName = user.Prenom,\r\n                        DateofBirth = user.DateNaissance,\r\n                        Pseudo = user.Pseudo,\r\n                        ProfilePicture = (user.FileIdPhotoProfil != null) ? user.UploadedFile_FileIdPhotoProfil.FileUrl : user.PhotoProfil,\r\n                        CoverPicture = (user.FileIdHeaderProfil != null) ? user.UploadedFile_FileIdHeaderProfil.FileUrl : user.HeaderProfil,\r\n                        Email = user.Email,\r\n                        Internal = user.Interne,\r\n                        // LastConnection = user.EcoleUsers.Where(eu => eu.EcoleId == ecoleId)\r\n                        //    .Select(eu => eu.LastConnectionDate)\r\n                        //    .FirstOrDefault()?.UtcDateTime,\r\n                        LastConnection = user.EcoleUsers.Where(eu => eu.EcoleId == ecoleId)\r\n                    .Select(eu => eu.LastConnectionDate)\r\n                    .FirstOrDefault(),\r\n\r\n                        TotalConnectionTimeInSeconds = user.EcoleUsers.Where(eu => eu.EcoleId == ecoleId)\r\n                           .Select(eu => eu.TotalConnectionTime)\r\n                           .FirstOrDefault(),\r\n                        MainAddress = new UserInfoAddressViewModel\r\n                        {\r\n                            AddressId = user.AdresseId,\r\n                            NumVoie = user.Adresse.NumeroVoie,\r\n                            NomVoie = user.Adresse.NomVoie,\r\n                            TypeVoieId = user.Adresse.TypeVoieId,\r\n                            CodePostal = user.Adresse.Cp,\r\n                            Ville = user.Adresse.Ville,\r\n                            PaysId = user.Adresse.PaysId,\r\n                            Appartement = user.Adresse.Appartement,\r\n                            Escalier = user.Adresse.Escalier,\r\n                            Etage = user.Adresse.Etage,\r\n                            Batiment = user.Adresse.Batiment,\r\n                            Residence = user.Adresse.Residence,\r\n                            Complement = user.Adresse.Complement,\r\n                        },\r\n                        ShippingAddress = new UserInfoAddressViewModel\r\n                        {\r\n                            AddressId = user.AdresseLivraisonId,\r\n                            NumVoie = user.AdresseLivraison.NumeroVoie,\r\n                            NomVoie = user.AdresseLivraison.NomVoie,\r\n                            TypeVoieId = user.AdresseLivraison.TypeVoieId,\r\n                            CodePostal = user.AdresseLivraison.Cp,\r\n                            Ville = user.AdresseLivraison.Ville,\r\n                            PaysId = user.AdresseLivraison.PaysId,\r\n                            Appartement = user.AdresseLivraison.Appartement,\r\n                            Escalier = user.AdresseLivraison.Escalier,\r\n                            Etage = user.AdresseLivraison.Etage,\r\n                            Batiment = user.AdresseLivraison.Batiment,\r\n                            Residence = user.AdresseLivraison.Residence,\r\n                            Complement = user.AdresseLivraison.Complement,\r\n                        },\r\n                        BillingAddress = new UserInfoAddressViewModel\r\n                        {\r\n                            AddressId = user.AdresseFacturationId,\r\n                            NumVoie = user.AdresseFacturation.NumeroVoie,\r\n                            NomVoie = user.AdresseFacturation.NomVoie,\r\n                            TypeVoieId = user.AdresseFacturation.TypeVoieId,\r\n                            CodePostal = user.AdresseFacturation.Cp,\r\n                            Ville = user.AdresseFacturation.Ville,\r\n                            PaysId = user.AdresseFacturation.PaysId,\r\n                            Appartement = user.AdresseFacturation.Appartement,\r\n                            Escalier = user.AdresseFacturation.Escalier,\r\n                            Etage = user.AdresseFacturation.Etage,\r\n                            Batiment = user.AdresseFacturation.Batiment,\r\n                            Residence = user.AdresseFacturation.Residence,\r\n                            Complement = user.AdresseFacturation.Complement,\r\n                        },\r\n                        UserType = user.EcoleUsers\r\n                                        .Where(eu => eu.EcoleId == ecoleId)\r\n                                        .Select(eu => new UserInfoTypeViewModel\r\n                                        {\r\n                                            Code = eu.UserType.Code,\r\n                                            Label = eu.UserType.Libelle\r\n                                        })\r\n                    .FirstOrDefault(),\r\n                        UserStatus = user.EcoleUsers\r\n                                        .Where(eu => eu.EcoleId == ecoleId)\r\n                                        .Select(eu => new UserInfoStatusViewModel\r\n                                        {\r\n                                            Code = eu.UserStatut.Code,\r\n                                            Label = eu.UserStatut.Libelle\r\n                                        })\r\n                                        .FirstOrDefault(),\r\n                        PhoneNumbers = user.UserPhoneNumbers\r\n                                        .Where(pn => pn.IsDefault)\r\n                                        .Select(pn => new UserInfoPhoneNumberViewModel\r\n                                        {\r\n                                            PhoneNumberId = pn.Id,\r\n                                            Code = pn.PhoneNumberType.Code,\r\n                                            Label = pn.PhoneNumberType.Code,\r\n                                            PhoneNumber = pn.PhoneNumber,\r\n                                            CountryCode = pn.Indicatif\r\n                                        }).ToList(),\r\n                        Promotions = user.InscriptionPromotions\r\n                                        .Where(ip => ip.EcoleId == ecoleId\r\n                                        && (ip.DateDelete == null || ip.DateDelete > DateTime.Now)",
+                    "metadata": {},
+                    "type": "Document"
+                },
+                {
+                    "page_content": "&& ((ip.DateFinAcces == null && ip.Promotion.DateFinPromo > DateTime.Now) || ip.DateFinAcces > DateTime.Now))\r\n                                        .OrderBy(ip => ip.Promotion.DateDebut)\r\n                                        .Select(ip => new UserInfoPromotionViewModel\r\n                                        {\r\n                                            PromotionId = ip.PromotionId,\r\n                                            ParcoursId = ip.Promotion.ParcoursId,\r\n                                            Code = ip.Promotion.Code,\r\n                                            Libelle = ip.Promotion.Libelle,\r\n                                            Session = ip.Promotion.Session,\r\n                                            CodeParcours = ip.Promotion.Parcour.Code,\r\n                                            TitreParcours = ip.Promotion.Parcour.Titre,\r\n                                            Evaluation = ip.Evaluation,\r\n                                            Partenaires = ip.User.InscriptionMatieres.Where(im => im.EcoleId == ip.EcoleId\r\n                                                                   && im.PromotionId == ip.PromotionId)\r\n                                                               .Select(q => new UserInfoPromotionPartenaireViewModel\r\n                                                               {\r\n                                                                   Id = q.Projet.PartenaireId,\r\n                                                                   Code = q.Projet.PartenaireId.HasValue ? q.Projet.Partenaire.Code : null,\r\n                                                                   HasInternship = q.Projet.PartenaireId.HasValue ? q.Projet.Partenaire.HasInternship : true\r\n                                                               })\r\n                                                               .ToList(),\r\n                                            HasInternship = ip.Promotion.ConventionStagePromotionInfoId != null,\r\n                                            //PartenaireId = ip.User.InscriptionMatieres.Where(im => im.EcoleId == ip.EcoleId\r\n                                            //                                                && im.PromotionId == ip.PromotionId\r\n                                            //                                                && im.ProjetId != null)\r\n                                            //                                            .Select(im => im.Projet.par)\r\n                                        }).ToList(),\r\n                        HasOralEval = user.AffectationCorrecteurs.Any(q => q.RessourcesObjectRessourcesVersion.RessourceVersion.Ressource.EvaluationCategorieId == evalOralCategoryId\r\n                               || (q.RessourcesObjectRessourcesVersion.RessourceVersion.Ressource.EvaluationCategorieId == finalExamCategoryId\r\n                                   && q.RessourcesObjectRessourcesVersion.RessourceVersion.Ressource.EvaluationTypeRenduAutoriseId == oralRenduId))\r\n                    })\r\n                    .FirstOrDefaultAsync();\r\n                });\r\n\r\n            var partnersWithoutForms = new List<string>()\r\n            {\r\n                \"ECOLE_DE_LUCA_BLENDED\",\r\n                \"ECOLE_FRANCOISE_MORICE_BLENDED\",\r\n                \"ECOLE_ISFEC_BLENDED\"\r\n            };\r\n\r\n            if (!us.Promotions.SelectMany(pr => pr.Partenaires.Select(p => p.Code)).Any(c => partnersWithoutForms.Contains(c)))\r\n            {\r\n                var forms = await _formsService.GetFormsAvailableAsync(userId, ecoleId);\r\n\r\n                us.RegistrationFormInfo = forms;\r\n            }\r\n\r\n            #region Addresses\r\n\r\n            if (us.MainAddress?.AddressId != null)\r\n            {\r\n                us.Addresses.Add(us.MainAddress);\r\n            }\r\n\r\n            if (us.ShippingAddress?.AddressId != null)\r\n            {\r\n                us.Addresses.Add(us.ShippingAddress);\r\n            }\r\n\r\n            if (us.BillingAddress?.AddressId != null)\r\n            {\r\n                us.Addresses.Add(us.BillingAddress);\r\n            }\r\n\r\n            #endregion Addresses\r\n\r\n            #region Workgroups\r\n\r\n            if (us.Internal)\r\n            {\r\n                us.Workgroups = await this._db.Workgroups\r\n                    .AsNoTracking()\r\n                    .Where(w => w.SchoolId == ecoleId)\r\n                    .Select(wu => new UserInfoWorkgroupViewModel\r\n                    {\r\n                        Code = wu.Code,\r\n                        Name = wu.Name,\r\n                        WorkgroupId = wu.WorkgroupId,\r\n                        CoverPicture = wu.CoverImageUrl,\r\n                        Description = wu.Description,\r\n                    })\r\n                    .OrderBy(wg => wg.Name)\r\n                    .ToListAsync();\r\n            }\r\n            else if (us.UserType.Code == \"PROSPECT\")\r\n            {\r\n                var defaultSchoolWorkgroupId = DataCache.GetDefaultSchoolWorkgroupId(_db, ecoleId);\r\n\r\n                us.Workgroups = await _db.Workgroups\r\n                    .AsNoTracking()\r\n                    .Where(w => w.WorkgroupId == defaultSchoolWorkgroupId)\r\n                    .Select(w => new UserInfoWorkgroupViewModel\r\n                    {\r\n                        Code = w.Code,\r\n                        Name = w.Name,\r\n                        WorkgroupId = w.WorkgroupId,\r\n                        CoverPicture = w.CoverImageUrl,\r\n                        Description = w.Description,\r\n                    })\r\n                    .ToListAsync();\r\n            }\r\n            else\r\n            {\r\n                var workgroupsIds = await _workgroupService.GetUserWorkgroupsAsync(userId, false, ecoleId);\r\n\r\n                var workgroupQuery = this._db.Workgroups\r\n                    .AsNoTracking()\r\n                    .Where(w => workgroupsIds\r\n                        .Contains(w.WorkgroupId)\r\n                    );\r\n\r\n                workgroupQuery = await _workgroupService\r\n                    .GetDcgDscgWorkgroupFilterAsync(workgroupQuery,\r\n                        us.Promotions\r\n                        .Select(p => p.CodeParcours)\r\n                        .ToList()\r\n                    );\r\n\r\n                us.Workgroups = await workgroupQuery\r\n                    .Select(wu => new UserInfoWorkgroupViewModel\r\n                    {\r\n                        WorkgroupId = wu.WorkgroupId,\r\n                        Code = wu.Code,\r\n                        Name = wu.Name,\r\n                        CoverPicture = wu.CoverImageUrl,\r\n                        Description = wu.Description,\r\n                    })\r\n                    .OrderBy(wg => wg.Name)\r\n                    .ToListAsync();\r\n            }\r\n\r\n            #endregion Workgroups\r\n\r\n            us.HasDownloadedMobileApp = await _db.EcoleUserDevices\r\n                .AnyAsync(eud => eud.UserId == userId\r\n                                && eud.EcoleId == ecoleId\r\n                                && (eud.DeviceType == \"Android\" || eud.DeviceType == \"iOS\"));\r\n\r\n            foreach (var promo in us.Promotions)\r\n            {\r\n                if (promo.HasInternship)\r\n                {\r\n                    promo.HasInternship = promo.Partenaires.Any(p => p.HasInternship);\r\n                }\r\n            }\r\n\r\n            #region AccessRights\r\n\r\n            us.AccessRights = (await _lmsUserServiceByClient.AccessRight.GetAsync(userId, ecoleId)).Select(ar => ar.ToString()).ToList();\r\n\r\n            #endregion AccessRights\r\n\r\n            return Ok(us);\r\n        }",
+                    "metadata": {},
+                    "type": "Document"
+                }
+            ]
+        },
+        {
+            "name": "GetUserInfoAsync",
+            "code_start_index": 17779,
+            "method_name": "GetUserInfoAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Get the profile information about the logged in user\r\n        /// </summary>\r\n        /// <param name=\"userId\"></param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n\r\n            var uservm = await this._db.Users\r\n                .AsNoTracking()\r\n                .Include(u => u.UploadedFile_FileIdPhotoProfil)\r\n                .Include(u => u.UploadedFile_FileIdHeaderProfil)\r\n                .Where(u => u.Id == userId)\r\n                .Select(user => new UserInfoLightViewModel\r\n                {\r\n                    Id = user.Id,\r\n                    Civility = \"\",\r\n                    LastName = \"\",\r\n                    FirstName = \"\",\r\n                    DateofBirth = DateTime.MinValue,\r\n                    Pseudo = user.Pseudo,\r\n                    ProfilePicture = (user.FileIdPhotoProfil != null) ? user.UploadedFile_FileIdPhotoProfil.FileUrl : user.PhotoProfil,\r\n                    CoverPicture = (user.FileIdHeaderProfil != null) ? user.UploadedFile_FileIdHeaderProfil.FileUrl : user.HeaderProfil,\r\n                    Email = \"\",\r\n                    Internal = user.Interne,\r\n\r\n                    UserType = user.EcoleUsers\r\n                        .Where(eu => eu.EcoleId == ecoleId)\r\n                        .Select(eu => new UserInfoTypeViewModel\r\n                        {\r\n                            Code = eu.UserType.Code,\r\n                            Label = eu.UserType.Libelle\r\n                        })\r\n                        .FirstOrDefault(),\r\n\r\n                    UserStatus = user.EcoleUsers\r\n                        .Where(eu => eu.EcoleId == ecoleId)\r\n                        .Select(eu => new UserInfoStatusViewModel\r\n                        {\r\n                            Code = eu.UserStatut.Code,\r\n                            Label = eu.UserStatut.Libelle\r\n                        })\r\n                        .FirstOrDefault(),\r\n\r\n                    LastConnectionDate = user.EcoleUsers.Where(eu => eu.EcoleId == ecoleId)\r\n                        .Select(eu => eu.LastConnectionDate)\r\n                        .FirstOrDefault(),\r\n\r\n                    Promotions = user.InscriptionPromotions.Where(ip =>\r\n                            ip.EcoleId == ecoleId\r\n                            && (ip.DateDelete == null || ip.DateDelete > DateTime.Now)\r\n                            && ((ip.DateFinAcces == null && ip.Promotion.DateFinPromo > DateTime.Now) || ip.DateFinAcces > DateTime.Now))\r\n                        .OrderBy(ip => ip.Promotion.DateDebut)\r\n                        .Select(ip => new UserInfoPromotionViewModel\r\n                        {\r\n                            PromotionId = ip.PromotionId,\r\n                            ParcoursId = ip.Promotion.ParcoursId,\r\n                            Code = ip.Promotion.Code,\r\n                            Libelle = ip.Promotion.Libelle,\r\n                            Session = ip.Promotion.Session,\r\n                            CodeParcours = ip.Promotion.Parcour.Code,\r\n                            TitreParcours = ip.Promotion.Parcour.Titre,\r\n                            Evaluation = false\r\n                        }).ToList()\r\n                }).FirstOrDefaultAsync();\r\n\r\n            return Ok(uservm);\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve user information asynchronously, including basic details, profile and cover pictures, user type, status, last connection date, and active promotions for a specified user ID.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The user ID for which the user information will be retrieved asynchronously. It is of type integer."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve user information asynchronously, including basic details, profile and cover pictures, user type, status, last connection date, and active promotions for a specified user ID.\n/// </summary>\n/// <param name=\"userId\">The user ID for which the user information will be retrieved asynchronously. It is of type integer.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetAccountSettingsAsync",
+            "code_start_index": 21018,
+            "method_name": "GetAccountSettingsAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n\r\n            var ecoleUser = await this._db.EcoleUsers.Where(eu => eu.UserId == userId && eu.EcoleId == ecoleId)\r\n                .Select(eu => new\r\n                {\r\n                    AppearInRanking = eu.ApparaitreChallenge,\r\n                    AppearInDirectory = eu.ApparaitreAnnuaire,\r\n                })\r\n                .FirstOrDefaultAsync();\r\n\r\n            return Ok(ecoleUser);\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the account settings for the current user within a specific school.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "methodName",
+                        "param_name": "methodName",
+                        "param_desc": "The name of the method being called. In this case, it is 'GetAccountSettingsAsync'."
+                    },
+                    {
+                        "name": "methodPurpose",
+                        "param_name": "methodPurpose",
+                        "param_desc": "The purpose of the method 'GetAccountSettingsAsync' is to retrieve the account settings for the current user within a specific school."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the account settings for the current user within a specific school.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"methodName\">The name of the method being called. In this case, it is 'GetAccountSettingsAsync'.</param>\n/// <param name=\"methodPurpose\">The purpose of the method 'GetAccountSettingsAsync' is to retrieve the account settings for the current user within a specific school.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "AppearInTheRankingAsync",
+            "code_start_index": 21681,
+            "method_name": "AppearInTheRankingAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var schoolIdList = User.Identity.GetSchoolIdsList();\r\n\r\n            if (schoolIdList.IsNullOrEmpty())\r\n            {\r\n                return BadRequest();\r\n            }\r\n\r\n            var ecoleUserList = await this._db.EcoleUsers\r\n                 .Where(eu => schoolIdList.Contains(eu.EcoleId) && eu.UserId == userId)\r\n                 .ToListAsync();\r\n\r\n            ecoleUserList.ForEach(eu => eu.ApparaitreChallenge = true);\r\n\r\n            try\r\n            {\r\n                await _db.SaveChangesAsync();\r\n                return Ok(true);\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error changing the appearance in the ranking option\");\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the appearance in the ranking option for a specific user in the database asynchronously.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "methodName",
+                        "param_name": "methodName",
+                        "param_desc": "The name of the method (AppearInTheRankingAsync)"
+                    },
+                    {
+                        "name": "methodPurpose",
+                        "param_name": "methodPurpose",
+                        "param_desc": "The purpose of the method (Update the appearance in the ranking option for a specific user in the database asynchronously.)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the appearance in the ranking option for a specific user in the database asynchronously.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"methodName\">The name of the method (AppearInTheRankingAsync)</param>\n/// <param name=\"methodPurpose\">The purpose of the method (Update the appearance in the ranking option for a specific user in the database asynchronously.)</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "AppearInTheRankingUndoAsync",
+            "code_start_index": 22647,
+            "method_name": "AppearInTheRankingUndoAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var schoolIdList = User.Identity.GetSchoolIdsList();\r\n\r\n            if (schoolIdList.IsNullOrEmpty())\r\n            {\r\n                return BadRequest();\r\n            }\r\n\r\n            var ecoleUserList = await this._db.EcoleUsers\r\n                 .Where(eu => schoolIdList.Contains(eu.EcoleId) && eu.UserId == userId)\r\n                 .ToListAsync();\r\n\r\n            ecoleUserList.ForEach(eu => eu.ApparaitreChallenge = false);\r\n\r\n            try\r\n            {\r\n                await _db.SaveChangesAsync();\r\n                return Ok(true);\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error changing the appearance in the ranking option\");\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the appearance in the ranking option for a specified user by setting it to false, after checking for school ID validity and handling potential errors during the process.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "method_name",
+                        "param_name": "method_name",
+                        "param_desc": "The name of the method which is 'AppearInTheRankingUndoAsync'"
+                    },
+                    {
+                        "name": "method_purpose",
+                        "param_name": "method_purpose",
+                        "param_desc": "The purpose of the method is to update the appearance in the ranking option for a specified user by setting it to false, after checking for school ID validity and handling potential errors during the process."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the appearance in the ranking option for a specified user by setting it to false, after checking for school ID validity and handling potential errors during the process.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"method_name\">The name of the method which is 'AppearInTheRankingUndoAsync'</param>\n/// <param name=\"method_purpose\">The purpose of the method is to update the appearance in the ranking option for a specified user by setting it to false, after checking for school ID validity and handling potential errors during the process.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "AppearInTheDirectoryAsync",
+            "code_start_index": 23635,
+            "method_name": "AppearInTheDirectoryAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var schoolIdList = User.Identity.GetSchoolIdsList();\r\n\r\n            if (schoolIdList.IsNullOrEmpty())\r\n            {\r\n                return BadRequest();\r\n            }\r\n\r\n            var ecoleUserList = await this._db.EcoleUsers\r\n                 .Where(eu => schoolIdList.Contains(eu.EcoleId) && eu.UserId == userId)\r\n                 .ToListAsync();\r\n\r\n            ecoleUserList.ForEach(eu => eu.ApparaitreAnnuaire = true);\r\n\r\n            try\r\n            {\r\n                await _db.SaveChangesAsync();\r\n                return Ok(true);\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error changing the appearence in the directory option\");\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the appearance in the directory for the current user in the specified schools, setting the 'ApparaitreAnnuaire' property to true, with error logging and handling.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "method",
+                        "param_name": "method",
+                        "param_desc": "Update the appearance in the directory for the current user in the specified schools, setting the 'ApparaitreAnnuaire' property to true, with error logging and handling."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the appearance in the directory for the current user in the specified schools, setting the 'ApparaitreAnnuaire' property to true, with error logging and handling.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"method\">Update the appearance in the directory for the current user in the specified schools, setting the 'ApparaitreAnnuaire' property to true, with error logging and handling.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "AppearInTheDirectoryUndoAsync",
+            "code_start_index": 24606,
+            "method_name": "AppearInTheDirectoryUndoAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var schoolIdList = User.Identity.GetSchoolIdsList();\r\n\r\n            if (schoolIdList.IsNullOrEmpty())\r\n            {\r\n                return BadRequest();\r\n            }\r\n\r\n            var ecoleUserList = await this._db.EcoleUsers\r\n                 .Where(eu => schoolIdList.Contains(eu.EcoleId) && eu.UserId == userId)\r\n                 .ToListAsync();\r\n\r\n            ecoleUserList.ForEach(eu => eu.ApparaitreAnnuaire = false);\r\n\r\n            try\r\n            {\r\n                await _db.SaveChangesAsync();\r\n                return Ok(true);\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error changing the appeareance in the directory option\");\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the appearance status in the directory for a user, setting it to false for all schools associated with the user's account.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "method_name",
+                        "param_name": "method_name",
+                        "param_desc": "The name of the method being documented. In this case, it is 'AppearInTheDirectoryUndoAsync'."
+                    },
+                    {
+                        "name": "method_purpose",
+                        "param_name": "method_purpose",
+                        "param_desc": "The purpose of the method 'AppearInTheDirectoryUndoAsync' is to update the appearance status in the directory for a user, setting it to false for all schools associated with the user's account."
+                    },
+                    {
+                        "name": "parameters",
+                        "param_name": "parameters",
+                        "param_desc": "The list of parameters for the method 'AppearInTheDirectoryUndoAsync' is 'no parameters'."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the appearance status in the directory for a user, setting it to false for all schools associated with the user's account.\n/// </summary>\n/// <param name=\"method_name\">The name of the method being documented. In this case, it is 'AppearInTheDirectoryUndoAsync'.</param>\n/// <param name=\"method_purpose\">The purpose of the method 'AppearInTheDirectoryUndoAsync' is to update the appearance status in the directory for a user, setting it to false for all schools associated with the user's account.</param>\n/// <param name=\"parameters\">The list of parameters for the method 'AppearInTheDirectoryUndoAsync' is 'no parameters'.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "UpdateUserPasswordAsync",
+            "code_start_index": 25598,
+            "method_name": "UpdateUserPasswordAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "passwordUpdateBm",
+                    "param_name": "passwordUpdateBm",
+                    "param_type": "PasswordUpdateBm",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            int userId = User.Identity.GetUserId();\r\n\r\n            var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);\r\n\r\n            if (user == null)\r\n            {\r\n                return NotFound();\r\n            }\r\n\r\n            var oldPasswordHash = _tokenService.HashPassword(passwordUpdateBm.OldPassword, Convert.FromBase64String(user.Salt));\r\n\r\n            if (user.Password != oldPasswordHash)\r\n            {\r\n                ModelState.AddModelError(nameof(passwordUpdateBm.OldPassword), \"L'ancien mot de passe est incorrect\");\r\n                return BadRequest(ModelState);\r\n            }\r\n\r\n            var newSalt = new byte[32];\r\n            using (var generator = RNGCryptoServiceProvider.Create())\r\n            {\r\n                generator.GetBytes(newSalt);\r\n            }\r\n\r\n            var newSalfB64 = Convert.ToBase64String(newSalt);\r\n            var newPassword = _tokenService.HashPassword(passwordUpdateBm.NewPassword, newSalt);\r\n\r\n            user.Salt = newSalfB64;\r\n            user.Password = newPassword;\r\n\r\n            try\r\n            {\r\n                await _db.SaveChangesAsync();\r\n                return Ok();\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error saving the new password for user {0}\", userId);\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the password of the currently authenticated user after verifying the old password and generating a new salt and hash.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "PasswordUpdateBm",
+                        "param_name": "PasswordUpdateBm",
+                        "param_desc": "The model containing the new password, old password, and other necessary information for updating the user's password."
+                    },
+                    {
+                        "name": "passwordUpdateBm",
+                        "param_name": "passwordUpdateBm",
+                        "param_desc": "The model containing the new password, old password, and other necessary information for updating the user's password."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the password of the currently authenticated user after verifying the old password and generating a new salt and hash.\n/// </summary>\n/// <param name=\"PasswordUpdateBm\">The model containing the new password, old password, and other necessary information for updating the user's password.</param>\n/// <param name=\"passwordUpdateBm\">The model containing the new password, old password, and other necessary information for updating the user's password.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "ProfileV2Controller"
+}

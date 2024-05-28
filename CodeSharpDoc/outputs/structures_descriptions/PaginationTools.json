@@ -1,0 +1,194 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Studi.Api.Lms.User/Tools/PaginationTools.cs",
+    "index_shift_code": 159,
+    "struct_type": "Class",
+    "namespace_name": "",
+    "usings": [
+        "Studi.Api.Core.Pagination.Filter",
+        "Studi.Api.Core.Pagination.Sort",
+        "Studi.Api.Lms.User.Decorators"
+    ],
+    "access_modifier": "public static",
+    "struct_name": "PaginationTools",
+    "base_class_name": "",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "TransformFilterFieldName",
+            "code_start_index": 222,
+            "method_name": "TransformFilterFieldName",
+            "existing_summary": "    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "filtersCompositions",
+                    "param_name": "filtersCompositions",
+                    "param_type": "IEnumerable<IFiltersComposition<TFilter>>?",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "transformText",
+                    "param_name": "transformText",
+                    "param_type": "ITransformText",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        if (filtersCompositions is null)\r\n            return;\r\n\r\n        var filters = filtersCompositions!.SelectMany(q => q.Filters);\r\n\r\n        foreach (var filter in filters)\r\n            TransformFilterFieldName(filter, transformText);\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Transform the field names of filters within a collection of filter compositions using a specified transformation function.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "filtersCompositions",
+                        "param_name": "filtersCompositions",
+                        "param_desc": "The list of filter compositions that implement the IFiltersComposition interface and are of type TFilter. It can be nullable."
+                    },
+                    {
+                        "name": "transformText",
+                        "param_name": "transformText",
+                        "param_desc": "The function used to transform the field names of the filters within the collection of filter compositions."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Transform the field names of filters within a collection of filter compositions using a specified transformation function.\n/// </summary>\n/// <param name=\"filtersCompositions\">The list of filter compositions that implement the IFiltersComposition interface and are of type TFilter. It can be nullable.</param>\n/// <param name=\"transformText\">The function used to transform the field names of the filters within the collection of filter compositions.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "TransformFilterFieldName",
+            "code_start_index": 222,
+            "method_name": "TransformFilterFieldName",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "filter",
+                    "param_name": "filter",
+                    "param_type": "IFilter<TFilter>?",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "transformText",
+                    "param_name": "transformText",
+                    "param_type": "ITransformText",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        if (filter is null)\r\n            return;\r\n\r\n        filter.Field = transformText.Transform(filter.Field)!;\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Transform filter field name text if filter is not null.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "filter",
+                        "param_name": "filter",
+                        "param_desc": "IFilter<TFilter>? filter - Represents the filter object used for filtering data. If no filter is provided, it can be null."
+                    },
+                    {
+                        "name": "transformText",
+                        "param_name": "transformText",
+                        "param_desc": "ITransformText transformText - Represents an object used for transforming text. It can be any implementation of the ITransformText interface."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Transform filter field name text if filter is not null.\n/// </summary>\n/// <param name=\"filter\">IFilter<TFilter>? filter - Represents the filter object used for filtering data. If no filter is provided, it can be null.</param>\n/// <param name=\"transformText\">ITransformText transformText - Represents an object used for transforming text. It can be any implementation of the ITransformText interface.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "TransformSortFieldName",
+            "code_start_index": 873,
+            "method_name": "TransformSortFieldName",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "sort",
+                    "param_name": "sort",
+                    "param_type": "ISort?",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "transformText",
+                    "param_name": "transformText",
+                    "param_type": "ITransformText",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        if (sort is null)\r\n            return;\r\n\r\n        sort.Field = transformText.Transform(sort.Field)!;\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Transform and update the field name in a sorting object.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "sort",
+                        "param_name": "sort",
+                        "param_desc": "ISort? sort - The sorting object that needs to be transformed and updated."
+                    },
+                    {
+                        "name": "transformText",
+                        "param_name": "transformText",
+                        "param_desc": "ITransformText transformText - The text transformation object used to update the field name."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Transform and update the field name in a sorting object.\n/// </summary>\n/// <param name=\"sort\">ISort? sort - The sorting object that needs to be transformed and updated.</param>\n/// <param name=\"transformText\">ITransformText transformText - The text transformation object used to update the field name.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "PaginationTools"
+}

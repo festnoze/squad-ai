@@ -1,0 +1,255 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Studi.Api.Lms.User/Controllers/ProfessionalExperiencesController.cs",
+    "index_shift_code": 335,
+    "struct_type": "Class",
+    "namespace_name": "",
+    "usings": [],
+    "access_modifier": "public",
+    "struct_name": "ProfessionalExperienceController",
+    "base_class_name": "ControllerWithAuthenticationBase",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetUserProfessionalExperiencesAsync",
+            "code_start_index": 1275,
+            "method_name": "GetUserProfessionalExperiencesAsync",
+            "existing_summary": "\r\n\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 1,
+            "code": "{\r\n        var userProfessionalExperiences = await _userQueryingService.GetUserProfessionalExperiencesAsync(User.StudiIdentity().LmsUserId);\r\n\r\n        return userProfessionalExperiences.ToResponseModel();\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the professional experiences of a specified user asynchronously.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "methodName",
+                        "param_name": "methodName",
+                        "param_desc": "The name of the method for which to retrieve professional experiences. Expected format: GetUserProfessionalExperiencesAsync"
+                    },
+                    {
+                        "name": "methodPurpose",
+                        "param_name": "methodPurpose",
+                        "param_desc": "The purpose of the method. Expected format: Retrieve the professional experiences of a specified user asynchronously."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the professional experiences of a specified user asynchronously.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"methodName\">The name of the method for which to retrieve professional experiences. Expected format: GetUserProfessionalExperiencesAsync</param>\n/// <param name=\"methodPurpose\">The purpose of the method. Expected format: Retrieve the professional experiences of a specified user asynchronously.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetContractTypesListForProfessionalExperiencesAsync",
+            "code_start_index": 1860,
+            "method_name": "GetContractTypesListForProfessionalExperiencesAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 1,
+            "code": "{\r\n        var contractTypesList = await _userQueryingService.GetContractTypesListForProfessionalExperiencesAsync();\r\n\r\n        return contractTypesList.ToResponseModel();\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve a list of contract types for professional experiences asynchronously.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "methodName",
+                        "param_name": "methodName",
+                        "param_desc": "GetContractTypesListForProfessionalExperiencesAsync"
+                    },
+                    {
+                        "name": "methodPurpose",
+                        "param_name": "methodPurpose",
+                        "param_desc": "Retrieve a list of contract types for professional experiences asynchronously."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve a list of contract types for professional experiences asynchronously.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"methodName\">GetContractTypesListForProfessionalExperiencesAsync</param>\n/// <param name=\"methodPurpose\">Retrieve a list of contract types for professional experiences asynchronously.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "CreateUserProfessionalExperienceAsync",
+            "code_start_index": 2377,
+            "method_name": "CreateUserProfessionalExperienceAsync",
+            "existing_summary": "\r\n\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "professionalExperienceRequestModel",
+                    "param_name": "professionalExperienceRequestModel",
+                    "param_type": "ProfessionalExperienceRequestModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return await _userWritingService.AddUserProfessionalExperienceAsync(professionalExperienceRequestModel.ToIto(), User.StudiIdentity().LmsUserId);\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Add a professional experience for the current user asynchronously.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "ProfessionalExperienceRequestModel",
+                        "param_name": "ProfessionalExperienceRequestModel",
+                        "param_desc": "The model containing the details of the professional experience to be added."
+                    },
+                    {
+                        "name": "professionalExperienceRequestModel",
+                        "param_name": "professionalExperienceRequestModel",
+                        "param_desc": "The instance of ProfessionalExperienceRequestModel containing the details of the professional experience to be added."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Add a professional experience for the current user asynchronously.\n/// </summary>\n/// <param name=\"ProfessionalExperienceRequestModel\">The model containing the details of the professional experience to be added.</param>\n/// <param name=\"professionalExperienceRequestModel\">The instance of ProfessionalExperienceRequestModel containing the details of the professional experience to be added.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "UpdateUserProfessionalExperienceAsync",
+            "code_start_index": 2846,
+            "method_name": "UpdateUserProfessionalExperienceAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "id",
+                    "param_name": "id",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "professionalExperienceRequestModel",
+                    "param_name": "professionalExperienceRequestModel",
+                    "param_type": "ProfessionalExperienceRequestModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        var professionalExperienceIto = professionalExperienceRequestModel.ToIto();\r\n        await _userWritingService.UpdateUserProfessionalExperienceAsync(id, professionalExperienceIto, User.StudiIdentity().LmsUserId);\r\n        return Ok();\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the professional experience of a user asynchronously.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "id",
+                        "param_name": "id",
+                        "param_desc": "The id of the user whose professional experience is to be updated."
+                    },
+                    {
+                        "name": "professionalExperienceRequestModel",
+                        "param_name": "professionalExperienceRequestModel",
+                        "param_desc": "The model containing the professional experience data to be updated for the user."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the professional experience of a user asynchronously.\n/// </summary>\n/// <param name=\"id\">The id of the user whose professional experience is to be updated.</param>\n/// <param name=\"professionalExperienceRequestModel\">The model containing the professional experience data to be updated for the user.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "DeleteUserProfessionalExperienceAsync",
+            "code_start_index": 3438,
+            "method_name": "DeleteUserProfessionalExperienceAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "id",
+                    "param_name": "id",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        await _userWritingService.RemoveUserProfessionalExperienceAsync(id, User.StudiIdentity().LmsUserId);\r\n        return Ok();\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Remove a user's professional experience asynchronously.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "id",
+                        "param_name": "id",
+                        "param_desc": "The id of the professional experience to be deleted."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Remove a user's professional experience asynchronously.\n/// </summary>\n/// <param name=\"id\">The id of the professional experience to be deleted.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "ProfessionalExperienceController"
+}

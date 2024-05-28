@@ -1,0 +1,577 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/V3/HallOfFameV3Controller.cs",
+    "index_shift_code": 539,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V3",
+    "usings": [
+        "System",
+        "System.Collections.Generic",
+        "System.Data.Entity",
+        "System.Linq",
+        "System.Threading.Tasks",
+        "System.Web",
+        "System.Web.Http",
+        "System.Web.Http.Description",
+        "LMS.Attributes",
+        "LMS.Attributes.Routing",
+        "LMS.Authentication",
+        "Lms.Common.Enumerations",
+        "LMS.Data",
+        "LMS.Domains.ActivityReport",
+        "LMS.Models.ViewModels.V3.HallOfFame",
+        "LMS.Models.ViewModels.V3.Newsfeed",
+        "LMS.Utils",
+        "LMS.Utils.Cache"
+    ],
+    "access_modifier": "public",
+    "struct_name": "HallOfFameV3Controller",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetUsersRankingAsync",
+            "code_start_index": 1819,
+            "method_name": "GetUsersRankingAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Return the weekly and the daily ranking of users\r\n        /// </summary>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            string cachekey = $\"GetUsersRankingAsync\";\r\n            if (HttpRuntime.Cache.Get(cachekey) is HallOfFameV3Vm cacheValue)\r\n            {\r\n                return Ok(cacheValue);\r\n            }\r\n\r\n            int ecoleId = this.GetSchoolId(_db);\r\n\r\n            var userRanks = GetUserRanksFromCache(ecoleId);\r\n\r\n            var userIds = userRanks.Select(q => q.UserId).ToList();\r\n\r\n            var users = userRanks.Select(u => new HallOfFameV3User\r\n            {\r\n                UserId = u.UserId,\r\n                TrimesterRank = u.UserRankData.TrimesterRank,\r\n                TrimesterScore = u.UserRankData.TrimesterPoints,\r\n                WeekRank = u.UserRankData.WeekRank,\r\n                WeekScore = u.UserRankData.WeekPoints,\r\n            }).ToList();\r\n\r\n            var now = DateTime.Now;\r\n\r\n            var usersData = await this._db.EcoleUsers.AsNoTracking()\r\n                .Where(eu => userIds.Contains(eu.UserId) && eu.EcoleId == ecoleId)\r\n                .Select(eu => new\r\n                {\r\n                    eu.UserId,\r\n                    eu.User.Pseudo,\r\n                    ProfilePicture =\r\n                        (eu.User.FileIdPhotoProfil != null)\r\n                            ? eu.User.UploadedFile_FileIdPhotoProfil.FileUrl\r\n                            : eu.User.PhotoProfil,\r\n                    CoverPicture =\r\n                        (eu.User.FileIdHeaderProfil != null)\r\n                            ? eu.User.UploadedFile_FileIdHeaderProfil.FileUrl\r\n                            : eu.User.HeaderProfil,\r\n                    Promotions = eu.User.InscriptionPromotions\r\n                        .Where(ip => ip.EcoleId == ecoleId\r\n                                     && (ip.DateDelete == null || ip.DateDelete > now)\r\n                                     && ((ip.DateFinAcces == null && ip.Promotion.DateFinPromo > now) ||\r\n                                         ip.DateFinAcces > now))\r\n                        .Select(i => i.PromotionId)\r\n                        .ToList()\r\n                })\r\n                .ToListAsync();\r\n\r\n            var usersDataDict = usersData.ToDictionary(q => q.UserId);\r\n\r\n            for (int i = 0; i < users.Count; i++)\r\n            {\r\n                var user = users[i];\r\n                var userData = usersDataDict[user.UserId];\r\n                user.Pseudo = userData.Pseudo;\r\n                user.ProfilePicture = userData.ProfilePicture;\r\n                user.CoverPicture = userData.CoverPicture;\r\n                user.Promotions = userData.Promotions;\r\n                users[i].IsOnline = ConnectionsListHolder.OnlineUsers.ContainsKey(users[i].UserId);\r\n            }\r\n\r\n            var usersPromotionsIds = users.SelectMany(q => q.Promotions).Distinct();\r\n\r\n            var promotions = _db.Promotions.AsNoTracking()\r\n                .Where(p => usersPromotionsIds.Contains(p.Id))\r\n                .Select(p => new NewsfeedUserPromotionV3ViewModel\r\n                {\r\n                    PromotionId = p.Id,\r\n                    Parcours = p.Parcour.Titre,\r\n                    Promotion = p.Libelle,\r\n                    CodeParcours = p.Parcour.Titre,\r\n                    Session = p.Session\r\n                })\r\n                .ToList();\r\n\r\n            var result = new HallOfFameV3Vm\r\n            {\r\n                WeekStartPeriod = this._weeklyStartPeriod,\r\n                WeekEndPeriod = this._weeklyEndPeriod,\r\n                TrimesterStartPeriod = this._firstMondayTrimester,\r\n                TrimesterEndPeriod = this._lastSundayTrimester,\r\n                Users = users,\r\n                Promotions = promotions\r\n            };\r\n            HttpRuntime.Cache.Insert(cachekey, result, null, DateTime.Now.Add(new TimeSpan(1, 0, 0)), TimeSpan.Zero);\r\n            return Ok(result);\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the count of unhandled forum posts for the current user, handling exceptions by logging errors and returning a bad request message if needed.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "methodName",
+                        "param_name": "methodName",
+                        "param_desc": "The name of the method ('GetUsersRankingAsync')"
+                    },
+                    {
+                        "name": "methodPurpose",
+                        "param_name": "methodPurpose",
+                        "param_desc": "The purpose of the method ('Retrieve the count of unhandled forum posts for the current user, handling exceptions by logging errors and returning a bad request message if needed.')"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the count of unhandled forum posts for the current user, handling exceptions by logging errors and returning a bad request message if needed.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"methodName\">The name of the method ('GetUsersRankingAsync')</param>\n/// <param name=\"methodPurpose\">The purpose of the method ('Retrieve the count of unhandled forum posts for the current user, handling exceptions by logging errors and returning a bad request message if needed.')</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetUsersWeeklyRankingAsync",
+            "code_start_index": 5953,
+            "method_name": "GetUsersWeeklyRankingAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Return the weekly and the daily ranking of users\r\n        /// </summary>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "pageStart",
+                    "param_name": "pageStart",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "pageSize",
+                    "param_name": "pageSize",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            return Ok(await this.GetUsersRankingPaginationAsync(pageStart, pageSize, RankOrderBy.WEEKLY_RANK));\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve forum formations assigned to the current user if they are a teacher, otherwise return a forbidden status code, logging any errors that occur.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "pageStart",
+                        "param_name": "pageStart",
+                        "param_desc": "The starting page number for retrieving the forum formations."
+                    },
+                    {
+                        "name": "pageSize",
+                        "param_name": "pageSize",
+                        "param_desc": "The number of items per page to be displayed in the forum formations."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve forum formations assigned to the current user if they are a teacher, otherwise return a forbidden status code, logging any errors that occur.\n/// </summary>\n/// <param name=\"pageStart\">The starting page number for retrieving the forum formations.</param>\n/// <param name=\"pageSize\">The number of items per page to be displayed in the forum formations.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetUsersTrimesterRankingAsync",
+            "code_start_index": 6447,
+            "method_name": "GetUsersTrimesterRankingAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Return the weekly and the daily ranking of users\r\n        /// </summary>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "pageStart",
+                    "param_name": "pageStart",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "pageSize",
+                    "param_name": "pageSize",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            return Ok(await this.GetUsersRankingPaginationAsync(pageStart, pageSize, RankOrderBy.TRIMESTER_RANK));\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve users ranking data from cache or database, including user details and promotions, and return it with caching for future use.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "pageStart",
+                        "param_name": "pageStart",
+                        "param_desc": "The starting page number for retrieving the users ranking data. It is of type integer."
+                    },
+                    {
+                        "name": "pageSize",
+                        "param_name": "pageSize",
+                        "param_desc": "The number of items per page to be retrieved for the users ranking data. It is of type integer."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve users ranking data from cache or database, including user details and promotions, and return it with caching for future use.\n/// </summary>\n/// <param name=\"pageStart\">The starting page number for retrieving the users ranking data. It is of type integer.</param>\n/// <param name=\"pageSize\">The number of items per page to be retrieved for the users ranking data. It is of type integer.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetOwnRanking",
+            "code_start_index": 6780,
+            "method_name": "GetOwnRanking",
+            "existing_summary": "\r\n\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            int userId = User.Identity.GetUserId();\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n\r\n            var usersRanks = GetUserRanksFromCache(schoolIdsList);\r\n            var userRanking = usersRanks.FirstOrDefault(u => u.UserId == userId);\r\n\r\n            if (userRanking == null)\r\n            {\r\n                return Ok(UserRankV3Vm.Empty);\r\n            }\r\n\r\n            return Ok(userRanking.UserRankData);\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the weekly ranking of users with pagination.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "parameters",
+                        "param_name": "parameters",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "existing",
+                        "param_name": "existing",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "method",
+                        "param_name": "method",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "named",
+                        "param_name": "named",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "GetOwnRanking",
+                        "param_name": "GetOwnRanking",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "context",
+                        "param_name": "context",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "method",
+                        "param_name": "method",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "purpose",
+                        "param_name": "purpose",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "Retrieve",
+                        "param_name": "Retrieve",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "the",
+                        "param_name": "the",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "weekly",
+                        "param_name": "weekly",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "ranking",
+                        "param_name": "ranking",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "of",
+                        "param_name": "of",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "users",
+                        "param_name": "users",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "with",
+                        "param_name": "with",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "pagination",
+                        "param_name": "pagination",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the weekly ranking of users with pagination.\n/// </summary>\n/// <param name=\"no\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"parameters\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"existing\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"method\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"named\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"GetOwnRanking\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"context\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"method\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"purpose\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"Retrieve\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"the\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"weekly\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"ranking\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"of\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"users\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"with\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"pagination\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetOwnRanking",
+            "code_start_index": 6780,
+            "method_name": "GetOwnRanking",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            int ecoleId = this.GetSchoolId(_db);\r\n\r\n            var usersRanks = GetUserRanksFromCache(ecoleId);\r\n            var userRanking = usersRanks.FirstOrDefault(u => u.UserId == userId);\r\n\r\n            if (userRanking == null)\r\n            {\r\n                return Ok(UserRankV3Vm.Empty);\r\n            }\r\n\r\n            return Ok(userRanking.UserRankData);\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the ranking of users based on trimester performance with pagination.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The ID of the user for whom the ranking needs to be retrieved."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the ranking of users based on trimester performance with pagination.\n/// </summary>\n/// <param name=\"userId\">The ID of the user for whom the ranking needs to be retrieved.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetUsersRankingPaginationAsync",
+            "code_start_index": 7857,
+            "method_name": "GetUsersRankingPaginationAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "pageStart",
+                    "param_name": "pageStart",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "pageSize",
+                    "param_name": "pageSize",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "rankOrderBy",
+                    "param_name": "rankOrderBy",
+                    "param_type": "RankOrderBy",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            //int userId = User.Identity.GetUserId();\r\n            int ecoleId = this.GetSchoolId(_db);\r\n\r\n            var userRanks = GetUserRanksFromCache(ecoleId);\r\n            switch (rankOrderBy)\r\n            {\r\n                case RankOrderBy.WEEKLY_RANK:\r\n                    userRanks = userRanks.Where(q => q.UserRankData.WeekPoints > 0)\r\n                        .OrderBy(q => q.UserRankData.WeekRank).ToList();\r\n                    break;\r\n                case RankOrderBy.TRIMESTER_RANK:\r\n                    userRanks = userRanks.Where(q => q.UserRankData.TrimesterPoints > 0)\r\n                        .OrderBy(q => q.UserRankData.TrimesterRank).ToList();\r\n                    break;\r\n                default:\r\n                    break;\r\n            }\r\n\r\n            int userCount = userRanks.Count;\r\n\r\n            var users = userRanks\r\n                .Skip(pageStart)\r\n                .Take(pageSize)\r\n                .Select(u => new HallOfFameV3User\r\n                {\r\n                    UserId = u.UserId,\r\n                    TrimesterRank = u.UserRankData.TrimesterRank,\r\n                    TrimesterScore = u.UserRankData.TrimesterPoints,\r\n                    WeekRank = u.UserRankData.WeekRank,\r\n                    WeekScore = u.UserRankData.WeekPoints,\r\n                }).ToList();\r\n\r\n\r\n            var userIds = users.Select(q => q.UserId).ToList();\r\n\r\n            var now = DateTime.Now.AddDays(-1);\r\n\r\n            var usersData = await this._db.EcoleUsers.AsNoTracking()\r\n                .Where(eu => userIds.Contains(eu.UserId) && eu.EcoleId == ecoleId)\r\n                .Select(eu => new\r\n                {\r\n                    UserId = eu.UserId,\r\n                    Pseudo = eu.User.Pseudo,\r\n                    ProfilePicture =\r\n                        (eu.User.FileIdPhotoProfil != null)\r\n                            ? eu.User.UploadedFile_FileIdPhotoProfil.FileUrl\r\n                            : eu.User.PhotoProfil,\r\n                    CoverPicture =\r\n                        (eu.User.FileIdHeaderProfil != null)\r\n                            ? eu.User.UploadedFile_FileIdHeaderProfil.FileUrl\r\n                            : eu.User.HeaderProfil,\r\n                    Promotions = eu.User.InscriptionPromotions\r\n                        .Where(ip => ip.EcoleId == ecoleId\r\n                                     && (ip.DateDelete == null || ip.DateDelete > now)\r\n                                     && ((ip.DateFinAcces == null && ip.Promotion.DateFinPromo > now) ||\r\n                                         ip.DateFinAcces > now))\r\n                        .Select(i => i.PromotionId)\r\n                        .ToList()\r\n                })\r\n                .ToListAsync();\r\n\r\n            var usersDataDict = usersData.ToDictionary(q => q.UserId);\r\n\r\n            for (int i = 0; i < users.Count; i++)\r\n            {\r\n                var user = users[i];\r\n                var userData = usersDataDict[user.UserId];\r\n                user.Pseudo = userData.Pseudo;\r\n                user.ProfilePicture = userData.ProfilePicture;\r\n                user.CoverPicture = userData.CoverPicture;\r\n                user.Promotions = userData.Promotions;\r\n                users[i].IsOnline = ConnectionsListHolder.OnlineUsers.ContainsKey(users[i].UserId);\r\n            }\r\n\r\n            var usersPromotionsIds = users.SelectMany(q => q.Promotions).Distinct();\r\n\r\n            var promotions = _db.Promotions.AsNoTracking()\r\n                .Where(p => usersPromotionsIds.Contains(p.Id))\r\n                .Select(p => new NewsfeedUserPromotionV3ViewModel\r\n                {\r\n                    PromotionId = p.Id,\r\n                    Parcours = p.Parcour.Titre,\r\n                    Promotion = p.Libelle,\r\n                    CodeParcours = p.Parcour.Titre,\r\n                    Session = p.Session\r\n                })\r\n                .ToList();\r\n\r\n            var pagination = new HallOfFameV3Pagination\r\n            {\r\n                Content = users,\r\n                NextPage = pageStart + pageSize < userCount,\r\n                PreviousPage = pageStart > 0,\r\n                Total = userCount,\r\n                WeekStartPeriod = this._weeklyStartPeriod,\r\n                WeekEndPeriod = this._weeklyEndPeriod,\r\n                TrimesterStartPeriod = this._firstMondayTrimester,\r\n                TrimesterEndPeriod = this._lastSundayTrimester,\r\n                Promotions = promotions\r\n            };\r\n            //return Ok(pagination);\r\n            return pagination;\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the ranking of the authenticated user within their school.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "pageStart",
+                        "param_name": "pageStart",
+                        "param_desc": "The starting page number for retrieving the ranking data."
+                    },
+                    {
+                        "name": "pageSize",
+                        "param_name": "pageSize",
+                        "param_desc": "The number of items to be displayed per page."
+                    },
+                    {
+                        "name": "rankOrderBy",
+                        "param_name": "rankOrderBy",
+                        "param_desc": "The criteria based on which the ranking order should be determined."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the ranking of the authenticated user within their school.\n/// </summary>\n/// <param name=\"pageStart\">The starting page number for retrieving the ranking data.</param>\n/// <param name=\"pageSize\">The number of items to be displayed per page.</param>\n/// <param name=\"rankOrderBy\">The criteria based on which the ranking order should be determined.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetUserRanksFromCache",
+            "code_start_index": 12528,
+            "method_name": "GetUserRanksFromCache",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "ecoleId",
+                    "param_name": "ecoleId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            return GetUserRanksFromCache(new List<int>() { ecoleId });\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the ranking data for the current user within a specific school.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "int",
+                        "param_name": "int",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "ecoleId",
+                        "param_name": "ecoleId",
+                        "param_desc": "The generated description for the parameter"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the ranking data for the current user within a specific school.\n/// </summary>\n/// <param name=\"int\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"ecoleId\">The generated description for the parameter</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetUserRanksFromCache",
+            "code_start_index": 12528,
+            "method_name": "GetUserRanksFromCache",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "schoolIdsList",
+                    "param_name": "schoolIdsList",
+                    "param_type": "IList<int>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            return TCache<List<UserRank>>.Get(\r\n                $\"halloffame.{string.Join(\".\", schoolIdsList)}.{this._weeklyStartPeriod:yyyyMMdd}\",\r\n\r\n                // cache expiration set to one hour\r\n                60 * 60,\r\n                () => GetUsersRanking(schoolIdsList));\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve a paginated list of users' ranking data based on different time periods, including user information, promotions, and online status.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "schoolIdsList",
+                        "param_name": "schoolIdsList",
+                        "param_desc": "The list of school IDs for which user ranks will be retrieved. The IDs should be of type integer."
+                    },
+                    {
+                        "name": "method",
+                        "param_name": "method",
+                        "param_desc": "The name of the existing method 'GetUserRanksFromCache' which retrieves a paginated list of users' ranking data based on different time periods. The method includes user information, promotions, and online status."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve a paginated list of users' ranking data based on different time periods, including user information, promotions, and online status.\n/// </summary>\n/// <param name=\"schoolIdsList\">The list of school IDs for which user ranks will be retrieved. The IDs should be of type integer.</param>\n/// <param name=\"method\">The name of the existing method 'GetUserRanksFromCache' which retrieves a paginated list of users' ranking data based on different time periods. The method includes user information, promotions, and online status.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetUsersRanking",
+            "code_start_index": 13390,
+            "method_name": "GetUsersRanking",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "schoolIdsList",
+                    "param_name": "schoolIdsList",
+                    "param_type": "ICollection<int>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var tuteurId = (int)UserTypeEnum.TUTEUR;\r\n            var scoresExpression = _db.ChallengeScores.AsNoTracking()\r\n                .Where(s => schoolIdsList.Contains(s.EcoleId) && s.User.EcoleUsers\r\n                    .Where(eu => schoolIdsList.Contains(eu.EcoleId)).Any(eu =>\r\n                        eu.ApparaitreChallenge && eu.UserTypeId != tuteurId))\r\n                .GroupBy(s => new { s.UserId, s.HasPicture })\r\n                .Select(s => new\r\n                {\r\n                    s.Key.UserId,\r\n                    DurationQuarter = s.Sum(g => g.DurationQuarter),\r\n                    DurationWeek = s.Sum(g => g.DurationWeek),\r\n                    s.Key.HasPicture\r\n                });\r\n\r\n            var scores = scoresExpression.ToList();\r\n\r\n            var usersRanks = new List<UserRank>();\r\n\r\n            foreach (var currentUserScore in scores)\r\n            {\r\n                int bonus = currentUserScore.HasPicture ? PROFILE_PICTURE_BONUS : 0;\r\n                usersRanks.Add(new UserRank\r\n                {\r\n                    UserId = currentUserScore.UserId,\r\n                    UserRankData = new UserRankV3Vm\r\n                    {\r\n                        WeekPoints = (currentUserScore.DurationWeek / 60) + bonus,\r\n                        TrimesterPoints = (currentUserScore.DurationQuarter / 60) + bonus\r\n                    }\r\n                });\r\n            }\r\n\r\n            usersRanks.RemoveAll(u => u.UserRankData.TrimesterPoints <= 0 && u.UserRankData.WeekPoints <= 0);\r\n\r\n            usersRanks = usersRanks.OrderByDescending(u => u.UserRankData.TrimesterPoints)\r\n                .ThenBy(u => u.UserId)\r\n                .ToList();\r\n\r\n            for (int i = 0; i < usersRanks.Count; i++)\r\n            {\r\n                usersRanks[i].UserRankData.TrimesterRank = i + 1;\r\n            }\r\n\r\n            var weeklyRanked = usersRanks.OrderByDescending(u => u.UserRankData.WeekPoints)\r\n                .ThenBy(u => u.UserId)\r\n                .ToList();\r\n\r\n            for (int i = 0; i < weeklyRanked.Count; i++)\r\n            {\r\n                weeklyRanked[i].UserRankData.WeekRank = i + 1;\r\n            }\r\n\r\n            return usersRanks;\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the user ranks from cache for a specified school ID.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "schoolIdsList",
+                        "param_name": "schoolIdsList",
+                        "param_desc": "A collection of integers representing the list of school IDs for which user ranks will be retrieved."
+                    },
+                    {
+                        "name": "method",
+                        "param_name": "method",
+                        "param_desc": "The name of the method, which is 'GetUsersRanking', used to retrieve user ranks from cache."
+                    },
+                    {
+                        "name": "purpose",
+                        "param_name": "purpose",
+                        "param_desc": "The purpose of the method 'GetUsersRanking' is to retrieve the user ranks from cache for a specified school ID."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the user ranks from cache for a specified school ID.\n/// </summary>\n/// <param name=\"schoolIdsList\">A collection of integers representing the list of school IDs for which user ranks will be retrieved.</param>\n/// <param name=\"method\">The name of the method, which is 'GetUsersRanking', used to retrieve user ranks from cache.</param>\n/// <param name=\"purpose\">The purpose of the method 'GetUsersRanking' is to retrieve the user ranks from cache for a specified school ID.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "HallOfFameV3Controller"
+}

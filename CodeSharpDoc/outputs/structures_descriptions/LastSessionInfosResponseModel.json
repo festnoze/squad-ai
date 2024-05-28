@@ -1,0 +1,58 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Studi.Api.Lms.User/ResponseModel/LastSessionInfosResponseModel.cs",
+    "index_shift_code": 47,
+    "struct_type": "Class",
+    "namespace_name": "",
+    "usings": [],
+    "access_modifier": "public",
+    "struct_name": "LastSessionInfosResponseModel",
+    "base_class_name": "",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [],
+    "properties": [
+        {
+            "name": "LoginDate",
+            "prop_name": "LoginDate",
+            "prop_type": "DateTime?",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "LogoutDate",
+            "prop_name": "LogoutDate",
+            "prop_type": "DateTime?",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "Device",
+            "prop_name": "Device",
+            "prop_type": "string?",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "IpAddress",
+            "prop_name": "IpAddress",
+            "prop_type": "string?",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "Browser",
+            "prop_name": "Browser",
+            "prop_type": "string?",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "TotalTime",
+            "prop_name": "TotalTime",
+            "prop_type": "long",
+            "is_property": true,
+            "is_field": false
+        }
+    ],
+    "name": "LastSessionInfosResponseModel"
+}

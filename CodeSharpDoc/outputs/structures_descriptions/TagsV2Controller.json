@@ -1,0 +1,170 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/V2/TagsV2Controller.cs",
+    "index_shift_code": 459,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V2",
+    "usings": [
+        "LMS.Attributes",
+        "LMS.Attributes.Routing",
+        "LMS.Authentication",
+        "LMS.Data",
+        "LMS.Models.ViewModels",
+        "LMS.ModelsDTOs.Newsfeed",
+        "LMS.Utils.Cache",
+        "LMS.Utils.Cache.Dtos",
+        "System",
+        "System.Collections.Generic",
+        "System.Linq",
+        "System.Data.Entity",
+        "System.Web",
+        "System.Web.Http",
+        "System.Web.Http.Description",
+        "System.Threading.Tasks"
+    ],
+    "access_modifier": "public",
+    "struct_name": "TagsV2Controller",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetNewsfeedTags",
+            "code_start_index": 969,
+            "method_name": "GetNewsfeedTags",
+            "existing_summary": "\r\n\r\n        /// <summary>\r\n        /// Get a list of tags\r\n        /// </summary>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "filter",
+                    "param_name": "filter",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var tags = DataCache.GetNewsfeedTags(this._db);\r\n\r\n            if (!string.IsNullOrWhiteSpace(filter))\r\n            {\r\n                filter = filter.ToLower();\r\n                tags = tags.Where(t => t.Name.ToLower().Contains(filter)).ToList();\r\n            }\r\n\r\n            tags = tags.OrderBy(t => t.Name).Take(20).ToList();\r\n\r\n            return Ok(tags);\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve newsfeed tags, optionally filtered by a specified keyword, and return a sorted list of up to 20 tags.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "string",
+                        "param_name": "string",
+                        "param_desc": "The specified keyword used to filter the newsfeed tags."
+                    },
+                    {
+                        "name": "filter",
+                        "param_name": "filter",
+                        "param_desc": "The filter criteria to apply when retrieving newsfeed tags."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve newsfeed tags, optionally filtered by a specified keyword, and return a sorted list of up to 20 tags.\n/// </summary>\n/// <param name=\"string\">The specified keyword used to filter the newsfeed tags.</param>\n/// <param name=\"filter\">The filter criteria to apply when retrieving newsfeed tags.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetForumTags",
+            "code_start_index": 1635,
+            "method_name": "GetForumTags",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Get a list of tags\r\n        /// </summary>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "filter",
+                    "param_name": "filter",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var tags = DataCache.GetForumTags(this._db);\r\n\r\n            if (!string.IsNullOrWhiteSpace(filter))\r\n            {\r\n                filter = filter.ToLower();\r\n                tags = tags.Where(t => t.Name.ToLower().Contains(filter)).ToList();\r\n            }\r\n\r\n            tags = tags.OrderBy(t => t.Name).Take(20).ToList();\r\n\r\n            return Ok(tags);\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve forum tags, optionally filtered by a specified keyword, and return a maximum of 20 tags ordered alphabetically.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "string",
+                        "param_name": "string",
+                        "param_desc": "The specified keyword for filtering the forum tags."
+                    },
+                    {
+                        "name": "filter",
+                        "param_name": "filter",
+                        "param_desc": "The filter to apply on the forum tags. It's optional and defaults to an empty string if not provided."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve forum tags, optionally filtered by a specified keyword, and return a maximum of 20 tags ordered alphabetically.\n/// </summary>\n/// <param name=\"string\">The specified keyword for filtering the forum tags.</param>\n/// <param name=\"filter\">The filter to apply on the forum tags. It's optional and defaults to an empty string if not provided.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetAllForumTags",
+            "code_start_index": 2213,
+            "method_name": "GetAllForumTags",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var forumTags = await TCache<List<NFTag>>.GetAsync(CacheKeys.FORUM_TAGS_LIST, 3600, async () =>\r\n            {\r\n                var tags = await _db.ForumPostTags.AsNoTracking()\r\n                    .Include(fpt => fpt.Tag)\r\n                    .GroupBy(t => t.Tag.Id)\r\n                    .Select(t => t.FirstOrDefault())\r\n                    .Select(t => new NFTag\r\n                    {\r\n                        id = t.Tag.Id,\r\n                        libelle = t.Tag.Libelle,\r\n                        is_promo_tag = t.Tag.IsPromoTag,\r\n                        is_official = t.Tag.IsOfficial,\r\n                        usage_count = t.Tag.UsageCount\r\n                    })\r\n                    .OrderBy(t => t.libelle)\r\n                    .ToListAsync();\r\n\r\n                return tags.Distinct(new TagsComparer()).ToList();\r\n            });\r\n\r\n            return Ok(forumTags);\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve all forum tags with their details, including ID, label, promotional status, official status, and usage count, sorted alphabetically.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no parameters",
+                        "param_name": "no parameters",
+                        "param_desc": "The list of parameters is 'no parameters'."
+                    },
+                    {
+                        "name": "GetAllForumTags",
+                        "param_name": "GetAllForumTags",
+                        "param_desc": "The method name is 'GetAllForumTags'. It is used to retrieve all forum tags with their details, including ID, label, promotional status, official status, and usage count, sorted alphabetically."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve all forum tags with their details, including ID, label, promotional status, official status, and usage count, sorted alphabetically.\n/// </summary>\n/// <param name=\"no parameters\">The list of parameters is 'no parameters'.</param>\n/// <param name=\"GetAllForumTags\">The method name is 'GetAllForumTags'. It is used to retrieve all forum tags with their details, including ID, label, promotional status, official status, and usage count, sorted alphabetically.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "TagsV2Controller"
+}

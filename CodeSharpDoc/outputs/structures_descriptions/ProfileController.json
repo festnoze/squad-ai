@@ -1,0 +1,844 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/v1/ProfileController.cs",
+    "index_shift_code": 697,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V1",
+    "usings": [
+        "System",
+        "System.Collections.Generic",
+        "System.Data.Entity",
+        "System.Linq",
+        "System.Net",
+        "System.Net.Http",
+        "System.Net.Http.Headers",
+        "System.Threading.Tasks",
+        "System.Web",
+        "System.Web.Hosting",
+        "System.Web.Http",
+        "System.Web.Http.Description",
+        "LMS.Attributes",
+        "LMS.Authentication",
+        "LMS.Configuration",
+        "LMS.Data",
+        "LMS.ModelsDTOs.User",
+        "LMS.Services.Implementations",
+        "LMS.Services.Interfaces",
+        "LMS.Utils",
+        "LMS.Utils.Cache",
+        "Newtonsoft.Json.Linq",
+        "Serilog"
+    ],
+    "access_modifier": "public",
+    "struct_name": "ProfileController",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "OldGetInfoUserAsync",
+            "code_start_index": 1962,
+            "method_name": "OldGetInfoUserAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// [Obsolete]  Get Info User\r\n        /// <seealso cref=\"GetUserInfoAsync\"/>\r\n        /// </summary>\r\n        /// <returns>Return Json object UUsers</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n\r\n            var ecoleUser = await _db.EcoleUsers.AsNoTracking()\r\n                .Include(p => p.UserType)\r\n                .Include(p => p.Ecole)\r\n                .Include(p => p.User)\r\n                .Include(p => p.User.UploadedFile_FileIdPhotoProfil)\r\n                .Include(p => p.User.UploadedFile_FileIdHeaderProfil)\r\n                .Include(p => p.User.Adresse.TypeVoie)\r\n                .Include(p => p.User.Adresse.Pay)\r\n                .Include(p => p.User.Diplome)\r\n                .Include(p => p.User.InscriptionPromotions)\r\n                .FirstOrDefaultAsync(p => p.UserId == userId && p.EcoleId == ecoleId);\r\n\r\n            if (ecoleUser == null)\r\n            {\r\n                Log.Error(\"problem Get Ecole User this method :GetInfoUser\");\r\n                return InternalServerError();\r\n            }\r\n\r\n            var dnsConfig = _dnsConfig.GetDnsConfig();\r\n\r\n            var ecoleUserVm = new UEcoleUsers\r\n            {\r\n                suspension = ecoleUser.Suspension, //?? false,\r\n                Users = new UUsers\r\n                {\r\n                    id = ecoleUser.User.Id,\r\n                    status = ecoleUser.User.Status,\r\n                    email = ecoleUser.User.Email,\r\n                    interne = ecoleUser.User.Interne,\r\n                    photo_profil = (ecoleUser.User.FileIdPhotoProfil != null) ? ecoleUser.User.UploadedFile_FileIdPhotoProfil.FileUrl : ecoleUser.User.PhotoProfil,\r\n                    test = ecoleUser.User.Test,\r\n                    pseudo = ecoleUser.User.Pseudo,\r\n                    header_profil = (ecoleUser.User.FileIdHeaderProfil != null) ? ecoleUser.User.UploadedFile_FileIdHeaderProfil.FileUrl : ecoleUser.User.HeaderProfil,\r\n\r\n                    // Ecoles_users_devices = ecoleUser.User.,\r\n                    civilite = ecoleUser.User.Civilite,\r\n                    nom = ecoleUser.User.Nom,\r\n                    prenom = ecoleUser.User.Prenom,\r\n\r\n                    // public_Profil = ecoleUser.User.,\r\n                    tel1 = ecoleUser.User.Tel1,\r\n                    tel2 = ecoleUser.User.Tel2,\r\n                    tel3 = ecoleUser.User.Tel3,\r\n                    last_location = ecoleUser.User.LastLocation,\r\n                    descriptionProfil = ecoleUser.User.DescriptionProfil,\r\n                    diplome_autre = ecoleUser.User.DiplomeAutre,\r\n                    date_naissance = ecoleUser.User.DateNaissance,\r\n                    Adresses = ecoleUser.User.Adresse != null\r\n                        ? new UAdresses\r\n                        {\r\n                            Type_voies = new UTypeVoie\r\n                            {\r\n                                id = ecoleUser.User.Adresse.TypeVoieId,\r\n                                libelle = ecoleUser.User.Adresse.TypeVoie?.Libelle\r\n                            },\r\n                            Pays = new CountryViewModel\r\n                            {\r\n                                id = ecoleUser.User.Adresse.Pay.Id,\r\n                                libelle = ecoleUser.User.Adresse.Pay.Libelle,\r\n                                code = ecoleUser.User.Adresse.Pay.Code\r\n                            },\r\n                            complement = ecoleUser.User.Adresse.Complement,\r\n                            cp = ecoleUser.User.Adresse.Cp,\r\n                            nom_voie = ecoleUser.User.Adresse.NumeroVoie,\r\n                            numero_voie = ecoleUser.User.Adresse.NumeroVoie,\r\n                            ville = ecoleUser.User.Adresse.Ville\r\n                        }\r\n                        : null,\r\n                    InscriptionsPromotion = ecoleUser.User.InscriptionPromotions.Select(x => new UInscriptionPromotion\r\n                    {\r\n                        DateFinAccess = x.DateFinAcces,\r\n                        SchoolId = x.EcoleId\r\n                    }\r\n                    ).Where( x => x.SchoolId == ecoleUser.Ecole.Id).ToList()\r\n                },\r\n                Ecoles = new UEcoles\r\n                {\r\n                    id = ecoleUser.Ecole.Id,\r\n                    libelle = dnsConfig.Title,\r\n                    code = ecoleUser.Ecole.Code,\r\n                    organisme_id = ecoleUser.Ecole.OrganismeId,\r\n                    website = dnsConfig.UrlPublicWebsite\r\n                },\r\n                Users_type = new UUserType\r\n                {\r\n                    id = ecoleUser.UserType.Id,\r\n                    libelle = ecoleUser.UserType.Libelle,\r\n                    code = ecoleUser.UserType.Code\r\n                }\r\n            };\r\n\r\n            ecoleUserVm.Users.hasDownloadedMobileApp = await _db.EcoleUserDevices.AnyAsync(eud =>\r\n                eud.UserId == userId && eud.EcoleId == ecoleId &&\r\n                (eud.DeviceType == \"Android\" || eud.DeviceType == \"iOS\"));\r\n\r\n            if (!string.IsNullOrWhiteSpace(ecoleUser.User.AutoriseProfilPublic))\r\n            {\r\n                ecoleUserVm.Users.public_Profil = JObject.Parse(ecoleUser.User.AutoriseProfilPublic);\r\n            }\r\n\r\n            var userAgent = HttpContext.Current.Request.Headers[\"User-Agent\"];\r\n            if (userAgent == null)\r\n            {\r\n                Log.Error(\"Couldn't get the user agent in \" + nameof(OldGetInfoUserAsync));\r\n                return null;\r\n            }\r\n\r\n            ecoleUserVm.Users.Ecoles_users_devices = new List<UEcoleUserDevice>(0);\r\n\r\n            return Ok(ecoleUserVm);\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve detailed information about a specific user and their associated school, including personal details, address, diplomas, promotions, and device information, with error handling for missing data.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "method_name",
+                        "param_name": "method_name",
+                        "param_desc": "The name of the existing method which needs parameter documentation. In this case, the method name is 'OldGetInfoUserAsync'."
+                    },
+                    {
+                        "name": "method_purpose",
+                        "param_name": "method_purpose",
+                        "param_desc": "The purpose of the existing method 'OldGetInfoUserAsync'. It is to retrieve detailed information about a specific user and their associated school, including personal details, address, diplomas, promotions, and device information, with error handling for missing data."
+                    },
+                    {
+                        "name": "parameters",
+                        "param_name": "parameters",
+                        "param_desc": "The list of parameters for the method 'OldGetInfoUserAsync'. In this case, there are no parameters ('no parameters')."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve detailed information about a specific user and their associated school, including personal details, address, diplomas, promotions, and device information, with error handling for missing data.\n/// </summary>\n/// <param name=\"method_name\">The name of the existing method which needs parameter documentation. In this case, the method name is 'OldGetInfoUserAsync'.</param>\n/// <param name=\"method_purpose\">The purpose of the existing method 'OldGetInfoUserAsync'. It is to retrieve detailed information about a specific user and their associated school, including personal details, address, diplomas, promotions, and device information, with error handling for missing data.</param>\n/// <param name=\"parameters\">The list of parameters for the method 'OldGetInfoUserAsync'. In this case, there are no parameters ('no parameters').</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetUserInfoAsync",
+            "code_start_index": 7788,
+            "method_name": "GetUserInfoAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Get user info\r\n        /// </summary>\r\n        /// <returns>Return Json object UUsers</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n\r\n            try\r\n            {\r\n                var ecoleUser = await\r\n                    _db.EcoleUsers.AsNoTracking()\r\n                        .Include(p => p.UserType)\r\n                        .Include(p => p.Ecole)\r\n                        .Include(p => p.User)\r\n                        .Include(p => p.User.Adresse.TypeVoie)\r\n                        .Include(p => p.User.Adresse.Pay)\r\n                        .Include(p => p.User.Diplome)\r\n                        .Include(p => p.User.EcoleUserDevices)\r\n                        .FirstOrDefaultAsync(p => p.UserId == userId && p.EcoleId == ecoleId);\r\n\r\n                if (ecoleUser == null)\r\n                {\r\n                    Log.Error($\"{nameof(GetUserInfoAsync)}(): User not found\");\r\n                    return InternalServerError();\r\n                }\r\n\r\n                var dnsConfig = _dnsConfig.GetDnsConfig();\r\n\r\n                var mappedEcoleUser = new UEcoleUsers\r\n                {\r\n                    suspension = ecoleUser.Suspension, //?? false,\r\n                    Users = new UUsers\r\n                    {\r\n                        id = ecoleUser.User.Id,\r\n                        status = ecoleUser.User.Status,\r\n                        email = ecoleUser.User.Email,\r\n                        interne = ecoleUser.User.Interne,\r\n                        photo_profil = ecoleUser.User.PhotoProfil,\r\n                        test = ecoleUser.User.Test,\r\n                        pseudo = ecoleUser.User.Pseudo,\r\n                        header_profil = ecoleUser.User.PhotoProfil,\r\n\r\n                        // Ecoles_users_devices = ecoleUser.User.,\r\n                        civilite = ecoleUser.User.Civilite,\r\n                        nom = ecoleUser.User.Nom,\r\n                        prenom = ecoleUser.User.Prenom,\r\n\r\n                        // public_Profil = ecoleUser.User.,\r\n                        tel1 = ecoleUser.User.Tel1,\r\n                        tel2 = ecoleUser.User.Tel2,\r\n                        tel3 = ecoleUser.User.Tel3,\r\n                        last_location = ecoleUser.User.LastLocation,\r\n                        descriptionProfil = ecoleUser.User.DescriptionProfil,\r\n                        diplome_autre = ecoleUser.User.DiplomeAutre,\r\n                        date_naissance = ecoleUser.User.DateNaissance,\r\n                        Adresses = ecoleUser.User.Adresse != null\r\n                            ? new UAdresses\r\n                            {\r\n                                Type_voies =\r\n                                    new UTypeVoie\r\n                                    {\r\n                                        id = ecoleUser\r\n                                            .User.Adresse\r\n                                            .TypeVoie.Id,\r\n                                        libelle =\r\n                                            ecoleUser.User\r\n                                                .Adresse\r\n                                                .TypeVoie\r\n                                                .Libelle\r\n                                    },\r\n                                Pays =\r\n                                    new CountryViewModel\r\n                                    {\r\n                                        id =\r\n                                            ecoleUser\r\n                                                .User\r\n                                                .Adresse\r\n                                                .Pay\r\n                                                .Id,\r\n                                        libelle =\r\n                                            ecoleUser\r\n                                                .User\r\n                                                .Adresse\r\n                                                .Pay\r\n                                                .Libelle,\r\n                                        code =\r\n                                            ecoleUser\r\n                                                .User\r\n                                                .Adresse\r\n                                                .Pay\r\n                                                .Code\r\n                                    },\r\n                                complement =\r\n                                    ecoleUser.User.Adresse.Complement,\r\n                                cp = ecoleUser.User.Adresse.Cp,\r\n                                nom_voie = ecoleUser.User.Adresse\r\n                                    .NumeroVoie,\r\n                                numero_voie =\r\n                                    ecoleUser.User.Adresse.NumeroVoie,\r\n                                ville = ecoleUser.User.Adresse.Ville\r\n                            }\r\n                            : null,\r\n                    },\r\n                    Ecoles = new UEcoles\r\n                    {\r\n                        id = ecoleUser.Ecole.Id,\r\n                        libelle = dnsConfig.Title,\r\n                        code = ecoleUser.Ecole.Code,\r\n                        organisme_id = ecoleUser.Ecole.OrganismeId,\r\n                        website = dnsConfig.UrlPublicWebsite\r\n                    },\r\n                    Users_type = new UUserType\r\n                    {\r\n                        id = ecoleUser.UserType.Id,\r\n                        libelle = ecoleUser.UserType.Libelle,\r\n                        code = ecoleUser.UserType.Code\r\n                    }\r\n                };\r\n\r\n                mappedEcoleUser.Users.public_Profil = JObject.Parse(ecoleUser.User.AutoriseProfilPublic);\r\n\r\n                mappedEcoleUser.Users.Ecoles_users_devices = new List<UEcoleUserDevice>(0);\r\n\r\n                return Ok(mappedEcoleUser);\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Erreur GetInfoUser\");\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the user information including personal details, address, school information, and user type, based on the user's identity and school ID, handling potential errors.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "methodName",
+                        "param_name": "methodName",
+                        "param_desc": "The name of the method being called. In this case, it is 'GetUserInfoAsync'."
+                    },
+                    {
+                        "name": "methodPurpose",
+                        "param_name": "methodPurpose",
+                        "param_desc": "The purpose of the method 'GetUserInfoAsync' is to retrieve user information, including personal details, address, school information, and user type, based on the user's identity and school ID. It also handles potential errors."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the user information including personal details, address, school information, and user type, based on the user's identity and school ID, handling potential errors.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"methodName\">The name of the method being called. In this case, it is 'GetUserInfoAsync'.</param>\n/// <param name=\"methodPurpose\">The purpose of the method 'GetUserInfoAsync' is to retrieve user information, including personal details, address, school information, and user type, based on the user's identity and school ID. It also handles potential errors.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetUserProfilePublicAsync",
+            "code_start_index": 14145,
+            "method_name": "GetUserProfilePublicAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Get the public profile of any user\r\n        /// </summary>\r\n        /// <param name=\"userId\">id of the user</param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n\r\n            var ecoleUser = await _db.EcoleUsers\r\n                .Include(u => u.User)\r\n                .Include(u => u.User.UploadedFile_FileIdPhotoProfil)\r\n                .Include(u => u.User.UploadedFile_FileIdHeaderProfil)\r\n                .Include(u => u.UserType)\r\n                .Include(u => u.Ecole)\r\n                .Include(u => u.User.Diplome)\r\n                .Include(u => u.User.InscriptionPromotions)\r\n                .FirstOrDefaultAsync(u => u.User.Id == userId);\r\n\r\n            if (ecoleUser == null)\r\n            {\r\n                return NotFound();\r\n            }\r\n\r\n            try\r\n            {\r\n                // todo revoir les informations recuperable par les autres utilisateurs\r\n\r\n                var dnsConfig = _dnsConfig.GetDnsConfig();\r\n\r\n                var publicProfile = new UEcoleUserPublic\r\n                {\r\n                    Users = new UUserPublic\r\n                    {\r\n                        id = ecoleUser.User.Id,\r\n                        pseudo = ecoleUser.User.Pseudo,\r\n                        photo_profil = (ecoleUser.User.FileIdPhotoProfil != null) ? ecoleUser.User.UploadedFile_FileIdPhotoProfil.FileUrl : ecoleUser.User.PhotoProfil,\r\n                        header_profil = (ecoleUser.User.FileIdHeaderProfil != null) ? ecoleUser.User.UploadedFile_FileIdHeaderProfil.FileUrl : ecoleUser.User.HeaderProfil,\r\n                        interne = ecoleUser.User.Interne,\r\n                        diplome_autre = ecoleUser.User.DiplomeAutre\r\n                    },\r\n                    Ecoles = new UEcoles\r\n                    {\r\n                        id = ecoleUser.Ecole.Id,\r\n                        libelle = dnsConfig.Title,\r\n                        code = ecoleUser.Ecole.Code,\r\n                        website = dnsConfig.UrlPublicWebsite\r\n                    },\r\n                    Users_type = new UUserType\r\n                    {\r\n                        id = ecoleUser.UserType.Id,\r\n                        libelle = ecoleUser.UserType.Libelle,\r\n                        code = ecoleUser.UserType.Code\r\n                    },\r\n                    IsFromCurrentSchool = ecoleUser.EcoleId == ecoleId\r\n                };\r\n\r\n                try\r\n                {\r\n                    if (!string.IsNullOrWhiteSpace(ecoleUser.User.AutoriseProfilPublic))\r\n                    {\r\n                        var authorizations = JObject.Parse(ecoleUser.User.AutoriseProfilPublic);\r\n\r\n                        if (authorizations.TryGetValue(\"genre\", out var token) && token.Value<bool>())\r\n                        {\r\n                            publicProfile.Users.civilite = ecoleUser.User.Civilite;\r\n                        }\r\n\r\n                        if (authorizations.TryGetValue(\"lastname\", out token) && token.Value<bool>())\r\n                        {\r\n                            publicProfile.Users.nom = ecoleUser.User.Nom;\r\n                        }\r\n\r\n                        if (authorizations.TryGetValue(\"firstname\", out token) && token.Value<bool>())\r\n                        {\r\n                            publicProfile.Users.prenom = ecoleUser.User.Prenom;\r\n                        }\r\n\r\n                        if (authorizations.TryGetValue(\"birthday\", out token) && token.Value<bool>())\r\n                        {\r\n                            publicProfile.Users.date_naissance = ecoleUser.User.DateNaissance;\r\n                        }\r\n\r\n                        if (authorizations.TryGetValue(\"phone\", out token) && token.Value<bool>())\r\n                        {\r\n                            publicProfile.Users.tel1 = ecoleUser.User.Tel1;\r\n                        }\r\n\r\n                        if (authorizations.TryGetValue(\"phone2\", out token) && token.Value<bool>())\r\n                        {\r\n                            publicProfile.Users.tel2 = ecoleUser.User.Tel2;\r\n                        }\r\n\r\n                        if (authorizations.TryGetValue(\"cellphone\", out token) && token.Value<bool>())\r\n                        {\r\n                            publicProfile.Users.tel3 = ecoleUser.User.Tel3;\r\n                        }\r\n\r\n                        if (authorizations.TryGetValue(\"description\", out token) && token.Value<bool>())\r\n                        {\r\n                            publicProfile.Users.descriptionProfil = ecoleUser.User.DescriptionProfil;\r\n                        }\r\n\r\n                        if (authorizations.TryGetValue(\"degree\", out token) && token.Value<bool>())\r\n                        {\r\n                            publicProfile.Users.Diplomes = new DegreeViewModel();\r\n                            if (ecoleUser.User.Diplome != null)\r\n                            {\r\n                                publicProfile.Users.Diplomes = new DegreeViewModel()\r\n                                {\r\n                                    id = ecoleUser.User.Diplome.Id,\r\n                                    libelle = ecoleUser.User.Diplome.Libelle\r\n                                };\r\n                            }\r\n                        }\r\n                    }\r\n                }\r\n                catch (Exception e)\r\n                {\r\n                    Log.Error(e, \"public profile error\");\r\n                }\r\n\r\n                return Ok(publicProfile);\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Erreur get Profile Public\");\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the public profile information of a user, including personal details, education, and contact information, based on authorization settings.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The ID of the user for whom the public profile information is to be retrieved."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the public profile information of a user, including personal details, education, and contact information, based on authorization settings.\n/// </summary>\n/// <param name=\"userId\">The ID of the user for whom the public profile information is to be retrieved.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetLastConnectionAsync",
+            "code_start_index": 20027,
+            "method_name": "GetLastConnectionAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        ///     return last connection on LMS\r\n        /// </summary>\r\n        /// <returns>Return Json object </returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n\r\n            try\r\n            {\r\n                //1 r\u00e9cup du dernier rapport de connexion user & \u00e9cole\r\n                var userConnectionLogDto = await _connectionReportService.GetLastConnectionAsync(userId, ecoleId);\r\n                if (userConnectionLogDto == null)\r\n                {\r\n                    return Ok();\r\n                }\r\n\r\n                // 2. r\u00e9cup du temps total pour le couple user/\u00e9cole\r\n                long time = await _connectionReportService.GetConsolidatedTimeAsync(userId, ecoleId);\r\n                return Ok(new UReportConnection\r\n                {\r\n                    id = userConnectionLogDto.Id,\r\n                    date_create = userConnectionLogDto.CreatedAt,\r\n                    annee = userConnectionLogDto.Start.Year,\r\n                    date_connexion = userConnectionLogDto.Start.LocalDateTime,\r\n                    date_deconnexion = userConnectionLogDto.End?.LocalDateTime,\r\n                    device = userConnectionLogDto.Device,\r\n                    ipaddress = userConnectionLogDto.IpAddress,\r\n                    jour = userConnectionLogDto.Start.Day,\r\n                    mois = userConnectionLogDto.Start.Month,\r\n                    navigateur = userConnectionLogDto.Browser,\r\n                    period = userConnectionLogDto.Start.LocalDateTime,\r\n                    totalTime = time\r\n                });\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error Get Last report\");\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the last connection report for a specific user and school, including details such as device, IP address, and total time spent connected.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "The list of parameters is 'no parameters'."
+                    },
+                    {
+                        "name": "method_name",
+                        "param_name": "method_name",
+                        "param_desc": "The existing method named 'GetLastConnectionAsync'."
+                    },
+                    {
+                        "name": "method_purpose",
+                        "param_name": "method_purpose",
+                        "param_desc": "The purpose of the method is to 'Retrieve the last connection report for a specific user and school, including details such as device, IP address, and total time spent connected'."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the last connection report for a specific user and school, including details such as device, IP address, and total time spent connected.\n/// </summary>\n/// <param name=\"no\">The list of parameters is 'no parameters'.</param>\n/// <param name=\"method_name\">The existing method named 'GetLastConnectionAsync'.</param>\n/// <param name=\"method_purpose\">The purpose of the method is to 'Retrieve the last connection report for a specific user and school, including details such as device, IP address, and total time spent connected'.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetUserByIdAsync",
+            "code_start_index": 22067,
+            "method_name": "GetUserByIdAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        ///     return User by Pseudo\r\n        /// </summary>\r\n        /// <param name=\"userId\"></param>\r\n        /// <returns>Return Json object </returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var user = await _db.Users\r\n                .AsNoTracking()\r\n                .Include(u => u.UploadedFile_FileIdPhotoProfil)\r\n                .Include(u => u.UploadedFile_FileIdHeaderProfil)\r\n                .Where(p => p.Id == userId)\r\n                .Select(u => new UUsers\r\n                {\r\n                    status = u.Status,\r\n                    interne = u.Interne,\r\n                    photo_profil = (u.FileIdPhotoProfil != null) ? u.UploadedFile_FileIdPhotoProfil.FileUrl : u.PhotoProfil,\r\n                    test = u.Test,\r\n                    pseudo = u.Pseudo,\r\n                    civilite = u.Civilite,\r\n                    descriptionProfil = u.DescriptionProfil,\r\n                    header_profil = (u.FileIdHeaderProfil != null) ? u.UploadedFile_FileIdHeaderProfil.FileUrl : u.HeaderProfil\r\n                }).FirstOrDefaultAsync();\r\n\r\n            if (user == null) return Ok();\r\n            return Ok(user);\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve a user by their ID, including their status, internal status, profile photo, test status, username, title, profile description, and header photo. If the user is not found, return a success response.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The ID of the user to retrieve. It should be an integer value."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve a user by their ID, including their status, internal status, profile photo, test status, username, title, profile description, and header photo. If the user is not found, return a success response.\n/// </summary>\n/// <param name=\"userId\">The ID of the user to retrieve. It should be an integer value.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetUserByPseudoAsync",
+            "code_start_index": 23398,
+            "method_name": "GetUserByPseudoAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        ///     return User by Pseudo\r\n        /// </summary>\r\n        /// <param name=\"pseudo\"></param>\r\n        /// <returns>Return Json object </returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "pseudo",
+                    "param_name": "pseudo",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var user = await _db.Users.AsNoTracking()\r\n                .Include(u => u.UploadedFile_FileIdPhotoProfil)\r\n                .Include(u => u.UploadedFile_FileIdHeaderProfil)\r\n                .Where(p => p.Pseudo == HttpUtility.UrlDecode(pseudo))\r\n                .Select(u => new UUsers\r\n                {\r\n                    status = u.Status,\r\n                    interne = u.Interne,\r\n                    photo_profil = (u.FileIdPhotoProfil != null) ? u.UploadedFile_FileIdPhotoProfil.FileUrl : u.PhotoProfil,\r\n                    test = u.Test,\r\n                    pseudo = u.Pseudo,\r\n                    civilite = u.Civilite,\r\n                    descriptionProfil = u.DescriptionProfil,\r\n                    header_profil = (u.FileIdHeaderProfil != null) ? u.UploadedFile_FileIdHeaderProfil.FileUrl : u.HeaderProfil\r\n                }).FirstOrDefaultAsync();\r\n\r\n            if (user == null) return Ok();\r\n            return Ok(user);\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve a user by their pseudo asynchronously, including their profile photo and header, and return their status, internal status, photo profile, test, pseudo, civility, profile description, and header profile if found.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "string",
+                        "param_name": "string",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "pseudo",
+                        "param_name": "pseudo",
+                        "param_desc": "The generated description for the parameter"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve a user by their pseudo asynchronously, including their profile photo and header, and return their status, internal status, photo profile, test, pseudo, civility, profile description, and header profile if found.\n/// </summary>\n/// <param name=\"string\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"pseudo\">The generated description for the parameter</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ListTypeStreet",
+            "code_start_index": 24690,
+            "method_name": "ListTypeStreet",
+            "existing_summary": "\r\n        /// <summary>\r\n        ///     received list type way\r\n        /// </summary>\r\n        /// <returns>Return Json object </returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var result = DataCache.GetTypeVoies(_db)\r\n                .Select(t => new UTypeVoie { id = t.Id, libelle = t.Libelle })\r\n                .ToList();\r\n            return Ok(result);\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve a list of street types from the database.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "method_name",
+                        "param_name": "method_name",
+                        "param_desc": "The name of the method ('ListTypeStreet')"
+                    },
+                    {
+                        "name": "method_purpose",
+                        "param_name": "method_purpose",
+                        "param_desc": "The purpose of the method ('Retrieve a list of street types from the database.')"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve a list of street types from the database.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"method_name\">The name of the method ('ListTypeStreet')</param>\n/// <param name=\"method_purpose\">The purpose of the method ('Retrieve a list of street types from the database.')</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetCountries",
+            "code_start_index": 25204,
+            "method_name": "GetCountries",
+            "existing_summary": "\r\n        /// <summary>\r\n        ///     received list country\r\n        /// </summary>\r\n        /// <returns>Return Json object </returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var countriesList = DataCache.GetCountries(_db)\r\n                .Select(c => new CountryViewModel\r\n                {\r\n                    id = c.Id,\r\n                    code = c.Code,\r\n                    libelle = c.Libelle,\r\n                })\r\n                .ToList();\r\n\r\n            return Ok(countriesList);\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve a list of countries with their respective ID, code, and label.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "methodName",
+                        "param_name": "methodName",
+                        "param_desc": "GetCountries - Retrieve a list of countries with their respective ID, code, and label."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve a list of countries with their respective ID, code, and label.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"methodName\">GetCountries - Retrieve a list of countries with their respective ID, code, and label.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetDegrees",
+            "code_start_index": 25849,
+            "method_name": "GetDegrees",
+            "existing_summary": "\r\n        /// <summary>\r\n        ///     received list degree\r\n        /// </summary>\r\n        /// <returns>Return Json object </returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var diplomasList = DataCache.GetDiplomes(_db)\r\n                .Select(d => new DegreeViewModel\r\n                {\r\n                    id = d.Id,\r\n                    libelle = d.Libelle\r\n                })\r\n                .ToList();\r\n\r\n            return Ok(diplomasList);\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve a list of degrees from the database and return them as a collection of DegreeViewModel objects.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "methodName",
+                        "param_name": "methodName",
+                        "param_desc": "The name of the method being called (e.g., 'GetDegrees')"
+                    },
+                    {
+                        "name": "methodPurpose",
+                        "param_name": "methodPurpose",
+                        "param_desc": "The purpose of the method (e.g., 'Retrieve a list of degrees from the database and return them as a collection of DegreeViewModel objects.')"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve a list of degrees from the database and return them as a collection of DegreeViewModel objects.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"methodName\">The name of the method being called (e.g., 'GetDegrees')</param>\n/// <param name=\"methodPurpose\">The purpose of the method (e.g., 'Retrieve a list of degrees from the database and return them as a collection of DegreeViewModel objects.')</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetOccupations",
+            "code_start_index": 26450,
+            "method_name": "GetOccupations",
+            "existing_summary": "\r\n        /// <summary>\r\n        ///     received list job\r\n        /// </summary>\r\n        /// <returns>Return Json object </returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var occupationsList = DataCache.GetProfessionalSituations(_db)\r\n                .Select(o => new OccupationViewModel\r\n                {\r\n                    id = o.Id,\r\n                    libelle = o.Libelle,\r\n                })\r\n                .ToList();\r\n\r\n            return Ok(occupationsList);\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve a list of occupations with their corresponding IDs and labels.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "methodName",
+                        "param_name": "methodName",
+                        "param_desc": "The name of the method (GetOccupations)"
+                    },
+                    {
+                        "name": "methodPurpose",
+                        "param_name": "methodPurpose",
+                        "param_desc": "The purpose of the method (Retrieve a list of occupations with their corresponding IDs and labels.)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve a list of occupations with their corresponding IDs and labels.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"methodName\">The name of the method (GetOccupations)</param>\n/// <param name=\"methodPurpose\">The purpose of the method (Retrieve a list of occupations with their corresponding IDs and labels.)</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "UploadAsync",
+            "code_start_index": 27033,
+            "method_name": "UploadAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Allow files upload\r\n        /// </summary>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n\r\n            var allowedFileExtensions = new[] { \".jpg\", \".jpeg\", \".gif\", \".bmp\", \".png\" };\r\n\r\n            try\r\n            {\r\n                string rootFolder = HostingEnvironment.MapPath(\"~/App_Data\");\r\n\r\n                // read form data\r\n                var provider = new MultipartFormDataStreamProvider(rootFolder);\r\n\r\n                await Request.Content.ReadAsMultipartAsync(provider);\r\n\r\n                var result = this.CheckUploadRequest(\r\n                    provider,\r\n                    allowedFileExtensions,\r\n                    out var fileDetails,\r\n                    out var uploadSource);\r\n                if (result != null)\r\n                {\r\n                    return result;\r\n                }\r\n\r\n                // upload to the ressources server\r\n                var uploadResponse =\r\n                    await this.UploadToRessourcesServerAsync(fileDetails, uploadSource, userId, ecoleId,\r\n                        _config.GetResourcesServerUrl());\r\n\r\n                if (uploadResponse == null)\r\n                {\r\n                    Log.Warning(\"Error uploading a file to the file server\");\r\n                    return InternalServerError();\r\n                }\r\n\r\n                if (!uploadResponse.Success)\r\n                {\r\n                    Log.Warning(\r\n                        \"Failed to upload a file to the ressources server with the following error\",\r\n                        uploadResponse.ErrorMessage);\r\n                    return InternalServerError();\r\n                }\r\n\r\n                switch (uploadSource)\r\n                {\r\n                    case \"profile_avatar\":\r\n                        await UpdatePictureAsync(userId, uploadResponse.FileUrl, \"profile\");\r\n                        break;\r\n                    case \"profile_cover\":\r\n                        await UpdatePictureAsync(userId, uploadResponse.FileUrl, \"cover\");\r\n                        break;\r\n                }\r\n\r\n                return Ok(_config.GetResourcesServerUrl() + uploadResponse.FileUrl);\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error during the file upload\");\r\n                return InternalServerError(e);\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Upload files to a resources server and update user profile pictures if necessary.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "method",
+                        "param_name": "method",
+                        "param_desc": "UploadAsync - Upload files to a resources server and update user profile pictures if necessary."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Upload files to a resources server and update user profile pictures if necessary.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"method\">UploadAsync - Upload files to a resources server and update user profile pictures if necessary.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "UploadAvatarAsync",
+            "code_start_index": 29612,
+            "method_name": "UploadAvatarAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Upload user avatar\r\n        /// </summary>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "fileGuid",
+                    "param_name": "fileGuid",
+                    "param_type": "Guid",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n\r\n            var user = await _db.Users\r\n                .FirstOrDefaultAsync(u => u.Id == userId);\r\n\r\n            if (user == null)\r\n            {\r\n                Log.Warning(\"User not found\");\r\n                return InternalServerError();\r\n            }\r\n\r\n            var uploadedFile = _db.UploadedFiles\r\n                .AsNoTracking()\r\n                .Where(uf => uf.FileGuid == fileGuid)\r\n                .FirstOrDefault();\r\n\r\n            if (uploadedFile == null)\r\n            {\r\n                Log.Warning(\"File not found\");\r\n                return InternalServerError();\r\n            }\r\n\r\n            try\r\n            {\r\n                user.FileIdPhotoProfil = uploadedFile.Id;\r\n\r\n                await _db.SaveChangesAsync();\r\n\r\n                return Ok(uploadedFile.FileUrl);\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error during the file upload\");\r\n                return InternalServerError(e);\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the user's profile picture with the uploaded file, handling error cases.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "Guid",
+                        "param_name": "Guid",
+                        "param_desc": "The unique identifier for the file to be uploaded."
+                    },
+                    {
+                        "name": "fileGuid",
+                        "param_name": "fileGuid",
+                        "param_desc": "The unique identifier for the file containing the user's new profile picture."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the user's profile picture with the uploaded file, handling error cases.\n/// </summary>\n/// <param name=\"Guid\">The unique identifier for the file to be uploaded.</param>\n/// <param name=\"fileGuid\">The unique identifier for the file containing the user's new profile picture.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "UploadBackgroundAsync",
+            "code_start_index": 30990,
+            "method_name": "UploadBackgroundAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Upload user avatar\r\n        /// </summary>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "fileGuid",
+                    "param_name": "fileGuid",
+                    "param_type": "Guid",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n\r\n            var user = await _db.Users\r\n                .FirstOrDefaultAsync(u => u.Id == userId);\r\n\r\n            if (user == null)\r\n            {\r\n                Log.Warning(\"User not found\");\r\n                return InternalServerError();\r\n            }\r\n\r\n            var uploadedFile = _db.UploadedFiles\r\n                .AsNoTracking()\r\n                .Where(uf => uf.FileGuid == fileGuid)\r\n                .FirstOrDefault();\r\n\r\n            if (uploadedFile == null)\r\n            {\r\n                Log.Warning(\"File not found\");\r\n                return InternalServerError();\r\n            }\r\n\r\n            try\r\n            {\r\n                user.FileIdHeaderProfil = uploadedFile.Id;\r\n\r\n                await _db.SaveChangesAsync();\r\n\r\n                return Ok(uploadedFile.FileUrl);\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error during the file upload\");\r\n                return InternalServerError(e);\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the user's profile picture with an uploaded file, handling error cases.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "Guid",
+                        "param_name": "Guid",
+                        "param_desc": "The unique identifier associated with a file."
+                    },
+                    {
+                        "name": "fileGuid",
+                        "param_name": "fileGuid",
+                        "param_desc": "The unique identifier associated with the uploaded file."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the user's profile picture with an uploaded file, handling error cases.\n/// </summary>\n/// <param name=\"Guid\">The unique identifier associated with a file.</param>\n/// <param name=\"fileGuid\">The unique identifier associated with the uploaded file.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "UpdatePictureAsync",
+            "code_start_index": 32204,
+            "method_name": "UpdatePictureAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "fileUrl",
+                    "param_name": "fileUrl",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "field",
+                    "param_name": "field",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var user = await _db.Users.FirstOrDefaultAsync(u => u.Id == userId);\r\n            switch (field)\r\n            {\r\n                case \"profile\":\r\n                    user.PhotoProfil = _config.GetResourcesServerUrl() + fileUrl;\r\n                    break;\r\n                case \"cover\":\r\n                    user.HeaderProfil = _config.GetResourcesServerUrl() + fileUrl;\r\n                    break;\r\n            }\r\n\r\n            try\r\n            {\r\n                await _db.SaveChangesAsync();\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error updating the user photo\");\r\n                throw;\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the user's profile or cover picture with the specified file URL and save changes in the database asynchronously.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The ID of the user whose profile or cover picture needs to be updated."
+                    },
+                    {
+                        "name": "fileUrl",
+                        "param_name": "fileUrl",
+                        "param_desc": "The URL of the file that contains the new picture to be updated for the user."
+                    },
+                    {
+                        "name": "field",
+                        "param_name": "field",
+                        "param_desc": "The field specifying whether the picture is a profile picture or a cover picture."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the user's profile or cover picture with the specified file URL and save changes in the database asynchronously.\n/// </summary>\n/// <param name=\"userId\">The ID of the user whose profile or cover picture needs to be updated.</param>\n/// <param name=\"fileUrl\">The URL of the file that contains the new picture to be updated for the user.</param>\n/// <param name=\"field\">The field specifying whether the picture is a profile picture or a cover picture.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GenerateCertificationTaskAsync",
+            "code_start_index": 33047,
+            "method_name": "GenerateCertificationTaskAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "promotionId",
+                    "param_name": "promotionId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "languageCode",
+                    "param_name": "languageCode",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            HttpResponseMessage httpResponseError;\r\n\r\n            var currentUser = User.Identity.GetUser();\r\n            var schoolId = this.GetSchoolId(_db);\r\n            var currentSchool = DataCache.GetSchools(_db).First(e => e.Id == schoolId);\r\n\r\n            try\r\n            {\r\n                var courseCertificateInformations = new CourseCertificateInformations(\r\n                    new CourseCertificateStudent(currentUser.Id, currentUser.Prenom, currentUser.Nom),\r\n                    new CourseCertificateSchool(schoolId, currentSchool.Code),\r\n                    promotionId,\r\n                    languageCode\r\n                );\r\n                var courseCertificateFile = await _courseCertificateService.GetSchoolCertificateAsync(courseCertificateInformations);\r\n\r\n                var httpResponseMessage = new HttpResponseMessage { Content = new ByteArrayContent(courseCertificateFile.File) };\r\n                httpResponseMessage.Content.Headers.ContentType = new MediaTypeHeaderValue(courseCertificateFile.MediaType);\r\n                httpResponseMessage.Content.Headers.ContentDisposition = new ContentDispositionHeaderValue(\"attachment\");\r\n                httpResponseMessage.Content.Headers.Add(\"x-filename\", courseCertificateFile.FileName);\r\n                httpResponseMessage.Content.Headers.ContentDisposition.FileName = courseCertificateFile.FileName;\r\n                httpResponseMessage.StatusCode = HttpStatusCode.OK;\r\n                return httpResponseMessage;\r\n            }\r\n            catch (Studi.DocumentGenerator.Client.DocumentGeneratorClientApiException ex)\r\n            {\r\n                Log.Error(ex, \"Error to generate a training certificate\");\r\n                httpResponseError = new HttpResponseMessage((HttpStatusCode)ex.StatusCode);\r\n                httpResponseError.Content = new StringContent(ex.Response);\r\n                return httpResponseError;\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error to generate a training certificate\");\r\n                httpResponseError = new HttpResponseMessage(HttpStatusCode.InternalServerError);\r\n                httpResponseError.Content = new StringContent(\"Un probl\u00e8me est survenu.\");\r\n                return httpResponseError;\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Generate a certification task asynchronously based on the provided information and return the generated certificate file or an error message if an exception occurs.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "promotionId",
+                        "param_name": "promotionId",
+                        "param_desc": "The ID of the promotion for which the certification task will be generated. It should be an integer value."
+                    },
+                    {
+                        "name": "languageCode",
+                        "param_name": "languageCode",
+                        "param_desc": "The language code used for the certification task generation. It should be a string value."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Generate a certification task asynchronously based on the provided information and return the generated certificate file or an error message if an exception occurs.\n/// </summary>\n/// <param name=\"promotionId\">The ID of the promotion for which the certification task will be generated. It should be an integer value.</param>\n/// <param name=\"languageCode\">The language code used for the certification task generation. It should be a string value.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GenerateTrainingCertificateTaskAsync",
+            "code_start_index": 35602,
+            "method_name": "GenerateTrainingCertificateTaskAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "promotionId",
+                    "param_name": "promotionId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "languageCode",
+                    "param_name": "languageCode",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            HttpResponseMessage httpResponseError;\r\n\r\n            var currentUser = User.Identity.GetUser();\r\n            var schoolId = this.GetSchoolId(_db);\r\n            var currentSchool = DataCache.GetSchools(_db).First(e => e.Id == schoolId);\r\n\r\n            try\r\n            {\r\n                var courseCertificateInformations = new CourseCertificateInformations(\r\n                    new CourseCertificateStudent(currentUser.Id, currentUser.Prenom, currentUser.Nom),\r\n                    new CourseCertificateSchool(schoolId, currentSchool.Code),\r\n                    promotionId,\r\n                    languageCode\r\n                );\r\n\r\n                var trainingCertificateFile = await _courseCertificateService.GetTrainingCertificateAsync(courseCertificateInformations);\r\n\r\n                var httpResponseMessage = new HttpResponseMessage { Content = new ByteArrayContent(trainingCertificateFile.File) };\r\n                httpResponseMessage.Content.Headers.ContentType = new MediaTypeHeaderValue(trainingCertificateFile.MediaType);\r\n                httpResponseMessage.Content.Headers.ContentDisposition = new ContentDispositionHeaderValue(\"attachment\");\r\n                httpResponseMessage.Content.Headers.Add(\"x-filename\", trainingCertificateFile.FileName);\r\n                httpResponseMessage.Content.Headers.ContentDisposition.FileName = trainingCertificateFile.FileName;\r\n                httpResponseMessage.StatusCode = HttpStatusCode.OK;\r\n                return httpResponseMessage;\r\n            }\r\n            catch (Studi.DocumentGenerator.Client.DocumentGeneratorClientApiException ex)\r\n            {\r\n                Log.Error(ex, \"Error to generate a training certificate\");\r\n                httpResponseError = new HttpResponseMessage((HttpStatusCode)ex.StatusCode);\r\n                httpResponseError.Content = new StringContent(ex.Response);\r\n                return httpResponseError;\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error to generate a training certificate\");\r\n                httpResponseError = new HttpResponseMessage(HttpStatusCode.InternalServerError);\r\n                httpResponseError.Content = new StringContent(\"Un probl\u00e8me est survenu.\");\r\n                return httpResponseError;\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Generate a training certificate asynchronously based on the provided course information, handle exceptions and return the generated certificate file or an error message.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "promotionId",
+                        "param_name": "promotionId",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "languageCode",
+                        "param_name": "languageCode",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Generate a training certificate asynchronously based on the provided course information, handle exceptions and return the generated certificate file or an error message.\n/// </summary>\n/// <param name=\"promotionId\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"languageCode\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetLanguages",
+            "code_start_index": 38345,
+            "method_name": "GetLanguages",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Get languages Availables for the creation of School certificate or Training certificate\r\n        /// </summary>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            List<Language> items = new List<Language>\r\n            {\r\n                new Language(0, \"fr\", \"Fran\u00e7ais\"),\r\n                new Language(1, \"en\", \"Anglais\")\r\n            };\r\n            return Ok(items);\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Return a list of available languages with their corresponding codes and names.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "GetLanguages",
+                        "param_name": "GetLanguages",
+                        "param_desc": "Return a list of available languages with their corresponding codes and names."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Return a list of available languages with their corresponding codes and names.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"GetLanguages\">Return a list of available languages with their corresponding codes and names.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "ProfileController"
+}

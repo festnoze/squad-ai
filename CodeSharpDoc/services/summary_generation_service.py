@@ -27,31 +27,33 @@ class SummaryGenerationService:
 
     @traceable #trace llm invoke through LangSmith
     @staticmethod
-    def generate_all_summaries_for_all_csharp_files_and_save(file_path: str, llms_infos: list[LlmInfo]):  
+    def generate_all_summaries_for_all_csharp_files_but_existing_and_save(file_path: str, existing_structs_desc: list[StructureDesc], llms_infos: list[LlmInfo]):  
         txt.activate_print = True
         llms = LangChainFactory.create_llms_from_infos(llms_infos)       
-        paths_and_codes = file.load_csharp_files(file_path)
+        paths_and_codes = file.get_files_paths_and_contents(file_path, 'cs')
         CSharpHelper.remove_existing_summaries_from_all_files(paths_and_codes)
         
-        structures_from_python = CSharpCodeStructureAnalyser.extract_code_structures_from_code_files(paths_and_codes)
-        known_structures = code_analyser_client.get_folder_code_files_structures(file_path)
-        SummaryGenerationService.copy_missing_infos(structures_from_python, known_structures)
-        CSharpCodeStructureAnalyser.split_classes_methods_code(known_structures) 
+        #structures_from_python = CSharpCodeStructureAnalyser.extract_code_structures_from_code_files(paths_and_codes)
+        structs_to_process = code_analyser_client.get_folder_files_code_structures(file_path, existing_structs_desc)
+        #SummaryGenerationService.copy_missing_infos(structures_from_python, known_structures)
+        CSharpCodeStructureAnalyser.split_classes_methods_code(structs_to_process) 
 
-        SummaryGenerationService.generate_methods_summaries_for_all_structures(llms, known_structures)
+        SummaryGenerationService.generate_methods_summaries_for_all_structures(llms, structs_to_process)        
+        JsonHelper.save_as_json_files(structs_to_process, 'outputs\\structures_descriptions')
         
-        paths_and_new_codes = SummaryGenerationService.include_generated_summaries_to_codes(paths_and_codes, known_structures)
+        paths_and_new_codes = SummaryGenerationService.include_generated_summaries_to_codes(paths_and_codes, structs_to_process)
         file.save_contents_within_files(paths_and_new_codes)
         
-        # rag = RAGService(llms[0], known_structures)
-        # query = input("What are you looking for?")
-        # while query != '':
-        #     answer = rag.query(query)
-        #     print(answer)
-        #     query = input("What are you looking for?")
-
         txt.print("\nDone.")
         txt.print("---------------------------")
+
+    def load_struct_desc_from_folder(folder_path: str):
+        json_files = file.get_files_paths_and_contents(folder_path, 'json')
+        structures_descriptions = []
+        for file_path in json_files:
+            json_struct_desc = json.loads(json_files[file_path])
+            structures_descriptions.append(StructureDesc(**json_struct_desc))
+        return structures_descriptions
 
     @staticmethod
     def copy_missing_infos(structures_from_python, known_structures):        
@@ -99,7 +101,7 @@ class SummaryGenerationService:
         paths_and_new_codes = {}
         
         for structure_description in structures_descriptions:
-            code = paths_and_codes[structure_description.file_path.replace('/', '\\')]
+            code = paths_and_codes[structure_description.file_path]
             new_code = SummaryGenerationService.add_generated_summaries_to_initial_code(structure_description, code)
             paths_and_new_codes[structure_description.file_path] = new_code
         
@@ -110,6 +112,7 @@ class SummaryGenerationService:
     def add_generated_summaries_to_initial_code(struct_desc: StructureDesc, initial_code: str):
         for method_desc in struct_desc.methods[::-1]:
             index = method_desc.code_start_index
+            if index == -1: continue
 
             if method_desc.attributes and len(method_desc.attributes) > 0: # has attributes
                 index = initial_code[:index].rfind(method_desc.attributes[0])
@@ -134,7 +137,6 @@ class SummaryGenerationService:
         txt.print_with_spinner(f"Ongoing parallel summaries generation for {SummaryGenerationService.methods_count(known_structures)} methods in {len(known_structures)} code files:")
         SummaryGenerationService.generate_methods_summaries_for_all_classes(llms, known_structures)        
         SummaryGenerationService.apply_to_interfaces_the_classes_generated_summaries(known_structures)
-        JsonHelper.save_as_json_files(known_structures, 'outputs\\structures_descriptions')
         txt.stop_spinner_replace_text("All methods' summaries generated successfully")
 
     @staticmethod
@@ -173,23 +175,24 @@ class SummaryGenerationService:
         for class_struct in all_classes:
             prompts = []
             format_instructions = ''
-            for method in class_struct.methods:
-                method_prompt, json_formatting_prompt = SummaryGenerationService.get_prompt_for_parameters_summaries(method)
-                prompt, output_parser = Llm.get_prompt_and_json_output_parser(method_prompt, MethodParametersDocumentationPydantic, MethodParametersDocumentation)
-                prompts.append(prompt)
+            if len(class_struct.methods) > 0:
+                for method in class_struct.methods:
+                    method_prompt, json_formatting_prompt = SummaryGenerationService.get_prompt_for_parameters_summaries(method)
+                    prompt, output_parser = Llm.get_prompt_and_json_output_parser(method_prompt, MethodParametersDocumentationPydantic, MethodParametersDocumentation)
+                    prompts.append(prompt)
 
-            methods_parameters_summaries = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(action_name, llms, output_parser, SummaryGenerationService.batch_size, *prompts)
+                methods_parameters_summaries = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(action_name, llms, output_parser, SummaryGenerationService.batch_size, *prompts)
 
-            for i in range(len(methods_parameters_summaries)):
-                if type(methods_parameters_summaries[i]) is list:
-                    methods_parameters_summaries[i] = {'params_list': methods_parameters_summaries[i]}
-                if methods_parameters_summaries[i]:
-                    methods_parameters_summaries[i] = MethodParametersDocumentation(**methods_parameters_summaries[i])
-                else:
-                    methods_parameters_summaries[i] = MethodParametersDocumentation(params_list=[])
+                for i in range(len(methods_parameters_summaries)):
+                    if type(methods_parameters_summaries[i]) is list:
+                        methods_parameters_summaries[i] = {'params_list': methods_parameters_summaries[i]}
+                    if methods_parameters_summaries[i]:
+                        methods_parameters_summaries[i] = MethodParametersDocumentation(**methods_parameters_summaries[i])
+                    else:
+                        methods_parameters_summaries[i] = MethodParametersDocumentation(params_list=[])
 
-            for method, method_params_summaries in zip(class_struct.methods, methods_parameters_summaries):
-                method.generated_parameters_summaries = method_params_summaries
+                for method, method_params_summaries in zip(class_struct.methods, methods_parameters_summaries):
+                    method.generated_parameters_summaries = method_params_summaries
 
     @staticmethod
     def generate_all_classes_methods_parameters_desc_json_from_llm(llms: list[BaseChatModel], all_classes):

@@ -1,0 +1,60 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/V2/HallOfFameV2Controller.cs",
+    "index_shift_code": 534,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V2",
+    "usings": [],
+    "access_modifier": "public",
+    "struct_name": "HallOfFameV2Controller",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetUsersRankingAsync",
+            "code_start_index": 1272,
+            "method_name": "GetUsersRankingAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Return the weekly and the daily ranking of users\r\n        /// </summary>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n\r\n            const int activeStatusId = 1;\r\n            const int studentUserTypeId = 2;\r\n\r\n            var firstdayOfThisWeek = DateTime.Now.FirstDayOfWeek();\r\n            var firstdayOfThisTrimestre = DateTime.Now.FirstMondayOfTrimester();\r\n\r\n            var rankedUsers = await _db.Users.AsNoTracking()\r\n                .Include(p => p.UploadedFile_FileIdPhotoProfil)\r\n                .Include(p => p.UploadedFile_FileIdHeaderProfil)\r\n                .Include(p => p.EcoleUsers)\r\n                .Include(m => m.EcoleUsers.Select(eu => eu.UserType))\r\n                .Include(u => u.InscriptionPromotions)\r\n                .Include(u => u.ReportConnexions)\r\n                .Where(u => u.EcoleUsers.Any(\r\n                        eu => eu.EcoleId == ecoleId\r\n                        && !eu.Suspension\r\n                        && eu.UserStatutId == activeStatusId\r\n                        && eu.UserTypeId == studentUserTypeId\r\n                        && !u.Interne))\r\n                .Select(user => new HallOfFameUserVm\r\n                {\r\n                    Id = user.Id,\r\n                    Pseudo = user.Pseudo,\r\n                    ProfilePicture = (user.FileIdPhotoProfil != null) ? user.UploadedFile_FileIdPhotoProfil.FileUrl : user.PhotoProfil,\r\n                    CoverPicture = (user.FileIdHeaderProfil != null) ? user.UploadedFile_FileIdHeaderProfil.FileUrl : user.HeaderProfil,\r\n                    Internal = user.Interne,\r\n                    Promotions = user.InscriptionPromotions\r\n                        .Where(ip => ip.EcoleId == ecoleId\r\n                                     && (ip.DateDelete == null || ip.DateDelete > DateTime.Now)\r\n                                     && ((ip.DateFinAcces == null && ip.Promotion.DateFinPromo > DateTime.Now) || ip.DateFinAcces > DateTime.Now))\r\n                        .Select(i => new RankingPromotionVm\r\n                        {\r\n                            Parcours = i.Promotion.Parcour.Titre,\r\n                            Libelle = i.Promotion.Libelle,\r\n                        }).ToList(),\r\n                    PointsSemester = Math.Round(((user.ReportConnexions\r\n                        .Where(rc => rc.DateCreate > firstdayOfThisTrimestre)\r\n                        .Sum(rc => (double?)rc.Duree) ?? 0) / 60) + (((user.FileIdPhotoProfil != null) ? user.UploadedFile_FileIdPhotoProfil.FileUrl : user.PhotoProfil) == _customWebResources.ProfilePhotoImage ? 0 : 200)),\r\n                    PointsHebdo = Math.Round(((user.ReportConnexions\r\n                       .Where(rc => rc.UserId == user.Id && rc.DateCreate > firstdayOfThisWeek)\r\n                       .Sum(reportConnexion => (double?)reportConnexion.Duree) ?? 0) / 60) + (((user.FileIdPhotoProfil != null) ? user.UploadedFile_FileIdPhotoProfil.FileUrl : user.PhotoProfil) == _customWebResources.ProfilePhotoImage ? 0 : 200)),\r\n                    IsOnline = false\r\n                })\r\n                .OrderBy(p => p.PointsHebdo)\r\n                .ToListAsync();\r\n\r\n            foreach (var user in rankedUsers)\r\n            {\r\n                user.IsOnline = ConnectionsListHolder.OnlineUsers.ContainsKey(user.Id);\r\n            }\r\n\r\n            return Ok(new HallOfFameRankingVm\r\n            {\r\n                CurrentUserRank = rankedUsers.FindIndex(p => p.Id == userId),\r\n                RankedUsers = rankedUsers\r\n            });\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the ranking of active student users in a specific school, including their profile information, promotions, and points for the current semester and week, with an indication of online status.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "The list of parameters is 'no parameters'."
+                    },
+                    {
+                        "name": "existing",
+                        "param_name": "existing",
+                        "param_desc": "We have an existing method named 'GetUsersRankingAsync'."
+                    },
+                    {
+                        "name": "context",
+                        "param_name": "context",
+                        "param_desc": "For context, the method purpose is 'Retrieve the ranking of active student users in a specific school, including their profile information, promotions, and points for the current semester and week, with an indication of online status.'."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the ranking of active student users in a specific school, including their profile information, promotions, and points for the current semester and week, with an indication of online status.\n/// </summary>\n/// <param name=\"no\">The list of parameters is 'no parameters'.</param>\n/// <param name=\"existing\">We have an existing method named 'GetUsersRankingAsync'.</param>\n/// <param name=\"context\">For context, the method purpose is 'Retrieve the ranking of active student users in a specific school, including their profile information, promotions, and points for the current semester and week, with an indication of online status.'.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "HallOfFameV2Controller"
+}

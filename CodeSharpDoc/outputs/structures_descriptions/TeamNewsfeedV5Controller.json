@@ -1,0 +1,721 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/V5/TeamNewsfeedV5Controller.cs",
+    "index_shift_code": 585,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V5",
+    "usings": [
+        "System",
+        "System.Collections.Generic",
+        "System.Data.Entity.Validation",
+        "System.Net",
+        "System.Threading.Tasks",
+        "System.Web",
+        "System.Web.Http",
+        "System.Web.Http.Description",
+        "Lms.Common.Enumerations",
+        "LMS.Attributes",
+        "LMS.Attributes.Routing",
+        "LMS.Authentication",
+        "LMS.Models.ViewModels",
+        "LMS.Models.ViewModels.V3.Newsfeed",
+        "LMS.Services.Interfaces",
+        "LMS.Utils",
+        "Serilog"
+    ],
+    "access_modifier": "public",
+    "struct_name": "TeamNewsfeedV5Controller",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetWallTeamPostsAsync",
+            "code_start_index": 1698,
+            "method_name": "GetWallTeamPostsAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Retrieve a team newsfeed's posts, paginated and filtered.\r\n        /// </summary>\r\n        /// <param name=\"teamId\">The team ID.</param>\r\n        /// <param name=\"filter\">The wall filter.</param>\r\n        /// <param name=\"since\">The beginning date.</param>\r\n        /// <param name=\"pagesize\">The page size.</param>\r\n        /// <returns>The team newsfeed posts.</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "teamId",
+                    "param_name": "teamId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "filter",
+                    "param_name": "filter",
+                    "param_type": "NewsfeedWallFilterEnum",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "since",
+                    "param_name": "since",
+                    "param_type": "DateTime?",
+                    "has_default_value": true,
+                    "default_value": "null",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "pagesize",
+                    "param_name": "pagesize",
+                    "param_type": "int",
+                    "has_default_value": true,
+                    "default_value": "20",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            // Limit the number of posts returned.\r\n            if (pagesize < 1 || pagesize > 100)\r\n            {\r\n                pagesize = 100;\r\n            }\r\n\r\n            var userId = User.Identity.GetUserId();\r\n            var schoolId = User.Identity.GetSchoolId();\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n\r\n            // Get the team posts.\r\n            var currentHost = HttpContext.Current.Request.OriginOrRequestHost();\r\n            var teamPosts = await _teamPostService.GetTeamPostsAsync(teamId, schoolId, schoolIdsList, userId, pagesize, currentHost, filter, since);\r\n\r\n            return\r\n                Ok(new PaginationV3ViewModel<NewsfeedItemV3ViewModel>(teamPosts, teamPosts.Posts.Count == pagesize));\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Delete a comment asynchronously, handling exceptions for object not found and unauthorized access.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "teamId",
+                        "param_name": "teamId",
+                        "param_desc": "The ID of the team."
+                    },
+                    {
+                        "name": "filter",
+                        "param_name": "filter",
+                        "param_desc": "The filter to be applied to the newsfeed wall."
+                    },
+                    {
+                        "name": "since",
+                        "param_name": "since",
+                        "param_desc": "The date and time since when to fetch the posts. It is optional and defaults to null if not provided."
+                    },
+                    {
+                        "name": "pagesize",
+                        "param_name": "pagesize",
+                        "param_desc": "The number of posts to be fetched per page. It is optional and defaults to 20 if not provided."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Delete a comment asynchronously, handling exceptions for object not found and unauthorized access.\n/// </summary>\n/// <param name=\"teamId\">The ID of the team.</param>\n/// <param name=\"filter\">The filter to be applied to the newsfeed wall.</param>\n/// <param name=\"since\">The date and time since when to fetch the posts. It is optional and defaults to null if not provided.</param>\n/// <param name=\"pagesize\">The number of posts to be fetched per page. It is optional and defaults to 20 if not provided.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "FetchPostAsync",
+            "code_start_index": 2957,
+            "method_name": "FetchPostAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Fetches a single post.\r\n        /// </summary>\r\n        /// <param name=\"postId\"></param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "postId",
+                    "param_name": "postId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var schoolId = User.Identity.GetSchoolId();\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n\r\n            // Get the team post.\r\n            var currentHost = HttpContext.Current.Request.OriginOrRequestHost();\r\n            var teamPost = await _teamPostService.GetTeamPostAsync(postId, schoolId, schoolIdsList, userId, currentHost);\r\n\r\n            return\r\n                Ok(new PaginationV3ViewModel<NewsfeedItemV3ViewModel>(teamPost, false));\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve and modify post and user data to create a view model for a newsfeed item.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "postId",
+                        "param_name": "postId",
+                        "param_desc": "The ID of the post to be fetched."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve and modify post and user data to create a view model for a newsfeed item.\n/// </summary>\n/// <param name=\"postId\">The ID of the post to be fetched.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "PostAsync",
+            "code_start_index": 3796,
+            "method_name": "PostAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Post a new post\r\n        /// </summary>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "newPost",
+                    "param_name": "newPost",
+                    "param_type": "NewsfeedNewPostV3ViewModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var currentUser = User.Identity.GetUser();\r\n            var userId = currentUser.Id;\r\n            var schoolId = User.Identity.GetSchoolId();\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n\r\n            try\r\n            {\r\n                // Create post\r\n                var currentHost = HttpContext.Current.Request.OriginOrRequestHost();\r\n                var postVm = await _teamPostService.CreateNewTeamPostAsync(newPost, schoolId, schoolIdsList, currentUser.Email, userId, currentHost);\r\n\r\n                return Ok(postVm);\r\n            }\r\n            catch (InvalidOperationException ex)\r\n            {\r\n                return Content(HttpStatusCode.BadRequest, ex.Message);\r\n            }\r\n            catch (UnauthorizedAccessException ex)\r\n            {\r\n                return Content(HttpStatusCode.Forbidden, ex.Message);\r\n            }\r\n            catch (DbEntityValidationException ex)\r\n            {\r\n                Log.Error(ex, \"Error trying to save a new team post\");\r\n                return BadRequest(\"Error publishing a new team post\");\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error trying to save a new team post\");\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve team posts from a specified team, school, and user, with pagination and filtering options.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "NewsfeedNewPostV3ViewModel",
+                        "param_name": "NewsfeedNewPostV3ViewModel",
+                        "param_desc": "The view model object containing data for a new post in the newsfeed."
+                    },
+                    {
+                        "name": "newPost",
+                        "param_name": "newPost",
+                        "param_desc": "The actual new post object to be posted in the newsfeed."
+                    },
+                    {
+                        "name": "PostAsync",
+                        "param_name": "PostAsync",
+                        "param_desc": "The method used to asynchronously post content in the newsfeed."
+                    },
+                    {
+                        "name": "Retrieve team posts from a specified team, school, and user, with pagination and filtering options.",
+                        "param_name": "Retrieve team posts from a specified team, school, and user, with pagination and filtering options.",
+                        "param_desc": "The purpose of the method 'PostAsync' which is to retrieve team posts from a specified team, school, and user, with pagination and filtering options."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve team posts from a specified team, school, and user, with pagination and filtering options.\n/// </summary>\n/// <param name=\"NewsfeedNewPostV3ViewModel\">The view model object containing data for a new post in the newsfeed.</param>\n/// <param name=\"newPost\">The actual new post object to be posted in the newsfeed.</param>\n/// <param name=\"PostAsync\">The method used to asynchronously post content in the newsfeed.</param>\n/// <param name=\"Retrieve team posts from a specified team, school, and user, with pagination and filtering options.\">The purpose of the method 'PostAsync' which is to retrieve team posts from a specified team, school, and user, with pagination and filtering options.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "LikePostAsync",
+            "code_start_index": 5532,
+            "method_name": "LikePostAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Likes a team post.\r\n        /// </summary>\r\n        /// <param name=\"teamPostId\">The team post ID.</param>\r\n        /// <returns>A user viewmodel.</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "teamPostId",
+                    "param_name": "teamPostId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var schoolId = User.Identity.GetSchoolId();\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n\r\n            try\r\n            {\r\n                // Like the post.\r\n                var userViewModel = await _teamPostService.LikePostAsync(teamPostId, schoolId, schoolIdsList, userId);\r\n                return Ok(userViewModel);\r\n            }\r\n            catch (InvalidOperationException ex)\r\n            {\r\n                return Content(HttpStatusCode.BadRequest, ex.Message);\r\n            }\r\n            catch (UnauthorizedAccessException ex)\r\n            {\r\n                return Content(HttpStatusCode.Forbidden, ex.Message);\r\n            }\r\n            catch (DbEntityValidationException ex)\r\n            {\r\n                Log.Error(ex, \"Error trying to like a team post\");\r\n                return BadRequest(\"Error trying to like a team post\");\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error trying to like a team post\");\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve a team post asynchronously based on user identity and specified parameters.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "teamPostId",
+                        "param_name": "teamPostId",
+                        "param_desc": "The ID of the team post to like."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve a team post asynchronously based on user identity and specified parameters.\n/// </summary>\n/// <param name=\"teamPostId\">The ID of the team post to like.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "LikePostUndoAsync",
+            "code_start_index": 7024,
+            "method_name": "LikePostUndoAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Unlikes a team post.\r\n        /// </summary>\r\n        /// <param name=\"teamPostId\">The team post ID.</param>\r\n        /// <returns>An OK result.</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "teamPostId",
+                    "param_name": "teamPostId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var schoolId = User.Identity.GetSchoolId();\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n\r\n            try\r\n            {\r\n                // Unlike the post.\r\n                await _teamPostService.LikePostUndoAsync(teamPostId, schoolId, schoolIdsList, userId);\r\n                return Ok();\r\n            }\r\n            catch (InvalidOperationException ex)\r\n            {\r\n                return Content(HttpStatusCode.BadRequest, ex.Message);\r\n            }\r\n            catch (UnauthorizedAccessException ex)\r\n            {\r\n                return Content(HttpStatusCode.Forbidden, ex.Message);\r\n            }\r\n            catch (DbEntityValidationException ex)\r\n            {\r\n                Log.Error(ex, \"Error unliking the team post with the following ID: {0} by userId: {1}\", teamPostId, userId);\r\n                return BadRequest(\"Error trying to unlike a post\");\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error unliking the team post with the following ID: {0} by userId: {1}\", teamPostId, userId);\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a new team post asynchronously with the current user's information and return the post view model, handling various exceptions.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "teamPostId",
+                        "param_name": "teamPostId",
+                        "param_desc": "The ID of the team post that needs to be unliked. It is an integer value."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a new team post asynchronously with the current user's information and return the post view model, handling various exceptions.\n/// </summary>\n/// <param name=\"teamPostId\">The ID of the team post that needs to be unliked. It is an integer value.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "PinPostAsync",
+            "code_start_index": 8598,
+            "method_name": "PinPostAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Pins a team post.\r\n        /// </summary>\r\n        /// <param name=\"teamPostId\">The team post ID.</param>\r\n        /// <returns>An OK result.</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "teamPostId",
+                    "param_name": "teamPostId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var schoolId = User.Identity.GetSchoolId();\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n\r\n            try\r\n            {\r\n                // Pin the post.\r\n                await _teamPostService.PinPostAsync(teamPostId, schoolId, schoolIdsList, userId);\r\n                return Ok();\r\n            }\r\n            catch (InvalidOperationException ex)\r\n            {\r\n                return Content(HttpStatusCode.BadRequest, ex.Message);\r\n            }\r\n            catch (UnauthorizedAccessException ex)\r\n            {\r\n                return Content(HttpStatusCode.Forbidden, ex.Message);\r\n            }\r\n            catch (DbEntityValidationException ex)\r\n            {\r\n                Log.Error(ex, \"Error pinning the team post with the following ID: {0} by userId: {1}\", teamPostId, userId);\r\n                return BadRequest(\"Error trying to unlike a post\");\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error pinning the team post with the following ID: {0} by userId: {1}\", teamPostId, userId);\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Like a post asynchronously, handling various exceptions and returning the result.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "teamPostId",
+                        "param_name": "teamPostId",
+                        "param_desc": "The ID of the team post to be pinned. It should be an integer value."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Like a post asynchronously, handling various exceptions and returning the result.\n/// </summary>\n/// <param name=\"teamPostId\">The ID of the team post to be pinned. It should be an integer value.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "PinPostUndoAsync",
+            "code_start_index": 10163,
+            "method_name": "PinPostUndoAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Unpins a team post.\r\n        /// </summary>\r\n        /// <param name=\"teamPostId\">The team post ID.</param>\r\n        /// <returns>An OK result.</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "teamPostId",
+                    "param_name": "teamPostId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var schoolId = User.Identity.GetSchoolId();\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n\r\n            try\r\n            {\r\n                // Unpin the post.\r\n                await _teamPostService.PinPostUndoAsync(teamPostId, schoolId, schoolIdsList, userId);\r\n                return Ok();\r\n            }\r\n            catch (InvalidOperationException ex)\r\n            {\r\n                return Content(HttpStatusCode.BadRequest, ex.Message);\r\n            }\r\n            catch (UnauthorizedAccessException ex)\r\n            {\r\n                return Content(HttpStatusCode.Forbidden, ex.Message);\r\n            }\r\n            catch (DbEntityValidationException ex)\r\n            {\r\n                Log.Error(ex, \"Error unpinning the team post with the following ID: {0} by userId: {1}\", teamPostId, userId);\r\n                return BadRequest(\"Error trying to unlike a post\");\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error unpinning the team post with the following ID: {0} by userId: {1}\", teamPostId, userId);\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Undo the like action on a post made by the user, handling different exceptions and logging errors if necessary.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "teamPostId",
+                        "param_name": "teamPostId",
+                        "param_desc": "The ID of the post made by the team to undo the like action on."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Undo the like action on a post made by the user, handling different exceptions and logging errors if necessary.\n/// </summary>\n/// <param name=\"teamPostId\">The ID of the post made by the team to undo the like action on.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "DeletePostAsync",
+            "code_start_index": 11737,
+            "method_name": "DeletePostAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Deletes a team post.\r\n        /// </summary>\r\n        /// <param name=\"teamPostId\">The team post ID.</param>\r\n        /// <returns>An OK result.</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "teamPostId",
+                    "param_name": "teamPostId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var schoolId = User.Identity.GetSchoolId();\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n\r\n            try\r\n            {\r\n                // Delete the post.\r\n                await _teamPostService.DeleteTeamPostAsync(teamPostId, schoolId, schoolIdsList, userId);\r\n                return Ok();\r\n            }\r\n            catch (InvalidOperationException ex)\r\n            {\r\n                return Content(HttpStatusCode.BadRequest, ex.Message);\r\n            }\r\n            catch (UnauthorizedAccessException ex)\r\n            {\r\n                return Content(HttpStatusCode.Forbidden, ex.Message);\r\n            }\r\n            catch (DbEntityValidationException ex)\r\n            {\r\n                Log.Error(ex, \"Error deleting the team post with the following ID: {0} by userId: {1}\", teamPostId, userId);\r\n                return BadRequest(\"Error trying to delete a team post\");\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error deleting the team post with the following ID: {0} by userId: {1}\", teamPostId, userId);\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Pin a team post asynchronously with specific user and school information, handling different exceptions accordingly.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "teamPostId",
+                        "param_name": "teamPostId",
+                        "param_desc": "The ID of the team post that needs to be deleted."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Pin a team post asynchronously with specific user and school information, handling different exceptions accordingly.\n/// </summary>\n/// <param name=\"teamPostId\">The ID of the team post that needs to be deleted.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "HidePostToPropectsAsync",
+            "code_start_index": 13332,
+            "method_name": "HidePostToPropectsAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Hides the team post to prospects.\r\n        /// </summary>\r\n        /// <param name=\"teamPostId\">The team post ID.</param>\r\n        /// <returns>An OK result.</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "teamPostId",
+                    "param_name": "teamPostId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var schoolId = User.Identity.GetSchoolId();\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n\r\n            try\r\n            {\r\n                // Hide the post to prospects.\r\n                await _teamPostService.HideToPropectsAsync(teamPostId, schoolId, schoolIdsList, userId, hideToProspects: true);\r\n                return Ok();\r\n            }\r\n            catch (InvalidOperationException ex)\r\n            {\r\n                return Content(HttpStatusCode.BadRequest, ex.Message);\r\n            }\r\n            catch (UnauthorizedAccessException ex)\r\n            {\r\n                return Content(HttpStatusCode.Forbidden, ex.Message);\r\n            }\r\n            catch (DbEntityValidationException ex)\r\n            {\r\n                Log.Error(ex, \"Error setting the htp of the post with the id {0} by the user {1}\", teamPostId, userId);\r\n                return BadRequest(\"Error trying to unlike a post\");\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error setting the htp of the post with the id {0} by the user {1}\", teamPostId, userId);\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Undo the pinning of a post by a user, handling various exceptions that may occur during the process.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "teamPostId",
+                        "param_name": "teamPostId",
+                        "param_desc": "The unique identifier of the post within the team. It is of type integer."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Undo the pinning of a post by a user, handling various exceptions that may occur during the process.\n/// </summary>\n/// <param name=\"teamPostId\">The unique identifier of the post within the team. It is of type integer.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "HidePostToPropectsUndoAsync",
+            "code_start_index": 14958,
+            "method_name": "HidePostToPropectsUndoAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Shows the team post to prospects.\r\n        /// </summary>\r\n        /// <param name=\"teamPostId\">The team post ID.</param>\r\n        /// <returns>An OK result.</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "teamPostId",
+                    "param_name": "teamPostId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var schoolId = User.Identity.GetSchoolId();\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n\r\n            try\r\n            {\r\n                // Show the post to prospects.\r\n                await _teamPostService.HideToPropectsAsync(teamPostId, schoolId, schoolIdsList, userId, hideToProspects: false);\r\n                return Ok();\r\n            }\r\n            catch (InvalidOperationException ex)\r\n            {\r\n                return Content(HttpStatusCode.BadRequest, ex.Message);\r\n            }\r\n            catch (UnauthorizedAccessException ex)\r\n            {\r\n                return Content(HttpStatusCode.Forbidden, ex.Message);\r\n            }\r\n            catch (DbEntityValidationException ex)\r\n            {\r\n                Log.Error(ex, \"Error unsetting the htp of the post with the id {0} by the user {1}\", teamPostId, userId);\r\n                return BadRequest(\"Error trying to unlike a post\");\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error unsetting the htp of the post with the id {0} by the user {1}\", teamPostId, userId);\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Delete a post asynchronously, handling different exceptions and returning appropriate responses based on the outcome.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "teamPostId",
+                        "param_name": "teamPostId",
+                        "param_desc": "The unique identifier of the post belonging to a team that needs to be deleted."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Delete a post asynchronously, handling different exceptions and returning appropriate responses based on the outcome.\n/// </summary>\n/// <param name=\"teamPostId\">The unique identifier of the post belonging to a team that needs to be deleted.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "PostCommentAsync",
+            "code_start_index": 16743,
+            "method_name": "PostCommentAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Posts a new team comment on the given team post.\r\n        /// </summary>\r\n        /// <param name=\"teamPostId\">The team post ID.</param>\r\n        /// <param name=\"newMessage\">The comment content.</param>\r\n        /// <returns>A comment viewmodel.</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "teamPostId",
+                    "param_name": "teamPostId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "newMessage",
+                    "param_name": "newMessage",
+                    "param_type": "NewsfeedNewCommentV3ViewModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            // Model state validation.\r\n            if (string.IsNullOrWhiteSpace(newMessage.CommentText))\r\n            {\r\n                ModelState.AddModelError(\"comment\", \"Votre commentaire ne peut pas \u00eatre vide\");\r\n            }\r\n\r\n            if (!ModelState.IsValid)\r\n            {\r\n                return BadRequest(ModelState);\r\n            }\r\n\r\n            if (newMessage.File != null && newMessage.Files == null)\r\n            {\r\n                newMessage.Files = new List<string>\r\n                    {\r\n                        newMessage.File\r\n                    };\r\n            }\r\n            if (newMessage.Files == null)\r\n            {\r\n                newMessage.Files = new List<string>();\r\n            }\r\n\r\n            if (newMessage.Files != null && newMessage.Files.Count > 1)\r\n            {\r\n                ModelState.AddModelError(\"comment\", \"La limite du nombre de fichiers d\u00e9pos\u00e9s pour un commentaire a \u00e9t\u00e9 d\u00e9pass\u00e9\");\r\n                return BadRequest(ModelState);\r\n            }\r\n\r\n            var userId = User.Identity.GetUserId();\r\n            var schoolId = User.Identity.GetSchoolId();\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n            var currentUser = User.Identity.GetUser();\r\n\r\n            try\r\n            {\r\n                // Add the comment.\r\n                var teamCommentVm = await _teamCommentService.CreateNewTeamPostCommentAsync(\r\n                    teamPostId, schoolId, schoolIdsList, userId, currentUser.Email, newMessage.CommentText, newMessage.Files);\r\n\r\n                return Ok(teamCommentVm);\r\n            }\r\n            catch (InvalidOperationException ex)\r\n            {\r\n                return Content(HttpStatusCode.BadRequest, ex.Message);\r\n            }\r\n            catch (UnauthorizedAccessException ex)\r\n            {\r\n                return Content(HttpStatusCode.Forbidden, ex.Message);\r\n            }\r\n            catch (DbEntityValidationException ex)\r\n            {\r\n                Log.Error(ex, \"Error posting a new comment\");\r\n                return BadRequest(\"Error posting a new comment\");\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error posting a new comment\");\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Hide a post from prospects asynchronously, handling various exceptions and logging errors if needed.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "teamPostId",
+                        "param_name": "teamPostId",
+                        "param_desc": "The ID of the team post to which the new comment will be added."
+                    },
+                    {
+                        "name": "newMessage",
+                        "param_name": "newMessage",
+                        "param_desc": "The view model containing the new comment to be posted on the newsfeed."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Hide a post from prospects asynchronously, handling various exceptions and logging errors if needed.\n/// </summary>\n/// <param name=\"teamPostId\">The ID of the team post to which the new comment will be added.</param>\n/// <param name=\"newMessage\">The view model containing the new comment to be posted on the newsfeed.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "LikeCommentAsync",
+            "code_start_index": 19519,
+            "method_name": "LikeCommentAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Likes a team comment.\r\n        /// </summary>\r\n        /// <param name=\"teamCommentId\">The team comment ID.</param>\r\n        /// <returns>A user viewmodel.</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "teamCommentId",
+                    "param_name": "teamCommentId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var schoolId = User.Identity.GetSchoolId();\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n\r\n            try\r\n            {\r\n                // Like the comment.\r\n                var userViewModel = await _teamCommentService.LikeTeamCommentAsync(teamCommentId, schoolId, schoolIdsList, userId);\r\n                return Ok(userViewModel);\r\n            }\r\n            catch (InvalidOperationException ex)\r\n            {\r\n                return Content(HttpStatusCode.BadRequest, ex.Message);\r\n            }\r\n            catch (UnauthorizedAccessException ex)\r\n            {\r\n                return Content(HttpStatusCode.Forbidden, ex.Message);\r\n            }\r\n            catch (DbEntityValidationException ex)\r\n            {\r\n                Log.Error(ex, \"Error trying to like the team comment with the following ID: {0} by userId: {1}\", teamCommentId, userId);\r\n                return BadRequest(\"Error trying to unlike a post\");\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error trying to like the team comment with the following ID: {0} by userId: {1}\", teamCommentId, userId);\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Undo the action of hiding a post to prospects, showing it again, with error handling for various exceptions.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "teamCommentId",
+                        "param_name": "teamCommentId",
+                        "param_desc": "The ID of the team comment that needs to be liked. It should be an integer value."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Undo the action of hiding a post to prospects, showing it again, with error handling for various exceptions.\n/// </summary>\n/// <param name=\"teamCommentId\">The ID of the team comment that needs to be liked. It should be an integer value.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "LikeCommentUndoAsync",
+            "code_start_index": 21185,
+            "method_name": "LikeCommentUndoAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Unlikes a team comment.\r\n        /// </summary>\r\n        /// <param name=\"teamCommentId\">The team comment ID.</param>\r\n        /// <returns>An OK result.</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "teamCommentId",
+                    "param_name": "teamCommentId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var schoolId = User.Identity.GetSchoolId();\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n\r\n            try\r\n            {\r\n                // Like the comment.\r\n                await _teamCommentService.LikeTeamCommentUndoAsync(teamCommentId, schoolId, schoolIdsList, userId);\r\n                return Ok();\r\n            }\r\n            catch (InvalidOperationException ex)\r\n            {\r\n                return Content(HttpStatusCode.BadRequest, ex.Message);\r\n            }\r\n            catch (UnauthorizedAccessException ex)\r\n            {\r\n                return Content(HttpStatusCode.Forbidden, ex.Message);\r\n            }\r\n            catch (DbEntityValidationException ex)\r\n            {\r\n                Log.Error(ex, \"Error trying to unlike the team comment with the following ID: {0} by userId: {1}\", teamCommentId, userId);\r\n                return BadRequest(\"Error trying to unlike a post\");\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error trying to unlike the team comment with the following ID: {0} by userId: {1}\", teamCommentId, userId);\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a new team post comment asynchronously with validations and error handling.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "teamCommentId",
+                        "param_name": "teamCommentId",
+                        "param_desc": "The id of the team comment to be unliked."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a new team post comment asynchronously with validations and error handling.\n/// </summary>\n/// <param name=\"teamCommentId\">The id of the team comment to be unliked.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "DeleteCommentAsync",
+            "code_start_index": 22823,
+            "method_name": "DeleteCommentAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Deletes a team comment.\r\n        /// </summary>\r\n        /// <param name=\"teamCommentId\">The team comment ID.</param>\r\n        /// <returns>An OK result.</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "teamCommentId",
+                    "param_name": "teamCommentId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var schoolId = User.Identity.GetSchoolId();\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n\r\n            try\r\n            {\r\n                // Delete the team comment.\r\n                await _teamCommentService.DeleteTeamCommentAsync(teamCommentId, schoolId, schoolIdsList, userId);\r\n                return Ok();\r\n            }\r\n            catch (InvalidOperationException ex)\r\n            {\r\n                return Content(HttpStatusCode.BadRequest, ex.Message);\r\n            }\r\n            catch (UnauthorizedAccessException ex)\r\n            {\r\n                return Content(HttpStatusCode.Forbidden, ex.Message);\r\n            }\r\n            catch (DbEntityValidationException ex)\r\n            {\r\n                Log.Error(ex, \"Error deleting the team comment with the following ID: {0} by userId: {1}\", teamCommentId, userId);\r\n                return BadRequest(\"Error trying to delete a team comment\");\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error deleting the team post with the following ID: {0} by userId: {1}\", teamCommentId, userId);\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Like a team comment asynchronously, handling various exceptions and returning the result or error message accordingly.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "teamCommentId",
+                        "param_name": "teamCommentId",
+                        "param_desc": "The ID of the team comment that needs to be deleted."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Like a team comment asynchronously, handling various exceptions and returning the result or error message accordingly.\n/// </summary>\n/// <param name=\"teamCommentId\">The ID of the team comment that needs to be deleted.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "TeamNewsfeedV5Controller"
+}

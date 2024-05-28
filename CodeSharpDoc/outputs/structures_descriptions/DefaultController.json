@@ -1,0 +1,211 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/v1/DefaultController.cs",
+    "index_shift_code": 430,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V1",
+    "usings": [
+        "LMS.Authentication",
+        "LMS.Configuration",
+        "LMS.Data",
+        "LMS.Models.ViewModels.V1",
+        "LMS.Services.Interfaces",
+        "LMS.Utils.Cache",
+        "Serilog",
+        "System",
+        "System.Linq",
+        "System.Runtime.Caching",
+        "System.Web",
+        "System.Web.Http",
+        "System.Web.Http.Description"
+    ],
+    "access_modifier": "public",
+    "struct_name": "DefaultController",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "Index",
+            "code_start_index": 1170,
+            "method_name": "Index",
+            "existing_summary": "\r\n        /// <summary>\r\n        ///     A default action to return a nice message instead of that ugly 404\r\n        /// </summary>\r\n        /// <returns>status and a message</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var currentSchoolCode = _config.GetSchoolCode();\r\n\r\n            if (string.IsNullOrEmpty(currentSchoolCode))\r\n            {\r\n                Log.Error(\"Current school code was not found: {0}\", currentSchoolCode);\r\n                return BadRequest(\"Current school code was not found\");\r\n            }\r\n\r\n            var currentSchool = DataCache.GetSchools(_db).FirstOrDefault(e => e.Code == currentSchoolCode);\r\n\r\n            if (currentSchool == null)\r\n            {\r\n                Log.Error(\"Current school was not found: {0}\", currentSchoolCode);\r\n                return BadRequest(\"Current school was not found\");\r\n            }\r\n\r\n            var dnsConfig = _dnsConfig.GetDnsConfig();\r\n\r\n            return Ok(new VersionInfoViewModel\r\n            {\r\n                Android = dnsConfig.AndroidAppVersion,\r\n                Ios = dnsConfig.IosAppVersion,\r\n                Api = GetAssemblyVersion(),\r\n                Updated = DateTime.UtcNow,\r\n                UpdatedServerHour = DateTime.Now,\r\n            });\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the version information for the current school's Android and iOS apps, API, and server update time. If the current school code is not found, return an error message.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "parameters",
+                        "param_name": "parameters",
+                        "param_desc": "The list of parameters for the method. In this case, there are no parameters."
+                    },
+                    {
+                        "name": "method_name",
+                        "param_name": "method_name",
+                        "param_desc": "The name of the method. In this case, the method name is 'Index'."
+                    },
+                    {
+                        "name": "method_purpose",
+                        "param_name": "method_purpose",
+                        "param_desc": "The purpose of the method. In this case, the purpose is to retrieve the version information for the current school's Android and iOS apps, API, and server update time. If the current school code is not found, an error message is returned."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the version information for the current school's Android and iOS apps, API, and server update time. If the current school code is not found, return an error message.\n/// </summary>\n/// <param name=\"parameters\">The list of parameters for the method. In this case, there are no parameters.</param>\n/// <param name=\"method_name\">The name of the method. In this case, the method name is 'Index'.</param>\n/// <param name=\"method_purpose\">The purpose of the method. In this case, the purpose is to retrieve the version information for the current school's Android and iOS apps, API, and server update time. If the current school code is not found, an error message is returned.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "WipeAllCachedItems",
+            "code_start_index": 2622,
+            "method_name": "WipeAllCachedItems",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Wipe out all API's cached items from both HttpRuntime cache and Memory cache\r\n        /// </summary>\r\n        /// <returns>the remaining count of not deleted cached items in both caches (should be zero if wipe fully succeed))</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            Log.Warning(\"Called Wipe\");\r\n\r\n            // Remove all keys from the HttpRuntime cache\r\n            foreach (System.Collections.DictionaryEntry entry in HttpRuntime.Cache)\r\n            {\r\n                HttpRuntime.Cache.Remove((string)entry.Key);\r\n            }\r\n\r\n            ObjectCache cache = MemoryCache.Default;\r\n            var cacheKeys = cache.Select(ck => ck.Key).ToList(); // to list to avoid enumeration modification while iterating in foreach\r\n\r\n            // Remove all keys from the memory cache\r\n            foreach (var key in cacheKeys)\r\n            {\r\n                cache.Remove(key);\r\n            }\r\n\r\n            // Count remaining items in both cache systems\r\n            var wipedCacheEntryCount = HttpRuntime.Cache.Count + cache.Count();\r\n            return Ok(wipedCacheEntryCount);\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Clear all cached items from both the HttpRuntime cache and memory cache systems, and return the total number of wiped cache entries.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters - This method does not accept any parameters."
+                    },
+                    {
+                        "name": "method",
+                        "param_name": "method",
+                        "param_desc": "WipeAllCachedItems - The existing method named 'WipeAllCachedItems' is used for clearing all cached items from both the HttpRuntime cache and memory cache systems."
+                    },
+                    {
+                        "name": "purpose",
+                        "param_name": "purpose",
+                        "param_desc": "Clear all cached items from both the HttpRuntime cache and memory cache systems, and return the total number of wiped cache entries. - This method's purpose is to clear all cached items and provide the count of wiped cache entries."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Clear all cached items from both the HttpRuntime cache and memory cache systems, and return the total number of wiped cache entries.\n/// </summary>\n/// <param name=\"no\">no parameters - This method does not accept any parameters.</param>\n/// <param name=\"method\">WipeAllCachedItems - The existing method named 'WipeAllCachedItems' is used for clearing all cached items from both the HttpRuntime cache and memory cache systems.</param>\n/// <param name=\"purpose\">Clear all cached items from both the HttpRuntime cache and memory cache systems, and return the total number of wiped cache entries. - This method's purpose is to clear all cached items and provide the count of wiped cache entries.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "EmptyCache",
+            "code_start_index": 3604,
+            "method_name": "EmptyCache",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "key",
+                    "param_name": "key",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            Log.Warning($\"Called Wipe with key: {key}\");\r\n\r\n            HttpRuntime.Cache.Remove(key);\r\n\r\n            return Ok();\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Clear the cache entry with the specified key.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "string",
+                        "param_name": "string",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "key",
+                        "param_name": "key",
+                        "param_desc": "The generated description for the parameter"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Clear the cache entry with the specified key.\n/// </summary>\n/// <param name=\"string\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"key\">The generated description for the parameter</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetAssemblyVersion",
+            "code_start_index": 3829,
+            "method_name": "GetAssemblyVersion",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            return System.Reflection.Assembly.GetExecutingAssembly()\r\n                         .GetName()\r\n                         .Version\r\n                         .ToString();\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the version number of the executing assembly.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "methodName",
+                        "param_name": "methodName",
+                        "param_desc": "The name of the method ('GetAssemblyVersion') for which the version number is to be retrieved."
+                    },
+                    {
+                        "name": "methodPurpose",
+                        "param_name": "methodPurpose",
+                        "param_desc": "The purpose of the method ('Retrieve the version number of the executing assembly.')."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the version number of the executing assembly.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"methodName\">The name of the method ('GetAssemblyVersion') for which the version number is to be retrieved.</param>\n/// <param name=\"methodPurpose\">The purpose of the method ('Retrieve the version number of the executing assembly.').</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "DefaultController"
+}

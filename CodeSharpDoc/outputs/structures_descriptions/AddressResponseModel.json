@@ -1,0 +1,65 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Studi.Api.Lms.User/ResponseModel/AddressResponseModel.cs",
+    "index_shift_code": 47,
+    "struct_type": "Class",
+    "namespace_name": "",
+    "usings": [],
+    "access_modifier": "public",
+    "struct_name": "AddressResponseModel",
+    "base_class_name": "",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [],
+    "properties": [
+        {
+            "name": "StreetNumber",
+            "prop_name": "StreetNumber",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "StreetType",
+            "prop_name": "StreetType",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "StreetName",
+            "prop_name": "StreetName",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "Complement",
+            "prop_name": "Complement",
+            "prop_type": "string?",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "PostCode",
+            "prop_name": "PostCode",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "City",
+            "prop_name": "City",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "Country",
+            "prop_name": "Country",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        }
+    ],
+    "name": "AddressResponseModel"
+}

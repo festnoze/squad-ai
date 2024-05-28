@@ -1,0 +1,277 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Common/Office365Controller.cs",
+    "index_shift_code": 6929,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.Common",
+    "usings": [
+        "LMS.Authentication",
+        "LMS.Configuration",
+        "LMS.Data",
+        "LMS.Utils",
+        "Microsoft.IdentityModel.Clients.ActiveDirectory",
+        "Newtonsoft.Json",
+        "System",
+        "System.Collections.Generic",
+        "System.Data.Entity",
+        "System.Linq",
+        "System.Net",
+        "System.Net.Http",
+        "System.Text",
+        "System.Text.RegularExpressions",
+        "System.Threading.Tasks",
+        "System.Web.Http",
+        "LMS.Attributes",
+        "LMS.Utils.Cache",
+        "Serilog",
+        "System.Web",
+        "LMS.Services.Interfaces"
+    ],
+    "access_modifier": "",
+    "struct_name": "MsGraphClient",
+    "base_class_name": "",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "CreateUserAsync",
+            "code_start_index": 8245,
+            "method_name": "CreateUserAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "organisme",
+                    "param_name": "organisme",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "firstName",
+                    "param_name": "firstName",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "lastName",
+                    "param_name": "lastName",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "mailNickname",
+                    "param_name": "mailNickname",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "password",
+                    "param_name": "password",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "usageLocation",
+                    "param_name": "usageLocation",
+                    "param_type": "string",
+                    "has_default_value": true,
+                    "default_value": "\"FR\"",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "forcePasswordChange",
+                    "param_name": "forcePasswordChange",
+                    "param_type": "bool",
+                    "has_default_value": true,
+                    "default_value": "true",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            if (string.IsNullOrWhiteSpace(organisme))\r\n            {\r\n                throw new ArgumentException(nameof(organisme));\r\n            }\r\n\r\n            if (_token == null)\r\n            {\r\n                this._token = await GetTokenAsync();\r\n                _httpClient.DefaultRequestHeaders.Add(\"Authorization\", \"Bearer \" + _token);\r\n            }\r\n\r\n            var user = new AzureAdUser\r\n                       {\r\n                           AccountEnabled = true,\r\n                           DisplayName = $\"{firstName} {lastName}\",\r\n                           JobTitle = \"Student\",\r\n                           GivenName = firstName, \r\n                           Surname = lastName,\r\n                           MailNickname = mailNickname,\r\n                           UserPrincipalName = $\"{organisme}{userId}@{_hostname}\",\r\n                           UsageLocation = usageLocation,\r\n                           PasswordProfile = new PasswordProfile\r\n                                             {\r\n                                                 ForceChangePasswordNextSignIn = forcePasswordChange,\r\n                                                 Password = password\r\n                                             },\r\n                       };\r\n\r\n            var stringContent = JsonConvert.SerializeObject(user);\r\n            var httpContent = new StringContent(stringContent, Encoding.GetEncoding(\"utf-8\"), \"application/json\");\r\n\r\n            var response = await _httpClient.PostAsync(\"https://graph.microsoft.com/v1.0/users\", httpContent);\r\n\r\n            response.EnsureSuccessStatusCode();\r\n\r\n            AzureAdUser responseUser = Helpers.DeserializeJsonFromStream<AzureAdUser>(await response.Content.ReadAsStreamAsync());\r\n            return responseUser;\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a new user in Azure Active Directory with the specified information.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The unique identifier for the user."
+                    },
+                    {
+                        "name": "organisme",
+                        "param_name": "organisme",
+                        "param_desc": "The organization to which the user belongs."
+                    },
+                    {
+                        "name": "firstName",
+                        "param_name": "firstName",
+                        "param_desc": "The first name of the user."
+                    },
+                    {
+                        "name": "lastName",
+                        "param_name": "lastName",
+                        "param_desc": "The last name of the user."
+                    },
+                    {
+                        "name": "mailNickname",
+                        "param_name": "mailNickname",
+                        "param_desc": "The mail nickname of the user."
+                    },
+                    {
+                        "name": "password",
+                        "param_name": "password",
+                        "param_desc": "The password for the user account."
+                    },
+                    {
+                        "name": "usageLocation",
+                        "param_name": "usageLocation",
+                        "param_desc": "The usage location for the user. Default value is 'FR'."
+                    },
+                    {
+                        "name": "forcePasswordChange",
+                        "param_name": "forcePasswordChange",
+                        "param_desc": "Indicates whether the user is forced to change the password at first login. Default value is 'true'."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a new user in Azure Active Directory with the specified information.\n/// </summary>\n/// <param name=\"userId\">The unique identifier for the user.</param>\n/// <param name=\"organisme\">The organization to which the user belongs.</param>\n/// <param name=\"firstName\">The first name of the user.</param>\n/// <param name=\"lastName\">The last name of the user.</param>\n/// <param name=\"mailNickname\">The mail nickname of the user.</param>\n/// <param name=\"password\">The password for the user account.</param>\n/// <param name=\"usageLocation\">The usage location for the user. Default value is 'FR'.</param>\n/// <param name=\"forcePasswordChange\">Indicates whether the user is forced to change the password at first login. Default value is 'true'.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "AssignLicense",
+            "code_start_index": 10377,
+            "method_name": "AssignLicense",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "Guid",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "license",
+                    "param_name": "license",
+                    "param_type": "Guid",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            if (_token == null)\r\n            {\r\n                _token = await GetTokenAsync();\r\n                _httpClient.DefaultRequestHeaders.Add(\"Authorization\", \"Bearer \" + _token);\r\n            }\r\n\r\n            var addedLicense = new AssignLicense\r\n                               {\r\n                                   AddLicenses = new List<AssignedLicense>(1)\r\n                                                 {\r\n                                                     new AssignedLicense\r\n                                                     {\r\n                                                         DisabledPlans = new List<Guid>(0),\r\n                                                         SkuId = license\r\n                                                     }\r\n                                                 },\r\n                                   RemoveLicenses = new List<Guid>(0)\r\n                               };\r\n\r\n            var stringContent = JsonConvert.SerializeObject(addedLicense);\r\n            var httpContent = new StringContent(stringContent, Encoding.GetEncoding(\"utf-8\"), \"application/json\");\r\n\r\n            var response = await _httpClient.PostAsync($\"https://graph.microsoft.com/v1.0/users/{userId}/assignLicense\", httpContent);\r\n\r\n            response.EnsureSuccessStatusCode();\r\n\r\n            return response.IsSuccessStatusCode;\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Assign a license to a specified user by sending a request to the Microsoft Graph API with the provided license ID.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "Guid userId - The unique identifier of the user to whom the license will be assigned."
+                    },
+                    {
+                        "name": "license",
+                        "param_name": "license",
+                        "param_desc": "Guid license - The unique identifier of the license that will be assigned to the specified user."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Assign a license to a specified user by sending a request to the Microsoft Graph API with the provided license ID.\n/// </summary>\n/// <param name=\"userId\">Guid userId - The unique identifier of the user to whom the license will be assigned.</param>\n/// <param name=\"license\">Guid license - The unique identifier of the license that will be assigned to the specified user.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetTokenAsync",
+            "code_start_index": 11845,
+            "method_name": "GetTokenAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            AuthenticationContext ctx = new AuthenticationContext(_authority);\r\n            var authenticationResult = await ctx.AcquireTokenAsync(\"https://graph.microsoft.com\", new ClientCredential(_clientId, _clientSecret));\r\n            return authenticationResult.AccessToken;\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve an access token for Microsoft Graph API authentication asynchronously.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "method",
+                        "param_name": "method",
+                        "param_desc": "Retrieve an access token for Microsoft Graph API authentication asynchronously."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve an access token for Microsoft Graph API authentication asynchronously.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"method\">Retrieve an access token for Microsoft Graph API authentication asynchronously.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "MsGraphClient"
+}

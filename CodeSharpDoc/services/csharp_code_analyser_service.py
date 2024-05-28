@@ -26,6 +26,37 @@ class CSharpCodeStructureAnalyser:
         txt.stop_spinner_replace_text(f"{len(paths_and_codes)} files were parsed successfully. Found {len(paths_and_codes)} files containing structures (like class, interface, record, enum ...)")
         return all_parsed_structs
     
+    def get_structures_from_code_file(file_path: str, code: str) -> list[StructureDesc]:
+        found_struct_separators, separator_indexes, splitted_struct_contents = CSharpCodeStructureAnalyser.split_by_class_interface_enum_definition(code)
+        
+        if len(found_struct_separators) == 0 or len(splitted_struct_contents) < 2:
+            return None
+        
+        first_chunk_has_usings = 'using' in splitted_struct_contents[0]
+        first_chunk_has_namespace = 'namespace' in splitted_struct_contents[0]
+        access_modifier = found_struct_separators[-1].split()[0]
+        struct_type: str = found_struct_separators[-1].split()[-1]
+
+        namespace_name = ''
+        usings = []
+        if first_chunk_has_namespace:
+            namespace_name = re.search(r'namespace\s+([\w.]+)[\s;]*', splitted_struct_contents[0]).group(1)
+        if first_chunk_has_usings:
+            usings = re.findall(r'using\s+([\w.]+)[\s;]*', splitted_struct_contents[0]) 
+
+        # Handle files with multiple class/interface/enum definitions (can happened, especially in transfert objects files)
+        structs_descs: list[StructureDesc] = []
+        for i in range(len(found_struct_separators)):
+            if struct_type == 'class':
+                struct_desc = CSharpCodeStructureAnalyser.class_extract_methods_and_props(file_path, separator_indexes[i], namespace_name, usings, access_modifier, splitted_struct_contents[i+1])
+            elif struct_type == 'interface':
+                struct_desc = CSharpCodeStructureAnalyser.interface_extract_methods_and_props(file_path, separator_indexes[i], namespace_name, usings, access_modifier, splitted_struct_contents[i+1])
+            elif struct_type == 'enum':
+                return None
+            structs_descs.append(struct_desc)
+
+        return structs_descs
+
     @staticmethod
     def get_structures_from_code_file(file_path: str, code: str, chunk_size:int = 8000, chunk_overlap: int = 0) -> list[StructureDesc]:
         found_struct_separators, separator_indexes, splitted_struct_contents = CSharpCodeStructureAnalyser.split_by_class_interface_enum_definition(code)
@@ -207,7 +238,7 @@ class CSharpCodeStructureAnalyser:
     def has_interfaces(first_line: str) -> bool:
         return ':' in first_line
         
-    def get_prompt_for_interface_parsing(code: str):      
+    def get_prompt_for_interface_parsing(code: str):
         prompt = txt.single_line(f"""\
             Hereinafter is the c# code of an interface. The aim is to extract the methods and properties from it:
             {code}.""")        

@@ -1,0 +1,366 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Common/ScholarvoxController.cs",
+    "index_shift_code": 524,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.Common",
+    "usings": [
+        "LMS.Authentication",
+        "LMS.Data",
+        "LMS.Configuration",
+        "Newtonsoft.Json",
+        "Serilog",
+        "System",
+        "System.Data.Entity",
+        "System.Linq",
+        "System.IO",
+        "System.Net.Http",
+        "System.Security.Cryptography",
+        "System.Text",
+        "System.Threading.Tasks",
+        "System.Web",
+        "System.Web.Http",
+        "System.Web.Http.Description",
+        "LMS.Services.Interfaces"
+    ],
+    "access_modifier": "public",
+    "struct_name": "ScholarvoxController",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetRessourceLinkAsync",
+            "code_start_index": 2295,
+            "method_name": "GetRessourceLinkAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Get the link for a ressource on Scholarvox\r\n        /// </summary>\r\n        /// <param name=\"docid\">(Optional) document id</param>\r\n        /// <param name=\"page\">(Optional) page number (if used then docid must be specified)</param>\r\n        /// <param name=\"folderid\">(Optional) folder id</param>\r\n        /// <param name=\"redirect\">(Optional) redirect to a specific page on the scholarvox plateforum</param>\r\n        /// <returns>URL if successful</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "docid",
+                    "param_name": "docid",
+                    "param_type": "string",
+                    "has_default_value": true,
+                    "default_value": "\"\"",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "page",
+                    "param_name": "page",
+                    "param_type": "string",
+                    "has_default_value": true,
+                    "default_value": "\"\"",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "folderid",
+                    "param_name": "folderid",
+                    "param_type": "string",
+                    "has_default_value": true,
+                    "default_value": "\"\"",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "redirect",
+                    "param_name": "redirect",
+                    "param_type": "string",
+                    "has_default_value": true,
+                    "default_value": "\"\"",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var user = User.Identity.GetUser();\r\n\r\n            var timestamp = DateTimeOffset.Now.ToUnixTimeSeconds().ToString();\r\n            var signature = SignData(user.ContactUnique + timestamp);\r\n\r\n            var url = _scholarvoxUrl + $\"?token={HttpUtility.UrlEncode(signature)}&clientid={user.ContactUnique.ToString().ToLower()}&ts={timestamp}&lname={HttpUtility.UrlEncode(user.Nom)}&fname={HttpUtility.UrlEncode(user.Prenom)}&email={HttpUtility.UrlEncode(user.Email)}\";\r\n\r\n            if (!string.IsNullOrWhiteSpace(docid))\r\n            {\r\n                url += $\"&docid={docid}\";\r\n                if (!string.IsNullOrWhiteSpace(page))\r\n                {\r\n                    url += $\"&page={page}\";\r\n                }\r\n            }\r\n            else if (!string.IsNullOrWhiteSpace(folderid))\r\n            {\r\n                url += $\"&folderid={folderid}\";\r\n            }\r\n            else if (!string.IsNullOrWhiteSpace(redirect))\r\n            {\r\n                url += $\"redirect={redirect}\";\r\n            }\r\n\r\n            try\r\n            {\r\n                using (var client = new HttpClient())\r\n                using (var stream = await client.GetStreamAsync(url))\r\n                using (var streamReader = new StreamReader(stream))\r\n                using (var jsonReader = new JsonTextReader(streamReader))\r\n                {\r\n                    JsonSerializer serializer = new JsonSerializer();\r\n                    ScholarvoxResponse response = serializer.Deserialize<ScholarvoxResponse>(jsonReader);\r\n                    if (response.Success == \"1\")\r\n                    {\r\n                        // Report service\r\n                        var userId = User.Identity.GetUserId();\r\n                        var schoolId = User.Identity.GetSchoolId();\r\n\r\n                        await _serviceAccessService.ReportServiceAccess(userId, schoolId, ServiceCode);\r\n\r\n                        return Ok(response.Url);\r\n                    }\r\n                    else\r\n                    {\r\n                        Log.Error(\"Error getting the ressource url from scholarvox: {0}\", response.Message);\r\n                        return InternalServerError();\r\n                    }\r\n                }\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error getting the ressource url from scholarvox.\");\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve a resource link from Scholarvox API, using user authentication and parameters if specified, and return the URL if successful or log an error if not.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "docid",
+                        "param_name": "docid",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "page",
+                        "param_name": "page",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "folderid",
+                        "param_name": "folderid",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "redirect",
+                        "param_name": "redirect",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve a resource link from Scholarvox API, using user authentication and parameters if specified, and return the URL if successful or log an error if not.\n/// </summary>\n/// <param name=\"docid\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"page\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"folderid\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"redirect\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "CheckAuthAsync",
+            "code_start_index": 5434,
+            "method_name": "CheckAuthAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Allows Scholarvox to check the auth request\r\n        /// </summary>\r\n        /// <param name=\"token\"></param>\r\n        /// <param name=\"clientId\"></param>\r\n        /// <param name=\"timeStamp\"></param>\r\n        /// <param name=\"lastName\"></param>\r\n        /// <param name=\"firstName\"></param>\r\n        /// <param name=\"email\"></param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "token",
+                    "param_name": "token",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "clientId",
+                    "param_name": "clientId",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "timeStamp",
+                    "param_name": "timeStamp",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "lastName",
+                    "param_name": "lastName",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "firstName",
+                    "param_name": "firstName",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "email",
+                    "param_name": "email",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            //recalc signature??\r\n            Log.Information(\"Called: {0}, {1}, {2}, {3}, {4}, {5}\", token, clientId, timeStamp, lastName, firstName, email);\r\n            Log.Information(\"Scholarvox keys: Key 1 {0}, Key 2: {1}\", _scholarvoxKey1, _scholarvoxKey2);\r\n\r\n            if (string.IsNullOrWhiteSpace(firstName) || string.IsNullOrWhiteSpace(lastName) || string.IsNullOrWhiteSpace(email))\r\n            {\r\n                Log.Error(\"Scholarvox: One of the required parameters is null or whitespace\");\r\n                return Ok(new\r\n                          {\r\n                              success = \"0\",\r\n                              message = \"User info cannot be empty\"\r\n                          });\r\n            }\r\n\r\n            string signature = SignData(clientId + timeStamp);\r\n            if (signature != token)\r\n            {\r\n                Log.Error(\"Scholarvox: The calculated signature {0} does not match the provided token {1}\", signature, token);\r\n                return Ok(new\r\n                          {\r\n                              success = \"0\",\r\n                              message = \"signatures don't match\"\r\n                          });\r\n            }\r\n\r\n            try\r\n            {\r\n                Guid contactGuid = Guid.Parse(clientId);\r\n                var userExists = await _db.Users.AsNoTracking().AnyAsync(u => u.ContactUnique == contactGuid && u.Email == email);\r\n                if (!userExists)\r\n                {\r\n                    Log.Warning(\"Scholarvox: User was not found\");\r\n                    return Ok(new\r\n                              {\r\n                                  success = \"0\",\r\n                                  message = \"user does not exist\"\r\n                              });\r\n                }\r\n            }\r\n            catch (FormatException e)\r\n            {\r\n                Log.Error(e, \"Scholarvox: Error parsing the guid\");\r\n                return InternalServerError();\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Scholarvox: Error\");\r\n                return InternalServerError();\r\n            }\r\n\r\n            return Ok(new {success = \"1\"});\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Check the authentication for a user based on provided parameters and return success or failure status.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "token",
+                        "param_name": "token",
+                        "param_desc": "The token used for authentication."
+                    },
+                    {
+                        "name": "clientId",
+                        "param_name": "clientId",
+                        "param_desc": "The client ID of the user."
+                    },
+                    {
+                        "name": "timeStamp",
+                        "param_name": "timeStamp",
+                        "param_desc": "The timestamp of the authentication request."
+                    },
+                    {
+                        "name": "lastName",
+                        "param_name": "lastName",
+                        "param_desc": "The last name of the user."
+                    },
+                    {
+                        "name": "firstName",
+                        "param_name": "firstName",
+                        "param_desc": "The first name of the user."
+                    },
+                    {
+                        "name": "email",
+                        "param_name": "email",
+                        "param_desc": "The email address of the user."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Check the authentication for a user based on provided parameters and return success or failure status.\n/// </summary>\n/// <param name=\"token\">The token used for authentication.</param>\n/// <param name=\"clientId\">The client ID of the user.</param>\n/// <param name=\"timeStamp\">The timestamp of the authentication request.</param>\n/// <param name=\"lastName\">The last name of the user.</param>\n/// <param name=\"firstName\">The first name of the user.</param>\n/// <param name=\"email\">The email address of the user.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "HashStringFromBytes",
+            "code_start_index": 8051,
+            "method_name": "HashStringFromBytes",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "bytes",
+                    "param_name": "bytes",
+                    "param_type": "byte[]",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var sb = new StringBuilder();\r\n            foreach (byte b in bytes)\r\n            {\r\n                var hex = b.ToString(\"x2\");\r\n                sb.Append(hex);\r\n            }\r\n            return sb.ToString();\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Convert a byte array to a hexadecimal string.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "bytes",
+                        "param_name": "bytes",
+                        "param_desc": "The byte array to be converted to a hexadecimal string."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Convert a byte array to a hexadecimal string.\n/// </summary>\n/// <param name=\"bytes\">The byte array to be converted to a hexadecimal string.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "SignData",
+            "code_start_index": 8358,
+            "method_name": "SignData",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "data",
+                    "param_name": "data",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            return HashStringFromBytes(Sha1HashFromString($\"{_scholarvoxKey1}{data}{_scholarvoxKey2}\"));\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Generate a signature for the provided data using a specific hashing algorithm.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "data",
+                        "param_name": "data",
+                        "param_desc": "The string data for which the signature needs to be generated."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Generate a signature for the provided data using a specific hashing algorithm.\n/// </summary>\n/// <param name=\"data\">The string data for which the signature needs to be generated.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "Sha1HashFromString",
+            "code_start_index": 8541,
+            "method_name": "Sha1HashFromString",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "data",
+                    "param_name": "data",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var sBytes = Encoding.UTF8.GetBytes(data);\r\n            byte[] hashValue;\r\n            using (var hasher = SHA1.Create())\r\n            {\r\n                hashValue = hasher.ComputeHash(sBytes);\r\n            }\r\n\r\n            return hashValue;\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Generate a SHA-1 hash value from a given string of data.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "data",
+                        "param_name": "data",
+                        "param_desc": "The string data from which to generate the SHA-1 hash value."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Generate a SHA-1 hash value from a given string of data.\n/// </summary>\n/// <param name=\"data\">The string data from which to generate the SHA-1 hash value.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "ScholarvoxController"
+}

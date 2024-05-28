@@ -1,0 +1,294 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/v1/PlanningController.cs",
+    "index_shift_code": 590,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V1",
+    "usings": [],
+    "access_modifier": "public",
+    "struct_name": "PlanningController",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetPromotions",
+            "code_start_index": 1235,
+            "method_name": "GetPromotions",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// R\u00e9cupere les promotions\r\n        /// </summary>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            return Ok(new byte[0]);\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Return promotions as a byte array.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no parameters",
+                        "param_name": "no parameters",
+                        "param_desc": "The list of parameters is 'no parameters'."
+                    },
+                    {
+                        "name": "GetPromotions",
+                        "param_name": "GetPromotions",
+                        "param_desc": "The method named 'GetPromotions' is an existing method. The purpose of the method is to return promotions as a byte array."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Return promotions as a byte array.\n/// </summary>\n/// <param name=\"no parameters\">The list of parameters is 'no parameters'.</param>\n/// <param name=\"GetPromotions\">The method named 'GetPromotions' is an existing method. The purpose of the method is to return promotions as a byte array.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetPromotionsByIdAsync",
+            "code_start_index": 1638,
+            "method_name": "GetPromotionsByIdAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Retrieve list of promotions by id\r\n        /// </summary>\r\n        /// <param name=\"pid\"></param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "pid",
+                    "param_name": "pid",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            try\r\n            {\r\n                var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n                return Ok(await _coursesRepository.GetPromotionsAsync(pid, schoolIdsList));\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error loading List Promotion by id\");\r\n                return NotFound();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve promotions by ID asynchronously using the school IDs list associated with the current user, handling errors appropriately.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "pid",
+                        "param_name": "pid",
+                        "param_desc": "The ID of the promotion to retrieve."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve promotions by ID asynchronously using the school IDs list associated with the current user, handling errors appropriately.\n/// </summary>\n/// <param name=\"pid\">The ID of the promotion to retrieve.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "SetParticipateEventAsync",
+            "code_start_index": 2526,
+            "method_name": "SetParticipateEventAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// set participate Events\r\n        /// 0: No\r\n        /// 1: Yes\r\n        /// 2: Maybe\r\n        /// </summary>\r\n        /// <param name=\"eventId\"></param>\r\n        /// <param name=\"state\"></param>\r\n        /// <returns>List JSON</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "eventId",
+                    "param_name": "eventId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "state",
+                    "param_name": "state",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n            bool aEventExist = false;\r\n            try\r\n            {\r\n                var eventEcole = await\r\n                    _db.EventUserEcoles.FirstOrDefaultAsync(\r\n                        p => p.EcoleId == ecoleId && p.UserId == userId && p.EventId == eventId);\r\n\r\n                if (eventEcole == null)\r\n                {\r\n                    eventEcole = new EventUserEcole\r\n                    {\r\n                        UserId = userId,\r\n                        EcoleId = ecoleId,\r\n                        Participation = state,\r\n                        EventId = eventId\r\n                    };\r\n\r\n                    _db.EventUserEcoles.Add(eventEcole);\r\n                }\r\n                else\r\n                {\r\n                    aEventExist = true;\r\n                    eventEcole.Participation = state;\r\n                    _db.Entry(eventEcole).State = EntityState.Modified;\r\n                }\r\n\r\n                await _db.SaveChangesAsync();\r\n\r\n                await _db.Entry(eventEcole).Reference(e => e.User).LoadAsync();\r\n\r\n                var hub = GlobalHost.ConnectionManager.GetHubContext<LiveHub>();\r\n                hub.Clients.All.addOrModifyParticipant(new PEventsEcolesUsers\r\n                {\r\n                    id = eventEcole.Id,\r\n                    event_id = eventEcole.EventId,\r\n                    intervenant_acces = eventEcole.IntervenantAcces,\r\n                    participation = eventEcole.Participation.ToString(),\r\n                    presence = eventEcole.Presence,\r\n                    timer = eventEcole.Timer,\r\n                    Users = new PUsers\r\n                    {\r\n                        id = eventEcole.User.Id,\r\n                        pseudo = eventEcole.User.Pseudo,\r\n                        test = eventEcole.User.Test,\r\n                        interne = eventEcole.User.Interne,\r\n                        civilite = eventEcole.User.Civilite\r\n                    }\r\n                }, aEventExist);\r\n\r\n                var aListEventsUsers = _db.EventUserEcoles.AsNoTracking()\r\n                    .Include(p => p.User)\r\n                    .Where(p => p.EventId == eventId);\r\n\r\n                var results = await aListEventsUsers.Select(e => new PEventsEcolesUsers\r\n                {\r\n                    id = e.Id,\r\n                    Users = new PUsers\r\n                    {\r\n                        id = e.User.Id,\r\n                        pseudo = e.User.Pseudo,\r\n                        test = e.User.Test,\r\n                        interne = e.User.Interne,\r\n                        civilite = e.User.Civilite\r\n                    },\r\n                    event_id = e.EventId,\r\n                    presence = e.Presence,\r\n                    participation = e.Participation.ToString(),\r\n                    intervenant_acces = e.IntervenantAcces,\r\n                    timer = e.Timer\r\n                }).ToListAsync();\r\n\r\n                return Ok(results);\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Set Event Ecole User\");\r\n                return InternalServerError(e);\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the participation status of a user in a specific event at a school, notify all participants of the change, and return the updated list of participants.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "eventId",
+                        "param_name": "eventId",
+                        "param_desc": "The ID of the event for which the participation status needs to be updated."
+                    },
+                    {
+                        "name": "state",
+                        "param_name": "state",
+                        "param_desc": "The new state to set for the participation status. It should be an integer representing the updated status."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the participation status of a user in a specific event at a school, notify all participants of the change, and return the updated list of participants.\n/// </summary>\n/// <param name=\"eventId\">The ID of the event for which the participation status needs to be updated.</param>\n/// <param name=\"state\">The new state to set for the participation status. It should be an integer representing the updated status.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetEventsByIdAsync",
+            "code_start_index": 6148,
+            "method_name": "GetEventsByIdAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// get events by ID\r\n        /// </summary>\r\n        /// <param name=\"eventId\"></param>\r\n        /// <returns>Object PEvent</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "eventId",
+                    "param_name": "eventId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var foundEvent = await _db.Events.AsNoTracking()\r\n                .Include(p => p.EventType)\r\n                .Include(p => p.User)\r\n                .Include(p => p.EventUserEcoles.Select(eue => eue.User))\r\n                .FirstOrDefaultAsync(p => p.Id == eventId);\r\n\r\n            if (foundEvent == null)\r\n            {\r\n                return NotFound();\r\n            }\r\n\r\n            foundEvent.EventObjects = await _db.EventObjects.AsNoTracking()\r\n                .Where(eo => eo.EventId == eventId)\r\n                .Where(eo => !eo.DateDelete.HasValue || eo.DateDelete > DateTime.Now)\r\n                .OrderBy(eo => eo.Ordre)\r\n                .ToListAsync();\r\n\r\n            return Ok(new PEvent\r\n            {\r\n                id = foundEvent.Id,\r\n                titre = foundEvent.Titre,\r\n                date_fin = foundEvent.DateFin,\r\n                date_create = foundEvent.DateCreate,\r\n                date_debut = foundEvent.DateDebut,\r\n                description = foundEvent.Description,\r\n                image = foundEvent.Image,\r\n                motif = foundEvent.Motif,\r\n                server_url = foundEvent.ServerUrl,\r\n                statut = foundEvent.Statut,\r\n                url_replay = foundEvent.UrlReplay,\r\n                //vues = aEvent.,\r\n                Events_type = new PEventType\r\n                {\r\n                    id = foundEvent.EventType.Id,\r\n                    libelle = foundEvent.EventType.Libelle,\r\n                    code = foundEvent.EventType.Code,\r\n                    glyph = foundEvent.EventType.Glyph,\r\n                    url = foundEvent.EventType.Url,\r\n                    dashboard = foundEvent.EventType.Dashboard,\r\n                    time_avant_acces = foundEvent.EventType.TimeAvantAcces\r\n                },\r\n                Events_users_ecole = foundEvent.EventUserEcoles.Select(e => new PEventsEcolesUsers\r\n                {\r\n                    id = e.Id,\r\n                    Users = new PUsers\r\n                    {\r\n                        id = e.User.Id,\r\n                        pseudo = e.User.Pseudo,\r\n                        test = e.User.Test,\r\n                        interne = e.User.Interne,\r\n                        civilite = e.User.Civilite\r\n                    },\r\n                    event_id = e.EventId,\r\n                    presence = e.Presence,\r\n                    participation = e.Participation.ToString(),\r\n                    intervenant_acces = e.IntervenantAcces,\r\n                    timer = e.Timer\r\n                }).ToList(),\r\n                FormateurUsers = new PUsers\r\n                {\r\n                    id = foundEvent.User.Id,\r\n                    pseudo = foundEvent.User.Pseudo,\r\n                    test = foundEvent.User.Test,\r\n                    interne = foundEvent.User.Interne,\r\n                    civilite = foundEvent.User.Civilite\r\n                },\r\n                Events_objects = foundEvent.EventObjects.Select(o => new PEvents_objects\r\n                {\r\n                    id = o.Id,\r\n                    libelle = o.Libelle,\r\n                    filename = o.Filename,\r\n                    date_acces_object = o.DateAccesObject,\r\n                    ordre = o.Ordre\r\n                }).ToList()\r\n            });\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve events by their ID asynchronously, including event type, user, event objects, and event users from a database, and return the corresponding event details if found.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "int",
+                        "param_name": "int",
+                        "param_desc": "The ID of the event to retrieve."
+                    },
+                    {
+                        "name": "eventId",
+                        "param_name": "eventId",
+                        "param_desc": "The ID of the event to retrieve."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve events by their ID asynchronously, including event type, user, event objects, and event users from a database, and return the corresponding event details if found.\n/// </summary>\n/// <param name=\"int\">The ID of the event to retrieve.</param>\n/// <param name=\"eventId\">The ID of the event to retrieve.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "HasFormateurUserClickedAsync",
+            "code_start_index": 9788,
+            "method_name": "HasFormateurUserClickedAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Returns if formateurUser has cliked or not the alert button\r\n        /// </summary>\r\n        /// <param name=\"eventId\">event's id</param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "eventId",
+                    "param_name": "eventId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            try\r\n            {\r\n                var hasFormateurUserClicked = await _db.EventUserEcoles\r\n                    .Where(eue => eue.UserId == userId && eue.EventId == eventId)\r\n                    .Select(eue => eue.UserHasClicked)\r\n                    .FirstOrDefaultAsync();\r\n                return Ok(hasFormateurUserClicked);\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"hasFormateurClicked\");\r\n                return InternalServerError(e);\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve whether a specific user associated with a formateur has clicked on an event.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "eventId",
+                        "param_name": "eventId",
+                        "param_desc": "The ID of the event for which the user click status is being checked."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve whether a specific user associated with a formateur has clicked on an event.\n/// </summary>\n/// <param name=\"eventId\">The ID of the event for which the user click status is being checked.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "AcceptAlertAsync",
+            "code_start_index": 10541,
+            "method_name": "AcceptAlertAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "eventId",
+                    "param_name": "eventId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            try\r\n            {\r\n                var eventsUsersEcole = await _db.EventUserEcoles\r\n                    .Where(eue => eue.UserId == userId && eue.EventId == eventId)\r\n                    .FirstOrDefaultAsync();\r\n                eventsUsersEcole.UserHasClicked = true;\r\n                _db.Entry(eventsUsersEcole).State = EntityState.Modified;\r\n                _db.SaveChanges();\r\n                return StatusCode(HttpStatusCode.NoContent);\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"hasFormateurClicked\");\r\n                return InternalServerError(e);\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the user's click status on a specific event in the database and log any errors encountered.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "eventId",
+                        "param_name": "eventId",
+                        "param_desc": "The ID of the event for which the user's click status is to be updated."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the user's click status on a specific event in the database and log any errors encountered.\n/// </summary>\n/// <param name=\"eventId\">The ID of the event for which the user's click status is to be updated.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "PlanningController"
+}

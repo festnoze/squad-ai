@@ -1,0 +1,44 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Studi.Api.Lms.Evaluation/BindingModel/GenerateBatchPdfsBindingModel.cs",
+    "index_shift_code": 56,
+    "struct_type": "Class",
+    "namespace_name": "Studi.Api.Lms.Evaluation.BindingModel",
+    "usings": [],
+    "access_modifier": "public",
+    "struct_name": "GenerateBatchPdfsBindingModel",
+    "base_class_name": "",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [],
+    "properties": [
+        {
+            "name": "UserUpdate",
+            "prop_name": "UserUpdate",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "MaxBatchDuration",
+            "prop_name": "MaxBatchDuration",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "MaxItemsToProcess",
+            "prop_name": "MaxItemsToProcess",
+            "prop_type": "int",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "ThrowOnException",
+            "prop_name": "ThrowOnException",
+            "prop_type": "bool",
+            "is_property": true,
+            "is_field": false
+        }
+    ],
+    "name": "GenerateBatchPdfsBindingModel"
+}

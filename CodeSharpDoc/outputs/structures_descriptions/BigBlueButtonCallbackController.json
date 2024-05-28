@@ -1,0 +1,331 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Common/BigBlueButtonCallbackController.cs",
+    "index_shift_code": 521,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.Common",
+    "usings": [
+        "LMS.Attributes",
+        "LMS.Authentication",
+        "LMS.Configuration",
+        "LMS.Data",
+        "LMS.Services.Interfaces",
+        "LMS.Utils",
+        "LMS.Utils.BigBlueButton",
+        "LMS.Utils.BigBlueButtonV2",
+        "LMS.Utils.Cache",
+        "Newtonsoft.Json",
+        "Serilog",
+        "Studi.BigBlueButtonClient",
+        "System",
+        "System.Collections.Generic",
+        "System.Data.Entity",
+        "System.Linq",
+        "System.Threading.Tasks",
+        "System.Web",
+        "System.Web.Http"
+    ],
+    "access_modifier": "public",
+    "struct_name": "BigBlueButtonCallbackController",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "HandleCallbackAsync",
+            "code_start_index": 1574,
+            "method_name": "HandleCallbackAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "callback",
+                    "param_name": "callback",
+                    "param_type": "BigBlueButtonCallback",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            Log.Information($\"Controller: {nameof(BigBlueButtonCallbackController)} - Method: {nameof(HandleCallbackAsync)}, Callback : {{0}}\", JsonConvert.SerializeObject(callback));\r\n            var schoolId = this.GetSchoolId(_db);\r\n            var currentSchool = DataCache.GetSchools(_db).First(e => e.Id == schoolId);\r\n            var organizationCode = currentSchool.Organisme?.Code ?? string.Empty;\r\n\r\n            // The Json pair's key 'attributes' is used to discriminate V1 from V2 messages, as it only exists in BBB V2 message format\r\n            // Ugly but temporary. Behaviour to remove once we got ride of BBB V1.x\r\n            bool IsBBBMessageV2 = callback.Event.Contains(@\"\"\"attributes\"\":\");\r\n            bool IsBBBMessageV1 = !IsBBBMessageV2;\r\n\r\n            // Handle V1.1 messages\r\n            if (IsBBBMessageV1)\r\n            {\r\n                return await HandleBBBMessageV1Callback(callback, organizationCode);\r\n            }\r\n            \r\n            // Handle V2.x messages\r\n            if(IsBBBMessageV2)\r\n            {                \r\n                return await HandleBBBMessageV2Callback(callback, organizationCode);\r\n            }\r\n\r\n            return Ok();\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Process a callback message from BigBlueButton, determine the message version, and handle it accordingly by calling the appropriate method based on the version detected.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "BigBlueButtonCallback",
+                        "param_name": "BigBlueButtonCallback",
+                        "param_desc": "The callback message received from BigBlueButton."
+                    },
+                    {
+                        "name": "callback",
+                        "param_name": "callback",
+                        "param_desc": "The method to handle the callback asynchronously."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Process a callback message from BigBlueButton, determine the message version, and handle it accordingly by calling the appropriate method based on the version detected.\n/// </summary>\n/// <param name=\"BigBlueButtonCallback\">The callback message received from BigBlueButton.</param>\n/// <param name=\"callback\">The method to handle the callback asynchronously.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "HandleBBBMessageV1Callback",
+            "code_start_index": 2892,
+            "method_name": "HandleBBBMessageV1Callback",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "callback",
+                    "param_name": "callback",
+                    "param_type": "BigBlueButtonCallback",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "organizationCode",
+                    "param_name": "organizationCode",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            try\r\n            {\r\n                EventInformation<object> headerOfEvent = JsonConvert.DeserializeObject<EventInformation<object>>(callback.Event);\r\n\r\n                // Meeting created V1.1\r\n                if (headerOfEvent.Header.Name.Equals(MessageBBBV1_MeetingCreated))\r\n                {\r\n                    Log.Information($\"Current callback is BBB V1.x Meeting created\");\r\n                    var eventPayload = JsonConvert.DeserializeObject<MeetingCreatedPayload>(headerOfEvent.Payload.ToString());\r\n                    var eventIdStr = eventPayload.ExternalMeetingId.Replace(\"_\" + organizationCode, string.Empty);\r\n                    if (int.TryParse(eventIdStr, out int eventId))\r\n                    {\r\n                        return await ProcessMeetingCreated(eventPayload.MeetingId, eventId);\r\n                    }\r\n                    else\r\n                    {\r\n                        Log.Error($\"Error with current BBB V1.x Meeting created callback. ExternalMeetingId='{eventIdStr}' can't be converted to int\");\r\n                        return BadRequest();\r\n                    }\r\n                }\r\n\r\n                // Publish ended V1.1\r\n                else if (headerOfEvent.Header.Name.Equals(MessageBBBV1_PublishEnded))\r\n                {\r\n                    Log.Information($\"Current callback is BBB V1.x Publish ended\");\r\n                    var eventPayload = JsonConvert.DeserializeObject<RecordPublishedPayload>(headerOfEvent.Payload.ToString());\r\n                    return await ProcessPublishEnded(eventPayload.MeetingId, organizationCode);\r\n                }\r\n\r\n                // Any others V1 events\r\n                else\r\n                {\r\n                    Log.Information($\"Current callback is BBB V1.x for an event that isn't handled\");\r\n                    return Ok();\r\n                }\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error could not parse BBB V1.x payload: {0}\", e.Message);\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Process different types of BBB V1.x callbacks and handle them accordingly, returning appropriate responses based on the event type.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "callback",
+                        "param_name": "callback",
+                        "param_desc": "The BigBlueButtonCallback object containing information about the callback received from BigBlueButton."
+                    },
+                    {
+                        "name": "organizationCode",
+                        "param_name": "organizationCode",
+                        "param_desc": "A string representing the organization code associated with the callback, used for identification or authentication purposes."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Process different types of BBB V1.x callbacks and handle them accordingly, returning appropriate responses based on the event type.\n/// </summary>\n/// <param name=\"callback\">The BigBlueButtonCallback object containing information about the callback received from BigBlueButton.</param>\n/// <param name=\"organizationCode\">A string representing the organization code associated with the callback, used for identification or authentication purposes.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "HandleBBBMessageV2Callback",
+            "code_start_index": 5116,
+            "method_name": "HandleBBBMessageV2Callback",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "callback",
+                    "param_name": "callback",
+                    "param_type": "BigBlueButtonCallback",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "organizationCode",
+                    "param_name": "organizationCode",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            try\r\n            {\r\n                EventInformationV2 callbackEvent = JsonConvert.DeserializeObject<List<EventInformationV2>>(callback.Event).First();\r\n                string internalIdStr = callbackEvent.Data.Attributes.Meeting.InternalMeetingId;\r\n                string externalIdStr = callbackEvent.Data.Attributes.Meeting.ExternalMeetingId.Replace(\"_\" + organizationCode, string.Empty);\r\n                if (int.TryParse(externalIdStr, out int externalId))\r\n                {\r\n                    // Meeting created V2.x\r\n                    if (callbackEvent.Data.Id.Equals(MessageBBBV2_MeetingCreated))\r\n                    {\r\n                        Log.Information($\"Current callback is BBB V2.x Meeting created\");\r\n                        return await ProcessMeetingCreated(internalIdStr, externalId);\r\n                    }\r\n\r\n                    // Publish ended V2.x\r\n                    else if (callbackEvent.Data.Id.Equals(MessageBBBV2_PublishEnded))\r\n                    {\r\n                        Log.Information($\"Current callback is BBB V2.x Publish ended\");\r\n                        return await ProcessPublishEnded(internalIdStr, organizationCode, callbackEvent.Data.Attributes?.Recording?.Playback?.Link);\r\n                    }\r\n\r\n                    else\r\n                    {\r\n                        Log.Information($\"Current callback is BBB V2.x for an event that isn't handled\");\r\n                        return Ok();\r\n                    }\r\n                }\r\n                else\r\n                {\r\n                    Log.Error($\"Error with current BBB V2.x callback. ExternalMeetingId='{externalIdStr}' can't be converted to int\");\r\n                    return BadRequest();\r\n                }\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error could not parse BBB V2.x payload: {0}\", e.Message);\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Process callback events related to BigBlueButton version 2.x, handling meeting creation, publishing end, and other unhandled events.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "callback",
+                        "param_name": "callback",
+                        "param_desc": "The BigBlueButtonCallback parameter represents the callback event received from BigBlueButton. It contains information about the event type, meeting details, and other related data."
+                    },
+                    {
+                        "name": "organizationCode",
+                        "param_name": "organizationCode",
+                        "param_desc": "The organizationCode parameter is a string that identifies the organization associated with the callback event. It is used to determine the specific organization context for processing the callback."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Process callback events related to BigBlueButton version 2.x, handling meeting creation, publishing end, and other unhandled events.\n/// </summary>\n/// <param name=\"callback\">The BigBlueButtonCallback parameter represents the callback event received from BigBlueButton. It contains information about the event type, meeting details, and other related data.</param>\n/// <param name=\"organizationCode\">The organizationCode parameter is a string that identifies the organization associated with the callback event. It is used to determine the specific organization context for processing the callback.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ProcessMeetingCreated",
+            "code_start_index": 7575,
+            "method_name": "ProcessMeetingCreated",
+            "existing_summary": "\r\n        #region Methods to handle BBB Callbacks (meeting created and publish ended)\r\n\r\n        /// <summary>\r\n        /// A meeting has been created on BBB : save its BBB internal ID\r\n        /// </summary>\r\n        /// <param name=\"internalMeetingId\"></param>\r\n        /// <param name=\"externalMeetingId\"></param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "internalMeetingId",
+                    "param_name": "internalMeetingId",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "externalMeetingId",
+                    "param_name": "externalMeetingId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var ev = await _db.Events.FirstOrDefaultAsync(e => e.Id == externalMeetingId);\r\n            if (ev == null)\r\n            {\r\n                Log.Error($\"Event Id {externalMeetingId} not found in database (for internalMeetingId '{internalMeetingId}')\");\r\n                return Ok();\r\n            }\r\n            else\r\n            {\r\n                // Affect the InternalMeetingId and save to DB\r\n                ev.InternalMeetingId = internalMeetingId;\r\n\r\n                try\r\n                {\r\n                    await _db.SaveChangesAsync();\r\n                    Log.Information($\"{nameof(ProcessMeetingCreated)} succeed for externalMeetingId = {externalMeetingId}\");\r\n                }\r\n                catch (Exception e)\r\n                {\r\n                    Log.Error(e, \"Error saving the internal meeting Id {0} for event {1}\", internalMeetingId, externalMeetingId);\r\n                    return InternalServerError();\r\n                }\r\n                return Ok();\r\n            }            \r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the internal meeting ID for a specified event in the database and log the result.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "internalMeetingId",
+                        "param_name": "internalMeetingId",
+                        "param_desc": "The internal meeting ID that uniquely identifies the event in the database."
+                    },
+                    {
+                        "name": "externalMeetingId",
+                        "param_name": "externalMeetingId",
+                        "param_desc": "The external meeting ID provided for the event, which may be used for reference purposes."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the internal meeting ID for a specified event in the database and log the result.\n/// </summary>\n/// <param name=\"internalMeetingId\">The internal meeting ID that uniquely identifies the event in the database.</param>\n/// <param name=\"externalMeetingId\">The external meeting ID provided for the event, which may be used for reference purposes.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ProcessPublishEnded",
+            "code_start_index": 9010,
+            "method_name": "ProcessPublishEnded",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// A meeting publish is ended on BBB\r\n        /// </summary>\r\n        /// <param name=\"internalMeetingId\"></param>\r\n        /// <param name=\"organizationCode\"></param>\r\n        /// <param name=\"link\"></param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "internalMeetingId",
+                    "param_name": "internalMeetingId",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "organizationCode",
+                    "param_name": "organizationCode",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "link",
+                    "param_name": "link",
+                    "param_type": "string",
+                    "has_default_value": true,
+                    "default_value": "null",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var ev = await _db.Events.FirstOrDefaultAsync(e => e.InternalMeetingId == internalMeetingId);\r\n            if (ev == null)\r\n            {\r\n                Log.Error($\"Event Id {internalMeetingId} not found in database\");\r\n                return Ok();\r\n            }\r\n            else\r\n            {\r\n                var client = new BigBlueButtonClient(ev.ServerUrl, _config.GetBbbModeratorPassword(), _config.GetBbbAttendeePassword(), _config.GetBbbServerSalt());\r\n                var meetingId = $\"{ev.Id}_{organizationCode}\";\r\n\r\n                if (String.IsNullOrEmpty(link))\r\n                {\r\n                    Log.Information($\"{nameof(ProcessPublishEnded)}. The link is not set, so call GetRecording to get it for internalMeetingId = {internalMeetingId}\");\r\n                    var recordings = await client.GetRecordingsAsync(new[] { meetingId }, new string[0]);\r\n                    link = recordings.FirstOrDefault()?.Url;                    \r\n                }\r\n\r\n                if (string.IsNullOrEmpty(link))\r\n                {\r\n                    Log.Error($\"{nameof(ProcessPublishEnded)}: The URL for replay isn't to be found for internalMeetingId = {internalMeetingId}, even after call to GetRecording\");\r\n                    return Ok();\r\n                }\r\n                else\r\n                {\r\n                    // Affect the url for replay link and save to DB\r\n                    ev.UrlReplay = link;\r\n\r\n                    try\r\n                    {\r\n                        await _db.SaveChangesAsync();\r\n                        Log.Information($\"{nameof(ProcessPublishEnded)} succeed. URL for replay is set and saved for internalMeetingId = {internalMeetingId}\");\r\n                    }\r\n                    catch (Exception e)\r\n                    {\r\n                        Log.Error(e, \"Error saving the replay url '{0}' for event {1}\", ev.UrlReplay, ev.Id);\r\n                        return InternalServerError();\r\n                    }\r\n                }\r\n            }\r\n            return Ok();\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the replay URL for a specific event after processing the publish event, handling cases where the URL is not set or cannot be found.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "internalMeetingId",
+                        "param_name": "internalMeetingId",
+                        "param_desc": "The unique identifier for the internal meeting."
+                    },
+                    {
+                        "name": "organizationCode",
+                        "param_name": "organizationCode",
+                        "param_desc": "The code identifying the organization."
+                    },
+                    {
+                        "name": "link",
+                        "param_name": "link",
+                        "param_desc": "The URL link for the replay, can be null if not set or cannot be found."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the replay URL for a specific event after processing the publish event, handling cases where the URL is not set or cannot be found.\n/// </summary>\n/// <param name=\"internalMeetingId\">The unique identifier for the internal meeting.</param>\n/// <param name=\"organizationCode\">The code identifying the organization.</param>\n/// <param name=\"link\">The URL link for the replay, can be null if not set or cannot be found.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "BigBlueButtonCallbackController"
+}

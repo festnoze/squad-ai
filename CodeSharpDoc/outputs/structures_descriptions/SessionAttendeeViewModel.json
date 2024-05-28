@@ -1,0 +1,90 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/V2/StudiSchedulerController.cs",
+    "index_shift_code": 36281,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V2",
+    "usings": [
+        "System",
+        "System.Collections.Generic",
+        "System.Data.Entity",
+        "System.Data.Entity.Core",
+        "System.Linq",
+        "System.Net",
+        "System.Threading.Tasks",
+        "System.Web.Http",
+        "Hangfire",
+        "Lms.Common.Enumerations",
+        "LMS.Attributes",
+        "LMS.Attributes.Routing",
+        "LMS.Authentication",
+        "LMS.Configuration",
+        "LMS.Controllers.V3",
+        "LMS.Data",
+        "LMS.Models.BindingModels.V2",
+        "LMS.Models.ViewModels.V2.StudiScheduler",
+        "LMS.Notifications",
+        "LMS.Notifications.V2",
+        "LMS.Notifications.V3",
+        "LMS.Notifications.V3.NotificationDtoModels",
+        "LMS.Services.Interfaces",
+        "LMS.Utils",
+        "LMS.Utils.BBCollaborate",
+        "LMS.Utils.Cache",
+        "Newtonsoft.Json",
+        "Serilog",
+        "Studi.Scheduler.Dto",
+        "Studi.SchedulerApiClient",
+        "Studi.SchedulerApiClient.Exceptions"
+    ],
+    "access_modifier": "private",
+    "struct_name": "SessionAttendeeViewModel",
+    "base_class_name": "",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [],
+    "properties": [
+        {
+            "name": "LastName",
+            "prop_name": "LastName",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "FirstName",
+            "prop_name": "FirstName",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "parcoursCode",
+            "prop_name": "parcoursCode",
+            "prop_type": "List<string>",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "parcoursTitle",
+            "prop_name": "parcoursTitle",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "PhoneNumbers",
+            "prop_name": "PhoneNumbers",
+            "prop_type": "List<string>",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "IsJury",
+            "prop_name": "IsJury",
+            "prop_type": "bool",
+            "is_property": true,
+            "is_field": false
+        }
+    ],
+    "name": "SessionAttendeeViewModel"
+}

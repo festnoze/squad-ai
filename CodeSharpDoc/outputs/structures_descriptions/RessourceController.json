@@ -1,0 +1,110 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/V3/RessourceV3Controller.cs",
+    "index_shift_code": 176,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V1",
+    "usings": [
+        "LMS.Attributes",
+        "LMS.Attributes.Routing",
+        "LMS.Authentication",
+        "LMS.Services.Interfaces",
+        "System.Web.Http"
+    ],
+    "access_modifier": "public",
+    "struct_name": "RessourceController",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetEventsRessourcesTypesTaskAsync",
+            "code_start_index": 750,
+            "method_name": "GetEventsRessourcesTypesTaskAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Ressources Types list for events\r\n        /// </summary>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            return Ok(_ressourceService.GetEventsRessourcesTypes());\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the current user's notification preferences asynchronously.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "The list of parameters is always 'no parameters'."
+                    },
+                    {
+                        "name": "existing",
+                        "param_name": "existing",
+                        "param_desc": "We have an existing method named 'GetEventsRessourcesTypesTaskAsync'."
+                    },
+                    {
+                        "name": "context",
+                        "param_name": "context",
+                        "param_desc": "For context, the method purpose is 'Retrieve the current user's notification preferences asynchronously.'."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the current user's notification preferences asynchronously.\n/// </summary>\n/// <param name=\"no\">The list of parameters is always 'no parameters'.</param>\n/// <param name=\"existing\">We have an existing method named 'GetEventsRessourcesTypesTaskAsync'.</param>\n/// <param name=\"context\">For context, the method purpose is 'Retrieve the current user's notification preferences asynchronously.'.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetCampusRessourcesTypesTaskAsync",
+            "code_start_index": 1112,
+            "method_name": "GetCampusRessourcesTypesTaskAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Ressources Types list for campus\r\n        /// </summary>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            return Ok(_ressourceService.GetEventsRessourcesTypes());\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the current user's notification preferences asynchronously using the specified preferences, school user ID, and email.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "preferences",
+                        "param_name": "preferences",
+                        "param_desc": "The specified preferences to update the current user's notification preferences."
+                    },
+                    {
+                        "name": "schoolUserID",
+                        "param_name": "schoolUserID",
+                        "param_desc": "The school user ID used to identify the current user."
+                    },
+                    {
+                        "name": "email",
+                        "param_name": "email",
+                        "param_desc": "The email address of the current user."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the current user's notification preferences asynchronously using the specified preferences, school user ID, and email.\n/// </summary>\n/// <param name=\"preferences\">The specified preferences to update the current user's notification preferences.</param>\n/// <param name=\"schoolUserID\">The school user ID used to identify the current user.</param>\n/// <param name=\"email\">The email address of the current user.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "RessourceController"
+}

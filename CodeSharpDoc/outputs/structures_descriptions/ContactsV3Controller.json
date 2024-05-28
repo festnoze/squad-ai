@@ -1,0 +1,149 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/V3/ContactsV3Controller.cs",
+    "index_shift_code": 469,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V3",
+    "usings": [
+        "System",
+        "System.Collections.Generic",
+        "System.Data.Entity",
+        "System.Linq",
+        "System.Threading.Tasks",
+        "System.Web.Http",
+        "System.Web.Http.Description",
+        "LMS.Attributes",
+        "LMS.Attributes.Routing",
+        "LMS.Authentication",
+        "LMS.Data",
+        "LMS.Data.Extensions",
+        "LMS.Models.ViewModels.V2.Newsfeed",
+        "LMS.Services.Interfaces",
+        "LMS.Utils",
+        "LMS.Utils.Cache"
+    ],
+    "access_modifier": "public",
+    "struct_name": "ContactsV3Controller",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetContactsList",
+            "code_start_index": 1353,
+            "method_name": "GetContactsList",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Returns a list of all the users matching the following conditions\r\n        /// * Same school\r\n        /// * Not suspended\r\n        /// * Not test accounts and not\r\n        /// * Not official\r\n        /// * Not the current user\r\n        /// * Promo not over and not deleted\r\n        /// </summary>\r\n        /// <returns>Users list</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "searchValue",
+                    "param_name": "searchValue",
+                    "param_type": "string",
+                    "has_default_value": true,
+                    "default_value": "\"\"",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "page",
+                    "param_name": "page",
+                    "param_type": "int",
+                    "has_default_value": true,
+                    "default_value": "1",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "pageSize",
+                    "param_name": "pageSize",
+                    "param_type": "int",
+                    "has_default_value": true,
+                    "default_value": "50",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n            searchValue = searchValue.ToLower();\r\n\r\n            string cacheKey = $\"contacts_list_{userId}_{ecoleId}_{page}_{pageSize}_{searchValue}\";\r\n\r\n            return await TCache<NewsfeedUserViewModel[]>.GetAsync(cacheKey, 3600, async () =>\r\n                {\r\n                    return await _db.Users.AsNoTracking()\r\n                       .Include(u => u.UploadedFile_FileIdPhotoProfil)\r\n                       .Include(u => u.UploadedFile_FileIdHeaderProfil)\r\n                       .Include(m => m.EcoleUsers.Select(eu => eu.UserType))\r\n                       .Include(m => m.InscriptionPromotions.Select(ip => ip.Promotion.Parcour))\r\n                       .Where(user => user.EcoleUsers.Any(eu => eu.EcoleId == ecoleId && !eu.Suspension && user.Id != userId && !user.Test) && (user.Nom.ToLower().Contains(searchValue) || user.Prenom.ToLower().Contains(searchValue)))\r\n                       .Where(u => !u.InscriptionPromotions.All(inscriptionPromotion =>\r\n                               inscriptionPromotion.EcoleId == ecoleId\r\n                               && (inscriptionPromotion.DateDelete == null || inscriptionPromotion.DateDelete > DateTime.Now)\r\n                               && ((inscriptionPromotion.DateFinAcces == null\r\n                                    && inscriptionPromotion.Promotion.DateFinPromo > DateTime.Now)\r\n                                   || inscriptionPromotion.DateFinAcces > DateTime.Now)))\r\n                       .Select(user => new NewsfeedUserViewModel\r\n                       {\r\n                           UserId = user.Id,\r\n                           Pseudo = user.Pseudo,\r\n                           ProfilePicture = (user.FileIdPhotoProfil != null) ? user.UploadedFile_FileIdPhotoProfil.FileUrl : user.PhotoProfil,\r\n                           CoverPicture = (user.FileIdHeaderProfil != null) ? user.UploadedFile_FileIdHeaderProfil.FileUrl : user.HeaderProfil,\r\n                           Internal = user.Interne,\r\n\r\n                           UserType =\r\n                               user.EcoleUsers.Where(eu => eu.EcoleId == ecoleId)\r\n                                   .Select(eu => new NewsfeedUserTypeViewModel\r\n                                   {\r\n                                       Code = eu.UserType.Code,\r\n                                       Label = eu.UserType.Libelle\r\n                                   }).FirstOrDefault(),\r\n                           Promotions =\r\n                               user.InscriptionPromotions.Where(inscriptionPromotion =>\r\n                                       inscriptionPromotion.EcoleId == ecoleId\r\n                                       && (inscriptionPromotion.DateDelete == null || inscriptionPromotion.DateDelete > DateTime.Now)\r\n                                       && ((inscriptionPromotion.DateFinAcces == null\r\n                                            && inscriptionPromotion.Promotion.DateFinPromo > DateTime.Now)\r\n                                           || inscriptionPromotion.DateFinAcces > DateTime.Now))\r\n                                   .Select(ip => new NewsfeedUserPromotionViewModel\r\n                                   {\r\n                                       PromotionId = ip.PromotionId,\r\n                                       Promotion = ip.Promotion.Libelle,\r\n                                       Parcours = ip.Promotion.Parcour.Titre,\r\n                                       CodeParcours = ip.Promotion.Parcour.Code,\r\n                                       Session = ip.Promotion.Session\r\n                                   })\r\n                       })\r\n                       .OrderBy(x => x.Pseudo)\r\n                       .SkipDynamic((page - 1) * pageSize)\r\n                       .TakeDynamic(pageSize)\r\n                       .ToArrayAsync();\r\n                });\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Return the hash code of the object's ID.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "searchValue",
+                        "param_name": "searchValue",
+                        "param_desc": "The string to search for. Defaults to an empty string if not provided."
+                    },
+                    {
+                        "name": "page",
+                        "param_name": "page",
+                        "param_desc": "The page number to retrieve. Defaults to 1 if not provided."
+                    },
+                    {
+                        "name": "pageSize",
+                        "param_name": "pageSize",
+                        "param_desc": "The number of items per page. Defaults to 50 if not provided."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Return the hash code of the object's ID.\n/// </summary>\n/// <param name=\"searchValue\">The string to search for. Defaults to an empty string if not provided.</param>\n/// <param name=\"page\">The page number to retrieve. Defaults to 1 if not provided.</param>\n/// <param name=\"pageSize\">The number of items per page. Defaults to 50 if not provided.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetOfficialUsersAsync",
+            "code_start_index": 5534,
+            "method_name": "GetOfficialUsersAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var currentUser = User.Identity.GetUser();\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n            var ecole = DataCache.GetSchools(_db).First(e => e.Id == ecoleId);\r\n\r\n            var dnsConfig = _dnsConfig.GetDnsConfig();\r\n\r\n            var officials = await _db.Users\r\n                .AsNoTracking()\r\n                .Include(u => u.UploadedFile_FileIdPhotoProfil)\r\n                .Include(u => u.UploadedFile_FileIdHeaderProfil)\r\n                .Include(u => u.EcoleUsers)\r\n                .Include(u => u.EcoleUsers.Select(eu => eu.UserType))\r\n                .Where(u =>\r\n                    u.Email == dnsConfig.EmailRecrutement\r\n                    || u.Email == dnsConfig.EmailPedagogie\r\n                    || u.Email == dnsConfig.EmailStage\r\n                    || u.Email == dnsConfig.EmailAdv\r\n                )\r\n                .Select(u => new\r\n                {\r\n                    Id = u.Id,\r\n                    Nom = u.Nom,\r\n                    Prenom = u.Prenom,\r\n                    Pseudo = u.Pseudo,\r\n                    PhotoProfil = (u.FileIdPhotoProfil != null) ? u.UploadedFile_FileIdPhotoProfil.FileUrl : u.PhotoProfil,\r\n                    HeaderProfil = (u.FileIdHeaderProfil != null) ? u.UploadedFile_FileIdHeaderProfil.FileUrl : u.HeaderProfil,\r\n                    Interne = u.Interne,\r\n                    Status = u.Status,\r\n                    Test = u.Test,\r\n                    UserTypeId = u.EcoleUsers.Any(eu => currentUser.SchoolIdsList.Contains(eu.EcoleId)) ? \r\n                        u.EcoleUsers.FirstOrDefault(eu => currentUser.SchoolIdsList.Contains(eu.EcoleId)).UserTypeId : \r\n                        u.EcoleUsers.FirstOrDefault().UserTypeId,\r\n                    UserProfile = (\r\n                        u.Email == dnsConfig.EmailRecrutement ? \"EMPLOI\" :\r\n                        u.Email == dnsConfig.EmailPedagogie ? \"PEDAGO\" :\r\n                        u.Email == dnsConfig.EmailStage ? \"STAGE\" :\r\n                        u.Email == dnsConfig.EmailAdv ? \"ADV\" :\r\n                        \"USER\"\r\n                    )\r\n                })\r\n                .ToListAsync();\r\n\r\n            return Ok(officials);\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the progress status of resources for a specified user based on the provided progress level, handling different cases such as 'Todo', 'Doing', and 'Done'.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "methodName",
+                        "param_name": "methodName",
+                        "param_desc": "GetOfficialUsersAsync"
+                    },
+                    {
+                        "name": "methodPurpose",
+                        "param_name": "methodPurpose",
+                        "param_desc": "Update the progress status of resources for a specified user based on the provided progress level, handling different cases such as 'Todo', 'Doing', and 'Done'."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the progress status of resources for a specified user based on the provided progress level, handling different cases such as 'Todo', 'Doing', and 'Done'.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"methodName\">GetOfficialUsersAsync</param>\n/// <param name=\"methodPurpose\">Update the progress status of resources for a specified user based on the provided progress level, handling different cases such as 'Todo', 'Doing', and 'Done'.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "ContactsV3Controller"
+}

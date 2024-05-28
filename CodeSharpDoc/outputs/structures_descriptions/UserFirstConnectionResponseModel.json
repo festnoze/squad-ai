@@ -1,0 +1,23 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Studi.Api.Lms.User/ResponseModel/UserFirstConnectionResponseModel.cs",
+    "index_shift_code": 47,
+    "struct_type": "Class",
+    "namespace_name": "",
+    "usings": [],
+    "access_modifier": "public",
+    "struct_name": "UserFirstConnectionResponseModel",
+    "base_class_name": "",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [],
+    "properties": [
+        {
+            "name": "FirstConnectionDate",
+            "prop_name": "FirstConnectionDate",
+            "prop_type": "DateTime?",
+            "is_property": true,
+            "is_field": false
+        }
+    ],
+    "name": "UserFirstConnectionResponseModel"
+}

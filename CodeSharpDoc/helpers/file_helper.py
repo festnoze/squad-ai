@@ -82,7 +82,7 @@ class file:
                     print(f'{file_path} deletion failed: {e}')
     
     @staticmethod
-    def get_all_folder_and_subfolders_files(path, extension=None):
+    def get_all_folder_and_subfolders_files_path(path, extension=None):
         all_files = []        
         for root, dirs, files in os.walk(path):
             for file in files:
@@ -96,11 +96,20 @@ class file:
         shutil.copytree(source_folder, destination_folder, dirs_exist_ok=True)
     
     @staticmethod
-    def load_csharp_files(file_path):
-        txt.print_with_spinner(f"Loading C# files ...")
-        paths_and_codes = {}
-        files = file.get_all_folder_and_subfolders_files(file_path, '.cs')
+    def get_files_paths_and_contents(file_path, extension):
+        txt.print_with_spinner(f"Loading {extension} files ...")
+        paths_and_contents = {}
+        files = file.get_all_folder_and_subfolders_files_path(file_path, '.' + extension)
         for file_path in files:
-            paths_and_codes[file_path] = file.get_as_str(file_path)
-        txt.stop_spinner_replace_text(f"{len(paths_and_codes)} C# files loaded successfully.")
-        return paths_and_codes
+            file_path = file_path.replace('\\', '/')
+            paths_and_contents[file_path] = file.get_as_str(file_path)
+        txt.stop_spinner_replace_text(f"{len(paths_and_contents)} {extension} files loaded successfully.")
+        return paths_and_contents
+    
+    @staticmethod
+    def get_files_contents(file_path, extension):
+        contents = []
+        files = file.get_all_folder_and_subfolders_files_path(file_path, '.' + extension)
+        for file_path in files:
+            contents.append(file.get_as_str(file_path))
+        return contents

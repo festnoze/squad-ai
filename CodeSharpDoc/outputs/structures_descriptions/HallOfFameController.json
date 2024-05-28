@@ -1,0 +1,265 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/v1/HallOfFameController.cs",
+    "index_shift_code": 460,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V1",
+    "usings": [
+        "LMS.Attributes",
+        "LMS.Authentication",
+        "LMS.Data",
+        "LMS.ModelsDTOs.Courses",
+        "LMS.ModelsDTOs.Directory",
+        "LMS.ModelsDTOs.User",
+        "LMS.Utils",
+        "LMS.Utils.Cache",
+        "System",
+        "System.Collections.Generic",
+        "System.Data.Entity",
+        "System.Linq",
+        "System.Linq.Expressions",
+        "System.Threading.Tasks",
+        "System.Web.Http",
+        "System.Web.Http.Description"
+    ],
+    "access_modifier": "public",
+    "struct_name": "HallOfFameController",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "AutoCompleteFilteredUsers",
+            "code_start_index": 744,
+            "method_name": "AutoCompleteFilteredUsers",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "showProspect",
+                    "param_name": "showProspect",
+                    "param_type": "bool",
+                    "has_default_value": true,
+                    "default_value": "false",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "distance",
+                    "param_name": "distance",
+                    "param_type": "double",
+                    "has_default_value": true,
+                    "default_value": "50",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            DUser[] userlist;\r\n\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n            var userId = User.Identity.GetUserId();\r\n\r\n            userlist = await TCache<DUser[]>.GetAsync($\"show-prospect-{userId}-{ecoleId}-{showProspect}-{distance}\", 12 * 3600, async () => await GetUsersAsync(true, ecoleId, userId, distance));\r\n\r\n            return Ok(userlist);\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve a list of filtered users for autocomplete based on specified criteria.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "showProspect",
+                        "param_name": "showProspect",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "distance",
+                        "param_name": "distance",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve a list of filtered users for autocomplete based on specified criteria.\n/// </summary>\n/// <param name=\"showProspect\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"distance\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetUsersCount",
+            "code_start_index": 1365,
+            "method_name": "GetUsersCount",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var res = await TCache<int>.GetAsync(\"HallOfFameGetUsersCount\", 12 * 3600, async () =>\r\n                  {\r\n                      var ecoleId = User.Identity.GetSchoolId();\r\n                      var userId = User.Identity.GetUserId();\r\n                      var currentUser = await _db.Users.FirstOrDefaultAsync(x => x.Id == userId);\r\n\r\n                      Expression<Func<User, bool>> exp = user =>\r\n                          user.EcoleUsers.Any(eu => eu.EcoleId == ecoleId\r\n                                                      && !eu.Suspension\r\n                                                      && (eu.UserType.Code == \"PROSPECT\" || eu.UserType.Code == \"ELEVE\")\r\n                                                      && eu.UserStatutId == 1 && !user.Interne)\r\n                          && user.InscriptionPromotions.Any(ip => ip.DateDelete == null || ip.DateDelete < DateTime.Now);\r\n\r\n                      return await _db.Users.AsNoTracking()\r\n                          .Include(u => u.EcoleUsers.Select(eu => eu.UserType))\r\n                          .Include(x => x.InscriptionPromotions.Select(p => p.Promotion))\r\n                          .Where(exp).Where(x => x.InscriptionPromotions.Any(inscriptionPromotion => inscriptionPromotion.UserId == x.Id &&\r\n                                      inscriptionPromotion.EcoleId == ecoleId\r\n                                      && (inscriptionPromotion.DateDelete == null\r\n                                          || inscriptionPromotion.DateDelete > DateTime.Now)\r\n                                      && (inscriptionPromotion.DateFinAcces == null\r\n                                          && inscriptionPromotion.Promotion.DateFinPromo > DateTime.Now\r\n                                          || inscriptionPromotion.DateFinAcces > DateTime.Now))).CountAsync();\r\n                  });\r\n\r\n            return Ok(res);\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the count of users meeting specific criteria based on school and user type.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "methodName",
+                        "param_name": "methodName",
+                        "param_desc": "The name of the method ('GetUsersCount')"
+                    },
+                    {
+                        "name": "methodPurpose",
+                        "param_name": "methodPurpose",
+                        "param_desc": "The purpose of the method ('Retrieve the count of users meeting specific criteria based on school and user type.')"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the count of users meeting specific criteria based on school and user type.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"methodName\">The name of the method ('GetUsersCount')</param>\n/// <param name=\"methodPurpose\">The purpose of the method ('Retrieve the count of users meeting specific criteria based on school and user type.')</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetUsersAsync",
+            "code_start_index": 3653,
+            "method_name": "GetUsersAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// \r\n        /// </summary>\r\n        /// <param name=\"showProspect\"></param>\r\n        /// <param name=\"ecoleId\"></param>\r\n        /// <param name=\"userId\"></param>\r\n        /// <param name=\"distance\">Distance from user in kilometer</param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "showProspect",
+                    "param_name": "showProspect",
+                    "param_type": "bool",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "ecoleId",
+                    "param_name": "ecoleId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "distance",
+                    "param_name": "distance",
+                    "param_type": "double",
+                    "has_default_value": true,
+                    "default_value": "50",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var currentUser = await _db.Users.FirstOrDefaultAsync(x => x.Id == userId);\r\n\r\n            Expression<Func<User, bool>> exp = user =>\r\n                user.EcoleUsers.Any(eu => eu.EcoleId == ecoleId\r\n                                            && !eu.Suspension\r\n                                            && (eu.UserType.Code == \"PROSPECT\" || eu.UserType.Code == \"ELEVE\")\r\n                                            && eu.UserStatutId == 1 && !user.Interne)\r\n                && user.InscriptionPromotions.Any(ip => ip.DateDelete == null || ip.DateDelete < DateTime.Now);\r\n\r\n            Expression<Func<User, bool>> exp2 = user => user.EcoleUsers.Any(eu => eu.EcoleId == ecoleId && !eu.Suspension && eu.UserType.Code == \"ELEVE\" && eu.UserStatutId == 1 && !user.Interne);\r\n\r\n            var usersList = await _db.Users.AsNoTracking()\r\n                .Include(u => u.UploadedFile_FileIdPhotoProfil)\r\n                .Include(u => u.UploadedFile_FileIdHeaderProfil)\r\n                .Include(u => u.EcoleUsers.Select(eu => eu.UserType))\r\n                .Where(showProspect ? exp : exp2).ToArrayAsync();\r\n\r\n            if (string.IsNullOrEmpty(currentUser.LastLocation))\r\n            {\r\n                currentUser.LastLocation = \"48.853,2.35\";\r\n            }\r\n\r\n\r\n            usersList = usersList.Where(x => x.DistanceFrom(currentUser) <= distance).ToArray();\r\n\r\n            var res = usersList.Select(u => new DUser\r\n            {\r\n                id = u.Id,\r\n                pseudo = u.Pseudo,\r\n                photo_profil = (u.FileIdPhotoProfil != null) ? u.UploadedFile_FileIdPhotoProfil.FileUrl : u.PhotoProfil,\r\n                interne = u.Interne,\r\n                last_location = u.LastLocation,\r\n                promotion = _db.InscriptionPromotions.Include(x => x.Promotion)\r\n                       .Where(inscriptionPromotion => inscriptionPromotion.UserId == u.Id &&\r\n                           inscriptionPromotion.EcoleId == ecoleId\r\n                           && (inscriptionPromotion.DateDelete == null\r\n                               || inscriptionPromotion.DateDelete > DateTime.Now)\r\n                           && (inscriptionPromotion.DateFinAcces == null\r\n                               && inscriptionPromotion.Promotion.DateFinPromo > DateTime.Now\r\n                               || inscriptionPromotion.DateFinAcces > DateTime.Now))\r\n                       .Select(i => new CRPromotion\r\n                       {\r\n                           promotion_id = i.PromotionId,\r\n                           titreParcours = i.Promotion.Parcour.Titre,\r\n                           libelle = i.Promotion.Libelle,\r\n                           date_debut = i.DateDebutPlanning ?? i.DateInscription,\r\n                           date_fin = i.Promotion.DateFinPromo ?? i.Promotion.DateFinPlanning\r\n                       }).ToList(),\r\n                Users_type = u.EcoleUsers.Where(eu => eu.EcoleId == ecoleId).Select(eu => new UUserType\r\n                {\r\n                    id = eu.UserType.Id,\r\n                    code = eu.UserType.Code,\r\n                    libelle = eu.UserType.Libelle\r\n                }).FirstOrDefault()\r\n            })\r\n            .Where(u => u.promotion.Count > 0)\r\n            .ToArray();\r\n\r\n            return res;\r\n\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve a list of users based on specific criteria and filter them by distance from the current user's location, including details such as user ID, pseudo, profile photo, internal status, last location, and promotion information.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "showProspect",
+                        "param_name": "showProspect",
+                        "param_desc": "A boolean value indicating whether to show only prospects or not."
+                    },
+                    {
+                        "name": "ecoleId",
+                        "param_name": "ecoleId",
+                        "param_desc": "An integer representing the ID of the school for which users are being retrieved."
+                    },
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "An integer representing the ID of the user making the request."
+                    },
+                    {
+                        "name": "distance",
+                        "param_name": "distance",
+                        "param_desc": "A double value representing the maximum distance in kilometers from the current user's location within which to search for other users. Default value is 50."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve a list of users based on specific criteria and filter them by distance from the current user's location, including details such as user ID, pseudo, profile photo, internal status, last location, and promotion information.\n/// </summary>\n/// <param name=\"showProspect\">A boolean value indicating whether to show only prospects or not.</param>\n/// <param name=\"ecoleId\">An integer representing the ID of the school for which users are being retrieved.</param>\n/// <param name=\"userId\">An integer representing the ID of the user making the request.</param>\n/// <param name=\"distance\">A double value representing the maximum distance in kilometers from the current user's location within which to search for other users. Default value is 50.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "FirstDayOfTrimestre",
+            "code_start_index": 7164,
+            "method_name": "FirstDayOfTrimestre",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var now = DateTime.Now;\r\n\r\n            var actualMonth = now.Month;\r\n\r\n            if (actualMonth >= 7 && actualMonth < 10)\r\n            {\r\n                var mth = 7;\r\n                var result = new DateTime(DateTime.Now.Year, mth, 1);\r\n                while (result.DayOfWeek != DayOfWeek.Monday)\r\n                {\r\n                    result = result.AddDays(1);\r\n                }\r\n                return result;\r\n            }\r\n\r\n            if (actualMonth >= 10)\r\n            {\r\n                var mth = 10;\r\n                var result = new DateTime(DateTime.Now.Year, mth, 1);\r\n                while (result.DayOfWeek != DayOfWeek.Monday)\r\n                {\r\n                    result = result.AddDays(1);\r\n                }\r\n                return result;\r\n            }\r\n\r\n            if (actualMonth >= 1 && actualMonth < 4)\r\n            {\r\n                var mth = 1;\r\n                var result = new DateTime(DateTime.Now.Year, mth, 1);\r\n                while (result.DayOfWeek != DayOfWeek.Monday)\r\n                {\r\n                    result = result.AddDays(1);\r\n                }\r\n                return result;\r\n            }\r\n\r\n            if (actualMonth >= 4 && actualMonth < 7)\r\n            {\r\n                var mth = 4;\r\n                var result = new DateTime(DateTime.Now.Year, mth, 1);\r\n                while (result.DayOfWeek != DayOfWeek.Monday)\r\n                {\r\n                    result = result.AddDays(1);\r\n                }\r\n                return result;\r\n            }\r\n\r\n            return DateTime.Now;\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Calculate and return the first day of the trimester based on the current date.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "methodName",
+                        "param_name": "methodName",
+                        "param_desc": "The name of the method (e.g., FirstDayOfTrimestre)"
+                    },
+                    {
+                        "name": "methodPurpose",
+                        "param_name": "methodPurpose",
+                        "param_desc": "The purpose of the method (e.g., Calculate and return the first day of the trimester based on the current date.)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Calculate and return the first day of the trimester based on the current date.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"methodName\">The name of the method (e.g., FirstDayOfTrimestre)</param>\n/// <param name=\"methodPurpose\">The purpose of the method (e.g., Calculate and return the first day of the trimester based on the current date.)</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "HallOfFameController"
+}

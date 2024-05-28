@@ -1,0 +1,219 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Studi.Api.Lms.Messenger/Controllers/Message/MessageController.cs",
+    "index_shift_code": 834,
+    "struct_type": "Class",
+    "namespace_name": "Studi.Api.Lms.Messenger.Controllers.Message",
+    "usings": [
+        "Hangfire",
+        "Microsoft.AspNetCore.Authorization",
+        "Microsoft.AspNetCore.Mvc",
+        "Studi.Api.Core.Exceptions.Guards",
+        "Studi.Api.Core.ListingSelector",
+        "Studi.Api.Core.Security.Authentication",
+        "Studi.Api.Lms.Messenger.Application.Services.MessageService",
+        "Studi.Api.Lms.Messenger.Application.Services.NotificationService",
+        "Studi.Api.Lms.Messenger.Controllers.Message.Mapping",
+        "Studi.Api.Lms.Messenger.ExchangeDataContract.v1.Message.ResponseModels",
+        "Studi.Api.Lms.Messenger.Shared.MessageListing",
+        "Studi.Api.Lms.Messenger.Utils.Middleware",
+        "Swashbuckle.AspNetCore.Annotations",
+        "System.Net"
+    ],
+    "access_modifier": "public",
+    "struct_name": "MessageController",
+    "base_class_name": "ControllerBase",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetMessageUnreadCountAsync",
+            "code_start_index": 1949,
+            "method_name": "GetMessageUnreadCountAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Retrieves the count of unread messages for a user in a school.\r\n        /// </summary>\r\n        /// <param name=\"userId\">The user ID for whom unread messages are counted.</param>\r\n        /// <param name=\"schoolId\">The school ID where the user belongs.</param>\r\n        /// <returns>The count of unread messages.</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "schoolId",
+                    "param_name": "schoolId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var unreadMessageCount = await _messageService.GetUnreadMessageCountByUserIdAndSchoolIdAsync(userId, schoolId);\r\n\r\n            return unreadMessageCount.ToResponseModel();\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the unread message count for a specified user and school.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "schoolId",
+                        "param_name": "schoolId",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the unread message count for a specified user and school.\n/// </summary>\n/// <param name=\"userId\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"schoolId\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "PostSendNotification",
+            "code_start_index": 2818,
+            "method_name": "PostSendNotification",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Send notification for messages (used to catch up on failed notifications)\r\n        /// </summary>\r\n        /// <param name=\"ids\">Ids of the messages to send the notification</param>\r\n        /// <param name=\"maxPerSecond\">Throttle queue to limit the number of notification sent per second</param>\r\n        /// <returns>Ok</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "ids",
+                    "param_name": "ids",
+                    "param_type": "ICollection<int>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "maxPerSecond",
+                    "param_name": "maxPerSecond",
+                    "param_type": "int",
+                    "has_default_value": true,
+                    "default_value": "10",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            Guard.Against.False(User.StudiIdentity().IsIntranetUser);\r\n            Guard.Against.NegativeOrZero(maxPerSecond);\r\n\r\n            foreach (var id in ids)\r\n            {\r\n                BackgroundJob.Enqueue<INotificationService>(service => service.SendNewMessageNotificationThrottledAsync(id, new ThrottleJobsPerSecondParams() { JobsPerSecond = maxPerSecond }));\r\n            }\r\n\r\n            return Ok();\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Send notifications for new messages to a group of users, throttling the rate at which notifications are sent.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "ids",
+                        "param_name": "ids",
+                        "param_desc": "The collection of integers representing unique identifiers."
+                    },
+                    {
+                        "name": "maxPerSecond",
+                        "param_name": "maxPerSecond",
+                        "param_desc": "An integer representing the maximum number of notifications allowed to be sent per second. Default value is 10."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Send notifications for new messages to a group of users, throttling the rate at which notifications are sent.\n/// </summary>\n/// <param name=\"ids\">The collection of integers representing unique identifiers.</param>\n/// <param name=\"maxPerSecond\">An integer representing the maximum number of notifications allowed to be sent per second. Default value is 10.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "CountMessageAsync",
+            "code_start_index": 3933,
+            "method_name": "CountMessageAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Count messages on function applying filters\r\n        /// </summary>\r\n        /// <param name=\"listingSelector\">The listing selector for filtering and pagination.</param>\r\n        /// <param name=\"userId\">The user ID.</param>\r\n        /// <param name=\"schoolIds\">The school IDs.</param>\r\n        /// <returns>The count of messages.</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "listingSelector",
+                    "param_name": "listingSelector",
+                    "param_type": "IListingSelector<IMessageListing>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "schoolIds",
+                    "param_name": "schoolIds",
+                    "param_type": "List<int>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var untypedListingSelector = listingSelector.ConvertToUntypedListingSelector();\r\n\r\n            var countMessages = await _messageService.CountMessagesAsync(userId, schoolIds, untypedListingSelector);\r\n\r\n            return countMessages;\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the count of messages for a specified user and school IDs.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "listingSelector",
+                        "param_name": "listingSelector",
+                        "param_desc": "The ListingSelector parameter is used to specify the type of listing to be selected. It should implement the IListingSelector interface and work with IMessageListing objects."
+                    },
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The userId parameter represents the unique identifier of the user for whom the message count needs to be retrieved."
+                    },
+                    {
+                        "name": "schoolIds",
+                        "param_name": "schoolIds",
+                        "param_desc": "The schoolIds parameter is a list of integers representing the unique identifiers of the schools for which the message count needs to be retrieved."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the count of messages for a specified user and school IDs.\n/// </summary>\n/// <param name=\"listingSelector\">The ListingSelector parameter is used to specify the type of listing to be selected. It should implement the IListingSelector interface and work with IMessageListing objects.</param>\n/// <param name=\"userId\">The userId parameter represents the unique identifier of the user for whom the message count needs to be retrieved.</param>\n/// <param name=\"schoolIds\">The schoolIds parameter is a list of integers representing the unique identifiers of the schools for which the message count needs to be retrieved.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "MessageController"
+}

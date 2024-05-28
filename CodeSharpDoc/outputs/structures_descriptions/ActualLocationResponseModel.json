@@ -1,0 +1,30 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Studi.Api.Lms.User/ResponseModel/ActualLocationResponseModel.cs",
+    "index_shift_code": 47,
+    "struct_type": "Class",
+    "namespace_name": "",
+    "usings": [],
+    "access_modifier": "public",
+    "struct_name": "ActualLocationResponseModel",
+    "base_class_name": "",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [],
+    "properties": [
+        {
+            "name": "TimezoneId",
+            "prop_name": "TimezoneId",
+            "prop_type": "string?",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "CountryCode",
+            "prop_name": "CountryCode",
+            "prop_type": "string?",
+            "is_property": true,
+            "is_field": false
+        }
+    ],
+    "name": "ActualLocationResponseModel"
+}

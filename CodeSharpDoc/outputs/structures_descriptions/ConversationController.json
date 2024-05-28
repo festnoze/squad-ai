@@ -1,0 +1,958 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Studi.Api.Lms.Messenger/Controllers/Conversation/ConversationController.cs",
+    "index_shift_code": 1384,
+    "struct_type": "Class",
+    "namespace_name": "",
+    "usings": [
+        "Microsoft.AspNetCore.Authorization",
+        "Microsoft.AspNetCore.Mvc",
+        "Studi.Api.Lms.Messenger.Application.Services.ConversationService",
+        "Studi.Api.Lms.Messenger.Application.Services.ConversationService.Ato",
+        "Studi.Api.Lms.Messenger.Application.Services.MessageService",
+        "Studi.Api.Lms.Messenger.Controllers.Conversation.Mapping",
+        "Studi.Api.Lms.Messenger.Controllers.Message.Mapping",
+        "Studi.Api.Lms.Messenger.ExchangeDataContract.v1.Conversation.RequestModels",
+        "Studi.Api.Lms.Messenger.ExchangeDataContract.v1.Conversation.ResponseModels",
+        "Studi.Api.Lms.Messenger.ExchangeDataContract.v1.Message.RequestModels",
+        "Studi.Api.Lms.Messenger.ExchangeDataContract.v1.Message.ResponseModels",
+        "Studi.Api.Lms.Messenger.Localization.Error.GeneratedClasses",
+        "Studi.Api.Lms.Messenger.Utils.Attributes",
+        "Swashbuckle.AspNetCore.Annotations",
+        "System.Net",
+        "Studi.Api.Lms.Messenger.Shared.ConversationListing",
+        "Studi.Api.Core.Exceptions.Guards",
+        "Studi.Api.Core.Security.Authentication",
+        "Studi.Api.Core.ListingSelector",
+        "Studi.Api.Core.ListingSelector.Untyped",
+        "Studi.Api.Core.ListingSelector.Filtering.AvailableFilters"
+    ],
+    "access_modifier": "public",
+    "struct_name": "ConversationController",
+    "base_class_name": "ControllerBase",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "CreateConversationAsync",
+            "code_start_index": 3147,
+            "method_name": "CreateConversationAsync",
+            "existing_summary": "\r\n    /// <summary>\r\n    /// Creates a new conversation.\r\n    /// </summary>\r\n    /// <param name=\"conversationBM\">The conversation request model.</param>\r\n    /// <param name=\"userId\">The user ID.</param>\r\n    /// <param name=\"schoolIds\">The school IDs.</param>\r\n    /// <param name=\"enableNotification\">Indicates whether to enable notification.</param>\r\n    /// <returns>The response model of the created conversation.</returns>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "conversationBM",
+                    "param_name": "conversationBM",
+                    "param_type": "ConversationRequestModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "schoolIds",
+                    "param_name": "schoolIds",
+                    "param_type": "List<int>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "enableNotification",
+                    "param_name": "enableNotification",
+                    "param_type": "bool",
+                    "has_default_value": true,
+                    "default_value": "true",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        var conversationAtoParam = Mapping.MappingAtoParam.CreateConversationAtoParam(conversationBM);\r\n\r\n        var isRequestFromIntranet = !User.StudiIdentity().IsLmsUser;\r\n\r\n        var conversation = await _conversationService.CreateConversationAsync(conversationAtoParam, isRequestFromIntranet, enableNotification: enableNotification);\r\n\r\n        return conversation.ToResponseModel(userId);\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a conversation asynchronously with the specified parameters and return it as a response model.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "conversationBM",
+                        "param_name": "conversationBM",
+                        "param_desc": "The ConversationRequestModel object that contains the details of the conversation to be created."
+                    },
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The integer value representing the unique identifier of the user initiating the conversation."
+                    },
+                    {
+                        "name": "schoolIds",
+                        "param_name": "schoolIds",
+                        "param_desc": "The list of integer values representing the unique identifiers of the schools involved in the conversation."
+                    },
+                    {
+                        "name": "enableNotification",
+                        "param_name": "enableNotification",
+                        "param_desc": "The boolean value indicating whether notifications for the conversation should be enabled. It defaults to true if not specified."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a conversation asynchronously with the specified parameters and return it as a response model.\n/// </summary>\n/// <param name=\"conversationBM\">The ConversationRequestModel object that contains the details of the conversation to be created.</param>\n/// <param name=\"userId\">The integer value representing the unique identifier of the user initiating the conversation.</param>\n/// <param name=\"schoolIds\">The list of integer values representing the unique identifiers of the schools involved in the conversation.</param>\n/// <param name=\"enableNotification\">The boolean value indicating whether notifications for the conversation should be enabled. It defaults to true if not specified.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "CreateConversationsListAsync",
+            "code_start_index": 4397,
+            "method_name": "CreateConversationsListAsync",
+            "existing_summary": "\r\n    /// <summary>\r\n    /// Creates a list of conversations.\r\n    /// </summary>\r\n    /// <param name=\"conversationBMs\">The conversation request models.</param>\r\n    /// <returns>The list of response models indicating if each conversation was created or not.</returns>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "conversationBMs",
+                    "param_name": "conversationBMs",
+                    "param_type": "IEnumerable<ConversationRequestModel>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        var conversationAtoParams = conversationBMs.Select(c => Mapping.MappingAtoParam.CreateConversationAtoParam(c));\r\n\r\n        var isRequestFromIntranet = !User.StudiIdentity().IsLmsUser;\r\n\r\n        var conversationCreatedOrNotAtos = await _conversationService.CreateRangeConversationAsync(conversationAtoParams, isRequestFromIntranet);\r\n        var conversationCreatedOrNotVMs = conversationCreatedOrNotAtos.Select(c => Mapping.MappingResponseModel.CreateConversationCreatedOrNotResponseModel(c));\r\n\r\n        return conversationCreatedOrNotVMs;\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a list of conversations asynchronously based on the provided data.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "conversationBMs",
+                        "param_name": "conversationBMs",
+                        "param_desc": "The IEnumerable<ConversationRequestModel> containing the conversation data to create a list of conversations asynchronously."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a list of conversations asynchronously based on the provided data.\n/// </summary>\n/// <param name=\"conversationBMs\">The IEnumerable<ConversationRequestModel> containing the conversation data to create a list of conversations asynchronously.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "CountConversationsAsync",
+            "code_start_index": 5667,
+            "method_name": "CountConversationsAsync",
+            "existing_summary": "\r\n    /// <summary>\r\n    /// Count conversations based on provided criteria.\r\n    /// </summary>\r\n    /// <param name=\"listingSelector\">The listing selector for filtering and pagination.</param>\r\n    /// <param name=\"userId\">The user ID.</param>\r\n    /// <param name=\"schoolIds\">The school IDs.</param>\r\n    /// <returns>number of Conversations</returns>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "listingSelector",
+                    "param_name": "listingSelector",
+                    "param_type": "IListingSelector<IConversationListing>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "schoolIds",
+                    "param_name": "schoolIds",
+                    "param_type": "List<int>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        var isRequestFromIntranet = !User.StudiIdentity().IsLmsUser;\r\n\r\n        var untypedListingSelector = listingSelector.ConvertToUntypedListingSelector();\r\n\r\n        var countConversation = await _conversationService.GetConversationCountByUserIdAsync(userId, schoolIds, untypedListingSelector, isRequestFromIntranet);\r\n\r\n        return countConversation;\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the count of conversations for a specified user, considering various conditions like user type and school IDs.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "listingSelector",
+                        "param_name": "listingSelector",
+                        "param_desc": "IListingSelector<IConversationListing> listingSelector - The object that specifies the listing criteria for conversations."
+                    },
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "int userId - The unique identifier of the user for whom the conversation count needs to be retrieved."
+                    },
+                    {
+                        "name": "schoolIds",
+                        "param_name": "schoolIds",
+                        "param_desc": "List<int> schoolIds - The list of unique identifiers representing the schools for which the conversation count needs to be considered."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the count of conversations for a specified user, considering various conditions like user type and school IDs.\n/// </summary>\n/// <param name=\"listingSelector\">IListingSelector<IConversationListing> listingSelector - The object that specifies the listing criteria for conversations.</param>\n/// <param name=\"userId\">int userId - The unique identifier of the user for whom the conversation count needs to be retrieved.</param>\n/// <param name=\"schoolIds\">List<int> schoolIds - The list of unique identifiers representing the schools for which the conversation count needs to be considered.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "SearchPaginatedConversationsAsync",
+            "code_start_index": 6880,
+            "method_name": "SearchPaginatedConversationsAsync",
+            "existing_summary": "\r\n    /// <summary>\r\n    /// Searches for paginated conversations based on provided criteria.\r\n    /// </summary>\r\n    /// <param name=\"listingSelector\">The listing selector for filtering and pagination.</param>\r\n    /// <param name=\"userId\">The user ID.</param>\r\n    /// <param name=\"schoolIds\">The school IDs.</param>\r\n    /// <returns>The paginated data of conversation response models.</returns>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "listingSelector",
+                    "param_name": "listingSelector",
+                    "param_type": "IListingSelector<IConversationListing>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "schoolIds",
+                    "param_name": "schoolIds",
+                    "param_type": "List<int>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        var isRequestFromIntranet = !User.StudiIdentity().IsLmsUser;\r\n\r\n        var untypedListingSelector = listingSelector.ConvertToUntypedListingSelector();\r\n\r\n        var searchAndCountConversationRAto = await _conversationService.GetFilteredConversationsAndCountByUserIdAsync(userId, schoolIds, untypedListingSelector, isRequestFromIntranet);\r\n\r\n        var paginedData = new PaginedData<ConversationResponseModel>\r\n        {\r\n            Data = searchAndCountConversationRAto.ConversationsListRAto.Select(q => q.ToResponseModel(userId)),\r\n            PageNumber = listingSelector?.Pagination?.PageNumber ?? 0,\r\n            PageSize = listingSelector?.Pagination?.PageSize ?? 0,\r\n            Total = searchAndCountConversationRAto.ConversationCount,\r\n        };\r\n\r\n        return paginedData;\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve paginated conversations based on specified criteria and user ID, considering if the request is from intranet or not.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "listingSelector",
+                        "param_name": "listingSelector",
+                        "param_desc": "IListingSelector<IConversationListing>: The selector used to specify the type of conversation listing to retrieve."
+                    },
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "int: The ID of the user for whom the conversations are being retrieved."
+                    },
+                    {
+                        "name": "schoolIds",
+                        "param_name": "schoolIds",
+                        "param_desc": "List<int>: The list of school IDs to consider for filtering conversations."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve paginated conversations based on specified criteria and user ID, considering if the request is from intranet or not.\n/// </summary>\n/// <param name=\"listingSelector\">IListingSelector<IConversationListing>: The selector used to specify the type of conversation listing to retrieve.</param>\n/// <param name=\"userId\">int: The ID of the user for whom the conversations are being retrieved.</param>\n/// <param name=\"schoolIds\">List<int>: The list of school IDs to consider for filtering conversations.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetConversationGeneralInfosAsync",
+            "code_start_index": 8602,
+            "method_name": "GetConversationGeneralInfosAsync",
+            "existing_summary": "\r\n    /// <summary>\r\n    /// Retrieves general information about a conversation based on its identifier.\r\n    /// </summary>\r\n    /// <param name=\"conversationId\">The identifier of the conversation.</param>\r\n    /// <param name=\"userId\">The user identifier.</param>\r\n    /// <param name=\"schoolId\">The school identifier, if applicable.</param>\r\n    /// <returns>The general information about the specified conversation.</returns>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "conversationId",
+                    "param_name": "conversationId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "schoolId",
+                    "param_name": "schoolId",
+                    "param_type": "int?",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        var schoolIds = schoolId != null ? new List<int> { (int)schoolId } : new List<int>();\r\n\r\n        var isRequestFromIntranet = !User.StudiIdentity().IsLmsUser;\r\n\r\n        var conversationAto = await _conversationService.GetConversationByIdWithChecksAsync(conversationId, userId, schoolIds, isRequestFromIntranet)!;\r\n\r\n        return conversationAto.ToResponseModel(userId);\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve general information about a conversation asynchronously, based on the conversation ID, user ID, and school ID.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "conversationId",
+                        "param_name": "conversationId",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "schoolId",
+                        "param_name": "schoolId",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve general information about a conversation asynchronously, based on the conversation ID, user ID, and school ID.\n/// </summary>\n/// <param name=\"conversationId\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"userId\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"schoolId\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetPaginatedConversationMessagesAsync",
+            "code_start_index": 9958,
+            "method_name": "GetPaginatedConversationMessagesAsync",
+            "existing_summary": "\r\n    /// <summary>\r\n    /// Retrieves paginated messages associated with a specific conversation.\r\n    /// </summary>\r\n    /// <param name=\"conversationId\">The identifier of the conversation.</param>\r\n    /// <param name=\"listingSelector\">The selector to specify pagination and other listing parameters.</param>\r\n    /// <param name=\"userId\">The user identifier.</param>\r\n    /// <param name=\"schoolIds\">List of school identifiers.</param>\r\n    /// <returns>A paginated list of messages for the specified conversation.</returns>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "conversationId",
+                    "param_name": "conversationId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "listingSelector",
+                    "param_name": "listingSelector",
+                    "param_type": "IListingSelector<IConversationListing>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "schoolIds",
+                    "param_name": "schoolIds",
+                    "param_type": "List<int>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        var pageNumber = listingSelector.Pagination?.PageNumber ?? 1;\r\n        var pageSize = listingSelector.Pagination?.PageSize ?? 25;\r\n\r\n        Guard.Against.NegativeOrZero(pageNumber, ErrorCode.Api.Lms.Messenger.DataValidation.Query.Common.ListingSelector.Pagination.PageNumberIncorrect);\r\n        Guard.Against.NegativeOrZero(pageSize, ErrorCode.Api.Lms.Messenger.DataValidation.Query.Common.ListingSelector.Pagination.PageSizeIncorrect);\r\n\r\n        var paginedDataAto = await _messageService.GetPaginatedMessagesByConversationIdAsync(conversationId, userId, schoolIds, pageNumber, pageSize);\r\n\r\n        var paginedData = new PaginedData<MessageResponseModel>\r\n        {\r\n            Data = paginedDataAto.Data.Select(m => m.ToResponseModel()),\r\n            PageNumber = paginedDataAto.PageNumber,\r\n            PageSize = paginedDataAto.PageSize,\r\n            Total = paginedDataAto.Total,\r\n        };\r\n\r\n        return paginedData;\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve paginated conversation messages for a specified conversation, user, and school IDs, based on the provided page number and page size.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "conversationId",
+                        "param_name": "conversationId",
+                        "param_desc": "The ID of the conversation for which messages are to be retrieved."
+                    },
+                    {
+                        "name": "listingSelector",
+                        "param_name": "listingSelector",
+                        "param_desc": "The selector used to filter and sort the conversation messages."
+                    },
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The ID of the user for whom the messages are being retrieved."
+                    },
+                    {
+                        "name": "schoolIds",
+                        "param_name": "schoolIds",
+                        "param_desc": "The list of IDs of schools whose messages are to be included in the result."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve paginated conversation messages for a specified conversation, user, and school IDs, based on the provided page number and page size.\n/// </summary>\n/// <param name=\"conversationId\">The ID of the conversation for which messages are to be retrieved.</param>\n/// <param name=\"listingSelector\">The selector used to filter and sort the conversation messages.</param>\n/// <param name=\"userId\">The ID of the user for whom the messages are being retrieved.</param>\n/// <param name=\"schoolIds\">The list of IDs of schools whose messages are to be included in the result.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "PatchArchiveMultipleAsync",
+            "code_start_index": 11811,
+            "method_name": "PatchArchiveMultipleAsync",
+            "existing_summary": "\r\n    /// <summary>\r\n    /// Archives or unarchives multiple conversations based on the provided details (relative to the user making the request).\r\n    /// </summary>\r\n    /// <param name=\"body\">Details of the conversations to be archived or unarchived.</param>\r\n    /// <param name=\"userId\">The user identifier.</param>\r\n    /// <param name=\"schoolIds\">List of school identifiers.</param>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "body",
+                    "param_name": "body",
+                    "param_type": "PatchArchiveMultipleConversationRequestModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "schoolIds",
+                    "param_name": "schoolIds",
+                    "param_type": "List<int>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        await _messageService.UpdateIsArchivedForUserIdByConversationsIdsAsync(body.Ids, body.IsArchived, userId);\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the 'isArchived' status for multiple conversations by user ID asynchronously.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "body",
+                        "param_name": "body",
+                        "param_desc": "The model containing the data for patching multiple conversations in the archive. It includes the necessary information to update the 'isArchived' status."
+                    },
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The unique identifier of the user for whom the conversations' 'isArchived' status needs to be updated. It is an integer value."
+                    },
+                    {
+                        "name": "schoolIds",
+                        "param_name": "schoolIds",
+                        "param_desc": "A list of integer values representing the identifiers of schools whose conversations' 'isArchived' status needs to be updated. It allows updating multiple school conversations simultaneously."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the 'isArchived' status for multiple conversations by user ID asynchronously.\n/// </summary>\n/// <param name=\"body\">The model containing the data for patching multiple conversations in the archive. It includes the necessary information to update the 'isArchived' status.</param>\n/// <param name=\"userId\">The unique identifier of the user for whom the conversations' 'isArchived' status needs to be updated. It is an integer value.</param>\n/// <param name=\"schoolIds\">A list of integer values representing the identifiers of schools whose conversations' 'isArchived' status needs to be updated. It allows updating multiple school conversations simultaneously.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "PatchStatusMultipleAsync",
+            "code_start_index": 12718,
+            "method_name": "PatchStatusMultipleAsync",
+            "existing_summary": "\r\n    /// <summary>\r\n    /// Updates the status for multiple conversations based on the provided details (only for official).\r\n    /// </summary>\r\n    /// <param name=\"body\">Details of the conversations whose status is to be updated.</param>\r\n    /// <param name=\"userId\">The user identifier.</param>\r\n    /// <param name=\"schoolId\">The school identifier.</param>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "body",
+                    "param_name": "body",
+                    "param_type": "PatchStatusMultipleConversationRequestModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "schoolId",
+                    "param_name": "schoolId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        await _conversationService.ChangeMultipleConversationStatusAsync(body.Ids, (EConversationStatusRAto)body.ConversationStatus, userId, schoolId);\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the status of multiple conversations asynchronously.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "body",
+                        "param_name": "body",
+                        "param_desc": "The model representing the request body for updating the status of multiple conversations. It should be of type PatchStatusMultipleConversationRequestModel."
+                    },
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The unique identifier of the user for whom the conversations' status will be updated. It should be of type int."
+                    },
+                    {
+                        "name": "schoolId",
+                        "param_name": "schoolId",
+                        "param_desc": "The unique identifier of the school to which the conversations belong. It should be of type int."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the status of multiple conversations asynchronously.\n/// </summary>\n/// <param name=\"body\">The model representing the request body for updating the status of multiple conversations. It should be of type PatchStatusMultipleConversationRequestModel.</param>\n/// <param name=\"userId\">The unique identifier of the user for whom the conversations' status will be updated. It should be of type int.</param>\n/// <param name=\"schoolId\">The unique identifier of the school to which the conversations belong. It should be of type int.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ChangeReadedDateSenderAsync",
+            "code_start_index": 13656,
+            "method_name": "ChangeReadedDateSenderAsync",
+            "existing_summary": "\r\n    /// <summary>\r\n    /// Updates the reading status for conversations based on the provided details (relative to the user making the request).\r\n    /// </summary>\r\n    /// <param name=\"markConversationAsReadOrUnread\">Details to mark conversations as read or unread.</param>\r\n    /// <param name=\"userId\">The user identifier.</param>\r\n    /// <param name=\"schoolIds\">List of school identifiers.</param>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "markConversationAsReadOrUnread",
+                    "param_name": "markConversationAsReadOrUnread",
+                    "param_type": "MarkConversationAsReadOrUnreadRequestModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "schoolIds",
+                    "param_name": "schoolIds",
+                    "param_type": "List<int>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        await _conversationService.ChangeReadedDateAsync(markConversationAsReadOrUnread.Ids, markConversationAsReadOrUnread.MarkAsRead, userId, schoolIds.ToArray());\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the read date for a conversation sender asynchronously.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "markConversationAsReadOrUnread",
+                        "param_name": "markConversationAsReadOrUnread",
+                        "param_desc": "The object of type 'MarkConversationAsReadOrUnreadRequestModel' that is used to mark a conversation as read or unread."
+                    },
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The ID of the user for whom the read date needs to be updated."
+                    },
+                    {
+                        "name": "schoolIds",
+                        "param_name": "schoolIds",
+                        "param_desc": "A list of integer IDs representing the schools for which the read date needs to be updated."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the read date for a conversation sender asynchronously.\n/// </summary>\n/// <param name=\"markConversationAsReadOrUnread\">The object of type 'MarkConversationAsReadOrUnreadRequestModel' that is used to mark a conversation as read or unread.</param>\n/// <param name=\"userId\">The ID of the user for whom the read date needs to be updated.</param>\n/// <param name=\"schoolIds\">A list of integer IDs representing the schools for which the read date needs to be updated.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "AddRecipientsAsync",
+            "code_start_index": 14777,
+            "method_name": "AddRecipientsAsync",
+            "existing_summary": "\r\n    /// <summary>\r\n    /// Adds recipients to a conversation based on the provided details.\r\n    /// </summary>\r\n    /// <param name=\"newRecipientsUsersIds\">List of user identifiers to be added as recipients.</param>\r\n    /// <param name=\"userId\">The user identifier.</param>\r\n    /// <param name=\"schoolIds\">List of school identifiers.</param>\r\n    /// <param name=\"id\">The identifier of the conversation.</param>\r\n    /// <returns>A list of correspondents that were added.</returns>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "newRecipientsUsersIds",
+                    "param_name": "newRecipientsUsersIds",
+                    "param_type": "IEnumerable<int>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "schoolIds",
+                    "param_name": "schoolIds",
+                    "param_type": "List<int>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "id",
+                    "param_name": "id",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        var isRequestFromIntranet = !User.StudiIdentity().IsLmsUser;\r\n\r\n        var addedCorrespondentsAtos = await _conversationService.AddRecipientsAsync(id, userId, schoolIds, newRecipientsUsersIds, isRequestFromIntranet);\r\n        var addedCorrespondents = addedCorrespondentsAtos?.Select(ato => ato.ToResponseModel(userId)).ToArray();\r\n\r\n        return addedCorrespondents;\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Add recipients to a conversation asynchronously, taking into account the request source and returning the added correspondents in a response model format.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "newRecipientsUsersIds",
+                        "param_name": "newRecipientsUsersIds",
+                        "param_desc": "The list of user IDs corresponding to the new recipients that need to be added to the conversation."
+                    },
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The unique identifier of the user initiating the action of adding recipients to the conversation."
+                    },
+                    {
+                        "name": "schoolIds",
+                        "param_name": "schoolIds",
+                        "param_desc": "A list of school IDs to which the recipients belong, providing context for the addition of recipients."
+                    },
+                    {
+                        "name": "id",
+                        "param_name": "id",
+                        "param_desc": "The identifier associated with the conversation to which recipients are being added."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Add recipients to a conversation asynchronously, taking into account the request source and returning the added correspondents in a response model format.\n/// </summary>\n/// <param name=\"newRecipientsUsersIds\">The list of user IDs corresponding to the new recipients that need to be added to the conversation.</param>\n/// <param name=\"userId\">The unique identifier of the user initiating the action of adding recipients to the conversation.</param>\n/// <param name=\"schoolIds\">A list of school IDs to which the recipients belong, providing context for the addition of recipients.</param>\n/// <param name=\"id\">The identifier associated with the conversation to which recipients are being added.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "RemoveRecipientsAsync",
+            "code_start_index": 16108,
+            "method_name": "RemoveRecipientsAsync",
+            "existing_summary": "\r\n    /// <summary>\r\n    /// Removes recipients from a conversation based on the provided details.\r\n    /// </summary>\r\n    /// <param name=\"recipientsUsersIds\">List of user identifiers to be removed as recipients.</param>\r\n    /// <param name=\"userId\">The user identifier.</param>\r\n    /// <param name=\"schoolIds\">List of school identifiers.</param>\r\n    /// <param name=\"id\">The identifier of the conversation.</param>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "recipientsUsersIds",
+                    "param_name": "recipientsUsersIds",
+                    "param_type": "IEnumerable<int>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "schoolIds",
+                    "param_name": "schoolIds",
+                    "param_type": "List<int>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "id",
+                    "param_name": "id",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        var isRequestFromIntranet = !User.StudiIdentity().IsLmsUser;\r\n\r\n        await _conversationService.RemoveRecipientsAsync(id, userId, schoolIds, recipientsUsersIds, isRequestFromIntranet);\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Remove recipients from a conversation asynchronously based on specified conditions.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "recipientsUsersIds",
+                        "param_name": "recipientsUsersIds",
+                        "param_desc": "The IEnumerable<int> of user IDs representing the recipients to be removed from the conversation."
+                    },
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The integer representing the user ID of the user initiating the removal of recipients."
+                    },
+                    {
+                        "name": "schoolIds",
+                        "param_name": "schoolIds",
+                        "param_desc": "The List<int> of school IDs specifying the schools from which recipients are to be removed."
+                    },
+                    {
+                        "name": "id",
+                        "param_name": "id",
+                        "param_desc": "The integer representing the unique identifier of the conversation from which recipients are to be removed."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Remove recipients from a conversation asynchronously based on specified conditions.\n/// </summary>\n/// <param name=\"recipientsUsersIds\">The IEnumerable<int> of user IDs representing the recipients to be removed from the conversation.</param>\n/// <param name=\"userId\">The integer representing the user ID of the user initiating the removal of recipients.</param>\n/// <param name=\"schoolIds\">The List<int> of school IDs specifying the schools from which recipients are to be removed.</param>\n/// <param name=\"id\">The integer representing the unique identifier of the conversation from which recipients are to be removed.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "AddNewMessageToConversationAsync",
+            "code_start_index": 17359,
+            "method_name": "AddNewMessageToConversationAsync",
+            "existing_summary": "\r\n    /// <summary>\r\n    /// Adds a new message to an existing conversation.\r\n    /// </summary>\r\n    /// <param name=\"conversationId\">The identifier of the conversation.</param>\r\n    /// <param name=\"newMessage\">The content and details of the new message.</param>\r\n    /// <param name=\"userId\">The user identifier.</param>\r\n    /// <param name=\"schoolId\">The school identifier.</param>\r\n    /// <param name=\"enableNotification\">Flag to determine if notifications should be enabled for this message.</param>\r\n    /// <returns>The created message details.</returns>\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "conversationId",
+                    "param_name": "conversationId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "newMessage",
+                    "param_name": "newMessage",
+                    "param_type": "MessageRequestModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "schoolId",
+                    "param_name": "schoolId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "enableNotification",
+                    "param_name": "enableNotification",
+                    "param_type": "bool",
+                    "has_default_value": true,
+                    "default_value": "true",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        Guard.Against.Null(newMessage, ErrorCode.Api.Lms.Messenger.DataValidation.Command.Message.CreateMessage.AddToExistingConversation.UndefinedMessage, paramsValues: conversationId.ToString());\r\n        var newMessageAddedToExistingConvAtoParam = Message.Mapping.MappingAtoParam.CreateMessageAtoParam(newMessage, userId, conversationId, schoolId);\r\n        var responseOfMessageCreate = await _messageService.AddMessageAsync(newMessageAddedToExistingConvAtoParam!, enableNotification);\r\n        return responseOfMessageCreate.ToResponseModel();\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Add a new message to an existing conversation asynchronously.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "conversationId",
+                        "param_name": "conversationId",
+                        "param_desc": "The id of the conversation to which the new message will be added."
+                    },
+                    {
+                        "name": "newMessage",
+                        "param_name": "newMessage",
+                        "param_desc": "The model representing the new message to be added to the conversation."
+                    },
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The id of the user initiating the message addition."
+                    },
+                    {
+                        "name": "schoolId",
+                        "param_name": "schoolId",
+                        "param_desc": "The id of the school to which the conversation belongs."
+                    },
+                    {
+                        "name": "enableNotification",
+                        "param_name": "enableNotification",
+                        "param_desc": "A boolean flag indicating whether to enable notifications for the new message. Default value is true."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Add a new message to an existing conversation asynchronously.\n/// </summary>\n/// <param name=\"conversationId\">The id of the conversation to which the new message will be added.</param>\n/// <param name=\"newMessage\">The model representing the new message to be added to the conversation.</param>\n/// <param name=\"userId\">The id of the user initiating the message addition.</param>\n/// <param name=\"schoolId\">The id of the school to which the conversation belongs.</param>\n/// <param name=\"enableNotification\">A boolean flag indicating whether to enable notifications for the new message. Default value is true.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "ConversationController"
+}

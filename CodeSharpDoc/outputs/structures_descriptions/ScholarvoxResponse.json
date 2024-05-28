@@ -1,0 +1,55 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Common/ScholarvoxController.cs",
+    "index_shift_code": 8872,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.Common",
+    "usings": [
+        "LMS.Authentication",
+        "LMS.Data",
+        "LMS.Configuration",
+        "Newtonsoft.Json",
+        "Serilog",
+        "System",
+        "System.Data.Entity",
+        "System.Linq",
+        "System.IO",
+        "System.Net.Http",
+        "System.Security.Cryptography",
+        "System.Text",
+        "System.Threading.Tasks",
+        "System.Web",
+        "System.Web.Http",
+        "System.Web.Http.Description",
+        "LMS.Services.Interfaces"
+    ],
+    "access_modifier": "internal",
+    "struct_name": "ScholarvoxResponse",
+    "base_class_name": "",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [],
+    "properties": [
+        {
+            "name": "Success",
+            "prop_name": "Success",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "Message",
+            "prop_name": "Message",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "Url",
+            "prop_name": "Url",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        }
+    ],
+    "name": "ScholarvoxResponse"
+}

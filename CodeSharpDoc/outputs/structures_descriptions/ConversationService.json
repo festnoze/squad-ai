@@ -50,7 +50,7 @@
     "methods": [
         {
             "name": "GetConversationByIdWithChecksAsync",
-            "code_start_index": 4153,
+            "code_start_index": 4776,
             "method_name": "GetConversationByIdWithChecksAsync",
             "existing_summary": "\r\n    #region V1\r\n\r\n    #region Get Conversation\r\n\r\n    /// <inheritdoc/>\r\n    ",
             "attributes": null,
@@ -105,7 +105,7 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Retrieve a conversation by its ID, perform necessary checks to ensure its existence, retrieve user information for all participants, and verify the user's right to access the conversation.",
+            "generated_summary": "Retrieve a conversation by ID with checks for existence and user rights, then build and return the conversation's corresponding user information.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
@@ -116,27 +116,27 @@
                     {
                         "name": "userId",
                         "param_name": "userId",
-                        "param_desc": "The ID of the user requesting the conversation."
+                        "param_desc": "The ID of the user performing the request."
                     },
                     {
                         "name": "schoolIds",
                         "param_name": "schoolIds",
-                        "param_desc": "A list of IDs representing the schools related to the conversation."
+                        "param_desc": "A list of IDs corresponding to schools that are related to the conversation."
                     },
                     {
                         "name": "isRequestFromIntranet",
                         "param_name": "isRequestFromIntranet",
-                        "param_desc": "A boolean flag indicating whether the request is coming from the intranet."
+                        "param_desc": "A boolean flag indicating whether the request is coming from an intranet."
                     }
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Retrieve a conversation by its ID, perform necessary checks to ensure its existence, retrieve user information for all participants, and verify the user's right to access the conversation.\n/// </summary>\n/// <param name=\"conversationId\">The ID of the conversation to retrieve.</param>\n/// <param name=\"userId\">The ID of the user requesting the conversation.</param>\n/// <param name=\"schoolIds\">A list of IDs representing the schools related to the conversation.</param>\n/// <param name=\"isRequestFromIntranet\">A boolean flag indicating whether the request is coming from the intranet.</param>\n",
+            "generated_xml_summary": "/// <summary>\n/// Retrieve a conversation by ID with checks for existence and user rights, then build and return the conversation's corresponding user information.\n/// </summary>\n/// <param name=\"conversationId\">The ID of the conversation to retrieve.</param>\n/// <param name=\"userId\">The ID of the user performing the request.</param>\n/// <param name=\"schoolIds\">A list of IDs corresponding to schools that are related to the conversation.</param>\n/// <param name=\"isRequestFromIntranet\">A boolean flag indicating whether the request is coming from an intranet.</param>\n",
             "code_chunks": null
         },
         {
             "name": "CreateConversationAsync",
-            "code_start_index": 5059,
+            "code_start_index": 5718,
             "method_name": "CreateConversationAsync",
             "existing_summary": "\r\n    #endregion Get Conversation\r\n\r\n    #region Create Conversation\r\n\r\n    /// <inheritdoc/>\r\n    ",
             "attributes": null,
@@ -191,7 +191,7 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Create a new conversation with specified recipients, subject, and message content, including handling internal service codes and attachments, and sending notifications if enabled.",
+            "generated_summary": "Create a new conversation with specified parameters, including recipients, subject, and message content, and handle any related validations and notifications.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
@@ -217,12 +217,12 @@
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Create a new conversation with specified recipients, subject, and message content, including handling internal service codes and attachments, and sending notifications if enabled.\n/// </summary>\n/// <param name=\"IConversationWAto\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"isRequestFromIntranet\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"cancellationToken\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"enableNotification\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
+            "generated_xml_summary": "/// <summary>\n/// Create a new conversation with specified parameters, including recipients, subject, and message content, and handle any related validations and notifications.\n/// </summary>\n/// <param name=\"IConversationWAto\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"isRequestFromIntranet\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"cancellationToken\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"enableNotification\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
             "code_chunks": null
         },
         {
             "name": "ValidateRecipientsAsync",
-            "code_start_index": 11627,
+            "code_start_index": 13002,
             "method_name": "ValidateRecipientsAsync",
             "existing_summary": "\r\n    /// <summary>\r\n    /// Check for every scenario if the recipient is a valid recipient for the current user\r\n    /// A student can't send direct messages to an official or a trainer\r\n    /// A trainer can't send a direct message to an official but can send one to another trainer\r\n    /// An official can send a direct message to anyone\r\n    /// </summary>\r\n    /// <param name=\"currentUser\">user trying to add recipients</param>\r\n    /// <param name=\"recipientsUsersIds\">list of ids of the users to add</param>\r\n    /// <exception cref=\"NotImplementedException\"></exception>\r\n    ",
             "attributes": null,
@@ -268,7 +268,7 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Validate recipients based on user types and school ID, with different validation rules for official users and trainers.",
+            "generated_summary": "Validate recipients based on user types and school ID, ensuring that official users and trainers are handled appropriately.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
@@ -279,22 +279,22 @@
                     {
                         "name": "recipientsUsersIds",
                         "param_name": "recipientsUsersIds",
-                        "param_desc": "The list of user IDs for whom the validation is being performed."
+                        "param_desc": "The list of user IDs for recipients to be validated."
                     },
                     {
                         "name": "schoolId",
                         "param_name": "schoolId",
-                        "param_desc": "The ID of the school against which the validation is being conducted."
+                        "param_desc": "The ID of the school against which the validation is being performed."
                     }
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Validate recipients based on user types and school ID, with different validation rules for official users and trainers.\n/// </summary>\n/// <param name=\"currentUser\">The current user who is performing the validation.</param>\n/// <param name=\"recipientsUsersIds\">The list of user IDs for whom the validation is being performed.</param>\n/// <param name=\"schoolId\">The ID of the school against which the validation is being conducted.</param>\n",
+            "generated_xml_summary": "/// <summary>\n/// Validate recipients based on user types and school ID, ensuring that official users and trainers are handled appropriately.\n/// </summary>\n/// <param name=\"currentUser\">The current user who is performing the validation.</param>\n/// <param name=\"recipientsUsersIds\">The list of user IDs for recipients to be validated.</param>\n/// <param name=\"schoolId\">The ID of the school against which the validation is being performed.</param>\n",
             "code_chunks": null
         },
         {
             "name": "CreateRangeConversationAsync",
-            "code_start_index": 13208,
+            "code_start_index": 14638,
             "method_name": "CreateRangeConversationAsync",
             "existing_summary": "\r\n    /// <inheritdoc/>\r\n    ",
             "attributes": null,
@@ -331,13 +331,13 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Create multiple conversations asynchronously and return a list indicating whether each conversation was successfully created or not.",
+            "generated_summary": "Create multiple conversations asynchronously based on the given parameters, handling any exceptions that may occur during the process.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
                         "name": "parameters",
                         "param_name": "parameters",
-                        "param_desc": "The list of conversations to be created. It should be of type IEnumerable<IConversationWAto>."
+                        "param_desc": "An IEnumerable of type IConversationWAto representing the parameters for creating multiple conversations asynchronously."
                     },
                     {
                         "name": "isRequestFromIntranet",
@@ -347,12 +347,12 @@
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Create multiple conversations asynchronously and return a list indicating whether each conversation was successfully created or not.\n/// </summary>\n/// <param name=\"parameters\">The list of conversations to be created. It should be of type IEnumerable<IConversationWAto>.</param>\n/// <param name=\"isRequestFromIntranet\">A boolean flag indicating whether the request is coming from an intranet or not.</param>\n",
+            "generated_xml_summary": "/// <summary>\n/// Create multiple conversations asynchronously based on the given parameters, handling any exceptions that may occur during the process.\n/// </summary>\n/// <param name=\"parameters\">An IEnumerable of type IConversationWAto representing the parameters for creating multiple conversations asynchronously.</param>\n/// <param name=\"isRequestFromIntranet\">A boolean flag indicating whether the request is coming from an intranet or not.</param>\n",
             "code_chunks": null
         },
         {
             "name": "ChangeReadedDateAsync",
-            "code_start_index": 14395,
+            "code_start_index": 15860,
             "method_name": "ChangeReadedDateAsync",
             "existing_summary": "\r\n    #endregion Create Conversation\r\n\r\n    #region Update Conversation\r\n\r\n    ",
             "attributes": null,
@@ -407,38 +407,38 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Update the readed date for conversations based on specified criteria and user information.",
+            "generated_summary": "Update the readed date of conversations for a specified user, based on given conditions.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
                         "name": "conversationIds",
                         "param_name": "conversationIds",
-                        "param_desc": "An array of integers representing the unique identifiers of conversations for which the readed date will be updated."
+                        "param_desc": "An array of integers representing the unique identifiers of conversations."
                     },
                     {
                         "name": "markAsRead",
                         "param_name": "markAsRead",
-                        "param_desc": "A boolean value indicating whether the conversations should be marked as read after updating the readed date."
+                        "param_desc": "A boolean value indicating whether the conversations should be marked as read."
                     },
                     {
                         "name": "userId",
                         "param_name": "userId",
-                        "param_desc": "An integer representing the unique identifier of the user for whom the readed date of conversations will be updated."
+                        "param_desc": "An integer representing the unique identifier of the user."
                     },
                     {
                         "name": "schoolIds",
                         "param_name": "schoolIds",
-                        "param_desc": "An array of integers representing the unique identifiers of schools associated with the conversations, used as criteria for updating the readed date."
+                        "param_desc": "An array of integers representing the unique identifiers of schools."
                     }
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Update the readed date for conversations based on specified criteria and user information.\n/// </summary>\n/// <param name=\"conversationIds\">An array of integers representing the unique identifiers of conversations for which the readed date will be updated.</param>\n/// <param name=\"markAsRead\">A boolean value indicating whether the conversations should be marked as read after updating the readed date.</param>\n/// <param name=\"userId\">An integer representing the unique identifier of the user for whom the readed date of conversations will be updated.</param>\n/// <param name=\"schoolIds\">An array of integers representing the unique identifiers of schools associated with the conversations, used as criteria for updating the readed date.</param>\n",
+            "generated_xml_summary": "/// <summary>\n/// Update the readed date of conversations for a specified user, based on given conditions.\n/// </summary>\n/// <param name=\"conversationIds\">An array of integers representing the unique identifiers of conversations.</param>\n/// <param name=\"markAsRead\">A boolean value indicating whether the conversations should be marked as read.</param>\n/// <param name=\"userId\">An integer representing the unique identifier of the user.</param>\n/// <param name=\"schoolIds\">An array of integers representing the unique identifiers of schools.</param>\n",
             "code_chunks": null
         },
         {
             "name": "AddRecipientsAsync",
-            "code_start_index": 14783,
+            "code_start_index": 16289,
             "method_name": "AddRecipientsAsync",
             "existing_summary": "\r\n    #endregion Update Conversation\r\n\r\n    #region Recipients\r\n\r\n    /// <inheritdoc/>\r\n    ",
             "attributes": null,
@@ -502,28 +502,28 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Add recipients to a conversation, checking permissions and user rights before adding each recipient, and updating the conversation type if necessary.",
+            "generated_summary": "Add recipients to a conversation after performing various checks and validations, including verifying user rights and recipient eligibility, then updating the conversation type if necessary and retrieving information about the added recipients.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
                         "name": "conversationId",
                         "param_name": "conversationId",
-                        "param_desc": "The ID of the conversation to which recipients will be added."
+                        "param_desc": "The ID of the conversation to which recipients are being added."
                     },
                     {
                         "name": "userId",
                         "param_name": "userId",
-                        "param_desc": "The ID of the user initiating the action."
+                        "param_desc": "The ID of the user performing the operation."
                     },
                     {
                         "name": "schoolIds",
                         "param_name": "schoolIds",
-                        "param_desc": "A list of IDs representing the schools to which the recipients belong."
+                        "param_desc": "A list of IDs representing the schools associated with the conversation."
                     },
                     {
                         "name": "newRecipientsUsersIds",
                         "param_name": "newRecipientsUsersIds",
-                        "param_desc": "An enumerable collection of IDs for the new recipients to be added to the conversation."
+                        "param_desc": "An enumerable collection of user IDs for the new recipients being added to the conversation."
                     },
                     {
                         "name": "isRequestFromIntranet",
@@ -533,12 +533,12 @@
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Add recipients to a conversation, checking permissions and user rights before adding each recipient, and updating the conversation type if necessary.\n/// </summary>\n/// <param name=\"conversationId\">The ID of the conversation to which recipients will be added.</param>\n/// <param name=\"userId\">The ID of the user initiating the action.</param>\n/// <param name=\"schoolIds\">A list of IDs representing the schools to which the recipients belong.</param>\n/// <param name=\"newRecipientsUsersIds\">An enumerable collection of IDs for the new recipients to be added to the conversation.</param>\n/// <param name=\"isRequestFromIntranet\">A boolean flag indicating whether the request is coming from the intranet.</param>\n",
+            "generated_xml_summary": "/// <summary>\n/// Add recipients to a conversation after performing various checks and validations, including verifying user rights and recipient eligibility, then updating the conversation type if necessary and retrieving information about the added recipients.\n/// </summary>\n/// <param name=\"conversationId\">The ID of the conversation to which recipients are being added.</param>\n/// <param name=\"userId\">The ID of the user performing the operation.</param>\n/// <param name=\"schoolIds\">A list of IDs representing the schools associated with the conversation.</param>\n/// <param name=\"newRecipientsUsersIds\">An enumerable collection of user IDs for the new recipients being added to the conversation.</param>\n/// <param name=\"isRequestFromIntranet\">A boolean flag indicating whether the request is coming from the intranet.</param>\n",
             "code_chunks": null
         },
         {
             "name": "RemoveRecipientsAsync",
-            "code_start_index": 19093,
+            "code_start_index": 20685,
             "method_name": "RemoveRecipientsAsync",
             "existing_summary": "\r\n    /// <inheritdoc/>\r\n    ",
             "attributes": null,
@@ -602,43 +602,43 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Remove recipients from a conversation, checking permissions and validity before deleting them, updating the conversation type if necessary.",
+            "generated_summary": "Remove recipients from a conversation after performing various checks and validations, including verifying user rights and recipient removal errors, updating the conversation type if necessary.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
                         "name": "conversationId",
                         "param_name": "conversationId",
-                        "param_desc": "The ID of the conversation from which recipients are to be removed."
+                        "param_desc": "The ID of the conversation from which recipients will be removed."
                     },
                     {
                         "name": "userId",
                         "param_name": "userId",
-                        "param_desc": "The ID of the user who is initiating the removal of recipients."
+                        "param_desc": "The ID of the user initiating the recipient removal process."
                     },
                     {
                         "name": "schoolIds",
                         "param_name": "schoolIds",
-                        "param_desc": "A list of integers representing the IDs of schools associated with the conversation."
+                        "param_desc": "A list of IDs representing the schools associated with the conversation."
                     },
                     {
                         "name": "recipientsUsersIds",
                         "param_name": "recipientsUsersIds",
-                        "param_desc": "An enumerable collection of integers representing the IDs of users who are recipients in the conversation."
+                        "param_desc": "An enumerable collection of user IDs representing the recipients to be removed from the conversation."
                     },
                     {
                         "name": "isRequestFromIntranet",
                         "param_name": "isRequestFromIntranet",
-                        "param_desc": "A boolean flag indicating whether the request to remove recipients is coming from an intranet source."
+                        "param_desc": "A boolean flag indicating whether the request to remove recipients is coming from the intranet."
                     }
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Remove recipients from a conversation, checking permissions and validity before deleting them, updating the conversation type if necessary.\n/// </summary>\n/// <param name=\"conversationId\">The ID of the conversation from which recipients are to be removed.</param>\n/// <param name=\"userId\">The ID of the user who is initiating the removal of recipients.</param>\n/// <param name=\"schoolIds\">A list of integers representing the IDs of schools associated with the conversation.</param>\n/// <param name=\"recipientsUsersIds\">An enumerable collection of integers representing the IDs of users who are recipients in the conversation.</param>\n/// <param name=\"isRequestFromIntranet\">A boolean flag indicating whether the request to remove recipients is coming from an intranet source.</param>\n",
+            "generated_xml_summary": "/// <summary>\n/// Remove recipients from a conversation after performing various checks and validations, including verifying user rights and recipient removal errors, updating the conversation type if necessary.\n/// </summary>\n/// <param name=\"conversationId\">The ID of the conversation from which recipients will be removed.</param>\n/// <param name=\"userId\">The ID of the user initiating the recipient removal process.</param>\n/// <param name=\"schoolIds\">A list of IDs representing the schools associated with the conversation.</param>\n/// <param name=\"recipientsUsersIds\">An enumerable collection of user IDs representing the recipients to be removed from the conversation.</param>\n/// <param name=\"isRequestFromIntranet\">A boolean flag indicating whether the request to remove recipients is coming from the intranet.</param>\n",
             "code_chunks": null
         },
         {
             "name": "CheckUserRightToAddOrRemoveRecipients",
-            "code_start_index": 21967,
+            "code_start_index": 23601,
             "method_name": "CheckUserRightToAddOrRemoveRecipients",
             "existing_summary": "\r\n    ",
             "attributes": null,
@@ -675,28 +675,28 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Check if a user has the right to add or remove recipients from a conversation based on their role and membership in the conversation correspondents.",
+            "generated_summary": "Check if the user has the right to add or remove recipients from a conversation based on their role and membership.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
                         "name": "userId",
                         "param_name": "userId",
-                        "param_desc": "The ID of the user who is being checked for the right to add or remove recipients from the conversation."
+                        "param_desc": "The ID of the user who is being checked for the right to add or remove recipients."
                     },
                     {
                         "name": "conversation",
                         "param_name": "conversation",
-                        "param_desc": "The object representing the conversation for which the user's right to add or remove recipients is being checked."
+                        "param_desc": "The conversation object for which the user's rights are being checked to add or remove recipients."
                     }
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Check if a user has the right to add or remove recipients from a conversation based on their role and membership in the conversation correspondents.\n/// </summary>\n/// <param name=\"userId\">The ID of the user who is being checked for the right to add or remove recipients from the conversation.</param>\n/// <param name=\"conversation\">The object representing the conversation for which the user's right to add or remove recipients is being checked.</param>\n",
+            "generated_xml_summary": "/// <summary>\n/// Check if the user has the right to add or remove recipients from a conversation based on their role and membership.\n/// </summary>\n/// <param name=\"userId\">The ID of the user who is being checked for the right to add or remove recipients.</param>\n/// <param name=\"conversation\">The conversation object for which the user's rights are being checked to add or remove recipients.</param>\n",
             "code_chunks": null
         },
         {
             "name": "CheckForRecipientAdditionDuringConversationCreationErrorsAsync",
-            "code_start_index": 23538,
+            "code_start_index": 25198,
             "method_name": "CheckForRecipientAdditionDuringConversationCreationErrorsAsync",
             "existing_summary": "\r\n    ",
             "attributes": null,
@@ -724,7 +724,7 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Prevent addition of Tuteur user as recipient during conversation creation.",
+            "generated_summary": "Prevent addition of a Tuteur user as a recipient during conversation creation.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
@@ -735,17 +735,27 @@
                     {
                         "name": "user",
                         "param_name": "user",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "CheckForRecipientAdditionDuringConversationCreationErrorsAsync",
+                        "param_name": "CheckForRecipientAdditionDuringConversationCreationErrorsAsync",
                         "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "Prevent addition of a Tuteur user as a recipient during conversation creation.",
+                        "param_name": "Prevent addition of a Tuteur user as a recipient during conversation creation.",
+                        "param_desc": "The generated description for the parameter"
                     }
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Prevent addition of Tuteur user as recipient during conversation creation.\n/// </summary>\n/// <param name=\"IUserWithTypeRIto\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"user\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
+            "generated_xml_summary": "/// <summary>\n/// Prevent addition of a Tuteur user as a recipient during conversation creation.\n/// </summary>\n/// <param name=\"IUserWithTypeRIto\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"user\">The generated description for the parameter</param>\n/// <param name=\"CheckForRecipientAdditionDuringConversationCreationErrorsAsync\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"Prevent addition of a Tuteur user as a recipient during conversation creation.\">The generated description for the parameter</param>\n",
             "code_chunks": null
         },
         {
             "name": "CheckForRecipientAdditionErrorsAsync",
-            "code_start_index": 23994,
+            "code_start_index": 25688,
             "method_name": "CheckForRecipientAdditionErrorsAsync",
             "existing_summary": "\r\n    /// <inheritdoc/>\r\n    ",
             "attributes": null,
@@ -782,28 +792,28 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Check for recipient addition errors, ensuring that the new recipient is not already in the conversation, exists in the system, and is not a Tuteur user.",
+            "generated_summary": "Check for errors related to adding a recipient to a conversation, ensuring the recipient is not already added, exists, and is not a Tuteur.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
                         "name": "newRecipientUserId",
                         "param_name": "newRecipientUserId",
-                        "param_desc": "The ID of the new recipient user. This parameter should be an integer."
+                        "param_desc": "The ID of the new recipient user who is being added to the conversation."
                     },
                     {
                         "name": "conversation",
                         "param_name": "conversation",
-                        "param_desc": "The conversation object representing the conversation where the recipient is being added."
+                        "param_desc": "The conversation object to which the new recipient user is being added."
                     }
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Check for recipient addition errors, ensuring that the new recipient is not already in the conversation, exists in the system, and is not a Tuteur user.\n/// </summary>\n/// <param name=\"newRecipientUserId\">The ID of the new recipient user. This parameter should be an integer.</param>\n/// <param name=\"conversation\">The conversation object representing the conversation where the recipient is being added.</param>\n",
+            "generated_xml_summary": "/// <summary>\n/// Check for errors related to adding a recipient to a conversation, ensuring the recipient is not already added, exists, and is not a Tuteur.\n/// </summary>\n/// <param name=\"newRecipientUserId\">The ID of the new recipient user who is being added to the conversation.</param>\n/// <param name=\"conversation\">The conversation object to which the new recipient user is being added.</param>\n",
             "code_chunks": null
         },
         {
             "name": "CheckForRecipientRemovalErrors",
-            "code_start_index": 25840,
+            "code_start_index": 27579,
             "method_name": "CheckForRecipientRemovalErrors",
             "existing_summary": "\r\n    /// <inheritdoc/>\r\n    ",
             "attributes": null,
@@ -840,13 +850,13 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Check for errors related to the removal of recipients in a conversation, preventing removal if the minimum number of correspondents has already been reached.",
+            "generated_summary": "Check for any errors that may occur when attempting to remove recipients from a conversation, based on the minimum number of correspondents allowed.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
                         "name": "conversation",
                         "param_name": "conversation",
-                        "param_desc": "The conversation object on which recipient removal errors are being checked."
+                        "param_desc": "The conversation object to check for recipient removal errors."
                     },
                     {
                         "name": "recipientsToRemoveCount",
@@ -856,12 +866,12 @@
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Check for errors related to the removal of recipients in a conversation, preventing removal if the minimum number of correspondents has already been reached.\n/// </summary>\n/// <param name=\"conversation\">The conversation object on which recipient removal errors are being checked.</param>\n/// <param name=\"recipientsToRemoveCount\">The number of recipients to be removed from the conversation.</param>\n",
+            "generated_xml_summary": "/// <summary>\n/// Check for any errors that may occur when attempting to remove recipients from a conversation, based on the minimum number of correspondents allowed.\n/// </summary>\n/// <param name=\"conversation\">The conversation object to check for recipient removal errors.</param>\n/// <param name=\"recipientsToRemoveCount\">The number of recipients to be removed from the conversation.</param>\n",
             "code_chunks": null
         },
         {
             "name": "CheckForRecipientRemovalErrorsForRecipient",
-            "code_start_index": 26729,
+            "code_start_index": 28503,
             "method_name": "CheckForRecipientRemovalErrorsForRecipient",
             "existing_summary": "\r\n    /// <inheritdoc/>\r\n    ",
             "attributes": null,
@@ -898,28 +908,28 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Check for errors related to removing a recipient from a conversation, ensuring the recipient is not the sender and is actually a recipient in the conversation.",
+            "generated_summary": "Validate if a recipient can be removed from a conversation, considering sender and recipient roles and corresponding error conditions.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
                         "name": "recipientUserIdToRemove",
                         "param_name": "recipientUserIdToRemove",
-                        "param_desc": "The ID of the recipient user to be removed from the conversation. This parameter should be an integer."
+                        "param_desc": "The ID of the recipient user to be removed from the conversation."
                     },
                     {
                         "name": "conversation",
                         "param_name": "conversation",
-                        "param_desc": "The conversation object from which the recipient should be removed. This parameter should be of type IConversationRAto."
+                        "param_desc": "The conversation object containing information about the conversation from which the recipient is to be removed."
                     }
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Check for errors related to removing a recipient from a conversation, ensuring the recipient is not the sender and is actually a recipient in the conversation.\n/// </summary>\n/// <param name=\"recipientUserIdToRemove\">The ID of the recipient user to be removed from the conversation. This parameter should be an integer.</param>\n/// <param name=\"conversation\">The conversation object from which the recipient should be removed. This parameter should be of type IConversationRAto.</param>\n",
+            "generated_xml_summary": "/// <summary>\n/// Validate if a recipient can be removed from a conversation, considering sender and recipient roles and corresponding error conditions.\n/// </summary>\n/// <param name=\"recipientUserIdToRemove\">The ID of the recipient user to be removed from the conversation.</param>\n/// <param name=\"conversation\">The conversation object containing information about the conversation from which the recipient is to be removed.</param>\n",
             "code_chunks": null
         },
         {
             "name": "CheckSchoolUserRightToAccessConversation",
-            "code_start_index": 28332,
+            "code_start_index": 30152,
             "method_name": "CheckSchoolUserRightToAccessConversation",
             "existing_summary": "\r\n    #endregion Recipients\r\n\r\n    #region Common\r\n\r\n    /// <inheritdoc/>\r\n    ",
             "attributes": null,
@@ -974,7 +984,7 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Validate the user's right to access a conversation based on the user's role and the conversation audience, taking into account whether the request is from an intranet or LMS environment.",
+            "generated_summary": "Validate the user's right to access a conversation based on the user's role and the type of request (Intranet or LMS).",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
@@ -985,27 +995,27 @@
                     {
                         "name": "userId",
                         "param_name": "userId",
-                        "param_desc": "The unique identifier of the user whose access rights need to be validated."
+                        "param_desc": "The unique identifier of the user whose access rights are being checked."
                     },
                     {
                         "name": "schoolIds",
                         "param_name": "schoolIds",
-                        "param_desc": "A list of unique identifiers representing the schools associated with the user."
+                        "param_desc": "A list of unique identifiers for schools that the user is associated with."
                     },
                     {
                         "name": "isRequestFromIntranet",
                         "param_name": "isRequestFromIntranet",
-                        "param_desc": "A boolean flag indicating whether the request is coming from an intranet environment."
+                        "param_desc": "A boolean flag indicating whether the request is coming from the intranet."
                     }
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Validate the user's right to access a conversation based on the user's role and the conversation audience, taking into account whether the request is from an intranet or LMS environment.\n/// </summary>\n/// <param name=\"conversation\">The conversation object that the user wants to access.</param>\n/// <param name=\"userId\">The unique identifier of the user whose access rights need to be validated.</param>\n/// <param name=\"schoolIds\">A list of unique identifiers representing the schools associated with the user.</param>\n/// <param name=\"isRequestFromIntranet\">A boolean flag indicating whether the request is coming from an intranet environment.</param>\n",
+            "generated_xml_summary": "/// <summary>\n/// Validate the user's right to access a conversation based on the user's role and the type of request (Intranet or LMS).\n/// </summary>\n/// <param name=\"conversation\">The conversation object that the user wants to access.</param>\n/// <param name=\"userId\">The unique identifier of the user whose access rights are being checked.</param>\n/// <param name=\"schoolIds\">A list of unique identifiers for schools that the user is associated with.</param>\n/// <param name=\"isRequestFromIntranet\">A boolean flag indicating whether the request is coming from the intranet.</param>\n",
             "code_chunks": null
         },
         {
             "name": "IsUserFoundAmongCorrespondants",
-            "code_start_index": 30914,
+            "code_start_index": 32792,
             "method_name": "IsUserFoundAmongCorrespondants",
             "existing_summary": "\r\n    /// <inheritdoc/>\r\n    ",
             "attributes": null,
@@ -1042,38 +1052,28 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Check if a user is found among a list of correspondants with specified roles.",
+            "generated_summary": "Check if a user is found among correspondants with specified roles.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
                         "name": "userId",
                         "param_name": "userId",
-                        "param_desc": "The ID of the user to check for among the list of correspondants."
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
                     },
                     {
                         "name": "correspondants",
                         "param_name": "correspondants",
-                        "param_desc": "An IEnumerable of ICorrespondantRAto objects representing the list of correspondants to search through."
-                    },
-                    {
-                        "name": "methodName",
-                        "param_name": "methodName",
-                        "param_desc": "The name of the method being called, in this case, 'IsUserFoundAmongCorrespondants'."
-                    },
-                    {
-                        "name": "methodPurpose",
-                        "param_name": "methodPurpose",
-                        "param_desc": "The purpose of the method 'IsUserFoundAmongCorrespondants' is to check if a user is found among a list of correspondants with specified roles."
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
                     }
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Check if a user is found among a list of correspondants with specified roles.\n/// </summary>\n/// <param name=\"userId\">The ID of the user to check for among the list of correspondants.</param>\n/// <param name=\"correspondants\">An IEnumerable of ICorrespondantRAto objects representing the list of correspondants to search through.</param>\n/// <param name=\"methodName\">The name of the method being called, in this case, 'IsUserFoundAmongCorrespondants'.</param>\n/// <param name=\"methodPurpose\">The purpose of the method 'IsUserFoundAmongCorrespondants' is to check if a user is found among a list of correspondants with specified roles.</param>\n",
+            "generated_xml_summary": "/// <summary>\n/// Check if a user is found among correspondants with specified roles.\n/// </summary>\n/// <param name=\"userId\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"correspondants\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
             "code_chunks": null
         },
         {
             "name": "IsUserFoundAmongCorrespondantsWithSpecifiedCorrespondantRoles",
-            "code_start_index": 31144,
+            "code_start_index": 33027,
             "method_name": "IsUserFoundAmongCorrespondantsWithSpecifiedCorrespondantRoles",
             "existing_summary": "\r\n    ",
             "attributes": null,
@@ -1119,33 +1119,33 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Check if a user with specified roles is found among the correspondants.",
+            "generated_summary": "Check if a user is found among correspondants with specified roles.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
                         "name": "userId",
                         "param_name": "userId",
-                        "param_desc": "The ID of the user to check for among the correspondants."
+                        "param_desc": "The ID of the user to check for among the correspondants with specified roles."
                     },
                     {
                         "name": "correspondants",
                         "param_name": "correspondants",
-                        "param_desc": "An IEnumerable of ICorrespondantRAto instances representing the correspondants to search through."
+                        "param_desc": "An IEnumerable collection of ICorrespondantRAto instances representing the correspondants to search through."
                     },
                     {
                         "name": "roles",
                         "param_name": "roles",
-                        "param_desc": "An optional array of ECorrespondantRoleRAto instances representing the roles to filter the search by."
+                        "param_desc": "An optional array of ECorrespondantRoleRAto values specifying the roles to consider when checking for the user among the correspondants."
                     }
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Check if a user with specified roles is found among the correspondants.\n/// </summary>\n/// <param name=\"userId\">The ID of the user to check for among the correspondants.</param>\n/// <param name=\"correspondants\">An IEnumerable of ICorrespondantRAto instances representing the correspondants to search through.</param>\n/// <param name=\"roles\">An optional array of ECorrespondantRoleRAto instances representing the roles to filter the search by.</param>\n",
+            "generated_xml_summary": "/// <summary>\n/// Check if a user is found among correspondants with specified roles.\n/// </summary>\n/// <param name=\"userId\">The ID of the user to check for among the correspondants with specified roles.</param>\n/// <param name=\"correspondants\">An IEnumerable collection of ICorrespondantRAto instances representing the correspondants to search through.</param>\n/// <param name=\"roles\">An optional array of ECorrespondantRoleRAto values specifying the roles to consider when checking for the user among the correspondants.</param>\n",
             "code_chunks": null
         },
         {
             "name": "IsUserFoundAmongCorrespondantsWithSpecifiedUserRoles",
-            "code_start_index": 32113,
+            "code_start_index": 34041,
             "method_name": "IsUserFoundAmongCorrespondantsWithSpecifiedUserRoles",
             "existing_summary": "\r\n    /// <inheritdoc/>\r\n    ",
             "attributes": null,
@@ -1197,37 +1197,27 @@
                     {
                         "name": "userId",
                         "param_name": "userId",
-                        "param_desc": "The ID of the user to be checked."
+                        "param_desc": "The ID of the user."
                     },
                     {
                         "name": "correspondants",
                         "param_name": "correspondants",
-                        "param_desc": "An enumerable collection of correspondants implementing the ICorrespondantRAto interface."
+                        "param_desc": "An enumerable collection of correspondants."
                     },
                     {
                         "name": "roles",
                         "param_name": "roles",
-                        "param_desc": "An array of EUserRoleRAto type representing user roles. This parameter is optional."
-                    },
-                    {
-                        "name": "methodName",
-                        "param_name": "methodName",
-                        "param_desc": "The name of the existing method: 'IsUserFoundAmongCorrespondantsWithSpecifiedUserRoles'."
-                    },
-                    {
-                        "name": "methodPurpose",
-                        "param_name": "methodPurpose",
-                        "param_desc": "The purpose of the method: 'Check if a user with specified roles is found among the correspondants.'."
+                        "param_desc": "An array of user roles. This parameter is optional."
                     }
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Check if a user with specified roles is found among the correspondants.\n/// </summary>\n/// <param name=\"userId\">The ID of the user to be checked.</param>\n/// <param name=\"correspondants\">An enumerable collection of correspondants implementing the ICorrespondantRAto interface.</param>\n/// <param name=\"roles\">An array of EUserRoleRAto type representing user roles. This parameter is optional.</param>\n/// <param name=\"methodName\">The name of the existing method: 'IsUserFoundAmongCorrespondantsWithSpecifiedUserRoles'.</param>\n/// <param name=\"methodPurpose\">The purpose of the method: 'Check if a user with specified roles is found among the correspondants.'.</param>\n",
+            "generated_xml_summary": "/// <summary>\n/// Check if a user with specified roles is found among the correspondants.\n/// </summary>\n/// <param name=\"userId\">The ID of the user.</param>\n/// <param name=\"correspondants\">An enumerable collection of correspondants.</param>\n/// <param name=\"roles\">An array of user roles. This parameter is optional.</param>\n",
             "code_chunks": null
         },
         {
             "name": "ChangeMultipleConversationStatusAsync",
-            "code_start_index": 33127,
+            "code_start_index": 35104,
             "method_name": "ChangeMultipleConversationStatusAsync",
             "existing_summary": "\r\n    #endregion Common\r\n\r\n    #endregion V1\r\n\r\n    #region V2\r\n\r\n    /// <inheritdoc/>\r\n    ",
             "attributes": null,
@@ -1282,38 +1272,38 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Update the status of multiple conversations based on specified conversation IDs, while ensuring the correct number of records and user permissions are met.",
+            "generated_summary": "Update the status of multiple conversations based on specified conversation IDs and user ID, ensuring the correct number of conversations are updated and that the user has the necessary permissions.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
                         "name": "conversationIds",
                         "param_name": "conversationIds",
-                        "param_desc": "An array of integers representing the conversation IDs that need their status changed."
+                        "param_desc": "An array of integers representing the IDs of the conversations to be updated."
                     },
                     {
                         "name": "conversationStatus",
                         "param_name": "conversationStatus",
-                        "param_desc": "An enum value representing the new conversation status to be applied."
+                        "param_desc": "The desired conversation status to which the specified conversations will be updated."
                     },
                     {
                         "name": "userId",
                         "param_name": "userId",
-                        "param_desc": "An integer representing the user ID who is initiating the status change."
+                        "param_desc": "An integer representing the ID of the user initiating the status change operation."
                     },
                     {
                         "name": "schoolId",
                         "param_name": "schoolId",
-                        "param_desc": "An integer representing the ID of the school where the conversations belong."
+                        "param_desc": "An integer representing the ID of the school to which the conversations belong."
                     }
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Update the status of multiple conversations based on specified conversation IDs, while ensuring the correct number of records and user permissions are met.\n/// </summary>\n/// <param name=\"conversationIds\">An array of integers representing the conversation IDs that need their status changed.</param>\n/// <param name=\"conversationStatus\">An enum value representing the new conversation status to be applied.</param>\n/// <param name=\"userId\">An integer representing the user ID who is initiating the status change.</param>\n/// <param name=\"schoolId\">An integer representing the ID of the school where the conversations belong.</param>\n",
+            "generated_xml_summary": "/// <summary>\n/// Update the status of multiple conversations based on specified conversation IDs and user ID, ensuring the correct number of conversations are updated and that the user has the necessary permissions.\n/// </summary>\n/// <param name=\"conversationIds\">An array of integers representing the IDs of the conversations to be updated.</param>\n/// <param name=\"conversationStatus\">The desired conversation status to which the specified conversations will be updated.</param>\n/// <param name=\"userId\">An integer representing the ID of the user initiating the status change operation.</param>\n/// <param name=\"schoolId\">An integer representing the ID of the school to which the conversations belong.</param>\n",
             "code_chunks": null
         },
         {
             "name": "GetFilteredConversationsAndCountByUserIdAsync",
-            "code_start_index": 34267,
+            "code_start_index": 36282,
             "method_name": "GetFilteredConversationsAndCountByUserIdAsync",
             "existing_summary": "\r\n    /// <inheritdoc/>\r\n    ",
             "attributes": null,
@@ -1368,38 +1358,38 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Retrieve filtered conversations and their count based on user ID, applying default filters and checking user rights before returning the conversations list.",
+            "generated_summary": "Retrieve filtered conversations and their count for a specified user, applying default filters and checking user's access rights before returning the result.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
                         "name": "userId",
                         "param_name": "userId",
-                        "param_desc": "The ID of the user for whom the conversations are being retrieved."
+                        "param_desc": "The ID of the user for whom the conversations need to be filtered."
                     },
                     {
                         "name": "schoolsIds",
                         "param_name": "schoolsIds",
-                        "param_desc": "A collection of IDs representing the schools to filter the conversations by."
+                        "param_desc": "A collection of IDs representing the schools for which the conversations need to be filtered."
                     },
                     {
                         "name": "listingSelector",
                         "param_name": "listingSelector",
-                        "param_desc": "An object used to select the type of listing to be applied on the conversations."
+                        "param_desc": "An untyped listing selector that defines additional filtering criteria for the conversations."
                     },
                     {
                         "name": "isRequestFromIntranet",
                         "param_name": "isRequestFromIntranet",
-                        "param_desc": "A flag indicating whether the request is coming from an intranet."
+                        "param_desc": "A boolean flag indicating whether the request is coming from an intranet."
                     }
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Retrieve filtered conversations and their count based on user ID, applying default filters and checking user rights before returning the conversations list.\n/// </summary>\n/// <param name=\"userId\">The ID of the user for whom the conversations are being retrieved.</param>\n/// <param name=\"schoolsIds\">A collection of IDs representing the schools to filter the conversations by.</param>\n/// <param name=\"listingSelector\">An object used to select the type of listing to be applied on the conversations.</param>\n/// <param name=\"isRequestFromIntranet\">A flag indicating whether the request is coming from an intranet.</param>\n",
+            "generated_xml_summary": "/// <summary>\n/// Retrieve filtered conversations and their count for a specified user, applying default filters and checking user's access rights before returning the result.\n/// </summary>\n/// <param name=\"userId\">The ID of the user for whom the conversations need to be filtered.</param>\n/// <param name=\"schoolsIds\">A collection of IDs representing the schools for which the conversations need to be filtered.</param>\n/// <param name=\"listingSelector\">An untyped listing selector that defines additional filtering criteria for the conversations.</param>\n/// <param name=\"isRequestFromIntranet\">A boolean flag indicating whether the request is coming from an intranet.</param>\n",
             "code_chunks": null
         },
         {
             "name": "AddConversationDefaultFilters",
-            "code_start_index": 35337,
+            "code_start_index": 37368,
             "method_name": "AddConversationDefaultFilters",
             "existing_summary": "\r\n    ",
             "attributes": null,
@@ -1454,38 +1444,38 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Apply default filters to conversations based on specified conditions, such as school IDs, user ID, archived status, and messaging type, depending on the origin of the request.",
+            "generated_summary": "Apply default filters to conversation listings based on specified conditions, such as school audience, user correspondence, and messaging type, with additional filters for intranet or non-intranet requests.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
                         "name": "userId",
                         "param_name": "userId",
-                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                        "param_desc": "The ID of the user for whom the conversation filters are being applied."
                     },
                     {
                         "name": "schoolsIds",
                         "param_name": "schoolsIds",
-                        "param_desc": "The generated description for the parameter"
+                        "param_desc": "An enumerable collection of school IDs used to filter conversation listings based on school audience."
                     },
                     {
                         "name": "listingSelector",
                         "param_name": "listingSelector",
-                        "param_desc": "The generated description for the parameter"
+                        "param_desc": "An untyped listing selector object that specifies additional conditions for filtering conversation listings."
                     },
                     {
                         "name": "isRequestFromIntranet",
                         "param_name": "isRequestFromIntranet",
-                        "param_desc": "The generated description for the parameter"
+                        "param_desc": "A boolean flag indicating whether the request is coming from an intranet or not, used to apply specific filters based on the request source."
                     }
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Apply default filters to conversations based on specified conditions, such as school IDs, user ID, archived status, and messaging type, depending on the origin of the request.\n/// </summary>\n/// <param name=\"userId\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"schoolsIds\">The generated description for the parameter</param>\n/// <param name=\"listingSelector\">The generated description for the parameter</param>\n/// <param name=\"isRequestFromIntranet\">The generated description for the parameter</param>\n",
+            "generated_xml_summary": "/// <summary>\n/// Apply default filters to conversation listings based on specified conditions, such as school audience, user correspondence, and messaging type, with additional filters for intranet or non-intranet requests.\n/// </summary>\n/// <param name=\"userId\">The ID of the user for whom the conversation filters are being applied.</param>\n/// <param name=\"schoolsIds\">An enumerable collection of school IDs used to filter conversation listings based on school audience.</param>\n/// <param name=\"listingSelector\">An untyped listing selector object that specifies additional conditions for filtering conversation listings.</param>\n/// <param name=\"isRequestFromIntranet\">A boolean flag indicating whether the request is coming from an intranet or not, used to apply specific filters based on the request source.</param>\n",
             "code_chunks": null
         },
         {
             "name": "DoesFilterAlreadyExist",
-            "code_start_index": 38648,
+            "code_start_index": 41016,
             "method_name": "DoesFilterAlreadyExist",
             "existing_summary": "\r\n    /// <summary>\r\n    /// Check filter's names existance in provided filters compositions\r\n    /// </summary>\r\n    /// <param name=\"filterName\"></param>\r\n    /// <param name=\"conversationFilters\"></param>\r\n    /// <param name=\"filterValue\"></param>\r\n    /// <returns></returns>\r\n    ",
             "attributes": null,
@@ -1531,33 +1521,33 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Check if a filter with a specified name already exists.",
+            "generated_summary": "Check if a filter with a specified name and optional value already exists in the conversation filters.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
                         "name": "filterName",
                         "param_name": "filterName",
-                        "param_desc": "The name of the filter to be checked if it already exists."
+                        "param_desc": "The name of the filter. It should be an instance of ConversationFiltersEnum."
                     },
                     {
                         "name": "conversationFilters",
                         "param_name": "conversationFilters",
-                        "param_desc": "A collection of untyped filters compositions related to conversations."
+                        "param_desc": "A collection of untyped filters compositions. It should implement the IEnumerable interface with elements of type IUntypedFiltersComposition."
                     },
                     {
                         "name": "filterValue",
                         "param_name": "filterValue",
-                        "param_desc": "The value to be used as a filter. It is optional and defaults to null if not provided."
+                        "param_desc": "An optional parameter that represents the value associated with the filter. If not provided, it defaults to null."
                     }
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Check if a filter with a specified name already exists.\n/// </summary>\n/// <param name=\"filterName\">The name of the filter to be checked if it already exists.</param>\n/// <param name=\"conversationFilters\">A collection of untyped filters compositions related to conversations.</param>\n/// <param name=\"filterValue\">The value to be used as a filter. It is optional and defaults to null if not provided.</param>\n",
+            "generated_xml_summary": "/// <summary>\n/// Check if a filter with a specified name and optional value already exists in the conversation filters.\n/// </summary>\n/// <param name=\"filterName\">The name of the filter. It should be an instance of ConversationFiltersEnum.</param>\n/// <param name=\"conversationFilters\">A collection of untyped filters compositions. It should implement the IEnumerable interface with elements of type IUntypedFiltersComposition.</param>\n/// <param name=\"filterValue\">An optional parameter that represents the value associated with the filter. If not provided, it defaults to null.</param>\n",
             "code_chunks": null
         },
         {
             "name": "GetConversationCountByUserIdAsync",
-            "code_start_index": 39204,
+            "code_start_index": 41601,
             "method_name": "GetConversationCountByUserIdAsync",
             "existing_summary": "\r\n    /// <inheritdoc/>\r\n    ",
             "attributes": null,
@@ -1612,38 +1602,38 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Retrieve the count of conversations for a specific user ID, with optional filters and sorting.",
+            "generated_summary": "Count the number of conversations for a specified user ID with optional filters and sorting.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
                         "name": "userId",
                         "param_name": "userId",
-                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                        "param_desc": "The ID of the user for whom the conversation count needs to be calculated."
                     },
                     {
                         "name": "schoolsIds",
                         "param_name": "schoolsIds",
-                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                        "param_desc": "A collection of school IDs for which the conversations need to be counted."
                     },
                     {
                         "name": "listingSelector",
                         "param_name": "listingSelector",
-                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                        "param_desc": "An untyped listing selector object that provides optional filters and sorting criteria for the conversations."
                     },
                     {
                         "name": "isRequestFromIntranet",
                         "param_name": "isRequestFromIntranet",
-                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                        "param_desc": "A boolean flag indicating whether the request is coming from the intranet."
                     }
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Retrieve the count of conversations for a specific user ID, with optional filters and sorting.\n/// </summary>\n/// <param name=\"userId\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"schoolsIds\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"listingSelector\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"isRequestFromIntranet\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
+            "generated_xml_summary": "/// <summary>\n/// Count the number of conversations for a specified user ID with optional filters and sorting.\n/// </summary>\n/// <param name=\"userId\">The ID of the user for whom the conversation count needs to be calculated.</param>\n/// <param name=\"schoolsIds\">A collection of school IDs for which the conversations need to be counted.</param>\n/// <param name=\"listingSelector\">An untyped listing selector object that provides optional filters and sorting criteria for the conversations.</param>\n/// <param name=\"isRequestFromIntranet\">A boolean flag indicating whether the request is coming from the intranet.</param>\n",
             "code_chunks": null
         },
         {
             "name": "GetFilteredConversationsByUserIdAsync",
-            "code_start_index": 39512,
+            "code_start_index": 41937,
             "method_name": "GetFilteredConversationsByUserIdAsync",
             "existing_summary": "\r\n    /// <inheritdoc/>\r\n    ",
             "attributes": null,
@@ -1698,7 +1688,7 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Retrieve conversations filtered by user ID with specified filters and sorting criteria, returning a list of conversation objects in a different format.",
+            "generated_summary": "Retrieve filtered conversations by user ID asynchronously, based on specified filters and sorting criteria.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
@@ -1724,12 +1714,12 @@
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Retrieve conversations filtered by user ID with specified filters and sorting criteria, returning a list of conversation objects in a different format.\n/// </summary>\n/// <param name=\"userId\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"schoolsIds\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"listingSelector\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"isRequestFromIntranet\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
+            "generated_xml_summary": "/// <summary>\n/// Retrieve filtered conversations by user ID asynchronously, based on specified filters and sorting criteria.\n/// </summary>\n/// <param name=\"userId\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"schoolsIds\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"listingSelector\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"isRequestFromIntranet\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
             "code_chunks": null
         },
         {
             "name": "GetConversationType",
-            "code_start_index": 40282,
+            "code_start_index": 42948,
             "method_name": "GetConversationType",
             "existing_summary": "\r\n    #endregion V2\r\n\r\n    /// <summary>\r\n    /// Gets a conversation type depending on its users.\r\n    /// </summary>\r\n    /// <param name=\"conversationUsers\">The conversation users.</param>\r\n    /// <returns>A conversation type.</returns>\r\n    ",
             "attributes": null,
@@ -1757,23 +1747,23 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Determine the type of conversation based on the users involved, prioritizing official users and formators.",
+            "generated_summary": "Determine the type of conversation based on the users involved, with options for official users and formators.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
                         "name": "conversationUsers",
                         "param_name": "conversationUsers",
-                        "param_desc": "The list of users involved in the conversation. The type of users must implement the 'IUserWithTypeRIto' interface."
+                        "param_desc": "The list of users involved in the conversation. The users are of type 'IUserWithTypeRIto'."
                     }
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Determine the type of conversation based on the users involved, prioritizing official users and formators.\n/// </summary>\n/// <param name=\"conversationUsers\">The list of users involved in the conversation. The type of users must implement the 'IUserWithTypeRIto' interface.</param>\n",
+            "generated_xml_summary": "/// <summary>\n/// Determine the type of conversation based on the users involved, with options for official users and formators.\n/// </summary>\n/// <param name=\"conversationUsers\">The list of users involved in the conversation. The users are of type 'IUserWithTypeRIto'.</param>\n",
             "code_chunks": null
         },
         {
             "name": "GetCorrespondantRoles",
-            "code_start_index": 41004,
+            "code_start_index": 44084,
             "method_name": "GetCorrespondantRoles",
             "existing_summary": "\r\n    /// <summary>\r\n    /// Defines a correspondant roles.\r\n    /// </summary>\r\n    /// <param name=\"isSender\">Defines whether the correspondant is a sender. True for a sender, false for a recipient.</param>\r\n    /// <param name=\"userId\">The user ID.</param>\r\n    /// <param name=\"usersWithType\">The collection of users with their type.</param>\r\n    /// <returns>A collection of roles.</returns>\r\n    ",
             "attributes": null,
@@ -1819,33 +1809,33 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Create an array of roles for a specified user based on whether they are a sender or recipient.",
+            "generated_summary": "Create and return an array of correspondent roles based on the sender status and specified user ID.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
                         "name": "isSender",
                         "param_name": "isSender",
-                        "param_desc": "A boolean value indicating whether the user is the sender."
+                        "param_desc": "A boolean value indicating whether the user is a sender or not."
                     },
                     {
                         "name": "userId",
                         "param_name": "userId",
-                        "param_desc": "An integer representing the unique identifier of the user."
+                        "param_desc": "An integer representing the ID of the user for whom correspondent roles need to be retrieved."
                     },
                     {
                         "name": "usersWithType",
                         "param_name": "usersWithType",
-                        "param_desc": "An enumerable collection of users with their corresponding types."
+                        "param_desc": "An enumerable collection of users with their corresponding types, used to determine the roles based on sender status and user ID."
                     }
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Create an array of roles for a specified user based on whether they are a sender or recipient.\n/// </summary>\n/// <param name=\"isSender\">A boolean value indicating whether the user is the sender.</param>\n/// <param name=\"userId\">An integer representing the unique identifier of the user.</param>\n/// <param name=\"usersWithType\">An enumerable collection of users with their corresponding types.</param>\n",
+            "generated_xml_summary": "/// <summary>\n/// Create and return an array of correspondent roles based on the sender status and specified user ID.\n/// </summary>\n/// <param name=\"isSender\">A boolean value indicating whether the user is a sender or not.</param>\n/// <param name=\"userId\">An integer representing the ID of the user for whom correspondent roles need to be retrieved.</param>\n/// <param name=\"usersWithType\">An enumerable collection of users with their corresponding types, used to determine the roles based on sender status and user ID.</param>\n",
             "code_chunks": null
         },
         {
             "name": "GetUsersIdsAndTheirBelongingToAnyInternalService",
-            "code_start_index": 44799,
+            "code_start_index": 45222,
             "method_name": "GetUsersIdsAndTheirBelongingToAnyInternalService",
             "existing_summary": "\r\n    /// <summary>\r\n    /// Gets a collection that contains users IDs and their belonging to any internal service.\r\n    /// </summary>\r\n    /// <param name=\"currentSchoolId\">The school ID.</param>\r\n    /// <param name=\"users\">Conversation users.</param>\r\n    /// <returns>A dictionary where the key is a user ID, and the value is a flag set to true if the user belongs to any internal service.</returns>\r\n    ",
             "attributes": null,
@@ -1882,28 +1872,28 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Retrieve the users' IDs and whether they belong to any internal service based on their email and current school ID.",
+            "generated_summary": "Retrieve the users' IDs and whether they belong to any internal service, based on their email and current school ID.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
                         "name": "currentSchoolId",
                         "param_name": "currentSchoolId",
-                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                        "param_desc": "The ID of the current school. It should be an integer value."
                     },
                     {
                         "name": "users",
                         "param_name": "users",
-                        "param_desc": "The generated description for the parameter"
+                        "param_desc": "An enumerable collection of IUserRIto instances representing the users. IUserRIto is an interface type."
                     }
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Retrieve the users' IDs and whether they belong to any internal service based on their email and current school ID.\n/// </summary>\n/// <param name=\"currentSchoolId\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"users\">The generated description for the parameter</param>\n",
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the users' IDs and whether they belong to any internal service, based on their email and current school ID.\n/// </summary>\n/// <param name=\"currentSchoolId\">The ID of the current school. It should be an integer value.</param>\n/// <param name=\"users\">An enumerable collection of IUserRIto instances representing the users. IUserRIto is an interface type.</param>\n",
             "code_chunks": null
         },
         {
             "name": "BuildConversationAto",
-            "code_start_index": 42713,
+            "code_start_index": 46225,
             "method_name": "BuildConversationAto",
             "existing_summary": "\r\n    ",
             "attributes": null,
@@ -1940,23 +1930,23 @@
             "is_sealed": false,
             "is_new": false,
             "_code_chunks": null,
-            "generated_summary": "Construct a conversation object with all related details, including correspondents, attachments, and reading status, based on the conversation ID and user ID provided.",
+            "generated_summary": "Construct the final object for a conversation, including details about correspondents, reading status, attachments, and message count.",
             "generated_parameters_summaries": {
                 "params_list": [
                     {
                         "name": "conversationRIto",
                         "param_name": "conversationRIto",
-                        "param_desc": "IConversationRIto conversationRIto"
+                        "param_desc": "The IConversationRIto instance that represents the conversation to be built."
                     },
                     {
                         "name": "userId",
                         "param_name": "userId",
-                        "param_desc": "int userId"
+                        "param_desc": "The integer ID of the user for whom the conversation is being built."
                     }
                 ]
             },
             "generated_return_summary": null,
-            "generated_xml_summary": "/// <summary>\n/// Construct a conversation object with all related details, including correspondents, attachments, and reading status, based on the conversation ID and user ID provided.\n/// </summary>\n/// <param name=\"conversationRIto\">IConversationRIto conversationRIto</param>\n/// <param name=\"userId\">int userId</param>\n",
+            "generated_xml_summary": "/// <summary>\n/// Construct the final object for a conversation, including details about correspondents, reading status, attachments, and message count.\n/// </summary>\n/// <param name=\"conversationRIto\">The IConversationRIto instance that represents the conversation to be built.</param>\n/// <param name=\"userId\">The integer ID of the user for whom the conversation is being built.</param>\n",
             "code_chunks": null
         }
     ],

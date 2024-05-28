@@ -1,0 +1,284 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/V2/NotificationsV2Controller.cs",
+    "index_shift_code": 499,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V2",
+    "usings": [
+        "LMS.Attributes",
+        "LMS.Attributes.Routing",
+        "LMS.Authentication",
+        "LMS.Data",
+        "LMS.Data.Extensions",
+        "LMS.Models.BindingModels",
+        "LMS.Models.ViewModels",
+        "LMS.Models.ViewModels.V2",
+        "LMS.Models.ViewModels.V2.Newsfeed",
+        "LMS.Utils",
+        "Serilog",
+        "System",
+        "System.Data.Entity",
+        "System.Linq",
+        "System.Net",
+        "System.Threading.Tasks",
+        "System.Web.Http",
+        "LMS.Utils.Cache"
+    ],
+    "access_modifier": "public",
+    "struct_name": "NotificationsV2Controller",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetNotificationsAsync",
+            "code_start_index": 869,
+            "method_name": "GetNotificationsAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "since",
+                    "param_name": "since",
+                    "param_type": "DateTime?",
+                    "has_default_value": true,
+                    "default_value": "null",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "count",
+                    "param_name": "count",
+                    "param_type": "int",
+                    "has_default_value": true,
+                    "default_value": "100",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n\r\n            var ecoleUserId = User.Identity.GetSchoolUserId();\r\n\r\n            var sinceDate = since ?? DateTime.Now;\r\n\r\n            var result = await _db.NotificationReceivers\r\n                .AsNoTracking()\r\n                .Where(u => u.EcoleUserId == ecoleUserId && !u.IsHidden && u.Notification.DateCreate < sinceDate)\r\n                .OrderByDescending(nr => nr.Notification.DateCreate)\r\n                .TakeDynamic(count)\r\n                .Select(n => new NotificationViewModel\r\n                {\r\n                    NotificationId = n.NotificationId,\r\n                    Title = n.Notification.Title,\r\n                    Message = n.Notification.Message,\r\n                    NotificationType = n.Notification.NotificationType.Code,\r\n                    Target = n.Notification.TargetId,\r\n                    ReadDate = n.DateRead,\r\n                    CreationDate = n.Notification.DateCreate,\r\n                    SenderId = n.Notification.SenderId,\r\n                    Sender = new NewsfeedUserViewModel\r\n                    {\r\n                        UserId = n.Notification.SenderId,\r\n                        Pseudo = n.Notification.User.Pseudo,\r\n                        ProfilePicture = (n.Notification.User.FileIdPhotoProfil != null) ? n.Notification.User.UploadedFile_FileIdPhotoProfil.FileUrl : n.Notification.User.PhotoProfil,\r\n                        CoverPicture = (n.Notification.User.FileIdHeaderProfil != null) ? n.Notification.User.UploadedFile_FileIdHeaderProfil.FileUrl : n.Notification.User.HeaderProfil,\r\n                        Internal = n.Notification.User.Interne,\r\n                        UserType =\r\n                            n.Notification.User.EcoleUsers.Where(eu => eu.EcoleId == ecoleId)\r\n                                .Select(eux => new NewsfeedUserTypeViewModel\r\n                                {\r\n                                    Code = eux.UserType.Code,\r\n                                    Label = eux.UserType.Libelle\r\n                                }).FirstOrDefault(),\r\n                        Promotions =\r\n                            n.Notification.User.InscriptionPromotions.Where(ip => ip.EcoleId == ecoleId)\r\n                                .Select(ip => new NewsfeedUserPromotionViewModel\r\n                                {\r\n                                    PromotionId = ip.PromotionId,\r\n                                    Promotion = ip.Promotion.Libelle,\r\n                                    Parcours = ip.Promotion.Parcour.Titre,\r\n                                    CodeParcours = ip.Promotion.Parcour.Code,\r\n                                    Session = ip.Promotion.Session\r\n                                })\r\n                    }\r\n                })\r\n                .ToListAsync();\r\n\r\n            return Ok(result);\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve notifications for a specific school user based on certain criteria and return them as a list of NotificationViewModel objects.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "DateTime?",
+                        "param_name": "DateTime?",
+                        "param_desc": "The parameter represents a nullable DateTime value. It is used to specify a starting point in time. If not provided, it defaults to null."
+                    },
+                    {
+                        "name": "int",
+                        "param_name": "int",
+                        "param_desc": "The parameter represents an integer value. It is used to specify the maximum number of notifications to retrieve. If not provided, it defaults to 100."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve notifications for a specific school user based on certain criteria and return them as a list of NotificationViewModel objects.\n/// </summary>\n/// <param name=\"DateTime?\">The parameter represents a nullable DateTime value. It is used to specify a starting point in time. If not provided, it defaults to null.</param>\n/// <param name=\"int\">The parameter represents an integer value. It is used to specify the maximum number of notifications to retrieve. If not provided, it defaults to 100.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "MarkNotificationAsReadAsync",
+            "code_start_index": 4046,
+            "method_name": "MarkNotificationAsReadAsync",
+            "existing_summary": "\r\n        // todo add a date as a param\r\n        // make it possible to accept an array of notification Ids\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "notificationsInfo",
+                    "param_name": "notificationsInfo",
+                    "param_type": "NotificationBindingModel[]",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var currentUser = User.Identity.GetUser();\r\n            var userId = currentUser.Id;\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n\r\n            var ecoleUserId = await _db.EcoleUsers.Where(eu => eu.EcoleId == ecoleId && eu.UserId == userId).\r\n                Select(eu => eu.EcoleUserId)\r\n                .FirstOrDefaultAsync();\r\n\r\n            // User doesn't have an account on this school\r\n            if (ecoleUserId == 0)\r\n            {\r\n                return StatusCode(HttpStatusCode.Forbidden);\r\n            }\r\n\r\n            // Notifications to mark as read\r\n            var notificationIds = notificationsInfo\r\n                .Select(n => n.NotificationId)\r\n                .Distinct()\r\n                .ToList();\r\n\r\n            // Notifications from the db\r\n            var dbNnotificationsIds = await _db.Notifications\r\n                .Where(n => notificationIds.Contains(n.Id))\r\n                .Select(n => n.Id)\r\n                .ToListAsync();\r\n\r\n            if (dbNnotificationsIds.Count == 0)\r\n            {\r\n                return Ok();\r\n            }\r\n\r\n            var receivers = await _db.NotificationReceivers\r\n                .Where(nr => nr.EcoleUserId == ecoleUserId && notificationIds.Contains(nr.NotificationId))\r\n                .ToListAsync();\r\n\r\n            foreach (var notificationId in dbNnotificationsIds)\r\n            {\r\n                var notificationReceiver = receivers.FirstOrDefault(nr => nr.EcoleUserId == ecoleUserId && notificationId == nr.NotificationId);\r\n\r\n                if (notificationReceiver != null)\r\n                {\r\n                    notificationReceiver.DateRead = notificationsInfo\r\n                        .Where(ni => ni.NotificationId == notificationReceiver.NotificationId)\r\n                        .Select(model => model.DateTime)\r\n                        .First();\r\n\r\n                    notificationReceiver.DateUpdate = DateTime.Now;\r\n                    notificationReceiver.UserUpdate = currentUser.Email;\r\n                }\r\n            }\r\n\r\n            try\r\n            {\r\n                await _db.SaveChangesAsync();\r\n                return Ok();\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error setting a notification [{0}] as read.\", string.Join(\",\", notificationIds));\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update notification receivers with read status and update information based on user and notification IDs.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "notificationsInfo",
+                        "param_name": "notificationsInfo",
+                        "param_desc": "An array of NotificationBindingModel objects containing information about notifications."
+                    },
+                    {
+                        "name": "MarkNotificationAsReadAsync",
+                        "param_name": "MarkNotificationAsReadAsync",
+                        "param_desc": "The method to update notification receivers with read status and update information based on user and notification IDs."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update notification receivers with read status and update information based on user and notification IDs.\n/// </summary>\n/// <param name=\"notificationsInfo\">An array of NotificationBindingModel objects containing information about notifications.</param>\n/// <param name=\"MarkNotificationAsReadAsync\">The method to update notification receivers with read status and update information based on user and notification IDs.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "MarkNotificationAsHiddenAsync",
+            "code_start_index": 6685,
+            "method_name": "MarkNotificationAsHiddenAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "notificationsInfo",
+                    "param_name": "notificationsInfo",
+                    "param_type": "NotificationBindingModel[]",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var currentUser = User.Identity.GetUser();\r\n\r\n            var ecoleUserId = User.Identity.GetSchoolUserId();\r\n\r\n            // User doesn't have an account on this school\r\n            if (ecoleUserId == 0)\r\n            {\r\n                return StatusCode(HttpStatusCode.Forbidden);\r\n            }\r\n\r\n            // Notifications to mark as hidden\r\n            var notificationIds = notificationsInfo\r\n                .Select(n => n.NotificationId)\r\n                .Distinct()\r\n                .ToList();\r\n\r\n            var dbNnotificationsIds = await _db.Notifications\r\n                .Where(n => notificationIds.Contains(n.Id))\r\n                .Select(n => n.Id)\r\n                .ToListAsync();\r\n\r\n            if (dbNnotificationsIds.Count == 0)\r\n            {\r\n                return Ok();\r\n            }\r\n\r\n            var receivers = await _db.NotificationReceivers\r\n                .Where(nr => nr.EcoleUserId == ecoleUserId && notificationIds.Contains(nr.NotificationId))\r\n                .ToListAsync();\r\n\r\n            foreach (var notificationId in dbNnotificationsIds)\r\n            {\r\n                var notificationReceiver = receivers.FirstOrDefault(nr => nr.EcoleUserId == ecoleUserId && notificationId == nr.NotificationId);\r\n\r\n                if (notificationReceiver != null)\r\n                {\r\n                    notificationReceiver.IsHidden = true;\r\n                    notificationReceiver.DateRead = notificationsInfo\r\n                        .Where(ni => ni.NotificationId == notificationReceiver.NotificationId)\r\n                        .Select(model => model.DateTime)\r\n                        .First();\r\n\r\n                    notificationReceiver.DateUpdate = DateTime.Now;\r\n                    notificationReceiver.UserUpdate = currentUser.Email;\r\n                }\r\n            }\r\n\r\n            try\r\n            {\r\n                await _db.SaveChangesAsync();\r\n                return Ok();\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error setting a notification [{0}] as read.\", string.Join(\",\", notificationIds));\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Mark notifications as hidden for the current user on a specific school, updating the hidden status, read date, and user information accordingly.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "notificationsInfo",
+                        "param_name": "notificationsInfo",
+                        "param_desc": "An array of NotificationBindingModel objects containing information about the notifications to be marked as hidden. Each object should include details such as notification content, sender, recipient, and timestamp."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Mark notifications as hidden for the current user on a specific school, updating the hidden status, read date, and user information accordingly.\n/// </summary>\n/// <param name=\"notificationsInfo\">An array of NotificationBindingModel objects containing information about the notifications to be marked as hidden. Each object should include details such as notification content, sender, recipient, and timestamp.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetNotificationPreferencesAsync",
+            "code_start_index": 9069,
+            "method_name": "GetNotificationPreferencesAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var ecoleUserId = User.Identity.GetSchoolUserId();\r\n\r\n            var notificationTypes = DataCache.GetNotificationTypes(_db)\r\n                                            .Where(nt => nt.Enabled)\r\n                                            .ToList();\r\n\r\n            var notificationPreferences = await _db.NotificationPreferences.AsNoTracking()\r\n                .Where(np => np.EcoleUserId == ecoleUserId)\r\n                .ToListAsync();\r\n\r\n            var result = notificationTypes.Select(nt => new NotificationPreferenceViewModel\r\n                                                {\r\n                                                    Id = nt.Id,\r\n                                                    Code = nt.Code,\r\n                                                    SendEmail = notificationPreferences.FirstOrDefault(np => np.NotifTypeId == nt.Id)?.SendInstantMail ?? nt.DefaultConfigMail,\r\n                                                    SendPush = notificationPreferences.FirstOrDefault(np => np.NotifTypeId == nt.Id)?.SendPush ?? nt.DefaultConfigPush,\r\n                                                })\r\n                                                .OrderByDescending(nt => nt.Code)\r\n                                                .ToList();\r\n\r\n            return Ok(result);\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the notification preferences for a specified user based on notification types, including whether to send email or push notifications, and order them by code.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "method_name",
+                        "param_name": "method_name",
+                        "param_desc": "The name of the method being documented. In this case, it is 'GetNotificationPreferencesAsync'."
+                    },
+                    {
+                        "name": "method_purpose",
+                        "param_name": "method_purpose",
+                        "param_desc": "The purpose of the method being documented. In this case, it is 'Retrieve the notification preferences for a specified user based on notification types, including whether to send email or push notifications, and order them by code'."
+                    },
+                    {
+                        "name": "parameters",
+                        "param_name": "parameters",
+                        "param_desc": "The list of parameters for the method. In this case, there are no parameters."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the notification preferences for a specified user based on notification types, including whether to send email or push notifications, and order them by code.\n/// </summary>\n/// <param name=\"method_name\">The name of the method being documented. In this case, it is 'GetNotificationPreferencesAsync'.</param>\n/// <param name=\"method_purpose\">The purpose of the method being documented. In this case, it is 'Retrieve the notification preferences for a specified user based on notification types, including whether to send email or push notifications, and order them by code'.</param>\n/// <param name=\"parameters\">The list of parameters for the method. In this case, there are no parameters.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "SetNotificationPreferencesAsync",
+            "code_start_index": 10533,
+            "method_name": "SetNotificationPreferencesAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "prefs",
+                    "param_name": "prefs",
+                    "param_type": "NotificationPreferenceViewModel[]",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var currentUser = User.Identity.GetUser();\r\n\r\n            var ecoleUserId = User.Identity.GetSchoolUserId();\r\n\r\n            var savedPrefs = await _db.NotificationPreferences.AsNoTracking()\r\n                .Where(np => np.EcoleUserId == ecoleUserId)\r\n                .ToListAsync();\r\n\r\n            var notifTypes = DataCache.GetNotificationTypes(_db).Where(nt => nt.Enabled).ToList();\r\n\r\n            var newPrefs = notifTypes.Select(nt => new NotificationPreference\r\n            {\r\n                Id = savedPrefs.FirstOrDefault(p => p.NotifTypeId == nt.Id)?.Id ?? 0,\r\n                NotifTypeId = nt.Id,\r\n                EcoleUserId = ecoleUserId,\r\n                PlaySound = nt.DefaultConfigPlaySound,\r\n                SendWeeklyMail = nt.DefaultConfigWeeklyMail,\r\n                SendInstantMail = prefs.FirstOrDefault(p => p.Id == nt.Id)?.SendEmail ?? nt.DefaultConfigMail,\r\n                SendPush = prefs.FirstOrDefault(p => p.Id == nt.Id)?.SendPush ?? nt.DefaultConfigPush,\r\n                DateUpdate = DateTime.Now,\r\n                UserUpdate = currentUser.Email\r\n            }).ToList();\r\n\r\n            try\r\n            {\r\n                foreach (var item in newPrefs.Where(np => np.Id != 0).ToList())\r\n                {\r\n                    _db.NotificationPreferences.Attach(item);\r\n                    _db.Entry(item).State = EntityState.Modified;\r\n                }\r\n                _db.NotificationPreferences.AddRange(newPrefs.Where(np => np.Id == 0));\r\n                await _db.SaveChangesAsync();\r\n                return Ok();\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error saving the user's notifications preferences\");\r\n                return InternalServerError(e);\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the notification preferences for the current user based on the selected notification types and default configurations.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "prefs",
+                        "param_name": "prefs",
+                        "param_desc": "An array of NotificationPreferenceViewModel objects representing the selected notification preferences and default configurations for the current user."
+                    },
+                    {
+                        "name": "method",
+                        "param_name": "method",
+                        "param_desc": "The name of the method to be called, in this case, 'SetNotificationPreferencesAsync'."
+                    },
+                    {
+                        "name": "purpose",
+                        "param_name": "purpose",
+                        "param_desc": "A brief description of the purpose of the method, which is to update the notification preferences for the current user based on the selected notification types and default configurations."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the notification preferences for the current user based on the selected notification types and default configurations.\n/// </summary>\n/// <param name=\"prefs\">An array of NotificationPreferenceViewModel objects representing the selected notification preferences and default configurations for the current user.</param>\n/// <param name=\"method\">The name of the method to be called, in this case, 'SetNotificationPreferencesAsync'.</param>\n/// <param name=\"purpose\">A brief description of the purpose of the method, which is to update the notification preferences for the current user based on the selected notification types and default configurations.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "NotificationsV2Controller"
+}

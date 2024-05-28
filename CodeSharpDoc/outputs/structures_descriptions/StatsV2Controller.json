@@ -1,0 +1,75 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/V2/StatsV2Controller.cs",
+    "index_shift_code": 403,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V2",
+    "usings": [
+        "LMS.Attributes",
+        "LMS.Attributes.Routing",
+        "LMS.Authentication",
+        "LMS.Data",
+        "LMS.Models.ViewModels",
+        "LMS.Utils",
+        "System.Collections.Generic",
+        "System.Data.Entity",
+        "System.Linq",
+        "System.Threading.Tasks",
+        "System.Transactions",
+        "System.Web.Http",
+        "System.Web.Http.Description",
+        "System"
+    ],
+    "access_modifier": "public",
+    "struct_name": "StatsV2Controller",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetConnectionStatsAsync",
+            "code_start_index": 822,
+            "method_name": "GetConnectionStatsAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            int userId = User.Identity.GetUserId();\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n\r\n            List<ConnectionStatsViewModel> stats;\r\n            using (var ts = new TransactionScope(\r\n                 TransactionScopeOption.Required,\r\n                new TransactionOptions\r\n                {\r\n                    IsolationLevel = IsolationLevel.ReadUncommitted,\r\n                    Timeout = TimeSpan.FromSeconds(60)\r\n                }))\r\n            {\r\n                stats = this._db.ReportConnexionHebdoes\r\n                .AsNoTracking()\r\n                .Where(r => r.UserId == userId && r.EcoleId == ecoleId)\r\n                .OrderBy(rch => rch.DateConnexion)\r\n                .Select(rch => new ConnectionStatsViewModel\r\n                {\r\n                    WebInSeconds = rch.DureeWeb,\r\n                    MobileInSeconds = rch.DureeAppli,\r\n                    TotalInSeconds = rch.DureeGlobale,\r\n                    Date = rch.DateConnexion\r\n                })\r\n                .ToList();\r\n            }\r\n\r\n            return Ok(stats);\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the connection statistics for a specific user and school.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "method",
+                        "param_name": "method",
+                        "param_desc": "GetConnectionStatsAsync"
+                    },
+                    {
+                        "name": "purpose",
+                        "param_name": "purpose",
+                        "param_desc": "Retrieve the connection statistics for a specific user and school."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the connection statistics for a specific user and school.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"method\">GetConnectionStatsAsync</param>\n/// <param name=\"purpose\">Retrieve the connection statistics for a specific user and school.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "StatsV2Controller"
+}

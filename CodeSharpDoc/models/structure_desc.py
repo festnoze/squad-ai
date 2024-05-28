@@ -40,7 +40,10 @@ class StructureDesc(BaseDesc):
             for key, value in kwargs.items():
                 key = txt.to_python_case(key)
                 if key == 'struct_type':
-                    self.struct_type: str = StructureType(value)
+                    if type(value) is int:
+                        self.struct_type: str = StructureType(value)
+                    else:
+                        self.struct_type: str = StructureType[value]
                 elif key == 'methods':
                     if type(value) is list and len(value) > 0 and type(value[0]) is MethodDesc:
                         self.methods: list[MethodDesc] = value

@@ -1,0 +1,89 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/V3/EvaluationsV3Controller.cs",
+    "index_shift_code": 47437,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V3",
+    "usings": [
+        "LMS.Attributes",
+        "LMS.Attributes.Routing",
+        "LMS.Authentication",
+        "LMS.Data",
+        "LMS.Utils",
+        "LMS.Utils.Cache",
+        "Newtonsoft.Json",
+        "Serilog",
+        "System",
+        "System.Collections.Generic",
+        "System.ComponentModel.DataAnnotations",
+        "System.Data.Entity",
+        "System.IO",
+        "System.Linq",
+        "System.Net",
+        "System.Threading.Tasks",
+        "System.Web.Http",
+        "System.Web.Http.Description",
+        "LMS.Configuration",
+        "LMS.Notifications.V2",
+        "Lms.Common.Enumerations",
+        "LMS.Services.Interfaces",
+        "LMS.ModelsDTOs.Evaluation"
+    ],
+    "access_modifier": "public",
+    "struct_name": "CopyUserV3ViewModel",
+    "base_class_name": "",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [],
+    "properties": [
+        {
+            "name": "UserId",
+            "prop_name": "UserId",
+            "prop_type": "int",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "Genre",
+            "prop_name": "Genre",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "LastName",
+            "prop_name": "LastName",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "FirstName",
+            "prop_name": "FirstName",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "DateOfBirth",
+            "prop_name": "DateOfBirth",
+            "prop_type": "DateTime?",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "ProfilePicture",
+            "prop_name": "ProfilePicture",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "SchoolId",
+            "prop_name": "SchoolId",
+            "prop_type": "int",
+            "is_property": true,
+            "is_field": false
+        }
+    ],
+    "name": "CopyUserV3ViewModel"
+}

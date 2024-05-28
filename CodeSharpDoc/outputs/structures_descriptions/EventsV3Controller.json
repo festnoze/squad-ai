@@ -1,0 +1,664 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/V3/EventsV3Controller.cs",
+    "index_shift_code": 770,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V3",
+    "usings": [
+        "LMS.Attributes",
+        "LMS.Attributes.Routing",
+        "LMS.Authentication",
+        "LMS.Configuration",
+        "LMS.Controllers.V2",
+        "LMS.Data",
+        "LMS.Models.BindingModels.V3",
+        "LMS.Models.ViewModels",
+        "LMS.Models.ViewModels.V3.Events",
+        "LMS.Services",
+        "LMS.Services.Interfaces",
+        "LMS.Utils",
+        "LMS.Utils.Cache",
+        "LMS.WebResources",
+        "Serilog",
+        "Studi.BigBlueButtonClient",
+        "Studi.Scheduler.Dto",
+        "System",
+        "System.Collections.Generic",
+        "System.Data.Entity",
+        "System.IO",
+        "System.Linq",
+        "System.Linq.Expressions",
+        "System.Net",
+        "System.Threading.Tasks",
+        "System.Web",
+        "System.Web.Http",
+        "System.Web.Http.Description"
+    ],
+    "access_modifier": "public",
+    "struct_name": "EventsV3Controller",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetUserLivesTaskAsync",
+            "code_start_index": 2592,
+            "method_name": "GetUserLivesTaskAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Retourne la liste des lives qui concerne l'\u00e9l\u00e8ve\r\n        /// </summary>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            // Current User Info\r\n            var currentUser = User.Identity.GetUser();\r\n            var result = await _eventServices.GetLives(string.Empty, 1, int.MaxValue, currentUser, EventsListScope.CurrentFormations);\r\n\r\n            return Ok(result);\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Check if a teacher is allowed to correct a specific copy based on various conditions such as existence of the copy, teacher's assignment, and status of the copy.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "methodName",
+                        "param_name": "methodName",
+                        "param_desc": "GetUserLivesTaskAsync"
+                    },
+                    {
+                        "name": "methodPurpose",
+                        "param_name": "methodPurpose",
+                        "param_desc": "Check if a teacher is allowed to correct a specific copy based on various conditions such as existence of the copy, teacher's assignment, and status of the copy."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Check if a teacher is allowed to correct a specific copy based on various conditions such as existence of the copy, teacher's assignment, and status of the copy.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"methodName\">GetUserLivesTaskAsync</param>\n/// <param name=\"methodPurpose\">Check if a teacher is allowed to correct a specific copy based on various conditions such as existence of the copy, teacher's assignment, and status of the copy.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetAllLivesTaskAsync",
+            "code_start_index": 3176,
+            "method_name": "GetAllLivesTaskAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Retourne les \u00e9v\u00e8nements qui ne sont ni dans la formation de l'utilisateur ni sont \u00e9cole\r\n        /// </summary>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var currentUser = User.Identity.GetUser();\r\n            var result = await _eventServices.GetLives(string.Empty, 1, int.MaxValue, currentUser, EventsListScope.Other);\r\n\r\n            return Ok(result);\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Calculate the number of working days between a due date and the next working day.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "methodName",
+                        "param_name": "methodName",
+                        "param_desc": "GetAllLivesTaskAsync"
+                    },
+                    {
+                        "name": "methodPurpose",
+                        "param_name": "methodPurpose",
+                        "param_desc": "Calculate the number of working days between a due date and the next working day."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Calculate the number of working days between a due date and the next working day.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"methodName\">GetAllLivesTaskAsync</param>\n/// <param name=\"methodPurpose\">Calculate the number of working days between a due date and the next working day.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetEventDetailsAsync",
+            "code_start_index": 3779,
+            "method_name": "GetEventDetailsAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// retourne les d\u00e9tails d'un evenement\r\n        /// </summary>\r\n        /// <param name=\"eventId\"></param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "eventId",
+                    "param_name": "eventId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var currentUser = User.Identity.GetUser();\r\n            var userId = currentUser.Id;\r\n            var ecoleId = currentUser.SchoolId;\r\n            var currentSchool = DataCache.GetSchools(_db)\r\n                .First(e => e.Id == ecoleId);\r\n\r\n            var organizationCode = currentSchool.Organisme?.Code ?? string.Empty;\r\n\r\n            // Current user scope\r\n            var currentUserType = await _db.EcoleUsers\r\n                .AsNoTracking()\r\n                .Where(eu => eu.EcoleId == ecoleId && eu.UserId == userId)\r\n                .Select(eu => eu.UserTypeId)\r\n                .FirstOrDefaultAsync();\r\n\r\n            var eventDetails = await this._db.Events\r\n                .AsNoTracking()\r\n                .Where(e => e.Id == eventId\r\n                    && e.DateDelete == null\r\n                    && e.Draft == false\r\n                    && e.EventType.Code == \"LIVE BBB\"\r\n                    && (!e.AvailableUntil.HasValue || e.AvailableUntil.Value > DateTime.Now)\r\n                    && (e.EventsUserTypes.Any(epp => epp.DateDelete == null && epp.UserTypeId == currentUserType) || !e.EventsUserTypes.Any() || e.OwnerUserId == userId))\r\n                .Where(predicateEvent)\r\n                .Select(e => new EventDetailV3ViewModel\r\n                {\r\n                    EventId = e.Id,\r\n                    Title = e.Titre,\r\n                    Description = e.Description,\r\n                    ViewsCount = 0,\r\n                    ReplayUrl = e.UrlReplay,\r\n                    ServerUrl = e.ServerUrl,\r\n                    StartDate = e.DateDebut,\r\n                    EndDate = e.DateFin,\r\n                    IsReplayExpected = e.OwnerAcceptedRecording\r\n                                                && string.IsNullOrEmpty(e.UrlReplay)\r\n                                                && DateTime.Now > DbFunctions.AddHours(e.DateFin, 1)\r\n                                                && DateTime.Now < DbFunctions.AddHours(e.DateFin, 6)\r\n                                                && (!e.AvailableUntil.HasValue || DbFunctions.AddDays(e.AvailableUntil.Value, 1) > DateTime.Now),\r\n                    IsReplayNoLongerAvailable =\r\n                                                   (!e.OwnerAcceptedRecording && DateTime.Now > DbFunctions.AddHours(e.DateFin, 1))\r\n                                                || (string.IsNullOrEmpty(e.UrlReplay) && DateTime.Now > DbFunctions.AddHours(e.DateFin, 6))\r\n                                                || (e.AvailableUntil.HasValue && DbFunctions.AddDays(e.AvailableUntil.Value, 1) < DateTime.Now)\r\n                                                || e.DateDelete != null,\r\n                    UserId = e.OwnerUserId,\r\n                    Image = e.Image,\r\n                    IsOngoing = false,\r\n                    AvailableUntil = e.AvailableUntil,\r\n                    MatiereId = e.EventMatieres\r\n                        .Where(em => em.DateDelete == null)\r\n                        .Select(m => m.MatiereId)\r\n                        .FirstOrDefault(),\r\n                    AttachedFiles = e.EventObjects\r\n                        .Where(eo => eo.DateDelete == null)\r\n                        .OrderBy(eo => eo.DateAccesObject)\r\n                        .Select(af => new AttachedFileV3ViewModel\r\n                        {\r\n                            Id = af.Id,\r\n                            IsAvailable = af.DateAccesObject < DateTime.Now,\r\n                            Filename = af.Filename,\r\n                            Label = af.Libelle,\r\n                            AvailabilityDate = af.DateAccesObject,\r\n                            Type = af.ResourceType.Libelle\r\n                        })\r\n                        .ToList(),\r\n                    ParticipationStatus = e.EventUserEcoles\r\n                        .Where(eue => eue.UserId == userId\r\n                            && eue.EcoleId == ecoleId)\r\n                        .Select(eue => new EventParticipationV3ViewModel\r\n                        {\r\n                            Participation = eue.Participation,\r\n                            Presence = eue.Presence,\r\n                            Favorited = eue.Favorited,\r\n                            Viewed = eue.Viewed\r\n                        })\r\n                        .FirstOrDefault(),\r\n                    EventType = new EventTypeV3ViewModel\r\n                    {\r\n                        Code = e.EventType.Code,\r\n                        Label = e.EventType.Libelle,\r\n                        TimeBeforeAccess = e.EventType.TimeAvantAcces,\r\n                    },\r\n                    TotalParticipantsFromAllSchools = e.EventUserEcoles.Count(eue => eue.Participation != (int?)ParticipationState.No)\r\n                })\r\n                .FirstOrDefaultAsync();\r\n\r\n            if (eventDetails == null)\r\n            {\r\n                return Content(HttpStatusCode.NotFound, \"L'\u00e9v\u00e9nement n'existe pas.\");\r\n            }\r\n\r\n            if (eventDetails.ParticipationStatus == null)\r\n            {\r\n                eventDetails.ParticipationStatus = new EventParticipationV3ViewModel { Participation = null, Presence = false, Favorited = false, Viewed = false };\r\n            }\r\n\r\n            // Get the event's host info\r\n            eventDetails.Host = await this._db.Users.AsNoTracking()\r\n                                          .Where(u => u.Id == eventDetails.UserId)\r\n                                          .Select(RepositoryV3.GetUserMapExpressionWithoutPromotions(ecoleId))\r\n                                          .FirstOrDefaultAsync();\r\n\r\n            // Get the event thumbnail image\r\n            var mThumbs = DataCache.GetMatieresThumbnails(this._db, _customWebResources);\r\n            eventDetails.Image = eventDetails.Image ?? (eventDetails.MatiereId != 0 ? mThumbs.GetValueOrNull(eventDetails.MatiereId)?.Filename : null) ?? _customWebResources.LiveDefaultUrl;\r\n\r\n            // Get the list of the participating users\r\n            //var participatingUsers = _db.EventUserEcoles.Where(u => u.DateDelete == null && u.Participation > 0 && u.EventId == eventId).Select(u => u.Id);\r\n\r\n            eventDetails.ParticipatingUsers = await this._db.EventUserEcoles\r\n                                                        .AsNoTracking()\r\n                                                        .Where(u => u.DateDelete == null && u.Participation > 0 && u.EventId == eventId && u.EcoleId == ecoleId)\r\n                                                        .Select(RepositoryV3.GetUserMapEventExpression(ecoleId))\r\n                                                        .OrderBy(u => u.Pseudo)\r\n                                                        .ToListAsync();\r\n\r\n            // Get a fresh views count\r\n            eventDetails.ViewsCount = await _db.ReportActivites.AsNoTracking()\r\n                                               .Where(ra => ra.DateDelete == null && ra.EventId == eventDetails.EventId && ra.Duree >= 60)\r\n                                               .CountAsync();\r\n\r\n            await CheckIfLiveIsOngoing(organizationCode, eventDetails);\r\n\r\n            return Ok(eventDetails);\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the lives of the current user for the specified event services.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "eventId",
+                        "param_name": "eventId",
+                        "param_desc": "The ID of the event for which the details are to be retrieved. It should be an integer value."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the lives of the current user for the specified event services.\n/// </summary>\n/// <param name=\"eventId\">The ID of the event for which the details are to be retrieved. It should be an integer value.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "CheckIfLiveIsOngoing",
+            "code_start_index": 11029,
+            "method_name": "CheckIfLiveIsOngoing",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "organizationCode",
+                    "param_name": "organizationCode",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "eventDetails",
+                    "param_name": "eventDetails",
+                    "param_type": "EventDetailV3ViewModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            eventDetails.IsOngoing = false;\r\n\r\n            if (!string.IsNullOrEmpty(eventDetails.ServerUrl))\r\n            {\r\n                var client = new BigBlueButtonClient(eventDetails.ServerUrl, _config.GetBbbModeratorPassword(), _config.GetBbbAttendeePassword(), _config.GetBbbServerSalt());\r\n                eventDetails.IsOngoing = await client.IsMeetingRunningAsync($\"{eventDetails.EventId}_{organizationCode}\");\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve all live events for the current user asynchronously.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "organizationCode",
+                        "param_name": "organizationCode",
+                        "param_desc": "The organization code identifying the specific organization."
+                    },
+                    {
+                        "name": "eventDetails",
+                        "param_name": "eventDetails",
+                        "param_desc": "The view model containing details of the event."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve all live events for the current user asynchronously.\n/// </summary>\n/// <param name=\"organizationCode\">The organization code identifying the specific organization.</param>\n/// <param name=\"eventDetails\">The view model containing details of the event.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "SetEventParticipationAsync",
+            "code_start_index": 11690,
+            "method_name": "SetEventParticipationAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "eventId",
+                    "param_name": "eventId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "participation",
+                    "param_name": "participation",
+                    "param_type": "ParticipationState",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var eventExists = await this._db.Events.Where(predicateEvent).AnyAsync(e => e.Id == eventId);\r\n\r\n            if (!eventExists)\r\n            {\r\n                return Content(HttpStatusCode.NotFound, \"L'\u00e9v\u00e8nement n'existe pas\");\r\n            }\r\n\r\n            // Current User Info\r\n            var currentUser = User.Identity.GetUser();\r\n            var userId = currentUser.Id;\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n\r\n            var userParticipation = await this._db.EventUserEcoles\r\n                                              .Where(e => e.EventId == eventId && e.UserId == userId && e.EcoleId == ecoleId)\r\n                                              .FirstOrDefaultAsync();\r\n\r\n            if (userParticipation == null)\r\n            {\r\n                userParticipation = new EventUserEcole\r\n                {\r\n                    UserCreate = currentUser.Email,\r\n                    DateCreate = DateTime.Now,\r\n                    EcoleId = ecoleId,\r\n                    UserId = userId,\r\n                    EventId = eventId,\r\n                    Participation = (int)participation,\r\n                    Presence = false\r\n                };\r\n\r\n                this._db.EventUserEcoles.Add(userParticipation);\r\n            }\r\n            else\r\n            {\r\n                userParticipation.DateUpdate = DateTime.Now;\r\n                userParticipation.UserUpdate = currentUser.Email;\r\n                userParticipation.Participation = (int)participation;\r\n            }\r\n\r\n            try\r\n            {\r\n                await this._db.SaveChangesAsync();\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error saving the user's event participation\");\r\n                return InternalServerError();\r\n            }\r\n\r\n            return Ok();\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve detailed information about a specific event, including its description, dates, attached files, participation status, and host information, while also checking for ongoing live broadcasts and updating the views count.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "eventId",
+                        "param_name": "eventId",
+                        "param_desc": "The unique identifier of the event for which participation information needs to be set."
+                    },
+                    {
+                        "name": "participation",
+                        "param_name": "participation",
+                        "param_desc": "The state of participation to be set for the event. It can be 'Attending', 'Not Attending', or 'Maybe Attending'."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve detailed information about a specific event, including its description, dates, attached files, participation status, and host information, while also checking for ongoing live broadcasts and updating the views count.\n/// </summary>\n/// <param name=\"eventId\">The unique identifier of the event for which participation information needs to be set.</param>\n/// <param name=\"participation\">The state of participation to be set for the event. It can be 'Attending', 'Not Attending', or 'Maybe Attending'.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "AddEventToFavoritesAsync",
+            "code_start_index": 13729,
+            "method_name": "AddEventToFavoritesAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "eventId",
+                    "param_name": "eventId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var eventExists = await this._db.Events.AsNoTracking().Where(predicateEvent).AnyAsync(e => e.Id == eventId && e.DateDelete == null);\r\n\r\n            if (!eventExists)\r\n            {\r\n                return Content(HttpStatusCode.NotFound, \"L'\u00e9v\u00e8nement n'existe pas\");\r\n            }\r\n\r\n            // Current User Info\r\n            var currentUser = User.Identity.GetUser();\r\n            var userId = currentUser.Id;\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n\r\n            var userParticipation = await this._db.EventUserEcoles\r\n                                              .Where(e => e.EventId == eventId && e.UserId == userId && e.EcoleId == ecoleId)\r\n                                              .FirstOrDefaultAsync();\r\n\r\n            if (userParticipation == null)\r\n            {\r\n                userParticipation = new EventUserEcole\r\n                {\r\n                    UserCreate = currentUser.Email,\r\n                    DateCreate = DateTime.Now,\r\n                    EcoleId = ecoleId,\r\n                    UserId = userId,\r\n                    EventId = eventId,\r\n                    Favorited = true,\r\n                    Participation = null,\r\n                    Presence = false,\r\n                    Viewed = false\r\n                };\r\n\r\n                this._db.EventUserEcoles.Add(userParticipation);\r\n            }\r\n            else\r\n            {\r\n                userParticipation.DateUpdate = DateTime.Now;\r\n                userParticipation.UserUpdate = currentUser.Email;\r\n                userParticipation.Favorited = true;\r\n            }\r\n\r\n            try\r\n            {\r\n                await this._db.SaveChangesAsync();\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error saving the user's event participation\");\r\n                return InternalServerError();\r\n            }\r\n\r\n            return Ok();\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Check if a live event is currently ongoing by connecting to a server and determining the status of the event based on its unique identifier and organization code.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "eventId",
+                        "param_name": "eventId",
+                        "param_desc": "The unique identifier of the event to be added to favorites. It is of type integer."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Check if a live event is currently ongoing by connecting to a server and determining the status of the event based on its unique identifier and organization code.\n/// </summary>\n/// <param name=\"eventId\">The unique identifier of the event to be added to favorites. It is of type integer.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "AddEventToFavoritesUndoAsync",
+            "code_start_index": 15820,
+            "method_name": "AddEventToFavoritesUndoAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "eventId",
+                    "param_name": "eventId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var eventExists = await this._db.Events.AsNoTracking().Where(predicateEvent).AnyAsync(e => e.Id == eventId);\r\n\r\n            if (!eventExists)\r\n            {\r\n                return Content(HttpStatusCode.NotFound, \"L'\u00e9v\u00e8nement n'existe pas\");\r\n            }\r\n\r\n            // Current User Info\r\n            var currentUser = User.Identity.GetUser();\r\n            var userId = currentUser.Id;\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n\r\n            var userParticipation = await this._db.EventUserEcoles\r\n                                              .Where(e => e.EventId == eventId && e.UserId == userId && e.EcoleId == ecoleId)\r\n                                              .FirstOrDefaultAsync();\r\n\r\n            if (userParticipation == null)\r\n            {\r\n                userParticipation = new EventUserEcole\r\n                {\r\n                    UserCreate = currentUser.Email,\r\n                    DateCreate = DateTime.Now,\r\n                    EcoleId = ecoleId,\r\n                    UserId = userId,\r\n                    EventId = eventId,\r\n                    Favorited = false,\r\n                    Participation = null,\r\n                    Presence = false,\r\n                    Viewed = false\r\n                };\r\n\r\n                this._db.EventUserEcoles.Add(userParticipation);\r\n            }\r\n            else\r\n            {\r\n                userParticipation.DateUpdate = DateTime.Now;\r\n                userParticipation.UserUpdate = currentUser.Email;\r\n                userParticipation.Favorited = false;\r\n            }\r\n\r\n            try\r\n            {\r\n                await this._db.SaveChangesAsync();\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error saving the user's event participation\");\r\n                return InternalServerError();\r\n            }\r\n\r\n            return Ok();\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the participation status of a user for a specific event, creating a new record if the user has not participated before.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "eventId",
+                        "param_name": "eventId",
+                        "param_desc": "The ID of the event to which the user's participation status will be updated. It is expected to be an integer value."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the participation status of a user for a specific event, creating a new record if the user has not participated before.\n/// </summary>\n/// <param name=\"eventId\">The ID of the event to which the user's participation status will be updated. It is expected to be an integer value.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "SetEventViewedAsync",
+            "code_start_index": 17888,
+            "method_name": "SetEventViewedAsync",
+            "existing_summary": "\r\n\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "eventId",
+                    "param_name": "eventId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var eventExists = await this._db.Events.AsNoTracking().Where(predicateEvent).AnyAsync(e => e.Id == eventId);\r\n\r\n            if (!eventExists)\r\n            {\r\n                return Content(HttpStatusCode.NotFound, \"L'\u00e9v\u00e8nement n'existe pas\");\r\n            }\r\n\r\n            // Current User Info\r\n            var currentUser = User.Identity.GetUser();\r\n            var userId = currentUser.Id;\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n\r\n            var userParticipation = await this._db.EventUserEcoles\r\n                                              .Where(e => e.EventId == eventId && e.UserId == userId && e.EcoleId == ecoleId)\r\n                                              .FirstOrDefaultAsync();\r\n\r\n            if (userParticipation == null)\r\n            {\r\n                userParticipation = new EventUserEcole\r\n                {\r\n                    UserCreate = currentUser.Email,\r\n                    DateCreate = DateTime.Now,\r\n                    EcoleId = ecoleId,\r\n                    UserId = userId,\r\n                    EventId = eventId,\r\n                    Favorited = false,\r\n                    Participation = null,\r\n                    Presence = false,\r\n                    Viewed = true\r\n                };\r\n\r\n                this._db.EventUserEcoles.Add(userParticipation);\r\n            }\r\n            else\r\n            {\r\n                userParticipation.DateUpdate = DateTime.Now;\r\n                userParticipation.UserUpdate = currentUser.Email;\r\n                userParticipation.Viewed = true;\r\n            }\r\n\r\n            try\r\n            {\r\n                await this._db.SaveChangesAsync();\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error saving the user's event participation\");\r\n                return InternalServerError();\r\n            }\r\n\r\n            return Ok();\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Add an event to the user's favorites asynchronously, updating participation details if the user has already interacted with the event.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "eventId",
+                        "param_name": "eventId",
+                        "param_desc": "The ID of the event to be added to the user's favorites and updated for event interaction details."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Add an event to the user's favorites asynchronously, updating participation details if the user has already interacted with the event.\n/// </summary>\n/// <param name=\"eventId\">The ID of the event to be added to the user's favorites and updated for event interaction details.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "SetEventViewedUndoAsync",
+            "code_start_index": 19945,
+            "method_name": "SetEventViewedUndoAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "eventId",
+                    "param_name": "eventId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var eventExists = await this._db.Events.AsNoTracking().Where(predicateEvent).AnyAsync(e => e.Id == eventId);\r\n\r\n            if (!eventExists)\r\n            {\r\n                return Content(HttpStatusCode.NotFound, \"L'\u00e9v\u00e8nement n'existe pas\");\r\n            }\r\n\r\n            // Current User Info\r\n            var currentUser = User.Identity.GetUser();\r\n            var userId = currentUser.Id;\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n\r\n            var userParticipation = await this._db.EventUserEcoles\r\n                                              .Where(e => e.EventId == eventId && e.UserId == userId && e.EcoleId == ecoleId)\r\n                                              .FirstOrDefaultAsync();\r\n\r\n            if (userParticipation == null)\r\n            {\r\n                userParticipation = new EventUserEcole\r\n                {\r\n                    UserCreate = currentUser.Email,\r\n                    DateCreate = DateTime.Now,\r\n                    EcoleId = ecoleId,\r\n                    UserId = userId,\r\n                    EventId = eventId,\r\n                    Favorited = false,\r\n                    Participation = null,\r\n                    Presence = false,\r\n                    Viewed = false\r\n                };\r\n\r\n                this._db.EventUserEcoles.Add(userParticipation);\r\n            }\r\n            else\r\n            {\r\n                userParticipation.DateUpdate = DateTime.Now;\r\n                userParticipation.UserUpdate = currentUser.Email;\r\n                userParticipation.Viewed = false;\r\n            }\r\n\r\n            try\r\n            {\r\n                await this._db.SaveChangesAsync();\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error saving the user's event participation\");\r\n                return InternalServerError();\r\n            }\r\n\r\n            return Ok();\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the user's event participation by adding or removing it from favorites.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "eventId",
+                        "param_name": "eventId",
+                        "param_desc": "The ID of the event to be updated."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the user's event participation by adding or removing it from favorites.\n/// </summary>\n/// <param name=\"eventId\">The ID of the event to be updated.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "SaveHostRecodingAcceptanceAsync",
+            "code_start_index": 22012,
+            "method_name": "SaveHostRecodingAcceptanceAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "eventId",
+                    "param_name": "eventId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            // Current User Info\r\n            var currentUser = User.Identity.GetUser();\r\n            var userId = currentUser.Id;\r\n\r\n            var lmsEvent = await this._db.Events.Where(predicateEvent).FirstOrDefaultAsync(e => e.Id == eventId && e.OwnerUserId == userId);\r\n\r\n            if (lmsEvent == null)\r\n            {\r\n                return Content(HttpStatusCode.NotFound, \"L'\u00e9v\u00e8nement n'existe pas\");\r\n            }\r\n\r\n            lmsEvent.OwnerAcceptedRecording = true;\r\n            lmsEvent.DateUpdate = DateTime.Now;\r\n            lmsEvent.UserUpdate = \"a \" + currentUser.Email;\r\n\r\n            try\r\n            {\r\n                await this._db.SaveChangesAsync();\r\n                return Ok(true);\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error saving the user's event participation\");\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the viewed status of a user for a specific event, creating a new entry if the user has not participated before, and saving the changes to the database.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "eventId",
+                        "param_name": "eventId",
+                        "param_desc": "The unique identifier of the event for which the viewed status of a user is being updated."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the viewed status of a user for a specific event, creating a new entry if the user has not participated before, and saving the changes to the database.\n/// </summary>\n/// <param name=\"eventId\">The unique identifier of the event for which the viewed status of a user is being updated.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "TrackActivity",
+            "code_start_index": 23120,
+            "method_name": "TrackActivity",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "trackingInfo",
+                    "param_name": "trackingInfo",
+                    "param_type": "EventTrackingBindingModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            // Current User Info\r\n            var currentUser = User.Identity.GetUser();\r\n            var userId = currentUser.Id;\r\n            var schoolId = this.GetSchoolId(_db);\r\n            var seconds = TimeSpan.FromMilliseconds(trackingInfo.Duration).TotalSeconds;\r\n\r\n\r\n            this._db.ReportActivites.Add(new ReportActivite()\r\n            {\r\n                UserId = userId,\r\n                EcoleId = schoolId,\r\n                EventId = trackingInfo.EventId,\r\n                Duree = seconds\r\n            });\r\n\r\n            try\r\n            {\r\n                await this._db.SaveChangesAsync();\r\n                return Ok();\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error saving the tracking info\");\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the user's event participation status, including marking the event as not viewed if necessary.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "trackingInfo",
+                        "param_name": "trackingInfo",
+                        "param_desc": "The object containing information about the event tracking, such as event ID, user ID, and tracking status."
+                    },
+                    {
+                        "name": "TrackActivity",
+                        "param_name": "TrackActivity",
+                        "param_desc": "The method responsible for updating the user's event participation status and marking the event as not viewed if necessary."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the user's event participation status, including marking the event as not viewed if necessary.\n/// </summary>\n/// <param name=\"trackingInfo\">The object containing information about the event tracking, such as event ID, user ID, and tracking status.</param>\n/// <param name=\"TrackActivity\">The method responsible for updating the user's event participation status and marking the event as not viewed if necessary.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "AddRessourceObjectAsync",
+            "code_start_index": 24144,
+            "method_name": "AddRessourceObjectAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "eventId",
+                    "param_name": "eventId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "eventObject",
+                    "param_name": "eventObject",
+                    "param_type": "EventObjectBindingModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var ev = await _db.Events\r\n                .Include(e => e.EventObjects)\r\n                .AsNoTracking()\r\n                .Where(e => e.Id == eventId)\r\n                .Where(predicateEvent)\r\n                .SingleOrDefaultAsync();\r\n\r\n            if (ev == null)\r\n            {\r\n                return Content(HttpStatusCode.NotFound, \"L'\u00e9v\u00e8nement n'existe pas\");\r\n            }\r\n\r\n            // Current User Info\r\n            var currentUser = User.Identity.GetUser();\r\n            var userId = currentUser.Id;\r\n\r\n            if (ev.OwnerUserId != userId)\r\n            {\r\n                return Content(HttpStatusCode.Forbidden, \"Vous ne pouvez pas ajouter une pi\u00e8ce jointe\");\r\n            }\r\n\r\n            var uploadedFile = await _db.UploadedFiles\r\n                .AsNoTracking()\r\n                .Where(uf => uf.FileGuid == eventObject.UploadedFileGuid)\r\n                .FirstOrDefaultAsync();\r\n\r\n            if (uploadedFile == null)\r\n            {\r\n                return Content(HttpStatusCode.NotFound, \"Fichier upload\u00e9 non trouv\u00e9\");\r\n            }\r\n\r\n            var order = (ev.EventObjects.Count > 0) ? ev.EventObjects.Max(e => e.Ordre) : 1;\r\n\r\n            var ressourceType = _ressourceService.GetEventsRessourceTypeFromExtension(Path.GetExtension(uploadedFile.FileUrl).Replace(\".\", \"\"));\r\n\r\n            if (ressourceType == null)\r\n            {\r\n                return Content(HttpStatusCode.NotFound, \"Type de ressource incorrect\");\r\n            }\r\n\r\n            EventObject eo = new EventObject\r\n            {\r\n                DateCreate = DateTime.Now,\r\n                UserCreate = currentUser.Email,\r\n                EventId = eventId,\r\n                Filename = uploadedFile.FileUrl,\r\n                RessourceTypeId = ressourceType.Id,\r\n                DateAccesObject = eventObject.IsDispoAfter ? ev.DateFin : DateTime.Now,\r\n                Ordre = order,\r\n                Libelle = uploadedFile.FileName,\r\n                FileId = uploadedFile.Id\r\n            };\r\n\r\n            _db.EventObjects.Add(eo);\r\n\r\n            try\r\n            {\r\n                await this._db.SaveChangesAsync();\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error saving the ressource object\");\r\n                return InternalServerError(e);\r\n            }\r\n\r\n            AttachedFileV3ViewModel attachedFile = new AttachedFileV3ViewModel\r\n            {\r\n                Id = eo.Id,\r\n                IsAvailable = eo.DateAccesObject < DateTime.Now,\r\n                Filename = eo.Filename,\r\n                Label = eo.Libelle,\r\n                AvailabilityDate = eo.DateAccesObject,\r\n                Type = ressourceType.Libelle\r\n            };\r\n\r\n            return Ok(attachedFile);\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the acceptance of a host recording for a specific user's event with error handling for saving the changes.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "eventId",
+                        "param_name": "eventId",
+                        "param_desc": "The ID of the event to be updated. It should be an integer value."
+                    },
+                    {
+                        "name": "eventObject",
+                        "param_name": "eventObject",
+                        "param_desc": "The binding model object containing data related to the event. It should be an instance of EventObjectBindingModel."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the acceptance of a host recording for a specific user's event with error handling for saving the changes.\n/// </summary>\n/// <param name=\"eventId\">The ID of the event to be updated. It should be an integer value.</param>\n/// <param name=\"eventObject\">The binding model object containing data related to the event. It should be an instance of EventObjectBindingModel.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "RemoveRessourceObjectAsync",
+            "code_start_index": 27130,
+            "method_name": "RemoveRessourceObjectAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "eventObjectId",
+                    "param_name": "eventObjectId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            // Current User Info\r\n            var currentUser = User.Identity.GetUser();\r\n            var userId = currentUser.Id;\r\n\r\n            var eventObject = await _db.EventObjects\r\n                .Include(eo => eo.Event)\r\n                .Where(eo => eo.Id == eventObjectId)\r\n                .SingleOrDefaultAsync();\r\n\r\n\r\n            if (eventObject.Event.OwnerUserId != userId)\r\n            {\r\n                return Content(HttpStatusCode.Forbidden, \"Vous ne pouvez pas supprimer une pi\u00e8ce jointe\");\r\n            }\r\n\r\n            _db.EventObjects.Remove(eventObject);\r\n\r\n            try\r\n            {\r\n                await this._db.SaveChangesAsync();\r\n                return Ok();\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error saving the tracking info\");\r\n                return InternalServerError(e);\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Track activity of the current user, by adding a new report entry with event duration, school ID, and user ID, and saving it to the database. If successful, return a success response, otherwise log an error and return an internal server error response.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "eventObjectId",
+                        "param_name": "eventObjectId",
+                        "param_desc": "The ID of the event object to be removed."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Track activity of the current user, by adding a new report entry with event duration, school ID, and user ID, and saving it to the database. If successful, return a success response, otherwise log an error and return an internal server error response.\n/// </summary>\n/// <param name=\"eventObjectId\">The ID of the event object to be removed.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "EventsV3Controller"
+}

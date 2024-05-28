@@ -1,0 +1,79 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Studi.Api.Lms.User/ResponseModel/TrainingResponseModel.cs",
+    "index_shift_code": 47,
+    "struct_type": "Class",
+    "namespace_name": "",
+    "usings": [],
+    "access_modifier": "public",
+    "struct_name": "TrainingResponseModel",
+    "base_class_name": "",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [],
+    "properties": [
+        {
+            "name": "CourseName",
+            "prop_name": "CourseName",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "PromotionId",
+            "prop_name": "PromotionId",
+            "prop_type": "int",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "PromotionName",
+            "prop_name": "PromotionName",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "StatusCode",
+            "prop_name": "StatusCode",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "StatusName",
+            "prop_name": "StatusName",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "RegistrationDate",
+            "prop_name": "RegistrationDate",
+            "prop_type": "DateTime?",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "IsSchoolCertificateAvailable",
+            "prop_name": "IsSchoolCertificateAvailable",
+            "prop_type": "bool",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "IsTrainingCertificateAvailable",
+            "prop_name": "IsTrainingCertificateAvailable",
+            "prop_type": "bool",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "RemainingDays",
+            "prop_name": "RemainingDays",
+            "prop_type": "int",
+            "is_property": true,
+            "is_field": false
+        }
+    ],
+    "name": "TrainingResponseModel"
+}

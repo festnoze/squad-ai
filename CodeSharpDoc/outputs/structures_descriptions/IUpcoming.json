@@ -1,0 +1,30 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/V2/LiveV2Controller.cs",
+    "index_shift_code": 23138,
+    "struct_type": "Interface",
+    "namespace_name": "LMS.Controllers.V2",
+    "usings": [],
+    "access_modifier": "public",
+    "struct_name": "IUpcoming",
+    "base_class_name": "",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [],
+    "properties": [
+        {
+            "name": "Type",
+            "prop_name": "Type",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "StartDate",
+            "prop_name": "StartDate",
+            "prop_type": "DateTime",
+            "is_property": true,
+            "is_field": false
+        }
+    ],
+    "name": "IUpcoming"
+}

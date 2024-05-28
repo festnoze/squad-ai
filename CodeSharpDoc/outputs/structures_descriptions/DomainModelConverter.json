@@ -1,0 +1,149 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Studi.Api.Lms.User/Mapper/DomainModelConverter.cs",
+    "index_shift_code": 121,
+    "struct_type": "Class",
+    "namespace_name": "",
+    "usings": [],
+    "access_modifier": "public static",
+    "struct_name": "DomainModelConverter",
+    "base_class_name": "",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "ToIto",
+            "code_start_index": 183,
+            "method_name": "ToIto",
+            "existing_summary": "    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "handicapInformationRequestModel",
+                    "param_name": "handicapInformationRequestModel",
+                    "param_type": "HandicapInformationRequestModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        if (handicapInformationRequestModel.Handicaps is null)\r\n        {\r\n            handicapInformationRequestModel.Handicaps = new List<string>();\r\n        }\r\n\r\n        UserDocumentIto? userDocumentModel = null;\r\n        if (handicapInformationRequestModel.Document.HasValue && handicapInformationRequestModel.Document!.Value.FileGuid != null)\r\n        {\r\n            var documentTypeCode = handicapInformationRequestModel.Document!.Value.ProofDocumentTypeCode;\r\n            var fileGuid = new Guid(handicapInformationRequestModel.Document!.Value.FileGuid);\r\n            userDocumentModel = new UserDocumentIto(documentTypeCode, fileGuid, string.Empty);\r\n        }\r\n\r\n        return new HandicapInformationIto(\r\n            handicaps: handicapInformationRequestModel.Handicaps.Select(handicapCode => new HandicapIto(0, handicapCode, null, null)).ToArray(),\r\n            document: userDocumentModel,\r\n            consentGiven: handicapInformationRequestModel.ConsentGiven);\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a HandicapInformationIto object with specified handicaps, document, and consent given status.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "HandicapInformationRequestModel",
+                        "param_name": "HandicapInformationRequestModel",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "handicapInformationRequestModel",
+                        "param_name": "handicapInformationRequestModel",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "ToIto",
+                        "param_name": "ToIto",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "Create a HandicapInformationIto object with specified handicaps, document, and consent given status.",
+                        "param_name": "Create a HandicapInformationIto object with specified handicaps, document, and consent given status.",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a HandicapInformationIto object with specified handicaps, document, and consent given status.\n/// </summary>\n/// <param name=\"HandicapInformationRequestModel\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"handicapInformationRequestModel\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"ToIto\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"Create a HandicapInformationIto object with specified handicaps, document, and consent given status.\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ToIto",
+            "code_start_index": 1295,
+            "method_name": "ToIto",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "studyInfos",
+                    "param_name": "studyInfos",
+                    "param_type": "StudyInfoRequestModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        return new StudyIto(\r\n            id: null,\r\n            degreeCode: studyInfos.HighestDegreeCode ?? throw new ArgumentException(nameof(studyInfos.HighestDegreeCode)),\r\n            degreeName: null,\r\n            graduationYear: studyInfos.GraduationYear ?? 0,\r\n            highestDegreeTitle: studyInfos.StudyLevel ?? throw new ArgumentException(nameof(studyInfos.StudyLevel)),\r\n            lastFollowedCourseTitle: studyInfos.LastStudyName ?? throw new ArgumentException(nameof(studyInfos.LastStudyName)),\r\n            isImportPrm: false);\r\n    }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a new study record with specified degree, graduation year, highest degree title, last followed course title, and import parameter.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "studyInfos",
+                        "param_name": "studyInfos",
+                        "param_desc": "The model containing information about the study."
+                    },
+                    {
+                        "name": "ToIto",
+                        "param_name": "ToIto",
+                        "param_desc": "The name of the method."
+                    },
+                    {
+                        "name": "degree",
+                        "param_name": "degree",
+                        "param_desc": "The specified degree for the new study record."
+                    },
+                    {
+                        "name": "graduationYear",
+                        "param_name": "graduationYear",
+                        "param_desc": "The year of graduation for the study record."
+                    },
+                    {
+                        "name": "highestDegreeTitle",
+                        "param_name": "highestDegreeTitle",
+                        "param_desc": "The title of the highest degree achieved."
+                    },
+                    {
+                        "name": "lastFollowedCourseTitle",
+                        "param_name": "lastFollowedCourseTitle",
+                        "param_desc": "The title of the last course followed."
+                    },
+                    {
+                        "name": "importParameter",
+                        "param_name": "importParameter",
+                        "param_desc": "The parameter used for importing data."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a new study record with specified degree, graduation year, highest degree title, last followed course title, and import parameter.\n/// </summary>\n/// <param name=\"studyInfos\">The model containing information about the study.</param>\n/// <param name=\"ToIto\">The name of the method.</param>\n/// <param name=\"degree\">The specified degree for the new study record.</param>\n/// <param name=\"graduationYear\">The year of graduation for the study record.</param>\n/// <param name=\"highestDegreeTitle\">The title of the highest degree achieved.</param>\n/// <param name=\"lastFollowedCourseTitle\">The title of the last course followed.</param>\n/// <param name=\"importParameter\">The parameter used for importing data.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "DomainModelConverter"
+}

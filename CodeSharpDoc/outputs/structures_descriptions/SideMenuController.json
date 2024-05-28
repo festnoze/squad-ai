@@ -1,0 +1,83 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Studi.Api.Lms.User/Controllers/SideMenuController.cs",
+    "index_shift_code": 395,
+    "struct_type": "Class",
+    "namespace_name": "",
+    "usings": [
+        "Microsoft.AspNetCore.Authorization",
+        "Microsoft.AspNetCore.Mvc",
+        "Studi.Api.Core.Security.Authentication",
+        "Studi.Api.Lms.User.Application.Interfaces",
+        "Studi.Api.Lms.User.Domain.Aggregates.User.Models",
+        "Studi.Api.Lms.User.Mapper",
+        "Studi.Api.Lms.User.ResponseModel",
+        "Swashbuckle.AspNetCore.Annotations"
+    ],
+    "access_modifier": "public",
+    "struct_name": "SideMenuController",
+    "base_class_name": "ControllerWithAuthenticationBase",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetUserSideMenu",
+            "code_start_index": 1085,
+            "method_name": "GetUserSideMenu",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int?",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "schoolId",
+                    "param_name": "schoolId",
+                    "param_type": "int?",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        var userSideMenu = await _sideMenuQueryingService.GetUserSideMenuByUserIdAndSchoolIdAsync(userId ?? User.StudiIdentity().LmsUserId, schoolId ?? User.StudiIdentity().LmsSchoolId);\r\n        var userSideMenuResponseModel = userSideMenu.SideMenuItems.Select(mi => mi.ToResponseModel());\r\n\r\n        return Ok(userSideMenuResponseModel);\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the user's side menu items based on their user ID and school ID.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "schoolId",
+                        "param_name": "schoolId",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the user's side menu items based on their user ID and school ID.\n/// </summary>\n/// <param name=\"userId\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"schoolId\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "SideMenuController"
+}

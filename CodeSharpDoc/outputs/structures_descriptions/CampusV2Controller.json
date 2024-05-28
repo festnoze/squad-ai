@@ -1,0 +1,545 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/V2/CampusV2Controller.cs",
+    "index_shift_code": 895,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V2",
+    "usings": [
+        "iTextSharp.text",
+        "iTextSharp.text.pdf",
+        "iTextSharp.text.pdf.draw",
+        "LMS.Attributes",
+        "LMS.Attributes.Routing",
+        "LMS.Authentication",
+        "LMS.Data",
+        "LMS.Models.ViewModels",
+        "LMS.Models.ViewModels.V3.Events",
+        "LMS.Utils",
+        "Serilog",
+        "System",
+        "System.Collections.Generic",
+        "System.ComponentModel.DataAnnotations",
+        "System.Data.Entity",
+        "System.Globalization",
+        "System.IO",
+        "System.Linq",
+        "System.Net",
+        "System.Net.Http",
+        "System.Net.Http.Headers",
+        "System.Threading.Tasks",
+        "System.Web.Http",
+        "System.Web.Http.Description",
+        "LMS.Models.ViewModels.V3.Newsfeed",
+        "Hangfire",
+        "LMS.Notifications.V2",
+        "LMS.Models.BindingModels.V3",
+        "LMS.Services.Interfaces",
+        "System.Linq.Expressions",
+        "LMS.WebResources"
+    ],
+    "access_modifier": "public",
+    "struct_name": "CampusV2Controller",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetUpcomingEventsAsync",
+            "code_start_index": 1967,
+            "method_name": "GetUpcomingEventsAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Get Campus type events\r\n        /// </summary>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var currentUser = User.Identity.GetUser();\r\n            var userId = this.User.Identity.GetUserId();\r\n\r\n            var eventsQuery = this._db.Events\r\n                                  .AsNoTracking()\r\n                                  .Where(predicateEventCampus)\r\n                                  .Select(e => e.Id);\r\n\r\n            var events =\r\n                await _db.Events.Where(e => eventsQuery.Contains(e.Id))\r\n                         .OrderBy(e => e.DateDebut)\r\n                         .Select(e => new CampusEventListItem\r\n                                      {\r\n                                          EventId = e.Id,\r\n                                          Title = e.Titre,\r\n                                          Description = e.Description,\r\n                                          CampusType = e.EventType.Code,\r\n                                          StartDate = e.DateDebut,\r\n                                          EndDate = e.DateFin,\r\n                                          Image = e.Image ?? _customWebResources.DefaultCampusUrl,\r\n                                          UserId = e.OwnerUserId,\r\n                                          AttendanceLimit = e.MaxNbUsers,\r\n                                          ParticipantsCount = e.EventUserEcoles.Count(eue => eue.Participation == (int?)ParticipationState.Yes),\r\n                                          AttachedFilesCount = e.EventObjects.Count,\r\n                                          ReadOnly = DateTime.Now > DbFunctions.AddMinutes(e.DateDebut, -_delay),\r\n                                          CampusId = e.CampusId,\r\n                                          EventType = new EventTypeV3ViewModel\r\n                                            {\r\n                                                Code = e.EventType.Code,\r\n                                                Label = e.EventType.Libelle,\r\n                                                TimeBeforeAccess = e.EventType.TimeAvantAcces,\r\n                                            },\r\n                         })\r\n                         .ToListAsync();\r\n\r\n            var usersIds = _db.Events.Where(e => eventsQuery.Contains(e.Id))\r\n                              .Select(e => e.OwnerUserId)\r\n                              .Distinct();\r\n\r\n            var users = await _db.Users\r\n                                 .Where(u => usersIds.Contains(u.Id))\r\n                                 .Select(RepositoryV3.GetUserMapExpression(currentUser.SchoolIdsList))\r\n                                 .ToListAsync();\r\n\r\n            var campuses = await _db.Events.Where(e => eventsQuery.Contains(e.Id))\r\n                                    .Select(e => e.Campus)\r\n                                    .Distinct()\r\n                                    .Select(c => new CampusViewModel\r\n                                                 {\r\n                                                     CampusId = c.Id,\r\n                                                     Name = c.Nom,\r\n                                                     PictureUrl = c.UploadedFile.FileUrl,\r\n                                                     Address = new CampusAddressViewModel\r\n                                                               {\r\n                                                                   Address = c.Address.NumeroVoie + \" \" + c.Address.TypeVoie.Libelle + \" \" + c.Address.NomVoie,\r\n                                                                   Complement = c.Address.Complement,\r\n                                                                   PostalCode = c.Address.Cp,\r\n                                                                   City = c.Address.Ville,\r\n                                                                   Country = c.Address.Pay.Libelle,\r\n                                                                   Latitude = c.Address.Latitude,\r\n                                                                   Longitude = c.Address.Longitude\r\n                                                               }\r\n                                                 })\r\n                                    .OrderBy(c => c.Address.City)\r\n                                    .ToListAsync();\r\n\r\n\r\n            var participationInfo = await this._db.EventUserEcoles.AsNoTracking()\r\n                                              .Where(eue => eue.UserId == userId\r\n                                                            && eventsQuery.Contains(eue.EventId)\r\n                                                            && eue.DateDelete == null)\r\n                                              .GroupBy(eue => eue.EventId, eue => new EventParticipationV3ViewModel {Participation = eue.Participation, Presence = eue.Presence, Favorited = eue.Favorited})\r\n                                              .ToDictionaryAsync(g => g.Key, g => g.FirstOrDefault());\r\n\r\n            foreach (var ev in events)\r\n            {\r\n                if (participationInfo.ContainsKey(ev.EventId))\r\n                {\r\n                    ev.ParticipationStatus = participationInfo[ev.EventId];\r\n                }\r\n            }\r\n\r\n            return Ok(new\r\n                      {\r\n                          Events = events,\r\n                          Users = users,\r\n                          Campuses = campuses,\r\n                          EventsCount = events.Count\r\n                      });\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve upcoming events along with related information, such as users and campuses, and participation status for the current user.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "parameters",
+                        "param_name": "parameters",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "existing",
+                        "param_name": "existing",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "method",
+                        "param_name": "method",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "named",
+                        "param_name": "named",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "GetUpcomingEventsAsync",
+                        "param_name": "GetUpcomingEventsAsync",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "context",
+                        "param_name": "context",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "methodPurpose",
+                        "param_name": "methodPurpose",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "Retrieve",
+                        "param_name": "Retrieve",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "upcoming",
+                        "param_name": "upcoming",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "events",
+                        "param_name": "events",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "along",
+                        "param_name": "along",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "with",
+                        "param_name": "with",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "related",
+                        "param_name": "related",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "information",
+                        "param_name": "information",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "such",
+                        "param_name": "such",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "as",
+                        "param_name": "as",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "users",
+                        "param_name": "users",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "and",
+                        "param_name": "and",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "campuses",
+                        "param_name": "campuses",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "participation",
+                        "param_name": "participation",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "status",
+                        "param_name": "status",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "for",
+                        "param_name": "for",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "the",
+                        "param_name": "the",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "current",
+                        "param_name": "current",
+                        "param_desc": "The generated description for the parameter"
+                    },
+                    {
+                        "name": "user",
+                        "param_name": "user",
+                        "param_desc": "The generated description for the parameter"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve upcoming events along with related information, such as users and campuses, and participation status for the current user.\n/// </summary>\n/// <param name=\"no\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"parameters\">The generated description for the parameter</param>\n/// <param name=\"existing\">The generated description for the parameter</param>\n/// <param name=\"method\">The generated description for the parameter</param>\n/// <param name=\"named\">The generated description for the parameter</param>\n/// <param name=\"GetUpcomingEventsAsync\">The generated description for the parameter</param>\n/// <param name=\"context\">The generated description for the parameter</param>\n/// <param name=\"methodPurpose\">The generated description for the parameter</param>\n/// <param name=\"Retrieve\">The generated description for the parameter</param>\n/// <param name=\"upcoming\">The generated description for the parameter</param>\n/// <param name=\"events\">The generated description for the parameter</param>\n/// <param name=\"along\">The generated description for the parameter</param>\n/// <param name=\"with\">The generated description for the parameter</param>\n/// <param name=\"related\">The generated description for the parameter</param>\n/// <param name=\"information\">The generated description for the parameter</param>\n/// <param name=\"such\">The generated description for the parameter</param>\n/// <param name=\"as\">The generated description for the parameter</param>\n/// <param name=\"users\">The generated description for the parameter</param>\n/// <param name=\"and\">The generated description for the parameter</param>\n/// <param name=\"campuses\">The generated description for the parameter</param>\n/// <param name=\"participation\">The generated description for the parameter</param>\n/// <param name=\"status\">The generated description for the parameter</param>\n/// <param name=\"for\">The generated description for the parameter</param>\n/// <param name=\"the\">The generated description for the parameter</param>\n/// <param name=\"current\">The generated description for the parameter</param>\n/// <param name=\"user\">The generated description for the parameter</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ParticipateAsync",
+            "code_start_index": 7580,
+            "method_name": "ParticipateAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "eventId",
+                    "param_name": "eventId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var user = this.User.Identity.GetUser();\r\n            var schoolId = this.GetSchoolId(_db);\r\n\r\n            var availabiltiyInfo = await this._db.Events\r\n                                             .AsNoTracking()\r\n                                             .Where(e => e.Id == eventId\r\n                                                         && DateTime.Now < DbFunctions.AddMinutes(e.DateDebut, -_delay))\r\n                                             .Where(predicateEventCampus)\r\n                                             .Select(e => new\r\n                                                          {\r\n                                                              AvailablePlaces = e.MaxNbUsers,\r\n                                                              ReservedPlaces = e.EventUserEcoles.Count(eue => eue.Participation == (int?)ParticipationState.Yes\r\n                                                                                                              && eue.DateDelete == null),\r\n                                                              HasReservation = e.EventUserEcoles.Any(eue => eue.UserId == user.Id\r\n                                                                                                            && eue.Participation == (int?)ParticipationState.Yes\r\n                                                                                                            && eue.DateDelete == null),\r\n                                                              HasParticipation = e.EventUserEcoles.Any(eue => eue.UserId == user.Id\r\n                                                                                                              && eue.DateDelete == null),\r\n                                                          })\r\n                                             .FirstOrDefaultAsync();\r\n\r\n            if (availabiltiyInfo == null)\r\n            {\r\n                return Content(HttpStatusCode.NotFound, \"EVENT_DOESNT_EXIST_OR_NOT_CAMPUS\");\r\n            }\r\n\r\n            if (availabiltiyInfo.HasReservation)\r\n            {\r\n                return Ok(\"RESERVATION_EXISTS\");\r\n            }\r\n\r\n            if (availabiltiyInfo.AvailablePlaces > availabiltiyInfo.ReservedPlaces)\r\n            {\r\n                if (availabiltiyInfo.HasParticipation)\r\n                {\r\n                    var participation = await this._db.EventUserEcoles\r\n                                                  .Where(eue => eue.UserId == user.Id\r\n                                                                && eue.EventId == eventId\r\n                                                                && eue.DateDelete == null)\r\n                                                  .FirstOrDefaultAsync();\r\n\r\n                    participation.Participation = (int?) ParticipationState.Yes;\r\n                    participation.DateUpdate = DateTime.Now;\r\n                    participation.UserUpdate = user.Email;\r\n                }\r\n                else\r\n                {\r\n                    this._db.EventUserEcoles.Add(new EventUserEcole\r\n                                                 {\r\n                                                     DateCreate = DateTime.Now,\r\n                                                     UserCreate = user.Email,\r\n                                                     EcoleId = schoolId,\r\n                                                     UserId = user.Id,\r\n                                                     Participation = (int?)ParticipationState.Yes,\r\n                                                     EventId = eventId\r\n                                                 });\r\n                }\r\n\r\n                try\r\n                {\r\n                    await this._db.SaveChangesAsync();\r\n\r\n                    BackgroundJob.Enqueue(() => NotificationSenderManager.SendCampusParticipateNotificationAsync(user.Id, schoolId, eventId));\r\n\r\n                    return Ok(\"PLACE_RESERVED\");\r\n                }\r\n                catch (Exception e)\r\n                {\r\n                    Log.Error(e, \"Error saving a reservation for a campus event\");\r\n                    return InternalServerError(e);\r\n                }\r\n            }\r\n            else\r\n            {\r\n                return Content(HttpStatusCode.Forbidden, \"EVENT_AT_CAPACITY\");\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Participate in a campus event, handling reservations and participation status, with notifications sent upon successful reservation.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "eventId",
+                        "param_name": "eventId",
+                        "param_desc": "The ID of the event in which the user wants to participate."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Participate in a campus event, handling reservations and participation status, with notifications sent upon successful reservation.\n/// </summary>\n/// <param name=\"eventId\">The ID of the event in which the user wants to participate.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ParticipateUndoAsync",
+            "code_start_index": 12089,
+            "method_name": "ParticipateUndoAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "eventId",
+                    "param_name": "eventId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var user = this.User.Identity.GetUser();\r\n\r\n            // var ecoleId = User.Identity.GetSchoolId();\r\n\r\n            var eventExists = await this._db.Events\r\n                                        .AsNoTracking()\r\n                                        .Where(e => e.Id == eventId)\r\n                                        .Where(predicateEventCampus)\r\n                                        .AnyAsync();\r\n\r\n            if (!eventExists)\r\n            {\r\n                return Content(HttpStatusCode.NotFound, \"EVENT_DOESNT_EXIST_OR_NOT_CAMPUS\");\r\n            }\r\n\r\n            var participation = await this._db.EventUserEcoles\r\n                                          .Where(eue => eue.UserId == user.Id\r\n                                                        && eue.EventId == eventId\r\n                                                        && eue.DateDelete == null)\r\n                                          .FirstOrDefaultAsync();\r\n\r\n            if (participation == null)\r\n            {\r\n                this._db.EventUserEcoles.Add(new EventUserEcole\r\n                                             {\r\n                                                 DateCreate = DateTime.Now,\r\n                                                 UserCreate = user.Email,\r\n                                                 EcoleId = this.GetSchoolId(_db),\r\n                                                 UserId = user.Id,\r\n                                                 EventId = eventId,\r\n                                                 Participation = (int?)ParticipationState.No,\r\n                                             });\r\n            }\r\n            else\r\n            {\r\n                participation.Participation = (int?)ParticipationState.No;\r\n                participation.DateUpdate = DateTime.Now;\r\n                participation.UserUpdate = user.Email;\r\n            }\r\n\r\n            try\r\n            {\r\n                await _db.SaveChangesAsync();\r\n                return Ok(\"RESERVATION_CANCELED\");\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error removing participations\");\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the participation status of a user in a specific event, either adding a new participation if none exists or updating an existing one, and return a success message or an error message if saving changes fails.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "eventId",
+                        "param_name": "eventId",
+                        "param_desc": "The ID of the event for which the participation status will be updated."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the participation status of a user in a specific event, either adding a new participation if none exists or updating an existing one, and return a success message or an error message if saving changes fails.\n/// </summary>\n/// <param name=\"eventId\">The ID of the event for which the participation status will be updated.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetEventDetailsAsync",
+            "code_start_index": 14639,
+            "method_name": "GetEventDetailsAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// retourne les d\u00e9tails d'un evenement\r\n        /// </summary>\r\n        /// <param name=\"eventId\"></param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "eventId",
+                    "param_name": "eventId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var currentUser = User.Identity.GetUser();\r\n            var userId = currentUser.Id;\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n\r\n            var eventDetails = await this._db.Events\r\n                .AsNoTracking()\r\n                .Where(e => e.Id == eventId)\r\n                .Where(predicateEventCampus)\r\n                .Select(e => new CampusEventDetails\r\n                {\r\n                    EventId = e.Id,\r\n                    Title = e.Titre,\r\n                    Description = e.Description,\r\n                    ReadOnly = DateTime.Now > DbFunctions.AddMinutes(e.DateDebut, -_delay),\r\n                    CampusId = e.CampusId,\r\n                    StartDate = e.DateDebut,\r\n                    EndDate = e.DateFin,\r\n                    UserId = e.OwnerUserId,\r\n                    Image = e.Image ?? _customWebResources.DefaultCampusUrl,\r\n                    AttachedFiles = e.EventObjects\r\n                        .Where(eo => eo.DateDelete == null)\r\n                        .OrderBy(eo => eo.DateAccesObject)\r\n                        .Select(af => new AttachedFileV3ViewModel\r\n                        {\r\n                            Id = af.Id,\r\n                            IsAvailable = af.DateAccesObject < DateTime.Now,\r\n                            Filename = af.Filename,\r\n                            Label = af.Libelle,\r\n                            AvailabilityDate = af.DateAccesObject,\r\n                            Type = af.ResourceType.Libelle\r\n                        })\r\n                        .ToList(),\r\n                        ParticipationStatus = e.EventUserEcoles\r\n                            .Where(eue => eue.UserId == userId\r\n                                && eue.DateDelete == null)\r\n                            .Select(eue => new EventParticipationV3ViewModel\r\n                            {\r\n                                Participation = eue.Participation,\r\n                                Presence = eue.Presence,\r\n                                Favorited = eue.Favorited\r\n                            })\r\n                            .FirstOrDefault(),\r\n\r\n                            EventType = new EventTypeV3ViewModel\r\n                            {\r\n                                Code = e.EventType.Code,\r\n                                Label = e.EventType.Libelle,\r\n                                TimeBeforeAccess = e.EventType.TimeAvantAcces,\r\n                            },\r\n                            AttendanceLimit = e.MaxNbUsers\r\n                        })\r\n                        .FirstOrDefaultAsync();\r\n\r\n            if (eventDetails == null)\r\n            {\r\n                return Content(HttpStatusCode.NotFound, \"EVENT_DOESNT_EXIST_OR_NOT_CAMPUS\");\r\n            }\r\n\r\n            // Get the event's host info\r\n\r\n            eventDetails.Host = await this._db.Users.AsNoTracking()\r\n                                          .Where(u => u.Id == eventDetails.UserId)\r\n                                          .Select(RepositoryV3.GetUserMapExpression(ecoleId))\r\n                                          .FirstOrDefaultAsync();\r\n\r\n            // Get the list of the participing by eventId, EcoleId\r\n            eventDetails.ParticipatingUsers = await this._db.EventUserEcoles\r\n                                                        .AsNoTracking()\r\n                                                        .Where(u => u.DateDelete == null && u.Participation == (int?)ParticipationState.Yes && u.EventId == eventId)\r\n                                                        .Select(RepositoryV3.GetUserMapEventExpression(ecoleId))\r\n                                                        .OrderByDescending(u => u.Internal)\r\n                                                        .ThenBy(u => u.Pseudo)\r\n                                                        .ToListAsync();\r\n\r\n            if (eventDetails.CampusId != null)\r\n            {\r\n                eventDetails.Campus = await _db.Campus\r\n                                               .AsNoTracking()\r\n                                               .Where(c => c.Id == eventDetails.CampusId)\r\n                                               .Select(c => new CampusViewModel\r\n                                                            {\r\n                                                                CampusId = c.Id,\r\n                                                                Name = c.Nom,\r\n                                                                PictureUrl = c.UploadedFile.FileUrl,\r\n                                                                Address = new CampusAddressViewModel\r\n                                                                          {\r\n                                                                              Address = c.Address.NumeroVoie + \" \" + c.Address.TypeVoie.Libelle + \" \" + c.Address.NomVoie,\r\n                                                                              Complement = c.Address.Complement,\r\n                                                                              PostalCode = c.Address.Cp,\r\n                                                                              City = c.Address.Ville,\r\n                                                                              Country = c.Address.Pay.Libelle,\r\n                                                                              Latitude = c.Address.Latitude,\r\n                                                                              Longitude = c.Address.Longitude\r\n                                                                          }\r\n                                                            })\r\n                                               .FirstOrDefaultAsync();\r\n            }\r\n\r\n            return Ok(eventDetails);\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the details of a specific event, including event information, attached files, participation status, event type, attendance limit, host information, participating users, and campus information if available.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "eventId",
+                        "param_name": "eventId",
+                        "param_desc": "The ID of the event that uniquely identifies it in the system."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the details of a specific event, including event information, attached files, participation status, event type, attendance limit, host information, participating users, and campus information if available.\n/// </summary>\n/// <param name=\"eventId\">The ID of the event that uniquely identifies it in the system.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetPdfAsync",
+            "code_start_index": 20629,
+            "method_name": "GetPdfAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "eventId",
+                    "param_name": "eventId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var user = this.User.Identity.GetUser();\r\n\r\n            // limit to organiser and officials\r\n            var evt = await this._db.Events\r\n                                .AsNoTracking()\r\n                                .Where(e => e.Id == eventId)\r\n                                .Where(predicateEventCampus)\r\n                                .Select(e => new\r\n                                             {\r\n                                                 e.Titre,\r\n                                                 e.OwnerUserId,\r\n                                                 e.DateDebut,\r\n                                                 Host = new\r\n                                                        {\r\n                                                            e.User.Nom,\r\n                                                            e.User.Prenom,\r\n                                                        }\r\n                                             })\r\n                                .FirstOrDefaultAsync();\r\n\r\n            if (evt == null)\r\n            {\r\n                return new HttpResponseMessage(HttpStatusCode.NotFound);\r\n            }\r\n\r\n            if (evt.OwnerUserId != user.Id && !user.Interne)\r\n            {\r\n                return new HttpResponseMessage(HttpStatusCode.Forbidden);\r\n            }\r\n\r\n            var students = await _db.EventUserEcoles.AsNoTracking()\r\n                                    .Where(eue => eue.EventId == eventId && eue.DateDelete == null && eue.Participation == (int?)ParticipationState.Yes)\r\n                                    .Select(eue => eue.User)\r\n                                    .Distinct()\r\n                                    .Select(usr => new\r\n                                                   {\r\n                                                       Nom = usr.Nom,\r\n                                                       Prenom = usr.Prenom,\r\n                                                       Interne = usr.Interne,\r\n                                                       Parcours = usr.InscriptionPromotions\r\n                                                                     .Where(inscPromo => (inscPromo.DateDelete == null || inscPromo.DateDelete > DateTime.Now)\r\n                                                                                         && ((inscPromo.DateFinAcces == null && inscPromo.Promotion.DateFinPromo > DateTime.Now) || inscPromo.DateFinAcces > DateTime.Now))\r\n                                                                     .Select(inscPromo => inscPromo.Promotion.Parcour.Titre)\r\n                                                                     .Distinct()\r\n                                                                     .ToList()\r\n                                                   })\r\n                                    .OrderByDescending(u => u.Interne)\r\n                                    .ThenBy(u => u.Nom)\r\n                                    .ThenBy(u => u.Prenom)\r\n                                    .ToListAsync();\r\n\r\n            if (evt.OwnerUserId != user.Id && !user.Interne)\r\n            {\r\n                return new HttpResponseMessage(HttpStatusCode.Forbidden)\r\n                       {\r\n                           Content = new StringContent(\"Vous n'avez pas le droit de t\u00e9l\u00e9charger ce fichier\")\r\n                       };\r\n            }\r\n\r\n            using (var ms = new MemoryStream())\r\n            {\r\n                var document = new Document(PageSize.A4.Rotate(), 25, 25, 25, 25);\r\n                var pdfWriter = PdfWriter.GetInstance(document, ms);\r\n\r\n                pdfWriter.CloseStream = false;\r\n\r\n                document.Open();\r\n                document.AddTitle(evt.Titre);\r\n\r\n                // Document title\r\n                var title = new Paragraph(evt.Titre, FontFactory.GetFont(\"Arial\", 18))\r\n                            {\r\n                                Alignment = Element.ALIGN_CENTER,\r\n                                ExtraParagraphSpace = 0.3f,\r\n                                SpacingAfter = 20\r\n                            };\r\n\r\n                document.Add(title);\r\n\r\n                var eventHost = new Paragraph();\r\n\r\n                var p = new Paragraph($\"Organisateur/trice : {evt.Host.Prenom} {evt.Host.Nom}                   Signature: \")\r\n                        {\r\n                            new Chunk(new Chunk(new VerticalPositionMark())),\r\n                            evt.DateDebut.ToString(\"D\", new CultureInfo(\"fr-FR\")),\r\n                        };\r\n                p.ExtraParagraphSpace = 0.3f;\r\n                p.SpacingAfter = 20;\r\n\r\n                document.Add(p);\r\n\r\n                document.Add(eventHost);\r\n\r\n                // Students list\r\n                var table = new PdfPTable(4)\r\n                            {\r\n                                HeaderRows = 1,\r\n                                WidthPercentage = 100,\r\n                            };\r\n\r\n                table.SetWidths(new[] {20, 20, 40, 20});\r\n\r\n                // Nom column\r\n                table.AddCell(new PdfPCell\r\n                              {\r\n                                  PaddingTop = 10,\r\n                                  PaddingBottom = 10,\r\n                                  Phrase = new Phrase(\"Nom\"),\r\n                                  BackgroundColor = BaseColor.LIGHT_GRAY,\r\n                              });\r\n\r\n                // Pr\u00e9nom column\r\n                table.AddCell(new PdfPCell\r\n                              {\r\n                                  PaddingTop = 10,\r\n                                  PaddingBottom = 10,\r\n                                  Phrase = new Phrase(\"Pr\u00e9nom\"),\r\n                                  BackgroundColor = BaseColor.LIGHT_GRAY,\r\n                              });\r\n\r\n                // Parcours\r\n                table.AddCell(new PdfPCell\r\n                              {\r\n                                  PaddingTop = 10,\r\n                                  PaddingBottom = 10,\r\n                                  Phrase = new Phrase(\"Parcours\"),\r\n                                  BackgroundColor = BaseColor.LIGHT_GRAY,\r\n                              });\r\n\r\n                // Signature column\r\n                table.AddCell(new PdfPCell\r\n                              {\r\n                                  PaddingTop = 10,\r\n                                  PaddingBottom = 10,\r\n                                  Phrase = new Phrase(\"Signature\"),\r\n                                  BackgroundColor = BaseColor.LIGHT_GRAY,\r\n                              });\r\n\r\n                // Students list\r\n                foreach (var e in students)\r\n                {\r\n                    // Nom\r\n                    table.AddCell(new PdfPCell\r\n                                  {\r\n                                      PaddingTop = 10,\r\n                                      PaddingBottom = 10,\r\n                                      Phrase = new Phrase(e.Nom) ,\r\n                                  });\r\n\r\n                    // Prenom\r\n                    table.AddCell(new PdfPCell\r\n                                  {\r\n                                      PaddingTop = 10,\r\n                                      PaddingBottom = 10,\r\n                                      Phrase = new Phrase(e.Prenom) \r\n                                  });\r\n\r\n                    // Parcours\r\n                    if (e.Interne)\r\n                    {\r\n                        table.AddCell(new PdfPCell\r\n                                      {\r\n                                          PaddingTop = 10,\r\n                                          PaddingBottom = 10,\r\n                                          Phrase = new Phrase(\"Officiel\") \r\n                                      });\r\n                    }\r\n                    else\r\n                    {\r\n                        var parcours = string.Join(\", \", e.Parcours);\r\n\r\n                        table.AddCell(new PdfPCell\r\n                                      {\r\n                                          PaddingTop = 10,\r\n                                          PaddingBottom = 10,\r\n                                          Phrase = new Phrase(parcours) \r\n                                      });\r\n                    }\r\n\r\n                    // Signature\r\n                    table.AddCell(string.Empty);\r\n                }\r\n\r\n                document.Add(table);\r\n\r\n                document.Close();\r\n                pdfWriter.Close();\r\n\r\n                var bytes = ms.ToArray();\r\n                var httpResponseMessage = new HttpResponseMessage\r\n                                          {\r\n                                              StatusCode = HttpStatusCode.OK,\r\n                                              Content = new ByteArrayContent(bytes)\r\n                                          };\r\n\r\n                httpResponseMessage.Content.Headers.ContentType = new MediaTypeHeaderValue(\"application/pdf\");\r\n                httpResponseMessage.Content.Headers.ContentDisposition = new ContentDispositionHeaderValue(\"attachment\");\r\n                httpResponseMessage.Content.Headers.Add(\"x-filename\", $\"presence_{eventId}.pdf\");\r\n                httpResponseMessage.Content.Headers.ContentDisposition.FileName = $\"presence_{eventId}.pdf\";\r\n                return httpResponseMessage;\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Generate a PDF document containing event attendance information for authorized users.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "eventId",
+                        "param_name": "eventId",
+                        "param_desc": "The ID of the event for which the PDF document will be generated."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Generate a PDF document containing event attendance information for authorized users.\n/// </summary>\n/// <param name=\"eventId\">The ID of the event for which the PDF document will be generated.</param>\n",
+            "code_chunks": [
+                {
+                    "page_content": "{\r\n            var user = this.User.Identity.GetUser();\r\n\r\n            // limit to organiser and officials\r\n            var evt = await this._db.Events\r\n                                .AsNoTracking()\r\n                                .Where(e => e.Id == eventId)\r\n                                .Where(predicateEventCampus)\r\n                                .Select(e => new\r\n                                             {\r\n                                                 e.Titre,\r\n                                                 e.OwnerUserId,\r\n                                                 e.DateDebut,\r\n                                                 Host = new\r\n                                                        {\r\n                                                            e.User.Nom,\r\n                                                            e.User.Prenom,\r\n                                                        }\r\n                                             })\r\n                                .FirstOrDefaultAsync();\r\n\r\n            if (evt == null)\r\n            {\r\n                return new HttpResponseMessage(HttpStatusCode.NotFound);\r\n            }\r\n\r\n            if (evt.OwnerUserId != user.Id && !user.Interne)\r\n            {\r\n                return new HttpResponseMessage(HttpStatusCode.Forbidden);\r\n            }\r\n\r\n            var students = await _db.EventUserEcoles.AsNoTracking()\r\n                                    .Where(eue => eue.EventId == eventId && eue.DateDelete == null && eue.Participation == (int?)ParticipationState.Yes)\r\n                                    .Select(eue => eue.User)\r\n                                    .Distinct()\r\n                                    .Select(usr => new\r\n                                                   {\r\n                                                       Nom = usr.Nom,\r\n                                                       Prenom = usr.Prenom,\r\n                                                       Interne = usr.Interne,\r\n                                                       Parcours = usr.InscriptionPromotions\r\n                                                                     .Where(inscPromo => (inscPromo.DateDelete == null || inscPromo.DateDelete > DateTime.Now)\r\n                                                                                         && ((inscPromo.DateFinAcces == null && inscPromo.Promotion.DateFinPromo > DateTime.Now) || inscPromo.DateFinAcces > DateTime.Now))\r\n                                                                     .Select(inscPromo => inscPromo.Promotion.Parcour.Titre)\r\n                                                                     .Distinct()\r\n                                                                     .ToList()\r\n                                                   })\r\n                                    .OrderByDescending(u => u.Interne)\r\n                                    .ThenBy(u => u.Nom)\r\n                                    .ThenBy(u => u.Prenom)\r\n                                    .ToListAsync();\r\n\r\n            if (evt.OwnerUserId != user.Id && !user.Interne)\r\n            {\r\n                return new HttpResponseMessage(HttpStatusCode.Forbidden)\r\n                       {\r\n                           Content = new StringContent(\"Vous n'avez pas le droit de t\u00e9l\u00e9charger ce fichier\")\r\n                       };\r\n            }\r\n\r\n            using (var ms = new MemoryStream())\r\n            {\r\n                var document = new Document(PageSize.A4.Rotate(), 25, 25, 25, 25);\r\n                var pdfWriter = PdfWriter.GetInstance(document, ms);\r\n\r\n                pdfWriter.CloseStream = false;\r\n\r\n                document.Open();\r\n                document.AddTitle(evt.Titre);\r\n\r\n                // Document title\r\n                var title = new Paragraph(evt.Titre, FontFactory.GetFont(\"Arial\", 18))\r\n                            {\r\n                                Alignment = Element.ALIGN_CENTER,\r\n                                ExtraParagraphSpace = 0.3f,\r\n                                SpacingAfter = 20\r\n                            };\r\n\r\n                document.Add(title);\r\n\r\n                var eventHost = new Paragraph();\r\n\r\n                var p = new Paragraph($\"Organisateur/trice : {evt.Host.Prenom} {evt.Host.Nom}                   Signature: \")\r\n                        {\r\n                            new Chunk(new Chunk(new VerticalPositionMark())),\r\n                            evt.DateDebut.ToString(\"D\", new CultureInfo(\"fr-FR\")),\r\n                        };\r\n                p.ExtraParagraphSpace = 0.3f;\r\n                p.SpacingAfter = 20;\r\n\r\n                document.Add(p);\r\n\r\n                document.Add(eventHost);\r\n\r\n                // Students list\r\n                var table = new PdfPTable(4)\r\n                            {\r\n                                HeaderRows = 1,\r\n                                WidthPercentage = 100,\r\n                            };\r\n\r\n                table.SetWidths(new[] {20, 20, 40, 20});\r\n\r\n                // Nom column\r\n                table.AddCell(new PdfPCell\r\n                              {\r\n                                  PaddingTop = 10,\r\n                                  PaddingBottom = 10,\r\n                                  Phrase = new Phrase(\"Nom\"),\r\n                                  BackgroundColor = BaseColor.LIGHT_GRAY,\r\n                              });\r\n\r\n                // Pr\u00e9nom column\r\n                table.AddCell(new PdfPCell\r\n                              {\r\n                                  PaddingTop = 10,\r\n                                  PaddingBottom = 10,\r\n                                  Phrase = new Phrase(\"Pr\u00e9nom\"),\r\n                                  BackgroundColor = BaseColor.LIGHT_GRAY,\r\n                              });\r\n\r\n                // Parcours\r\n                table.AddCell(new PdfPCell\r\n                              {\r\n                                  PaddingTop = 10,\r\n                                  PaddingBottom = 10,\r\n                                  Phrase = new Phrase(\"Parcours\"),\r\n                                  BackgroundColor = BaseColor.LIGHT_GRAY,\r\n                              });\r\n\r\n                // Signature column\r\n                table.AddCell(new PdfPCell\r\n                              {\r\n                                  PaddingTop = 10,\r\n                                  PaddingBottom = 10,\r\n                                  Phrase = new Phrase(\"Signature\"),\r\n                                  BackgroundColor = BaseColor.LIGHT_GRAY,\r\n                              });\r\n\r\n                // Students list\r\n                foreach (var e in students)\r\n                {\r\n                    // Nom\r\n                    table.AddCell(new PdfPCell\r\n                                  {\r\n                                      PaddingTop = 10,\r\n                                      PaddingBottom = 10,\r\n                                      Phrase = new Phrase(e.Nom) ,\r\n                                  });\r\n\r\n                    // Prenom\r\n                    table.AddCell(new PdfPCell\r\n                                  {\r\n                                      PaddingTop = 10,\r\n                                      PaddingBottom = 10,\r\n                                      Phrase = new Phrase(e.Prenom) \r\n                                  });\r\n\r\n                    // Parcours\r\n                    if (e.Interne)\r\n                    {\r\n                        table.AddCell(new PdfPCell\r\n                                      {\r\n                                          PaddingTop = 10,\r\n                                          PaddingBottom = 10,\r\n                                          Phrase = new Phrase(\"Officiel\") \r\n                                      });\r\n                    }\r\n                    else\r\n                    {\r\n                        var parcours = string.Join(\", \", e.Parcours);",
+                    "metadata": {},
+                    "type": "Document"
+                },
+                {
+                    "page_content": "table.AddCell(new PdfPCell\r\n                                      {\r\n                                          PaddingTop = 10,\r\n                                          PaddingBottom = 10,\r\n                                          Phrase = new Phrase(parcours) \r\n                                      });\r\n                    }\r\n\r\n                    // Signature\r\n                    table.AddCell(string.Empty);\r\n                }\r\n\r\n                document.Add(table);\r\n\r\n                document.Close();\r\n                pdfWriter.Close();\r\n\r\n                var bytes = ms.ToArray();\r\n                var httpResponseMessage = new HttpResponseMessage\r\n                                          {\r\n                                              StatusCode = HttpStatusCode.OK,\r\n                                              Content = new ByteArrayContent(bytes)\r\n                                          };\r\n\r\n                httpResponseMessage.Content.Headers.ContentType = new MediaTypeHeaderValue(\"application/pdf\");\r\n                httpResponseMessage.Content.Headers.ContentDisposition = new ContentDispositionHeaderValue(\"attachment\");\r\n                httpResponseMessage.Content.Headers.Add(\"x-filename\", $\"presence_{eventId}.pdf\");\r\n                httpResponseMessage.Content.Headers.ContentDisposition.FileName = $\"presence_{eventId}.pdf\";\r\n                return httpResponseMessage;\r\n            }\r\n        }",
+                    "metadata": {},
+                    "type": "Document"
+                }
+            ]
+        },
+        {
+            "name": "SetPresenceAsync",
+            "code_start_index": 30234,
+            "method_name": "SetPresenceAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "presenceBm",
+                    "param_name": "presenceBm",
+                    "param_type": "PresenceBindingModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var user = this.User.Identity.GetUser();\r\n\r\n            var eventExists = await this._db.Events\r\n                                        .AsNoTracking()\r\n                                        .Where(e => e.Id == presenceBm.EventId && (e.OwnerUserId == user.Id || user.Interne))\r\n                                        .Where(predicateEventCampus)\r\n                                        .AnyAsync();\r\n\r\n            if (!eventExists)\r\n            {\r\n                return NotFound();\r\n            }\r\n\r\n            var studentPresence = await this._db.EventUserEcoles.FirstOrDefaultAsync(eue => eue.EventId == presenceBm.EventId && eue.Participation == (int?)ParticipationState.Yes && eue.UserId == presenceBm.UserId);\r\n\r\n            if (studentPresence == null)\r\n            {\r\n                return BadRequest(\"NOT_REGISTERED\");\r\n            }\r\n\r\n            studentPresence.Presence = presenceBm.Presence;\r\n\r\n            try\r\n            {\r\n                await _db.SaveChangesAsync();\r\n                return Ok();\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error updating the user's presence information\");\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the user's presence information for a specific event, checking if the event exists and if the user is registered before updating the presence status.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "presenceBm",
+                        "param_name": "presenceBm",
+                        "param_desc": "The PresenceBindingModel parameter represents the presence information to be set for the user. It contains details such as the user's status, event details, and presence timestamp."
+                    },
+                    {
+                        "name": "SetPresenceAsync",
+                        "param_name": "SetPresenceAsync",
+                        "param_desc": "The method SetPresenceAsync is responsible for updating the user's presence information. It checks if the specified event exists and if the user is registered before updating the user's presence status accordingly."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the user's presence information for a specific event, checking if the event exists and if the user is registered before updating the presence status.\n/// </summary>\n/// <param name=\"presenceBm\">The PresenceBindingModel parameter represents the presence information to be set for the user. It contains details such as the user's status, event details, and presence timestamp.</param>\n/// <param name=\"SetPresenceAsync\">The method SetPresenceAsync is responsible for updating the user's presence information. It checks if the specified event exists and if the user is registered before updating the user's presence status accordingly.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "AddRessourceObjectAsync",
+            "code_start_index": 31666,
+            "method_name": "AddRessourceObjectAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "eventId",
+                    "param_name": "eventId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "eventObject",
+                    "param_name": "eventObject",
+                    "param_type": "EventObjectBindingModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var ev = await _db.Events\r\n                .Include(e => e.EventObjects)\r\n                .AsNoTracking()\r\n                .Where(e => e.Id == eventId)\r\n                .Where(predicateEventCampus)\r\n                .SingleOrDefaultAsync();\r\n\r\n            if (ev == null)\r\n            {\r\n                return Content(HttpStatusCode.NotFound, \"Le campus n'existe pas\");\r\n            }\r\n\r\n            // Current User Info\r\n            var currentUser = User.Identity.GetUser();\r\n            var userId = currentUser.Id;\r\n\r\n            if (ev.OwnerUserId != userId)\r\n            {\r\n                return Content(HttpStatusCode.Forbidden, \"Vous ne pouvez pas ajouter une pi\u00e8ce jointe\");\r\n            }\r\n\r\n            var uploadedFile = await _db.UploadedFiles\r\n                .AsNoTracking()\r\n                .Where(uf => uf.FileGuid == eventObject.UploadedFileGuid)\r\n                .FirstOrDefaultAsync();\r\n\r\n            if (uploadedFile == null)\r\n            {\r\n                return Content(HttpStatusCode.NotFound, \"Fichier upload\u00e9 non trouv\u00e9\");\r\n            }\r\n\r\n            var order = (ev.EventObjects.Count > 0) ? ev.EventObjects.Max(e => e.Ordre) : 1;\r\n\r\n            var ressourceType = _ressourceService.GetEventsRessourceTypeFromExtension(Path.GetExtension(uploadedFile.FileUrl).Replace(\".\", \"\"));\r\n\r\n            if (ressourceType == null)\r\n            {\r\n                return Content(HttpStatusCode.NotFound, \"Type de ressource incorrect\");\r\n            }\r\n\r\n            EventObject eo = new EventObject\r\n            {\r\n                DateCreate = DateTime.Now,\r\n                UserCreate = currentUser.Email,\r\n                EventId = eventId,\r\n                Filename = uploadedFile.FileUrl,\r\n                RessourceTypeId = ressourceType.Id,\r\n                DateAccesObject = eventObject.IsDispoAfter ? ev.DateFin : DateTime.Now,\r\n                Ordre = order,\r\n                Libelle = uploadedFile.FileName,\r\n                FileId = uploadedFile.Id\r\n            };\r\n\r\n            _db.EventObjects.Add(eo);\r\n\r\n            try\r\n            {\r\n                await this._db.SaveChangesAsync();\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error saving the ressource object\");\r\n                return InternalServerError();\r\n            }\r\n\r\n            AttachedFileV3ViewModel attachedFile = new AttachedFileV3ViewModel\r\n            {\r\n                Id = eo.Id,\r\n                IsAvailable = eo.DateAccesObject < DateTime.Now,\r\n                Filename = eo.Filename,\r\n                Label = eo.Libelle,\r\n                AvailabilityDate = eo.DateAccesObject,\r\n                Type = ressourceType.Libelle\r\n            };\r\n\r\n            return Ok(attachedFile);\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Add a resource object asynchronously to an event if the current user has permission, handling various error cases and returning the added object.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "eventId",
+                        "param_name": "eventId",
+                        "param_desc": "The ID of the event to which the resource object will be added."
+                    },
+                    {
+                        "name": "eventObject",
+                        "param_name": "eventObject",
+                        "param_desc": "The binding model representing the resource object that will be added to the event."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Add a resource object asynchronously to an event if the current user has permission, handling various error cases and returning the added object.\n/// </summary>\n/// <param name=\"eventId\">The ID of the event to which the resource object will be added.</param>\n/// <param name=\"eventObject\">The binding model representing the resource object that will be added to the event.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "RemoveRessourceObjectAsync",
+            "code_start_index": 34655,
+            "method_name": "RemoveRessourceObjectAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "eventObjectId",
+                    "param_name": "eventObjectId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            // Current User Info\r\n            var currentUser = User.Identity.GetUser();\r\n            var userId = currentUser.Id;\r\n\r\n            var eventObject = await _db.EventObjects\r\n                .Include(eo => eo.Event)\r\n                .Where(eo => eo.Id == eventObjectId)\r\n                .SingleOrDefaultAsync();\r\n\r\n\r\n            if (eventObject.Event.OwnerUserId != userId)\r\n            {\r\n                return Content(HttpStatusCode.Forbidden, \"Vous ne pouvez pas supprimer une pi\u00e8ce jointe\");\r\n            }\r\n\r\n            _db.EventObjects.Remove(eventObject);\r\n\r\n            try\r\n            {\r\n                await this._db.SaveChangesAsync();\r\n                return Ok();\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error saving the tracking info\");\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Remove a resource object asynchronously after checking ownership, returning forbidden if the current user is not the owner, and logging any errors that occur during the process.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "eventObjectId",
+                        "param_name": "eventObjectId",
+                        "param_desc": "The identifier of the event object to be removed."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Remove a resource object asynchronously after checking ownership, returning forbidden if the current user is not the owner, and logging any errors that occur during the process.\n/// </summary>\n/// <param name=\"eventObjectId\">The identifier of the event object to be removed.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "CampusV2Controller"
+}

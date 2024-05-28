@@ -1,0 +1,74 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Common/GoFluentController.cs",
+    "index_shift_code": 349,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.Common",
+    "usings": [
+        "LMS.Authentication",
+        "LMS.Configuration",
+        "LMS.Data",
+        "LMS.Utils",
+        "Serilog",
+        "Studi.GoFluent.Models",
+        "System",
+        "System.Data.Entity",
+        "System.Linq",
+        "System.Net",
+        "System.Threading.Tasks",
+        "System.Web.Http",
+        "System.Web.Http.Description"
+    ],
+    "access_modifier": "public",
+    "struct_name": "GoFluentController",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "UserAccountConnectionAsync",
+            "code_start_index": 1452,
+            "method_name": "UserAccountConnectionAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            string url = _config.GetGofluentUrl();\r\n            string key = _config.GetGofluentKey();\r\n            string iv = _config.GetGofluentIv();\r\n\r\n            // On check si l'utilisateur a des credentials dans inscriptions services avec l'id du groupe donn\u00e9\r\n            var currentUser = User.Identity.GetUser();\r\n            var ecoleUserId = User.Identity.GetSchoolUserId();\r\n\r\n            try\r\n            {\r\n                var serviceGoFluent = await _db.InscriptionsServices\r\n                                               .Where(inscriptionsService => inscriptionsService.EcoleUserId == ecoleUserId && inscriptionsService.Service.Code == \"GO_FLUENT\")\r\n                                               .FirstOrDefaultAsync();\r\n\r\n                string result;\r\n                if (serviceGoFluent != null)\r\n                {\r\n                    if (serviceGoFluent.DateActivation == null)\r\n                    {\r\n                        serviceGoFluent.DateActivation = DateTimeOffset.Now;\r\n                        serviceGoFluent.DateFinService = serviceGoFluent.DateActivation.Value.AddYears(1);\r\n                        await _db.SaveChangesAsync();\r\n                    }\r\n\r\n                    Studi.GoFluent.Action goFluent = new Studi.GoFluent.Action(url, iv, key);\r\n\r\n                    // Now create a submission ...\r\n                    Submission submission = new Submission($\"ID_{currentUser.Id}\", PROVIDER_ID, new Product(PRODUCT_TYPE, SSO_PRODUCT_ID, EXPIRATION));\r\n\r\n                    Studi.GoFluent.Models.User user = new Studi.GoFluent.Models.User(currentUser.Prenom,\r\n                                                                                     currentUser.Nom,\r\n                                                                                     currentUser.Email,\r\n                                                                                     USER_COMPANY,\r\n                                                                                     USER_BUSINESSUNIT,\r\n                                                                                     USER_LANGUAGE,\r\n                                                                                     USER_TIMEZONE,\r\n                                                                                     \"FR\",\r\n                                                                                     currentUser.Civilite == \"Mme\" ? \"2\" : \"1\",\r\n                                                                                     string.Empty);\r\n\r\n                    // currentUser.DateNaissance != null ? currentUser.DateNaissance.Value.ToUniversalTime().ToString(\"yyyy'-'MM'-'dd'T'HH':'mm':'ss'.'ff'Z'\") : \r\n                    result = goFluent.BuildQuery(POST_PARAM_SUBMISSION, POST_PARAM_USER, submission, user);\r\n                }\r\n                else\r\n                {\r\n                    return Content(HttpStatusCode.Forbidden, \"Impossible d'acc\u00e9der \u00e0 Go Fluent.\");\r\n                }\r\n\r\n                return Ok(result);\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Erreur lors de la connexion \u00e0 Go Fluent.\");\r\n                return InternalServerError(ex);\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the user's Go Fluent connection information and handle the connection process accordingly, including creating a submission and building a query for the user's details.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "methodName",
+                        "param_name": "methodName",
+                        "param_desc": "The name of the method being called, in this case 'UserAccountConnectionAsync'."
+                    },
+                    {
+                        "name": "methodPurpose",
+                        "param_name": "methodPurpose",
+                        "param_desc": "The purpose of the method 'UserAccountConnectionAsync' is to retrieve the user's Go Fluent connection information and handle the connection process accordingly, including creating a submission and building a query for the user's details."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the user's Go Fluent connection information and handle the connection process accordingly, including creating a submission and building a query for the user's details.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"methodName\">The name of the method being called, in this case 'UserAccountConnectionAsync'.</param>\n/// <param name=\"methodPurpose\">The purpose of the method 'UserAccountConnectionAsync' is to retrieve the user's Go Fluent connection information and handle the connection process accordingly, including creating a submission and building a query for the user's details.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "GoFluentController"
+}

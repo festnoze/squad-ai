@@ -1,0 +1,53 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/V4/JwpController.cs",
+    "index_shift_code": 547,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V4",
+    "usings": [
+        "System.Web.Http.Description",
+        "LMS.Configuration"
+    ],
+    "access_modifier": "public",
+    "struct_name": "JwpController",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "PostHandleWebHook",
+            "code_start_index": 2533,
+            "method_name": "PostHandleWebHook",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// The HandleWebHook.\r\n        /// </summary>\r\n        /// <returns>The <see cref=\"IHttpActionResult\"/>.</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var jwtToken = HttpContext.Current.Request.Headers[\"Authorization\"].Replace(\"Bearer \", string.Empty);\r\n\r\n            JwtSecurityToken jsonToken;\r\n            try\r\n            {\r\n                var handler = new JwtSecurityTokenHandler();\r\n                jsonToken = handler.ReadToken(jwtToken) as JwtSecurityToken;\r\n            }\r\n            catch (ArgumentException ex)\r\n            {\r\n                Log.Error($\"Unable to read Jwt token {ex}\");\r\n                return;\r\n            }\r\n\r\n            // Sample Payload\r\n            //{\r\n            //    \"event\": \"media_available\",\r\n            //      \"media_id\": \"24tbC5Qm\",\r\n            //      \"webhook_id\": \"ManlZYYr\",\r\n            //      \"site_id\": \"9P5aMUs7\",\r\n            //      \"event_time\": \"2021-01-20T14:42:01+00:00\"\r\n            // }\r\n            try\r\n            {\r\n                var mediaId = jsonToken?.Claims?.FirstOrDefault(c => c.Type == \"media_id\")?.Value;\r\n                var videoFile = await _db.UploadedFiles.FirstOrDefaultAsync(uf => uf.FileUrl.Contains(mediaId));\r\n                if (videoFile == null)\r\n                {\r\n                    return;\r\n                }\r\n\r\n                if (videoFile.FileUrl.Split('|').Length != 2)\r\n                {\r\n                    return;\r\n                }\r\n\r\n                if (!int.TryParse(videoFile.FileUrl.Split('|')[1], out var ecoleUserId))\r\n                {\r\n                    Log.Error($\"JwpController.PostHandleWebHook:  There was a problem reading information in table UploadedFiles with fileUrl containing this JwPlayer mediaId: {mediaId}\");\r\n                    return;\r\n                }\r\n\r\n                var ecoleUser = await (from eu in _db.EcoleUsers\r\n                                       where eu.EcoleUserId == ecoleUserId\r\n                                       select eu)\r\n                                       .FirstOrDefaultAsync();\r\n\r\n                videoFile.FileUrl = mediaId;\r\n\r\n                await _db.SaveChangesAsync();\r\n\r\n                var copy = await (from co in _db.CopieOriginales\r\n                                  join c in _db.Copies on co.CopieId equals c.Id\r\n                                  where co.UploadFileId == videoFile.Id\r\n                                  select c)\r\n                    .FirstOrDefaultAsync();\r\n\r\n                if (copy == null)\r\n                {\r\n                    Log.Error($\"Copy not found for uploadedFile id: {videoFile.Id}\");\r\n                    return;\r\n                }\r\n\r\n                var user = await _db.EcoleUsers\r\n                        .Where(eu => eu.EcoleUserId == ecoleUser.EcoleUserId)\r\n                        .Select(eu => new ApplicationUser\r\n                        {\r\n                            Id = eu.User.Id,\r\n                            Email = eu.User.Email,\r\n                            Nom = eu.User.Nom,\r\n                            SchoolUserId = eu.EcoleUserId,\r\n                            SchoolId = eu.EcoleId\r\n                        })\r\n                        .FirstOrDefaultAsync();\r\n\r\n                if (user == null)\r\n                {\r\n                    throw new ApplicationException(\"User not found or not allowed in this school\");\r\n                }\r\n\r\n                User = new AppPrincipal(user);\r\n\r\n\r\n                var result = await _evaluationService.ValidateCopyAsync(User.Identity.GetUserId(), User.Identity.GetSchoolUserId(), User.Identity.GetSchoolId(),\r\n                                        User.Identity.GetUser().Email, User.Identity.IsAuthenticated, _dnsConfig, _userService, copy.Id, ecoleUser);\r\n                if (!result)\r\n                {\r\n                    Log.Error($\"evaluationService.ValidateCopyAsync() failed for uploadedFile id: {videoFile.Id}\");\r\n                }\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error($\"{ex}\");\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the title of a Cursus and the Jira sector name based on a specified parcours code.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "parcours_code",
+                        "param_name": "parcours_code",
+                        "param_desc": "The specified parcours code for which the title of a Cursus and the Jira sector name will be retrieved."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the title of a Cursus and the Jira sector name based on a specified parcours code.\n/// </summary>\n/// <param name=\"parcours_code\">The specified parcours code for which the title of a Cursus and the Jira sector name will be retrieved.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "JwpController"
+}

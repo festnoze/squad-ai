@@ -99,6 +99,31 @@ public record MethodDesc : BaseDesc
         return methodCode;
     }
 
+    public string GetMethodSignature(bool withParams = false)
+    {
+        var methodSignature = $"{AccessModifier}";
+        
+        if (IsAsync) methodSignature += " async";
+        if (IsOverride) methodSignature += " override";
+        if (IsVirtual) methodSignature += " virtual";
+        if (IsSealed) methodSignature += " sealed";
+        if (IsNew) methodSignature += " new";
+
+        methodSignature += $" {ReturnType} {MethodName}(";
+
+        if (withParams)
+        {
+            methodSignature += string.Join(", ", Params);
+            methodSignature += ")";
+        }
+        return methodSignature;
+    }
+
+    public string GetMethodReturnTypeAndName()
+    {
+        return $" {ReturnType} {MethodName}(";
+    }
+
     private string Indent(int level)
     {
         return new string(' ', level * 4);

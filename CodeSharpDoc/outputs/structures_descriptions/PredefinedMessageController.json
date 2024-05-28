@@ -1,0 +1,165 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Studi.Api.Lms.Messenger/Controllers/PredefinedMessage/PredefinedMessageController.cs",
+    "index_shift_code": 607,
+    "struct_type": "Class",
+    "namespace_name": "Studi.Api.Lms.Messenger.Controllers.PredefinedMessage",
+    "usings": [
+        "Microsoft.AspNetCore.Authorization",
+        "Microsoft.AspNetCore.Mvc",
+        "Studi.Api.Lms.Messenger.Application.Services.PredefinedMessage",
+        "Studi.Api.Lms.Messenger.Controllers.PredefinedMessage.Mapping",
+        "Studi.Api.Lms.Messenger.ExchangeDataContract.v1.PredefinedMessage.ResponseModels",
+        "Studi.Api.Lms.Messenger.Utils.Middleware",
+        "Swashbuckle.AspNetCore.Annotations",
+        "System.Net"
+    ],
+    "access_modifier": "public",
+    "struct_name": "PredefinedMessageController",
+    "base_class_name": "ControllerBase",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetPredefinedMessagesAsync",
+            "code_start_index": 1781,
+            "method_name": "GetPredefinedMessagesAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Retrieves predefined messages.\r\n        /// </summary>\r\n        /// <param name=\"userId\">The user ID</param>\r\n        /// <param name=\"schoolIds\">The list of school IDs</param>\r\n        /// <returns>A collection of predefined messages.</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "schoolIds",
+                    "param_name": "schoolIds",
+                    "param_type": "List<int>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var predefinedMessages = (await _predefinedMessageService.GetPredefinedMessagesAsync()).Select(pm => pm.ToPredefinedMessageResponseModel());\r\n\r\n            return predefinedMessages;\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve predefined messages asynchronously and return them as response models.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The ID of the user who is making the request."
+                    },
+                    {
+                        "name": "schoolIds",
+                        "param_name": "schoolIds",
+                        "param_desc": "A list of IDs representing the schools for which predefined messages need to be retrieved."
+                    },
+                    {
+                        "name": "methodName",
+                        "param_name": "methodName",
+                        "param_desc": "The name of the method being called, in this case 'GetPredefinedMessagesAsync'."
+                    },
+                    {
+                        "name": "methodPurpose",
+                        "param_name": "methodPurpose",
+                        "param_desc": "The purpose of the method 'GetPredefinedMessagesAsync' is to retrieve predefined messages asynchronously and return them as response models."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve predefined messages asynchronously and return them as response models.\n/// </summary>\n/// <param name=\"userId\">The ID of the user who is making the request.</param>\n/// <param name=\"schoolIds\">A list of IDs representing the schools for which predefined messages need to be retrieved.</param>\n/// <param name=\"methodName\">The name of the method being called, in this case 'GetPredefinedMessagesAsync'.</param>\n/// <param name=\"methodPurpose\">The purpose of the method 'GetPredefinedMessagesAsync' is to retrieve predefined messages asynchronously and return them as response models.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetPredefinedMessageContentByIdAsync",
+            "code_start_index": 2759,
+            "method_name": "GetPredefinedMessageContentByIdAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Retrieves predefined message content by its ID.\r\n        /// </summary>\r\n        /// <param name=\"id\">The ID of the predefined message.</param>\r\n        /// <param name=\"userId\">The user ID</param>\r\n        /// <param name=\"schoolIds\">The list of school IDs</param>\r\n        /// <returns>The content of the predefined message.</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "id",
+                    "param_name": "id",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "schoolIds",
+                    "param_name": "schoolIds",
+                    "param_type": "List<int>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var predefinedMessageContentStr = await _predefinedMessageService.GetPredefinedMessageContentByIdAsync(id);\r\n            var predefinedMessageContent = new PredefinedMessageContentResponseModel() { MessageContent = predefinedMessageContentStr };\r\n\r\n            return predefinedMessageContent;\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the predefined message content by its ID asynchronously.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "id",
+                        "param_name": "id",
+                        "param_desc": "The ID of the predefined message content to be retrieved."
+                    },
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "The ID of the user who is requesting the predefined message content."
+                    },
+                    {
+                        "name": "schoolIds",
+                        "param_name": "schoolIds",
+                        "param_desc": "A list of IDs representing the schools for which the predefined message content is requested."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the predefined message content by its ID asynchronously.\n/// </summary>\n/// <param name=\"id\">The ID of the predefined message content to be retrieved.</param>\n/// <param name=\"userId\">The ID of the user who is requesting the predefined message content.</param>\n/// <param name=\"schoolIds\">A list of IDs representing the schools for which the predefined message content is requested.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "PredefinedMessageController"
+}

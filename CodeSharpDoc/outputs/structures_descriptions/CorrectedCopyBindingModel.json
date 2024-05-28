@@ -1,0 +1,103 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/V3/EvaluationsV3Controller.cs",
+    "index_shift_code": 49041,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V3",
+    "usings": [
+        "LMS.Attributes",
+        "LMS.Attributes.Routing",
+        "LMS.Authentication",
+        "LMS.Data",
+        "LMS.Utils",
+        "LMS.Utils.Cache",
+        "Newtonsoft.Json",
+        "Serilog",
+        "System",
+        "System.Collections.Generic",
+        "System.ComponentModel.DataAnnotations",
+        "System.Data.Entity",
+        "System.IO",
+        "System.Linq",
+        "System.Net",
+        "System.Threading.Tasks",
+        "System.Web.Http",
+        "System.Web.Http.Description",
+        "LMS.Configuration",
+        "LMS.Notifications.V2",
+        "Lms.Common.Enumerations",
+        "LMS.Services.Interfaces",
+        "LMS.ModelsDTOs.Evaluation"
+    ],
+    "access_modifier": "public",
+    "struct_name": "CorrectedCopyBindingModel",
+    "base_class_name": "",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [],
+    "properties": [
+        {
+            "name": "CopyId",
+            "prop_name": "CopyId",
+            "prop_type": "int",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "OriginalCopyId",
+            "prop_name": "OriginalCopyId",
+            "prop_type": "int",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "CorrectedCopyFile",
+            "prop_name": "CorrectedCopyFile",
+            "prop_type": "Guid?",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "TrainerAudioFile",
+            "prop_name": "TrainerAudioFile",
+            "prop_type": "Guid?",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "Grade",
+            "prop_name": "Grade",
+            "prop_type": "double?",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "InternalComment",
+            "prop_name": "InternalComment",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "PublicComment",
+            "prop_name": "PublicComment",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "KeepCorrection",
+            "prop_name": "KeepCorrection",
+            "prop_type": "bool",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "KeepAudioMessage",
+            "prop_name": "KeepAudioMessage",
+            "prop_type": "bool",
+            "is_property": true,
+            "is_field": false
+        }
+    ],
+    "name": "CorrectedCopyBindingModel"
+}

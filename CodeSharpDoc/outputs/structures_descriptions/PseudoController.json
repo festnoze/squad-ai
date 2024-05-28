@@ -1,0 +1,128 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Studi.Api.Lms.User/Controllers/Pseudo/PseudoController.cs",
+    "index_shift_code": 227,
+    "struct_type": "Class",
+    "namespace_name": "",
+    "usings": [
+        "Microsoft.AspNetCore.Mvc",
+        "Studi.Api.Core.Security.Authentication",
+        "Studi.Api.Lms.User.Application.Interfaces",
+        "Swashbuckle.AspNetCore.Annotations"
+    ],
+    "access_modifier": "public",
+    "struct_name": "PseudoController",
+    "base_class_name": "ControllerWithAuthenticationBase",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "ExistAsync",
+            "code_start_index": 896,
+            "method_name": "ExistAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "pseudo",
+                    "param_name": "pseudo",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        if (!User.StudiIdentity().IsIntranetUser)\r\n            return Unauthorized(\"Only intranet user can access to this endpoint\");\r\n\r\n        var exist = await _userQueryingService.ExistUserByPseudoAsync(pseudo);\r\n        return Ok(exist);\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Check if a user exists by their pseudonym and return a response indicating whether they exist or not.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "string",
+                        "param_name": "string",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "pseudo",
+                        "param_name": "pseudo",
+                        "param_desc": "The generated description for the parameter"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Check if a user exists by their pseudonym and return a response indicating whether they exist or not.\n/// </summary>\n/// <param name=\"string\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"pseudo\">The generated description for the parameter</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GenerateAsync",
+            "code_start_index": 1408,
+            "method_name": "GenerateAsync",
+            "existing_summary": "\r\n    ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "firstName",
+                    "param_name": "firstName",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "lastName",
+                    "param_name": "lastName",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 1,
+            "code": "{\r\n        if (!User.StudiIdentity().IsIntranetUser)\r\n            return Unauthorized(\"Only intranet user can access to this endpoint\");\r\n\r\n        var pseudo = await _userQueryingService.GeneratePseudoAsync(firstName, lastName);\r\n        return Ok(pseudo);\r\n    }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Generate a pseudo asynchronously based on the provided first and last names, accessible only to intranet users.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "firstName",
+                        "param_name": "firstName",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "lastName",
+                        "param_name": "lastName",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Generate a pseudo asynchronously based on the provided first and last names, accessible only to intranet users.\n/// </summary>\n/// <param name=\"firstName\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"lastName\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "PseudoController"
+}

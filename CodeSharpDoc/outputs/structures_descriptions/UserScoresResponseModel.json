@@ -1,0 +1,30 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Studi.Api.Lms.User/ResponseModel/UserScoresResponseModel.cs",
+    "index_shift_code": 47,
+    "struct_type": "Record",
+    "namespace_name": "",
+    "usings": [],
+    "access_modifier": "public",
+    "struct_name": "UserScoresResponseModel",
+    "base_class_name": "",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [],
+    "properties": [
+        {
+            "name": "WeekScore",
+            "prop_name": "WeekScore",
+            "prop_type": "Score",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "QuarterScore",
+            "prop_name": "QuarterScore",
+            "prop_type": "Score",
+            "is_property": true,
+            "is_field": false
+        }
+    ],
+    "name": "UserScoresResponseModel"
+}

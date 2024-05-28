@@ -38,7 +38,7 @@ openai.api_key = openai_api_key
 # exit()
 
 # Select the LLM to be used
-llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0613",  timeout= 60, api_key= openai_api_key)
+llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo",  timeout= 60, api_key= openai_api_key)
 #llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo-2024-04-09",  timeout= 120, api_key= openai_api_key)
 #llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout= 60, api_key= openai_api_key)
 
@@ -68,15 +68,19 @@ def run_main():
     then integrate this french word into a leet sentence speaking of giving a defined quantity of flowers to a beloved one.
     The number of flowers is the previous number in french word. output the sentence in lower snake case."""
 
-    print('Direct LLM resolution:')
-    result = llm.invoke(prompt) 
-    print(Llm.get_llm_answer_content(result))
-    print('-----------------------------------')
+    # print('Direct LLM resolution:')
+    # result = llm.invoke(prompt) 
+    # print(Llm.get_llm_answer_content(result))
+    # print('-----------------------------------')
 
     print('LLM resolution with tools:')
-    tools = [WordsToolBox.to_lowercase, RandomToolBox.get_random_number, WordsToolBox.number_to_french_words, WordsToolBox.text_to_leet, WordsToolBox.to_upper_snake_case, WordsToolBox.translate_in_spanish, MathToolBox.add, MathToolBox.divide, MathToolBox.round_int]
-    WordsToolBox.llm = LangGraphTest1.llm # set the llm to be used by the tools
-    result = Llm.invoke_llm_with_tools(LangGraphTest1.llm, tools, prompt)    
+    tools = [
+        WordsToolBox.to_lowercase, RandomToolBox.get_random_number, WordsToolBox.number_to_french_words, 
+        WordsToolBox.text_to_leet, WordsToolBox.to_upper_snake_case, WordsToolBox.translate_in_spanish, 
+        MathToolBox.add, MathToolBox.divide, MathToolBox.round_int
+    ]   
+    WordsToolBox.llm = llm # set the llm to be used by the tools
+    result = Llm.invoke_llm_with_tools(llm, tools, prompt)    
     print(Llm.get_llm_answer_content(result))
     print('-----------------------------------')
 

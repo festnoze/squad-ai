@@ -1,0 +1,17 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Studi.Api.Lms.User/Controllers/Unavailability/Mapper/FilterableFieldMapper.cs",
+    "index_shift_code": 139,
+    "struct_type": "Class",
+    "namespace_name": "",
+    "usings": [
+        "Studi.Api.Lms.User.Application.Services.Unavailability.Fields"
+    ],
+    "access_modifier": "public static",
+    "struct_name": "FilterableFieldMapper",
+    "base_class_name": "",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [],
+    "properties": [],
+    "name": "FilterableFieldMapper"
+}

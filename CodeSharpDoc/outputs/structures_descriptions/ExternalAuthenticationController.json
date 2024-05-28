@@ -1,0 +1,61 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/ExternalServices/ExternalAuthenticationController.cs",
+    "index_shift_code": 190,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.ExternalServices",
+    "usings": [
+        "System.Threading.Tasks",
+        "System.Web.Http",
+        "LMS.Attributes",
+        "LMS.Authentication",
+        "LMS.Services.Interfaces"
+    ],
+    "access_modifier": "public",
+    "struct_name": "ExternalAuthenticationController",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "Authenticate",
+            "code_start_index": 732,
+            "method_name": "Authenticate",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var schoolUserId = User.Identity.GetSchoolUserId();\r\n\r\n            var userInfo = await _externalAuthenticationService.GetUserInfoAsync(schoolUserId);\r\n\r\n            return Ok(userInfo);\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve user information for authentication purposes using an external authentication service.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "method",
+                        "param_name": "method",
+                        "param_desc": "Retrieve user information for authentication purposes using an external authentication service."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve user information for authentication purposes using an external authentication service.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"method\">Retrieve user information for authentication purposes using an external authentication service.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "ExternalAuthenticationController"
+}

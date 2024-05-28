@@ -1,0 +1,680 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/V2/ForumV2Controller.cs",
+    "index_shift_code": 903,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V2",
+    "usings": [],
+    "access_modifier": "public",
+    "struct_name": "ForumV2Controller",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "QuestionAskAsync",
+            "code_start_index": 1225,
+            "method_name": "QuestionAskAsync",
+            "existing_summary": "        /// <summary>\r\n        /// Create a new question.\r\n        /// </summary>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n\r\n            var resourcesServer = _config.GetResourcesServerUrl();\r\n\r\n            try\r\n            {\r\n                string rootFolder = HostingEnvironment.MapPath(\"~/App_Data\");\r\n                // read form data\r\n                var provider = new MultipartFormDataStreamProvider(rootFolder);\r\n\r\n                await Request.Content.ReadAsMultipartAsync(provider);\r\n                var questionJsonString = provider.FormData.Get(\"content\");\r\n                var question = JsonConvert.DeserializeObject<AddQuestionViewModel>(questionJsonString);\r\n                Validate(question);\r\n                if (!ModelState.IsValid)\r\n                {\r\n                    return BadRequest(ModelState);\r\n                }\r\n\r\n                var result = this.CheckMultipleUploadRequest(provider, WebsiteConfiguration.ForumAllowedFileExtensions, out List<FileDetails> filesDetails);\r\n                if (result != null)\r\n                {\r\n                    return result;\r\n                }\r\n\r\n                var forumUploads = new List<ForumUpload>();\r\n                foreach (var file in filesDetails)\r\n                {\r\n                    var uploadResponse = await this.UploadToRessourcesServerAsync(file, \"forum\", userId, ecoleId, _config.GetResourcesServerUrl());\r\n\r\n                    if (uploadResponse == null)\r\n                    {\r\n                        Log.Warning(\"Error uploading a file to the file server. File: {0}, Upload Source: {1}, UserID: {2}, ecoleID: {3}\", file, \"forum\", userId, ecoleId);\r\n                        return InternalServerError();\r\n                    }\r\n\r\n                    if (!uploadResponse.Success)\r\n                    {\r\n                        Log.Warning(\"Failed to upload a file to the ressources server with the following error\", uploadResponse.ErrorMessage);\r\n                        return InternalServerError();\r\n                    }\r\n\r\n                    forumUploads.Add(new ForumUpload\r\n                    {\r\n                        FilePath = resourcesServer + uploadResponse.FileUrl,\r\n                        Filename = file.Filename\r\n                    });\r\n                }\r\n\r\n                //Check specified category to determine forum type\r\n                var category = DataCache.GetForumCategoryById(_db, question.Category);\r\n                if (category is null)\r\n                    throw new ArgumentException($\"The specified category of id {question.Category} doesn't exist or have been deleted\");\r\n\r\n                if (!Enum.TryParse(category.ForumType.Code, out ForumTypeEnum forumType))\r\n                    throw new ArgumentException($\"Specified category '{category.Code}' is of an unhanded forum type: '{category.ForumType.Code}'\");\r\n\r\n                // Handle content forum post\r\n                int? ressourceVersionId = null;\r\n                int? parcoursId = null;\r\n                if (forumType == ForumTypeEnum.FORUM_CONTENT)\r\n                {\r\n                    ressourceVersionId = question.RessourceVersionId;\r\n                    parcoursId = null;\r\n\r\n                    if (question.ThemeId != null)\r\n                    {\r\n                        var theme = await _db.Themes\r\n                            .AsNoTracking()\r\n                            .Where(r => r.Id == question.ThemeId)\r\n                            .Select(t => t.Code)\r\n                            .FirstOrDefaultAsync();\r\n\r\n                        question.Tags += \";\" + theme;\r\n                    }\r\n\r\n                    if (ressourceVersionId.HasValue)\r\n                    {\r\n                        var ressourceVersion = await _db.RessourceVersions\r\n                            .AsNoTracking()\r\n                            .Include(rv => rv.Ressource)\r\n                            .Where(rv => rv.Id == question.RessourceVersionId)\r\n                            .Select(rv => rv.Ressource.Code)\r\n                            .FirstOrDefaultAsync();\r\n\r\n                        question.Tags += \";\" + ressourceVersion;\r\n                    }\r\n                }\r\n                // Handle parcours forum post\r\n                else if (forumType == ForumTypeEnum.FORUM_PARCOURS)\r\n                {\r\n                    parcoursId = question.ParcoursId;\r\n                    ressourceVersionId = null;\r\n                }\r\n\r\n                var forumPostTags = new List<ForumPostTag>();\r\n                if (!string.IsNullOrEmpty(question.Tags))\r\n                {\r\n                    var tags = await RepositoryV3.GetTagsIdsAsync(_db, question.Tags.Split(';').ToList());\r\n                    forumPostTags = tags.Select(t => new ForumPostTag { TagId = t.Id }).ToList();\r\n                }\r\n\r\n                var post = new ForumPost\r\n                {\r\n                    CreationDate = DateTime.Now,\r\n                    UpdateDate = DateTime.Now,\r\n                    Title = question.Title,\r\n                    Body = question.Body,\r\n                    Tags = question.Tags,\r\n                    OwnerUserId = userId,\r\n                    OwnerSchoolId = ecoleId,\r\n                    ForumUploads = forumUploads,\r\n                    CategoryId = question.Category,\r\n                    ParcoursId = parcoursId,\r\n                    RessourceVersionId = ressourceVersionId,\r\n                    ForumPostTags = forumPostTags,\r\n                    PageUrl = question.PageUrl,\r\n                    Handled = false,\r\n                    HandledDate = null,\r\n                    HandlingUser = null,\r\n                };\r\n\r\n                _db.ForumPosts.Add(post);\r\n                await _db.SaveChangesAsync();\r\n\r\n                //BackgroundJob.Enqueue(\r\n                //    () => NotificationManager.NotifyNewForumQuestion(post.Id, userID.Value, ecoleId));\r\n\r\n                BackgroundJob.Enqueue(\r\n                    () => NotificationSenderManager.SendForumPostNotificationAsync(userId, ecoleId, post.Id));\r\n\r\n                return Ok(post.Id);\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error during the file upload/Error while saving new question\");\r\n                return InternalServerError(e);\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a new forum post with a question, including uploading files and notifying users, based on the specified category and forum type.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "method",
+                        "param_name": "method",
+                        "param_desc": "QuestionAskAsync - Create a new forum post with a question, including uploading files and notifying users, based on the specified category and forum type."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a new forum post with a question, including uploading files and notifying users, based on the specified category and forum type.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"method\">QuestionAskAsync - Create a new forum post with a question, including uploading files and notifying users, based on the specified category and forum type.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetForumPostsAsync",
+            "code_start_index": 8738,
+            "method_name": "GetForumPostsAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Get all forum posts\r\n        /// </summary>\r\n        /// <param name=\"tags\">tag ids</param>\r\n        /// <param name=\"sort\">sort method (new, popular, favorites, activity)</param>\r\n        /// <param name=\"start\">Start Date</param>\r\n        /// <param name=\"category\">int category id</param>\r\n        /// <param name=\"accepted\">nullable boolean</param>\r\n        /// <param name=\"certified\">nullable boolean</param>\r\n        /// <param name=\"pageSize\">Optional int to specify the number of posts to return per page (default is 20) </param>\r\n        /// <param name=\"resourceVersionId\">Optional id of the RessourceObject object to filter with</param>\r\n        /// <param name=\"module\"></param>\r\n        /// <param name=\"matiere\"></param>\r\n        /// <param name=\"parcours\"></param>\r\n        /// <param name=\"parcoursId\"></param>\r\n        /// <param name=\"searchTerms\"></param>\r\n        /// <param name=\"forumTypeCode\"></param>\r\n        /// <param name=\"forumCategoryCode\"></param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "tags",
+                    "param_name": "tags",
+                    "param_type": "int[]",
+                    "has_default_value": true,
+                    "default_value": "null",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "sort",
+                    "param_name": "sort",
+                    "param_type": "string",
+                    "has_default_value": true,
+                    "default_value": "\"popular\"",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "start",
+                    "param_name": "start",
+                    "param_type": "string",
+                    "has_default_value": true,
+                    "default_value": "null",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "category",
+                    "param_name": "category",
+                    "param_type": "int?",
+                    "has_default_value": true,
+                    "default_value": "null",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "accepted",
+                    "param_name": "accepted",
+                    "param_type": "bool?",
+                    "has_default_value": true,
+                    "default_value": "null",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "certified",
+                    "param_name": "certified",
+                    "param_type": "bool?",
+                    "has_default_value": true,
+                    "default_value": "null",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "pageSize",
+                    "param_name": "pageSize",
+                    "param_type": "int",
+                    "has_default_value": true,
+                    "default_value": "20",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "resourceVersionId",
+                    "param_name": "resourceVersionId",
+                    "param_type": "int?",
+                    "has_default_value": true,
+                    "default_value": "null",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "module",
+                    "param_name": "module",
+                    "param_type": "string",
+                    "has_default_value": true,
+                    "default_value": "null",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "matiere",
+                    "param_name": "matiere",
+                    "param_type": "string",
+                    "has_default_value": true,
+                    "default_value": "null",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "parcours",
+                    "param_name": "parcours",
+                    "param_type": "string",
+                    "has_default_value": true,
+                    "default_value": "null",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "parcoursId",
+                    "param_name": "parcoursId",
+                    "param_type": "int?",
+                    "has_default_value": true,
+                    "default_value": "null",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "searchTerms",
+                    "param_name": "searchTerms",
+                    "param_type": "string",
+                    "has_default_value": true,
+                    "default_value": "null",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "forumTypeCode",
+                    "param_name": "forumTypeCode",
+                    "param_type": "string",
+                    "has_default_value": true,
+                    "default_value": "null",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "forumCategoryCode",
+                    "param_name": "forumCategoryCode",
+                    "param_type": "string",
+                    "has_default_value": true,
+                    "default_value": "null",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n\r\n            try\r\n            {\r\n                var currentUser = User.Identity.GetUser();\r\n                var userId = currentUser.Id;\r\n\r\n                // If not specified, set defaut forum type to content forum\r\n                if (forumTypeCode is null)\r\n                    forumTypeCode = ForumTypeEnum.FORUM_CONTENT.ToString();\r\n\r\n                var pagedData = await _forumService.GetForumPosts(\r\n                                    userId,\r\n                                    currentUser.Interne,\r\n                                    currentUser.SchoolIdsList,\r\n                                    tags,\r\n                                    sort,\r\n                                    start,\r\n                                    category,\r\n                                    accepted,\r\n                                    certified,\r\n                                    pageSize,\r\n                                    resourceVersionId,\r\n                                    module,\r\n                                    matiere,\r\n                                    parcours,\r\n                                    parcoursId,\r\n                                    searchTerms,\r\n                                    forumTypeCode,\r\n                                    forumCategoryCode);\r\n\r\n                return Ok(pagedData);\r\n            }\r\n            catch (ArgumentException ex)\r\n            {\r\n                Log.Error(\"Error on GetForumPosts:\" + ex.Message);\r\n                return BadRequest(\"Error on GetForumPosts:\" + ex.Message);\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(\"Error on GetForumPosts:\" + ex.Message);\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve forum posts based on specified parameters for the current user, with error handling in case of exceptions.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "tags",
+                        "param_name": "tags",
+                        "param_desc": "An array of integers representing tags. Default value is null."
+                    },
+                    {
+                        "name": "sort",
+                        "param_name": "sort",
+                        "param_desc": "A string representing the sorting criteria. Default value is 'popular'."
+                    },
+                    {
+                        "name": "start",
+                        "param_name": "start",
+                        "param_desc": "A string representing the starting point. Default value is null."
+                    },
+                    {
+                        "name": "category",
+                        "param_name": "category",
+                        "param_desc": "An integer representing the category. Default value is null."
+                    },
+                    {
+                        "name": "accepted",
+                        "param_name": "accepted",
+                        "param_desc": "A boolean indicating if posts are accepted. Default value is null."
+                    },
+                    {
+                        "name": "certified",
+                        "param_name": "certified",
+                        "param_desc": "A boolean indicating if posts are certified. Default value is null."
+                    },
+                    {
+                        "name": "pageSize",
+                        "param_name": "pageSize",
+                        "param_desc": "An integer representing the page size. Default value is 20."
+                    },
+                    {
+                        "name": "resourceVersionId",
+                        "param_name": "resourceVersionId",
+                        "param_desc": "An integer representing the resource version ID. Default value is null."
+                    },
+                    {
+                        "name": "module",
+                        "param_name": "module",
+                        "param_desc": "A string representing the module. Default value is null."
+                    },
+                    {
+                        "name": "matiere",
+                        "param_name": "matiere",
+                        "param_desc": "A string representing the subject matter. Default value is null."
+                    },
+                    {
+                        "name": "parcours",
+                        "param_name": "parcours",
+                        "param_desc": "A string representing the course. Default value is null."
+                    },
+                    {
+                        "name": "parcoursId",
+                        "param_name": "parcoursId",
+                        "param_desc": "An integer representing the course ID. Default value is null."
+                    },
+                    {
+                        "name": "searchTerms",
+                        "param_name": "searchTerms",
+                        "param_desc": "A string representing the search terms. Default value is null."
+                    },
+                    {
+                        "name": "forumTypeCode",
+                        "param_name": "forumTypeCode",
+                        "param_desc": "A string representing the forum type code. Default value is null."
+                    },
+                    {
+                        "name": "forumCategoryCode",
+                        "param_name": "forumCategoryCode",
+                        "param_desc": "A string representing the forum category code. Default value is null."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve forum posts based on specified parameters for the current user, with error handling in case of exceptions.\n/// </summary>\n/// <param name=\"tags\">An array of integers representing tags. Default value is null.</param>\n/// <param name=\"sort\">A string representing the sorting criteria. Default value is 'popular'.</param>\n/// <param name=\"start\">A string representing the starting point. Default value is null.</param>\n/// <param name=\"category\">An integer representing the category. Default value is null.</param>\n/// <param name=\"accepted\">A boolean indicating if posts are accepted. Default value is null.</param>\n/// <param name=\"certified\">A boolean indicating if posts are certified. Default value is null.</param>\n/// <param name=\"pageSize\">An integer representing the page size. Default value is 20.</param>\n/// <param name=\"resourceVersionId\">An integer representing the resource version ID. Default value is null.</param>\n/// <param name=\"module\">A string representing the module. Default value is null.</param>\n/// <param name=\"matiere\">A string representing the subject matter. Default value is null.</param>\n/// <param name=\"parcours\">A string representing the course. Default value is null.</param>\n/// <param name=\"parcoursId\">An integer representing the course ID. Default value is null.</param>\n/// <param name=\"searchTerms\">A string representing the search terms. Default value is null.</param>\n/// <param name=\"forumTypeCode\">A string representing the forum type code. Default value is null.</param>\n/// <param name=\"forumCategoryCode\">A string representing the forum category code. Default value is null.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "MarkQuestionAsHandledAsync",
+            "code_start_index": 11564,
+            "method_name": "MarkQuestionAsHandledAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Mark a question as handled\r\n        /// </summary>\r\n        /// <param name=\"questionId\"></param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "questionId",
+                    "param_name": "questionId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var currentUser = User.Identity.GetUser();\r\n\r\n            // On r\u00e9cup\u00e8re ecoleUser pour check si l'appelant est bien un interne ou formateur \r\n             var IsInterne = await this.IsInterne(_db);\r\n            var estFormateur = await this.IsTeacher(_db);\r\n\r\n            if (!IsInterne && !estFormateur)\r\n            {\r\n                return StatusCode(HttpStatusCode.Forbidden);\r\n            }\r\n\r\n            // Make sure that the question exists and not deleted\r\n            var question = await this._db.ForumPosts\r\n                .Where(q => q.ParentId == null && q.DeletionDate == null && q.Id == questionId)\r\n                .FirstOrDefaultAsync();\r\n\r\n            if (question == null)\r\n            {\r\n                return NotFound();\r\n            }\r\n\r\n            if (question.Handled)\r\n            {\r\n                return Ok();\r\n            }\r\n\r\n            question.Handled = true;\r\n            question.HandlingUser = currentUser.Email;\r\n            question.HandledDate = DateTime.Now;\r\n\r\n            try\r\n            {\r\n                await this._db.SaveChangesAsync();\r\n                return Ok();\r\n            }\r\n            catch (Exception exception)\r\n            {\r\n                Log.Error(exception, \"Error marking the questions as read\");\r\n                return InternalServerError(exception);\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Mark a question as handled by an internal user or teacher, ensuring the question exists, is not deleted, and updating its handling status and user.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "questionId",
+                        "param_name": "questionId",
+                        "param_desc": "The ID of the question to be marked as handled. This should be an integer value representing the unique identifier of the question."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Mark a question as handled by an internal user or teacher, ensuring the question exists, is not deleted, and updating its handling status and user.\n/// </summary>\n/// <param name=\"questionId\">The ID of the question to be marked as handled. This should be an integer value representing the unique identifier of the question.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "MarkQuestionAsHandledUndoAsync",
+            "code_start_index": 13292,
+            "method_name": "MarkQuestionAsHandledUndoAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Undo marking a question as handled\r\n        /// </summary>\r\n        /// <param name=\"questionId\"></param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "questionId",
+                    "param_name": "questionId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            // On r\u00e9cup\u00e8re ecoleUser pour check si l'appelant est bien un formateur\r\n            var estFormateur = await this.IsTeacher(_db);\r\n\r\n            var isInterne = await this.IsInterne(_db);\r\n\r\n            if (!estFormateur && !isInterne)\r\n            {\r\n                return StatusCode(HttpStatusCode.Forbidden);\r\n            }\r\n\r\n            var question = await this._db.ForumPosts\r\n                .Where(q => q.ParentId == null && q.DeletionDate == null && q.Id == questionId)\r\n                .FirstOrDefaultAsync();\r\n\r\n            if (question == null)\r\n            {\r\n                return NotFound();\r\n            }\r\n\r\n            if (!question.Handled)\r\n            {\r\n                return Ok();\r\n            }\r\n\r\n            question.Handled = false;\r\n            question.HandlingUser = null;\r\n            question.HandledDate = null;\r\n\r\n            try\r\n            {\r\n                await this._db.SaveChangesAsync();\r\n                return Ok();\r\n            }\r\n            catch (Exception exception)\r\n            {\r\n                Log.Error(exception, \"Error marking the questions as read\");\r\n                return InternalServerError(exception);\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Undo the handling of a question if the caller is a teacher or internal user, otherwise return a forbidden status code, and update the question's handling status and user information accordingly.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "questionId",
+                        "param_name": "questionId",
+                        "param_desc": "The ID of the question that needs to be marked as not handled. It should be an integer value."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Undo the handling of a question if the caller is a teacher or internal user, otherwise return a forbidden status code, and update the question's handling status and user information accordingly.\n/// </summary>\n/// <param name=\"questionId\">The ID of the question that needs to be marked as not handled. It should be an integer value.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetQuestionDetails",
+            "code_start_index": 14835,
+            "method_name": "GetQuestionDetails",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Get question details\r\n        /// </summary>\r\n        /// <param name=\"questionId\"></param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "questionId",
+                    "param_name": "questionId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var currentUser = User.Identity.GetUser();\r\n            var userId = currentUser.Id;\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n\r\n            var question = await _db.ForumPosts\r\n                .AsNoTracking()\r\n                .Where(q => q.Id == questionId && q.ParentId == null && q.DeletionDate == null)\r\n                .Select(q => new QuestionV2ViewModel\r\n                {\r\n                    QuestionId = q.Id,\r\n                    Title = q.Title,\r\n                    Body = q.Body,\r\n                    Created = q.CreationDate,\r\n                    Updated = q.UpdateDate,\r\n                    Closed = q.ClosureDate,\r\n                    Score = q.Score,\r\n                    UserId = q.OwnerUserId,\r\n                    ViewCount = q.ViewCount,\r\n                    FavoritesCount = q.FavoriteCount,\r\n                    IsUpvoted = q.ForumPostVotes.Any(fpv => fpv.UserId == userId),\r\n                    IsFavorited = q.ForumPostFavorites.Any(fpv => fpv.UserId == userId),\r\n\r\n                    Tags = q.Tags,\r\n\r\n                    RessourceId = q.RessourceId,\r\n                    RessourceVersionId = q.RessourceVersionId,\r\n\r\n                    Handled = q.Handled,\r\n\r\n                    AcceptedAnswerId = q.AcceptedAnswerId,\r\n\r\n                    Uploads = q.ForumUploads.Where(fu => fu.DeletionDate == null).Select(fu => new ForumUploadV2ViewModel\r\n                    {\r\n                        Filename = (fu.FileId != null) ? fu.UploadedFile.FileName : fu.Filename,\r\n                        FilePath = (fu.FileId != null) ? fu.UploadedFile.FileUrl : fu.FilePath,\r\n                    }),\r\n\r\n                    Comments = q.ForumComments.Where(fc => fc.DeletionDate == null).Select(fc => new ForumCommentV2ViewModel\r\n                    {\r\n                        CommentId = fc.Id,\r\n                        Created = fc.CreationDate,\r\n                        UserId = fc.OwnerUserId,\r\n                        Body = fc.Text,\r\n                        Score = fc.Score,\r\n                        IsUpvoted = fc.ForumCommentVotes.Any(fpv => fpv.UserId == userId)\r\n\r\n                    }),\r\n\r\n                    Category = new ForumCategoryV2ViewModel\r\n                    {\r\n                        Code = q.ForumCategory.Code,\r\n                        Color = q.ForumCategory.Color,\r\n                        Label = q.ForumCategory.Libelle\r\n                    },\r\n\r\n                    Answers = q.ForumPosts_ParentId.Where(ans => ans.DeletionDate == null).Select(ans => new ForumAnswerV2ViewModel\r\n                    {\r\n                        AnswerId = ans.Id,\r\n                        Created = ans.CreationDate,\r\n                        Updated = ans.UpdateDate,\r\n                        UserId = ans.OwnerUserId,\r\n                        Score = ans.Score,\r\n                        IsUpvoted = ans.ForumPostVotes.Any(fpv => fpv.UserId == userId),\r\n                        ModApproved = ans.ModApproved,\r\n\r\n                        Uploads = ans.ForumUploads.Where(fu => fu.DeletionDate == null).Select(fu => new ForumUploadV2ViewModel\r\n                        {\r\n                            Filename = (fu.FileId != null) ? fu.UploadedFile.FileName : fu.Filename,\r\n                            FilePath = (fu.FileId != null) ? fu.UploadedFile.FileUrl : fu.FilePath,\r\n                        }),\r\n\r\n                        Comments = ans.ForumComments.Where(fc => fc.DeletionDate == null).Select(fc => new ForumCommentV2ViewModel\r\n                        {\r\n                            CommentId = fc.Id,\r\n                            Created = fc.CreationDate,\r\n                            UserId = fc.OwnerUserId,\r\n                            Body = fc.Text,\r\n                            Score = fc.Score,\r\n                            IsUpvoted = fc.ForumCommentVotes.Any(fpv => fpv.UserId == userId)\r\n                        })\r\n                    }).ToList()\r\n\r\n                })\r\n                .FirstOrDefaultAsync();\r\n\r\n            if (question == null)\r\n            {\r\n                return NotFound();\r\n            }\r\n\r\n            if (question.AcceptedAnswerId != null)\r\n            {\r\n                question.AcceptedAnswer = question.Answers.FirstOrDefault(ans => ans.AnswerId == question.AcceptedAnswerId.Value);\r\n\r\n                question.Answers.Remove(question.AcceptedAnswer);\r\n            }\r\n\r\n            var usersIds = new List<int> {question.UserId};\r\n            usersIds.AddRange(question.Comments.Select(c => c.UserId));\r\n\r\n            if (question.AcceptedAnswer != null)\r\n            {\r\n                usersIds.Add(question.AcceptedAnswer.UserId);\r\n                usersIds.AddRange(question.AcceptedAnswer.Comments.Select(c => c.UserId));\r\n            }\r\n\r\n            usersIds.AddRange(question.Answers.Select(a => a.UserId));\r\n            usersIds.AddRange(question.Answers.SelectMany(a => a.Comments).Select(c => c.UserId));\r\n\r\n            var users = await RepositoryV3.GetUsers(this._db)\r\n                .Select(RepositoryV3.GetUserMapExpression(ecoleId))\r\n                .Where(u => usersIds.Contains(u.UserId))\r\n                .ToListAsync();\r\n\r\n            await IncrementPageViewCountAsync(_db, questionId, userId);\r\n\r\n            return Ok(new\r\n            {\r\n                question = question,\r\n                users = users\r\n            });\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve details of a specific question from the forum, including title, body, creation date, tags, uploads, comments, category, answers, and associated users, and return them along with the users' information in a response.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "questionId",
+                        "param_name": "questionId",
+                        "param_desc": "The unique identifier of the question for which details need to be retrieved."
+                    },
+                    {
+                        "name": "GetQuestionDetails",
+                        "param_name": "GetQuestionDetails",
+                        "param_desc": "The name of the method to retrieve details of a specific question from the forum, including various information like title, body, creation date, tags, uploads, comments, category, answers, and associated users, and return them along with the users' information in a response."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve details of a specific question from the forum, including title, body, creation date, tags, uploads, comments, category, answers, and associated users, and return them along with the users' information in a response.\n/// </summary>\n/// <param name=\"questionId\">The unique identifier of the question for which details need to be retrieved.</param>\n/// <param name=\"GetQuestionDetails\">The name of the method to retrieve details of a specific question from the forum, including various information like title, body, creation date, tags, uploads, comments, category, answers, and associated users, and return them along with the users' information in a response.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "QuestionAddAnswerAsync",
+            "code_start_index": 20372,
+            "method_name": "QuestionAddAnswerAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "questionId",
+                    "param_name": "questionId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "answer",
+                    "param_name": "answer",
+                    "param_type": "ForumAnswerPostV2ViewModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var currentUser = User.Identity.GetUser();\r\n            var userId = currentUser.Id;\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n            var estFormateur = await this.IsTeacher(_db);\r\n\r\n            var isInterne = await this.IsInterne(_db);\r\n\r\n            var question = await _db.ForumPosts.FirstOrDefaultAsync(q => q.Id == questionId);\r\n\r\n            if (question == null)\r\n            {\r\n                return NotFound();\r\n            }\r\n\r\n            if (question.ParentId != null)\r\n            {\r\n                return BadRequest(\"You can't answer an answer\");\r\n            }\r\n\r\n            if (question.DeletionDate != null)\r\n            {\r\n                return NotFound();\r\n            }\r\n\r\n            try\r\n            {\r\n                if (string.IsNullOrWhiteSpace(answer.Content))\r\n                {\r\n                    ModelState.AddModelError(\"content\", \"answer cannot be null, empty or contain only whitespace\");\r\n                    return BadRequest(ModelState);\r\n                }\r\n\r\n                var uploadedFileIds = await _db.UploadedFiles\r\n                    .Where(uf => answer.Files.Contains(uf.FileGuid.ToString()))\r\n                    .Select(u => u.Id)\r\n                    .ToListAsync();\r\n\r\n                var forumUploads = new List<ForumUpload>();\r\n                foreach (var fileId in uploadedFileIds)\r\n                {\r\n\r\n                    forumUploads.Add(new ForumUpload\r\n                    {\r\n                        CreationDate = DateTime.Now,\r\n                        FileId = fileId\r\n                    });\r\n                }\r\n\r\n                var post = new ForumPost\r\n                {\r\n                    ParentId = questionId,\r\n                    Body = answer.Content,\r\n                    OwnerUserId = userId,\r\n                    OwnerSchoolId = ecoleId,\r\n                    ForumUploads = forumUploads\r\n                };\r\n                question.AnswersCount++;\r\n\r\n                question.UpdateDate = DateTime.Now;\r\n\r\n                if (isInterne || estFormateur)\r\n                {\r\n                    question.Handled = true;\r\n                    question.HandledDate = DateTime.Now;\r\n                    question.HandlingUser = User.Identity.GetUser().Email;\r\n                    if (answer.Certify)\r\n                    {\r\n                        question.ModApproved = true;\r\n                        question.ApprovingModeratorId = User.Identity.GetUserId();\r\n                        post.ModApproved = true;\r\n                        post.ApprovingModeratorId = User.Identity.GetUserId();\r\n                    }\r\n                }\r\n                else\r\n                {\r\n                    question.Handled = false;\r\n                    question.HandledDate = null;\r\n                    question.HandlingUser = null;\r\n                }\r\n\r\n                _db.ForumPosts.Add(post);\r\n                await _db.SaveChangesAsync();\r\n\r\n                var anwerComplete = await _db.ForumPosts\r\n                    .Where(fp => fp.Id == post.Id)\r\n                    .Include(fp => fp.OwnerUser)\r\n                    .Include(fp => fp.OwnerUser.UploadedFile_FileIdPhotoProfil)\r\n                    .Include(fp => fp.OwnerUser.UploadedFile_FileIdHeaderProfil)\r\n                    .Include(fp => fp.ForumUploads)\r\n                    .Include(fp => fp.ForumUploads.Select(fu => fu.UploadedFile))\r\n                    .Include(x => x.OwnerUser.EcoleUsers.Select(xx => xx.UserType))\r\n                    .Include(x => x.OwnerUser.InscriptionPromotions.Select(xx => xx.Promotion.Parcour))\r\n                    .SingleAsync();\r\n\r\n                var postAnswerViewModel = ConvertToPostAnswerViewModel(anwerComplete);\r\n\r\n                BackgroundJob.Enqueue(() => NotificationSenderManager.SendForumReplyNotificationAsync(userId, ecoleId, post.Id));\r\n\r\n                var forumHub = GlobalHost.ConnectionManager.GetHubContext<ForumHub>();\r\n                forumHub.Clients.All.publishAnswer(postAnswerViewModel);\r\n\r\n                return Ok(postAnswerViewModel);\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error adding an answer\");\r\n                return InternalServerError(e);\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Add an answer to a forum question, handling various conditions and updating relevant data before notifying users and returning the new answer.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "questionId",
+                        "param_name": "questionId",
+                        "param_desc": "The ID of the question to which the answer will be added. It should be an integer."
+                    },
+                    {
+                        "name": "answer",
+                        "param_name": "answer",
+                        "param_desc": "The view model representing the answer to be added to the forum question. It should be an instance of ForumAnswerPostV2ViewModel."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Add an answer to a forum question, handling various conditions and updating relevant data before notifying users and returning the new answer.\n/// </summary>\n/// <param name=\"questionId\">The ID of the question to which the answer will be added. It should be an integer.</param>\n/// <param name=\"answer\">The view model representing the answer to be added to the forum question. It should be an instance of ForumAnswerPostV2ViewModel.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "QuestionNewAsync",
+            "code_start_index": 24833,
+            "method_name": "QuestionNewAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "newPost",
+                    "param_name": "newPost",
+                    "param_type": "ForumPostV2ViewModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUser().Id;\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n\r\n            try\r\n            {\r\n                // Call service for question creation\r\n                var newPostId = await _forumService.CreateForumQuestion(userId, ecoleId, newPost);\r\n\r\n                BackgroundJob.Enqueue(\r\n                    () => NotificationSenderManager.SendForumPostNotificationAsync(userId, ecoleId, newPostId));\r\n\r\n                return Ok(newPostId);\r\n            }\r\n            catch(ArgumentException ex)\r\n            {\r\n                Log.Error(ex.Message);\r\n                return BadRequest(ex.Message);\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Error during the file upload/Error while saving new question\");\r\n                return InternalServerError(ex);\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a new forum question asynchronously, send notifications to relevant users, and handle any exceptions that may occur.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "ForumPostV2ViewModel",
+                        "param_name": "ForumPostV2ViewModel",
+                        "param_desc": "The view model representing the forum post to be created."
+                    },
+                    {
+                        "name": "newPost",
+                        "param_name": "newPost",
+                        "param_desc": "The new forum post to be added to the system."
+                    },
+                    {
+                        "name": "QuestionNewAsync",
+                        "param_name": "QuestionNewAsync",
+                        "param_desc": "The name of the existing method responsible for creating a new forum question asynchronously."
+                    },
+                    {
+                        "name": "Create a new forum question asynchronously, send notifications to relevant users, and handle any exceptions that may occur.",
+                        "param_name": "Create a new forum question asynchronously, send notifications to relevant users, and handle any exceptions that may occur.",
+                        "param_desc": "The purpose of the 'QuestionNewAsync' method."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a new forum question asynchronously, send notifications to relevant users, and handle any exceptions that may occur.\n/// </summary>\n/// <param name=\"ForumPostV2ViewModel\">The view model representing the forum post to be created.</param>\n/// <param name=\"newPost\">The new forum post to be added to the system.</param>\n/// <param name=\"QuestionNewAsync\">The name of the existing method responsible for creating a new forum question asynchronously.</param>\n/// <param name=\"Create a new forum question asynchronously, send notifications to relevant users, and handle any exceptions that may occur.\">The purpose of the 'QuestionNewAsync' method.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "IncrementPageViewCountAsync",
+            "code_start_index": 26094,
+            "method_name": "IncrementPageViewCountAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Increment page by view\r\n        /// </summary>\r\n        /// <param name=\"db\"></param>\r\n        /// <param name=\"questionId\"></param>\r\n        /// <param name=\"userId\"></param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "db",
+                    "param_name": "db",
+                    "param_type": "IStudiDbCtx",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "questionId",
+                    "param_name": "questionId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "userId",
+                    "param_name": "userId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            if (await db.ForumPostViews.AnyAsync(pv => pv.UserId == userId && pv.ForumPostId == questionId))\r\n            {\r\n                return true;\r\n            }\r\n\r\n            try\r\n            {\r\n                var question = await db.ForumPosts.FirstOrDefaultAsync(q => q.Id == questionId && q.DeletionDate == null && q.ParentId == null);\r\n                question.ViewCount++;\r\n                var postView = new ForumPostView { UserId = userId, ForumPostId = questionId, CreationDate = DateTime.Now };\r\n\r\n                db.ForumPostViews.Add(postView);\r\n                await db.SaveChangesAsync();\r\n                return true;\r\n            }\r\n            catch (Exception exception)\r\n            {\r\n                Log.Error(exception, \"Error adding a page view to question {0} and user {1}\", questionId, userId);\r\n                return false;\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": true,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Increment the view count of a forum post asynchronously, while also adding a new entry to track the user's view.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "db",
+                        "param_name": "db",
+                        "param_desc": "IStudiDbCtx: The database context used for interacting with the database."
+                    },
+                    {
+                        "name": "questionId",
+                        "param_name": "questionId",
+                        "param_desc": "int: The unique identifier of the forum post for which the view count needs to be incremented."
+                    },
+                    {
+                        "name": "userId",
+                        "param_name": "userId",
+                        "param_desc": "int: The unique identifier of the user who viewed the forum post."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Increment the view count of a forum post asynchronously, while also adding a new entry to track the user's view.\n/// </summary>\n/// <param name=\"db\">IStudiDbCtx: The database context used for interacting with the database.</param>\n/// <param name=\"questionId\">int: The unique identifier of the forum post for which the view count needs to be incremented.</param>\n/// <param name=\"userId\">int: The unique identifier of the user who viewed the forum post.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "ConvertToPostAnswerViewModel",
+            "code_start_index": 27483,
+            "method_name": "ConvertToPostAnswerViewModel",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "post",
+                    "param_name": "post",
+                    "param_type": "ForumPost",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            if (post == null)\r\n            {\r\n                return null;\r\n            }\r\n\r\n            var result = new PostAnswerViewModel\r\n            {\r\n                Id = post.Id,\r\n                OwnerUserId = post.OwnerUserId,\r\n                Score = post.Score,\r\n                IsUpvoted = post.IsUpvoted,\r\n                CreationDate = post.CreationDate,\r\n                Body = post.Body,\r\n                IsFavorited = post.IsFavorited,\r\n                UpdateDate = post.UpdateDate,\r\n                ModApproved = post.ModApproved,\r\n                ModApprovedName = post.ApprovingModerator != null ? $\"{post.ApprovingModerator.Prenom} {post.ApprovingModerator.Nom}\" : string.Empty,\r\n                ParentId = post.ParentId,\r\n            };\r\n\r\n            if (post.OwnerUser != null)\r\n            {\r\n                result.OwnerUser = new FUser\r\n                {\r\n                    id = post.OwnerUser.Id,\r\n                    photo_profil = (post.OwnerUser.FileIdPhotoProfil != null) ? post.OwnerUser.UploadedFile_FileIdPhotoProfil.FileUrl : post.OwnerUser.PhotoProfil,\r\n                    header_profil = (post.OwnerUser.FileIdHeaderProfil != null) ? post.OwnerUser.UploadedFile_FileIdHeaderProfil.FileUrl : post.OwnerUser.HeaderProfil,\r\n                    pseudo = post.OwnerUser.Pseudo,\r\n                    test = post.OwnerUser.Test,\r\n                    interne = post.OwnerUser.Interne,\r\n                };\r\n\r\n                if (post.OwnerUser?.InscriptionPromotions != null && post.OwnerUser?.InscriptionPromotions.Count > 0)\r\n                {\r\n                    result.OwnerUser.Inscriptions_promotions = post.OwnerUser?.InscriptionPromotions.Select(\r\n                            ip => new FInscriptions_promotions\r\n                            {\r\n                                Promotion =\r\n                                    new FPromotion\r\n                                    {\r\n                                        id = ip.Promotion.Id,\r\n                                        libelle =\r\n                                            ip.Promotion.Libelle,\r\n                                        code = ip.Promotion.Code,\r\n                                        Parcours =\r\n                                            new FParcours\r\n                                            {\r\n                                                id\r\n                                                    = ip\r\n                                                        .Promotion\r\n                                                        .Parcour\r\n                                                        .Id,\r\n                                                code\r\n                                                    = ip\r\n                                                        .Promotion\r\n                                                        .Parcour\r\n                                                        .Code,\r\n                                                titre\r\n                                                    = ip\r\n                                                        .Promotion\r\n                                                        .Parcour\r\n                                                        .Titre\r\n                                            }\r\n                                    }\r\n                            })\r\n                        .ToList();\r\n                }\r\n\r\n                if (post.OwnerUser?.EcoleUsers != null && post.OwnerUser?.EcoleUsers.Count > 0)\r\n                {\r\n                    result.OwnerUser.Ecoles_users = post.OwnerUser.EcoleUsers.Select(\r\n                            e => new NFEcoleUser\r\n                            {\r\n                                Users_type =\r\n                                    new UUserType\r\n                                    {\r\n                                        id = e.UserType.Id,\r\n                                        libelle = e.UserType.Libelle,\r\n                                        code = e.UserType.Code\r\n                                    }\r\n                            })\r\n                        .ToList();\r\n                }\r\n            }\r\n\r\n            if (post.ForumComments != null)\r\n            {\r\n                result.ForumComments = post.ForumComments.Select(\r\n                        c => new FCommentDetail\r\n                        {\r\n                            Id = c.Id,\r\n                            OwnerUserId = c.OwnerUserId,\r\n                            OwnerUser =\r\n                                new FUser\r\n                                {\r\n                                    id = c.User.Id,\r\n                                    header_profil = (c.User.FileIdHeaderProfil != null) ? c.User.UploadedFile_FileIdHeaderProfil.FileUrl : c.User.HeaderProfil,\r\n                                    photo_profil = (c.User.FileIdPhotoProfil != null) ? c.User.UploadedFile_FileIdPhotoProfil.FileUrl : c.User.PhotoProfil,\r\n                                    pseudo = c.User.Pseudo,\r\n                                    test = c.User.Test,\r\n                                    interne = c.User.Interne\r\n                                },\r\n                            Score = c.Score,\r\n                            IsUpvoted = c.IsUpvoted,\r\n                            CreationDate = c.CreationDate,\r\n                            ForumPostId = c.ForumPostId,\r\n                            Text = c.Text\r\n                        })\r\n                    .ToList();\r\n\r\n                if (post.ForumComments?.Count > 0)\r\n                {\r\n                }\r\n            }\r\n\r\n            if (post.ForumUploads != null)\r\n            {\r\n                result.ForumUploads = post.ForumUploads\r\n                    .Select(fu => new FForumUploads {\r\n                        FilePath = (fu.FileId != null) ? fu.UploadedFile.FileUrl : fu.FilePath,\r\n                        Filename = (fu.FileId != null) ? fu.UploadedFile.FileName : fu.Filename\r\n                    })\r\n                    .ToList();\r\n            }\r\n\r\n            return result;\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Create a view model object with various properties based on the input post data, including user information, comments, and uploads.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "ForumPost",
+                        "param_name": "ForumPost",
+                        "param_desc": "The input parameter representing a forum post."
+                    },
+                    {
+                        "name": "post",
+                        "param_name": "post",
+                        "param_desc": "The input parameter representing the post data to be converted."
+                    },
+                    {
+                        "name": "ConvertToPostAnswerViewModel",
+                        "param_name": "ConvertToPostAnswerViewModel",
+                        "param_desc": "The name of the existing method used to create a view model object based on the input post data."
+                    },
+                    {
+                        "name": "Create a view model object with various properties based on the input post data, including user information, comments, and uploads.",
+                        "param_name": "Create a view model object with various properties based on the input post data, including user information, comments, and uploads.",
+                        "param_desc": "The purpose of the 'ConvertToPostAnswerViewModel' method."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Create a view model object with various properties based on the input post data, including user information, comments, and uploads.\n/// </summary>\n/// <param name=\"ForumPost\">The input parameter representing a forum post.</param>\n/// <param name=\"post\">The input parameter representing the post data to be converted.</param>\n/// <param name=\"ConvertToPostAnswerViewModel\">The name of the existing method used to create a view model object based on the input post data.</param>\n/// <param name=\"Create a view model object with various properties based on the input post data, including user information, comments, and uploads.\">The purpose of the 'ConvertToPostAnswerViewModel' method.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "ForumV2Controller"
+}

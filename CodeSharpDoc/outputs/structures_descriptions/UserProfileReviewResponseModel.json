@@ -1,0 +1,30 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Studi.Api.Lms.User/ResponseModel/UserProfileReviewResponseModel.cs",
+    "index_shift_code": 47,
+    "struct_type": "Class",
+    "namespace_name": "",
+    "usings": [],
+    "access_modifier": "public",
+    "struct_name": "UserProfileReviewResponseModel",
+    "base_class_name": "",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [],
+    "properties": [
+        {
+            "name": "HasUserReviewedItsProfile",
+            "prop_name": "HasUserReviewedItsProfile",
+            "prop_type": "bool",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "ProfileReviewDate",
+            "prop_name": "ProfileReviewDate",
+            "prop_type": "DateTime?",
+            "is_property": true,
+            "is_field": false
+        }
+    ],
+    "name": "UserProfileReviewResponseModel"
+}

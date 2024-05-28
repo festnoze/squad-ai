@@ -25,6 +25,9 @@ Into a Git bash terminal (ctrl+shift+ù - in VS Code on Windows):
 - Download the required packages (you might need to run VS Code as administrator)
   `pip install -r requirements.txt`
 
+  It seems there's an error on destination folder while doing pip install from the 'senv' venv. In this case, rather explicit taget directory:
+`pip install --target=C:\Dev\squad-ai\CodeSharpDoc\senv\Lib\site-packages -r requirements.txt`
+
 <u>WARNING</u>: to reinstall 'pip' on venv whether pip don't work anymore, do:
 `python -m ensurepip --upgrade
 python -m pip install --upgrade pip`

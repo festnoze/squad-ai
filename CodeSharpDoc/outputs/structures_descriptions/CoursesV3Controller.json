@@ -1,0 +1,617 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/V3/CoursesV3Controller.cs",
+    "index_shift_code": 798,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V3",
+    "usings": [
+        "System",
+        "System.Collections.Generic",
+        "System.ComponentModel.DataAnnotations",
+        "System.Data.Entity",
+        "System.Linq",
+        "System.Net",
+        "System.Threading.Tasks",
+        "System.Web.Http",
+        "System.Web.Http.Description",
+        "Hangfire",
+        "Lms.Common.Enumerations",
+        "LMS.Attributes",
+        "LMS.Attributes.Routing",
+        "LMS.Authentication",
+        "LMS.Data",
+        "LMS.Data.Extensions",
+        "LMS.Models.ViewModels.V3.Course",
+        "LMS.Models.ViewModels.V3.Medialibrary",
+        "LMS.Notifications.V2",
+        "LMS.Repositories",
+        "LMS.Services.Interfaces",
+        "LMS.Utils",
+        "LMS.Utils.Cache",
+        "Newtonsoft.Json",
+        "Serilog"
+    ],
+    "access_modifier": "public",
+    "struct_name": "CoursesV3Controller",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetChangeLogAsync",
+            "code_start_index": 1757,
+            "method_name": "GetChangeLogAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Get the revision history for a given resource\r\n        /// </summary>\r\n        /// <param name=\"resourceId\">Resource Id</param>\r\n        /// <param name=\"resourceVersionId\">Resource version Id</param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "resourceId",
+                    "param_name": "resourceId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "resourceVersionId",
+                    "param_name": "resourceVersionId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var maj = await this._db.RessourceVersions\r\n                                .Where(rv => rv.Id == resourceVersionId)\r\n                                .Select(rv => rv.VersionMajeure)\r\n                                .FirstOrDefaultAsync();\r\n\r\n            var result = await this._db.Ressources\r\n                                   .AsNoTracking()\r\n                                   .Where(r => r.Id == resourceId && r.DateDelete == null)\r\n                                   .Select(r => new ChangeLogViewModel\r\n                                   {\r\n                                       Title = r.Titre,\r\n                                       Description = r.Descriptif,\r\n                                       Versions = r.RessourceVersions\r\n                                                                .Where(rv => rv.VersionMajeure == maj)\r\n                                                                .Select(rv => new ChangeLogVersionViewModel\r\n                                                                {\r\n                                                                    PublicationDate = rv.DatePublication,\r\n                                                                    ReleaseNotes = rv.DescriptionExterne,\r\n                                                                    Version = rv.Version,\r\n                                                                    ReleaseNotesFiles = rv.RessourceVersionUploadedFiles\r\n                                                                                                        .Select(rvuf => new ChangeLogVersionFile\r\n                                                                                                        {\r\n                                                                                                            Filename = rvuf.UploadedFile.FileName,\r\n                                                                                                            FileUrl = rvuf.UploadedFile.FileUrl\r\n                                                                                                        })\r\n                                                                })\r\n                                                                .OrderByDescending(rv => rv.PublicationDate)\r\n                                                                .ToList()\r\n                                   })\r\n                                   .FirstOrDefaultAsync();\r\n\r\n            if (result == null)\r\n            {\r\n                return Content(HttpStatusCode.NotFound, \"The resource was not found\");\r\n            }\r\n\r\n            return Ok(result);\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve a list of contacts based on specified search criteria for the current user's school, including user details and promotions they are involved in.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "resourceId",
+                        "param_name": "resourceId",
+                        "param_desc": "The ID of the resource for which the change log is being retrieved."
+                    },
+                    {
+                        "name": "resourceVersionId",
+                        "param_name": "resourceVersionId",
+                        "param_desc": "The version ID of the resource for which the change log is being retrieved."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve a list of contacts based on specified search criteria for the current user's school, including user details and promotions they are involved in.\n/// </summary>\n/// <param name=\"resourceId\">The ID of the resource for which the change log is being retrieved.</param>\n/// <param name=\"resourceVersionId\">The version ID of the resource for which the change log is being retrieved.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetCoursesAsync",
+            "code_start_index": 4789,
+            "method_name": "GetCoursesAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Get the media library content for the current user\r\n        /// </summary>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            // current user info\r\n            var currentUser = User.Identity.GetUser();\r\n            var userId = currentUser.Id;\r\n            var schoolId = User.Identity.GetSchoolId();\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n\r\n            try\r\n            {\r\n                // Parcours de la mediatheques\r\n                var parcours = await _parcourService.GetParcoursAsync(schoolId, userId, schoolIdsList);\r\n\r\n                #region Last open date, Progress and favorites\r\n\r\n                // List of all the resources in the medialibrary\r\n                var medialibResources = parcours\r\n                                        .SelectMany(e => e.Matieres)\r\n                                        .SelectMany(e => e.Modules)\r\n                                        .SelectMany(e => e.Themes)\r\n                                        .SelectMany(e => e.Ressources)\r\n                                        .ToList();\r\n\r\n                // Get the lastOpenDate for all the resources in the medialib for the current user\r\n                var resourcesLastOpenDateMap = await this._db.ReportActivites\r\n                                                         .AsNoTracking()\r\n                                                         .Where(ra => ra.UserId == currentUser.Id && schoolIdsList.Contains(ra.EcoleId))\r\n                                                         .Where(ra => ra.DateDelete == null && ra.RessourceId != null)\r\n                                                         .GroupBy(e => e.RessourceId.Value)\r\n                                                         .ToDictionaryAsync(e => e.Key, p => p.Max(f => f.DateCreate));\r\n\r\n                // Map of [ResourceId, User progress]\r\n                var resourceProgressMap = await this._db.UserProgresses\r\n                                                    .AsNoTracking()\r\n                                                    .Where(up => up.UserId == userId)\r\n                                                    .GroupBy(up => up.ResourceId, up => up.Progress)\r\n                                                    .ToDictionaryAsync(up => up.Key, up => up.First());\r\n\r\n                var schoolUserIdsList = User.Identity.GetSchoolUserIdsList();\r\n\r\n                var resourceFavorites = await this._db.EcoleUserRessourceFavorites\r\n                                                  .AsNoTracking()\r\n                                                  .Join(_db.GetIdList(schoolUserIdsList), eurf => eurf.EcoleUserId, tmp => tmp.Val, (eurf, tmp) => eurf)\r\n                                                  .Select(eu => eu.RessourceId)\r\n                                                  .ToArrayAsync();\r\n\r\n                // Update the resources in the medialib with the progress\r\n                foreach (var resource in medialibResources)\r\n                {\r\n                    if (resourcesLastOpenDateMap.ContainsKey(resource.RessourceId))\r\n                    {\r\n                        resource.LastOpenDate = resourcesLastOpenDateMap[resource.RessourceId];\r\n                    }\r\n                    else\r\n                    {\r\n                        resource.LastOpenDate = null;\r\n                    }\r\n\r\n                    resource.Progress = resourceProgressMap.ContainsKey(resource.RessourceId)\r\n                                            ? resourceProgressMap[resource.RessourceId]\r\n                                            : 0;\r\n\r\n                    resource.Favorited = resourceFavorites.Contains(resource.RessourceId);\r\n                }\r\n\r\n                #endregion Last open date, Progress and favorites\r\n\r\n                #region User Rating\r\n\r\n                // Ratings by the current user\r\n                var currentUserRatings = await this._db.EcoleUserRvParcoursFeedbacks\r\n                    .AsNoTracking()\r\n                    .Join(_db.GetIdList(schoolUserIdsList), eurpf => eurpf.EcoleUserId, tmp => tmp.Val, (eurpf, tmp) => eurpf)\r\n                    .Where(f => f.IsLast\r\n                                && f.UserFeedbackTypeId == 2) // todo SATISFACTION\r\n                    .Select(f => new\r\n                    {\r\n                        f.ParcoursId,\r\n                        f.RessourceVersionId,\r\n                        f.IntValue,\r\n                    })\r\n                    .ToListAsync();\r\n\r\n                // Map of [ParcoursId, Resources]\r\n                var mediaLibResources = parcours\r\n                                        .GroupBy(g => g.ParcoursId, g => g.Matieres\r\n                                                                          .SelectMany(m => m.Modules)\r\n                                                                          .SelectMany(mod => mod.Themes)\r\n                                                                          .SelectMany(theme => theme.Ressources)\r\n                                                                          .ToList())\r\n                                        .ToDictionary(g => g.Key, p => p.First());\r\n\r\n                foreach (var userRating in currentUserRatings)\r\n                {\r\n                    if (mediaLibResources.ContainsKey(userRating.ParcoursId))\r\n                    {\r\n                        foreach (var mediaLibResource in mediaLibResources[userRating.ParcoursId])\r\n                        {\r\n                            if (mediaLibResource.RessourceVersionId == userRating.RessourceVersionId)\r\n                            {\r\n                                mediaLibResource.UserRating = userRating.IntValue;\r\n                            }\r\n                        }\r\n                    }\r\n                }\r\n\r\n                var parcoursIdList = parcours.Select(c => c.ParcoursId).ToList();\r\n                var average = await _db.EcoleUserRvParcoursFeedbacks\r\n                    .AsNoTracking()\r\n                    .Join(_db.GetIdList(parcoursIdList), eurpf => eurpf.ParcoursId, tmp => tmp.Val, (eurpf, tmp) => eurpf)\r\n                    .Where(f => f.UserFeedbackTypeId == 2 && f.IsLast)\r\n                    .GroupBy(eu => new\r\n                    {\r\n                        ParcoursId = eu.ParcoursId,\r\n                        ResourceVersionId = eu.RessourceVersionId,\r\n                    })\r\n                    .Select(g => new\r\n                    {\r\n                        ParcoursId = g.Key.ParcoursId,\r\n                        ResourceVersionId = g.Key.ResourceVersionId,\r\n                        Average = g.Average(t => t.IntValue),\r\n                        Count = (int?)g.Count()\r\n                    })\r\n                    .ToListAsync();\r\n\r\n                foreach (var ar in average)\r\n                {\r\n                    if (mediaLibResources.ContainsKey(ar.ParcoursId))\r\n                    {\r\n                        foreach (var model in mediaLibResources[ar.ParcoursId])\r\n                        {\r\n                            if (ar.ResourceVersionId == model.RessourceVersionId)\r\n                            {\r\n                                model.RatingUsersCount = ar.Count;\r\n                                model.AverageRating = ar.Average;\r\n                            }\r\n                        }\r\n                    }\r\n                }\r\n\r\n                #endregion User Rating\r\n\r\n                #region Progression\r\n\r\n                var globalProgressViewModel = await _parcourService.GetGlobalProgressByParcoursAsync(schoolId, userId, parcours);\r\n\r\n                foreach (var parcourProgress in globalProgressViewModel.ParcoursProgresses)\r\n                {\r\n                    parcours.Where(p => p.ParcoursId == parcourProgress.ParcoursId).ToList().ForEach(parcour =>\r\n                    {\r\n                        parcour.Progress = parcourProgress.ProgressPercentage;\r\n                        parcour.ShouldDisplayProgression = parcour.Matieres.SelectMany(ma => ma.Modules).SelectMany(mo => mo.Themes).SelectMany(t => t.Ressources).Any(r => r.Priority == \"Indispensable\");\r\n\r\n                        foreach (var matiereProgress in parcourProgress.MatieresProgresses)\r\n                        {\r\n                            parcour.Matieres.Where(ma => ma.MatiereId == matiereProgress.MatiereId).ToList().ForEach(matiere =>\r\n                            {\r\n                                matiere.Progress = matiereProgress.ProgressPercentage;\r\n                                matiere.ShouldDisplayProgression = matiere.Modules.SelectMany(mo => mo.Themes).SelectMany(t => t.Ressources).Any(r => r.Priority == \"Indispensable\");\r\n\r\n                                foreach (var moduleProgress in matiereProgress.ModulesProgresses)\r\n                                {\r\n                                    matiere.Modules.Where(mo => mo.ModuleId == moduleProgress.ModuleId).ToList().ForEach(module =>\r\n                                    {\r\n                                        module.Progress = moduleProgress.ProgressPercentage;\r\n                                        module.ShouldDisplayProgression = module.Themes.SelectMany(t => t.Ressources).Any(r => r.Priority == \"Indispensable\");\r\n\r\n                                        foreach (var themeProgress in moduleProgress.ThemesProgresses)\r\n                                        {\r\n                                            module.Themes.Where(t => t.ThemeId == themeProgress.ThemeId).ToList().ForEach(theme =>\r\n                                            {\r\n                                                theme.Progress = themeProgress.ProgressPercentage;\r\n                                                theme.ProgressStatus = (ProgressStatusCodeEnum)Enum.Parse(typeof(ProgressStatusCodeEnum), themeProgress.ProgressStatus.ToString());\r\n                                                theme.ShouldDisplayProgression = theme.Ressources.Any(r => r.Priority == \"Indispensable\");\r\n\r\n                                                foreach (var ressourceProgress in themeProgress.RessourcesProgresses)\r\n                                                {\r\n                                                    theme.Ressources.Where(r => r.RessourceId == ressourceProgress.RessourceId).ToList().ForEach(ressource =>\r\n                                                    {\r\n                                                        ressource.ProgressStatus = (ProgressStatusCodeEnum)Enum.Parse(typeof(ProgressStatusCodeEnum), ressourceProgress.ProgressStatus.ToString());\r\n                                                    });\r\n                                                }\r\n                                            });\r\n                                        }\r\n                                    });\r\n                                }\r\n                            });\r\n                        }\r\n                    });\r\n                }\r\n\r\n                #endregion Progression\r\n\r\n                var mediatheque = new MediathequeV3ViewModel\r\n                {\r\n                    Parcours = parcours,\r\n                    Services = await CheckServices(schoolUserIdsList, medialibResources),\r\n                    Progress = globalProgressViewModel.ProgressPercentage\r\n                };\r\n\r\n                return Ok(mediatheque);\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Fatal(ex, \"Medialib error\");\r\n                return InternalServerError(ex);\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve a list of users with specific email addresses based on DNS configuration for recruitment, pedagogy, stage, and advisory purposes, including their profile information and file URLs.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "methodName",
+                        "param_name": "methodName",
+                        "param_desc": "GetCoursesAsync - Retrieve a list of users with specific email addresses based on DNS configuration for recruitment, pedagogy, stage, and advisory purposes, including their profile information and file URLs."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve a list of users with specific email addresses based on DNS configuration for recruitment, pedagogy, stage, and advisory purposes, including their profile information and file URLs.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"methodName\">GetCoursesAsync - Retrieve a list of users with specific email addresses based on DNS configuration for recruitment, pedagogy, stage, and advisory purposes, including their profile information and file URLs.</param>\n",
+            "code_chunks": [
+                {
+                    "page_content": "{\r\n            // current user info\r\n            var currentUser = User.Identity.GetUser();\r\n            var userId = currentUser.Id;\r\n            var schoolId = User.Identity.GetSchoolId();\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n\r\n            try\r\n            {\r\n                // Parcours de la mediatheques\r\n                var parcours = await _parcourService.GetParcoursAsync(schoolId, userId, schoolIdsList);\r\n\r\n                #region Last open date, Progress and favorites\r\n\r\n                // List of all the resources in the medialibrary\r\n                var medialibResources = parcours\r\n                                        .SelectMany(e => e.Matieres)\r\n                                        .SelectMany(e => e.Modules)\r\n                                        .SelectMany(e => e.Themes)\r\n                                        .SelectMany(e => e.Ressources)\r\n                                        .ToList();\r\n\r\n                // Get the lastOpenDate for all the resources in the medialib for the current user\r\n                var resourcesLastOpenDateMap = await this._db.ReportActivites\r\n                                                         .AsNoTracking()\r\n                                                         .Where(ra => ra.UserId == currentUser.Id && schoolIdsList.Contains(ra.EcoleId))\r\n                                                         .Where(ra => ra.DateDelete == null && ra.RessourceId != null)\r\n                                                         .GroupBy(e => e.RessourceId.Value)\r\n                                                         .ToDictionaryAsync(e => e.Key, p => p.Max(f => f.DateCreate));\r\n\r\n                // Map of [ResourceId, User progress]\r\n                var resourceProgressMap = await this._db.UserProgresses\r\n                                                    .AsNoTracking()\r\n                                                    .Where(up => up.UserId == userId)\r\n                                                    .GroupBy(up => up.ResourceId, up => up.Progress)\r\n                                                    .ToDictionaryAsync(up => up.Key, up => up.First());\r\n\r\n                var schoolUserIdsList = User.Identity.GetSchoolUserIdsList();\r\n\r\n                var resourceFavorites = await this._db.EcoleUserRessourceFavorites\r\n                                                  .AsNoTracking()\r\n                                                  .Join(_db.GetIdList(schoolUserIdsList), eurf => eurf.EcoleUserId, tmp => tmp.Val, (eurf, tmp) => eurf)\r\n                                                  .Select(eu => eu.RessourceId)\r\n                                                  .ToArrayAsync();\r\n\r\n                // Update the resources in the medialib with the progress\r\n                foreach (var resource in medialibResources)\r\n                {\r\n                    if (resourcesLastOpenDateMap.ContainsKey(resource.RessourceId))\r\n                    {\r\n                        resource.LastOpenDate = resourcesLastOpenDateMap[resource.RessourceId];\r\n                    }\r\n                    else\r\n                    {\r\n                        resource.LastOpenDate = null;\r\n                    }\r\n\r\n                    resource.Progress = resourceProgressMap.ContainsKey(resource.RessourceId)\r\n                                            ? resourceProgressMap[resource.RessourceId]\r\n                                            : 0;\r\n\r\n                    resource.Favorited = resourceFavorites.Contains(resource.RessourceId);\r\n                }\r\n\r\n                #endregion Last open date, Progress and favorites\r\n\r\n                #region User Rating\r\n\r\n                // Ratings by the current user\r\n                var currentUserRatings = await this._db.EcoleUserRvParcoursFeedbacks\r\n                    .AsNoTracking()\r\n                    .Join(_db.GetIdList(schoolUserIdsList), eurpf => eurpf.EcoleUserId, tmp => tmp.Val, (eurpf, tmp) => eurpf)\r\n                    .Where(f => f.IsLast\r\n                                && f.UserFeedbackTypeId == 2) // todo SATISFACTION\r\n                    .Select(f => new\r\n                    {\r\n                        f.ParcoursId,\r\n                        f.RessourceVersionId,\r\n                        f.IntValue,\r\n                    })\r\n                    .ToListAsync();\r\n\r\n                // Map of [ParcoursId, Resources]\r\n                var mediaLibResources = parcours\r\n                                        .GroupBy(g => g.ParcoursId, g => g.Matieres\r\n                                                                          .SelectMany(m => m.Modules)\r\n                                                                          .SelectMany(mod => mod.Themes)\r\n                                                                          .SelectMany(theme => theme.Ressources)\r\n                                                                          .ToList())\r\n                                        .ToDictionary(g => g.Key, p => p.First());\r\n\r\n                foreach (var userRating in currentUserRatings)\r\n                {\r\n                    if (mediaLibResources.ContainsKey(userRating.ParcoursId))\r\n                    {\r\n                        foreach (var mediaLibResource in mediaLibResources[userRating.ParcoursId])\r\n                        {\r\n                            if (mediaLibResource.RessourceVersionId == userRating.RessourceVersionId)\r\n                            {\r\n                                mediaLibResource.UserRating = userRating.IntValue;\r\n                            }\r\n                        }\r\n                    }\r\n                }\r\n\r\n                var parcoursIdList = parcours.Select(c => c.ParcoursId).ToList();\r\n                var average = await _db.EcoleUserRvParcoursFeedbacks\r\n                    .AsNoTracking()\r\n                    .Join(_db.GetIdList(parcoursIdList), eurpf => eurpf.ParcoursId, tmp => tmp.Val, (eurpf, tmp) => eurpf)\r\n                    .Where(f => f.UserFeedbackTypeId == 2 && f.IsLast)\r\n                    .GroupBy(eu => new\r\n                    {\r\n                        ParcoursId = eu.ParcoursId,\r\n                        ResourceVersionId = eu.RessourceVersionId,\r\n                    })\r\n                    .Select(g => new\r\n                    {\r\n                        ParcoursId = g.Key.ParcoursId,\r\n                        ResourceVersionId = g.Key.ResourceVersionId,\r\n                        Average = g.Average(t => t.IntValue),\r\n                        Count = (int?)g.Count()\r\n                    })\r\n                    .ToListAsync();\r\n\r\n                foreach (var ar in average)\r\n                {\r\n                    if (mediaLibResources.ContainsKey(ar.ParcoursId))\r\n                    {\r\n                        foreach (var model in mediaLibResources[ar.ParcoursId])\r\n                        {\r\n                            if (ar.ResourceVersionId == model.RessourceVersionId)\r\n                            {\r\n                                model.RatingUsersCount = ar.Count;\r\n                                model.AverageRating = ar.Average;\r\n                            }\r\n                        }\r\n                    }\r\n                }\r\n\r\n                #endregion User Rating\r\n\r\n                #region Progression\r\n\r\n                var globalProgressViewModel = await _parcourService.GetGlobalProgressByParcoursAsync(schoolId, userId, parcours);\r\n\r\n                foreach (var parcourProgress in globalProgressViewModel.ParcoursProgresses)\r\n                {\r\n                    parcours.Where(p => p.ParcoursId == parcourProgress.ParcoursId).ToList().ForEach(parcour =>\r\n                    {\r\n                        parcour.Progress = parcourProgress.ProgressPercentage;\r\n                        parcour.ShouldDisplayProgression = parcour.Matieres.SelectMany(ma => ma.Modules).SelectMany(mo => mo.Themes).SelectMany(t => t.Ressources).Any(r => r.Priority == \"Indispensable\");",
+                    "metadata": {},
+                    "type": "Document"
+                },
+                {
+                    "page_content": "foreach (var matiereProgress in parcourProgress.MatieresProgresses)\r\n                        {\r\n                            parcour.Matieres.Where(ma => ma.MatiereId == matiereProgress.MatiereId).ToList().ForEach(matiere =>\r\n                            {\r\n                                matiere.Progress = matiereProgress.ProgressPercentage;\r\n                                matiere.ShouldDisplayProgression = matiere.Modules.SelectMany(mo => mo.Themes).SelectMany(t => t.Ressources).Any(r => r.Priority == \"Indispensable\");\r\n\r\n                                foreach (var moduleProgress in matiereProgress.ModulesProgresses)\r\n                                {\r\n                                    matiere.Modules.Where(mo => mo.ModuleId == moduleProgress.ModuleId).ToList().ForEach(module =>\r\n                                    {\r\n                                        module.Progress = moduleProgress.ProgressPercentage;\r\n                                        module.ShouldDisplayProgression = module.Themes.SelectMany(t => t.Ressources).Any(r => r.Priority == \"Indispensable\");\r\n\r\n                                        foreach (var themeProgress in moduleProgress.ThemesProgresses)\r\n                                        {\r\n                                            module.Themes.Where(t => t.ThemeId == themeProgress.ThemeId).ToList().ForEach(theme =>\r\n                                            {\r\n                                                theme.Progress = themeProgress.ProgressPercentage;\r\n                                                theme.ProgressStatus = (ProgressStatusCodeEnum)Enum.Parse(typeof(ProgressStatusCodeEnum), themeProgress.ProgressStatus.ToString());\r\n                                                theme.ShouldDisplayProgression = theme.Ressources.Any(r => r.Priority == \"Indispensable\");\r\n\r\n                                                foreach (var ressourceProgress in themeProgress.RessourcesProgresses)\r\n                                                {\r\n                                                    theme.Ressources.Where(r => r.RessourceId == ressourceProgress.RessourceId).ToList().ForEach(ressource =>\r\n                                                    {\r\n                                                        ressource.ProgressStatus = (ProgressStatusCodeEnum)Enum.Parse(typeof(ProgressStatusCodeEnum), ressourceProgress.ProgressStatus.ToString());\r\n                                                    });\r\n                                                }\r\n                                            });\r\n                                        }\r\n                                    });\r\n                                }\r\n                            });\r\n                        }\r\n                    });\r\n                }\r\n\r\n                #endregion Progression\r\n\r\n                var mediatheque = new MediathequeV3ViewModel\r\n                {\r\n                    Parcours = parcours,\r\n                    Services = await CheckServices(schoolUserIdsList, medialibResources),\r\n                    Progress = globalProgressViewModel.ProgressPercentage\r\n                };\r\n\r\n                return Ok(mediatheque);\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Fatal(ex, \"Medialib error\");\r\n                return InternalServerError(ex);\r\n            }\r\n        }",
+                    "metadata": {},
+                    "type": "Document"
+                }
+            ]
+        },
+        {
+            "name": "GetCurrentParcoursAndMatieres",
+            "code_start_index": 16637,
+            "method_name": "GetCurrentParcoursAndMatieres",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// This method allows to retrieve only the list of the parcours and matieres related to the mediatheque of the current user\r\n        /// </summary>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            #region R\u00e9cup\u00e9ration userId et ecoleId\r\n\r\n            var currentUser = User.Identity.GetUser();\r\n            var userId = currentUser.Id;\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n\r\n            #endregion R\u00e9cup\u00e9ration userId et ecoleId\r\n\r\n            try\r\n            {\r\n                CourseParcoursV3ViewModel result = await _courseService.GetParcoursAndMatieres(userId, schoolIdsList);\r\n                return Ok(result);\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Fatal(ex, \"Courses | getCurrentParcoursAndMatieres | userId' {0} | schoolIdsList {1} : Erreur lors de la recuperation des parcours et matieres\", userId, string.Join(\";\", schoolIdsList));\r\n                return InternalServerError(ex);\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the change log information for a specific resource based on the resource version ID.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "method",
+                        "param_name": "method",
+                        "param_desc": "GetCurrentParcoursAndMatieres - Retrieve the change log information for a specific resource based on the resource version ID."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the change log information for a specific resource based on the resource version ID.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"method\">GetCurrentParcoursAndMatieres - Retrieve the change log information for a specific resource based on the resource version ID.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetCurrentParcoursMatieresAndModules",
+            "code_start_index": 17926,
+            "method_name": "GetCurrentParcoursMatieresAndModules",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// This method allows to retrieve only the list of the parcours, matieres and modules related to the mediatheque of the current user\r\n        /// </summary>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            #region R\u00e9cup\u00e9ration userId et ecoleId\r\n\r\n            var currentUser = User.Identity.GetUser();\r\n            var userId = currentUser.Id;\r\n            var ecoleId = currentUser.SchoolId;\r\n\r\n            #endregion R\u00e9cup\u00e9ration userId et ecoleId\r\n\r\n            try\r\n            {\r\n                CourseParcoursV3ViewModel result = await _courseService.GetParcoursMatieresAndModules(userId, ecoleId);\r\n                return Ok(result);\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Fatal(ex, \"Courses | getCurrentParcoursMatieresAndModules | userId' {0} | ecoleId {1} : Erreur lors de la recuperation des parcours, matieres et modules\", userId, ecoleId);\r\n                return InternalServerError(ex);\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve courses asynchronously, along with user progress, favorites, ratings, and overall progression data, for the current user in the medialibrary.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no parameters",
+                        "param_name": "no parameters",
+                        "param_desc": "The list of parameters is 'no parameters'."
+                    },
+                    {
+                        "name": "method_name",
+                        "param_name": "method_name",
+                        "param_desc": "The name of the existing method is 'GetCurrentParcoursMatieresAndModules'."
+                    },
+                    {
+                        "name": "method_purpose",
+                        "param_name": "method_purpose",
+                        "param_desc": "The purpose of the method 'GetCurrentParcoursMatieresAndModules' is to retrieve courses asynchronously, along with user progress, favorites, ratings, and overall progression data, for the current user in the medialibrary."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve courses asynchronously, along with user progress, favorites, ratings, and overall progression data, for the current user in the medialibrary.\n/// </summary>\n/// <param name=\"no parameters\">The list of parameters is 'no parameters'.</param>\n/// <param name=\"method_name\">The name of the existing method is 'GetCurrentParcoursMatieresAndModules'.</param>\n/// <param name=\"method_purpose\">The purpose of the method 'GetCurrentParcoursMatieresAndModules' is to retrieve courses asynchronously, along with user progress, favorites, ratings, and overall progression data, for the current user in the medialibrary.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetServiceById",
+            "code_start_index": 18869,
+            "method_name": "GetServiceById",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "serviceId",
+                    "param_name": "serviceId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            // current user info\r\n            var ecoleUserId = User.Identity.GetSchoolUserId();\r\n\r\n            // r\u00e9cup\u00e9ration de tous les services de l'user\r\n            var inscriptionsService = await _db.InscriptionsServices\r\n                                               .AsNoTracking()\r\n                                               .Include(iservices => iservices.Service)\r\n                                               .Include(iservices => iservices.Service.UploadedFile)\r\n                                               .Where(iservices => iservices.EcoleUserId == ecoleUserId\r\n                                                                   && iservices.Service.Id == serviceId\r\n                                                                   && (iservices.DateDebutService == null || iservices.DateDebutService <= DateTime.Now)\r\n                                                                   && (iservices.DateFinService == null || iservices.DateFinService >= DateTime.Now)\r\n                                                                   && (iservices.DateActivation == null || iservices.DateActivation <= DateTime.Now)\r\n                                                                   && iservices.Service.Actif)\r\n                                               .Select(ins => new ServiceV3ViewModel\r\n                                               {\r\n                                                   Id = ins.Service.Id,\r\n                                                   Code = ins.Service.Code,\r\n                                                   Libelle = ins.Service.Libelle,\r\n                                                   Vignette = ins.Service.UploadedFile.FileUrl,\r\n                                                   Target = ins.Service.Target,\r\n                                                   Url = ins.Service.Url,\r\n                                                   ExternId = ins.ExternId,\r\n                                                   RosettaStoneIdGroup = ins.Service.IdGroupRosetta,\r\n                                                   Specifique = ins.Service.Specifique,\r\n                                               })\r\n                                               .FirstOrDefaultAsync();\r\n\r\n            if (inscriptionsService == null)\r\n            {\r\n                return Content(HttpStatusCode.Forbidden, \"Vous n'avez pas acc\u00e8s \u00e0 ce service.\");\r\n            }\r\n\r\n            return Ok(inscriptionsService);\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the current course and subjects for a specified user and school.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "serviceId",
+                        "param_name": "serviceId",
+                        "param_desc": "The ID of the service to retrieve. This should be an integer value."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the current course and subjects for a specified user and school.\n/// </summary>\n/// <param name=\"serviceId\">The ID of the service to retrieve. This should be an integer value.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "SetProgressAsync",
+            "code_start_index": 21537,
+            "method_name": "SetProgressAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "progress",
+                    "param_name": "progress",
+                    "param_type": "MedialibProgress",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "resources",
+                    "param_name": "resources",
+                    "param_type": "int[]",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n            var distinctResources = resources.Distinct().ToList();\r\n\r\n            var nonEvalResources = await _db.Ressources\r\n                                            .AsNoTracking()\r\n                                            .Include(r => r.ResourcesCategory)\r\n                                            .Where(r => distinctResources.Contains(r.Id) && r.ResourcesCategory.Code != \"DEVOIRS\")\r\n                                            .Select(r => r.Id)\r\n                                            .ToListAsync();\r\n\r\n            var existingProgressItems = await _db.UserProgresses\r\n                                                 .Where(up => nonEvalResources.Contains(up.ResourceId) && up.UserId == userId)\r\n                                                 .ToListAsync();\r\n\r\n            switch (progress)\r\n            {\r\n                case MedialibProgress.Todo:\r\n                    _db.UserProgresses.RemoveRange(existingProgressItems);\r\n                    break;\r\n\r\n                case MedialibProgress.Doing:\r\n                    existingProgressItems.ForEach(up =>\r\n                    {\r\n                        up.Progress = 1;\r\n                        up.UpdatedDate = DateTime.Now;\r\n                    });\r\n\r\n                    var newDoingItems = nonEvalResources\r\n                                        .Where(resourceId => existingProgressItems.All(up => up.ResourceId != resourceId))\r\n                                        .Select(resourceId => new UserProgress\r\n                                        {\r\n                                            UserId = userId,\r\n                                            SchoolId = ecoleId,\r\n                                            ResourceId = resourceId,\r\n                                            Progress = 1,\r\n                                            CreatedDate = DateTime.Now,\r\n                                            UpdatedDate = DateTime.Now\r\n                                        }).ToList();\r\n                    _db.UserProgresses.AddRange(newDoingItems);\r\n                    break;\r\n\r\n                case MedialibProgress.Done:\r\n                    existingProgressItems.ForEach(up =>\r\n                    {\r\n                        up.Progress = 100;\r\n                        up.UpdatedDate = DateTime.Now;\r\n                    });\r\n\r\n                    var newDoneItems = nonEvalResources\r\n                                       .Where(resourceId => existingProgressItems.All(up => up.ResourceId != resourceId))\r\n                                       .Select(resourceId => new UserProgress\r\n                                       {\r\n                                           UserId = userId,\r\n                                           SchoolId = ecoleId,\r\n                                           ResourceId = resourceId,\r\n                                           Progress = 100,\r\n                                           CreatedDate = DateTime.Now,\r\n                                           UpdatedDate = DateTime.Now\r\n                                       }).ToList();\r\n                    _db.UserProgresses.AddRange(newDoneItems);\r\n                    break;\r\n\r\n                default:\r\n                    return Ok();\r\n            }\r\n\r\n            try\r\n            {\r\n                await _db.SaveChangesAsync();\r\n                return Ok();\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Erreur lors de la suppression des info des progress info\");\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the current parcours, matieres, and modules for the specified user and school.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "progress",
+                        "param_name": "progress",
+                        "param_desc": "The MedialibProgress parameter represents the progress of a specific task or operation."
+                    },
+                    {
+                        "name": "resources",
+                        "param_name": "resources",
+                        "param_desc": "The resources parameter is an array of integers representing the resources to be processed or utilized."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the current parcours, matieres, and modules for the specified user and school.\n/// </summary>\n/// <param name=\"progress\">The MedialibProgress parameter represents the progress of a specific task or operation.</param>\n/// <param name=\"resources\">The resources parameter is an array of integers representing the resources to be processed or utilized.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "MarkAsFavoriteAsync",
+            "code_start_index": 25828,
+            "method_name": "MarkAsFavoriteAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Mark a given resource as a favorite\r\n        /// </summary>\r\n        /// <param name=\"resourceId\">Resource Id</param>\r\n        /// <param name=\"undo\">default value is false. if this parameter is true then the resource is removed from the favorites</param>\r\n        /// <returns>200 status code if the operation completed successfully</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "resourceId",
+                    "param_name": "resourceId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "undo",
+                    "param_name": "undo",
+                    "param_type": "bool",
+                    "has_default_value": true,
+                    "default_value": "false",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var ecoleUserId = User.Identity.GetSchoolUserId();\r\n\r\n            var existingFavorite = await _db.EcoleUserRessourceFavorites\r\n                                                 .Where(up => up.RessourceId == resourceId && up.EcoleUserId == ecoleUserId)\r\n                                                 .FirstOrDefaultAsync();\r\n\r\n            // Marking as a favorite\r\n            if (!undo)\r\n            {\r\n                if (existingFavorite == null)\r\n                {\r\n                    _db.EcoleUserRessourceFavorites.Add(new EcoleUserRessourceFavorite\r\n                    {\r\n                        RessourceId = resourceId,\r\n                        DateCreate = DateTime.Now,\r\n                        EcoleUserId = ecoleUserId,\r\n                    });\r\n                }\r\n                else\r\n                {\r\n                    return Ok();\r\n                }\r\n            }\r\n            // Unmarking as a favorite\r\n            else\r\n            {\r\n                if (existingFavorite != null)\r\n                {\r\n                    this._db.EcoleUserRessourceFavorites.Remove(existingFavorite);\r\n                }\r\n                else\r\n                {\r\n                    return Ok();\r\n                }\r\n            }\r\n\r\n            try\r\n            {\r\n                await _db.SaveChangesAsync();\r\n                return Ok();\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                Log.Error(ex, \"Erreur lors de la sauvegarde de la mise en favoris des ressources\");\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve a specific service by ID for the current user, including relevant information and checking for access permissions.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "resourceId",
+                        "param_name": "resourceId",
+                        "param_desc": "The ID of the resource that needs to be marked as favorite."
+                    },
+                    {
+                        "name": "undo",
+                        "param_name": "undo",
+                        "param_desc": "A boolean flag indicating whether to undo the action of marking as favorite. Default value is false."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve a specific service by ID for the current user, including relevant information and checking for access permissions.\n/// </summary>\n/// <param name=\"resourceId\">The ID of the resource that needs to be marked as favorite.</param>\n/// <param name=\"undo\">A boolean flag indicating whether to undo the action of marking as favorite. Default value is false.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetResourceRatingAsync",
+            "code_start_index": 27923,
+            "method_name": "GetResourceRatingAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// API used to prefill the satisfaction modal\r\n        /// </summary>\r\n        /// <param name=\"resourceVersionId\">Resource version Id</param>\r\n        /// <param name=\"promotionId\">Promotion Id</param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "resourceVersionId",
+                    "param_name": "resourceVersionId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "promotionId",
+                    "param_name": "promotionId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var userId = User.Identity.GetUserId();\r\n            var ecoleId = User.Identity.GetSchoolId();\r\n            var schoolIdsList = User.Identity.GetSchoolIdsList();\r\n            var schoolUserIdsList = User.Identity.GetSchoolUserIdsList();\r\n\r\n            int parcoursId = await this._db.Promotions\r\n                                       .Where(p => p.Id == promotionId)\r\n                                        .Select(p => p.ParcoursId)\r\n                                        .FirstOrDefaultAsync();\r\n\r\n            if (parcoursId == 0)\r\n            {\r\n                return Content(HttpStatusCode.NotFound, \"promotion doesn't exist.\");\r\n            }\r\n\r\n            var feedbacks = await this._db.EcoleUserRvParcoursFeedbacks\r\n                              .AsNoTracking()\r\n                              .Join(_db.GetIdList(schoolUserIdsList), f => f.EcoleUserId, tmp => tmp.Val, (f, tmp) => f)\r\n                              .Where(f => f.IsLast\r\n                                          && f.RessourceVersionId == resourceVersionId\r\n                                          && f.ParcoursId == parcoursId)\r\n                                      .Select(f => new\r\n                                      {\r\n                                          f.IntValue,\r\n                                          f.TextValue,\r\n                                          f.UserFeedbackType.Code,\r\n                                      })\r\n                              .ToListAsync();\r\n\r\n            var result = new ResourceRatingViewModelModel\r\n            {\r\n                PromotionId = promotionId,\r\n                ResourceVersionId = resourceVersionId\r\n            };\r\n\r\n            foreach (var feedback in feedbacks)\r\n            {\r\n                switch (feedback.Code)\r\n                {\r\n                    case \"TEMPS_ETUDE_MIN\":\r\n                        var ts = TimeSpan.FromMinutes(feedback.IntValue ?? 0);\r\n\r\n                        result.HoursSpent = (ts.Days * 24) + ts.Hours;\r\n                        result.MinutesSpent = ts.Minutes;\r\n                        break;\r\n\r\n                    case \"SATISFACTION\":\r\n                        result.SatisfactionLevel = feedback.IntValue ?? 0;\r\n                        result.SatisfactionExists = feedback.IntValue != null;\r\n                        break;\r\n\r\n                    case \"DIFFICULTE\":\r\n                        result.DifficutyLevel = feedback.IntValue ?? 0;\r\n                        result.DifficultyExists = feedback.IntValue != null;\r\n                        break;\r\n\r\n                    case \"COMMENTAIRE\":\r\n                        result.Comment = feedback.TextValue;\r\n                        break;\r\n                }\r\n            }\r\n\r\n            if (result.HoursSpent == 0 && result.MinutesSpent == 0)\r\n            {\r\n                double duration = await _db.ReportActivites\r\n                                            .Where(ra => schoolIdsList.Contains(ra.EcoleId)\r\n                                                && ra.UserId == userId\r\n                                                && ra.RessourceVersionId == resourceVersionId)\r\n                                            .SumAsync(ra => (double?)ra.Duree) ?? 0;\r\n\r\n                var ts = TimeSpan.FromSeconds(duration);\r\n\r\n                result.HoursSpent = (ts.Days * 24) + ts.Hours;\r\n                result.MinutesSpent = ts.Minutes;\r\n            }\r\n\r\n            return Ok(result);\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Update the progress status of resources for a specific user based on the input progress level, handling different cases such as marking as 'Todo', 'Doing', or 'Done', and saving the changes to the database.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "resourceVersionId",
+                        "param_name": "resourceVersionId",
+                        "param_desc": "The ID of the resource version for which the rating needs to be updated."
+                    },
+                    {
+                        "name": "promotionId",
+                        "param_name": "promotionId",
+                        "param_desc": "The ID of the promotion for which the rating needs to be updated."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Update the progress status of resources for a specific user based on the input progress level, handling different cases such as marking as 'Todo', 'Doing', or 'Done', and saving the changes to the database.\n/// </summary>\n/// <param name=\"resourceVersionId\">The ID of the resource version for which the rating needs to be updated.</param>\n/// <param name=\"promotionId\">The ID of the promotion for which the rating needs to be updated.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "RateResourceAsync",
+            "code_start_index": 31841,
+            "method_name": "RateResourceAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Rate a resource\r\n        /// </summary>\r\n        /// <param name=\"resourceRating\"></param>\r\n        /// <returns>returns the updated resource info</returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "resourceRating",
+                    "param_name": "resourceRating",
+                    "param_type": "ResourceRatingModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            // User info\r\n            var ecoleUserId = User.Identity.GetSchoolUserId();\r\n\r\n            // ParcoursId\r\n            var parcoursId = await this._db.Promotions\r\n                                       .Where(p => p.Id == resourceRating.PromotionId)\r\n                                       .Select(p => p.ParcoursId)\r\n                                       .FirstAsync();\r\n\r\n            try\r\n            {\r\n                //1\tTEMPS_ETUDE_MIN\r\n                int elapsedTimeId = DataCache.GetFeedbackTypes(_db).First(a => a.Code == \"TEMPS_ETUDE_MIN\").Id;\r\n                if (resourceRating.HoursSpent != 0 || resourceRating.MinutesSpent != 0)\r\n                {\r\n                    var timeMinutes = TimeSpan.FromHours(resourceRating.HoursSpent) + TimeSpan.FromMinutes(resourceRating.MinutesSpent);\r\n\r\n                    int result = _db.AddUserResourceFeedback(ecoleUserId, resourceRating.ResourceVersionId, parcoursId, elapsedTimeId, Convert.ToInt32(timeMinutes.TotalMinutes), null);\r\n                    if (result != 0)\r\n                    {\r\n                        Log.Error(\"Error saving the time spent info for user {0} and resource version {1}\", ecoleUserId, resourceRating.ResourceVersionId);\r\n                        return InternalServerError();\r\n                    }\r\n                }\r\n\r\n                //2\tSATISFACTION\r\n                int satisfactionId = DataCache.GetFeedbackTypes(_db).First(a => a.Code == \"SATISFACTION\").Id;\r\n                if (resourceRating.SatisfactionLevel != 0)\r\n                {\r\n                    int result = _db.AddUserResourceFeedback(ecoleUserId, resourceRating.ResourceVersionId, parcoursId, satisfactionId, resourceRating.SatisfactionLevel, null);\r\n                    if (result != 0)\r\n                    {\r\n                        Log.Error(\"Error saving the satisfaction level info for user {0} and resource version {1}\", ecoleUserId, resourceRating.ResourceVersionId);\r\n                        return InternalServerError();\r\n                    }\r\n                }\r\n\r\n                //3\tDIFFICULTE\r\n                int difficultyId = DataCache.GetFeedbackTypes(_db).First(a => a.Code == \"DIFFICULTE\").Id;\r\n                if (resourceRating.DifficutyLevel != 0)\r\n                {\r\n                    int result = _db.AddUserResourceFeedback(ecoleUserId, resourceRating.ResourceVersionId, parcoursId, difficultyId, resourceRating.DifficutyLevel, null);\r\n                    if (result != 0)\r\n                    {\r\n                        Log.Error(\"Error saving the difficulty level info for user {0} and resource version {1}\", ecoleUserId, resourceRating.ResourceVersionId);\r\n                        return InternalServerError();\r\n                    }\r\n                }\r\n\r\n                //4\tCOMMENTAIRE\r\n                int commentId = DataCache.GetFeedbackTypes(_db).First(a => a.Code == \"COMMENTAIRE\").Id;\r\n                if (!string.IsNullOrWhiteSpace(resourceRating.Comment))\r\n                {\r\n                    int result = _db.AddUserResourceFeedback(ecoleUserId, resourceRating.ResourceVersionId, parcoursId, commentId, null, resourceRating.Comment);\r\n                    if (result != 0)\r\n                    {\r\n                        Log.Error(\"Error saving the comment info for user {0} and resource version {1}\", ecoleUserId, resourceRating.ResourceVersionId);\r\n                        return InternalServerError();\r\n                    }\r\n                }\r\n\r\n                // Get the new Average, count and user rating info to update the UI\r\n                var newRatingInfo = await _db.EcoleUserRvParcoursFeedbacks\r\n                                                            .Where(f => f.UserFeedbackTypeId == satisfactionId\r\n                                                                        && f.IsLast\r\n                                                                        && f.RessourceVersionId == resourceRating.ResourceVersionId\r\n                                                                        && f.ParcoursId == parcoursId)\r\n                                                            .GroupBy(f => f.RessourceVersionId)\r\n                                                            .Select(g => new\r\n                                                            {\r\n                                                                Average = g.Average(t => t.IntValue),\r\n                                                                Count = (int?)g.Count(),\r\n                                                                UserRating = resourceRating.SatisfactionLevel\r\n                                                            })\r\n                                                            .FirstOrDefaultAsync();\r\n\r\n                BackgroundJob.Enqueue(() => NotificationSenderManager.SendRatingNotificationAsync(parcoursId,\r\n                                                                                                  resourceRating.ResourceVersionId,\r\n                                                                                                  ecoleUserId,\r\n                                                                                                  (resourceRating.HoursSpent * 60) + resourceRating.MinutesSpent,\r\n                                                                                                  resourceRating.DifficutyLevel,\r\n                                                                                                  resourceRating.SatisfactionLevel,\r\n                                                                                                  resourceRating.Comment\r\n                                                                                                 ));\r\n\r\n                return Ok(new UpdatedResourceRatingViewModel\r\n                {\r\n                    Average = newRatingInfo?.Average,\r\n                    Count = newRatingInfo?.Count,\r\n                    UserRating = newRatingInfo?.UserRating\r\n                });\r\n            }\r\n            catch (Exception e)\r\n            {\r\n                Log.Error(e, \"Error saving the rating info for user {0} and resource {1}\", ecoleUserId, resourceRating.ResourceVersionId);\r\n                return InternalServerError();\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Toggle a resource as favorite for a specific user, adding or removing it from the favorites list in the database.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "ResourceRatingModel",
+                        "param_name": "ResourceRatingModel",
+                        "param_desc": "The model representing the rating of a specific resource."
+                    },
+                    {
+                        "name": "resourceRating",
+                        "param_name": "resourceRating",
+                        "param_desc": "The rating value assigned to the resource."
+                    },
+                    {
+                        "name": "RateResourceAsync",
+                        "param_name": "RateResourceAsync",
+                        "param_desc": "The method used to toggle a resource as favorite for a specific user, adding or removing it from the favorites list in the database."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Toggle a resource as favorite for a specific user, adding or removing it from the favorites list in the database.\n/// </summary>\n/// <param name=\"ResourceRatingModel\">The model representing the rating of a specific resource.</param>\n/// <param name=\"resourceRating\">The rating value assigned to the resource.</param>\n/// <param name=\"RateResourceAsync\">The method used to toggle a resource as favorite for a specific user, adding or removing it from the favorites list in the database.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetRessourcePathByForumPostIdAsync",
+            "code_start_index": 38566,
+            "method_name": "GetRessourcePathByForumPostIdAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Fetch the specified resource and its objects\r\n        /// </summary>\r\n        /// <param name=\"forumPostId\"></param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "forumPostId",
+                    "param_name": "forumPostId",
+                    "param_type": "int",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var currentUser = User.Identity.GetUser();\r\n\r\n            // On r\u00e9cup\u00e8re ecoleUser pour check si l'appelant est bien un formateur\r\n            var estFormateur = await this.IsTeacher(_db);\r\n\r\n            if (!estFormateur && !currentUser.Interne)\r\n            {\r\n                return Content(HttpStatusCode.Forbidden, \"You're not allowed to do that\");\r\n            }\r\n\r\n            // On r\u00e9cup\u00e8re le forumPost\r\n            var rvId = await _db.ForumPosts\r\n                                .AsNoTracking()\r\n                                .Where(fp => fp.Id == forumPostId && fp.DeletionDate == null && fp.RessourceVersionId != null)\r\n                                .Select(fp => fp.RessourceVersionId)\r\n                                .FirstOrDefaultAsync();\r\n\r\n            if (rvId == 0)\r\n            {\r\n                return NotFound();\r\n            }\r\n\r\n            var ressource = await _db.RessourceVersions\r\n                                     .AsNoTracking()\r\n                                     .Include(rv => rv.Ressource.RessourceObjects.Select(ro => ro.ResourceType))\r\n                                     .Include(rv => rv.Ressource.RessourceObjects.Select(ro => ro.RessourcesObjectsMetas))\r\n                                     .Include(rv => rv.Ressource.RessourceObjects.Select(ro => ro.RessourcesObjectsMetas.Select(rom => rom.Meta)))\r\n                                     .Where(rv => rv.Id == rvId && rv.DateDelete == null)\r\n                                     .Select(rv => new RessourceV3ViewModel\r\n                                     {\r\n                                         RessourceId = rv.RessourceId,\r\n                                         Name = rv.Ressource.Titre,\r\n                                         Code = rv.Ressource.Code,\r\n                                         CategoryCode = rv.Ressource.ResourcesCategory.Code,\r\n                                         Type = rv.Ressource.ResourcesCategory.Libelle,\r\n                                         Description = rv.Ressource.Descriptif,\r\n                                         Progress = 0,\r\n                                         RessourceVersionId = rv.Id,\r\n                                         RessourceVersion = rv.Version,\r\n                                         UniqueId = rv.Ressource.Uid,\r\n                                         Duree = rv.Ressource.Duree ?? 20,\r\n                                         Difficulty = rv.Ressource.Difficulte ?? 3,\r\n                                         Order = 0,\r\n                                         Priority = \"Recommand\u00e9\",\r\n                                         LastOpenDate = null,\r\n                                         RessourceObjects =\r\n                                                           rv.RessourcesObjectRessourcesVersions\r\n                                                             .Where(rorv => rorv.DateDelete == null)\r\n                                                             .Select(rorv => rorv.RessourceObject)\r\n                                                             .Where(ro => ro.DateDelete == null || ro.DateDelete >= DateTime.Now)\r\n                                                             .Select(ro => new RessourceObjectV3ViewModel\r\n                                                             {\r\n                                                                 RessourceObjectId = ro.Id,\r\n                                                                 Name = ro.Libelle,\r\n                                                                 Type = ro.ResourceType.Code,\r\n                                                                 Filename = ro.FileId == null ? ro.Filename : ro.UploadedFile.FileName,\r\n                                                                 Url = ro.FileId == null ? ro.ResourceType.Url + ro.Filename : ro.UploadedFile.FileUrl,\r\n                                                                 Meta = ro.RessourcesObjectsMetas\r\n                                                                    .Select(rom => new RessourceObjectMetaV3ViewModel\r\n                                                                    {\r\n                                                                        MetaCode = rom.Meta.Code,\r\n                                                                        IntValue = rom.IntValue,\r\n                                                                        TextValue = rom.TextValue\r\n                                                                    })\r\n                                                                    .ToList(),\r\n                                                                 Online = ro.Online,\r\n                                                                 Downloadable = ro.EnTelechargement,\r\n                                                                 Order = ro.Ordre ?? 0,\r\n                                                                 LastOpenDate = null\r\n                                                             }).OrderBy(ro => ro.RessourceObjectId).ToList(),\r\n                                     }).FirstOrDefaultAsync();\r\n\r\n            return Ok(ressource);\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve resource ratings and feedback for a specified promotion, resource version, and user, calculating time spent, satisfaction level, difficulty level, and comments.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "forumPostId",
+                        "param_name": "forumPostId",
+                        "param_desc": "The ID of the forum post for which the resource path needs to be retrieved."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve resource ratings and feedback for a specified promotion, resource version, and user, calculating time spent, satisfaction level, difficulty level, and comments.\n/// </summary>\n/// <param name=\"forumPostId\">The ID of the forum post for which the resource path needs to be retrieved.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "CheckServices",
+            "code_start_index": 44182,
+            "method_name": "CheckServices",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// CheckServices v2 : retourne les services disponibles d'un utilisateur depuis inscriptions_services\r\n        /// </summary>\r\n        /// <param name=\"ecoleUserIdsList\"></param>\r\n        /// <param name=\"resources\"></param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "ecoleUserIdsList",
+                    "param_name": "ecoleUserIdsList",
+                    "param_type": "IList<int>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "resources",
+                    "param_name": "resources",
+                    "param_type": "List<RessourceV3ViewModel>",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            // r\u00e9cup\u00e9ration de tous les services de l'user\r\n            var inscriptionsServices = await _db.InscriptionsServices\r\n                                                .AsNoTracking()\r\n                                                .Join(_db.GetIdList(ecoleUserIdsList), ins => ins.EcoleUserId, tmp => tmp.Val, (ins, tmp) => ins)\r\n                                                .Where(svc => (svc.DateDebutService == null || svc.DateDebutService <= DateTimeOffset.Now)\r\n                                                                    && (svc.DateFinService == null || svc.DateFinService >= DateTimeOffset.Now)\r\n                                                                    && svc.DateDelete == null\r\n                                                                    && svc.Service.Actif)\r\n                                                .Select(isvc => new\r\n                                                {\r\n                                                    isvc.ExternId,\r\n                                                    Service = new ServiceV3ViewModel\r\n                                                    {\r\n                                                        Id = isvc.Service.Id,\r\n                                                        Code = isvc.Service.Code,\r\n                                                        Libelle = isvc.Service.Libelle,\r\n                                                        Vignette = isvc.Service.UploadedFile.FileUrl,\r\n                                                        Target = isvc.Service.Target,\r\n                                                        Url = isvc.Service.Url,\r\n                                                        RosettaStoneIdGroup = isvc.Service.IdGroupRosetta,\r\n                                                        Specifique = isvc.Service.Specifique,\r\n                                                        IsPublished = isvc.Service.IsPublished,\r\n\r\n                                                        AccessEndDate = isvc.DateFinService != null ? isvc.DateFinService :\r\n                                                        (isvc.Service.DureeDefaut > 0 && isvc.DateActivation.HasValue ?\r\n                                                            DbFunctions.AddDays(isvc.DateActivation.Value, isvc.Service.DureeDefaut) :\r\n                                                            DateTime.MaxValue)\r\n                                                    }\r\n                                                })\r\n                                                .ToListAsync();\r\n\r\n            var ressourcesObjectsHasScholarvox = resources.SelectMany(r => r.RessourceObjects).Any(x => x.Type == \"scholarvox\");\r\n\r\n            var hasScholarVox = inscriptionsServices.Any(iservices => iservices.Service.Code.Contains(\"SCHOLARVOX\")) || ressourcesObjectsHasScholarvox;\r\n\r\n            var hasRosettaStone = inscriptionsServices.Any(iservices => iservices.Service.Code.Contains(\"ROSETTASTONE\"));\r\n\r\n            var hasGoFluent = inscriptionsServices.Any(iservices => iservices.Service.Code.Contains(\"GO_FLUENT\"));\r\n\r\n            var courseService = new CourseServiceV3ViewModel\r\n            {\r\n                Services = inscriptionsServices.Select(ins => ins.Service).ToList(),\r\n                HasRosettaStone = hasRosettaStone,\r\n                HasGoFluent = hasGoFluent,\r\n                HasScholarvox = hasScholarVox,\r\n            };\r\n\r\n            return courseService;\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Save user feedback for a specific resource, including time spent, satisfaction level, difficulty level, and comments, and update UI with new average rating and count.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "ecoleUserIdsList",
+                        "param_name": "ecoleUserIdsList",
+                        "param_desc": "A list of integer values representing the ecole user IDs."
+                    },
+                    {
+                        "name": "resources",
+                        "param_name": "resources",
+                        "param_desc": "A list of RessourceV3ViewModel objects representing the resources."
+                    },
+                    {
+                        "name": "methodName",
+                        "param_name": "methodName",
+                        "param_desc": "The name of the method, which is 'CheckServices'."
+                    },
+                    {
+                        "name": "methodPurpose",
+                        "param_name": "methodPurpose",
+                        "param_desc": "The purpose of the method is to save user feedback for a specific resource, including time spent, satisfaction level, difficulty level, and comments, and update UI with new average rating and count."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Save user feedback for a specific resource, including time spent, satisfaction level, difficulty level, and comments, and update UI with new average rating and count.\n/// </summary>\n/// <param name=\"ecoleUserIdsList\">A list of integer values representing the ecole user IDs.</param>\n/// <param name=\"resources\">A list of RessourceV3ViewModel objects representing the resources.</param>\n/// <param name=\"methodName\">The name of the method, which is 'CheckServices'.</param>\n/// <param name=\"methodPurpose\">The purpose of the method is to save user feedback for a specific resource, including time spent, satisfaction level, difficulty level, and comments, and update UI with new average rating and count.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "CoursesV3Controller"
+}

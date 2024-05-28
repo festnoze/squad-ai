@@ -1,0 +1,80 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Common/DoYouBuzzController.cs",
+    "index_shift_code": 376,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.Common",
+    "usings": [
+        "LMS.Authentication",
+        "LMS.Data",
+        "LMS.Utils",
+        "LMS.Configuration",
+        "Serilog",
+        "System",
+        "System.Collections.Generic",
+        "System.Data.Entity",
+        "System.Linq",
+        "System.Threading.Tasks",
+        "System.Web",
+        "System.Web.Http",
+        "LMS.Utils.Cache",
+        "LMS.Services.Interfaces"
+    ],
+    "access_modifier": "public",
+    "struct_name": "DoYouBuzzController",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetAsync",
+            "code_start_index": 938,
+            "method_name": "GetAsync",
+            "existing_summary": "\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "timestamp",
+                    "param_name": "timestamp",
+                    "param_type": "string",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var currentUser = User.Identity.GetUser();\r\n\r\n            var dnsConfig = _dnsConfig.GetDnsConfig();\r\n\r\n            if (string.IsNullOrEmpty(dnsConfig.UrlDoYouBuzz))\r\n            {\r\n                Log.Fatal(\"DoYouBuzz url is either null of empty\");\r\n                return InternalServerError();\r\n            }\r\n\r\n            var groups = await this._db.InscriptionPromotions\r\n                                   .AsNoTracking()\r\n                                   .Include(ip => ip.Promotion.Parcour)\r\n                                   .Where(ip => ip.UserId == currentUser.Id \r\n                                            && currentUser.SchoolIdsList.Contains(ip.EcoleId)\r\n                                            && (ip.DateDelete == null || ip.DateDelete > DateTime.Now))\r\n                                   .Select(ip => ip.Promotion.Parcour.Code)\r\n                                   .Distinct()\r\n                                   .ToListAsync();\r\n\r\n            List<string> list = new List<string>(groups.Count);\r\n            foreach (var group in groups)\r\n            {\r\n                list.Add(\"groups%5B%5D=\" + HttpUtility.UrlEncode(group));\r\n            }\r\n\r\n            string groupsParam = string.Join(\"&\", list);\r\n\r\n            string secretKey = _config.GetDoYouBuzzKey();\r\n\r\n            string email = currentUser.Email;\r\n            int externalId = currentUser.Id;\r\n            string firstName = currentUser.Prenom;\r\n            string lastName = currentUser.Nom;\r\n            int userType = 1; // default value\r\n\r\n            string hash = Helpers.CalcMd5Hash($\"{email}{firstName}{lastName}{externalId}{string.Join(string.Empty, groups)}{userType}{timestamp}{secretKey}\");\r\n\r\n            string url =\r\n                $\"{dnsConfig.UrlDoYouBuzz.ToLowerInvariant()}?\" +\r\n                $\"email={email}\" +\r\n                $\"&external_id={externalId}\" +\r\n                $\"&firstname={firstName}\" +\r\n                $\"&{groupsParam}\" +\r\n                $\"&user_type={userType}\" +\r\n                $\"&hash={hash}\" +\r\n                $\"&lastname={lastName}\" +\r\n                $\"&timestamp={timestamp}\";\r\n\r\n            return Ok(url);\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the URL for a specific user's DoYouBuzz profile based on their information and groups.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "string",
+                        "param_name": "string",
+                        "param_desc": "The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)"
+                    },
+                    {
+                        "name": "timestamp",
+                        "param_name": "timestamp",
+                        "param_desc": "The generated description for the parameter"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the URL for a specific user's DoYouBuzz profile based on their information and groups.\n/// </summary>\n/// <param name=\"string\">The name of the parameter (it's always a single word. Also exclude the type of the parameter which may come firstly)</param>\n/// <param name=\"timestamp\">The generated description for the parameter</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "DoYouBuzzController"
+}

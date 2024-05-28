@@ -1,0 +1,172 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/V3/ForumFormateurV3Controller.cs",
+    "index_shift_code": 527,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V3",
+    "usings": [
+        "System",
+        "System.Collections.Generic",
+        "System.Linq",
+        "System.Net",
+        "System.Threading.Tasks",
+        "System.Web.Http",
+        "System.Web.Http.Description",
+        "Lms.Common.Enumerations",
+        "LMS.Attributes.Routing",
+        "LMS.Authentication",
+        "LMS.Data",
+        "LMS.Models.BindingModels.V2.ForumsFormateurs",
+        "LMS.ModelsDTOs.Forum",
+        "LMS.ModelsDTOs.ForumFormateur",
+        "LMS.Services",
+        "LMS.Utils",
+        "Newtonsoft.Json",
+        "Serilog"
+    ],
+    "access_modifier": "public",
+    "struct_name": "ForumFormateurV3Controller",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetAllFormateurForumPostsAsync",
+            "code_start_index": 1510,
+            "method_name": "GetAllFormateurForumPostsAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// This method allows to retrieve all the forums posts linked to the current user, depending on forumsFormateursBindingModel\r\n        /// The current user must be a teacher\r\n        /// Created by Sofiane Jamai\r\n        /// </summary>\r\n        /// <param name=\"forumsFormateursBindingModel\"></param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "forumsFormateursBindingModel",
+                    "param_name": "forumsFormateursBindingModel",
+                    "param_type": "ForumsFormateursBindingModel",
+                    "has_default_value": false,
+                    "default_value": "",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            var currentUser = User.Identity.GetUser();\r\n\r\n            try\r\n            {\r\n                #region Checks de s\u00e9curit\u00e9\r\n\r\n                #region Check CurrentUser is a Teacher\r\n\r\n                var isTeacher = await this.IsTeacher(_db);\r\n\r\n                if (!isTeacher)\r\n                {\r\n                    return StatusCode(HttpStatusCode.Forbidden);\r\n                }\r\n\r\n                #endregion\r\n\r\n                #region Check sur ForumTypeCode\r\n\r\n                ForumTypeEnum? currentForumTypeCode = null;\r\n\r\n                if (!string.IsNullOrWhiteSpace(forumsFormateursBindingModel.SelectedForumTypeCode))\r\n                {\r\n                    bool forumTypeCodeExists = Enum.TryParse(forumsFormateursBindingModel.SelectedForumTypeCode, out ForumTypeEnum forumTypeCode);\r\n\r\n                    if (!forumTypeCodeExists)\r\n                    {\r\n                        throw new ArgumentException(\"forumTypeCode doesn't correspond to the allowed values\");\r\n                    }\r\n                    else\r\n                    {\r\n                        currentForumTypeCode = forumTypeCode;\r\n                    }\r\n                }\r\n\r\n                #endregion\r\n\r\n                #region Check sur ForumFormateurSection\r\n\r\n                if (string.IsNullOrWhiteSpace(forumsFormateursBindingModel.ForumFormateurSection))\r\n                {\r\n                    throw new ArgumentException(\"No forumFormateurSection selected\");\r\n                }\r\n\r\n                bool forumFormateurSectionExists = Enum.TryParse(forumsFormateursBindingModel.ForumFormateurSection, out ForumFormateurSectionEnum currentForumFormateurSection);\r\n\r\n                if (!forumFormateurSectionExists)\r\n                {\r\n                    throw new ArgumentException(\"ForumFormateurSection doesn't correspond to the allowed values\");\r\n                }\r\n\r\n                #endregion\r\n\r\n                #endregion\r\n\r\n                ForumsFormateursFormDto forumsFormateursFormDto = new ForumsFormateursFormDto\r\n                {\r\n                    CurrentUser = currentUser,\r\n                    ForumFormateurSection = currentForumFormateurSection,\r\n                    SelectedForumTypeCode = currentForumTypeCode,\r\n                    SearchValue = forumsFormateursBindingModel.SearchValue,\r\n                    SelectedAffectations = forumsFormateursBindingModel.SelectedAffectations?\r\n                                                                       .Select(sa => new AffectationFormationDto\r\n                                                                       {\r\n                                                                           CourseId = sa.CourseId,\r\n                                                                           MatiereId = sa.MatiereId,\r\n                                                                           ModuleId = sa.ModuleId,\r\n                                                                           ThemeId = sa.ThemeId\r\n                                                                       })\r\n                                                                        .ToList(),\r\n                    PageSize = forumsFormateursBindingModel?.PageSize ?? 40,\r\n                    StartDate = forumsFormateursBindingModel.StartDate\r\n\r\n                };\r\n\r\n                var pagedData = await _forumFormateurService.GetAllFormateurForumPostsAsync(forumsFormateursFormDto);\r\n\r\n                return Ok(pagedData);\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                string errorMessage = JsonConvert.SerializeObject(new\r\n                {\r\n                    userId = currentUser.Id,\r\n                    ecoleId = currentUser.SchoolId,\r\n                    forumsFormateursBindingModel,\r\n                    ex.Message\r\n                });\r\n\r\n                Log.Error(ex, $\"{nameof(ForumFormateurV3Controller)} | {nameof(GetAllFormateurForumPostsAsync)} | {errorMessage}\");\r\n                return BadRequest(ex.Message);\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Add a resource object to an event, checking permissions and file validity before saving it to the database.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "forumsFormateursBindingModel",
+                        "param_name": "forumsFormateursBindingModel",
+                        "param_desc": "The model containing the data for binding forums and formateurs."
+                    },
+                    {
+                        "name": "GetAllFormateurForumPostsAsync",
+                        "param_name": "GetAllFormateurForumPostsAsync",
+                        "param_desc": "The method name used for getting all formateur forum posts asynchronously."
+                    },
+                    {
+                        "name": "purpose",
+                        "param_name": "purpose",
+                        "param_desc": "The purpose of the method which is to add a resource object to an event, checking permissions and file validity before saving it to the database."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Add a resource object to an event, checking permissions and file validity before saving it to the database.\n/// </summary>\n/// <param name=\"forumsFormateursBindingModel\">The model containing the data for binding forums and formateurs.</param>\n/// <param name=\"GetAllFormateurForumPostsAsync\">The method name used for getting all formateur forum posts asynchronously.</param>\n/// <param name=\"purpose\">The purpose of the method which is to add a resource object to an event, checking permissions and file validity before saving it to the database.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetUnhandledForumPostsCountAsync",
+            "code_start_index": 6158,
+            "method_name": "GetUnhandledForumPostsCountAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// This method allows to retrieve the number of unhandled forum posts concerning the current connected user\r\n        /// In the past, this operation was done in the getAllFormateurForumPosts method. But it costs half a second to execute.\r\n        /// </summary>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var currentUser = User.Identity.GetUser();\r\n\r\n            try\r\n            {\r\n                var unhandled = await _forumFormateurService.GetUnhandledForumPostsCountAsync(currentUser.Id);\r\n                return Ok(unhandled);\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                string errorMessage = JsonConvert.SerializeObject(new\r\n                {\r\n                    userId = currentUser.Id,\r\n                    ecoleId = currentUser.SchoolId,\r\n                    ex.Message\r\n                });\r\n\r\n                Log.Error(ex, $\"{nameof(ForumFormateurV3Controller)} | {nameof(GetUnhandledForumPostsCountAsync)} | {errorMessage}\");\r\n                return BadRequest(ex.Message);\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Remove a resource object asynchronously if the current user is the owner, otherwise return a forbidden error message.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "method",
+                        "param_name": "method",
+                        "param_desc": "GetUnhandledForumPostsCountAsync"
+                    },
+                    {
+                        "name": "purpose",
+                        "param_name": "purpose",
+                        "param_desc": "Remove a resource object asynchronously if the current user is the owner, otherwise return a forbidden error message."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Remove a resource object asynchronously if the current user is the owner, otherwise return a forbidden error message.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"method\">GetUnhandledForumPostsCountAsync</param>\n/// <param name=\"purpose\">Remove a resource object asynchronously if the current user is the owner, otherwise return a forbidden error message.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetForumFormateurFormationsFromAffectationsAsync",
+            "code_start_index": 7321,
+            "method_name": "GetForumFormateurFormationsFromAffectationsAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Retourne la liste des affectations forum pour le formateurs\r\n        /// </summary>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var currentUser = User.Identity.GetUser();\r\n            var currentUserId = currentUser.Id;\r\n\r\n            try\r\n            {\r\n                var estFormateur = await this.IsTeacher(_db);\r\n                if (!estFormateur)\r\n                {\r\n                    return StatusCode(HttpStatusCode.Forbidden);\r\n                }\r\n\r\n                var affectations = await _forumFormateurService.GetFormationsFromAffectations(currentUserId);\r\n                return Ok(affectations);\r\n            }\r\n            catch (Exception ex)\r\n            {\r\n                string errorMessage = JsonConvert.SerializeObject(new\r\n                {\r\n                    userId = currentUser.Id,\r\n                    ecoleId = currentUser.SchoolId,\r\n                    ex.Message\r\n                });\r\n\r\n                Log.Error(ex, $\"{nameof(ForumFormateurV3Controller)} | {nameof(GetForumFormateurFormationsFromAffectationsAsync)} | {errorMessage}\");\r\n                return BadRequest(ex.Message);\r\n            }\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve all forum posts for a teacher, with security checks and filtering options.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no_parameters",
+                        "param_name": "no_parameters",
+                        "param_desc": "The list of parameters is 'no parameters'."
+                    },
+                    {
+                        "name": "GetForumFormateurFormationsFromAffectationsAsync",
+                        "param_name": "GetForumFormateurFormationsFromAffectationsAsync",
+                        "param_desc": "We have an existing method named 'GetForumFormateurFormationsFromAffectationsAsync', for context, the method purpose is 'Retrieve all forum posts for a teacher, with security checks and filtering options.'."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve all forum posts for a teacher, with security checks and filtering options.\n/// </summary>\n/// <param name=\"no_parameters\">The list of parameters is 'no parameters'.</param>\n/// <param name=\"GetForumFormateurFormationsFromAffectationsAsync\">We have an existing method named 'GetForumFormateurFormationsFromAffectationsAsync', for context, the method purpose is 'Retrieve all forum posts for a teacher, with security checks and filtering options.'.</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "ForumFormateurV3Controller"
+}

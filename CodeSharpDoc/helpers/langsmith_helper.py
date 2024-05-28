@@ -20,11 +20,12 @@ class Langsmith:
         self.client = Client(api_key=self.langsmith_api_key)
 
     def create_project(self):
-        self.langsmith_project_session = self.langsmith_project_name + '_' + str(uuid.uuid4().hex[0:5]) # Add a specific LangSmith project for this session
+        self.langsmith_project_session = self.langsmith_project_name + '_' + str(uuid.uuid4().hex[0:6]) # Add a specific LangSmith project for this session
         self.session = self.client.create_project(
             project_name= self.langsmith_project_session,
-            description= f"Session of project '{self.langsmith_project_name}' began on: {datetime.datetime.now().strftime('%d/%m/%Y at: %H:%M:%S')}",
+            description= f"{datetime.datetime.now().strftime('%d/%m/%Y at: %H:%M:%S')} session of: '{self.langsmith_project_name}'",
         )
+        return self.session
 
     def create_dataset(self):
         self.dl_dataset = self.client.create_dataset(
@@ -40,13 +41,10 @@ class Langsmith:
 
     def get_all_projects(self):
         return list(self.client.list_projects())
-        
-    # Function to delete a project by ID
-    def delete_project(self, project_name):
-        self.client.delete_project(project_name=project_name)
 
     # Main function to delete all projects
-    def delete_all_projects(self):
+    def delete_all_project_sessions(self):
         projects = self.get_all_projects()
         for project in projects:
-            self.delete_project(project.name)
+            if project.name.startswith(self.langsmith_project_name) and project.name != self.langsmith_project_name:
+                self.client.delete_project(project_name=project.name)

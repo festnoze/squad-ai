@@ -1,0 +1,170 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/v1/TagsController.cs",
+    "index_shift_code": 431,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.V1",
+    "usings": [
+        "System",
+        "System.Collections.Generic",
+        "System.Data.Entity",
+        "System.Linq",
+        "System.Threading.Tasks",
+        "System.Web.Http",
+        "System.Web.Http.Description",
+        "LMS.Authentication",
+        "LMS.Data",
+        "LMS.Data.Extensions",
+        "LMS.ModelsDTOs.Newsfeed",
+        "LMS.Utils.Cache"
+    ],
+    "access_modifier": "public",
+    "struct_name": "TagsController",
+    "base_class_name": "ApiController",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [
+        {
+            "name": "GetHotestTagsAsync",
+            "code_start_index": 1116,
+            "method_name": "GetHotestTagsAsync",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Get the hostest tags (most used) \r\n        /// <example>?period={int}&amp;count={int} (0 for all)</example>\r\n        /// </summary>\r\n        /// <param name=\"period\">int (days)</param>\r\n        /// <param name=\"count\">Number of tags to return</param>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [
+                {
+                    "name": "period",
+                    "param_name": "period",
+                    "param_type": "int",
+                    "has_default_value": true,
+                    "default_value": "7",
+                    "description": null,
+                    "extra_infos": null
+                },
+                {
+                    "name": "count",
+                    "param_name": "count",
+                    "param_type": "int",
+                    "has_default_value": true,
+                    "default_value": "20",
+                    "description": null,
+                    "extra_infos": null
+                }
+            ],
+            "indent_level": 2,
+            "code": "{\r\n            if (period < 1)\r\n            {\r\n                ModelState.AddModelError(nameof(period), \"Period must be >= 1\");\r\n                return BadRequest(ModelState);\r\n            }\r\n\r\n            var past = DateTime.UtcNow.AddDays(-period);\r\n\r\n            var hotTags = _db.PostTags.AsNoTracking()\r\n                .Include(pt => pt.Tag)\r\n                .Where(pt => pt.DateCreate > past)\r\n                .OrderByDescending(t => t.Tag.UsageCount);\r\n\r\n            List<NFTag> result;\r\n\r\n            if (count <= 0)\r\n            {\r\n                result = await hotTags.Select(t => new NFTag\r\n                {\r\n                    id = t.Tag.Id,\r\n                    libelle = t.Tag.Libelle,\r\n                    is_promo_tag = t.Tag.IsPromoTag,\r\n                    is_official = t.Tag.IsOfficial,\r\n                    usage_count = t.Tag.UsageCount\r\n                })\r\n                    .OrderBy(t => t.libelle)\r\n                    .ToListAsync();\r\n            }\r\n            else\r\n            {\r\n                result = await hotTags.Select(t => new NFTag\r\n                {\r\n                    id = t.Tag.Id,\r\n                    libelle = t.Tag.Libelle,\r\n                    is_promo_tag = t.Tag.IsPromoTag,\r\n                    is_official = t.Tag.IsOfficial,\r\n                    usage_count = t.Tag.UsageCount\r\n                })\r\n                    .TakeDynamic(count)\r\n                    .OrderBy(t => t.libelle)\r\n                    .ToListAsync();\r\n            }\r\n\r\n            return Ok(result);\r\n        }",
+            "is_async": true,
+            "is_task": true,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve the hottest tags based on a specified period and optional count.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "period",
+                        "param_name": "period",
+                        "param_desc": "An integer representing the period for which to retrieve the hottest tags. Default value is 7."
+                    },
+                    {
+                        "name": "count",
+                        "param_name": "count",
+                        "param_desc": "An integer representing the number of hottest tags to retrieve. Default value is 20."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve the hottest tags based on a specified period and optional count.\n/// </summary>\n/// <param name=\"period\">An integer representing the period for which to retrieve the hottest tags. Default value is 7.</param>\n/// <param name=\"count\">An integer representing the number of hottest tags to retrieve. Default value is 20.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetAllTags",
+            "code_start_index": 2984,
+            "method_name": "GetAllTags",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Returns a list of all the tags\r\n        /// </summary>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var tags = TCache<List<NFTag>>.Get(CacheKeys.TAGS_LIST, 3600, () =>\r\n            {\r\n                return _db.Tags.AsNoTracking()\r\n                    .Where(t => t.IsPublic)\r\n                    .OrderByDescending(t => t.IsOfficial)\r\n                    .ThenByDescending(t => t.UsageCount)\r\n                    .ThenBy(t => t.IsPromoTag)\r\n                    .ThenBy(t => t.Libelle)\r\n                    .Select(t => new NFTag\r\n                    {\r\n                        id = t.Id,\r\n                        libelle = t.Libelle,\r\n                        is_promo_tag = t.IsPromoTag,\r\n                        is_official = t.IsOfficial,\r\n                        usage_count = t.UsageCount\r\n                    })\r\n                    .ToList();\r\n            });\r\n\r\n            return Ok(tags);\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve all tags that are marked as public, ordered by official status, usage count, promo tag status, and label.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "method",
+                        "param_name": "method",
+                        "param_desc": "GetAllTags - Retrieve all tags that are marked as public, ordered by official status, usage count, promo tag status, and label."
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve all tags that are marked as public, ordered by official status, usage count, promo tag status, and label.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"method\">GetAllTags - Retrieve all tags that are marked as public, ordered by official status, usage count, promo tag status, and label.</param>\n",
+            "code_chunks": null
+        },
+        {
+            "name": "GetAllForumTags",
+            "code_start_index": 4097,
+            "method_name": "GetAllForumTags",
+            "existing_summary": "\r\n        /// <summary>\r\n        /// Returns a list of all the tags used in the forum\r\n        /// </summary>\r\n        /// <returns></returns>\r\n        ",
+            "attributes": null,
+            "return_type": null,
+            "params": [],
+            "indent_level": 2,
+            "code": "{\r\n            var forumTags = TCache<List<NFTag>>.Get(CacheKeys.FORUM_TAGS_LIST, 3600, () =>\r\n            {\r\n                var tags = _db.ForumPostTags.AsNoTracking()\r\n                    .Include(fpt => fpt.Tag)\r\n                    .GroupBy(t => t.Tag.Id)\r\n                    .Select(t => t.FirstOrDefault())\r\n                    .Select(t => new NFTag\r\n                    {\r\n                        id = t.Tag.Id,\r\n                        libelle = t.Tag.Libelle,\r\n                        is_promo_tag = t.Tag.IsPromoTag,\r\n                        is_official = t.Tag.IsOfficial,\r\n                        usage_count = t.Tag.UsageCount\r\n                    })\r\n                    .OrderBy(t => t.libelle)\r\n                    .ToList();\r\n\r\n                return tags.Distinct(new TagsComparer()).ToList();\r\n            });\r\n\r\n            return Ok(forumTags);\r\n        }",
+            "is_async": false,
+            "is_task": false,
+            "is_ctor": false,
+            "is_static": false,
+            "is_abstract": false,
+            "is_override": false,
+            "is_virtual": false,
+            "is_sealed": false,
+            "is_new": false,
+            "_code_chunks": null,
+            "generated_summary": "Retrieve all forum tags with their respective information and return them in alphabetical order with no duplicates.",
+            "generated_parameters_summaries": {
+                "params_list": [
+                    {
+                        "name": "no",
+                        "param_name": "no",
+                        "param_desc": "no parameters"
+                    },
+                    {
+                        "name": "method_name",
+                        "param_name": "method_name",
+                        "param_desc": "The name of the method (e.g., 'GetAllForumTags')"
+                    },
+                    {
+                        "name": "method_purpose",
+                        "param_name": "method_purpose",
+                        "param_desc": "The purpose of the method (e.g., 'Retrieve all forum tags with their respective information and return them in alphabetical order with no duplicates.')"
+                    }
+                ]
+            },
+            "generated_return_summary": null,
+            "generated_xml_summary": "/// <summary>\n/// Retrieve all forum tags with their respective information and return them in alphabetical order with no duplicates.\n/// </summary>\n/// <param name=\"no\">no parameters</param>\n/// <param name=\"method_name\">The name of the method (e.g., 'GetAllForumTags')</param>\n/// <param name=\"method_purpose\">The purpose of the method (e.g., 'Retrieve all forum tags with their respective information and return them in alphabetical order with no duplicates.')</param>\n",
+            "code_chunks": null
+        }
+    ],
+    "properties": [],
+    "name": "TagsController"
+}

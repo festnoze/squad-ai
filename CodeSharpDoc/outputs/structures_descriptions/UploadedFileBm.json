@@ -1,0 +1,56 @@
+{
+    "file_path": "C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated/Common/UploadsController.cs",
+    "index_shift_code": 2271,
+    "struct_type": "Class",
+    "namespace_name": "LMS.Controllers.Common",
+    "usings": [
+        "LMS.Attributes",
+        "LMS.Authentication",
+        "LMS.Data",
+        "Newtonsoft.Json",
+        "Serilog",
+        "System",
+        "System.ComponentModel.DataAnnotations",
+        "System.Data.Entity",
+        "System.Threading.Tasks",
+        "System.Web.Http",
+        "System.Web.Http.Description"
+    ],
+    "access_modifier": "public",
+    "struct_name": "UploadedFileBm",
+    "base_class_name": "",
+    "interfaces_names": [],
+    "related_structures": [],
+    "methods": [],
+    "properties": [
+        {
+            "name": "FileHash",
+            "prop_name": "FileHash",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "FileName",
+            "prop_name": "FileName",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "FileUrl",
+            "prop_name": "FileUrl",
+            "prop_type": "string",
+            "is_property": true,
+            "is_field": false
+        },
+        {
+            "name": "FileSize",
+            "prop_name": "FileSize",
+            "prop_type": "long",
+            "is_property": true,
+            "is_field": false
+        }
+    ],
+    "name": "UploadedFileBm"
+}

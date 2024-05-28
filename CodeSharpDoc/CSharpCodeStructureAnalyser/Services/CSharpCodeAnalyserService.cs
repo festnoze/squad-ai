@@ -36,6 +36,19 @@ public static class CSharpCodeAnalyserService
                 structures.Add(CreateStructureDesc(decl, fileCode, filePath, structType!.Value));
         }
 
+        // Manually calculate the methods start index in file code
+        foreach (var structure in structures)
+        {
+            foreach (var method in structure.Methods)
+            {
+                var methodAndType = method.GetMethodReturnTypeAndName();
+                var methodStartIndex = fileCode.IndexOf(methodAndType);
+                if (methodStartIndex == -1)
+                    methodStartIndex = fileCode.IndexOf(method.MethodName);
+                method.CodeStartIndex = methodStartIndex;
+            }
+        }
+
         return structures;
     }
 
@@ -101,11 +114,6 @@ public static class CSharpCodeAnalyserService
         {
             // Handle Enum
         }
-
-        //foreach (var method in methods)
-        //{
-        //    method.CodeStartIndex = fullCode.IndexOf($"{method.AccessModifier} {method.ReturnType} {method.MethodName}(".Trim());// + method.Params.Join();
-        //}
 
         return new StructureDesc(
             filePath,
