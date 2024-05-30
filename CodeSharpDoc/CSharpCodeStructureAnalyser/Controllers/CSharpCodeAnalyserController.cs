@@ -14,8 +14,8 @@ public class CSharpCodeAnalyserController : ControllerBase
     [HttpPost]
     [ActionName("GetAnalysedCSharpCodeStructure")]
     [Route("from-folder")]
-    public IEnumerable<StructureDesc> GetAnalysedCSharpCodeFolder([FromBody] string folderPath)
+    public IEnumerable<StructureDesc> GetAnalysedCSharpCodeFolder([FromBody] List<string> filesPath)
     {
-        return CSharpCodeAnalyserService.AnalyzeFolder(folderPath);
+        return CSharpCodeAnalyserService.AnalyzeFiles(filesPath);
     }
 }

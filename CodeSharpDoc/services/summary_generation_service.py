@@ -25,16 +25,30 @@ class SummaryGenerationService:
     batch_size = 200
     using_json_output_parsing = True
 
-    @traceable #trace llm invoke through LangSmith
+    #@traceable #trace llm invoke through LangSmith
     @staticmethod
-    def generate_all_summaries_for_all_csharp_files_but_existing_and_save(file_path: str, existing_structs_desc: list[StructureDesc], llms_infos: list[LlmInfo]):  
+    def generate_all_summaries_for_all_new_csharp_files_and_save(file_path: str, existing_structs_desc: list[StructureDesc], llms_infos: list[LlmInfo]):  
         txt.activate_print = True
         llms = LangChainFactory.create_llms_from_infos(llms_infos)       
         paths_and_codes = file.get_files_paths_and_contents(file_path, 'cs')
-        CSharpHelper.remove_existing_summaries_from_all_files(paths_and_codes)
+        # Remove existing summaries from all files
+        existing_structs_file_paths = [struct.file_path for struct in existing_structs_desc]
+        removed_keys = [] 
+        for path in paths_and_codes.keys():
+            if path in existing_structs_file_paths:
+                removed_keys.append(path)
+        for key in removed_keys:
+            del paths_and_codes[key]
+
+        if len(paths_and_codes) == 0:
+            txt.print("No new C# files to process.")
+            return
         
         #structures_from_python = CSharpCodeStructureAnalyser.extract_code_structures_from_code_files(paths_and_codes)
-        structs_to_process = code_analyser_client.get_folder_files_code_structures(file_path, existing_structs_desc)
+        structs_to_process = code_analyser_client.analyse_code_structures_of(list(paths_and_codes.keys()))
+
+        CSharpHelper.remove_existing_summaries_from_all_files(paths_and_codes)
+        
         #SummaryGenerationService.copy_missing_infos(structures_from_python, known_structures)
         CSharpCodeStructureAnalyser.split_classes_methods_code(structs_to_process) 
 
@@ -111,6 +125,8 @@ class SummaryGenerationService:
     @staticmethod
     def add_generated_summaries_to_initial_code(struct_desc: StructureDesc, initial_code: str):
         for method_desc in struct_desc.methods[::-1]:
+            if method_desc.generated_xml_summary is None: 
+                continue
             index = method_desc.code_start_index
             if index == -1: continue
 
@@ -135,27 +151,27 @@ class SummaryGenerationService:
     @staticmethod
     def generate_methods_summaries_for_all_structures(llms: list[BaseChatModel], known_structures: list[StructureDesc]):
         txt.print_with_spinner(f"Ongoing parallel summaries generation for {SummaryGenerationService.methods_count(known_structures)} methods in {len(known_structures)} code files:")
-        SummaryGenerationService.generate_methods_summaries_for_all_classes(llms, known_structures)        
+        SummaryGenerationService.generate_methods_summaries_for_all_classes_or_records(llms, known_structures)        
         SummaryGenerationService.apply_to_interfaces_the_classes_generated_summaries(known_structures)
         txt.stop_spinner_replace_text("All methods' summaries generated successfully")
 
     @staticmethod
-    def generate_methods_summaries_for_all_classes(llm: BaseChatModel, known_structures: list[StructureDesc]):
-        all_classes = [s for s in known_structures if s.struct_type == StructureType.Class]
+    def generate_methods_summaries_for_all_classes_or_records(llm: BaseChatModel, known_structures: list[StructureDesc]):
+        all_classes_records = [s for s in known_structures if s.struct_type == StructureType.Class or s.struct_type == StructureType.Record]
         
-        SummaryGenerationService.generate_methods_summaries_only_all_classes(llm, known_structures, all_classes)
+        SummaryGenerationService.generate_methods_summaries_only_all_classes(llm, known_structures, all_classes_records)
         
         if SummaryGenerationService.using_json_output_parsing:
-            SummaryGenerationService.generate_all_classes_methods_parameters_desc_json_from_output_parser(llm, all_classes)
+            SummaryGenerationService.generate_all_classes_methods_parameters_desc_json_from_output_parser(llm, all_classes_records)
         else:
-            SummaryGenerationService.generate_all_classes_methods_parameters_desc_json_from_llm(llm, all_classes)
+            SummaryGenerationService.generate_all_classes_methods_parameters_desc_json_from_llm(llm, all_classes_records)
             
-        SummaryGenerationService.generate_methods_return_summaries_for_all_classes(llm, all_classes)
+        SummaryGenerationService.generate_methods_return_summaries_for_all_classes(llm, all_classes_records)
 
         #TODO: Generate a summary for the structures (classes, interfaces, etc) themselves
 
         # Assign to all methods a generated summary including method description, parameters description, and return type description
-        for class_struct in all_classes:
+        for class_struct in all_classes_records:
             for i in range(len(class_struct.methods)):
                 method = class_struct.methods[i]
                 xml_doc = CSharpXMLDocumentation(method.generated_summary, method.generated_parameters_summaries, method.generated_return_summary, None) #method.example
@@ -170,29 +186,48 @@ class SummaryGenerationService:
         SummaryGenerationService.apply_generated_summaries_to_classes_methods(known_structures, methods_summaries_prompts_by_classes, methods_summaries)
 
     @staticmethod
-    def generate_all_classes_methods_parameters_desc_json_from_output_parser(llms: list[BaseChatModel], all_classes):
-        action_name = 'Generate parameters descriptions (output parser)'
+    def apply_generated_summaries_to_classes_methods(known_structures, classes_methods_summaries_prompts: dict, methods_summaries):
+        i = 0
+        for class_name in classes_methods_summaries_prompts.keys():
+            class_struct = next((s for s in known_structures if s.struct_name == class_name), None)
+            if class_struct is None: raise Exception(f"Class {class_name} not found in loaded files")
+
+            for method in class_struct.methods:
+                method.generated_summary = methods_summaries[i]
+                i += 1
+
+    @staticmethod
+    def generate_all_classes_methods_parameters_desc_json_from_output_parser(llms: list[BaseChatModel], all_classes: list[StructureDesc]):
+        
+        # Create prompts for each method's parameters summary generation
+        prompts = []
         for class_struct in all_classes:
-            prompts = []
-            format_instructions = ''
             if len(class_struct.methods) > 0:
                 for method in class_struct.methods:
                     method_prompt, json_formatting_prompt = SummaryGenerationService.get_prompt_for_parameters_summaries(method)
                     prompt, output_parser = Llm.get_prompt_and_json_output_parser(method_prompt, MethodParametersDocumentationPydantic, MethodParametersDocumentation)
                     prompts.append(prompt)
 
-                methods_parameters_summaries = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(action_name, llms, output_parser, SummaryGenerationService.batch_size, *prompts)
+        # Invoke LLM by batch to generate summaries for all methods' parameters
+        action_name = 'Generate parameters descriptions (output parser)'
+        if len(prompts) == 0: return
+        
+        methods_parameters_summaries = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(action_name, llms, output_parser, SummaryGenerationService.batch_size, *prompts)
+        
+        # Assign generated parameters summaries to each method desc
+        current_method_index = 0
+        for class_struct in all_classes:
+            for method in class_struct.methods:
+                if type(methods_parameters_summaries[current_method_index]) is list:
+                    methods_parameters_summaries[current_method_index] = {'params_list': methods_parameters_summaries[current_method_index]}
+                if methods_parameters_summaries[current_method_index]:
+                    method.generated_parameters_summaries = MethodParametersDocumentation(**methods_parameters_summaries[current_method_index])
+                else:
+                    method.generated_parameters_summaries = MethodParametersDocumentation(params_list=[])
+                current_method_index += 1
 
-                for i in range(len(methods_parameters_summaries)):
-                    if type(methods_parameters_summaries[i]) is list:
-                        methods_parameters_summaries[i] = {'params_list': methods_parameters_summaries[i]}
-                    if methods_parameters_summaries[i]:
-                        methods_parameters_summaries[i] = MethodParametersDocumentation(**methods_parameters_summaries[i])
-                    else:
-                        methods_parameters_summaries[i] = MethodParametersDocumentation(params_list=[])
-
-                for method, method_params_summaries in zip(class_struct.methods, methods_parameters_summaries):
-                    method.generated_parameters_summaries = method_params_summaries
+        if current_method_index != len(methods_parameters_summaries):
+            raise Exception("Error: the number of generated parameters summaries don't match the number of methods in classes.")
 
     @staticmethod
     def generate_all_classes_methods_parameters_desc_json_from_llm(llms: list[BaseChatModel], all_classes):
@@ -237,18 +272,6 @@ class SummaryGenerationService:
             classes_methods_summaries_prompts[class_struct.struct_name] = class_methods_summaries_prompts
         return classes_methods_summaries_prompts
     
-    @staticmethod
-    def apply_generated_summaries_to_classes_methods(known_structures, classes_methods_summaries_prompts: dict, methods_summaries):
-        i = 0
-        for class_name in classes_methods_summaries_prompts.keys():
-            class_struct = next((s for s in known_structures if s.struct_name == class_name), None)
-            if class_struct is None: raise Exception(f"Class {class_name} not found in loaded files")
-
-            for method in class_struct.methods:
-                method.generated_summary = methods_summaries[i]
-                i += 1
-
-
     ctor_txt = "Take into account that this method is a constructor for the containing class of the same name."
     
     @staticmethod    

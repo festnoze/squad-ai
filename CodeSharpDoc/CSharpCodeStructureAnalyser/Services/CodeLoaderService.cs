@@ -6,13 +6,19 @@ namespace CSharpCodeStructureAnalyser.Services;
 
 public static class CodeLoaderService
 {
-    public static List<KeyValuePair<string, string>> LoadCsFiles(string folderPath)
+    public static List<KeyValuePair<string, string>> LoadCsFolderFiles(string folderPath)
+    {
+        var files = GetCsFiles(folderPath);
+        return LoadCsFiles(files);
+    }
+
+    public static List<KeyValuePair<string, string>> LoadCsFiles(List<string> filesPath)
     {
         List<KeyValuePair<string, string>> csFilesCode = new List<KeyValuePair<string, string>>();
-        var files = GetCsFiles(folderPath);
-        foreach (var filePath in files)
+        foreach (var filePath in filesPath)
+        {
             csFilesCode.Add(new KeyValuePair<string, string>(filePath, LoadFile(filePath)));
-        
+        }
         return csFilesCode;
     }
 

@@ -10,9 +10,9 @@ namespace CSharpCodeStructureAnalyser.Services;
 
 public static class CSharpCodeAnalyserService
 {
-    public static List<StructureDesc> AnalyzeFolder(string folderPath)
+    public static List<StructureDesc> AnalyzeFiles(List<string> filesPath)
     {
-        var csFilesCode = CodeLoaderService.LoadCsFiles(folderPath);
+        var csFilesCode = CodeLoaderService.LoadCsFiles(filesPath);
         var structures = new List<StructureDesc>();
 
         foreach (var file in csFilesCode)

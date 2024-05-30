@@ -4,3 +4,4 @@ class LangChainAdapterType(Enum):
     OpenAI = "OpenAI"
     Ollama = "Ollama"
     Groq = "Groq"
+    Google = "Google"

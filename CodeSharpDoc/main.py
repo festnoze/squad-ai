@@ -21,7 +21,8 @@ load_dotenv(find_dotenv())
 
 groq_api_key = os.getenv("GROQ_API_KEY")
 openai_api_key = os.getenv("OPEN_API_KEY")
-openai.api_key = openai_api_key
+google_api_key = os.getenv("GOOGLE_API_KEY")
+#openai.api_key = openai_api_key
 
 langsmith = Langsmith()
 langsmith.delete_all_project_sessions()
@@ -42,6 +43,8 @@ llms_infos = []
 #llms_infos.append(LlmInfo(type= LangChainAdapterType.Groq, model= "llama3-8b-8192",  timeout= 10, temperature = 0.5, api_key= groq_api_key))
 #llms_infos.append(LlmInfo(type= LangChainAdapterType.Groq, model= "llama3-70b-8192",  timeout= 20, temperature = 0.5, api_key= groq_api_key))
 
+#llms_infos.append(LlmInfo(type= LangChainAdapterType.Google, model= "gemini-pro",  timeout= 60, temperature = 0.5, api_key= google_api_key))
+
 llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0125",  timeout= 60, temperature = 0.5, api_key= openai_api_key))
 #llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo",  timeout= 60, temperature = 0.5, api_key= openai_api_key))
 llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo",  timeout= 120, temperature = 0.5, api_key= openai_api_key))
@@ -50,19 +53,19 @@ llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  t
 
 # Re-init. files which will be touched
 project_path = "C:/Dev/squad-ai/CodeSharpDoc"
-folder_code_path = f"{project_path}/inputs/code_files_generated"
+generated_code_path = f"{project_path}/inputs/code_files_generated"
+origin_code_path = f"{project_path}/inputs/code_files_saved"
 struct_desc_folder_subpath = "outputs/structures_descriptions"
 struct_desc_folder_path = project_path + "/" + struct_desc_folder_subpath
 
-file.delete_files_in_folder(folder_code_path)
-file.copy_folder_files_and_folders_to_folder("inputs/code_files_saved", folder_code_path)
-txt.activate_print = True # Activate print each step advancement
+file.delete_files_in_folder(generated_code_path)
+file.copy_folder_files_and_folders_to_folder(origin_code_path, generated_code_path)
+txt.activate_print = True # Activate print each step advancement in the console
 
 existing_structs_desc = SummaryGenerationService.load_struct_desc_from_folder(struct_desc_folder_path)
 
-# Generate summaries for all C# files
-if len(existing_structs_desc) > 0:
-    SummaryGenerationService.generate_all_summaries_for_all_csharp_files_but_existing_and_save(folder_code_path, existing_structs_desc, llms_infos)
+# Generate summaries for all new C# files
+SummaryGenerationService.generate_all_summaries_for_all_new_csharp_files_and_save(generated_code_path, existing_structs_desc, llms_infos)
 
 # Create the RAG service to search for methods by fonctionalities
 llm = LangChainFactory.create_llms_from_infos(llms_infos)[0]
