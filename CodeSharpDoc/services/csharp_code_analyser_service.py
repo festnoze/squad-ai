@@ -81,7 +81,7 @@ class CSharpCodeStructureAnalyser:
         for i in range(len(found_struct_separators)):
             if struct_type == 'class':
                 struct_desc = CSharpCodeStructureAnalyser.class_extract_methods_and_props(file_path, separator_indexes[i], namespace_name, usings, access_modifier, splitted_struct_contents[i+1])
-                CSharpCodeStructureAnalyser.split_class_methods_code(struct_desc, chunk_size, chunk_overlap) # split each method into chunks adapted to the LLM context window size
+                CSharpCodeStructureAnalyser.chunkify_code_of_class_methods(struct_desc, chunk_size, chunk_overlap) # split each method into chunks adapted to the LLM context window size
             elif struct_type == 'interface':
                 struct_desc = CSharpCodeStructureAnalyser.interface_extract_methods_and_props(file_path, separator_indexes[i], namespace_name, usings, access_modifier, splitted_struct_contents[i+1])
             elif struct_type == 'enum':
@@ -91,20 +91,25 @@ class CSharpCodeStructureAnalyser:
         return structs_descs
     
     
-    def split_classes_methods_code(classes_desc: list[StructureDesc], chunk_size:int = 8000, chunk_overlap: int = 0):
+    def chunkify_code_of_classes_methods(classes_desc: list[StructureDesc], chunk_size:int = 8000, chunk_overlap: int = 0):
         for class_desc in classes_desc:
-            CSharpCodeStructureAnalyser.split_class_methods_code(class_desc, chunk_size, chunk_overlap)
+            CSharpCodeStructureAnalyser.chunkify_code_of_class_methods(class_desc, chunk_size, chunk_overlap)
             
-    def split_class_methods_code(class_desc: StructureDesc, chunk_size:int = 8000, chunk_overlap: int = 0):
+    def chunkify_code_of_class_methods(class_desc: StructureDesc, chunk_size:int = 8000, chunk_overlap: int = 0):
         # split each method into chunks adapted to the LLM context window size
         chunk_count = 0
         for method in class_desc.methods:
-            method_chunks = CSharpCodeStructureAnalyser.split_method(method.code, chunk_size, chunk_overlap)
+            method_chunks = CSharpCodeStructureAnalyser.chunkify_method_code(method.code, chunk_size, chunk_overlap)
             if (len(method_chunks) < 2):
                 method.code_chunks = None
             else:
                 method.code_chunks = method_chunks
             chunk_count += len(method_chunks)
+
+    def chunkify_method_code(method_or_prop: str, chunk_size: int, chunk_overlap: int) -> list[str]:
+        csharp_splitter = RecursiveCharacterTextSplitter.from_language(language=Language.CSHARP, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+        return csharp_splitter.create_documents([method_or_prop])
+    
 
     def split_by_class_interface_enum_definition(code: str) -> tuple[list[str], list[str], list[int]]:
         struct_separators_array = [
@@ -230,10 +235,6 @@ class CSharpCodeStructureAnalyser:
         
     def is_interface_property(first_line) -> bool:
         return first_line.endswith(';') or first_line.endswith('; }') or first_line.endswith(';}')
-    
-    def split_method(method_or_prop: str, chunk_size: int, chunk_overlap: int) -> list[str]:
-        csharp_splitter = RecursiveCharacterTextSplitter.from_language(language=Language.CSHARP, chunk_size=chunk_size, chunk_overlap=chunk_overlap)
-        return csharp_splitter.create_documents([method_or_prop])
     
     def has_interfaces(first_line: str) -> bool:
         return ':' in first_line

@@ -11,7 +11,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.document_loaders import TextLoader
 from langchain_core.documents import Document
-from langchain_community.vectorstores import FAISS
+#from langchain_community.vectorstores import FAISS
 from langchain_chroma import Chroma
 from langchain_community.embeddings.sentence_transformer import SentenceTransformerEmbeddings
 from langchain.retrievers.multi_query import MultiQueryRetriever
@@ -39,24 +39,33 @@ def build_vectorstore(documents: List[str]):
     chunks = []
     for document in documents:
         chunks.extend(split_text_into_chunks(document))
-    db = Chroma.from_texts(texts= chunks, embedding = embeddings)
+    db = Chroma.from_texts(texts= chunks, embedding = embeddings, persist_directory="./chroma_db")
     return db
 
+def load_vectorstore():
+    embeddings = OpenAIEmbeddings(openai_api_key= os.getenv("OPEN_API_KEY"))
+    return Chroma(persist_directory= "./chroma_db", embedding_function=
+     embeddings)
+
 # Retrieve useful info similar to user query
-def retrieve(llm: BaseChatModel, vectorstore, question) -> List[Document]:
+def retrieve(llm: BaseChatModel, vectorstore, question: str, additionnal_context: str = None) -> List[Document]:
+    if additionnal_context:
+        full_question = f"### User Question:\n {question}\n\n### Context:\n{additionnal_context}" 
+    else:
+        full_question = question
 
     retriever_from_llm = MultiQueryRetriever.from_llm(
-        retriever=vectorstore.as_retriever(), llm=llm
-    )
-    unique_docs = retriever_from_llm.get_relevant_documents(query=question)
-    unique_docs = vectorstore.similarity_search(question)
+        retriever=vectorstore.as_retriever(), llm=llm)
+    unique_docs = retriever_from_llm.invoke(input==full_question)
+    #unique_docs = vectorstore.similarity_search(full_question)
     return unique_docs
     
 def generate_response_from_retrieval(llm: BaseChatModel, retriever, question):
     template = f"""\
     # Instructions #
     Answer to the user question the best you can, only based on the context provided. Always give a full quote of the source(s) you used from the context to answer the question. 
-    If none informations from the context seems relevant enough to answer the question properly, just answer: 'I didn't find any source of information relevant enough to answer the question properly'.
+    If none informations from the context is relevant to answer the question properly, just answer: 'I didn't find any source of information relevant enough to answer the question properly', 
+    else provide a summary of the requested information and fully quote the source you get it from.
     
     # User Question #
     {question}
@@ -66,8 +75,6 @@ def generate_response_from_retrieval(llm: BaseChatModel, retriever, question):
     rag_custom_prompt = ChatPromptTemplate.from_template(template)
 
     context = "\n".join(doc.page_content for doc in retriever)
-    rag_chain = (
-        rag_custom_prompt | llm | RunnablePassthrough()
-    )
+    rag_chain = rag_custom_prompt | llm | RunnablePassthrough()
     answer = rag_chain.invoke(input= context)
     return answer

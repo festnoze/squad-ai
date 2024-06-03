@@ -27,30 +27,20 @@ class SummaryGenerationService:
 
     #@traceable #trace llm invoke through LangSmith
     @staticmethod
-    def generate_all_summaries_for_all_new_csharp_files_and_save(file_path: str, existing_structs_desc: list[StructureDesc], llms_infos: list[LlmInfo]):  
+    def generate_and_save_all_summaries_all_csharp_files_from_folder(file_path: str, existing_structs_desc: list[StructureDesc], llms_infos: list[LlmInfo]):  
         txt.activate_print = True
         llms = LangChainFactory.create_llms_from_infos(llms_infos)       
-        paths_and_codes = file.get_files_paths_and_contents(file_path, 'cs')
-        # Remove existing summaries from all files
-        existing_structs_file_paths = [struct.file_path for struct in existing_structs_desc]
-        removed_keys = [] 
-        for path in paths_and_codes.keys():
-            if path in existing_structs_file_paths:
-                removed_keys.append(path)
-        for key in removed_keys:
-            del paths_and_codes[key]
+        paths_and_codes = file.get_files_paths_and_contents(file_path, 'cs')        
+        SummaryGenerationService.remove_already_analysed_files(existing_structs_desc, paths_and_codes)
+        if len(paths_and_codes) == 0: return
 
-        if len(paths_and_codes) == 0:
-            txt.print("No new C# files to process.")
-            return
-        
         #structures_from_python = CSharpCodeStructureAnalyser.extract_code_structures_from_code_files(paths_and_codes)
         structs_to_process = code_analyser_client.analyse_code_structures_of(list(paths_and_codes.keys()))
 
         CSharpHelper.remove_existing_summaries_from_all_files(paths_and_codes)
         
         #SummaryGenerationService.copy_missing_infos(structures_from_python, known_structures)
-        CSharpCodeStructureAnalyser.split_classes_methods_code(structs_to_process) 
+        CSharpCodeStructureAnalyser.chunkify_code_of_classes_methods(structs_to_process) 
 
         SummaryGenerationService.generate_methods_summaries_for_all_structures(llms, structs_to_process)        
         JsonHelper.save_as_json_files(structs_to_process, 'outputs\\structures_descriptions')
@@ -60,6 +50,16 @@ class SummaryGenerationService:
         
         txt.print("\nDone.")
         txt.print("---------------------------")
+
+    @staticmethod
+    def remove_already_analysed_files(existing_structs_desc, paths_and_codes):
+        existing_structs_file_paths = [struct.file_path for struct in existing_structs_desc]
+        removed_keys = [] 
+        for path in paths_and_codes.keys():
+            if path in existing_structs_file_paths:
+                removed_keys.append(path)
+        for key in removed_keys:
+            del paths_and_codes[key]
 
     def load_struct_desc_from_folder(folder_path: str):
         json_files = file.get_files_paths_and_contents(folder_path, 'json')

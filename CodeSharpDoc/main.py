@@ -51,7 +51,8 @@ llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo
 #llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout= 60, temperature = 1, api_key= openai_api_key))
 llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout= 80, temperature = 0.1, api_key= openai_api_key))
 
-# Re-init. files which will be touched
+
+# Re-initialize files which will be touched
 project_path = "C:/Dev/squad-ai/CodeSharpDoc"
 generated_code_path = f"{project_path}/inputs/code_files_generated"
 origin_code_path = f"{project_path}/inputs/code_files_saved"
@@ -65,24 +66,27 @@ txt.activate_print = True # Activate print each step advancement in the console
 existing_structs_desc = SummaryGenerationService.load_struct_desc_from_folder(struct_desc_folder_path)
 
 # Generate summaries for all new C# files
-SummaryGenerationService.generate_all_summaries_for_all_new_csharp_files_and_save(generated_code_path, existing_structs_desc, llms_infos)
+SummaryGenerationService.generate_and_save_all_summaries_all_csharp_files_from_folder(generated_code_path, existing_structs_desc, llms_infos)
 
-# Create the RAG service to search for methods by fonctionalities
-llm = LangChainFactory.create_llms_from_infos(llms_infos)[0]
+# Create the RAG service on methods summaries vector database
+llm = LangChainFactory.create_llms_from_infos(llms_infos)[-1]
 rag = RAGService(llm)
-docs = []
-structs_str = file.get_files_contents(struct_desc_folder_path, 'json')
-for struct_str in structs_str:
-    struct = json.loads(struct_str)
-    for method in struct['methods']:
-        desc = f"In {struct['struct_type']} '{struct['struct_name']}', method named: '{method['method_name']}' does: '{method['generated_summary']}'"
-        docs.append(desc)
-json_struct = rag.import_data(docs)
+if input("Do you to rebuild vectorstore from analysed structs? (y/_) ") == 'y':
+    docs = rag.load_structures_summaries(struct_desc_folder_path)
+    count = rag.build_vectorstore_from(docs)
+    print(f"Vector store built with {count} items")
+else:
+    count = rag.load_vectorstore()
+    print(f"Vector store loaded with {count} items")
+
 query = input("What are you looking for? ")
+additionnal_context = file.get_as_str("inputs/rag_query_code_additionnal_instructions.txt")
+
 while query != '':
-    answer, documents = rag.query(query)
+    answer, documents = rag.query(query, additionnal_context)
     print(answer)
-    for document in documents:
-        print('- ' + document.page_content)
+    if input("Do you want to see the sources? (y/_) ") == 'y':
+        for document in documents:
+            print('- ' + document.page_content)
     query = input("What are you looking for? ")
 print ("End program")
