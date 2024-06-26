@@ -1,3 +1,7 @@
+inputs/
+outputs/
+chroma_db/
+
 .env
 *.pyc
 *.exe
