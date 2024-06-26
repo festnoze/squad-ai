@@ -1,7 +1,5 @@
 import json
 from typing import List
-
-from langchain.tools import tool
 from langchain.pydantic_v1 import BaseModel, Field
 
 from helpers.txt_helper import txt
@@ -18,7 +16,7 @@ class MethodParametersDocumentation:
         Args:
             **kwargs (dict): A dictionary containing the parameters list as a list of ParameterDocumentation objects, or no parameters to init. an empty object.
         """
-        if len(kwargs) > 1:
+        if len(kwargs) > 1 and 'params_list' not in kwargs:
             raise ValueError('Invalid arguments: accepts either no arguments, or a list of ParameterDocumentation objects, or a dictionary containing parameter name and description.')
         
         self.params_list: List[ParameterDocumentation] = []

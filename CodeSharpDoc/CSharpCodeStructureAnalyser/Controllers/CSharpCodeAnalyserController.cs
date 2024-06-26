@@ -13,9 +13,26 @@ public class CSharpCodeAnalyserController : ControllerBase
 
     [HttpPost]
     [ActionName("GetAnalysedCSharpCodeStructure")]
-    [Route("from-folder")]
+    [Route("analyse/from-folder")]
     public IEnumerable<StructureDesc> GetAnalysedCSharpCodeFolder([FromBody] List<string> filesPath)
     {
         return CSharpCodeAnalyserService.AnalyzeFiles(filesPath);
+    }
+
+    [HttpPost]
+    [ActionName("AddSummariesToCSharpCodeFiles")]
+    [Route("add-summaries/to-structures")]
+    public void AddSummariesToCSharpCodeFiles([FromBody]List<StructSummariesInfos> structuresSummaries)
+    {
+        CodeEditionService.AddGeneratedSummariesToCodeFilesAndSave(structuresSummaries);
+    }
+
+
+    [HttpPost]
+    [ActionName("AddSummariesToCSharpCodeFiles")]
+    [Route("add-summaries/from-fake")]
+    public void AddFake()
+    {
+        var tmp = 0;
     }
 }

@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import glob
@@ -20,6 +21,12 @@ class file:
         except Exception as e:
             print(f"Error happends while reading file: {filename}: {e}")
             return None
+        
+    def get_as_json(file_path):
+        """Get the specified file content as a JSON object."""
+        with open(f"inputs\\{file_path}", 'r') as file:
+            data = json.load(file)
+        return data
         
     def write_file(content, path, filename):
         """

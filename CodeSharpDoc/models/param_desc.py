@@ -86,6 +86,9 @@ class ParameterDesc(BaseDesc):
     def to_json(self):
         return json.dumps(self.__dict__, cls=ParamDescEncoder)
     
+    def to_dict(self):
+        return {key: value for key, value in self.__dict__.items()}
+    
     def to_str(self):
         if self.default_value:
             return f"{self.param_type} {self.param_name} = {self.default_value}"

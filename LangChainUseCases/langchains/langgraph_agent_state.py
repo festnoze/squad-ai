@@ -7,7 +7,7 @@ class AgentState(TypedDict):
    # The input string
    input: str
    # The list of previous messages in the conversation
-   chat_history: Annotated[Sequence[BaseMessage], operator.add]
+   messages: Annotated[Sequence[BaseMessage], operator.add]
    # The outcome of a given call to the agent
    # Needs `None` as a valid type, since this is what this will start as
    agent_outcome: Union[AgentAction, AgentFinish, None]

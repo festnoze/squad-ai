@@ -12,6 +12,7 @@ from helpers.llm_helper import Llm
 from models.llm_info import LlmInfo
 from models.method_desc import MethodDesc
 from models.params_doc import MethodParametersDocumentation, MethodParametersDocumentationPydantic
+from models.struct_summaries_infos import MethodSummaryInfo, StructSummariesInfos
 from models.structure_desc import StructureDesc
 from models.structure_types import StructureType
 from services.code_analyser_client import code_analyser_client
@@ -30,26 +31,52 @@ class SummaryGenerationService:
     def generate_and_save_all_summaries_all_csharp_files_from_folder(file_path: str, existing_structs_desc: list[StructureDesc], llms_infos: list[LlmInfo]):  
         txt.activate_print = True
         llms = LangChainFactory.create_llms_from_infos(llms_infos)       
-        paths_and_codes = file.get_files_paths_and_contents(file_path, 'cs')        
+        paths_and_codes = file.get_files_paths_and_contents(file_path, 'cs')
+        CSharpHelper.remove_existing_summaries_from_all_code_files_and_save(paths_and_codes)  
+        paths_and_codes = {}
+        paths_and_codes = file.get_files_paths_and_contents(file_path, 'cs')
+        
         SummaryGenerationService.remove_already_analysed_files(existing_structs_desc, paths_and_codes)
         if len(paths_and_codes) == 0: return
 
         #structures_from_python = CSharpCodeStructureAnalyser.extract_code_structures_from_code_files(paths_and_codes)
-        structs_to_process = code_analyser_client.analyse_code_structures_of(list(paths_and_codes.keys()))
-
-        CSharpHelper.remove_existing_summaries_from_all_files(paths_and_codes)
+        structs_to_process = code_analyser_client.parse_and_analyse_code_files(list(paths_and_codes.keys()))
         
         #SummaryGenerationService.copy_missing_infos(structures_from_python, known_structures)
         CSharpCodeStructureAnalyser.chunkify_code_of_classes_methods(structs_to_process) 
 
-        SummaryGenerationService.generate_methods_summaries_for_all_structures(llms, structs_to_process)        
-        JsonHelper.save_as_json_files(structs_to_process, 'outputs\\structures_descriptions')
+        SummaryGenerationService.generate_methods_summaries_for_all_structures(llms, structs_to_process) 
+
+        structs_summaries_infos = SummaryGenerationService.create_struct_summaries_infos(structs_to_process)
+        code_analyser_client.add_summaries_to_code_files(structs_summaries_infos)
+        # paths_and_new_codes = SummaryGenerationService.include_generated_summaries_to_codes(paths_and_codes, structs_to_process)
+        # file.save_contents_within_files(paths_and_new_codes)      
         
-        paths_and_new_codes = SummaryGenerationService.include_generated_summaries_to_codes(paths_and_codes, structs_to_process)
-        file.save_contents_within_files(paths_and_new_codes)
+        #JsonHelper.save_as_json_files(structs_to_process, 'outputs\\structures_descriptions')
         
         txt.print("\nDone.")
         txt.print("---------------------------")
+
+    @staticmethod
+    def create_struct_summaries_infos(structure_descs: list[StructureDesc]) -> list[StructSummariesInfos]:
+        struct_summaries_list : list[StructSummariesInfos] = []
+        for struct_desc in structure_descs:
+            method_summaries = [
+                MethodSummaryInfo(method.code_start_index, method.generated_xml_summary)
+                for method in struct_desc.methods
+            ]
+
+            struct_summary_info = StructSummariesInfos(
+                file_path=struct_desc.file_path,
+                index_shift_code=struct_desc.index_shift_code,
+                indent_level=struct_desc.indent_level,
+                generated_summary=struct_desc.generated_summary,
+                methods=method_summaries
+            )
+
+            struct_summaries_list.append(struct_summary_info)
+
+        return struct_summaries_list
 
     @staticmethod
     def remove_already_analysed_files(existing_structs_desc, paths_and_codes):
@@ -109,11 +136,10 @@ class SummaryGenerationService:
                     method.generated_xml_summary = class_method.generated_xml_summary
 
     @staticmethod
-    def include_generated_summaries_to_codes(paths_and_codes, structures_descriptions):        
+    def include_generated_summaries_to_codes(paths_and_codes, structures_descriptions):
+        paths_and_new_codes = {}        
         txt.print_with_spinner(f"Include summaries into the existing {len(paths_and_codes)} code files:")
-        paths_and_codes_list = [(path, code) for path, code in paths_and_codes.items()]
-        paths_and_new_codes = {}
-        
+
         for structure_description in structures_descriptions:
             code = paths_and_codes[structure_description.file_path]
             new_code = SummaryGenerationService.add_generated_summaries_to_initial_code(structure_description, code)
@@ -123,22 +149,30 @@ class SummaryGenerationService:
         return paths_and_new_codes
 
     @staticmethod
-    def add_generated_summaries_to_initial_code(struct_desc: StructureDesc, initial_code: str):
+    def add_generated_summaries_to_initial_code(struct_desc: StructureDesc, code: str):
+        # Add methods summaries to the code
         for method_desc in struct_desc.methods[::-1]:
             if method_desc.generated_xml_summary is None: 
                 continue
             index = method_desc.code_start_index
             if index == -1: continue
 
-            if method_desc.attributes and len(method_desc.attributes) > 0: # has attributes
-                index = initial_code[:index].rfind(method_desc.attributes[0])
+            # if method_desc.attributes and len(method_desc.attributes) > 0: # has attributes
+            #     index = initial_code[:index].rfind(method_desc.attributes[0])
 
-            special_shift = 1
-            index = initial_code[:index].rfind('\n') + special_shift
+            # special_shift = 1
+            # index = initial_code[:index].rfind('\n') + special_shift
 
             method_summary = '\n' + txt.indent(method_desc.indent_level, method_desc.generated_xml_summary)
-            initial_code = initial_code[:index] + method_summary + initial_code[index:]
-        return initial_code
+            #print(code[index:index+100])
+            code = code[:index] + method_summary + code[index:]
+
+        # Add global structure summay to the code
+        if struct_desc.generated_summary is not None:
+            global_summary = '\n' + txt.indent(struct_desc.indent_level, struct_desc.generated_summary)
+            code = code[:struct_desc.index_shift_code] + global_summary + code[struct_desc.index_shift_code:]
+        
+        return code
 
     @staticmethod
     def get_classes_flatten_prompts(all_classes: list[StructureDesc], classes_methods_summaries_prompts: dict):
@@ -151,12 +185,12 @@ class SummaryGenerationService:
     @staticmethod
     def generate_methods_summaries_for_all_structures(llms: list[BaseChatModel], known_structures: list[StructureDesc]):
         txt.print_with_spinner(f"Ongoing parallel summaries generation for {SummaryGenerationService.methods_count(known_structures)} methods in {len(known_structures)} code files:")
-        SummaryGenerationService.generate_methods_summaries_for_all_classes_or_records(llms, known_structures)        
+        SummaryGenerationService.generate_methods_summaries_for_all_classes(llms, known_structures)        
         SummaryGenerationService.apply_to_interfaces_the_classes_generated_summaries(known_structures)
         txt.stop_spinner_replace_text("All methods' summaries generated successfully")
 
     @staticmethod
-    def generate_methods_summaries_for_all_classes_or_records(llm: BaseChatModel, known_structures: list[StructureDesc]):
+    def generate_methods_summaries_for_all_classes(llm: BaseChatModel, known_structures: list[StructureDesc]):
         all_classes_records = [s for s in known_structures if s.struct_type == StructureType.Class or s.struct_type == StructureType.Record]
         
         SummaryGenerationService.generate_methods_summaries_only_all_classes(llm, known_structures, all_classes_records)
@@ -168,7 +202,8 @@ class SummaryGenerationService:
             
         SummaryGenerationService.generate_methods_return_summaries_for_all_classes(llm, all_classes_records)
 
-        #TODO: Generate a summary for the structures (classes, interfaces, etc) themselves
+        # Generate the global summary for the structures (classes, interfaces, etc) themselves        
+        SummaryGenerationService.generate_classes_global_summaries(llm, all_classes_records)
 
         # Assign to all methods a generated summary including method description, parameters description, and return type description
         for class_struct in all_classes_records:
@@ -262,6 +297,18 @@ class SummaryGenerationService:
                     return_index += 1
 
     @staticmethod
+    def generate_classes_global_summaries(llms: list[BaseChatModel], all_classes: list[StructureDesc]):
+        action_name = 'Generate classes global descriptions'
+        class_prompts = []
+        for class_struct in all_classes:
+            class_prompts.append(SummaryGenerationService.get_prompt_for_class_summary(class_struct))
+        classes_summaries = Llm.invoke_parallel_prompts(action_name, llms, *class_prompts)
+            
+        # Apply classes generated summaries to all classes
+        for i in range(len(all_classes)):
+            all_classes[i].generated_summary = CSharpXMLDocumentation(classes_summaries[i]).to_xml()
+
+    @staticmethod
     def generate_methods_summary_prompts_by_class(all_classes: list[StructureDesc]):
         classes_methods_summaries_prompts = {}
         for class_struct in all_classes: 
@@ -327,4 +374,14 @@ class SummaryGenerationService:
             Instructions: You always begin with: 'Returns ' then generate a description of the return value. The description must be very short and synthetic (less than 15 words)
             The method name is: '{method.method_name}', {SummaryGenerationService.ctor_txt if method.is_ctor else ""} and to help you understand the purpose of the method, method summary is: '{method.generated_summary}'.
             The list of parameters is: '{params_list_str}'.""")
+        return prompt
+
+    @staticmethod                   
+    def get_prompt_for_class_summary(class_desc: StructureDesc) -> str:
+        prompt = txt.single_line(f"""\
+            Instructions: Create a global description for the following C# class (or record) which will be used as its summary.
+            The description must be very short and synthetic (one or two sentences maximum).
+            The class name is: '{class_desc.struct_name}'.
+            To help you understand the global purpose of this class/record, hereinafter is listed all its exposed methods with theirs names and respective summaries :
+            - {'\n- '.join([f'{method.method_name}: {method.generated_summary}.' for method in class_desc.methods])}""")
         return prompt

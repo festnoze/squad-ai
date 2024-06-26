@@ -1,35 +1,77 @@
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.CSharp;
-using Newtonsoft.Json;
 using Microsoft.CodeAnalysis;
+using System.Text.Json.Serialization;
+using Newtonsoft.Json;
 
 namespace CSharpCodeStructureAnalyser.Models;
 
 public record MethodDesc : BaseDesc
 {
+    [JsonPropertyName("code_start_index")]
     public int CodeStartIndex { get; set; }
+
+    [JsonPropertyName("existing_summary")]
     public string ExistingSummary { get; set; }
+
+    [JsonPropertyName("access_modifier")]
     public string AccessModifier { get; set; }
+
+    [JsonPropertyName("attributs")]
     public List<string> Attributes { get; set; }
+
+    [JsonPropertyName("method_name")]
+    public string MethodName { get; set; }
+
+    [JsonPropertyName("method_return_type")]
     public string ReturnType { get; set; }
+
+    [JsonPropertyName("params")]
     public List<ParameterDesc> Params { get; set; }
+
+    [JsonPropertyName("indent_level")]
     public int IndentLevel { get; set; }
+
+    [JsonPropertyName("code")]
     public string Code { get; set; }
+
+    [JsonPropertyName("is_async")]
     public bool IsAsync { get; set; }
+
+    [JsonPropertyName("is_task")]
     public bool IsTask { get; set; }
+
+    [JsonPropertyName("is_ctor")]
     public bool IsCtor { get; set; }
+
+    [JsonPropertyName("is_static")]
     public bool IsStatic { get; set; }
+
+    [JsonPropertyName("is_abstract")]
     public bool IsAbstract { get; set; }
+
+    [JsonPropertyName("is_override")]
     public bool IsOverride { get; set; }
+
+    [JsonPropertyName("is_virtual")]
     public bool IsVirtual { get; set; }
+
+    [JsonPropertyName("is_sealed")]
     public bool IsSealed { get; set; }
+
+    [JsonPropertyName("is_new")]
     public bool IsNew { get; set; }
 
-    public List<string> CodeChunks;
+    [JsonPropertyName("code_chunks")]
+    public List<string> CodeChunks { get; set; }
+
+    [JsonPropertyName("generated_xml_summary")]
     public string GeneratedXmlSummary { get; set; }
+
+    [JsonPropertyName("summary")]
     public string Summary { get; set; }
-    public string MethodName { get; set; }
+
 
     public MethodDesc(
         int codeStartIndex,
@@ -119,9 +161,9 @@ public record MethodDesc : BaseDesc
         return methodSignature;
     }
 
-    public string GetMethodReturnTypeAndName()
+    public string GetMethodSignatureStart()
     {
-        return $" {ReturnType} {MethodName}(";
+        return $"{AccessModifier} {ReturnType} {MethodName}(".Trim();
     }
 
     private string Indent(int level)
@@ -143,9 +185,10 @@ public record MethodDesc : BaseDesc
         // detect the indentation level of the method 
         var indentLevel = method.GetLeadingTrivia().ToString().Split('\n').Last().Count(c => c == ' ')/4;
         var accessModifier = method.Modifiers.FirstOrDefault(m => m.IsKind(SyntaxKind.PublicKeyword) || m.IsKind(SyntaxKind.ProtectedKeyword) || m.IsKind(SyntaxKind.PrivateKeyword) || m.IsKind(SyntaxKind.InternalKeyword)).ToString() ?? SyntaxKind.PrivateKeyword.ToString();
- 
+        var methodStartIndex = method.FullSpan.Start;
+
         return new MethodDesc(
-            method.FullSpan.Start,
+            methodStartIndex,
             method.GetLeadingTrivia().ToString(),
             accessModifier,
             method.AttributeLists.SelectMany(a => a.Attributes).Select(a => a.ToString()).ToList(),
@@ -164,22 +207,6 @@ public record MethodDesc : BaseDesc
             method.Modifiers.Any(m => m.IsKind(SyntaxKind.SealedKeyword)),
             method.Modifiers.Any(m => m.IsKind(SyntaxKind.NewKeyword))
         );
-    }
-
-    private static List<string> DetectAttributes(string code)
-    {
-        var attributes = new List<string>();
-        var attributePattern = @"\[\s*(.*?)\s*\]";
-        var lines = code.Split('\n');
-        foreach (var line in lines)
-        {
-            var matches = Regex.Matches(line, attributePattern);
-            foreach (Match match in matches)
-            {
-                attributes.Add(match.Value);
-            }
-        }
-        return attributes;
     }
 
     public string ToJson()

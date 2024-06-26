@@ -1,35 +1,77 @@
+using System.Text.Json.Serialization;
+
 namespace CSharpCodeStructureAnalyser.Models;
 
 public record StructureDesc : BaseDesc
 {
+    [JsonPropertyName("file_path")]
     public string FilePath { get; set; }
+
+    [JsonPropertyName("index_shift_code")]
     public int IndexShiftCode { get; set; }
+
+    [JsonPropertyName("indent_level")]
+    public int IndentLevel { get; set; }
+
+    [JsonPropertyName("struct_type")]
     public StructureType StructType { get; set; }
+
+    [JsonPropertyName("namespace_name")]
     public string NamespaceName { get; set; }
+
+    [JsonPropertyName("usings")]
     public List<string> Usings { get; set; }
+
+    [JsonPropertyName("access_modifier")]
     public string AccessModifier { get; set; }
+
+    [JsonPropertyName("struct_name")]
     public string StructName { get; set; }
+
+    [JsonPropertyName("base_class_name")]
     public string BaseClassName { get; set; }
+
+    [JsonPropertyName("existing_summary")]
+    public string ExistingSummary { get; set; }
+
+    [JsonPropertyName("interfaces_names")]
     public List<string> InterfacesNames { get; set; }
+
+    [JsonPropertyName("attributs")]
+    public List<string> Attributs { get; set; }
+
+    [JsonPropertyName("related_structures")]
     public List<StructureDesc> RelatedStructures { get; set; }
+
+    [JsonPropertyName("methods")]
     public List<MethodDesc> Methods { get; set; }
+
+    [JsonPropertyName("properties")]
     public List<PropertyDesc> Properties { get; set; }
+
+    [JsonPropertyName("generated_summary")]
+    public string? GeneratedSummary { get; set; }
 
     public StructureDesc(
         string filePath, 
-        int indexShiftCode, 
+        int indexShiftCode,
+        int indentLevel,
         StructureType structType, 
         string namespaceName, 
         List<string> usings, 
         string structName, 
         string accessModifier, 
         string baseClassName, 
-        List<string> interfacesNames = null!, 
+        List<string> interfacesNames = null!,
+        string existingSummary = "",
+        List<string> attributs = null!,
         List<MethodDesc> methods = null!, 
-        List<PropertyDesc> properties = null!) : base(structName)
+        List<PropertyDesc> properties = null!,
+        string? generatedSummary = null) : base(structName)
     {
         FilePath = filePath;
         IndexShiftCode = indexShiftCode;
+        IndentLevel = indentLevel;
         StructType = structType;
         NamespaceName = namespaceName;
         Usings = usings ?? new List<string>();
@@ -37,9 +79,12 @@ public record StructureDesc : BaseDesc
         StructName = structName;
         BaseClassName = baseClassName;
         InterfacesNames = interfacesNames ?? new List<string>();
+        ExistingSummary = existingSummary;
+        Attributs = attributs ?? new List<string>();
         RelatedStructures = new List<StructureDesc>();
         Methods = methods ?? new List<MethodDesc>();
         Properties = properties ?? new List<PropertyDesc>();
+        GeneratedSummary = generatedSummary;
     }
 
     public string ToJson()

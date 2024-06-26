@@ -8,3 +8,6 @@ langchain_core
 langchain_openai
 langchain_groq
 langsmith
+langchain-anthropic
+langchain_chroma
+google-generativeai

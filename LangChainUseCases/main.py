@@ -1,12 +1,20 @@
 # internal import
+from csharp_code_reviewer import CSharpCodeReviewer
+from function_call_examples import FunctionCallExamples
 from helpers.file_helper import file
-from helpers.langgraph_tests import LangGraphTest1
+from helpers.langgraph_llm_generated_code_execution import LangGraphLlmGeneratedCodeExecution
+from helpers.langgraph_tools_supervisor import LangGraphToolsSupervisor
 from helpers.llm_helper import Llm
 from helpers.test_helpers import test_agent_executor_with_tools, test_parallel_chains_invocations_with_imputs, test_parallel_invocations_with_homemade_parallel_chains_invocations, test_parallel_invocations_with_homemade_parallel_prompts_invocations
 from helpers.tools_helpers import MathToolBox, RandomToolBox, WordsToolBox
 from helpers.txt_helper import txt
 from langchains.langchain_factory import LangChainFactory
 from langchains.langchain_adapter_type import LangChainAdapterType
+from langchains.langgraph_agent_state import AgentState
+from langchains.langsmith_client import Langsmith
+from langchain_community.callbacks import get_openai_callback, OpenAICallbackHandler
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from models.llm_info import LlmInfo
 from summarize import Summarize
 from helpers.groq_helper import GroqHelper
@@ -16,125 +24,99 @@ import openai
 import os
 from dotenv import find_dotenv, load_dotenv
 import yfinance as yf
-from langchain_community.callbacks import get_openai_callback, OpenAICallbackHandler
-
-# Text splitters
-from langchain.text_splitter import CharacterTextSplitter
-from langchain_community.document_loaders import TextLoader
 
 # Load environment variables from .env file
-print("Started")
+print("Starting...")
 
 load_dotenv(find_dotenv())
 
 # Set api keys
 groq_api_key = os.getenv("GROQ_API_KEY")
 openai_api_key = os.getenv("OPEN_API_KEY")
-openai.api_key = openai_api_key
+google_api_key = os.getenv("GOOGLE_API_KEY")
+anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
+#openai.api_key = openai_api_key
 
 # models = openai.models.list()
 # for model in models:
 #     print(model.id)
 # exit()
 
+
+langsmith = Langsmith()
+langsmith.create_project()
+
 # Select the LLM to be used
-llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo",  timeout= 60, api_key= openai_api_key)
-#llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo-2024-04-09",  timeout= 120, api_key= openai_api_key)
-#llm_infos = LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout= 60, api_key= openai_api_key)
+llms_infos = []
+#llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "phi3", timeout= 80, temperature = 0.5, api_key= None))
+#llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "llama2",  timeout= 200, temperature = 0.5, api_key= None))
+#llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "llama3", timeout= 200, temperature = 0.5, api_key= None))
+#llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "mistral",  timeout= 200, temperature = 0.5, api_key= None))
+#llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "mixtral",  timeout= 500, temperature = 0.5, api_key= None))
+#llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "dolphin-mixtral",  timeout= 400, temperature = 0.5, api_key= None))
+#llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "nous-hermes2", timeout= 200, temperature = 0.5, api_key= None))
+#llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "openhermes", timeout= 200, temperature = 0.5, api_key= None))
 
-#llm_infos = LlmInfo(type= LangChainAdapterType.Groq, model= "mixtral-8x7b-32768",  timeout= 20, api_key= groq_api_key)
-#llm_infos = LlmInfo(type= LangChainAdapterType.Groq, model= "llama3-8b-8192",  timeout= 10, api_key= groq_api_key)
-#llm_infos = LlmInfo(type= LangChainAdapterType.Groq, model= "llama3-70b-8192",  timeout= 20, api_key= groq_api_key)
+#llms_infos.append(LlmInfo(type= LangChainAdapterType.Groq, model= "mixtral-8x7b-32768",  timeout= 20, temperature = 0.5, api_key= groq_api_key))
+#llms_infos.append(LlmInfo(type= LangChainAdapterType.Groq, model= "llama3-8b-8192",  timeout= 10, temperature = 0.5, api_key= groq_api_key))
+#llms_infos.append(LlmInfo(type= LangChainAdapterType.Groq, model= "llama3-70b-8192",  timeout= 20, temperature = 0.5, api_key= groq_api_key))
 
-#llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "phi3", timeout= 20, api_key= None)
-#llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "llama3", timeout= 200, api_key= None)
-#llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "llama2",  timeout= 200, api_key= None)
-#llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "mistral",  timeout= 200, api_key= None)
-#llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "mixtral",  timeout= 500, api_key= None)
-#llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "dolphin-mixtral",  timeout= 400, api_key= None)
-#llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "nous-hermes2", timeout= 200, api_key= None)
-#llm_infos = LlmInfo(type= LangChainAdapterType.Ollama, model= "openhermes", timeout= 200, api_key= None)
+#llms_infos.append(LlmInfo(type= LangChainAdapterType.Google, model= "gemini-pro",  timeout= 60, temperature = 0.5, api_key= google_api_key))
 
-def run_main():
-    # Instanciate the LLM
-    llm = LangChainFactory.create_llm(
-        adapter_type= llm_infos.type,
-        llm_model_name= llm_infos.model,
-        timeout_seconds= llm_infos.timeout,
-        temperature= 1.0,
-        api_key= llm_infos.api_key)
+#llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-2",  timeout= 60, temperature = 0.5, api_key= anthropic_api_key))
+#llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-haiku-20240307",  timeout= 60, temperature = 0.5, api_key= anthropic_api_key))
+#llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-sonnet-20240229",  timeout= 60, temperature = 0.5, api_key= anthropic_api_key))
+#llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-opus-20240229",  timeout= 60, temperature = 0.5, api_key= anthropic_api_key))
+
+#llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0125",  timeout= 60, temperature = 0.5, api_key= openai_api_key))
+#llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo",  timeout= 60, temperature = 0.5, api_key= openai_api_key))
+#llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo",  timeout= 120, temperature = 0.5, api_key= openai_api_key))
+llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout= 60, temperature = 1, api_key= openai_api_key))
+llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout= 80, temperature = 0.1, api_key= openai_api_key))
+
+# Examples of resolution with agent and tools or code generation
+#FunctionCallExamples.resolve_using_llm_direct(llms_infos)
+#FunctionCallExamples.resolve_using_agent_executor_with_tools(llms_infos)
+#FunctionCallExamples.resolve_using_agent_with_tools(llms_infos)
+FunctionCallExamples.resolve_using_codeact_code_execution(llms_infos)
+
+# Test Groq through its own client (no langchain)
+#GroqHelper.test_query(llms_infos[0])
+
+# # Test code review
+# llms = LangChainFactory.create_llms_from_infos(llms_infos)
+# code_review = CSharpCodeReviewer(llms)
+# code = file.get_as_str("FunderIto.cs")
+# examples = langsmith.get_dataset_examples("ds-csharp-reviewer-01")
+# for example in examples:
+#     print(example["input"])
+#     print(example["output"])
+#     print("----")
+#     broken_rules = code_review.review_code(code)
+#     print(str(broken_rules))
     
-    prompt = """get a random number, add 7 to it, divide the result be three, round it to the nearest integer, convert this number in french word, 
-    then integrate this french word into a leet sentence speaking of giving a defined quantity of flowers to a beloved one.
-    The number of flowers is the previous number in french word. output the sentence in lower snake case."""
+# code_review.evaluate_code_review()
+# exit()
 
-    # print('Direct LLM resolution:')
-    # result = llm.invoke(prompt) 
-    # print(Llm.get_llm_answer_content(result))
-    # print('-----------------------------------')
+# Test parallel invocations
+llm = LangChainFactory.create_llms_from_infos(llms_infos)[0]
+test_parallel_invocations_with_homemade_parallel_prompts_invocations(llm)
+test_parallel_invocations_with_homemade_parallel_chains_invocations(llm)
+test_parallel_chains_invocations_with_imputs(llm)
 
-    print('LLM resolution with tools:')
-    tools = [
-        WordsToolBox.to_lowercase, RandomToolBox.get_random_number, WordsToolBox.number_to_french_words, 
-        WordsToolBox.text_to_leet, WordsToolBox.to_upper_snake_case, WordsToolBox.translate_in_spanish, 
-        MathToolBox.add, MathToolBox.divide, MathToolBox.round_int
-    ]   
-    WordsToolBox.llm = llm # set the llm to be used by the tools
-    result = Llm.invoke_llm_with_tools(llm, tools, prompt)    
-    print(Llm.get_llm_answer_content(result))
-    print('-----------------------------------')
+# Use web search tool
+from langchain_community.utilities import GoogleSerperAPIWrapper
+web_search = GoogleSerperAPIWrapper()
+res = web_search.run("what's Obama's first name?")
+print(res)
 
-    # Resolve using graph
-    LangGraphTest1.llm = llm
-    graph = LangGraphTest1.get_graph_1()
-    print('LLMResolution through workflow (with graph):')    
-    result = graph.invoke(prompt)
-    print(Llm.get_llm_answer_content(result))
-    print('-----------------------------------')
+## Use tools through agent executor
+test_agent_executor_with_tools(llm)
 
-    exit()
+# Summarize short text
+text = file.get_as_str("short-text.txt")
+res = Summarize.summarize_short_text(llm, text)
 
-    # Test Groq through its own client (no langchain)
-    GroqHelper.test_query(llm_infos)
-
-    # Test paralell invocations
-    test_parallel_invocations_with_homemade_parallel_prompts_invocations(llm)
-    test_parallel_invocations_with_homemade_parallel_chains_invocations(llm)
-    test_parallel_chains_invocations_with_imputs(llm)
-
-    ## Use web search tool
-    from langchain_community.utilities import GoogleSerperAPIWrapper
-    web_search = GoogleSerperAPIWrapper()
-    res = web_search.run("what's Obama's first name?")
-    print(res)
-
-    ## Use tools through agent executor
-    test_agent_executor_with_tools(llm)
-
-    # Summarize short text
-    text = file.get_as_str("short-text.txt")
-    res = Summarize.summarize_short_text(llm, text)
-
-    # Summarize long text
-    text = file.get_as_str("LLM agents PhD thesis full.txt")
-    res = Summarize.summarize_long_text(llm, text, 15000)
-
-def get_eur_usd_rate():
-    ticker = yf.Ticker("EURUSD=X")
-    data = ticker.history(period="1d")
-    rate = data["Close"].iloc[-1]
-    return rate
-
-def display_tokens_consumtion(cb: OpenAICallbackHandler):
-    max_len = max(len(str(cb.completion_tokens)), len(str(cb.prompt_tokens)), len(str(cb.total_tokens)))
-    print(f"Prompt Tokens:       {cb.prompt_tokens}")
-    print(f"Completion Tokens: + {cb.completion_tokens}")    
-    print(f"                     " + "-" * max_len)
-    print(f"Total Tokens:        {cb.total_tokens}")
-    print(f"Cost:                {cb.total_cost / get_eur_usd_rate():.3f}€ ({cb.total_cost:.3f}$)")
-    print(f"(Cost by 1M token:   {(1000000 * cb.total_cost / cb.total_tokens):.3f}$)")   
-
-with get_openai_callback() as openai_callback:
-    run_main()
-    if llm_infos.type == LangChainAdapterType.OpenAI:
-        display_tokens_consumtion(openai_callback)
+# Summarize long text
+text = file.get_as_str("LLM agents PhD thesis full.txt")
+res = Summarize.summarize_long_text(llm, text, 15000)

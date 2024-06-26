@@ -11,10 +11,11 @@ from models.structure_types import StructureType
 import json
 
 class StructureDesc(BaseDesc):
-    def __init__(self, file_path: str, index_shift_code: int, struct_type: StructureType, namespace_name: str, usings: list[str], struct_name: str, access_modifier: str, base_class_name: str, interfaces_names: list[str] = [], methods: list[MethodDesc] = [], properties: list[PropertyDesc] = []):
+    def __init__(self, file_path: str, index_shift_code: int, indent_level: int, struct_type: StructureType, namespace_name: str, usings: list[str], struct_name: str, access_modifier: str, base_class_name: str, interfaces_names: list[str] = [], existingSummary = '', attributs = None, methods: list[MethodDesc] = [], properties: list[PropertyDesc] = []):
         super().__init__(name=struct_name)
         self.file_path: str = file_path
         self.index_shift_code: int = index_shift_code
+        self.indent_level: int = indent_level
         self.struct_type: StructureType = struct_type
         self.namespace_name: str = namespace_name
         self.usings: list[str] = usings
@@ -22,9 +23,12 @@ class StructureDesc(BaseDesc):
         self.struct_name: str = struct_name
         self.base_class_name: str = base_class_name
         self.interfaces_names: list[str] = interfaces_names
+        self.existing_summary: str = existingSummary
+        self.attributs: List[str] = attributs if attributs is not None else []
         self.related_structures: list[StructureDesc] = []
         self.methods: list[MethodDesc] = methods
         self.properties: list[PropertyDesc] = properties
+        self.generated_summary: str = None
     
     def __init__(self, **kwargs):
         if len(kwargs) == 1 and 'params_list' in kwargs:
@@ -59,6 +63,13 @@ class StructureDesc(BaseDesc):
     
     def to_json(self):
         return json.dumps(self.__dict__, cls=StructureDescEncoder, indent=4)
+    
+    def to_dict(self):
+        result = {key: value for key, value in self.__dict__.items() if key not in ['struct_type', 'methods', 'properties']}
+        result['struct_type'] = str(self.struct_type)
+        result['methods'] = [method.to_dict() for method in self.methods]
+        result['properties'] = [prop.to_dict() for prop in self.properties]
+        return result
     
     def __repr__(self):
         return f"StructureDesc(name={self.name}, type={self.type})"

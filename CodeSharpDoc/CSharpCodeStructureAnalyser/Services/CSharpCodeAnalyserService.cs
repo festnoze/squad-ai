@@ -25,6 +25,9 @@ public static class CSharpCodeAnalyserService
 
     public static List<StructureDesc> AnalyzeFile(string fileCode, string filePath)
     {
+        //// Remove existing summaries first
+        //fileCode = RemoveExistingSummariesFromFile(fileCode);
+
         var tree = CSharpSyntaxTree.ParseText(fileCode);
         var root = tree.GetCompilationUnitRoot();
         var structures = new List<StructureDesc>();
@@ -35,22 +38,52 @@ public static class CSharpCodeAnalyserService
             if (structType != null)
                 structures.Add(CreateStructureDesc(decl, fileCode, filePath, structType!.Value));
         }
-
-        // Manually calculate the methods start index in file code
-        foreach (var structure in structures)
-        {
-            foreach (var method in structure.Methods)
-            {
-                var methodAndType = method.GetMethodReturnTypeAndName();
-                var methodStartIndex = fileCode.IndexOf(methodAndType);
-                if (methodStartIndex == -1)
-                    methodStartIndex = fileCode.IndexOf(method.MethodName);
-                method.CodeStartIndex = methodStartIndex;
-            }
-        }
+        //fileCode = AddSummariesToCode(fileCode, structures);
+        //File.WriteAllText(filePath, fileCode);
 
         return structures;
     }
+
+    private static string AddSummariesToCode(string fileCode, List<StructureDesc> structures)
+    {
+        var summary = $@"
+/// <summary>
+/// [summaryContent]
+/// </summary>";
+
+        for (var i = structures.Count - 1; i >= 0; i--)
+        {
+            var structure = structures[i];
+
+            for (var j = structure.Methods.Count - 1; j >= 0; j--)
+            {
+                var method = structure.Methods[j];
+                if (method.CodeStartIndex > 0)
+                {
+                    var methodSummary = summary.Replace("[summaryContent]", method.MethodName);
+                    var lines = methodSummary.Split('\n').ToList();
+                    for (int k = 0; k < lines.Count; k++)
+                    {
+                        if (lines[k].Length > 0)
+                            lines[k] = new string('\t', method.IndentLevel) + lines[k].Trim();
+                    }
+                    methodSummary = string.Join('\n', lines);
+
+                    var before = fileCode.Substring(0, method.CodeStartIndex);
+                    var after = fileCode.Substring(method.CodeStartIndex);
+                    fileCode = before + methodSummary + after;
+                }
+            }
+        }
+        return fileCode;
+    }
+
+    //public static string RemoveExistingSummariesFromFile(string code)
+    //{
+    //    var lines = code.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
+    //    var filteredLines = lines.Where(line => !line.Trim().StartsWith("///")).ToList();
+    //    return string.Join(Environment.NewLine, filteredLines);
+    //}
 
     private static StructureType? GetStructType(SyntaxNode decl)
     {
@@ -73,7 +106,8 @@ public static class CSharpCodeAnalyserService
         var namespaceName = decl.Ancestors().OfType<NamespaceDeclarationSyntax>().FirstOrDefault()?.Name.ToString() ?? string.Empty;
         var usings = decl.SyntaxTree.GetCompilationUnitRoot().Usings.Select(u => u.Name!.ToString()).ToList();
         var structName = decl.ChildTokens().FirstOrDefault(t => t.IsKind(SyntaxKind.IdentifierToken)).ValueText;
-        string accessModifier = GetAccessModifiers(decl);
+        var accessModifier = GetAccessModifiers(decl);
+        var attributes = GetAttributes(decl);
 
         var baseClassName = string.Empty;
         var interfacesNames = new List<string>();
@@ -115,9 +149,14 @@ public static class CSharpCodeAnalyserService
             // Handle Enum
         }
 
+        var existingSummary = GetSummary(decl);
+        var indentLevel = decl.GetLeadingTrivia().ToString().Split('\n').Last().Count(c => c == ' ') / 4;
+        var startIndex = decl.FullSpan.Start;
+
         return new StructureDesc(
             filePath,
-            decl.Span.Start,
+            startIndex,
+            indentLevel,
             structType,
             namespaceName,
             usings,
@@ -125,6 +164,8 @@ public static class CSharpCodeAnalyserService
             accessModifier,
             baseClassName,
             interfacesNames,
+            existingSummary,
+            attributes,
             methods,
             properties
         );
@@ -145,5 +186,32 @@ public static class CSharpCodeAnalyserService
             return recordDecl.Modifiers.ToString();
         }
         return string.Empty;
+    }
+    private static List<string> GetAttributes(SyntaxNode decl)
+    {
+        return decl.ChildNodes()
+                   .OfType<AttributeListSyntax>()
+                   .SelectMany(a => a.Attributes)
+                   .Select(a => a.ToString())
+                   .ToList();
+    }
+
+    private static string GetSummary(SyntaxNode decl)
+    {
+        var trivia = decl.GetLeadingTrivia()
+                          .Select(t => t.GetStructure())
+                          .OfType<DocumentationCommentTriviaSyntax>()
+                          .FirstOrDefault();
+
+        if (trivia == null)
+        {
+            return string.Empty;
+        }
+
+        var summaryNode = trivia.ChildNodes()
+                                 .OfType<XmlElementSyntax>()
+                                 .FirstOrDefault(e => e.StartTag.Name.LocalName.Text == "summary");
+
+        return summaryNode?.Content.ToString().Trim() ?? string.Empty;
     }
 }

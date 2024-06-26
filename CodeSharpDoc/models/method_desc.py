@@ -12,6 +12,7 @@ class MethodDesc(BaseDesc):
         self.code_start_index: int = code_start_index
         self.method_name: str = method_name
         self.existing_summary: str = existing_summary
+        self.access_modifier: str = None
         self.attributes: list[str] = attributs
         self.return_type: str = method_return_type
         self.params: list[ParameterDesc] = method_params
@@ -190,6 +191,12 @@ class MethodDesc(BaseDesc):
     
     def to_json(self):
         return json.dumps(self.__dict__, cls=MethodDescEncoder)
+    
+    def to_dict(self):
+        result = {key: value for key, value in self.__dict__.items() if key not in ['code', 'params', 'generated_parameters_summaries', '_code_chunks']}
+        result['code'] = ""
+        result['params'] = [param.to_dict() for param in self.params]
+        return result
 
 class MethodDescPydantic:
     pass

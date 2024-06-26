@@ -7,7 +7,7 @@ class GroqHelper:
     @staticmethod
     def test_query(llm_info: LlmInfo):
         if llm_info.type != LangChainAdapterType.Groq:
-            print("This method is only for Groq models.")
+            print("This method is only working on Groq models.")
             return
         
         groq = Groq(api_key=llm_info.api_key)

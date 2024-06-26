@@ -1,15 +1,27 @@
-﻿using System.Text.RegularExpressions;
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
+using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 
 namespace CSharpCodeStructureAnalyser.Models;
 
 public record ParameterDesc : BaseDesc
 {
+    [JsonPropertyName("param_name")]
     public string ParamName { get; set; }
+
+    [JsonPropertyName("param_type")]
     public string ParamType { get; set; }
+
+    [JsonPropertyName("has_default_value")]
     public bool HasDefaultValue { get; set; }
+
+    [JsonPropertyName("default_value")]
     public string? DefaultValue { get; set; }
+
+    [JsonPropertyName("description")]
     public string? Description { get; set; }
+
+    [JsonPropertyName("extra_infos")]
     public string? ExtraInfos { get; set; }
 
     public ParameterDesc(string paramName, string paramType, bool hasDefaultValue = false, string? defaultValue = null, string? description = null, string? extraInfos = null)

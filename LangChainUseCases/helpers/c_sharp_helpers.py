@@ -2,7 +2,7 @@
 from langchain.pydantic_v1 import BaseModel, Field
 from langchain.tools import BaseTool, StructuredTool, tool
 from models.param_doc import ParameterDocumentation
-from models.params_doc import MethodParametersDocumentation
+from models.coding_guidelines_broken_rules_model import MethodParametersDocumentation
     
 # class CSharpXMLDocumentationInput(BaseModel):
 #     summary: str = Field(description="A string representing the summary section.")

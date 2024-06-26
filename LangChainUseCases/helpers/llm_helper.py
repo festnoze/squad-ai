@@ -29,6 +29,7 @@ class Llm:
     
     @staticmethod
     def get_code_block(code_block_type: str, text: str) -> str:
+        text = Llm.get_llm_answer_content(text)
         start_index = text.find(f"```{code_block_type}")
         end_index = text.rfind("```")        
         if start_index != -1 and end_index != -1 and start_index != end_index:
@@ -99,7 +100,7 @@ class Llm:
         return Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(action_name, llms, None, None, *prompts)
     
     @staticmethod
-    def invoke_parallel_prompts_with_parser_batchs_fallbacks(action_name, llms_with_fallbacks: Union[BaseChatModel, list[BaseChatModel]], output_parser: BaseTransformOutputParser, batch_size: int = None, *prompts: Union[str, ChatPromptTemplate]) -> list[str]:
+    def invoke_parallel_prompts_with_parser_batchs_fallbacks(action_name, llms_with_fallbacks: Union[BaseChatModel, list[BaseChatModel]], output_parser: BaseTransformOutputParser, batch_size: int = None, inputs: dict = None, *prompts: Union[str, ChatPromptTemplate]) -> list[str]:
         if len(prompts) == 0:
             return []        
         if not isinstance(llms_with_fallbacks, list):
@@ -121,10 +122,12 @@ class Llm:
                 chain = chain.with_fallbacks(fallback_chains)
             chains.append(chain)
 
-        # If output parser is JsonOutputParser, add the instructions to the input
-        inputs = None
+        # If output parser is JsonOutputParser, add the instructions to the inputs
         if output_parser and isinstance(output_parser, JsonOutputParser):
-            inputs = {Llm.output_parser_instructions_name: output_parser.get_format_instructions()}
+            if not inputs:
+                inputs = {Llm.output_parser_instructions_name: output_parser.get_format_instructions()}
+            else:
+                inputs[Llm.output_parser_instructions_name] = output_parser.get_format_instructions()
         
         answers = Llm._invoke_parallel_chains(action_name, inputs, batch_size, *chains)
         return answers

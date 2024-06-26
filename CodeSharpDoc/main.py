@@ -1,7 +1,7 @@
 # internal import
 import json
 from helpers.file_helper import file
-from helpers.langsmith_helper import Langsmith
+from langchains.langsmith_client import Langsmith
 from helpers.llm_helper import Llm
 from helpers.txt_helper import txt
 from helpers.groq_helper import GroqHelper
@@ -22,10 +22,11 @@ load_dotenv(find_dotenv())
 groq_api_key = os.getenv("GROQ_API_KEY")
 openai_api_key = os.getenv("OPEN_API_KEY")
 google_api_key = os.getenv("GOOGLE_API_KEY")
+anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
 #openai.api_key = openai_api_key
 
 langsmith = Langsmith()
-langsmith.delete_all_project_sessions()
+#langsmith.delete_all_project_sessions()
 langsmith.create_project()
 
 # Select the LLMs to be used for first and fallbacks uses
@@ -45,9 +46,12 @@ llms_infos = []
 
 #llms_infos.append(LlmInfo(type= LangChainAdapterType.Google, model= "gemini-pro",  timeout= 60, temperature = 0.5, api_key= google_api_key))
 
+#llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-2",  timeout= 60, temperature = 0.5, api_key= anthropic_api_key))
+#llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-opus-20240229",  timeout= 60, temperature = 0.5, api_key= anthropic_api_key))
+
 llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0125",  timeout= 60, temperature = 0.5, api_key= openai_api_key))
 #llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo",  timeout= 60, temperature = 0.5, api_key= openai_api_key))
-llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo",  timeout= 120, temperature = 0.5, api_key= openai_api_key))
+#llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo",  timeout= 120, temperature = 0.5, api_key= openai_api_key))
 #llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout= 60, temperature = 1, api_key= openai_api_key))
 llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout= 80, temperature = 0.1, api_key= openai_api_key))
 
