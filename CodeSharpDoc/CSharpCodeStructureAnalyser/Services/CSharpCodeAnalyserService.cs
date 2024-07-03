@@ -152,7 +152,24 @@ public static class CSharpCodeAnalyserService
 
         var existingSummary = GetSummary(decl);
         var indentLevel = decl.GetLeadingTrivia().ToString().Split('\n').Last().Count(c => c == ' ') / 4;
+        
+        // Find the actual start index of the class excluding preprocessor directives
+        var leadingTrivia = decl.GetLeadingTrivia();
         var startIndex = decl.FullSpan.Start;
+        foreach (var trivia in leadingTrivia.ToList())
+        {
+            if (trivia.IsKind(SyntaxKind.RegionDirectiveTrivia) ||
+                trivia.IsKind(SyntaxKind.EndRegionDirectiveTrivia) ||
+                trivia.IsKind(SyntaxKind.IfDirectiveTrivia) ||
+                trivia.IsKind(SyntaxKind.EndIfDirectiveTrivia) ||
+                trivia.IsKind(SyntaxKind.ElseDirectiveTrivia) ||
+                trivia.IsKind(SyntaxKind.ElifDirectiveTrivia) ||
+                trivia.IsKind(SyntaxKind.DefineDirectiveTrivia) ||
+                trivia.IsKind(SyntaxKind.UndefDirectiveTrivia) ||
+                trivia.IsKind(SyntaxKind.PragmaWarningDirectiveTrivia) ||
+                trivia.IsKind(SyntaxKind.PragmaChecksumDirectiveTrivia))
+                    startIndex = trivia.FullSpan.End;
+        }
 
         return new StructureDesc(
             filePath,
