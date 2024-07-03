@@ -35,7 +35,7 @@ class SummaryGenerationService:
         CSharpHelper.remove_existing_summaries_from_all_code_files_and_save(paths_and_codes)  
         paths_and_codes = {}
         paths_and_codes = file.get_files_paths_and_contents(file_path, 'cs')
-        
+
         SummaryGenerationService.remove_already_analysed_files(existing_structs_desc, paths_and_codes)
         if len(paths_and_codes) == 0: return
 
@@ -48,11 +48,13 @@ class SummaryGenerationService:
         SummaryGenerationService.generate_methods_summaries_for_all_structures(llms, structs_to_process) 
 
         structs_summaries_infos = SummaryGenerationService.create_struct_summaries_infos(structs_to_process)
-        code_analyser_client.add_summaries_to_code_files(structs_summaries_infos)
+
         # paths_and_new_codes = SummaryGenerationService.include_generated_summaries_to_codes(paths_and_codes, structs_to_process)
         # file.save_contents_within_files(paths_and_new_codes)      
+        # 2 above lines are replaced by this # call:
+        code_analyser_client.add_summaries_to_code_files(structs_summaries_infos)
         
-        #JsonHelper.save_as_json_files(structs_to_process, 'outputs\\structures_descriptions')
+        JsonHelper.save_as_json_files(structs_to_process, 'outputs\\structures_descriptions')
         
         txt.print("\nDone.")
         txt.print("---------------------------")

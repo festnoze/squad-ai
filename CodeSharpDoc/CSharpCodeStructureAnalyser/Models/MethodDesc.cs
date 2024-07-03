@@ -185,7 +185,24 @@ public record MethodDesc : BaseDesc
         // detect the indentation level of the method 
         var indentLevel = method.GetLeadingTrivia().ToString().Split('\n').Last().Count(c => c == ' ')/4;
         var accessModifier = method.Modifiers.FirstOrDefault(m => m.IsKind(SyntaxKind.PublicKeyword) || m.IsKind(SyntaxKind.ProtectedKeyword) || m.IsKind(SyntaxKind.PrivateKeyword) || m.IsKind(SyntaxKind.InternalKeyword)).ToString() ?? SyntaxKind.PrivateKeyword.ToString();
+
+        // Modify the actual start index of the method excluding preprocessor directives
+        var leadingTrivia = method.GetLeadingTrivia();
         var methodStartIndex = method.FullSpan.Start;
+        foreach (var trivia in leadingTrivia.ToList())
+        {
+            if (trivia.IsKind(SyntaxKind.RegionDirectiveTrivia) ||
+                trivia.IsKind(SyntaxKind.EndRegionDirectiveTrivia) ||
+                trivia.IsKind(SyntaxKind.IfDirectiveTrivia) ||
+                trivia.IsKind(SyntaxKind.EndIfDirectiveTrivia) ||
+                trivia.IsKind(SyntaxKind.ElseDirectiveTrivia) ||
+                trivia.IsKind(SyntaxKind.ElifDirectiveTrivia) ||
+                trivia.IsKind(SyntaxKind.DefineDirectiveTrivia) ||
+                trivia.IsKind(SyntaxKind.UndefDirectiveTrivia) ||
+                trivia.IsKind(SyntaxKind.PragmaWarningDirectiveTrivia) ||
+                trivia.IsKind(SyntaxKind.PragmaChecksumDirectiveTrivia))
+                    methodStartIndex = trivia.FullSpan.End;
+        }
 
         return new MethodDesc(
             methodStartIndex,

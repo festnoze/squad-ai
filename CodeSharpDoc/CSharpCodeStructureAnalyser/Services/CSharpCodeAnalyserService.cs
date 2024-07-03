@@ -38,19 +38,19 @@ public static class CSharpCodeAnalyserService
             if (structType != null)
                 structures.Add(CreateStructureDesc(decl, fileCode, filePath, structType!.Value));
         }
-        //fileCode = AddSummariesToCode(fileCode, structures);
+        //fileCode = AddFakeSummariesToCode(fileCode, structures);
         //File.WriteAllText(filePath, fileCode);
 
         return structures;
     }
 
-    private static string AddSummariesToCode(string fileCode, List<StructureDesc> structures)
+    private static string AddFakeSummariesToCode(string fileCode, List<StructureDesc> structures)
     {
         var summary = $@"
 /// <summary>
 /// [summaryContent]
 /// </summary>";
-
+        var tmp = "";
         for (var i = structures.Count - 1; i >= 0; i--)
         {
             var structure = structures[i];
@@ -69,6 +69,7 @@ public static class CSharpCodeAnalyserService
                     }
                     methodSummary = string.Join('\n', lines);
 
+                    tmp += method.CodeStartIndex.ToString() + ", ";
                     var before = fileCode.Substring(0, method.CodeStartIndex);
                     var after = fileCode.Substring(method.CodeStartIndex);
                     fileCode = before + methodSummary + after;
