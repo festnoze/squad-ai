@@ -31,6 +31,8 @@ public static class CodeEditionService
                 string globalSummary = "\n" + Indent(structureSummariesInfos.IndentLevel, structureSummariesInfos.GeneratedSummary.TrimEnd());
                 var before = newCode.Substring(0, structureSummariesInfos.IndexShiftCode);
                 var after = newCode.Substring(structureSummariesInfos.IndexShiftCode);
+                if (!after.StartsWith("\n"))
+                    globalSummary += "\n";
                 newCode = before + globalSummary + after;
             }
         }

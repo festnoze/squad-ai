@@ -49,12 +49,12 @@ class SummaryGenerationService:
 
         structs_summaries_infos = SummaryGenerationService.create_struct_summaries_infos(structs_to_process)
 
-        # paths_and_new_codes = SummaryGenerationService.include_generated_summaries_to_codes(paths_and_codes, structs_to_process)
+        # paths_and_new_codes = SummaryGenerationService.add_generated_summaries_to_initial_codes(paths_and_codes, structs_to_process)
         # file.save_contents_within_files(paths_and_new_codes)      
         # 2 above lines are replaced by this # call:
         code_analyser_client.add_summaries_to_code_files(structs_summaries_infos)
         
-        JsonHelper.save_as_json_files(structs_to_process, 'outputs\\structures_descriptions')
+        #JsonHelper.save_as_json_files(structs_to_process, 'outputs\\structures_descriptions')
         
         txt.print("\nDone.")
         txt.print("---------------------------")
@@ -137,6 +137,40 @@ class SummaryGenerationService:
                     method.generated_return_summary = class_method.generated_return_summary
                     method.generated_xml_summary = class_method.generated_xml_summary
 
+    #obsolete
+    @staticmethod
+    def add_generated_summaries_to_initial_codes(paths_and_codes: dict, structures_summaries_infos: list):
+        paths_and_new_codes = {}
+
+        for file_path, code in paths_and_codes.items():
+            # Determine all the concerned structures_summaries_infos for the current file
+            relevant_structures = [s for s in structures_summaries_infos if s.file_path == file_path]
+
+            if not relevant_structures:
+                continue
+            
+            new_code = code
+
+            for struct_info in sorted(relevant_structures, key=lambda m: m.index_shift_code, reverse=True):
+                # Add methods summaries to the code
+                for method in sorted(struct_info.methods, key=lambda m: m.code_start_index, reverse=True):
+                    method_summary = method.generated_xml_summary.rstrip()
+                    method_summary = '\n' + txt.indent(struct_info.indent_level + 1, method_summary)
+                    before = new_code[:method.code_start_index]
+                    after = new_code[method.code_start_index:]
+                    new_code = before + method_summary + after
+
+                # Add global structure summary to the code
+                if struct_info.generated_summary:
+                    global_summary = '\n' + txt.indent(struct_info.indent_level, struct_info.generated_summary.rstrip())
+                    before = new_code[:struct_info.index_shift_code]
+                    after = new_code[struct_info.index_shift_code:]
+                    new_code = before + global_summary + after
+            
+            paths_and_new_codes[file_path] = new_code
+        return paths_and_new_codes
+
+    #obsolete
     @staticmethod
     def include_generated_summaries_to_codes(paths_and_codes, structures_descriptions):
         paths_and_new_codes = {}        
@@ -150,6 +184,7 @@ class SummaryGenerationService:
         txt.stop_spinner_replace_text("Summaries successfully included in initial files code.")
         return paths_and_new_codes
 
+    #obsolete
     @staticmethod
     def add_generated_summaries_to_initial_code(struct_desc: StructureDesc, code: str):
         # Add methods summaries to the code
