@@ -1,8 +1,6 @@
 ﻿using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System.Collections.Generic;
-using System.Linq;
 
 using CSharpCodeStructureAnalyser.Models;
 
@@ -17,30 +15,55 @@ public static class CSharpCodeAnalyserService
 
         foreach (var file in csFilesCode)
         {
-            structures.AddRange(AnalyzeFile(file.Value, file.Key));
+            var newStructs = AnalyzeFile(file.Value, file.Key, true);
+            var structsWithSummaries = AnalyzeFile(file.Value, file.Key, false);
+            CopyExistingSummariesToStructs(ref newStructs, ref structsWithSummaries);
+            structures.AddRange(newStructs);
         }
 
         return structures;
     }
 
-    public static List<StructureDesc> AnalyzeFile(string fileCode, string filePath)
+    private static void CopyExistingSummariesToStructs(ref List<StructureDesc> targetStructs, ref List<StructureDesc> structsWithSummaries)
     {
-        //// Remove existing summaries first
-        //fileCode = RemoveExistingSummariesFromFile(fileCode);
+        foreach (var structWithSummaries in structsWithSummaries)
+        {
+            var targetStruct = targetStructs.Single(s => s.Name == structWithSummaries.Name);
+            foreach (var method in structWithSummaries.Methods)
+            {
+                var targetMethod = targetStruct.Methods.Single(m => 
+                    m.Name == method.Name && 
+                    m.AccessModifier == method.AccessModifier && 
+                    m.Params.Count == method.Params.Count && 
+                    m.Params.All(p => method.Params.Any(mp => mp.Name == p.Name && mp.ParamType == p.ParamType)));
 
-        var tree = CSharpSyntaxTree.ParseText(fileCode);
-        var root = tree.GetCompilationUnitRoot();
+                targetMethod.ExistingSummary = method.ExistingSummary;
+            }
+            targetStruct.ExistingSummary = structWithSummaries.ExistingSummary;
+        }
+    }
+
+    public static List<StructureDesc> AnalyzeFile(string fileCode, string filePath, bool removeSummaries = true)
+    {
+        // Remove existing summaries first
+        var codeWoSummaries = string.Empty;
+        if (removeSummaries)
+            codeWoSummaries = CodeEditionService.RemoveExistingSummariesFromFile(fileCode);
+        else
+            codeWoSummaries = fileCode;
+
+        var tree = CSharpSyntaxTree.ParseText(codeWoSummaries);
         var structures = new List<StructureDesc>();
 
-        foreach (var decl in root.DescendantNodes())
+        foreach (var decl in tree.GetCompilationUnitRoot().DescendantNodes())
         {
             var structType = GetStructType(decl);
             if (structType != null)
-                structures.Add(CreateStructureDesc(decl, fileCode, filePath, structType!.Value));
+            {
+                var structs = CreateStructureDesc(decl, codeWoSummaries, filePath, structType!.Value);
+                structures.Add(structs);
+            }
         }
-        //fileCode = AddFakeSummariesToCode(fileCode, structures);
-        //File.WriteAllText(filePath, fileCode);
-
         return structures;
     }
 
@@ -79,13 +102,6 @@ public static class CSharpCodeAnalyserService
         return fileCode;
     }
 
-    //public static string RemoveExistingSummariesFromFile(string code)
-    //{
-    //    var lines = code.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
-    //    var filteredLines = lines.Where(line => !line.Trim().StartsWith("///")).ToList();
-    //    return string.Join(Environment.NewLine, filteredLines);
-    //}
-
     private static StructureType? GetStructType(SyntaxNode decl)
     {
         StructureType? structType;
@@ -114,6 +130,7 @@ public static class CSharpCodeAnalyserService
         var interfacesNames = new List<string>();
         var methods = new List<MethodDesc>();
         var properties = new List<PropertyDesc>();
+        EnumMembersDesc? enumMembers = null;
 
         if (decl is ClassDeclarationSyntax classDecl)
         {
@@ -145,12 +162,26 @@ public static class CSharpCodeAnalyserService
             methods = interfaceDecl.Members.OfType<MethodDeclarationSyntax>().Select(m => MethodDesc.CreateMethodDescFromSyntax(m)).ToList();
             properties = interfaceDecl.Members.OfType<PropertyDeclarationSyntax>().Select(p => PropertyDesc.GetPropertyDescFromSynthax(p)).ToList();
         }
-        else if (decl is EnumDeclarationSyntax)
+        else if (decl is EnumDeclarationSyntax enumDecl)
         {
-            // Handle Enum
+            // Enums do not have methods
+            // Enums do not have properties
+
+            int nextValue = 0;
+            enumMembers = new EnumMembersDesc();
+            foreach (var member in enumDecl.Members.OfType<EnumMemberDeclarationSyntax>())
+            {
+                int value;
+                if (member.EqualsValue != null && int.TryParse(member.EqualsValue.Value.ToString(), out value))
+                {
+                    nextValue = value;
+                }
+                enumMembers.Members.Add(new EnumMemberDesc(member.Identifier.Text, nextValue));
+                nextValue++;
+            }
         }
 
-        var existingSummary = GetSummary(decl);
+        var existingSummary = CSharpCodeAnalyserHelper.GetSummary(decl);
         var indentLevel = decl.GetLeadingTrivia().ToString().Split('\n').Last().Count(c => c == ' ') / 4;
         
         // Find the actual start index of the class excluding preprocessor directives
@@ -185,7 +216,8 @@ public static class CSharpCodeAnalyserService
             existingSummary,
             attributes,
             methods,
-            properties
+            properties,
+            enumMembers
         );
     }
 
@@ -212,24 +244,5 @@ public static class CSharpCodeAnalyserService
                    .SelectMany(a => a.Attributes)
                    .Select(a => a.ToString())
                    .ToList();
-    }
-
-    private static string GetSummary(SyntaxNode decl)
-    {
-        var trivia = decl.GetLeadingTrivia()
-                          .Select(t => t.GetStructure())
-                          .OfType<DocumentationCommentTriviaSyntax>()
-                          .FirstOrDefault();
-
-        if (trivia == null)
-        {
-            return string.Empty;
-        }
-
-        var summaryNode = trivia.ChildNodes()
-                                 .OfType<XmlElementSyntax>()
-                                 .FirstOrDefault(e => e.StartTag.Name.LocalName.Text == "summary");
-
-        return summaryNode?.Content.ToString().Trim() ?? string.Empty;
     }
 }

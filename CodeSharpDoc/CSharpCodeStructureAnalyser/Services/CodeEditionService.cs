@@ -1,8 +1,4 @@
 ﻿using CSharpCodeStructureAnalyser.Models;
-using System;
-using System.IO;
-using System.Reflection;
-
 namespace CSharpCodeStructureAnalyser.Services;
 
 public static class CodeEditionService
@@ -10,8 +6,11 @@ public static class CodeEditionService
     public static string AddGeneratedSummariesToInitialCode(IEnumerable<StructSummariesInfos> structuresSummariesInfos)
     {
         // Load code from file
-        string code = File.ReadAllText(structuresSummariesInfos.First().FilePath);
-        var newCode = code;
+        var code = File.ReadAllText(structuresSummariesInfos.First().FilePath);
+
+        // Remove existing summaries first
+        var newCode = RemoveExistingSummariesFromFile(code);
+
         // Add methods summaries to the code
         foreach (var structureSummariesInfos in structuresSummariesInfos.OrderByDescending(m => m.IndexShiftCode))
         {
@@ -48,6 +47,13 @@ public static class CodeEditionService
             var code = AddGeneratedSummariesToInitialCode(group.ToList());
             File.WriteAllText(group.First().FilePath, code);
         }
+    }
+
+    public static string RemoveExistingSummariesFromFile(string code)
+    {
+        var lines = code.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
+        var filteredLines = lines.Where(line => !line.Trim().StartsWith("///")).ToList();
+        return string.Join(Environment.NewLine, filteredLines);
     }
 
     private static string Indent(int level, string text)

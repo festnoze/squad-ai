@@ -2,6 +2,7 @@ from helpers.file_helper import file
 from models.params_doc import MethodParametersDocumentation
 
 class CSharpHelper:    
+    #obsolete
     @staticmethod
     def remove_existing_summaries_from_all_code_files_and_save(paths_and_codes: dict):
         for file_path, code in paths_and_codes.items():

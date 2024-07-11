@@ -3,6 +3,7 @@ from typing import List
 from pydantic import BaseModel, Field
 from helpers.txt_helper import txt
 from models.base_desc import BaseDesc
+from models.enum_desc import EnumMembersDesc
 from models.method_desc import MethodDesc, MethodDescPydantic
 from models.param_desc import ParameterDesc
 from models.param_doc import ParameterDocumentation
@@ -11,7 +12,26 @@ from models.structure_types import StructureType
 import json
 
 class StructureDesc(BaseDesc):
-    def __init__(self, file_path: str, index_shift_code: int, indent_level: int, struct_type: StructureType, namespace_name: str, usings: list[str], struct_name: str, access_modifier: str, base_class_name: str, interfaces_names: list[str] = [], existingSummary = '', attributs = None, methods: list[MethodDesc] = [], properties: list[PropertyDesc] = []):
+    #def __init__(self, file_path: str, index_shift_code: int, indent_level: int, struct_type: StructureType, namespace_name: str, usings: list[str], struct_name: str, access_modifier: str, base_class_name: str, interfaces_names: list[str] = [], existingSummary = '', attributs = None, methods: list[MethodDesc] = [], properties: list[PropertyDesc] = []):
+    def __init__(
+        self, 
+        file_path: str, 
+        index_shift_code: int,
+        indent_level: int,
+        struct_type: StructureType, 
+        namespace_name: str, 
+        usings: List[str], 
+        struct_name: str, 
+        access_modifier: str, 
+        base_class_name: str, 
+        interfaces_names: List[str] = None,
+        existing_summary: str = "",
+        attributs: List[str] = None,
+        methods: List[MethodDesc] = None, 
+        properties: List[PropertyDesc] = None,
+        enum_members: EnumMembersDesc = None,
+        generated_summary: str = None
+    ):
         super().__init__(name=struct_name)
         self.file_path: str = file_path
         self.index_shift_code: int = index_shift_code
@@ -23,12 +43,13 @@ class StructureDesc(BaseDesc):
         self.struct_name: str = struct_name
         self.base_class_name: str = base_class_name
         self.interfaces_names: list[str] = interfaces_names
-        self.existing_summary: str = existingSummary
+        self.existing_summary: str = existing_summary
         self.attributs: List[str] = attributs if attributs is not None else []
         self.related_structures: list[StructureDesc] = []
         self.methods: list[MethodDesc] = methods
-        self.properties: list[PropertyDesc] = properties
-        self.generated_summary: str = None
+        self.properties: list[PropertyDesc] = properties,
+        self.enum_members: EnumMembersDesc = enum_members,
+        self.generated_summary: str = generated_summary
     
     def __init__(self, **kwargs):
         if len(kwargs) == 1 and 'params_list' in kwargs:
@@ -58,6 +79,11 @@ class StructureDesc(BaseDesc):
                         self.properties: list[PropertyDesc] = value
                     else:
                          self.properties: list[PropertyDesc] = [PropertyDesc.factory_from_kwargs(**prop) for prop in value]
+                elif key == 'enum_members':
+                    if type(value) is EnumMembersDesc:
+                        self.enum_members: EnumMembersDesc = value
+                    else:
+                        self.enum_members: EnumMembersDesc = EnumMembersDesc.factory_from_kwargs(**value)
                 else:
                     setattr(self, key, value)
     

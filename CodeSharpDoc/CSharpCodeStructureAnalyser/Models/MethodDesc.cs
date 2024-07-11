@@ -4,6 +4,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis;
 using System.Text.Json.Serialization;
 using Newtonsoft.Json;
+using CSharpCodeStructureAnalyser.Services;
 
 namespace CSharpCodeStructureAnalyser.Models;
 
@@ -206,7 +207,7 @@ public record MethodDesc : BaseDesc
 
         return new MethodDesc(
             methodStartIndex,
-            method.GetLeadingTrivia().ToString(),
+            CSharpCodeAnalyserHelper.GetSummary(method),
             accessModifier,
             method.AttributeLists.SelectMany(a => a.Attributes).Select(a => a.ToString()).ToList(),
             method.Identifier.Text,

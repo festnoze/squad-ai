@@ -20,7 +20,7 @@ from services.csharp_code_analyser_service import CSharpCodeStructureAnalyser
 import os
 import json
 
-from services.rag_service import RAGService
+from services.summary_generation_prompts import SummaryGenerationPrompts
 
 class SummaryGenerationService:    
     batch_size = 200
@@ -30,10 +30,7 @@ class SummaryGenerationService:
     @staticmethod
     def generate_and_save_all_summaries_all_csharp_files_from_folder(file_path: str, existing_structs_desc: list[StructureDesc], llms_infos: list[LlmInfo]):  
         txt.activate_print = True
-        llms = LangChainFactory.create_llms_from_infos(llms_infos)       
-        paths_and_codes = file.get_files_paths_and_contents(file_path, 'cs')
-        CSharpHelper.remove_existing_summaries_from_all_code_files_and_save(paths_and_codes)  
-        paths_and_codes = {}
+        llms = LangChainFactory.create_llms_from_infos(llms_infos)
         paths_and_codes = file.get_files_paths_and_contents(file_path, 'cs')
 
         SummaryGenerationService.remove_already_analysed_files(existing_structs_desc, paths_and_codes)
@@ -54,7 +51,7 @@ class SummaryGenerationService:
         # 2 above lines are replaced by this # call:
         code_analyser_client.add_summaries_to_code_files(structs_summaries_infos)
         
-        #JsonHelper.save_as_json_files(structs_to_process, 'outputs\\structures_descriptions')
+        JsonHelper.save_as_json_files(structs_to_process, 'outputs\\structures_descriptions')
         
         txt.print("\nDone.")
         txt.print("---------------------------")
@@ -228,22 +225,25 @@ class SummaryGenerationService:
 
     @staticmethod
     def generate_methods_summaries_for_all_classes(llm: BaseChatModel, known_structures: list[StructureDesc]):
-        all_classes_records = [s for s in known_structures if s.struct_type == StructureType.Class or s.struct_type == StructureType.Record]
+        all_classes_records_enums = [s for s in known_structures 
+                               if s.struct_type == StructureType.Class 
+                               or s.struct_type == StructureType.Record 
+                               or s.struct_type == StructureType.Enum]
         
-        SummaryGenerationService.generate_methods_summaries_only_all_classes(llm, known_structures, all_classes_records)
+        SummaryGenerationService.generate_methods_summaries_only_all_classes(llm, known_structures, all_classes_records_enums)
         
         if SummaryGenerationService.using_json_output_parsing:
-            SummaryGenerationService.generate_all_classes_methods_parameters_desc_json_from_output_parser(llm, all_classes_records)
+            SummaryGenerationService.generate_all_classes_methods_parameters_desc_json_from_output_parser(llm, all_classes_records_enums)
         else:
-            SummaryGenerationService.generate_all_classes_methods_parameters_desc_json_from_llm(llm, all_classes_records)
+            SummaryGenerationService.generate_all_classes_methods_parameters_desc_json_from_llm(llm, all_classes_records_enums)
             
-        SummaryGenerationService.generate_methods_return_summaries_for_all_classes(llm, all_classes_records)
+        SummaryGenerationService.generate_methods_return_summaries_for_all_classes(llm, all_classes_records_enums)
 
-        # Generate the global summary for the structures (classes, interfaces, etc) themselves        
-        SummaryGenerationService.generate_classes_global_summaries(llm, all_classes_records)
+        # Generate the global summary for the structures themselves(classes, records, enums, but not for interfaces)        
+        SummaryGenerationService.generate_structures_global_summaries(llm, all_classes_records_enums)
 
         # Assign to all methods a generated summary including method description, parameters description, and return type description
-        for class_struct in all_classes_records:
+        for class_struct in all_classes_records_enums:
             for i in range(len(class_struct.methods)):
                 method = class_struct.methods[i]
                 xml_doc = CSharpXMLDocumentation(method.generated_summary, method.generated_parameters_summaries, method.generated_return_summary, None) #method.example
@@ -276,7 +276,7 @@ class SummaryGenerationService:
         for class_struct in all_classes:
             if len(class_struct.methods) > 0:
                 for method in class_struct.methods:
-                    method_prompt, json_formatting_prompt = SummaryGenerationService.get_prompt_for_parameters_summaries(method)
+                    method_prompt, json_formatting_prompt = SummaryGenerationPrompts.get_prompt_to_generate_parameters_summaries(method)
                     prompt, output_parser = Llm.get_prompt_and_json_output_parser(method_prompt, MethodParametersDocumentationPydantic, MethodParametersDocumentation)
                     prompts.append(prompt)
 
@@ -307,7 +307,7 @@ class SummaryGenerationService:
         for class_struct in all_classes:
             prompts_or_chains = []
             for method in class_struct.methods:
-                method_prompt, json_formatting_spec_prompt = SummaryGenerationService.get_prompt_for_parameters_summaries(method)
+                method_prompt, json_formatting_spec_prompt = SummaryGenerationPrompts.get_prompt_to_generate_parameters_summaries(method)
                 prompt_or_chain = method_prompt + json_formatting_spec_prompt
                 prompts_or_chains.append(prompt_or_chain)
 
@@ -323,7 +323,7 @@ class SummaryGenerationService:
         for class_struct in all_classes:
             class_prompts = []
             for method in [met for met in class_struct.methods if met.has_return_type()]:
-                class_prompts.append(SummaryGenerationService.get_prompt_for_method_return_summary(method))
+                class_prompts.append(SummaryGenerationPrompts.get_prompt_to_generate_method_return_summary(method))
             methods_return_summaries_only = Llm.invoke_parallel_prompts(action_name, llms, *class_prompts)
             
             # Apply return method summary only to methods with a return type
@@ -334,16 +334,22 @@ class SummaryGenerationService:
                     return_index += 1
 
     @staticmethod
-    def generate_classes_global_summaries(llms: list[BaseChatModel], all_classes: list[StructureDesc]):
-        action_name = 'Generate classes global descriptions'
+    def generate_structures_global_summaries(llms: list[BaseChatModel], all_classes_records_enums: list[StructureDesc]):
+        action_name = 'Generate structures global descriptions'
         class_prompts = []
-        for class_struct in all_classes:
-            class_prompts.append(SummaryGenerationService.get_prompt_for_class_summary(class_struct))
+        for struct in all_classes_records_enums:
+            if struct.struct_type == StructureType.Class or struct.struct_type == StructureType.Record:
+                class_prompts.append(SummaryGenerationPrompts.get_prompt_to_generate_class_summary(struct))
+            elif struct.struct_type == StructureType.Enum:
+                class_prompts.append(SummaryGenerationPrompts.get_prompt_to_generate_enum_summary(struct))
+            else:
+                raise Exception(f"Error: unhandled structure type {struct.struct_type}")
+            
         classes_summaries = Llm.invoke_parallel_prompts(action_name, llms, *class_prompts)
             
         # Apply classes generated summaries to all classes
-        for i in range(len(all_classes)):
-            all_classes[i].generated_summary = CSharpXMLDocumentation(classes_summaries[i]).to_xml()
+        for i in range(len(all_classes_records_enums)):
+            all_classes_records_enums[i].generated_summary = CSharpXMLDocumentation(classes_summaries[i]).to_xml()
 
     @staticmethod
     def generate_methods_summary_prompts_by_class(all_classes: list[StructureDesc]):
@@ -351,74 +357,7 @@ class SummaryGenerationService:
         for class_struct in all_classes: 
             class_methods_summaries_prompts = []
             for method in class_struct.methods:
-                method_summary = SummaryGenerationService.generate_method_summary_prompt(method)
+                method_summary = SummaryGenerationPrompts.get_prompt_to_generate_method_summary(method)
                 class_methods_summaries_prompts.append(method_summary)
             classes_methods_summaries_prompts[class_struct.struct_name] = class_methods_summaries_prompts
         return classes_methods_summaries_prompts
-    
-    ctor_txt = "Take into account that this method is a constructor for the containing class of the same name."
-    
-    @staticmethod    
-    def generate_method_summary_prompt(method: MethodDesc) -> str:
-        output_format = txt.single_line(f"""
-                Respect the following format: Your answer must have a direct, conscise and factual style. 
-                Your answer must always begin by an action verb, (like: 'Get', 'Retrieve', 'Update', 'Check', etc ...) to describe the aim of the method, 
-                then possibly followed by any needed precisions, like: conditions, infos about concerned data, or anything else.
-                For example: 'Retrieve the last message for a specified user' is a good formated answer, where as:
-                'This method retrieves the last message by user ID' is not formated correctly.""")
-        prompt = txt.single_line(f"""
-                Analyse method name and the method code to produce a single sentence summary of it's functionnal purpose and behavior 
-                without any mention to the method name or any technicalities, nor any mention whether it's asynchronous, nor to its parameter, unless itmake sense to explain the method purpose. 
-                {SummaryGenerationService.ctor_txt if method.is_ctor else ""} {output_format}             
-                The method name is: '{method.method_name}' and its full code is: """)
-        
-        prompt += Llm.embed_into_code_block('csharp', method.code)
-        return prompt
-
-        # TODO: see how to rather use code_chunks from method_desc for big methods
-        # docs = Summarize.split_text(llm, text, max_tokens)
-        # chain = Summarize.splitting_chain(llm)
-        # method_summary = Summarize.split_prompt_and_invoke(llm, prompt, 8000)
-        # return method_summary
-    
-    @staticmethod
-    def get_prompt_for_parameters_summaries(method: MethodDesc): 
-        if not method.params or len(method.params) == 0:
-            method_params_str = 'no parameters'
-        else:
-            method_params_str = ', '.join([item.to_str() for item in method.params])
-
-        # Base prompt w/o json output format spec. (used alone in case of further use of an output parser to convert the LLM response to the specified pydantic json object)
-        method_params_summaries_prompt = txt.single_line(f"""\
-            The list of parameters is: '{method_params_str}'. We have an existing method named: '{method.method_name}', 
-            {SummaryGenerationService.ctor_txt if method.is_ctor else ""} for context, the method purpose is: '{method.generated_summary}'.
-            Generate a description for each parameter of the following C# method.""")
-        
-        # Prompt extension to specify the awaited json output format (used when no output parser is defined)
-        json_formatting_spec_prompt = txt.single_line(f"""
-            The awaited output should be a json array, with one item by parameter, each item having two keys: 
-            - 'param_name': containing the parameter name, 
-            - and 'param_desc': containing the description that you have generated of the parameter.""")
-        
-        return method_params_summaries_prompt, json_formatting_spec_prompt
-     
-    @staticmethod                   
-    def get_prompt_for_method_return_summary(method: MethodDesc) -> str:
-        params_list = txt.get_prop_or_key(method.generated_parameters_summaries, 'params_list')
-        params_list_str = ' ; '.join([str(item) for item in params_list])
-        prompt = txt.single_line(f"""\
-            Create a description of the return value of the following C# method.
-            Instructions: You always begin with: 'Returns ' then generate a description of the return value. The description must be very short and synthetic (less than 15 words)
-            The method name is: '{method.method_name}', {SummaryGenerationService.ctor_txt if method.is_ctor else ""} and to help you understand the purpose of the method, method summary is: '{method.generated_summary}'.
-            The list of parameters is: '{params_list_str}'.""")
-        return prompt
-
-    @staticmethod                   
-    def get_prompt_for_class_summary(class_desc: StructureDesc) -> str:
-        prompt = txt.single_line(f"""\
-            Instructions: Create a global description for the following C# class (or record) which will be used as its summary.
-            The description must be very short and synthetic (one or two sentences maximum).
-            The class name is: '{class_desc.struct_name}'.
-            To help you understand the global purpose of this class/record, hereinafter is listed all its exposed methods with theirs names and respective summaries :
-            - {'\n- '.join([f'{method.method_name}: {method.generated_summary}.' for method in class_desc.methods])}""")
-        return prompt

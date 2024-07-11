@@ -49,6 +49,9 @@ public record StructureDesc : BaseDesc
     [JsonPropertyName("properties")]
     public List<PropertyDesc> Properties { get; set; }
 
+    [JsonPropertyName("enum_members")]
+    public EnumMembersDesc? EnumMembers { get; set; }
+
     [JsonPropertyName("generated_summary")]
     public string? GeneratedSummary { get; set; }
 
@@ -67,6 +70,7 @@ public record StructureDesc : BaseDesc
         List<string> attributs = null!,
         List<MethodDesc> methods = null!, 
         List<PropertyDesc> properties = null!,
+        EnumMembersDesc? enumMembers= null,
         string? generatedSummary = null) : base(structName)
     {
         FilePath = filePath;
@@ -84,6 +88,7 @@ public record StructureDesc : BaseDesc
         RelatedStructures = new List<StructureDesc>();
         Methods = methods ?? new List<MethodDesc>();
         Properties = properties ?? new List<PropertyDesc>();
+        EnumMembers = enumMembers;
         GeneratedSummary = generatedSummary;
     }
 
