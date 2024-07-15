@@ -105,11 +105,12 @@ class txt:
             text = empty
             sys.stdout.write(f'\r{empty}')
         else:
-            elapsed_str = ''
             if txt.start_time:
                 elapsed_str = txt.get_elapsed_str(txt.start_time, time.time())
                 if elapsed_str:
-                    elapsed_str = f" {elapsed_str}."             
+                    elapsed_str = f" {elapsed_str}."
+                else:
+                    elapsed_str = ''         
                 txt.start_time = None
 
             text = f"✓ {text}{elapsed_str}" 

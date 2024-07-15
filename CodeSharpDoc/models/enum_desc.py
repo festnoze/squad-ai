@@ -27,7 +27,7 @@ class EnumMembersDesc(BaseDesc):
 
     @staticmethod
     def factory_from_kwargs(**kwargs):
-        if len(kwargs) == 1 and 'members' in kwargs:
+        if 'members' in kwargs and len(kwargs) <= 2:
             members = []
             for member in kwargs['members']:
                 members.append(EnumMemberDesc.factory_from_kwargs(**member))

@@ -1,4 +1,5 @@
 import os
+from helpers.file_helper import file
 from typing import List
 from langchain_community.embeddings.openai import OpenAIEmbeddings
 from langchain_core.embeddings import Embeddings
@@ -32,6 +33,8 @@ def build_vectorstore_from_folder_files(folder_path: str):
     documents = txt_loader.load(folder_path)
     return build_vectorstore(documents)
 
+vectorstore_path = "./chroma_db"
+
 # Obtain the vector store
 def build_vectorstore(documents: List[str]):
     embeddings = OpenAIEmbeddings(openai_api_key= os.getenv("OPEN_API_KEY"))
@@ -39,13 +42,15 @@ def build_vectorstore(documents: List[str]):
     chunks = []
     for document in documents:
         chunks.extend(split_text_into_chunks(document))
-    db = Chroma.from_texts(texts= chunks, embedding = embeddings, persist_directory="./chroma_db")
+    db = Chroma.from_texts(texts= chunks, embedding = embeddings, persist_directory= vectorstore_path)
     return db
+
+def delete_vectorstore():
+    file.delete_files_in_folder(vectorstore_path)
 
 def load_vectorstore():
     embeddings = OpenAIEmbeddings(openai_api_key= os.getenv("OPEN_API_KEY"))
-    return Chroma(persist_directory= "./chroma_db", embedding_function=
-     embeddings)
+    return Chroma(persist_directory= vectorstore_path, embedding_function= embeddings)
 
 # Retrieve useful info similar to user query
 def retrieve(llm: BaseChatModel, vectorstore, question: str, additionnal_context: str = None) -> List[Document]:

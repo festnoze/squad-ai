@@ -53,7 +53,7 @@ class SummaryGenerationService:
         
         JsonHelper.save_as_json_files(structs_to_process, 'outputs\\structures_descriptions')
         
-        txt.print("\nDone.")
+        txt.print("\nAction finished: all files saved with new summaries.")
         txt.print("---------------------------")
 
     @staticmethod
@@ -87,13 +87,13 @@ class SummaryGenerationService:
         for key in removed_keys:
             del paths_and_codes[key]
 
-    def load_struct_desc_from_folder(folder_path: str):
+    def load_json_structs_desc_from_folder(folder_path: str):
         json_files = file.get_files_paths_and_contents(folder_path, 'json')
         structures_descriptions = []
         for file_path in json_files:
             json_struct_desc = json.loads(json_files[file_path])
             structures_descriptions.append(StructureDesc(**json_struct_desc))
-        return structures_descriptions
+        return structures_descriptions, json_files
 
     @staticmethod
     def copy_missing_infos(structures_from_python, known_structures):        
