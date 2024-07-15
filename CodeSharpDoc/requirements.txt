@@ -15,3 +15,4 @@ google-generativeai
 langchain-google-genai
 langchain-google-vertexai
 langchain-anthropic
+rank_bm25

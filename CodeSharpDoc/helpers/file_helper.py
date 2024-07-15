@@ -1,6 +1,7 @@
 import os
 import shutil
 import glob
+import csv
 
 from helpers.txt_helper import txt
 
@@ -43,7 +44,20 @@ class file:
 
         # Write the content to the file
         with open(filepath, 'w', encoding='utf-8-sig') as file:
-            file.write(content)    
+            file.write(content)
+
+    def write_csv(filepath, data):
+        with open(filepath, 'w', newline='\r\n', encoding='utf-8-sig') as file:
+            writer = csv.writer(file)
+            #writer.writerows(data)
+            for line in data:
+                writer.writerow([line])
+
+    def read_csv(filepath):
+        with open(filepath, 'r', newline='\r\n', encoding='utf-8-sig') as file:
+            reader = csv.reader(file)
+            data = list(reader)
+        return data
     
     @staticmethod
     def save_contents_within_files(paths_and_new_codes: list):

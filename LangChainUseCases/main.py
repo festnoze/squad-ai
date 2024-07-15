@@ -18,6 +18,7 @@ from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from models.llm_info import LlmInfo
 from summarize import Summarize
 from helpers.groq_helper import GroqHelper
+from langchain_community.retrievers import BM25Retriever
 
 # external imports
 import openai
@@ -73,6 +74,19 @@ llms_infos = []
 #llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo",  timeout= 120, temperature = 0.5, api_key= openai_api_key))
 llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout= 60, temperature = 1, api_key= openai_api_key))
 llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout= 80, temperature = 0.1, api_key= openai_api_key))
+
+# Test BM25 retriever
+rag_structs_summaries_csv = "outputs/rag_structs_summaries.csv"
+documents = file.read_csv(rag_structs_summaries_csv)
+documents = [doc[0] for doc in documents]
+
+bm25_retriever = BM25Retriever.from_texts(documents)
+bm25_retriever.k = 7
+
+results = bm25_retriever.invoke("Which method speak about answers?")
+for result in results:
+    print(result.page_content)
+    print("----")
 
 # Examples of resolution with agent and tools or code generation
 #FunctionCallExamples.resolve_using_llm_direct(llms_infos)

@@ -13,6 +13,8 @@ from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.document_loaders import TextLoader
 from langchain_core.documents import Document
 #from langchain_community.vectorstores import FAISS
+from langchain_community.retrievers import BM25Retriever
+from langchain.retrievers import EnsembleRetriever
 from langchain_chroma import Chroma
 from langchain_community.embeddings.sentence_transformer import SentenceTransformerEmbeddings
 from langchain.retrievers.multi_query import MultiQueryRetriever
@@ -35,7 +37,6 @@ def build_vectorstore_from_folder_files(folder_path: str):
 
 vectorstore_path = "./chroma_db"
 
-# Obtain the vector store
 def build_vectorstore(documents: List[str]):
     embeddings = OpenAIEmbeddings(openai_api_key= os.getenv("OPEN_API_KEY"))
     #embeddings = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
@@ -44,6 +45,11 @@ def build_vectorstore(documents: List[str]):
         chunks.extend(split_text_into_chunks(document))
     db = Chroma.from_texts(texts= chunks, embedding = embeddings, persist_directory= vectorstore_path)
     return db
+
+def build_bm25_retriever(documents: List[str], doc_count: int) -> any:
+    bm25_retriever = BM25Retriever.from_texts(documents)
+    bm25_retriever.k = doc_count
+    return bm25_retriever
 
 def delete_vectorstore():
     file.delete_files_in_folder(vectorstore_path)

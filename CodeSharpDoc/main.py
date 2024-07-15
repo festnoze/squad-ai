@@ -70,6 +70,7 @@ generated_code_path = f"{project_path}/inputs/code_files_generated"
 origin_code_path = f"{project_path}/inputs/code_files_saved"
 struct_desc_folder_subpath = "outputs/structures_descriptions"
 struct_desc_folder_path = project_path + "/" + struct_desc_folder_subpath
+
 llm = LangChainFactory.create_llms_from_infos(llms_infos)[-1]
 rag = RAGService(llm)
 
@@ -106,21 +107,21 @@ while True:
 
     # Query the RAG service on methods summaries vector database
     elif choice == '3' or choice == 'q':
-        count = rag.load_vectorstore()
+        count = rag.load_vectorstore(bm25_results_count= 5)
         print(f"Vector store loaded with {count} items")
 
         query = input("What are you looking for? ")
         additionnal_context = file.get_as_str("inputs/rag_query_code_additionnal_instructions.txt")
 
         while query != '':
-            answer, documents = rag.query(query, additionnal_context)
+            answer, sources = rag.query(query, additionnal_context)
             print(answer)
             #if input("Do you want to see the sources? (y/_) ") == 'y':
-            print("Sources:")
-            for document in documents:
-                print('- ' + document.page_content)
+            print("> Sources:")
+            for source in sources:
+                print('- ' + source.page_content)
             print("------------------------------------")
-            query = input("What are you looking for next (empty to quit)? ")
+            query = input("What next are you looking for? - empty to quit. ")
         print_menu()
         continue
     

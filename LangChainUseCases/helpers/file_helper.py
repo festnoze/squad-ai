@@ -2,6 +2,7 @@ import json
 import os
 import shutil
 import glob
+import csv
 
 class file:
     def get_as_str(filename):
@@ -46,7 +47,20 @@ class file:
         # Write the content to the file
         with open(full_path, 'w', encoding='utf-8') as file:
             file.write(content)
+    
+    def write_csv(filepath, data):
+        with open(filepath, 'w', newline='\r\n', encoding='utf-8-sig') as file:
+            writer = csv.writer(file)
+            #writer.writerows(data)
+            for line in data:
+                writer.writerow([line])
 
+    def read_csv(filepath):
+        with open(filepath, 'r', newline='\r\n', encoding='utf-8-sig') as file:
+            reader = csv.reader(file)
+            data = list(reader)
+        return data
+    
 
     def delete_all_files_with_extension(extension, folder_path):
         files_to_delete = glob.glob(os.path.join(folder_path, f"{extension}"))
