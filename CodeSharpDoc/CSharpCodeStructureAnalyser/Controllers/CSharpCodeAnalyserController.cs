@@ -26,13 +26,4 @@ public class CSharpCodeAnalyserController : ControllerBase
     {
         CodeEditionService.AddGeneratedSummariesToCodeFilesAndSave(structuresSummaries);
     }
-
-
-    [HttpPost]
-    [ActionName("AddSummariesToCSharpCodeFiles")]
-    [Route("add-summaries/from-fake")]
-    public void AddFake()
-    {
-        var tmp = 0;
-    }
 }

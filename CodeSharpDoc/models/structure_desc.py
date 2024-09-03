@@ -98,7 +98,10 @@ class StructureDesc(BaseDesc):
         return result
     
     def __repr__(self):
-        return f"StructureDesc(name={self.name}, type={self.type})"
+        return f"StructureDesc(name={self.name}, type={self.struct_type.name})"
+    
+    def __str__(self):
+        return f"StructureDesc(name={self.name}, type={self.struct_type.name})"
     
     def generate_code_from_class_desc(self):
         class_file = ""

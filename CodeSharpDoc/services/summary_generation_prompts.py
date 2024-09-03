@@ -1,4 +1,5 @@
 import os
+from typing import List, Callable, Any
 #
 from helpers.txt_helper import txt
 from helpers.llm_helper import Llm
@@ -28,8 +29,8 @@ class SummaryGenerationPrompts:
                 The method name is: '{method.method_name}' and its full code is: """)
         
         prompt += Llm.embed_into_code_block('csharp', method.code)
-        if method.existing_summary:
-            prompt += '\n' + SummaryGenerationPrompts.compare_created_summary_with_existing
+        # if method.existing_summary:
+        #     prompt += '\n' + SummaryGenerationPrompts.compare_created_summary_with_existing
         return prompt
 
         # TODO: see how to rather use code_chunks from method_desc for big methods
@@ -51,18 +52,20 @@ class SummaryGenerationPrompts:
             {SummaryGenerationPrompts.ctor_txt if method.is_ctor else ""} for context, the method purpose is: '{method.generated_summary}'.
             Generate a description for each parameter of the following C# method.""")
         
+        return method_params_summaries_prompt
+    
+    @staticmethod
+    def get_output_parsing_prompt_for_parameters_summary(): 
         # Prompt extension to specify the awaited json output format (used when no output parser is defined)
-        json_formatting_spec_prompt = txt.single_line(f"""
+        return txt.single_line(f"""
             The awaited output should be a json array, with one item by parameter, each item having two keys: 
             - 'param_name': containing the parameter name, 
             - and 'param_desc': containing the description that you have generated of the parameter.""")
-        
-        return method_params_summaries_prompt, json_formatting_spec_prompt
-     
+
     @staticmethod                   
     def get_prompt_to_generate_method_return_summary(method: MethodDesc) -> str:
         params_list = txt.get_prop_or_key(method.generated_parameters_summaries, 'params_list')
-        params_list_str = ' ; '.join([str(item) for item in params_list])
+        params_list_str = ' ; '.join([str(item) for item in params_list]) if params_list else 'no parameters'
         prompt = txt.single_line(f"""\
             Create a description of the return value of the following C# method.
             Instructions: You always begin with: 'Returns ' then generate a description of the return value. The description must be very short and synthetic (less than 15 words)
@@ -89,3 +92,13 @@ class SummaryGenerationPrompts:
             To help you understand the global purpose of this class/record, hereinafter is listed all its members with theirs names and respective values:
             - {'\n- '.join([f'{enum_member.member_name} = {str(enum_member.member_value)};' for enum_member in enum_desc.enum_members.members])}""")
         return prompt
+    
+    @staticmethod
+    def get_all_methods_prompts(all_classes: List[Any], predicate: Callable[[MethodDesc], bool], delegate: Callable[[MethodDesc], str]) -> List[str]:
+        prompts = []
+        for class_struct in all_classes:
+            if len(class_struct.methods) > 0:
+                for method in class_struct.methods:
+                    if predicate(method):
+                        prompts.append(delegate(method))
+        return prompts

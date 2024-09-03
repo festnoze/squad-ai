@@ -10,6 +10,9 @@ public record StructureDesc : BaseDesc
     [JsonPropertyName("index_shift_code")]
     public int IndexShiftCode { get; set; }
 
+    [JsonPropertyName("end_code_index")]
+    public int EndCodeIndex { get; set; }
+
     [JsonPropertyName("indent_level")]
     public int IndentLevel { get; set; }
 
@@ -58,6 +61,7 @@ public record StructureDesc : BaseDesc
     public StructureDesc(
         string filePath, 
         int indexShiftCode,
+        int endCodeIndex,
         int indentLevel,
         StructureType structType, 
         string namespaceName, 
@@ -75,6 +79,7 @@ public record StructureDesc : BaseDesc
     {
         FilePath = filePath;
         IndexShiftCode = indexShiftCode;
+        EndCodeIndex = endCodeIndex;
         IndentLevel = indentLevel;
         StructType = structType;
         NamespaceName = namespaceName;

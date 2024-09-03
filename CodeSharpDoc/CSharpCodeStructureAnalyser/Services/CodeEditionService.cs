@@ -1,4 +1,5 @@
 ﻿using CSharpCodeStructureAnalyser.Models;
+using System.Linq;
 namespace CSharpCodeStructureAnalyser.Services;
 
 public static class CodeEditionService
@@ -41,17 +42,34 @@ public static class CodeEditionService
     public static void AddGeneratedSummariesToCodeFilesAndSave(IEnumerable<StructSummariesInfos> structuresSummaries)
     {
         var groupedByFilePath = structuresSummaries.GroupBy(s => s.FilePath);
-        // Display the grouped result
+        var errors = new List<Exception>();
         foreach (var group in groupedByFilePath)
         {
-            var code = AddGeneratedSummariesToInitialCode(group.ToList());
-            File.WriteAllText(group.First().FilePath, code);
+            try
+            {
+                //Skip the file if some generated summaries are missing
+                var fileStructs = group.ToList();
+                if (fileStructs.Any(s => string.IsNullOrEmpty(s.GeneratedSummary)) || fileStructs.Any(s => s.Methods.Any(m => string.IsNullOrEmpty(m.GeneratedXmlSummary))))
+                    continue;
+
+                var code = AddGeneratedSummariesToInitialCode(fileStructs);
+                File.WriteAllText(group.First().FilePath, code);
+            }
+            catch (Exception ex)
+            {
+                errors.Add(ex);
+            }
+        }
+
+        if (errors.Any())
+        {
+            throw new AggregateException(errors);
         }
     }
 
     public static string RemoveExistingSummariesFromFile(string code)
     {
-        var lines = code.Split(new[] { Environment.NewLine }, StringSplitOptions.None);
+        var lines = code.Split(new[] { "\n", "\r\n" }, StringSplitOptions.None);
         var filteredLines = lines.Where(line => !line.Trim().StartsWith("///")).ToList();
         return string.Join(Environment.NewLine, filteredLines);
     }

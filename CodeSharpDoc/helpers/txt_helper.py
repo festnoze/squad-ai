@@ -24,22 +24,22 @@ class txt:
     def single_line(text: str) -> str:
         return ' '.join([line.strip() for line in text.split('\n')])
         
-    def get_elapsed_str(start_time, end_time):
+    def get_elapsed_seconds(start_time, end_time):
         if not start_time or not end_time:
-            return None
-        elapsed_sec = int(end_time - start_time)
+            return 0
+        return int(end_time - start_time)
+        
+    
+    def get_elapsed_str(elapsed_sec: int):
+        elapsed_str = ''
         elapsed_minutes = int(elapsed_sec / 60)
         elapsed_seconds = int(elapsed_sec % 60)
 
-        if elapsed_sec == 0:
-            return None
-        
-        elapsed_str = ''
         if elapsed_minutes != 0:
             elapsed_str += f"{elapsed_minutes}m "
         elapsed_str +=  f"{elapsed_seconds}s"
         return '(' + elapsed_str + ')'
-
+    
     def get_prop_or_key(object, prop_to_find):
         if hasattr(object, prop_to_find):
             return getattr(object, prop_to_find)
@@ -95,7 +95,7 @@ class txt:
             txt.waiting_spinner_thread.join()
             txt.waiting_spinner_thread = None
 
-    def stop_spinner_replace_text(text=None):
+    def stop_spinner_replace_text(text=None)-> int:
         txt.stop_spinner()
         if not txt.activate_print:
             return None
@@ -104,9 +104,11 @@ class txt:
         if not text:
             text = empty
             sys.stdout.write(f'\r{empty}')
+            return 0
         else:
             if txt.start_time:
-                elapsed_str = txt.get_elapsed_str(txt.start_time, time.time())
+                elapsed_sec = txt.get_elapsed_seconds(txt.start_time, time.time())
+                elapsed_str = txt.get_elapsed_str(elapsed_sec)
                 if elapsed_str:
                     elapsed_str = f" {elapsed_str}."
                 else:
@@ -116,3 +118,4 @@ class txt:
             text = f"✓ {text}{elapsed_str}" 
             sys.stdout.write(f'\r{empty}')
             sys.stdout.write(f'\r{text}\r\n')
+            return elapsed_sec if elapsed_sec else 0

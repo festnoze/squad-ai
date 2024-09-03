@@ -5,6 +5,8 @@ import uuid
 from langsmith import Client
 import requests
 
+from helpers.txt_helper import txt
+
 class Langsmith:
     def __init__(self):
         self.langsmith_api_key = os.getenv("LANGCHAIN_API_KEY")
@@ -25,6 +27,7 @@ class Langsmith:
             project_name= self.langsmith_project_session,
             description= f"{datetime.datetime.now().strftime('%d/%m/%Y at: %H:%M:%S')} session of: '{self.langsmith_project_name}'",
         )
+        txt.print(f"Langsmith project '{self.langsmith_project_session}' created")
         return self.session
 
     def create_dataset(self):
@@ -48,3 +51,5 @@ class Langsmith:
         for project in projects:
             if project.name.startswith(self.langsmith_project_name) and project.name != self.langsmith_project_name:
                 self.client.delete_project(project_name=project.name)
+                txt.print_with_spinner(f"Langsmith project '{project.name}' deleted")
+        txt.stop_spinner_replace_text("Langsmith All related projects deleted.")

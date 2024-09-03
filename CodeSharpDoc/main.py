@@ -66,7 +66,8 @@ def print_menu() -> None:
     print("5. Exit")
 
 project_path = "C:/Dev/squad-ai/CodeSharpDoc"
-generated_code_path = f"{project_path}/inputs/code_files_generated"
+generated_code_path = "C:/Dev/LMS/lms-api"
+#generated_code_path = f"{project_path}/inputs/code_files_generated"
 origin_code_path = f"{project_path}/inputs/code_files_saved"
 struct_desc_folder_subpath = "outputs/structures_descriptions"
 struct_desc_folder_path = project_path + "/" + struct_desc_folder_subpath
@@ -82,10 +83,10 @@ while True:
     # Generate summaries for all specified C# files
     if (choice == "1" or choice == "g"):
         # Re-initialize files which will be touched
-        file.delete_files_in_folder(generated_code_path)
-        file.copy_folder_files_and_folders_to_folder(origin_code_path, generated_code_path)
-        txt.activate_print = True # Activate print each step advancement in the console
+        # file.delete_files_in_folder(generated_code_path)
+        # file.copy_folder_files_and_folders_to_folder(origin_code_path, generated_code_path)
 
+        txt.activate_print = True # Activate print each step advancement in the console
         existing_structs_desc, json_files = SummaryGenerationService.load_json_structs_desc_from_folder(struct_desc_folder_path)
         if existing_structs_desc:
             print(f"{len(existing_structs_desc)} structures descriptions already exist. We will keep those structures descriptions...")
@@ -117,7 +118,7 @@ while True:
             answer, sources = rag.query(query, additionnal_context)
             print(answer)
             #if input("Do you want to see the sources? (y/_) ") == 'y':
-            print("> Sources:")
+            print(">>>>> Sources: <<<<<<")
             for source in sources:
                 print('- ' + source.page_content)
             print("------------------------------------")

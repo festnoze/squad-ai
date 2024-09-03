@@ -152,8 +152,12 @@ class Llm:
 
         answers = []
         for chains_batch in chains_batches:
-            combined = RunnableParallel(**{f"invoke_{i}": chain for i, chain in enumerate(chains_batch)}).with_config({"run_name": action_name})
-            responses = combined.invoke(inputs)            
+            # combined = RunnableParallel(**{f"invoke_{i}": chain for i, chain in enumerate(chains_batch)}).with_config({"run_name": action_name})
+            # responses = combined.invoke(inputs)
+            combined = RunnableParallel(**{f"invoke_{i}": chain for i, chain in enumerate(chains_batch)})
+            parallel_chains = combined.with_config({"run_name": f"{action_name}{f"- batch x{str(batch_size)}" if batch_size else ""}"})
+            responses = parallel_chains.invoke(inputs) 
+
             responses_list = [responses[key] for key in responses.keys()]
             batch_answers = [Llm.get_llm_answer_content(response) for response in responses_list]
             answers.extend(batch_answers)

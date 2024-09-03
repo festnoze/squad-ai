@@ -31,7 +31,7 @@ public static class CSharpCodeAnalyserService
             var targetStruct = targetStructs.Single(s => s.Name == structWithSummaries.Name);
             foreach (var method in structWithSummaries.Methods)
             {
-                var targetMethod = targetStruct.Methods.Single(m => 
+                var targetMethod = targetStruct.Methods.First(m => 
                     m.Name == method.Name && 
                     m.AccessModifier == method.AccessModifier && 
                     m.Params.Count == method.Params.Count && 
@@ -60,8 +60,15 @@ public static class CSharpCodeAnalyserService
             var structType = GetStructType(decl);
             if (structType != null)
             {
-                var structs = CreateStructureDesc(decl, codeWoSummaries, filePath, structType!.Value);
-                structures.Add(structs);
+                var structure = CreateStructureDesc(decl, filePath, structType!.Value);
+
+                //Shift indexes of containing structures having embedded structures
+                if (structures.Any(str => str.IndexShiftCode < structure.IndexShiftCode && str.EndCodeIndex > structure.EndCodeIndex))
+                {
+                    var structsWithEmbededOnes = structures.Where(str => str.IndexShiftCode < structure.IndexShiftCode && str.EndCodeIndex > structure.IndexShiftCode).ToList();
+                    structsWithEmbededOnes.ForEach(s => s.IndexShiftCode += structure.EndCodeIndex - structure.IndexShiftCode);
+                }
+                structures.Add(structure);
             }
         }
         return structures;
@@ -118,7 +125,7 @@ public static class CSharpCodeAnalyserService
         return structType;
     }
 
-    private static StructureDesc CreateStructureDesc(SyntaxNode decl, string fullCode, string filePath, StructureType structType)
+    private static StructureDesc CreateStructureDesc(SyntaxNode decl, string filePath, StructureType structType)
     {
         var namespaceName = decl.Ancestors().OfType<NamespaceDeclarationSyntax>().FirstOrDefault()?.Name.ToString() ?? string.Empty;
         var usings = decl.SyntaxTree.GetCompilationUnitRoot().Usings.Select(u => u.Name!.ToString()).ToList();
@@ -202,9 +209,13 @@ public static class CSharpCodeAnalyserService
                     startIndex = trivia.FullSpan.End;
         }
 
+        var endIndex = decl.FullSpan.End;//decl.SyntaxTree.GetLineSpan(decl.FullSpan).EndLinePosition.Line + 1;
+
+
         return new StructureDesc(
             filePath,
             startIndex,
+            endIndex,
             indentLevel,
             structType,
             namespaceName,
