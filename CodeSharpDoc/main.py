@@ -16,7 +16,6 @@ import openai
 import os
 from dotenv import find_dotenv, load_dotenv
 
-print("Starting...")
 load_dotenv(find_dotenv())
 
 groq_api_key = os.getenv("GROQ_API_KEY")
@@ -24,10 +23,6 @@ openai_api_key = os.getenv("OPEN_API_KEY")
 google_api_key = os.getenv("GOOGLE_API_KEY")
 anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
 #openai.api_key = openai_api_key
-
-langsmith = Langsmith()
-#langsmith.delete_all_project_sessions()
-langsmith.create_project()
 
 # Select the LLMs to be used for first and fallbacks uses
 llms_infos = []
@@ -59,47 +54,47 @@ def print_menu() -> None:
     print("")
     print("Choose one of the available actions (press number or 1st letter):")
     print("------------------------------------")
-    print("1. Generate summaries for all C# files in the project")
-    print("2. Build vector database from analysed structs json files")
-    print("3. Query the RAG service")
-    print("4. Help: Display this menu again")
-    print("5. Exit")
+    print("1. Generate & replace summaries for all C# files in the project")
+    print("2. Analyse code structures & summaries and save structs json files")
+    print("3. Build new vector database from analysed structures json files")
+    print("4. Query RAG service on vector database")
+    print("5. Help: Display this menu again")
+    print("6. Exit")
+
+print("Starting...")
+langsmith = Langsmith()
+langsmith.delete_all_project_sessions()
+langsmith.create_project()
 
 project_path = "C:/Dev/squad-ai/CodeSharpDoc"
-generated_code_path = "C:/Dev/LMS/lms-api"
-#generated_code_path = f"{project_path}/inputs/code_files_generated"
-origin_code_path = f"{project_path}/inputs/code_files_saved"
+target_code_path = "C:/Dev/studi.api.lms.user/src"
+#target_code_path = "C:/Dev/LMS/lms-api"
+#target_code_path = f"{project_path}/inputs/code_files_generated"
 struct_desc_folder_subpath = "outputs/structures_descriptions"
-struct_desc_folder_path = project_path + "/" + struct_desc_folder_subpath
-
+struct_desc_folder_path = f"{project_path}/{struct_desc_folder_subpath}"
+#
 llm = LangChainFactory.create_llms_from_infos(llms_infos)[-1]
 rag = RAGService(llm)
 
-print_menu()
+txt.activate_print = True # Activate print each step advancement in the console
 
+print_menu()
 while True:
     choice = input("")
     
     # Generate summaries for all specified C# files
-    if (choice == "1" or choice == "g"):
-        # Re-initialize files which will be touched
-        # file.delete_files_in_folder(generated_code_path)
-        # file.copy_folder_files_and_folders_to_folder(origin_code_path, generated_code_path)
+    if choice == "1" or choice == "g":
+        existing_structs_analysis = SummaryGenerationService.load_json_structs_from_folder_and_ask_to_replace(struct_desc_folder_path)
+        SummaryGenerationService.generate_and_save_all_summaries_all_csharp_files_from_folder(target_code_path, existing_structs_analysis, llms_infos)
+        continue
 
-        txt.activate_print = True # Activate print each step advancement in the console
-        existing_structs_desc, json_files = SummaryGenerationService.load_json_structs_desc_from_folder(struct_desc_folder_path)
-        if existing_structs_desc:
-            print(f"{len(existing_structs_desc)} structures descriptions already exist. We will keep those structures descriptions...")
-            update_choice = input("... unless you want to Regenerate them? (r/_) ")
-            if update_choice == 'r':
-                for json_file in json_files:
-                    file.delete_file(json_file)
-                existing_structs_desc = []
-        SummaryGenerationService.generate_and_save_all_summaries_all_csharp_files_from_folder(generated_code_path, existing_structs_desc, llms_infos)
+    elif choice == "2" or choice == "a":
+        existing_structs_analysis = SummaryGenerationService.load_json_structs_from_folder_and_ask_to_replace(struct_desc_folder_path)
+        SummaryGenerationService.save_structures_analysis_code_files_from_folder(target_code_path, existing_structs_analysis, llms_infos)
         continue
 
     # Build vector database
-    elif choice == '2' or choice == 'b':
+    elif choice == '3' or choice == 'b':
         rag.delete_vectorstore() # delete previous DB first
         docs = rag.load_structures_summaries(struct_desc_folder_path)
         count = rag.build_vectorstore_from(docs)
@@ -107,7 +102,7 @@ while True:
         continue
 
     # Query the RAG service on methods summaries vector database
-    elif choice == '3' or choice == 'q':
+    elif choice == '4' or choice == 'q':
         count = rag.load_vectorstore(bm25_results_count= 5)
         print(f"Vector store loaded with {count} items")
 
@@ -126,10 +121,10 @@ while True:
         print_menu()
         continue
     
-    elif choice == '4' or choice == 'h':
+    elif choice == '5' or choice == 'h':
         print_menu()
         continue
-    elif choice == '5' or choice == 'e':
+    elif choice == '6' or choice == 'e':
         print ("End program")
         break
     else:

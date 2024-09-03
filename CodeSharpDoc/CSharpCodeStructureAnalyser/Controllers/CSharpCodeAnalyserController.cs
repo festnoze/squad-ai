@@ -14,16 +14,16 @@ public class CSharpCodeAnalyserController : ControllerBase
     [HttpPost]
     [ActionName("GetAnalysedCSharpCodeStructure")]
     [Route("analyse/from-folder")]
-    public IEnumerable<StructureDesc> GetAnalysedCSharpCodeFolder([FromBody] List<string> filesPath)
+    public IEnumerable<StructureDesc> GetAnalysedCSharpCodeFolder([FromBody] List<string> filesPath, [FromQuery] bool includeActualSummaries)
     {
-        return CSharpCodeAnalyserService.AnalyzeFiles(filesPath);
+        return CSharpCodeAnalyserService.AnalyzeFiles(filesPath, includeActualSummaries);
     }
 
     [HttpPost]
-    [ActionName("AddSummariesToCSharpCodeFiles")]
-    [Route("add-summaries/to-structures")]
-    public void AddSummariesToCSharpCodeFiles([FromBody]List<StructSummariesInfos> structuresSummaries)
+    [ActionName("ReplaceExistingSummariesWithNewProvidedSummariesIntoCodeFiles")]
+    [Route("replace-summaries/to-structures")]
+    public void ReplaceExistingSummariesWithNewProvidedSummariesIntoCodeFiles([FromBody]List<StructSummariesInfos> structuresSummaries)
     {
-        CodeEditionService.AddGeneratedSummariesToCodeFilesAndSave(structuresSummaries);
+        CodeEditionService.ReplaceExistingSummariesWithNewProvidedSummariesIntoCodeFiles(structuresSummaries);
     }
 }

@@ -45,72 +45,95 @@ class SummaryGenerationService:
         global_missing_methods_summaries = 0
         global_missing_structs_summaries = 0
 
-        # Process each batch separately
+        # Process each batch sequentially
         total_elapsed = 0
         for i, paths_and_codes_batch in enumerate(paths_and_codes_batchs):
             txt.print("\nBatch n°" + str(i+1) + " of " + str(len(paths_and_codes_batchs)) + ":")
             paths_and_codes_chunk = dict(paths_and_codes_batch)                
             paths_and_codes_chunk = SummaryGenerationService.remove_auto_generated_files(paths_and_codes_chunk)
-
             if len(paths_and_codes_chunk) == 0: continue
-
-            #structures_from_python = CSharpCodeStructureAnalyser.extract_code_structures_from_code_files(paths_and_codes_chunk)
-            structs_to_process = code_analyser_client.parse_and_analyse_code_files(list(paths_and_codes_chunk.keys()))
-            
-            #SummaryGenerationService.copy_missing_infos(structures_from_python, known_structures)
+            structs_to_process = code_analyser_client.parse_and_analyse_code_files(list(paths_and_codes_chunk.keys()), False)
             CSharpCodeStructureAnalyser.chunkify_code_of_classes_methods(structs_to_process) 
 
             elapsed = SummaryGenerationService.generate_all_summaries_for_all_structures(llms, structs_to_process, f"Files batch n°{i+1}/{len(paths_and_codes_batchs)} - ") 
             total_elapsed += elapsed
 
-            structs_summaries_infos, missing_methods_summaries, missing_structs_summaries = SummaryGenerationService.create_struct_summaries_infos(structs_to_process)
+            structs_summaries_infos, missing_methods_summaries, missing_structs_summaries = SummaryGenerationService.create_struct_summaries_infos(structs_to_process, True)
             global_missing_methods_summaries += missing_methods_summaries
             global_missing_structs_summaries += missing_structs_summaries
             if missing_methods_summaries != 0: txt.print(f"Missing methods summaries: {missing_methods_summaries}")
             if missing_structs_summaries != 0: txt.print(f"Missing structs summaries: {missing_structs_summaries}")
-            
-            # paths_and_new_codes = SummaryGenerationService.add_generated_summaries_to_initial_codes(paths_and_codes_chunk, structs_to_process)
-            # file.save_contents_within_files(paths_and_new_codes)      
-            # 2 above lines are replaced by this # call:
             code_analyser_client.add_summaries_to_code_files(structs_summaries_infos)
             
-            JsonHelper.save_as_json_files(structs_to_process, f'outputs\\structures_descriptions')
-            
-        txt.print("\nAll actions finished: all codes files saved with new summaries.")
+        txt.print("\nAll summaries generated & codes files saved with new summaries.")
         txt.print(f"Total missing methods summaries: {global_missing_methods_summaries}")
         txt.print(f"Total missing structs summaries: {global_missing_structs_summaries}")
         txt.print(f"Total elapsed time: {total_elapsed}s.")
         txt.print("---------------------------")
 
     @staticmethod
-    def create_struct_summaries_infos(structure_descs: list[StructureDesc]) -> list[StructSummariesInfos]:
+    def save_structures_analysis_code_files_from_folder(file_path: str, existing_structs_desc: list[StructureDesc], llms_infos: list[LlmInfo]):  
+        txt.activate_print = True
+        llms = LangChainFactory.create_llms_from_infos(llms_infos)
+        paths_and_codes = file.get_files_paths_and_contents(file_path, 'cs')
+        SummaryGenerationService.remove_already_analysed_files(existing_structs_desc, paths_and_codes)
+
+        # Split code files 'paths_and_codes' into batchs of 'files-batch-size' items
+        paths_and_codes_batchs = []
+        for i in range(0, len(paths_and_codes), SummaryGenerationService.files_batch_size):
+            batch = list(paths_and_codes.items())[i:i+SummaryGenerationService.files_batch_size]
+            paths_and_codes_batchs.append(batch)
+
+        # Process each batch
+        for i, paths_and_codes_batch in enumerate(paths_and_codes_batchs):
+            paths_and_codes_chunk = dict(paths_and_codes_batch)                
+            paths_and_codes_chunk = SummaryGenerationService.remove_auto_generated_files(paths_and_codes_chunk)
+            if len(paths_and_codes_chunk) == 0: continue
+            structs_to_process = code_analyser_client.parse_and_analyse_code_files(list(paths_and_codes_chunk.keys()), True)
+            CSharpCodeStructureAnalyser.chunkify_code_of_classes_methods(structs_to_process)
+            structs_summaries_infos, missing_methods_summaries, missing_structs_summaries = SummaryGenerationService.create_struct_summaries_infos(structs_to_process, False)
+            JsonHelper.save_as_json_files(structs_to_process, f'outputs\\structures_descriptions')
+            
+        txt.print("\nAll codes files structures analysed.")
+
+    @staticmethod
+    def create_struct_summaries_infos(structure_descs: list[StructureDesc], from_generated_summary: bool) -> list[StructSummariesInfos]:
         struct_summaries_list : list[StructSummariesInfos] = []
         missing_methods_summaries = 0
         missing_structs_summaries = 0
+        struct_summary_prop_name = 'generated_summary' if from_generated_summary else 'existing_summary'
+        method_summary_prop_name = 'generated_xml_summary' if from_generated_summary else 'existing_summary'
 
         for struct_desc in structure_descs:
             method_summaries = []
             for method in struct_desc.methods:
-                if method.generated_xml_summary:
-                    method_summary = MethodSummaryInfo(method.code_start_index, method.generated_xml_summary)
+                method_summary = ''
+                if hasattr(method, method_summary_prop_name):
+                    method_summary = getattr(method, method_summary_prop_name)
+                    if not method_summary:
+                        method_summary = ''
+                        missing_methods_summaries += 1
                 else:
-                    method_summary = MethodSummaryInfo(method.code_start_index, '')
+                    method_summary = ''
                     missing_methods_summaries += 1
-                                                       
-                method_summaries.append(method_summary)
+                                                                           
+                method_summaries.append(MethodSummaryInfo(method.code_start_index, method_summary))
             
-            generated_summary = ""
-            if hasattr(struct_desc, 'generated_summary'):
-                generated_summary = struct_desc.generated_summary
+            struct_summary = ''
+            if hasattr(struct_desc, struct_summary_prop_name):
+                struct_summary = getattr(struct_desc, struct_summary_prop_name)
+                if not struct_summary:
+                    struct_summary = ''
+                    missing_structs_summaries += 1
             else:
-                generated_summary = ""
+                struct_summary = ''
                 missing_structs_summaries += 1
 
             struct_summary_info = StructSummariesInfos(
                 file_path=struct_desc.file_path,
                 index_shift_code=struct_desc.index_shift_code,
                 indent_level=struct_desc.indent_level,
-                generated_summary=generated_summary,
+                summary=struct_summary,
                 methods=method_summaries
             )
 
@@ -140,6 +163,17 @@ class SummaryGenerationService:
         for key in removed_keys:
             del paths_and_codes[key]
 
+    def load_json_structs_from_folder_and_ask_to_replace(folder_path: str):
+        existing_structs_desc, json_files = SummaryGenerationService.load_json_structs_desc_from_folder(folder_path)
+        if existing_structs_desc:
+            print(f"{len(existing_structs_desc)} structures descriptions already exist. We will keep those structures descriptions...")
+            update_choice = input("... unless you want to Regenerate them? (r/_) ")
+            if update_choice == 'r':
+                for json_file in json_files:
+                    file.delete_file(json_file)
+                existing_structs_desc = []
+        return existing_structs_desc
+    
     def load_json_structs_desc_from_folder(folder_path: str):
         json_files = file.get_files_paths_and_contents(folder_path, 'json')
         structures_descriptions = []
@@ -147,18 +181,6 @@ class SummaryGenerationService:
             json_struct_desc = json.loads(json_files[file_path])
             structures_descriptions.append(StructureDesc(**json_struct_desc))
         return structures_descriptions, json_files
-
-    @staticmethod
-    def copy_missing_infos(structures_from_python, known_structures):        
-        """ Copy all methods' params and code_start_index from python structures to csharp structures methods """
-        for struct in known_structures:
-            for method in struct.methods:
-                for python_struct in structures_from_python:
-                    if python_struct.struct_name == struct.struct_name:
-                        for python_method in python_struct.methods:
-                            if python_method.method_name == method.method_name:
-                                method.code_start_index = python_method.code_start_index
-                                break
     
     @staticmethod
     def classes_methods_count(known_structures: list[StructureDesc]):
@@ -187,39 +209,6 @@ class SummaryGenerationService:
                     method.generated_return_summary = class_method.generated_return_summary
                     method.generated_xml_summary = class_method.generated_xml_summary
 
-    #obsolete
-    @staticmethod
-    def add_generated_summaries_to_initial_codes(paths_and_codes: dict, structures_summaries_infos: list):
-        paths_and_new_codes = {}
-
-        for file_path, code in paths_and_codes.items():
-            # Determine all the concerned structures_summaries_infos for the current file
-            relevant_structures = [s for s in structures_summaries_infos if s.file_path == file_path]
-
-            if not relevant_structures:
-                continue
-            
-            new_code = code
-
-            for struct_info in sorted(relevant_structures, key=lambda m: m.index_shift_code, reverse=True):
-                # Add methods summaries to the code
-                for method in sorted(struct_info.methods, key=lambda m: m.code_start_index, reverse=True):
-                    method_summary = method.generated_xml_summary.rstrip()
-                    method_summary = '\n' + txt.indent(struct_info.indent_level + 1, method_summary)
-                    before = new_code[:method.code_start_index]
-                    after = new_code[method.code_start_index:]
-                    new_code = before + method_summary + after
-
-                # Add global structure summary to the code
-                if struct_info.generated_summary:
-                    global_summary = '\n' + txt.indent(struct_info.indent_level, struct_info.generated_summary.rstrip())
-                    before = new_code[:struct_info.index_shift_code]
-                    after = new_code[struct_info.index_shift_code:]
-                    new_code = before + global_summary + after
-            
-            paths_and_new_codes[file_path] = new_code
-        return paths_and_new_codes
-    
     @staticmethod
     def generate_all_summaries_for_all_structures(llms: list[BaseChatModel], structures: list[StructureDesc], action_name_prefix: str)-> int:
         txt.print_with_spinner(f"Ongoing parallel summaries generation for {SummaryGenerationService.classes_methods_count(structures)} methods in {len(structures)} code files:")

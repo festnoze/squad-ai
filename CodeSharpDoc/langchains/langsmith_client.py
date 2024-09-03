@@ -51,5 +51,5 @@ class Langsmith:
         for project in projects:
             if project.name.startswith(self.langsmith_project_name) and project.name != self.langsmith_project_name:
                 self.client.delete_project(project_name=project.name)
-                txt.print_with_spinner(f"Langsmith project '{project.name}' deleted")
-        txt.stop_spinner_replace_text("Langsmith All related projects deleted.")
+                print(f"Langsmith project '{project.name}' deleted")
+        print("Langsmith All related projects deleted.")

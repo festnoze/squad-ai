@@ -14,6 +14,7 @@ from models.structure_types import StructureType
 from summarize import Summarize
 import re
 
+#obsolete: use C# project using Roselyn, which is more accurate, instead
 class CSharpCodeStructureAnalyser:
     @staticmethod
     def extract_code_structures_from_code_files(paths_and_codes):

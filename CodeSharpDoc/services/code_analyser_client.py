@@ -1,4 +1,5 @@
 from typing import AsyncGenerator
+from urllib.parse import urlencode
 import requests 
 from requests.exceptions import HTTPError
 import json
@@ -12,11 +13,16 @@ class code_analyser_client:
     controller_subpath = "code-structure"
     #endpoints
     analyse_folder_files_post = "analyse/from-folder"
-    add_summaries_files_post = "add-summaries/to-structures"
+    add_summaries_files_post = "replace-summaries/to-structures"
 
     @staticmethod
-    def parse_and_analyse_code_files(files_paths: list[str]) -> list[StructureDesc]:
-        url = f"{code_analyser_client.host_uri}/{code_analyser_client.controller_subpath}/{code_analyser_client.analyse_folder_files_post}"        
+    def parse_and_analyse_code_files(files_paths: list[str], does_include_actual_summaries: bool) -> list[StructureDesc]:
+        url = f"{code_analyser_client.host_uri}/{code_analyser_client.controller_subpath}/{code_analyser_client.analyse_folder_files_post}"   
+        query_params = {
+            'includeActualSummaries': str(does_include_actual_summaries).lower()
+        }
+        url += f"?{urlencode(query_params)}"
+        
         headers = {
             'accept': 'text/plain',
             'Content-Type': 'application/json'

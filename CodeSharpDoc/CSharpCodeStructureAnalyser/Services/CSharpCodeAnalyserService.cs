@@ -8,7 +8,7 @@ namespace CSharpCodeStructureAnalyser.Services;
 
 public static class CSharpCodeAnalyserService
 {
-    public static List<StructureDesc> AnalyzeFiles(List<string> filesPath)
+    public static List<StructureDesc> AnalyzeFiles(List<string> filesPath, bool doesMethodsShiftIndexesIncludeActualSummaries)
     {
         var csFilesCode = CodeLoaderService.LoadCsFiles(filesPath);
         var structures = new List<StructureDesc>();
@@ -16,8 +16,11 @@ public static class CSharpCodeAnalyserService
         foreach (var file in csFilesCode)
         {
             var newStructs = AnalyzeFile(file.Value, file.Key, true);
-            var structsWithSummaries = AnalyzeFile(file.Value, file.Key, false);
-            CopyExistingSummariesToStructs(ref newStructs, ref structsWithSummaries);
+            if (!doesMethodsShiftIndexesIncludeActualSummaries)
+            {
+                var structsWithSummaries = AnalyzeFile(file.Value, file.Key, false);
+                CopyExistingSummariesToStructs(ref newStructs, ref structsWithSummaries);
+            }
             structures.AddRange(newStructs);
         }
 

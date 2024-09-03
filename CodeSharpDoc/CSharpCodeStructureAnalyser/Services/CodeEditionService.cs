@@ -4,7 +4,7 @@ namespace CSharpCodeStructureAnalyser.Services;
 
 public static class CodeEditionService
 {
-    public static string AddGeneratedSummariesToInitialCode(IEnumerable<StructSummariesInfos> structuresSummariesInfos)
+    public static string ReplaceExistingSummariesWithNewProvidedSummariesIntoCodeFile(IEnumerable<StructSummariesInfos> structuresSummariesInfos)
     {
         // Load code from file
         var code = File.ReadAllText(structuresSummariesInfos.First().FilePath);
@@ -39,7 +39,7 @@ public static class CodeEditionService
         return newCode;
     }
 
-    public static void AddGeneratedSummariesToCodeFilesAndSave(IEnumerable<StructSummariesInfos> structuresSummaries)
+    public static void ReplaceExistingSummariesWithNewProvidedSummariesIntoCodeFiles(IEnumerable<StructSummariesInfos> structuresSummaries)
     {
         var groupedByFilePath = structuresSummaries.GroupBy(s => s.FilePath);
         var errors = new List<Exception>();
@@ -52,7 +52,7 @@ public static class CodeEditionService
                 if (fileStructs.Any(s => string.IsNullOrEmpty(s.GeneratedSummary)) || fileStructs.Any(s => s.Methods.Any(m => string.IsNullOrEmpty(m.GeneratedXmlSummary))))
                     continue;
 
-                var code = AddGeneratedSummariesToInitialCode(fileStructs);
+                var code = ReplaceExistingSummariesWithNewProvidedSummariesIntoCodeFile(fileStructs);
                 File.WriteAllText(group.First().FilePath, code);
             }
             catch (Exception ex)
