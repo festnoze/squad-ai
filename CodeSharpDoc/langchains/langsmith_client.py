@@ -49,7 +49,7 @@ class Langsmith:
     def delete_all_project_sessions(self):
         projects = self.get_all_projects()
         for project in projects:
-            if project.name.startswith(self.langsmith_project_name) and project.name != self.langsmith_project_name:
+            if project.name.startswith(self.langsmith_project_name): # and project.name != self.langsmith_project_name:
                 self.client.delete_project(project_name=project.name)
                 print(f"Langsmith project '{project.name}' deleted")
         print("Langsmith All related projects deleted.")

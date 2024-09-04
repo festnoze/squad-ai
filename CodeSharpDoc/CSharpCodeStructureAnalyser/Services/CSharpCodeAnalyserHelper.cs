@@ -25,6 +25,10 @@ public static class CSharpCodeAnalyserHelper
                                      .Select(t => t.ToFullString())
                                      .Where(line => !string.IsNullOrWhiteSpace(line))
                                      .Aggregate(string.Empty, (current, next) => current + next.Trim() + " ");
-        return summaryText.Trim();
+        
+        var lines = summaryText.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+        var processedLines = lines.Select(line => line.Contains("///") ? line.Substring(line.IndexOf("///") + 3).Trim() : line.Trim());
+        var cleanedSummary = string.Join("\r\n", processedLines).Trim();
+        return cleanedSummary;
     }
 }

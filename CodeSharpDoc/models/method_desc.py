@@ -185,7 +185,7 @@ class MethodDesc(BaseDesc):
         for line in lines:
             if '[' in line:
                 line_attributes = re.findall(attribute_pattern, line)
-                if len(line_attributes) > 0:
+                if any(line_attributes):
                     attributs_list.extend(line_attributes)
         return attributs_list
     

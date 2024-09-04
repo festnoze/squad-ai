@@ -15,13 +15,16 @@ public static class CSharpCodeAnalyserService
 
         foreach (var file in csFilesCode)
         {
-            var newStructs = AnalyzeFile(file.Value, file.Key, true);
+            var structsWithSummaries = AnalyzeFile(file.Value, file.Key, false);
+
+            List<StructureDesc> structsWithoutSummaries = null!;
             if (!doesMethodsShiftIndexesIncludeActualSummaries)
             {
-                var structsWithSummaries = AnalyzeFile(file.Value, file.Key, false);
-                CopyExistingSummariesToStructs(ref newStructs, ref structsWithSummaries);
+                structsWithoutSummaries = AnalyzeFile(file.Value, file.Key, true);
+                CopyExistingSummariesToStructs(ref structsWithoutSummaries, ref structsWithSummaries);
             }
-            structures.AddRange(newStructs);
+
+            structures.AddRange(doesMethodsShiftIndexesIncludeActualSummaries ? structsWithSummaries : structsWithoutSummaries);
         }
 
         return structures;

@@ -1,17 +1,11 @@
 from langchain_text_splitters import Language, RecursiveCharacterTextSplitter
-from langchain_core.language_models import BaseChatModel
-from langchain_core.prompts import ChatPromptTemplate
 import re
 # internal imports
 from helpers.txt_helper import txt
-from models.base_desc import BaseDesc
-from models.structure_desc import StructureDesc, StructureDescPydantic
+from models.structure_desc import StructureDesc
 from models.method_desc import MethodDesc
-from models.param_doc import ParameterDocumentation
-from models.params_doc import MethodParametersDocumentation, MethodParametersDocumentationPydantic
 from models.prop_desc import PropertyDesc
-from models.structure_types import StructureType
-from summarize import Summarize
+from models.structure_type import StructureType
 import re
 
 #obsolete: use C# project using Roselyn, which is more accurate, instead
@@ -22,7 +16,7 @@ class CSharpCodeStructureAnalyser:
         all_parsed_structs = []
         for file_path, code in paths_and_codes.items():
             structures_descriptions: list[StructureDesc] = CSharpCodeStructureAnalyser.get_structures_from_code_file(file_path, code)
-            if structures_descriptions and len(structures_descriptions) > 0:
+            if structures_descriptions and any(structures_descriptions):
                 all_parsed_structs.extend(structures_descriptions)
         txt.stop_spinner_replace_text(f"{len(paths_and_codes)} files were parsed successfully. Found {len(paths_and_codes)} files containing structures (like class, interface, record, enum ...)")
         return all_parsed_structs

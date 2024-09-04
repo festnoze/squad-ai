@@ -37,7 +37,7 @@ class MethodParametersDocumentation:
             str: The string representation of the MethodParametersDocumentation object.
         """
         desc = "The method contains the following parameters and their descriptions:\n"
-        if self.params_list and len(self.params_list) > 0:
+        if self.params_list and any(self.params_list):
             desc += '\n  * ' + '\n  * '.join([str(param) for param in self.params_list])
         else:
             desc += "No parameter required for the method."

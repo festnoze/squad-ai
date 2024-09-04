@@ -8,7 +8,8 @@ from models.method_desc import MethodDesc, MethodDescPydantic
 from models.param_desc import ParameterDesc
 from models.param_doc import ParameterDocumentation
 from models.prop_desc import PropertyDesc, PropertyDescPydantic
-from models.structure_types import StructureType
+from models.structure_functional_type import StructureFunctionalType
+from models.structure_type import StructureType
 import json
 
 class StructureDesc(BaseDesc):
@@ -48,8 +49,9 @@ class StructureDesc(BaseDesc):
         self.related_structures: list[StructureDesc] = []
         self.methods: list[MethodDesc] = methods
         self.properties: list[PropertyDesc] = properties,
-        self.enum_members: EnumMembersDesc = enum_members,
+        self.enum_members: EnumMembersDesc = enum_members
         self.generated_summary: str = generated_summary
+        self.functional_type: StructureFunctionalType = StructureDesc.GetFunctionalTypeFromStructureName(self)
     
     def __init__(self, **kwargs):
         if len(kwargs) == 1 and 'params_list' in kwargs:
@@ -70,12 +72,12 @@ class StructureDesc(BaseDesc):
                     else:
                         self.struct_type: str = StructureType[value]
                 elif key == 'methods':
-                    if type(value) is list and len(value) > 0 and type(value[0]) is MethodDesc:
+                    if type(value) is list and any(value) and type(value[0]) is MethodDesc:
                         self.methods: list[MethodDesc] = value
                     else:
                         self.methods: list[MethodDesc] = [MethodDesc.factory_from_kwargs(**method) for method in value]                    
                 elif key == 'properties':
-                    if type(value) is list and len(value) > 0 and type(value[0]) is PropertyDesc:
+                    if type(value) is list and any(value) and type(value[0]) is PropertyDesc:
                         self.properties: list[PropertyDesc] = value
                     else:
                          self.properties: list[PropertyDesc] = [PropertyDesc.factory_from_kwargs(**prop) for prop in value]
@@ -86,9 +88,10 @@ class StructureDesc(BaseDesc):
                         self.enum_members: EnumMembersDesc = EnumMembersDesc.factory_from_kwargs(**value)
                 else:
                     setattr(self, key, value)
+            self.functional_type: StructureFunctionalType = StructureDesc.GetFunctionalTypeFromStructureName(self)
     
     def to_json(self):
-        return json.dumps(self.__dict__, cls=StructureDescEncoder, indent=4)
+        return json.dumps(self.to_dict(), cls=StructureDescEncoder, indent=4)
     
     def to_dict(self):
         result = {key: value for key, value in self.__dict__.items() if key not in ['struct_type', 'methods', 'properties']}
@@ -103,6 +106,24 @@ class StructureDesc(BaseDesc):
     def __str__(self):
         return f"StructureDesc(name={self.name}, type={self.struct_type.name})"
     
+    
+    @staticmethod
+    def GetFunctionalTypeFromStructureName(structure_desc: 'StructureDesc') -> StructureFunctionalType:
+        if structure_desc.name.endswith('Controller'):
+            return StructureFunctionalType.Controller
+        elif structure_desc.name.endswith('Service'):
+            return StructureFunctionalType.Service
+        elif structure_desc.name.endswith('Repository'):
+            return StructureFunctionalType.Repository
+        elif structure_desc.name.endswith('DTO') or structure_desc.name.endswith('Dto') or structure_desc.name.endswith('ViewModel') or structure_desc.name.endswith('VM') or structure_desc.name.endswith('BindingModel') or structure_desc.name.endswith('BM') or structure_desc.name.endswith('RequestModel') or structure_desc.name.endswith('ResponseModel') or structure_desc.name.endswith('Ato') or structure_desc.name.endswith('ATO') or structure_desc.name.endswith('Ito') or structure_desc.name.endswith('ITO'):
+            return StructureFunctionalType.TransferObject
+        elif (structure_desc.name.endswith('DomainModel') or structure_desc.name.endswith('Model')) and any(not method.is_ctor for method in structure_desc.methods):
+            return StructureFunctionalType.DomainModel
+        elif structure_desc.name.endswith('Test') or structure_desc.name.endswith('Tests') or structure_desc.name.endswith('Feature') or structure_desc.name.endswith('Steps') or any(using.endswith('NUnit') or using.endswith('XUnit') or using.endswith('UnitTesting') for using in structure_desc.usings):
+            return StructureFunctionalType.Test
+        else:
+            return StructureFunctionalType.Other
+        
     def generate_code_from_class_desc(self):
         class_file = ""
         # Using statements
@@ -128,19 +149,8 @@ class StructureDesc(BaseDesc):
 class StructureDescEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, StructureType):
-            return obj.name
+            return str(obj)
+        elif isinstance(obj, StructureFunctionalType):
+            return str(obj)
         else:
             return obj.__dict__
-
-class StructureDescPydantic(BaseModel):
-    pass
-#     file_path: str = Field(description="Path to the file")
-#     index_shift_code: int = Field(description="Index shift code")
-#     structure_type: StructureType = Field(description="Type of the structure")
-#     namespace_name: str = Field(description="Namespace name")
-#     usings: List[str] = Field(description="List of usings")
-#     class_name: str = Field(description="Class name")
-#     access_modifier: str = Field(description="Access modifier")
-#     interfaces_names: List[str] = Field(default_factory=list, description="List of interface names")
-#     methods: List[MethodDescPydantic] = Field(default_factory=list, description="List of methods")
-#     properties: List[PropertyDescPydantic] = Field(default_factory=list, description="List of properties")

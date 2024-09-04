@@ -17,7 +17,7 @@ public static class CodeEditionService
         {
             for (int i = structureSummariesInfos.Methods.Count - 1; i >= 0; i--)
             {
-                var methodSummary = structureSummariesInfos.Methods[i].GeneratedXmlSummary.TrimEnd();
+                var methodSummary = structureSummariesInfos.Methods[i].Summary.TrimEnd();
                 if (methodSummary.EndsWith("\n"))
                     methodSummary = methodSummary.TrimEnd('\n');
                 methodSummary = "\n" + Indent(structureSummariesInfos.IndentLevel + 1, methodSummary);
@@ -26,9 +26,9 @@ public static class CodeEditionService
                 newCode = before + methodSummary + after;
             }
             // Add global structureSummaries summary to the code
-            if (!string.IsNullOrEmpty(structureSummariesInfos.GeneratedSummary))
+            if (!string.IsNullOrEmpty(structureSummariesInfos.Summary))
             {
-                string globalSummary = "\n" + Indent(structureSummariesInfos.IndentLevel, structureSummariesInfos.GeneratedSummary.TrimEnd());
+                string globalSummary = "\n" + Indent(structureSummariesInfos.IndentLevel, structureSummariesInfos.Summary.TrimEnd());
                 var before = newCode.Substring(0, structureSummariesInfos.IndexShiftCode);
                 var after = newCode.Substring(structureSummariesInfos.IndexShiftCode);
                 if (!after.StartsWith("\n"))
@@ -49,7 +49,7 @@ public static class CodeEditionService
             {
                 //Skip the file if some generated summaries are missing
                 var fileStructs = group.ToList();
-                if (fileStructs.Any(s => string.IsNullOrEmpty(s.GeneratedSummary)) || fileStructs.Any(s => s.Methods.Any(m => string.IsNullOrEmpty(m.GeneratedXmlSummary))))
+                if (fileStructs.Any(s => string.IsNullOrEmpty(s.Summary)) || fileStructs.Any(s => s.Methods.Any(m => string.IsNullOrEmpty(m.Summary))))
                     continue;
 
                 var code = ReplaceExistingSummariesWithNewProvidedSummariesIntoCodeFile(fileStructs);

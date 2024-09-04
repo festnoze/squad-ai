@@ -224,7 +224,7 @@ class Llm:
         print(f"            " + "-" * max_len)
         print(f"Total tokens: {Llm.format_number(cb.total_tokens)}")
         print(f"Total cost:   {cost_eur:.3f}€ ({cb.total_cost:.3f}$)")
-        if cb.total_tokens > 0:
+        if cb.total_tokens != 0:
             print(f"(Cost by 1M tokens: {(1000000 * cb.total_cost / cb.total_tokens):.3f}$)\n") 
     
     def format_number(number: int) -> str:

@@ -1,10 +1,10 @@
-import os
-import time
+from typing import Callable
 from langchain_core.language_models import BaseChatModel
+from langsmith import traceable
+import json
+#
 from helpers.json_helper import JsonHelper
 from langchains.langchain_factory import LangChainFactory
-from langsmith import traceable
-#
 from helpers.file_helper import file
 from helpers.txt_helper import txt
 from helpers.c_sharp_helper import CSharpHelper, CSharpXMLDocumentation
@@ -14,12 +14,9 @@ from models.method_desc import MethodDesc
 from models.params_doc import MethodParametersDocumentation, MethodParametersDocumentationPydantic
 from models.struct_summaries_infos import MethodSummaryInfo, StructSummariesInfos
 from models.structure_desc import StructureDesc
-from models.structure_types import StructureType
+from models.structure_type import StructureType
 from services.code_analyser_client import code_analyser_client
 from services.csharp_code_analyser_service import CSharpCodeStructureAnalyser
-import os
-import json
-
 from services.summary_generation_prompts import SummaryGenerationPrompts
 
 class SummaryGenerationService:    
@@ -116,7 +113,7 @@ class SummaryGenerationService:
                 else:
                     method_summary = ''
                     missing_methods_summaries += 1
-                                                                           
+
                 method_summaries.append(MethodSummaryInfo(method.code_start_index, method_summary))
             
             struct_summary = ''
@@ -136,7 +133,6 @@ class SummaryGenerationService:
                 summary=struct_summary,
                 methods=method_summaries
             )
-
             struct_summaries_list.append(struct_summary_info)
 
         return struct_summaries_list, missing_methods_summaries, missing_structs_summaries
@@ -186,7 +182,6 @@ class SummaryGenerationService:
     def classes_methods_count(known_structures: list[StructureDesc]):
         count = 0
         for struct in known_structures:
-            if struct.struct_type == StructureType.Class:
                 count += len(struct.methods)
         return count
     
@@ -248,15 +243,13 @@ class SummaryGenerationService:
         SummaryGenerationService.apply_generated_summaries_to_classes_methods(all_classes, methods_summaries)
 
     @staticmethod
-    def apply_generated_summaries_to_classes_methods(known_structures, methods_summaries):
-        i = 0        
+    def apply_generated_summaries_to_classes_methods(known_structures, methods_summaries):      
         count = SummaryGenerationService.classes_methods_count(known_structures)
         if count != len(methods_summaries):
-            raise Exception(f"Error: the number of generated summaries don't match the number of methods in classes.")
-
+            raise Exception(f"Error: they're {len(methods_summaries)} generated summaries, which doesn't match the count of {count} methods in classes of the current batch.")
+        
+        i = 0 
         for class_struct in known_structures:
-            class_name = class_struct.struct_name
-
             for method in class_struct.methods:
                 method.generated_summary = methods_summaries[i]
                 i += 1
@@ -266,7 +259,7 @@ class SummaryGenerationService:
         action_name = action_name_prefix + 'Generate parameters descriptions'
         
         # Create prompts for each method's parameters summary generation
-        prompts_str = SummaryGenerationPrompts.get_all_methods_prompts(all_classes, lambda method: len(method.params) > 0, SummaryGenerationPrompts.get_prompt_to_generate_parameters_summaries)
+        prompts_str = SummaryGenerationPrompts.get_all_methods_prompts(all_classes, lambda method: any(method.params), SummaryGenerationPrompts.get_prompt_to_generate_parameters_summaries)
         prompts_for_output_parser = []
         for method_prompt in prompts_str:
             prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(method_prompt, MethodParametersDocumentationPydantic, MethodParametersDocumentation)
@@ -282,7 +275,7 @@ class SummaryGenerationService:
         current_method_index = 0
         for class_struct in all_classes:
             for method in class_struct.methods:
-                if len(method.params) > 0:
+                if any(method.params):
                     if current_method_index >= len(methods_parameters_summaries):
                         raise Exception("Error: the number of generated parameters summaries don't match the number of methods with params in all classes.")
                     if type(methods_parameters_summaries[current_method_index]) is list:

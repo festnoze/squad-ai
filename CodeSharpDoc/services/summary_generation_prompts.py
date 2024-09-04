@@ -5,7 +5,7 @@ from helpers.txt_helper import txt
 from helpers.llm_helper import Llm
 from models.method_desc import MethodDesc
 from models.structure_desc import StructureDesc
-from models.structure_types import StructureType
+from models.structure_type import StructureType
 
 class SummaryGenerationPrompts:    
     ctor_txt = "Take into account that this method is a constructor for the containing class of the same name."
@@ -97,7 +97,7 @@ class SummaryGenerationPrompts:
     def get_all_methods_prompts(all_classes: List[Any], predicate: Callable[[MethodDesc], bool], delegate: Callable[[MethodDesc], str]) -> List[str]:
         prompts = []
         for class_struct in all_classes:
-            if len(class_struct.methods) > 0:
+            if any(class_struct.methods):
                 for method in class_struct.methods:
                     if predicate(method):
                         prompts.append(delegate(method))

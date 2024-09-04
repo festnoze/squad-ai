@@ -8,13 +8,13 @@ public class MethodSummaryInfo
     [JsonPropertyName("code_start_index")]
     public int CodeStartIndex { get; set; }
 
-    [JsonPropertyName("generated_xml_summary")]
-    public string GeneratedXmlSummary { get; set; }
+    [JsonPropertyName("summary")]
+    public string Summary { get; set; }
 
-    public MethodSummaryInfo(int codeStartIndex, string generatedXmlSummary = null)
+    public MethodSummaryInfo(int codeStartIndex, string summary = "")
     {
         CodeStartIndex = codeStartIndex;
-        GeneratedXmlSummary = generatedXmlSummary;
+        Summary = summary ?? "";
     }
 }
 
@@ -29,18 +29,18 @@ public class StructSummariesInfos
     [JsonPropertyName("indent_level")]
     public int IndentLevel { get; set; }
 
-    [JsonPropertyName("generated_summary")]
-    public string GeneratedSummary { get; set; }
+    [JsonPropertyName("summary")]
+    public string Summary { get; set; }
 
     [JsonPropertyName("methods")]
     public List<MethodSummaryInfo> Methods { get; set; }
 
-    public StructSummariesInfos(string filePath, int indexShiftCode, int indentLevel, string generatedSummary, List<MethodSummaryInfo> methods = null)
+    public StructSummariesInfos(string filePath, int indexShiftCode, int indentLevel, string summary, List<MethodSummaryInfo>? methods = null)
     {
         FilePath = filePath;
         IndexShiftCode = indexShiftCode;
         IndentLevel = indentLevel;
-        GeneratedSummary = generatedSummary;
+        Summary = summary;
         Methods = methods ?? new List<MethodSummaryInfo>();
     }
 }

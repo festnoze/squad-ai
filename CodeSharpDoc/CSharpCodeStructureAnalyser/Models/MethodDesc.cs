@@ -184,7 +184,7 @@ public record MethodDesc : BaseDesc
         )).ToList();
 
         // detect the indentation level of the method 
-        var indentLevel = method.GetLeadingTrivia().ToString().Split('\n').Last().Count(c => c == ' ')/4;
+        var indentLevel = method.GetLeadingTrivia().ToString().Split("\r\n").Last().Count(c => c == ' ')/4;
         var accessModifier = method.Modifiers.FirstOrDefault(m => m.IsKind(SyntaxKind.PublicKeyword) || m.IsKind(SyntaxKind.ProtectedKeyword) || m.IsKind(SyntaxKind.PrivateKeyword) || m.IsKind(SyntaxKind.InternalKeyword)).ToString() ?? SyntaxKind.PrivateKeyword.ToString();
 
         // Find the actual start index of the method excluding preprocessor directives

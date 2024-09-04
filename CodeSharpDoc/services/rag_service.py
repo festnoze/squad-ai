@@ -16,9 +16,15 @@ class RAGService:
         structs_str = file.get_files_contents(struct_desc_folder_path, 'json')
         for struct_str in structs_str:
             struct = json.loads(struct_str)
-            for method in struct['methods']:
-                desc = f"{method['generated_summary']}. In {struct['struct_type']} {struct['struct_name']}, method: '{method['method_name']}'."
+            summary = struct['generated_summary'] if hasattr(struct, 'generated_summary') and getattr(struct, 'generated_summary') else struct['existing_summary']
+            if summary:
+                desc = f"{summary}. In {struct['struct_type']} '{struct['struct_name']}'."
                 docs.append(desc)
+            for method in struct['methods']:
+                summary = method['generated_summary'] if hasattr(method, 'generated_summary') and getattr(method, 'generated_summary') else method['existing_summary']
+                if summary:
+                    desc = f"{summary}. In {struct['struct_type']} {struct['struct_name']}, method: '{method['method_name']}'."
+                    docs.append(desc)
         return docs
     
     def delete_vectorstore(self):
