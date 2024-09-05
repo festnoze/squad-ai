@@ -1,3 +1,4 @@
+from helpers.file_already_exists_policy import FileAlreadyExistsPolicy
 from helpers.file_helper import file
 from models.params_doc import MethodParametersDocumentation
 
@@ -9,7 +10,7 @@ class CSharpHelper:
             lines = code.splitlines()
             lines = [line for line in lines if not line.strip().startswith('///')]
             newCode = '\n'.join(lines)
-            file.write_file(newCode, file_path)
+            file.write_file(newCode, file_path, FileAlreadyExistsPolicy.Override)
 
 class CSharpXMLDocumentation:    
     summary: str = ""

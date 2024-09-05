@@ -82,9 +82,8 @@ class CSharpCodeStructureAnalyser:
             elif struct_type == 'enum':
                 return None
             structs_descs.append(struct_desc)
-
-        return structs_descs
-    
+            
+        return structs_descs    
     
     def chunkify_code_of_classes_methods(classes_desc: list[StructureDesc], chunk_size:int = 8000, chunk_overlap: int = 0):
         for class_desc in classes_desc:

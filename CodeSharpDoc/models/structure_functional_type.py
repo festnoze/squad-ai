@@ -10,4 +10,4 @@ class StructureFunctionalType(Enum):
     Other = 6
 
     def __str__(self):
-        return self.name.lower()
+        return self.name

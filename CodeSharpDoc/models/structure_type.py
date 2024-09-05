@@ -1,7 +1,5 @@
 from enum import Enum
 
-from helpers.txt_helper import txt
-
 class StructureType(Enum):
     Class = 0
     Record = 1
@@ -9,4 +7,4 @@ class StructureType(Enum):
     Enum = 3
 
     def __str__(self):
-        return self.name.lower()
+        return self.name

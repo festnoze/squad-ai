@@ -3,6 +3,7 @@ import shutil
 import glob
 import csv
 
+from helpers.file_already_exists_policy import FileAlreadyExistsPolicy
 from helpers.txt_helper import txt
 
 class file:
@@ -15,8 +16,8 @@ class file:
             filename (str): the name of the file in the current directory
         """
         try:
-            with open(f"{filepath}", 'r', encoding='utf-8') as file_reader:
-                content = file_reader.read()
+            with open(f"{filepath}", 'r', encoding='utf-8-sig') as file_handler:
+                content = file_handler.read()
                 return content
         except FileNotFoundError:
             print(f"file: {filepath} cannot be found.")
@@ -26,7 +27,7 @@ class file:
             return None
         
     @staticmethod
-    def write_file(content, filepath):
+    def write_file(content: str, filepath: str, file_exists_policy: FileAlreadyExistsPolicy):
         """
         Writes content to a file specified by path and filename.
 
@@ -38,34 +39,55 @@ class file:
         # Ensure the directory exists
         os.makedirs(os.path.dirname(filepath), exist_ok=True)
         
-        # Remove the file if it already exists
+        # Apply policy in case the file already exists
         if os.path.exists(filepath):
-            os.remove(filepath)
+            if file_exists_policy == FileAlreadyExistsPolicy.Override:
+                pass # continue overwrites the file
+            elif file_exists_policy == FileAlreadyExistsPolicy.Skip:
+                txt.print(f"File '{filepath}' already exists. Skipping writing as per policy.")
+                return # skip writing the file
+            elif file_exists_policy == FileAlreadyExistsPolicy.AutoRename:
+                filepath = file._get_unique_filename(filepath)
+                txt.print(f"File '{filepath}' exists. Renaming to '{filepath}' as per policy.")
+            elif file_exists_policy == FileAlreadyExistsPolicy.Fail:
+                raise FileExistsError(f"File '{filepath}' already exists. Failing as per policy.")            
 
         # Write the content to the file
-        with open(filepath, 'w', encoding='utf-8-sig') as file:
-            file.write(content)
+        with open(filepath, 'w', encoding='utf-8-sig') as file_handler:
+            file_handler.write(content)
+
+    @staticmethod
+    def _get_unique_filename(filepath: str) -> str:
+        """
+        Generate a unique filename by appending a number if the file already exists.
+        
+        Args:
+            filepath (str): The original filepath to check for uniqueness.
+        
+        Returns:
+            str: A new unique filepath.
+        """
+        base, extension = os.path.splitext(filepath)
+        counter = 1
+        new_filepath = f"{base}_{counter}{extension}"
+        while os.path.exists(new_filepath):
+            counter += 1
+            new_filepath = f"{base}_{counter}{extension}"
+        return new_filepath
 
     def write_csv(filepath, data):
-        with open(filepath, 'w', newline='\r\n', encoding='utf-8-sig') as file:
-            writer = csv.writer(file)
+        with open(filepath, 'w', newline='\r\n', encoding='utf-8-sig') as file_handler:
+            writer = csv.writer(file_handler)
             #writer.writerows(data)
             for line in data:
                 writer.writerow([line])
 
     def read_csv(filepath):
-        with open(filepath, 'r', newline='\r\n', encoding='utf-8-sig') as file:
-            reader = csv.reader(file)
+        with open(filepath, 'r', newline='\r\n', encoding='utf-8-sig') as file_handler:
+            reader = csv.reader(file_handler)
             data = list(reader)
         return data
     
-    @staticmethod
-    def save_contents_within_files(paths_and_new_codes: list):
-        txt.print_with_spinner(f"Saving and override the {len(paths_and_new_codes)} files:")
-        for file_path in paths_and_new_codes:
-            file.write_file(paths_and_new_codes[file_path], file_path)
-        txt.stop_spinner_replace_text(f"{len(paths_and_new_codes)} files overrided and saved successfully.")
-
     @staticmethod
     def delete_all_files_with_extension(extension, folder_path):
         files_to_delete = glob.glob(os.path.join(folder_path, f"{extension}"))
@@ -114,14 +136,14 @@ class file:
         shutil.copytree(source_folder, destination_folder, dirs_exist_ok=True)
     
     @staticmethod
-    def get_files_paths_and_contents(file_path, extension):
-        txt.print_with_spinner(f"Loading {extension} files ...")
+    def get_files_paths_and_contents(file_path: str, extension: str, file_kind: str = None):
+        txt.print_with_spinner(f"Loading {file_kind if file_kind else extension} files ...")
         paths_and_contents = {}
         files = file.get_all_folder_and_subfolders_files_path(file_path, '.' + extension)
         for file_path in files:
             file_path = file_path.replace('\\', '/')
             paths_and_contents[file_path] = file.get_as_str(file_path)
-        txt.stop_spinner_replace_text(f"{len(paths_and_contents)} {extension} files loaded successfully.")
+        txt.stop_spinner_replace_text(f"{len(paths_and_contents)} {file_kind if file_kind else extension} files loaded successfully.")
         return paths_and_contents
     
     @staticmethod
