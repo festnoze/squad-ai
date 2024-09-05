@@ -1,10 +1,25 @@
+inputs/
+outputs/
+chroma_db/
+
 .env
 *.pyc
 *.exe
 /Include
 /Lib
+Lib/
+site-packages/
 /Scripts
 /__pycache__
+
+# CodeSharpDoc
+/code_files_generated
+/code_files_saved
+
+/code_files_generated
+/code_files_saved
+code_files_generated/
+code_files_saved/
 
 # VS files and dir to ignore
 

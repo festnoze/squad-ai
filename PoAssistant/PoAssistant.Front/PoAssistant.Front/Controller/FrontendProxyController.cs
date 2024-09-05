@@ -11,13 +11,13 @@ namespace PoAssistant.Front.Controller;
 [Route("[controller]")]
 public class FrontendProxyController : ControllerBase
 {
-    public FrontendProxyController(ThreadMetierPoService threadService, UserStoryService userStoryService)
+    public FrontendProxyController(ThreadMetierCdPService threadService, UserStoryService userStoryService)
     {
         _threadService = threadService;
         _userStoryService = userStoryService;
     }
 
-    private readonly ThreadMetierPoService _threadService;
+    private readonly ThreadMetierCdPService _threadService;
     private readonly UserStoryService _userStoryService;
 
     /// <summary>
@@ -46,7 +46,6 @@ public class FrontendProxyController : ControllerBase
         _threadService.AddNewMessage(newMessage);
     }
 
-
     [HttpDelete("metier-po/delete-all")]
     public void DeleteMetierPoThread()
     {
@@ -54,14 +53,14 @@ public class FrontendProxyController : ControllerBase
     }
 
     [HttpPost("po/us")]
-    public void ReadyPoUserStory([FromBody] UserStoryModel userStory)
+    public void ReadyPoUserStory([FromBody]IEnumerable<UserStoryModel> userStories)
     {
         _threadService.EndMetierMetierExchange();
-        _userStoryService.SetPoUserStory(userStory);
+        _userStoryService.SetPoUserStory(userStories);
     }
 
-    [HttpPost("metier-po/message-content-stream")]
-    public async Task ReceiveMessageStreamaSYNC(/*[FromBody] IAsyncEnumerable<string> messageChunks*/)
+    [HttpPost("metier-po/new-message/stream")]
+    public async Task ReceiveMessageAsStream()
     {
         var buffer = new StringBuilder();
         _threadService.InitStreamMessage();
@@ -74,6 +73,13 @@ public class FrontendProxyController : ControllerBase
                 _threadService.DisplayStreamMessage(newWord);
             }
         }
+        _threadService.EndsStreamMessage();
+    }
+
+    [HttpPost("metier-po/update-last-message")]
+    public void UpdateLastMetierPoMessage([FromBody] MessageModel newMessage)
+    {
+        _threadService.UpdateLastMessage(newMessage);
     }
 
     [HttpGet("ping")]

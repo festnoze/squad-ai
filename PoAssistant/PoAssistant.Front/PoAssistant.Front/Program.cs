@@ -1,3 +1,5 @@
+using Microsoft.AspNetCore.Components.Authorization;
+using PoAssistant.Front.Infrastructure;
 using PoAssistant.Front.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -8,9 +10,14 @@ builder.Services.AddServerSideBlazor();
 
 builder.Services.AddControllers();
 
-builder.Services.AddSingleton<ThreadMetierPoService>();
+builder.Services.AddSingleton<ThreadMetierCdPService>();
 builder.Services.AddSingleton<UserStoryService>();
-builder.Services.AddSingleton<NavigationService>();
+builder.Services.AddScoped<NavigationService>();
+builder.Services.AddSingleton<IUserRepository, UserRepository>();
+builder.Services.AddSingleton<IExchangesRepository, ExchangesRepository>();
+builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
+builder.Services.AddScoped<ISimpleAuthenticationStateProvider, SimpleAuthenticationStateProvider>();
+
 
 var app = builder.Build();
 

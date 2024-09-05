@@ -1,0 +1,4 @@
+You write all your unit tests in XUnit.
+You use XUnit's Fact, or Theory with InlineData, depending whether several data sets needed to be tested to cover the whole case. 
+You always add 3 comments in your unit tests to separate the 3 steps : Arrange, Act, and Assert 
+You always use FluentAssertions for your assertions.

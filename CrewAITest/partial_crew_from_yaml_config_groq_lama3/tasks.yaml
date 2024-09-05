@@ -1,0 +1,17 @@
+research_company_task:
+  description: >
+    Use a search tool to look up this company's stock information: {company_name}.
+    Then provide a report on its financials, competitors, and market position to allow the user to make an informed decision on stock future performance.
+  expected_output: >
+    A report that includes the company's financials, competitors, and market position.
+
+analyse_company_task:
+  description: >
+    For company: {company_name}, analyse all their financaial reports and provide metrics like: 
+    Profitability Ratios: Gross Profit Margin, Operating Margin, Net Profit Margin, Return on Assets (ROA), Return on Equity (ROE), Earnings Before Interest and Taxes (EBIT), Earnings Before Interest, Taxes, Depreciation, and Amortization (EBITDA).
+    Liquidity Ratios: Current Ratio, Quick Ratio (Acid Test), Cash Ratio.
+    Solvency Ratios: Debt to Equity Ratio, Interest Coverage Ratio, Debt Service Coverage Ratio.
+    Efficiency Ratios: Asset Turnover Ratio, Inventory Turnover Ratio, Receivables Turnover Ratio, Payables Turnover Ratio, Capital Turnover Ratio.
+    Valuation Ratios: Price to Earnings Ratio (P/E), Price to Book Ratio (P/B), Price to Sales Ratio (P/S), Price to Cash Flow Ratio, Dividend Yield, Enterprise Value to EBITDA (EV/EBITDA), Market to Book Ratio.
+  expected_output: >
+    A report that includes the company's financial metrics.

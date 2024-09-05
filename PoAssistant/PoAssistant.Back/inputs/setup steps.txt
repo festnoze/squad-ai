@@ -4,8 +4,12 @@ Into a Git bash terminal (ctrl+shift+ù):
 python -m venv studienv
 
 - Activate the environment:
-source studienv/Scripts/activate
+studienv/Scripts/activate
 
 -download the required packages (might need to run VS Code as administrator)
-pip install -r requirements.txt
+pip install -r inputs/requirements.txt
 
+WARNING: to reinstall 'pip' on venv whether pip don't work anymore, do:
+python -m ensurepip --upgrade
+python -m pip install --upgrade pip
+then check 'source' with: Get-Command pip

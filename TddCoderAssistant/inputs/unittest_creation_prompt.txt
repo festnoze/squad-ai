@@ -1,0 +1,8 @@
+You have to write a single unit test to cover the following acceptance criterion : ''.
+This unit test method should be named : '{unittest_method_name}', only postfixing it with 'Async' if it as asynchronous test method.
+Take insights from the corresponding BDD test in Gherkin to plan the test creation. Here is the Gherkin: ''.
+You should take into account the existing service methods code, to reuse the existing methods that you might need for your test.
+If no existing methods exist to fit your needs, you're allow to write the test calling methods, even if they don't already exists.
+Hereinafter is the existing service code : 
+{existing_code}
+

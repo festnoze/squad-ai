@@ -1,0 +1,13 @@
+python-dotenv
+openai
+requests
+ollama
+langchain
+langchain_community
+langchain_core
+langchain_openai
+langchain_groq
+langsmith
+langchain-anthropic
+langchain_chroma
+google-generativeai

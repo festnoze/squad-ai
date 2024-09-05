@@ -1,7 +1,11 @@
+from typing import AsyncGenerator
+import httpx
 import requests 
 from requests.exceptions import HTTPError
 import json
+# internal import
 from misc import misc
+from models.conversation import Message
 
 class front_client:
     host_uri = "http://localhost:5132"
@@ -9,9 +13,9 @@ class front_client:
 
     metier_brief_url_get = "metier/brief"
     validated_metier_answer_url_get = "metier/last-answer"
-    new_metier_po_message_url_post = "metier-po/new-message"
-    new_metier_po_message_url_post = "metier-po/new-message"
-    delete_metier_po_thread_url_delete = "metier-po/delete-all"
+    new_metier_pm_message_url_post = "metier-po/new-message"
+    update_last_metier_pm_message_url_post = "metier-po/update-last-message"
+    delete_metier_pm_thread_url_delete = "metier-po/delete-all"
     new_po_us_and_usecases_url_post = "po/us"
     ping_url_get = "ping"
 
@@ -35,8 +39,8 @@ class front_client:
             return response.text
         return ""
 
-    def wait_brief_creation_and_get():
-        sleep_interval = 2
+    def wait_need_expression_creation_and_get():
+        sleep_interval = 1
         brief_str = front_client.get_metier_brief_if_ready()
         while brief_str == "":
             misc.pause(sleep_interval)
@@ -58,14 +62,31 @@ class front_client:
             metier_answer_str = front_client.get_validated_metier_answer_if_ready()
         return metier_answer_str
     
-    def post_new_metier_or_po_answer(message_json):
-        url = f"{front_client.host_uri}/{front_client.frontend_proxy_subpath}/{front_client.new_metier_po_message_url_post}"        
+    def post_new_metier_or_pm_answer(message: Message):
+        message_json = misc.get_message_as_json(message)
+        url = f"{front_client.host_uri}/{front_client.frontend_proxy_subpath}/{front_client.new_metier_pm_message_url_post}"        
         headers = {'Content-Type': 'application/json'}
         response = requests.post(url, data= json.dumps(message_json), headers= headers)
-        front_client.print_response_status(response, front_client.post_new_metier_or_po_answer.__name__)
+        front_client.print_response_status(response, front_client.post_new_metier_or_pm_answer.__name__)
+
+    def post_update_last_metier_or_pm_answer(message: Message):
+        message_json = misc.get_message_as_json(message)
+        url = f"{front_client.host_uri}/{front_client.frontend_proxy_subpath}/{front_client.update_last_metier_pm_message_url_post}"        
+        headers = {'Content-Type': 'application/json'}
+        response = requests.post(url, data= json.dumps(message_json), headers= headers)
+        front_client.print_response_status(response, front_client.post_new_metier_or_pm_answer.__name__)
+
+    async def post_new_metier_or_pm_answer_as_stream(content_stream: AsyncGenerator[bytes, None]):
+        url = f"{front_client.host_uri}/{front_client.frontend_proxy_subpath}/{front_client.new_metier_pm_message_url_post}/stream"  
+        async with httpx.AsyncClient() as http_client:            
+            headers = {"Content-Type": "application/octet-stream"}
+            # Stream the data to the API endpoint
+            response = await http_client.post(url, content=content_stream, headers=headers)
+            if (response.status_code == 200):
+                print(" [end sent]")
         
     def delete_all_metier_po_thread(throw_upon_error = True):
-        url = f"{front_client.host_uri}/{front_client.frontend_proxy_subpath}/{front_client.delete_metier_po_thread_url_delete}"
+        url = f"{front_client.host_uri}/{front_client.frontend_proxy_subpath}/{front_client.delete_metier_pm_thread_url_delete}"
         response = requests.delete(url)        
         return response
 

@@ -8,9 +8,7 @@
 }
 
 .navbar-brand {
-    font-size: 1.2rem;
-    padding-left: 20px;
-    justify-content: center
+    justify-content: start
 }
 
 .sidebar {
@@ -33,19 +31,15 @@
         vertical-align: text-top;
         top: -2px;
     }
+    .nav-icon {
+        font-size: 1.5rem;
+    }
 
     .nav-item {
         font-size: 0.9rem;
         padding-bottom: 0.5rem;
+        padding-top: 0.5rem;
     }
-
-        .nav-item:first-of-type {
-            padding-top: 1rem;
-        }
-
-        .nav-item:last-of-type {
-            padding-bottom: 1rem;
-        }
 
         .nav-item ::deep a {
             color: #d7d7d7;
@@ -92,9 +86,32 @@
 
     /* Styles additionnels pour le menu réduit */
     .menu-reduced {
-        width: 80px; /* Largeur réduite pour n'afficher que les icônes */
+        width: 95px; /* Largeur réduite pour n'afficher que les icônes */
     }
 
         .menu-reduced .nav-link {
             justify-content: center; /* Centrer les icônes */
         }
+
+.sub-menu-item {
+    cursor: pointer;
+    margin-left: 25px;
+    font-size: 0.7rem;
+    font-weight: 100;
+    color: rgb(140, 164, 187);
+    padding: 5px 0px; /* Adjust padding as needed */
+    border: 1px solid transparent; /* Transparent border to maintain the layout */
+    border-radius: 6px; /* Rounded corners, adjust as needed */
+    transition: all 0.9s ease; /* Smooth transition for hover effects */
+}
+
+    .sub-menu-item:hover {
+        margin-left: 3px;
+        margin-right: 8px;
+        font-size: 0.9rem;
+        font-weight: 400;
+        color: rgb(84, 178, 178);
+        background-color: rgba(255, 255, 255, 0.15); /* Whitish background with low opacity */
+        border-color: rgba(255, 255, 255, 0.3); /* Whitish border with some opacity */
+        box-shadow: 0 0 8px rgba(255, 255, 255, 0.5); /* Optional: Adds glow effect */
+    }
