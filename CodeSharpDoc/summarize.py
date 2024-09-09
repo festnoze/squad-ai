@@ -40,4 +40,4 @@ class Summarize:
         docs = Summarize.split_text(llm, text, max_tokens)
         chain = Summarize.splitting_chain(llm)
         result = chain.invoke(docs)        
-        return Llm.get_llm_answer_content(result)
+        return Llm.get_content(result)

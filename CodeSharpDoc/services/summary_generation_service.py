@@ -187,7 +187,7 @@ class SummaryGenerationService:
 
             methods_parameters_summaries = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(action_name, llms, None, llm_batch_size, *prompts_or_chains)
             for method, method_params_summaries in zip(class_struct.methods, methods_parameters_summaries):
-                method_params_summaries_str = Llm.get_llm_answer_content(method_params_summaries)
+                method_params_summaries_str = Llm.get_content(method_params_summaries)
                 method_params_summaries_str = Llm.extract_json_from_llm_response(method_params_summaries_str)
                 method.generated_parameters_summaries = MethodParametersDocumentation.from_json(method_params_summaries_str)
 

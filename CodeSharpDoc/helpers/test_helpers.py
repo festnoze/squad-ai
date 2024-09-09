@@ -39,9 +39,9 @@ def test_parallel_invocations(llm: BaseChatModel):
     poem_result = results['poem']
     input_x_result = results['xx']
 
-    print("Joke about bears:", Llm.get_llm_answer_content(joke_result))
-    print("Poem about trees:", Llm.get_llm_answer_content(poem_result))
-    print("Rebus about flowers:", Llm.get_llm_answer_content(input_x_result))
+    print("Joke about bears:", Llm.get_content(joke_result))
+    print("Poem about trees:", Llm.get_content(poem_result))
+    print("Rebus about flowers:", Llm.get_content(input_x_result))
     exit()
 
 def test_parallel_invocations_with_homemade_parallel_prompts_invocations(llm: BaseChatModel):        
@@ -53,7 +53,7 @@ def test_parallel_invocations_with_homemade_parallel_prompts_invocations(llm: Ba
     ]
     answers = Llm.invoke_parallel_prompts(llm, None, *prompts)
     for i, answer in enumerate(answers):
-        print(f"Answer to prompt n°{i+1}: {Llm.get_llm_answer_content(answer)}")
+        print(f"Answer to prompt n°{i+1}: {Llm.get_content(answer)}")
         print("--------------------------------------------------")
     exit()
 
@@ -69,7 +69,7 @@ def test_parallel_invocations_with_homemade_parallel_chains_invocations(llm: Bas
         chains.append(chain)
     answers = Llm._invoke_parallel_chains(None, None, True, *chains)
     for i, answer in enumerate(answers):
-        print(f"Answer to prompt n°{i+1}: {Llm.get_llm_answer_content(answer)}")
+        print(f"Answer to prompt n°{i+1}: {Llm.get_content(answer)}")
         print("--------------------------------------------------")
     exit()
 
@@ -86,7 +86,7 @@ def test_parallel_chains_invocations_with_imputs(llm: BaseChatModel):
     inputs = {"input_1": "flowers", "input_2": "darkness", "input_3": "fruits"}
     answers = Llm._invoke_parallel_chains(inputs, None, True, *chains)
     for i, answer in enumerate(answers):
-        print(f"Answer to prompt n°{i+1}: {Llm.get_llm_answer_content(answer)}")
+        print(f"Answer to prompt n°{i+1}: {Llm.get_content(answer)}")
         print("--------------------------------------------------")
     exit()
 
@@ -107,9 +107,9 @@ def test_parallel_invocations_no_template(llm: BaseChatModel):
     poem_result = results['poem']
     input_x_result = results['xx']
 
-    print("Joke about flowers:", Llm.get_llm_answer_content(joke_result))
-    print("Poem about darkness:", Llm.get_llm_answer_content(poem_result))
-    print("Rebus about fruits:", Llm.get_llm_answer_content(input_x_result))
+    print("Joke about flowers:", Llm.get_content(joke_result))
+    print("Poem about darkness:", Llm.get_content(poem_result))
+    print("Rebus about fruits:", Llm.get_content(input_x_result))
     exit()
 
 def test_tool_bind(llm):

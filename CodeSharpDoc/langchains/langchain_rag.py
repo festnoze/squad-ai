@@ -20,6 +20,8 @@ from langchain_community.embeddings.sentence_transformer import SentenceTransfor
 from langchain.retrievers.multi_query import MultiQueryRetriever
 from langchain_openai import OpenAIEmbeddings
 
+from helpers.llm_helper import Llm
+
 def split_text_into_chunks(text: str) -> List[str]:
     txt_splitter = CharacterTextSplitter(
         separator= "\n",
@@ -37,13 +39,20 @@ def build_vectorstore_from_folder_files(folder_path: str):
 
 vectorstore_path = "./chroma_db"
 
-def build_vectorstore(documents: List[str]):
+def build_vectorstore(documents: List[dict], doChunkContent = True) -> any:
     embeddings = OpenAIEmbeddings(openai_api_key= os.getenv("OPEN_API_KEY"))
     #embeddings = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
-    chunks = []
-    for document in documents:
-        chunks.extend(split_text_into_chunks(document))
-    db = Chroma.from_texts(texts= chunks, embedding = embeddings, persist_directory= vectorstore_path)
+    if doChunkContent:
+        chunks = []
+        for document in documents:
+                chunks.extend(split_text_into_chunks(document['page_content']))                
+        db = Chroma.from_texts(texts= chunks, embedding = embeddings, persist_directory= vectorstore_path)
+    else:
+        langchain_documents = [
+            Document(page_content=doc["page_content"], metadata=doc["metadata"]) 
+            for doc in documents
+        ]
+        db = Chroma.from_documents(documents= langchain_documents, embedding = embeddings, persist_directory= vectorstore_path)
     return db
 
 def build_bm25_retriever(documents: List[str], doc_count: int) -> any:
@@ -67,25 +76,18 @@ def retrieve(llm: BaseChatModel, vectorstore, question: str, additionnal_context
 
     retriever_from_llm = MultiQueryRetriever.from_llm(
         retriever=vectorstore.as_retriever(), llm=llm)
-    unique_docs = retriever_from_llm.invoke(input==full_question)
-    #unique_docs = vectorstore.similarity_search(full_question)
-    return unique_docs
-    
-def generate_response_from_retrieval(llm: BaseChatModel, retriever, question):
-    template = f"""\
-    # Instructions #
-    Answer to the user question the best you can, only based on the context provided. Always give a full quote of the source(s) you used from the context to answer the question. 
-    If none informations from the context is relevant to answer the question properly, just answer: 'I didn't find any source of information relevant enough to answer the question properly', 
-    else provide a summary of the requested information and fully quote the source you get it from.
-    
-    # User Question #
-    {question}
-    
-    # Context #
-    """ + "{input}"
-    rag_custom_prompt = ChatPromptTemplate.from_template(template)
+    #results = retriever_from_llm.invoke(input==full_question)
+    #results = vectorstore.similarity_search(full_question)
+    results = vectorstore.similarity_search(full_question, k=2, filter={"functional_type": "Controller"})
 
-    context = "\n".join(doc.page_content for doc in retriever)
+    return results
+    
+def generate_response_from_retrieval(llm: BaseChatModel, retriever, question: str) -> str:
+    retrieval_prompt = file.get_as_str("prompts/rag_retriever_query.txt", remove_comments= True)
+    retrieval_prompt = retrieval_prompt.replace("{question}", question)
+    rag_custom_prompt = ChatPromptTemplate.from_template(retrieval_prompt)
+
+    context = "• " + "\n• ".join(doc.page_content for doc in retriever)
     rag_chain = rag_custom_prompt | llm | RunnablePassthrough()
     answer = rag_chain.invoke(input= context)
-    return answer
+    return Llm.get_content(answer)

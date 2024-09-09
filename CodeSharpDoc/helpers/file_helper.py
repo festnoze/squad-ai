@@ -8,9 +8,9 @@ from helpers.txt_helper import txt
 
 class file:
     @staticmethod
-    def get_as_str(filepath):
+    def get_as_str(filepath, remove_comments= False):
         """
-        Get the specified file content as string
+        Get the specified file content as string (removing '//' commented lines)
 
         Args:
             filename (str): the name of the file in the current directory
@@ -18,6 +18,8 @@ class file:
         try:
             with open(f"{filepath}", 'r', encoding='utf-8-sig') as file_handler:
                 content = file_handler.read()
+                if remove_comments:
+                    content = '\n'.join([line for line in content.split('\n') if not line.strip().startswith('//')])
                 return content
         except FileNotFoundError:
             print(f"file: {filepath} cannot be found.")

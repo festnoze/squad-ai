@@ -16,7 +16,7 @@ from typing import TypeVar, Generic, Any, Union
 
 class Llm:
     @staticmethod
-    def get_llm_answer_content(response: any) -> str:
+    def get_content(response: any) -> str:
         if isinstance(response, str):
             return response
         elif hasattr(response, 'content'):
@@ -45,7 +45,7 @@ class Llm:
         
     @staticmethod
     def extract_json_from_llm_response(response: any) -> str:
-        content = Llm.get_llm_answer_content(response)
+        content = Llm.get_content(response)
         content = Llm.get_code_block("json", content)
         start_index = -1 
         first_index_open_curly_brace = content.find('{')
@@ -73,7 +73,7 @@ class Llm:
     #     for i in range(max_retries):
     #         try:
     #             result = llm.invoke(input)
-    #             return Llm.get_llm_answer_content(result)
+    #             return Llm.get_content(result)
     #         except Exception as e:
     #             print(f"Error: {e}")
     #             print(f"Retrying... {i+1}/{max_retries}")
@@ -159,7 +159,7 @@ class Llm:
             responses = parallel_chains.invoke(inputs) 
 
             responses_list = [responses[key] for key in responses.keys()]
-            batch_answers = [Llm.get_llm_answer_content(response) for response in responses_list]
+            batch_answers = [Llm.get_content(response) for response in responses_list]
             answers.extend(batch_answers)
 
         return answers

@@ -31,15 +31,19 @@ def init_rag_service() -> RAGService:
     from services.rag_service import RAGService
     return RAGService()
 
-def display_menu_and_actions(llms_infos: List[LlmInfo]):
+def display_menu_and_actions(llms_infos: List[LlmInfo], default_first_action: int = None):
     # Activate print each step advancement in the console
     txt.activate_print = True
     files_batch_size = 100
     llm_batch_size = 100
 
     while True:
-        display_menu()
-        choice = input("")
+        if default_first_action is None:
+            display_menu()
+            choice = input("")
+        else:
+            choice = str(default_first_action)
+            default_first_action = None
         
         # Generate summaries for all specified C# files
         if choice == "1" or choice == "g":
@@ -57,8 +61,8 @@ def display_menu_and_actions(llms_infos: List[LlmInfo]):
             llm = LangChainFactory.create_llms_from_infos(llms_infos)[-1]
             rag = RAGService(llm)
             rag.delete_vectorstore() # delete previous DB first
-            docs = rag.load_structures_summaries(struct_desc_folder_path)
-            count = rag.build_vectorstore_from(docs)
+            docs = rag.get_documents_to_vectorize_from_loaded_analysed_structures(struct_desc_folder_path)
+            count = rag.build_vectorstore_from(docs, doChunkContent=False)
             print(f"Vector store built with {count} items")        
             continue
 
@@ -70,17 +74,17 @@ def display_menu_and_actions(llms_infos: List[LlmInfo]):
             print(f"Vector store loaded with {count} items")
 
             query = input("What are you looking for? ")
-            additionnal_context = file.get_as_str("inputs/rag_query_code_additionnal_instructions.txt")
+            additionnal_context = file.get_as_str("prompts/rag_query_code_additionnal_instructions.txt")
 
             while query != '':
                 answer, sources = rag.query(query, additionnal_context)
                 print(answer)
-                #if input("Do you want to see the sources? (y/_) ") == 'y':
-                print(">>>>> Sources: <<<<<<")
-                for source in sources:
-                    print('- ' + source.page_content)
+                if input("Do you want to see the full retieved documents? (y/_) ") == 'y':
+                    print(">>>>> Sources: <<<<<<")
+                    for source in sources:
+                        print('- ' + source.page_content)
                 print("------------------------------------")
-                query = input("What next are you looking for? - empty to quit. ")
+                query = input("What next are you looking for? - (empty to quit) - ")
             display_menu()
             continue
         

@@ -57,4 +57,4 @@ langsmith = Langsmith()
 langsmith.delete_all_project_sessions()
 langsmith.create_project()
 
-selection_menu.display_menu_and_actions(llms_infos)
+selection_menu.display_menu_and_actions(llms_infos, 4)
