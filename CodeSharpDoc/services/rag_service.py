@@ -49,11 +49,11 @@ class RAGService:
         self.vectorstore = lrag.load_vectorstore()
         data = file.read_file(RAGService.rag_structs_summaries_json_filepath)
         json_data = json.loads(data)
-        langchain_documents = [
+        self.langchain_documents = [
             Document(page_content=doc["page_content"], metadata=doc["metadata"]) 
             for doc in json_data
         ]
-        self.bm25_retriever = lrag.build_bm25_retriever(langchain_documents, bm25_results_count)
+        self.bm25_retriever = lrag.build_bm25_retriever(self.langchain_documents, bm25_results_count)
         return self.vectorstore._collection.count()
 
     def import_structures(self, structures: list[StructureDesc]):
@@ -73,36 +73,42 @@ class RAGService:
         retrieved_chunks = lrag.retrieve(self.llm, self.vectorstore, question, additionnal_context, give_score, filters)
         
         if include_bm25_retieval:
+            if filters:
+                self.bm25_retriever = lrag.build_bm25_retriever([doc for doc in self.langchain_documents if RAGService.filters_predicate(doc, filters)], len(retrieved_chunks))
             self.bm25_retriever.k = len(retrieved_chunks)
             bm25_retrieved_chunks = self.bm25_retriever.invoke(question)
-            bm25_retrieved_chunks = [doc for doc in bm25_retrieved_chunks if RAGService.filters_predicate(doc, filters, LogicalOperator.AND)]
             retrieved_chunks.extend([(chunk, 0) for chunk in bm25_retrieved_chunks] if give_score else bm25_retrieved_chunks)
 
         answer = lrag.generate_response_from_retrieved_chunks(self.llm, retrieved_chunks, question)
         return answer, retrieved_chunks
     
     # Helper function to evaluate single filter (handling nested operators)
-    def single_filter_or_operator_predicate(doc, filter_dict):
-        if isinstance(filter_dict, dict):
-            if "$and" in filter_dict:
-                return RAGService.filters_predicate(doc, filter_dict["$and"], LogicalOperator.AND)
-            elif "$or" in filter_dict:
-                return RAGService.filters_predicate(doc, filter_dict["$or"], LogicalOperator.OR)
-            else:
-                return all(doc.metadata.get(key) == value for key, value in filter_dict.items())
-        return False
-
-    # Function to evaluate multiple filters (supports AND/OR logic)
     def filters_predicate(doc, filters, operator=LogicalOperator.AND):
-        if operator == LogicalOperator.AND:
-            return all(
-                RAGService.single_filter_or_operator_predicate(doc, sub_filters)
-                for sub_filters in filters
-            )
-        elif operator == LogicalOperator.OR:
-            return any(
-                RAGService.single_filter_or_operator_predicate(doc, filter_dict)
-                for filter_dict in filters
-            )
-        else:
-            raise ValueError(f"Unhandled operator: {operator}")
+        # If filters is a dictionary (single filter or operator like $and/$or)
+        if isinstance(filters, dict):
+            if "$and" in filters:
+                # Recursively handle $and with multiple conditions
+                return RAGService.filters_predicate(doc, filters["$and"], LogicalOperator.AND)
+            elif "$or" in filters:
+                # Recursively handle $or with multiple conditions
+                return RAGService.filters_predicate(doc, filters["$or"], LogicalOperator.OR)
+            else:
+                # Handle single key-value filter (field-value pair)
+                return all(doc.metadata.get(key) == value for key, value in filters.items())
+
+        # If filters is a list, apply the operator (AND/OR)
+        elif isinstance(filters, list):
+            if operator == LogicalOperator.AND:
+                return all(
+                    RAGService.filters_predicate(doc, sub_filter, LogicalOperator.AND)
+                    for sub_filter in filters
+                )
+            elif operator == LogicalOperator.OR:
+                return any(
+                    RAGService.filters_predicate(doc, sub_filter, LogicalOperator.OR)
+                    for sub_filter in filters
+                )
+            else:
+                raise ValueError(f"Unhandled operator: {operator}")
+
+        return False

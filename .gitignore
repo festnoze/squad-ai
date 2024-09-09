@@ -13,11 +13,7 @@ site-packages/
 /__pycache__
 
 # CodeSharpDoc
-/code_files_generated
-/code_files_saved
-
-/code_files_generated
-/code_files_saved
+senv/
 code_files_generated/
 code_files_saved/
 
