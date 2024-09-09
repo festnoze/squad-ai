@@ -77,7 +77,7 @@ def display_menu_and_actions(llms_infos: List[LlmInfo], default_first_action: in
             additionnal_context = file.get_as_str("prompts/rag_query_code_additionnal_instructions.txt")
 
             while query != '':
-                answer, sources = rag.query(query, additionnal_context)
+                answer, sources = rag.query(query, additionnal_context, include_bm25_retieval= True, give_score= True)
                 print(answer)
                 if input("Do you want to see the full retieved documents? (y/_) ") == 'y':
                     print(">>>>> Sources: <<<<<<")

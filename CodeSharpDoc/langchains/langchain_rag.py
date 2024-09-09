@@ -55,9 +55,9 @@ def build_vectorstore(documents: List[dict], doChunkContent = True) -> any:
         db = Chroma.from_documents(documents= langchain_documents, embedding = embeddings, persist_directory= vectorstore_path)
     return db
 
-def build_bm25_retriever(documents: List[str], doc_count: int) -> any:
-    bm25_retriever = BM25Retriever.from_texts(documents)
-    bm25_retriever.k = doc_count
+def build_bm25_retriever(documents: List[Document], k: int) -> any:
+    bm25_retriever = BM25Retriever.from_documents(documents)
+    bm25_retriever.k = k
     return bm25_retriever
 
 def delete_vectorstore():
@@ -68,7 +68,7 @@ def load_vectorstore():
     return Chroma(persist_directory= vectorstore_path, embedding_function= embeddings)
 
 # Retrieve useful info similar to user query
-def retrieve(llm: BaseChatModel, vectorstore, question: str, additionnal_context: str = None, give_score = False) -> List[Document]:
+def retrieve(llm: BaseChatModel, vectorstore, question: str, additionnal_context: str = None, give_score = False, filters: dict = None) -> List[Document]:
     if additionnal_context:
         full_question = f"### User Question:\n {question}\n\n### Context:\n{additionnal_context}" 
     else:
@@ -78,12 +78,12 @@ def retrieve(llm: BaseChatModel, vectorstore, question: str, additionnal_context
     #results = retriever_from_llm.invoke(input==full_question)
 
     if give_score:
-        results = vectorstore.similarity_search_with_score(full_question, k=2, filter={"functional_type": "Controller"})
+        results = vectorstore.similarity_search_with_score(full_question, k=2, filter=filters)
     else:
-        results = vectorstore.similarity_search(full_question, k=2, filter={"functional_type": "Controller"})
+        results = vectorstore.similarity_search(full_question, k=2, filter=filters)
     return results
     
-def generate_response_from_retrieval(llm: BaseChatModel, retrieved_docs, question: str) -> str:
+def generate_response_from_retrieved_chunks(llm: BaseChatModel, retrieved_docs, question: str) -> str:
     retrieval_prompt = file.get_as_str("prompts/rag_retriever_query.txt", remove_comments= True)
     retrieval_prompt = retrieval_prompt.replace("{question}", question)
     rag_custom_prompt = ChatPromptTemplate.from_template(retrieval_prompt)

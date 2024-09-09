@@ -90,6 +90,11 @@ class file:
             data = list(reader)
         return data
     
+    def read_file(filepath):
+        with open(filepath, 'r', encoding='utf-8-sig') as file_handler:
+            data = file_handler.read()
+        return data
+    
     @staticmethod
     def delete_all_files_with_extension(extension, folder_path):
         files_to_delete = glob.glob(os.path.join(folder_path, f"{extension}"))
