@@ -56,10 +56,10 @@ class RAGService:
         self.vectorstore = lrag.build_vectorstore(self.rag_methods_desc)
 
     def query(self, question: str, additionnal_context: str = None, include_bm25_retieval = False) -> Tuple[str, str]:
-        retrived_chunks = lrag.retrieve(self.llm, self.vectorstore, question, additionnal_context)
+        retrived_chunks = lrag.retrieve(self.llm, self.vectorstore, question, additionnal_context, give_score=True)
         if include_bm25_retieval:
             bm25_retrived_chunks = self.bm25_retriever.invoke(question)
-            retrived_chunks.extend(bm25_retrived_chunks)
+            retrived_chunks.extend([(chunk, 0) for chunk in bm25_retrived_chunks])
 
         answer = lrag.generate_response_from_retrieval(self.llm, retrived_chunks, question)
         return answer, retrived_chunks

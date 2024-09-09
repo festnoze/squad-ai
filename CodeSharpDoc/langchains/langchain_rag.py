@@ -68,26 +68,27 @@ def load_vectorstore():
     return Chroma(persist_directory= vectorstore_path, embedding_function= embeddings)
 
 # Retrieve useful info similar to user query
-def retrieve(llm: BaseChatModel, vectorstore, question: str, additionnal_context: str = None) -> List[Document]:
+def retrieve(llm: BaseChatModel, vectorstore, question: str, additionnal_context: str = None, give_score = False) -> List[Document]:
     if additionnal_context:
         full_question = f"### User Question:\n {question}\n\n### Context:\n{additionnal_context}" 
     else:
         full_question = question
 
-    retriever_from_llm = MultiQueryRetriever.from_llm(
-        retriever=vectorstore.as_retriever(), llm=llm)
+    #retriever_from_llm = MultiQueryRetriever.from_llm(retriever=vectorstore.as_retriever(), llm=llm)
     #results = retriever_from_llm.invoke(input==full_question)
-    #results = vectorstore.similarity_search(full_question)
-    results = vectorstore.similarity_search(full_question, k=2, filter={"functional_type": "Controller"})
 
+    if give_score:
+        results = vectorstore.similarity_search_with_score(full_question, k=2, filter={"functional_type": "Controller"})
+    else:
+        results = vectorstore.similarity_search(full_question, k=2, filter={"functional_type": "Controller"})
     return results
     
-def generate_response_from_retrieval(llm: BaseChatModel, retriever, question: str) -> str:
+def generate_response_from_retrieval(llm: BaseChatModel, retrieved_docs, question: str) -> str:
     retrieval_prompt = file.get_as_str("prompts/rag_retriever_query.txt", remove_comments= True)
     retrieval_prompt = retrieval_prompt.replace("{question}", question)
     rag_custom_prompt = ChatPromptTemplate.from_template(retrieval_prompt)
 
-    context = "• " + "\n• ".join(doc.page_content for doc in retriever)
+    context = "• " + "\n• ".join(doc.page_content if type(doc) != tuple else doc[0].page_content for doc in retrieved_docs)
     rag_chain = rag_custom_prompt | llm | RunnablePassthrough()
     answer = rag_chain.invoke(input= context)
     return Llm.get_content(answer)

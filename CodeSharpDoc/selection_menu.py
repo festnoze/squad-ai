@@ -81,8 +81,8 @@ def display_menu_and_actions(llms_infos: List[LlmInfo], default_first_action: in
                 print(answer)
                 if input("Do you want to see the full retieved documents? (y/_) ") == 'y':
                     print(">>>>> Sources: <<<<<<")
-                    for source in sources:
-                        print('- ' + source.page_content)
+                    for doc in sources:
+                        print("• " + doc.page_content if type(doc) != tuple else doc[0].page_content)
                 print("------------------------------------")
                 query = input("What next are you looking for? - (empty to quit) - ")
             display_menu()
