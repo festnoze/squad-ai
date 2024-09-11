@@ -9,12 +9,12 @@ from services.rag_service import RAGService
 from services.summary_generation_service import SummaryGenerationService
 
 
-project_path = "C:/Dev/squad-ai/CodeSharpDoc"
-target_code_path = "C:/Dev/studi.api.lms.user/src"
-#target_code_path = "C:/Dev/LMS/lms-api"
-#target_code_path = f"{project_path}/inputs/code_files_generated"
+local_path = "C:/Dev/squad-ai/CodeSharpDoc"
+# target_code_path = "C:/Dev/studi.api.lms.user/src"
+# target_code_path = "C:/Dev/LMS/lms-api"
+# target_code_path = f"{project_path}/inputs/code_files_generated"
 struct_desc_folder_subpath = "outputs/structures_descriptions"
-struct_desc_folder_path = f"{project_path}/{struct_desc_folder_subpath}"
+struct_desc_folder_path = f"{local_path}/{struct_desc_folder_subpath}"
 
 def display_menu() -> None:
     print("")
@@ -47,54 +47,73 @@ def display_menu_and_actions(llms_infos: List[LlmInfo], default_first_action: in
         
         # Generate summaries for all specified C# files
         if choice == "1" or choice == "g":
-            existing_structs_analysis = AnalysedStructuresHandling.load_json_structs_from_folder_and_ask_to_replace(struct_desc_folder_path)
-            SummaryGenerationService.generate_and_save_all_summaries_all_csharp_files_from_folder(target_code_path, files_batch_size, existing_structs_analysis, llms_infos)
+            generate_all_summaries(llms_infos, files_batch_size, llm_batch_size, local_path)
             continue
 
         elif choice == "2" or choice == "a":
-            existing_structs_analysis = AnalysedStructuresHandling.load_json_structs_from_folder_and_ask_to_replace(struct_desc_folder_path)
-            AnalysedStructuresHandling.analyse_code_structures_of_folder_and_save(target_code_path, files_batch_size, existing_structs_analysis)
+            analyse_files_code_structures(files_batch_size, local_path)
             continue
 
         # Build vector database
         elif choice == '3' or choice == 'b':            
-            llm = LangChainFactory.create_llms_from_infos(llms_infos)[-1]
-            rag = RAGService(llm)
-            rag.delete_vectorstore() # delete previous DB first
-            docs = rag.get_documents_to_vectorize_from_loaded_analysed_structures(struct_desc_folder_path)
-            count = rag.build_vectorstore_from(docs, doChunkContent=False)
-            print(f"Vector store built with {count} items")        
+            rebuild_vectorstore(llms_infos)        
             continue
 
         # Query the RAG service on methods summaries vector database
         elif choice == '4' or choice == 'q':            
-            llm = LangChainFactory.create_llms_from_infos(llms_infos)[-1]
-            rag = RAGService(llm)
-            count = rag.load_vectorstore(bm25_results_count= 5)
-            print(f"Vector store loaded with {count} items")
-
-            query = input("What are you looking for? ")
-            additionnal_context = file.get_as_str("prompts/rag_query_code_additionnal_instructions.txt")
-
-            while query != '':
-                answer, sources = rag.query(query, additionnal_context, include_bm25_retieval= False, give_score= True)
-                print(answer)
-                if input("Do you want to see all raw retrieved documents? (y/_) ") == 'y':
-                    print(">>>>> Sources: <<<<<<")
-                    for doc in sources:
-                        print("• " + doc.page_content if type(doc) != tuple else doc[0].page_content)
-                print("------------------------------------")
-                query = input("What next are you looking for? - (empty to quit) - ")
-            display_menu()
+            rag_querying_from_console(RAGService(llms_infos))
             continue
         
         elif choice == '5' or choice == 'h':
             display_menu()
             continue
+
         elif choice == '6' or choice == 'e':
             print ("End program")
             break
+
         else:
             print("Invalid choice. Please select a valid option.")
             display_menu()
             continue
+
+def rag_querying_from_console(rag: RAGService):
+    query = input("What are you looking for? ")
+    additionnal_context = file.get_as_str("prompts/rag_query_code_additionnal_instructions.txt")
+
+    while query != '':
+        answer, sources = rag.query(query, additionnal_context, include_bm25_retieval= False, give_score= True)
+        print(answer)
+        if input("Do you want to see all raw retrieved documents? (y/_) ") == 'y':
+            print(">>>>> Sources: <<<<<<")
+            for doc in sources:
+                print("• " + doc.page_content if type(doc) != tuple else doc[0].page_content)
+        print("------------------------------------")
+        query = input("What next are you looking for? - (empty to quit) - ")
+
+def rag_querying_from_sl_chatbot(rag: RAGService, query: str, st):
+    additionnal_context = file.get_as_str("prompts/rag_query_code_additionnal_instructions.txt")
+    
+    answer, sources = rag.query(query, additionnal_context, include_bm25_retieval= False, give_score= True)
+    st.session_state.messages.append({"role": "assistant", "content": answer})
+    st.chat_message("assistant").write(answer)
+
+    sources = "Sources :\n• " + "• ".join([doc.page_content if type(doc) != tuple else doc[0].page_content for doc in sources])
+    st.session_state.messages.append({"role": "sources", "content": sources})
+    st.chat_message("sources").write(sources)
+
+def rebuild_vectorstore(llms_infos: List[LlmInfo]):
+    llm = LangChainFactory.create_llms_from_infos(llms_infos[-1])[0]
+    rag = RAGService(llm)
+    rag.delete_vectorstore() # delete previous DB first
+    docs = rag.get_documents_to_vectorize_from_loaded_analysed_structures(struct_desc_folder_path)
+    count = rag.build_vectorstore_from(docs, doChunkContent=False)
+    print(f"Vector store built with {count} items")
+
+def analyse_files_code_structures(files_batch_size: int, folder_path: str):
+    existing_structs_analysis = AnalysedStructuresHandling.load_json_structs_from_folder_and_ask_to_replace(folder_path)
+    AnalysedStructuresHandling.analyse_code_structures_of_folder_and_save(folder_path, files_batch_size, existing_structs_analysis)
+
+def generate_all_summaries(llms_infos: List[LlmInfo], files_batch_size: int, llm_batch_size: int, folder_path: str):
+    existing_structs_analysis = AnalysedStructuresHandling.load_json_structs_from_folder_and_ask_to_replace(folder_path)
+    SummaryGenerationService.generate_and_save_all_summaries_all_csharp_files_from_folder(folder_path, files_batch_size, llm_batch_size, existing_structs_analysis, llms_infos)

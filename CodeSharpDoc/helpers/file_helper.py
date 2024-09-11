@@ -95,6 +95,9 @@ class file:
             data = file_handler.read()
         return data
     
+    def file_exists(filepath):
+        return os.path.exists(filepath)
+    
     @staticmethod
     def delete_all_files_with_extension(extension, folder_path):
         files_to_delete = glob.glob(os.path.join(folder_path, f"{extension}"))

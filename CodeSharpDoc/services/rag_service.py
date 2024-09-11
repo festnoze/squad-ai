@@ -2,7 +2,11 @@ import json
 from typing import Tuple
 from helpers.file_already_exists_policy import FileAlreadyExistsPolicy
 from helpers.file_helper import file
+from helpers.llm_helper import Llm
+from langchains.langchain_factory import LangChainFactory
+from models.llm_info import LlmInfo
 from models.logical_operator import LogicalOperator
+from models.question_analysis import QuestionAnalysis, QuestionAnalysisPydantic
 from models.rag_struct import RagMethodDesc
 from models.structure_desc import StructureDesc
 from langchain_core.language_models import BaseChatModel
@@ -11,8 +15,14 @@ from langchain_core.documents import Document
 import langchains.langchain_rag as lrag
 
 class RAGService:
-    def __init__(self, llm: BaseChatModel):
-        self.llm = llm
+    def __init__(self, llm_or_infos):
+        if isinstance(llm_or_infos, LlmInfo) or (isinstance(llm_or_infos, list) and any(llm_or_infos) and isinstance(llm_or_infos[0], LlmInfo)):            
+            self.llm = LangChainFactory.create_llms_from_infos(llm_or_infos)[0]
+        elif isinstance(llm_or_infos, BaseChatModel):
+            self.llm = llm_or_infos
+        else:
+            raise ValueError("Invalid llm_or_infos parameter")
+        self.load_vectorstore()
 
     def get_documents_to_vectorize_from_loaded_analysed_structures(self, struct_desc_folder_path: str) -> list[str]:
         docs: list[str] = []
@@ -38,15 +48,20 @@ class RAGService:
 
     rag_structs_summaries_json_filepath = "outputs/rag_structs_summaries.json"
     
-    def build_vectorstore_from(self, data: list, doChunkContent = True):
+    def build_vectorstore_from(self, data: list, doChunkContent = True)-> int:
+        if not data or len(data) == 0:
+            return 0
         self.rag_methods_desc = []
         self.vectorstore = lrag.build_vectorstore(data, doChunkContent)
         json_data = json.dumps(data)
         file.write_file(json_data, RAGService.rag_structs_summaries_json_filepath, file_exists_policy= FileAlreadyExistsPolicy.Override)
         return self.vectorstore._collection.count()
     
-    def load_vectorstore(self, bm25_results_count: int):
+    def load_vectorstore(self, bm25_results_count: int = 1):
+        if not file.file_exists(RAGService.rag_structs_summaries_json_filepath):
+            return None
         self.vectorstore = lrag.load_vectorstore()
+        
         data = file.read_file(RAGService.rag_structs_summaries_json_filepath)
         json_data = json.loads(data)
         self.langchain_documents = [
@@ -64,6 +79,12 @@ class RAGService:
         self.vectorstore = lrag.build_vectorstore(self.rag_methods_desc)
 
     def query(self, question: str, additionnal_context: str = None, include_bm25_retieval = False, give_score = False) -> Tuple[str, str]:
+        # pre-filtering: analyse used language and need to RAG retieval
+        questionAnalysis = self.prefilter_rag_query(question)
+        if not questionAnalysis.detected_language.__contains__("english"):
+            question = questionAnalysis.translated_question
+
+        #RAG documents retrieval
         filters = {
             "$and": [
                 {"functional_type": "Controller"},
@@ -72,6 +93,7 @@ class RAGService:
         }
         retrieved_chunks = lrag.retrieve(self.llm, self.vectorstore, question, additionnal_context, give_score, filters)
         
+        #BM25 retrieval
         if include_bm25_retieval:
             if filters:
                 self.bm25_retriever = lrag.build_bm25_retriever([doc for doc in self.langchain_documents if RAGService.filters_predicate(doc, filters)], len(retrieved_chunks))
@@ -79,8 +101,18 @@ class RAGService:
             bm25_retrieved_chunks = self.bm25_retriever.invoke(question)
             retrieved_chunks.extend([(chunk, 0) for chunk in bm25_retrieved_chunks] if give_score else bm25_retrieved_chunks)
 
-        answer = lrag.generate_response_from_retrieved_chunks(self.llm, retrieved_chunks, question)
+        answer = lrag.generate_response_from_retrieved_chunks(self.llm, retrieved_chunks, questionAnalysis)
         return answer, retrieved_chunks
+
+    def prefilter_rag_query(self, question)-> QuestionAnalysis:
+        prefilter_prompt = file.get_as_str("prompts/rag_prefiltering_query.txt", remove_comments= True)
+        prefilter_prompt = prefilter_prompt.replace("{question}", question)
+        prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(prefilter_prompt, QuestionAnalysisPydantic, QuestionAnalysis)
+        self.llm_batch_size = 100
+        response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks("RAG prefiltering", [self.llm, self.llm], output_parser, self.llm_batch_size, *[prompt_for_output_parser])
+        questionAnalysis = response[0]
+        questionAnalysis['question'] = question
+        return QuestionAnalysis(**questionAnalysis)
     
     # Helper function to evaluate single filter (handling nested operators)
     def filters_predicate(doc, filters, operator=LogicalOperator.AND):

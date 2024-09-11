@@ -3,6 +3,8 @@ Answer to the user's question the best you can basing your answer solely on the 
 Always give a full quote of the source(s) you used from the context to answer the question.  
 Provide a direct and concise answer to the user question. then always add a title "Quotes:" then fully quote the source(s) you get this answer from.
 //If none of the informations from the context seems relevant to answer the question properly, add to your answer: 'The answer can be wrong, as I didn't found much sources of information relevant to answer your question.',   
+{additional_instructions}
+
 # User Question #
 {question}
     

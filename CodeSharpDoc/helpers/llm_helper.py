@@ -86,7 +86,7 @@ class Llm:
 
     @staticmethod
     def get_prompt_and_json_output_parser(prompt_str: str, json_type: TPydanticModel, output_type: TOutputModel):
-        assert issubclass(json_type, BaseModel), "json_type must inherit from BaseModel"
+        assert issubclass(json_type, BaseModel), "provided pydantic type must inherit from BaseModel"
         assert inspect.isclass(output_type), "output_type must be a class"
         prompt = ChatPromptTemplate.from_messages(
             [

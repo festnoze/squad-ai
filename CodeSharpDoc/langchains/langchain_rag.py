@@ -21,6 +21,7 @@ from langchain.retrievers.multi_query import MultiQueryRetriever
 from langchain_openai import OpenAIEmbeddings
 
 from helpers.llm_helper import Llm
+from models.question_analysis import QuestionAnalysis
 
 def split_text_into_chunks(text: str) -> List[str]:
     txt_splitter = CharacterTextSplitter(
@@ -40,6 +41,9 @@ def build_vectorstore_from_folder_files(folder_path: str):
 vectorstore_path = "./chroma_db"
 
 def build_vectorstore(documents: List[dict], doChunkContent = True) -> any:
+    if not documents or len(documents) == 0:
+        return None
+        
     embeddings = OpenAIEmbeddings(openai_api_key= os.getenv("OPEN_API_KEY"))
     #embeddings = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
     if doChunkContent:
@@ -83,9 +87,14 @@ def retrieve(llm: BaseChatModel, vectorstore, question: str, additionnal_context
         results = vectorstore.similarity_search(full_question, k=2, filter=filters)
     return results
     
-def generate_response_from_retrieved_chunks(llm: BaseChatModel, retrieved_docs, question: str) -> str:
+def generate_response_from_retrieved_chunks(llm: BaseChatModel, retrieved_docs, questionAnalysis: QuestionAnalysis) -> str:
     retrieval_prompt = file.get_as_str("prompts/rag_retriever_query.txt", remove_comments= True)
-    retrieval_prompt = retrieval_prompt.replace("{question}", question)
+    retrieval_prompt = retrieval_prompt.replace("{question}", questionAnalysis.translated_question)
+    additional_instructions = ''
+    if not questionAnalysis.detected_language.__contains__("english"):
+        additional_instructions = file.get_as_str("prompts/rag_prefiltering_ask_for_translation_instructions.txt", remove_comments= True)
+        additional_instructions = additional_instructions.replace("{target_language}", questionAnalysis.detected_language)
+    retrieval_prompt = retrieval_prompt.replace("{additional_instructions}", additional_instructions)
     rag_custom_prompt = ChatPromptTemplate.from_template(retrieval_prompt)
 
     context = "• " + "\n• ".join(doc.page_content if type(doc) != tuple else doc[0].page_content for doc in retrieved_docs)

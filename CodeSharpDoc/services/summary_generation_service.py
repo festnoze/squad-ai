@@ -28,6 +28,7 @@ class SummaryGenerationService:
         llms = LangChainFactory.create_llms_from_infos(llms_infos)
         paths_and_codes = file.get_files_paths_and_contents(file_path, 'cs', 'C# code')
         SummaryGenerationService.remove_already_analysed_files(existing_structs_desc, paths_and_codes)
+        paths_and_codes = SummaryGenerationService.remove_auto_generated_files(paths_and_codes)
 
         # Split code files 'paths_and_codes' into batchs of 'files-batch-size' items
         paths_and_codes_batchs = []
@@ -44,12 +45,11 @@ class SummaryGenerationService:
         for i, paths_and_codes_batch in enumerate(paths_and_codes_batchs):
             txt.print("\nBatch n°" + str(i+1) + " of " + str(len(paths_and_codes_batchs)) + ":")
             paths_and_codes_chunk = dict(paths_and_codes_batch)                
-            paths_and_codes_chunk = SummaryGenerationService.remove_auto_generated_files(paths_and_codes_chunk)
             if len(paths_and_codes_chunk) == 0: continue
             structs_to_process = code_analyser_client.parse_and_analyse_code_files(list(paths_and_codes_chunk.keys()), False)
             CSharpCodeStructureAnalyser.chunkify_code_of_classes_methods(structs_to_process) 
 
-            elapsed = SummaryGenerationService.generate_all_summaries_for_all_structures(llms, structs_to_process, f"Files batch n°{i+1}/{len(paths_and_codes_batchs)} - ") 
+            elapsed = SummaryGenerationService.generate_all_summaries_for_all_structures(llms, structs_to_process, llm_batch_size, f"Files batch n°{i+1}/{len(paths_and_codes_batchs)} - ") 
             total_elapsed += elapsed
 
             structs_summaries_infos, missing_methods_summaries, missing_structs_summaries = SummaryGenerationService.create_struct_summaries_infos(structs_to_process, True)
@@ -64,56 +64,30 @@ class SummaryGenerationService:
         txt.print(f"Total missing structs summaries: {global_missing_structs_summaries}")
         txt.print(f"Total elapsed time: {total_elapsed}s.")
         txt.print("---------------------------")
-    
-    @staticmethod
-    def classes_methods_count(known_structures: list[StructureDesc]):
-        count = 0
-        for struct in known_structures:
-                count += len(struct.methods)
-        return count
-    
-    @staticmethod
-    def apply_to_interfaces_the_classes_generated_summaries(known_structures: list[StructureDesc]):
-        for interface_structure in [s for s in known_structures if s.struct_type == StructureType.Interface]:
-            classes_implementing_interface = [s for s in known_structures if s.struct_type == StructureType.Class and interface_structure.struct_name in s.interfaces_names]
-            interface_structure.related_structures = classes_implementing_interface #TODO: should add base classes too
-            
-            for method in interface_structure.methods:
-                class_method = None
-                for class_desc in classes_implementing_interface:
-                    class_method = next((m for m in class_desc.methods if m.method_name == method.method_name), None)
-                    if class_method:
-                        break
-
-                if class_method:
-                    method.generated_summary = class_method.generated_summary
-                    method.generated_parameters_summaries = class_method.generated_parameters_summaries
-                    method.generated_return_summary = class_method.generated_return_summary
-                    method.generated_xml_summary = class_method.generated_xml_summary
 
     @staticmethod
-    def generate_all_summaries_for_all_structures(llms: list[BaseChatModel], structures: list[StructureDesc], action_name_prefix: str)-> int:
+    def generate_all_summaries_for_all_structures(llms: list[BaseChatModel], structures: list[StructureDesc], llm_batch_size: int, action_name_prefix: str)-> int:
         txt.print_with_spinner(f"Ongoing parallel summaries generation for {SummaryGenerationService.classes_methods_count(structures)} methods in {len(structures)} code files:")
-        SummaryGenerationService.generate_all_summaries_for_all_classes(llms, structures, action_name_prefix)        
+        SummaryGenerationService.generate_all_summaries_for_all_classes(llms, llm_batch_size, structures, action_name_prefix)        
         SummaryGenerationService.apply_to_interfaces_the_classes_generated_summaries(structures)
         elapsed = txt.stop_spinner_replace_text(f"{SummaryGenerationService.classes_methods_count(structures)}  methods' summaries generation finished on {len(structures)} code files.")
         return elapsed
     
     @staticmethod
-    def generate_all_summaries_for_all_classes(llm: BaseChatModel, llm_batch_size: int, known_structures: list[StructureDesc], action_name_prefix: str):
+    def generate_all_summaries_for_all_classes(llms: list[BaseChatModel], llm_batch_size: int, known_structures: list[StructureDesc], action_name_prefix: str):
         all_classes_records_enums = [s for s in known_structures 
                                if s.struct_type == StructureType.Class 
                                or s.struct_type == StructureType.Record 
                                or s.struct_type == StructureType.Enum]
         
-        SummaryGenerationService.generate_methods_summaries_all_classes(llm, llm_batch_size, all_classes_records_enums, action_name_prefix)
+        SummaryGenerationService.generate_methods_summaries_all_classes(llms, llm_batch_size, all_classes_records_enums, action_name_prefix)
         
-        SummaryGenerationService.generate_all_classes_methods_parameters_desc_w_output_parser(llm, llm_batch_size, all_classes_records_enums, action_name_prefix)
+        SummaryGenerationService.generate_all_classes_methods_parameters_desc_w_output_parser(llms, llm_batch_size, all_classes_records_enums, action_name_prefix)
          
-        SummaryGenerationService.generate_methods_return_summaries_all_classes(llm, all_classes_records_enums, action_name_prefix)
+        SummaryGenerationService.generate_methods_return_summaries_all_classes(llms, all_classes_records_enums, action_name_prefix)
 
         # Generate the global summary for the structures themselves(classes, records, enums, but not for interfaces)        
-        SummaryGenerationService.generate_structures_global_summaries(llm, all_classes_records_enums, action_name_prefix)
+        SummaryGenerationService.generate_structures_global_summaries(llms, all_classes_records_enums, action_name_prefix)
 
         # Assign to all methods a generated summary including method description, parameters description, and return type description
         for class_struct in all_classes_records_enums:
@@ -221,3 +195,95 @@ class SummaryGenerationService:
         # Apply classes generated summaries to all classes
         for i in range(len(all_classes_records_enums)):
             all_classes_records_enums[i].generated_summary = CSharpXMLDocumentation(classes_summaries[i]).to_xml()
+    
+    @staticmethod
+    def create_struct_summaries_infos(structure_descs: list[StructureDesc], from_generated_summary: bool) -> list[StructSummariesInfos]:
+        struct_summaries_list : list[StructSummariesInfos] = []
+        missing_methods_summaries = 0
+        missing_structs_summaries = 0
+        struct_summary_prop_name = 'generated_summary' if from_generated_summary else 'existing_summary'
+        method_summary_prop_name = 'generated_xml_summary' if from_generated_summary else 'existing_summary'
+
+        for struct_desc in structure_descs:
+            method_summaries = []
+            for method in struct_desc.methods:
+                method_summary = ''
+                if hasattr(method, method_summary_prop_name):
+                    method_summary = getattr(method, method_summary_prop_name)
+                    if not method_summary:
+                        method_summary = ''
+                        missing_methods_summaries += 1
+                else:
+                    method_summary = ''
+                    missing_methods_summaries += 1
+
+                method_summaries.append(MethodSummaryInfo(method.code_start_index, method_summary))
+            
+            struct_summary = ''
+            if hasattr(struct_desc, struct_summary_prop_name):
+                struct_summary = getattr(struct_desc, struct_summary_prop_name)
+                if not struct_summary:
+                    struct_summary = ''
+                    missing_structs_summaries += 1
+            else:
+                struct_summary = ''
+                missing_structs_summaries += 1
+
+            struct_summary_info = StructSummariesInfos(
+                file_path=struct_desc.file_path,
+                index_shift_code=struct_desc.index_shift_code,
+                indent_level=struct_desc.indent_level,
+                summary=struct_summary,
+                methods=method_summaries
+            )
+            struct_summaries_list.append(struct_summary_info)
+
+        return struct_summaries_list, missing_methods_summaries, missing_structs_summaries
+    
+    @staticmethod
+    def remove_already_analysed_files(existing_structs_desc, paths_and_codes):
+        existing_structs_file_paths = [struct.file_path for struct in existing_structs_desc]
+        removed_keys = [] 
+        for path in paths_and_codes.keys():
+            if path in existing_structs_file_paths:
+                removed_keys.append(path)
+        for key in removed_keys:
+            del paths_and_codes[key]
+    
+    @staticmethod
+    def remove_auto_generated_files(paths_and_codes):
+        auto_generated_files_path_by_content = [path for path, code in paths_and_codes.items() if code and '<auto-generated>' in code]
+        for path in auto_generated_files_path_by_content:
+            del paths_and_codes[path]
+
+        auto_generated_files_path_by_extension = [path for path in paths_and_codes.keys() if path.endswith(".g.cs") or path.endswith(".Designer.cs")]
+        for path in auto_generated_files_path_by_extension:
+            del paths_and_codes[path]
+
+        return paths_and_codes
+
+    @staticmethod
+    def classes_methods_count(known_structures: list[StructureDesc]):
+        count = 0
+        for struct in known_structures:
+                count += len(struct.methods)
+        return count
+    
+    @staticmethod
+    def apply_to_interfaces_the_classes_generated_summaries(known_structures: list[StructureDesc]):
+        for interface_structure in [s for s in known_structures if s.struct_type == StructureType.Interface]:
+            classes_implementing_interface = [s for s in known_structures if s.struct_type == StructureType.Class and interface_structure.struct_name in s.interfaces_names]
+            interface_structure.related_structures = classes_implementing_interface #TODO: should add base classes too
+            
+            for method in interface_structure.methods:
+                class_method = None
+                for class_desc in classes_implementing_interface:
+                    class_method = next((m for m in class_desc.methods if m.method_name == method.method_name), None)
+                    if class_method:
+                        break
+
+                if class_method:
+                    method.generated_summary = class_method.generated_summary
+                    method.generated_parameters_summaries = class_method.generated_parameters_summaries
+                    method.generated_return_summary = class_method.generated_return_summary
+                    method.generated_xml_summary = class_method.generated_xml_summary
