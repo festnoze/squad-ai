@@ -3,7 +3,7 @@ from openai import OpenAI
 import streamlit as st
 from helpers.txt_helper import txt
 from models.llm_info import LlmInfo
-import selection_menu
+from available_actions import AvailableActions
 from services.rag_service import RAGService
 from startup import Startup
 
@@ -21,7 +21,7 @@ class ChatbotFront:
         if not ChatbotFront.llms_infos:
             ChatbotFront.llms_infos = Startup.initialize()
         if not ChatbotFront.rag:
-            ChatbotFront.rag = RAGService(ChatbotFront.llms_infos)
+            ChatbotFront.rag = AvailableActions.init_rag_service(ChatbotFront.llms_infos)
 
         st.set_page_config(
             page_title="DRY C# Chatbot",
@@ -52,7 +52,7 @@ class ChatbotFront:
             st.button("📊 Analyser structures des fichiers C#", on_click=ChatbotFront.analyse_files_code_structures)
             st.button("🗃️ Ajouter fichiers analysés à la base", on_click= ChatbotFront.vectorize_summaries)
             st.button("📚 Créer documentation du code C#", on_click= ChatbotFront.generate_documentations, disabled=True)
-            ChatbotFront.folder_path = st.text_input("Dossier à traiter", value=ChatbotFront.folder_path, disabled=True)
+            ChatbotFront.folder_path = st.text_input("Dossier à traiter", value=ChatbotFront.folder_path)#, disabled=True)
 
         st.title("💬 Chatbot DRY C#")
         st.markdown("<h4 style='text-align: right;'><em><strong>Réutilisez le code existant 🧩</strong></em></h4>", unsafe_allow_html=True)
@@ -73,52 +73,40 @@ class ChatbotFront:
                 time.sleep(1)
             
         if prompt := st.chat_input():
-            st.session_state.messages.append({"role": "user", "content": prompt})
-            st.chat_message("user").write(prompt)
-            ChatbotFront.handle_user_prompt(prompt, ChatbotFront.llms_infos, ChatbotFront.rag)
-
+            with st.spinner("Recherche de réponses en cours ..."):
+                st.session_state.messages.append({"role": "user", "content": txt.remove_markdown(prompt)})
+                st.chat_message("user").write(prompt)
+                AvailableActions.rag_querying_from_sl_chatbot(ChatbotFront.rag, prompt, st)
+            
     def generate_summaries():
         ChatbotFront.ongoing_action = "generate_summary"
         prompt = f"Génération et remplacement des résumés des méthodes et classes pour tous les fichiers C# du dossier : '{ChatbotFront.folder_path}'"
         with st.spinner("En cours ... " + prompt):
-            selection_menu.generate_all_summaries(ChatbotFront.llms_infos, ChatbotFront.files_batch_size, ChatbotFront.llm_batch_size, ChatbotFront.folder_path)
-        st.session_state.messages.append({"role": "assistant", "content": "Terminé avec succès : " + prompt})
+            AvailableActions.generate_all_summaries(ChatbotFront.llms_infos, ChatbotFront.files_batch_size, ChatbotFront.llm_batch_size, ChatbotFront.folder_path)
+        st.session_state.messages.append({"role": "assistant", "content": txt.remove_markdown("Terminé avec succès : " + prompt)})
 
     def analyse_files_code_structures():
         ChatbotFront.ongoing_action = "analyse_files_code"
         prompt = f"Analyse de structure de tous les fichiers C# du dossier : '{ChatbotFront.folder_path}'"
         with st.spinner("En cours ... " + prompt):
-            selection_menu.analyse_files_code_structures(ChatbotFront.files_batch_size, ChatbotFront.folder_path)
-        st.session_state.messages.append({"role": "assistant", "content": "Terminé avec succès : " + prompt})
+            AvailableActions.analyse_files_code_structures(ChatbotFront.files_batch_size, ChatbotFront.folder_path)
+        st.session_state.messages.append({"role": "assistant", "content": txt.remove_markdown("Terminé avec succès : " + prompt)})
 
     def vectorize_summaries():
         ChatbotFront.ongoing_action = "vectorize_summaries"
         prompt = f"Ajout à la base vectorielle de toutes les structures analysées"
         with st.spinner("En cours ... " + prompt):
-            selection_menu.rebuild_vectorstore(ChatbotFront.llms_infos)
-        st.session_state.messages.append({"role": "assistant", "content": "Terminé avec succès : " + prompt})
+            AvailableActions.rebuild_vectorstore(ChatbotFront.llms_infos)
+        st.session_state.messages.append({"role": "assistant", "content": txt.remove_markdown("Terminé avec succès : " + prompt)})
 
     def generate_documentations():
         ChatbotFront.ongoing_action = "generate_documentation"
         prompt = f"En cours de génération de la documentation pour tous les fichiers C# du dossier : '{ChatbotFront.folder_path}'"
-        st.session_state.messages.append({"role": "assistant", "content": prompt})
+        st.session_state.messages.append({"role": "assistant", "content": txt.remove_markdown(prompt)})
         st.chat_message("assistant").write(prompt)
 
     def start_caption():
         return "Décrivez ci-dessous la fonctionnalité que vous recherchez"
-    
-    def handle_user_prompt(prompt, llms_infos: list[LlmInfo], rag: RAGService):
-        if not ChatbotFront.ongoing_action:
-            selection_menu.rag_querying_from_sl_chatbot(rag, prompt, st)
-        
-        elif ChatbotFront.ongoing_action == "generate_summaries":
-            selection_menu.generate_all_summaries(llms_infos, ChatbotFront.files_batch_size, ChatbotFront.folder_path)
-        elif prompt == "2":
-            selection_menu.analyse_files_code_structures(ChatbotFront.files_batch_size, ChatbotFront.folder_path)
-        elif prompt == "3":
-            selection_menu.rebuild_vectorstore(llms_infos, ChatbotFront.folder_path)
-        
-        ChatbotFront.ongoing_action = None
 
 if __name__ == "__main__":
     ChatbotFront.main()

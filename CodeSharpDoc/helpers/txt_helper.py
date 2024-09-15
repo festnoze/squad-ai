@@ -1,3 +1,4 @@
+import re
 import sys
 import threading
 import time
@@ -119,3 +120,7 @@ class txt:
             sys.stdout.write(f'\r{empty}')
             sys.stdout.write(f'\r{text}\r\n')
             return elapsed_sec if elapsed_sec else 0
+        
+    def remove_markdown(text):
+        remove_chars = r"[*_#+=|{}!]"
+        return re.sub(remove_chars, "", text)

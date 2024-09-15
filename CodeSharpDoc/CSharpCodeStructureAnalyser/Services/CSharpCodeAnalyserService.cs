@@ -8,6 +8,7 @@ namespace CSharpCodeStructureAnalyser.Services;
 
 public static class CSharpCodeAnalyserService
 {
+
     public static List<StructureDesc> AnalyzeFiles(List<string> filesPath, bool doesMethodsShiftIndexesIncludeActualSummaries)
     {
         var csFilesCode = CodeLoaderService.LoadCsFiles(filesPath);

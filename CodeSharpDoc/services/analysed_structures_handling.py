@@ -12,8 +12,8 @@ from services.summary_generation_service import SummaryGenerationService
 class AnalysedStructuresHandling:
     
     @staticmethod
-    def analyse_code_structures_of_folder_and_save(file_path: str, files_batch_size: int, existing_structs_desc: list[StructureDesc]):  
-        paths_and_codes = file.get_files_paths_and_contents(file_path, 'cs', 'C# code')
+    def analyse_code_structures_of_folder_and_save(code_file_path: str, struct_desc_folder_path: str, files_batch_size: int, existing_structs_desc: list[StructureDesc]):  
+        paths_and_codes = file.get_files_paths_and_contents(code_file_path, 'cs', 'C# code')
         if any(existing_structs_desc):
             SummaryGenerationService.remove_already_analysed_files(existing_structs_desc, paths_and_codes)
 
@@ -31,7 +31,7 @@ class AnalysedStructuresHandling:
             structs_to_process = code_analyser_client.parse_and_analyse_code_files(list(paths_and_codes_chunk.keys()), True)
             CSharpCodeStructureAnalyser.chunkify_code_of_classes_methods(structs_to_process)
             #structs_summaries_infos, missing_methods_summaries, missing_structs_summaries = SummaryGenerationService.create_struct_summaries_infos(structs_to_process, False)
-            AnalysedStructuresHandling.save_analysed_structures_as_json_files(structs_to_process, f'outputs\\structures_descriptions')
+            AnalysedStructuresHandling.save_analysed_structures_as_json_files(structs_to_process, struct_desc_folder_path)
             txt.print(f"\nBatch {i+1} of {len(paths_and_codes_batchs)} code files analysed and analysis saved.")
             
         txt.print("\nAll codes files successfully analysed.")

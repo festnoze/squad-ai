@@ -1,4 +1,5 @@
 import json
+import time
 from typing import Tuple
 from helpers.file_already_exists_policy import FileAlreadyExistsPolicy
 from helpers.file_helper import file
@@ -12,7 +13,7 @@ from models.structure_desc import StructureDesc
 from langchain_core.language_models import BaseChatModel
 from langchain_core.documents import Document
 #
-import langchains.langchain_rag as lrag
+import langchains.langchain_rag as langchain_rag
 
 class RAGService:
     def __init__(self, llm_or_infos):
@@ -43,8 +44,10 @@ class RAGService:
     def build_document(self, content: str, metadata: dict):
         return {'page_content': content, 'metadata': metadata}
     
-    def delete_vectorstore(self):
-        lrag.delete_vectorstore()
+    def empty_vectorstore(self):
+        if self.vectorstore:
+            self.vectorstore.reset_collection()
+            #langchain_rag.delete_vectorstore_files()
 
     rag_structs_summaries_json_filepath = "outputs/rag_structs_summaries.json"
     
@@ -52,7 +55,7 @@ class RAGService:
         if not data or len(data) == 0:
             return 0
         self.rag_methods_desc = []
-        self.vectorstore = lrag.build_vectorstore(data, doChunkContent)
+        self.vectorstore = langchain_rag.build_vectorstore(data, doChunkContent)
         json_data = json.dumps(data)
         file.write_file(json_data, RAGService.rag_structs_summaries_json_filepath, file_exists_policy= FileAlreadyExistsPolicy.Override)
         return self.vectorstore._collection.count()
@@ -60,7 +63,7 @@ class RAGService:
     def load_vectorstore(self, bm25_results_count: int = 1):
         if not file.file_exists(RAGService.rag_structs_summaries_json_filepath):
             return None
-        self.vectorstore = lrag.load_vectorstore()
+        self.vectorstore = langchain_rag.load_vectorstore()
         
         data = file.read_file(RAGService.rag_structs_summaries_json_filepath)
         json_data = json.loads(data)
@@ -68,7 +71,7 @@ class RAGService:
             Document(page_content=doc["page_content"], metadata=doc["metadata"]) 
             for doc in json_data
         ]
-        self.bm25_retriever = lrag.build_bm25_retriever(self.langchain_documents, bm25_results_count)
+        self.bm25_retriever = langchain_rag.build_bm25_retriever(self.langchain_documents, bm25_results_count)
         return self.vectorstore._collection.count()
 
     def import_structures(self, structures: list[StructureDesc]):
@@ -76,7 +79,7 @@ class RAGService:
         for struct in structures:
             for method in struct.methods:
                 self.rag_methods_desc.append(RagMethodDesc(method.method_name, method.generated_summary, struct.file_path).to_dict())  
-        self.vectorstore = lrag.build_vectorstore(self.rag_methods_desc)
+        self.vectorstore = langchain_rag.build_vectorstore(self.rag_methods_desc)
 
     def query(self, question: str, additionnal_context: str = None, include_bm25_retieval = False, give_score = False) -> Tuple[str, str]:
         # pre-filtering: analyse used language and need to RAG retieval
@@ -91,17 +94,17 @@ class RAGService:
                 {"summary_kind": "method"}
             ]
         }
-        retrieved_chunks = lrag.retrieve(self.llm, self.vectorstore, question, additionnal_context, give_score, filters)
+        retrieved_chunks = langchain_rag.retrieve(self.llm, self.vectorstore, question, additionnal_context, filters, give_score, 10, 0.2, 2)
         
         #BM25 retrieval
         if include_bm25_retieval:
             if filters:
-                self.bm25_retriever = lrag.build_bm25_retriever([doc for doc in self.langchain_documents if RAGService.filters_predicate(doc, filters)], len(retrieved_chunks))
+                self.bm25_retriever = langchain_rag.build_bm25_retriever([doc for doc in self.langchain_documents if RAGService.filters_predicate(doc, filters)], len(retrieved_chunks))
             self.bm25_retriever.k = len(retrieved_chunks)
             bm25_retrieved_chunks = self.bm25_retriever.invoke(question)
             retrieved_chunks.extend([(chunk, 0) for chunk in bm25_retrieved_chunks] if give_score else bm25_retrieved_chunks)
 
-        answer = lrag.generate_response_from_retrieved_chunks(self.llm, retrieved_chunks, questionAnalysis)
+        answer = langchain_rag.generate_response_from_retrieved_chunks(self.llm, retrieved_chunks, questionAnalysis)
         return answer, retrieved_chunks
 
     def prefilter_rag_query(self, question)-> QuestionAnalysis:

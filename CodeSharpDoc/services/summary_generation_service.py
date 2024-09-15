@@ -24,9 +24,9 @@ class SummaryGenerationService:
 
     #@traceable #trace llm invoke through LangSmith
     @staticmethod
-    def generate_and_save_all_summaries_all_csharp_files_from_folder(file_path: str, files_batch_size: int, llm_batch_size: int, existing_structs_desc: list[StructureDesc], llms_infos: list[LlmInfo]):  
+    def generate_and_save_all_summaries_all_csharp_files_from_folder(code_file_path: str, files_batch_size: int, llm_batch_size: int, existing_structs_desc: list[StructureDesc], llms_infos: list[LlmInfo]):  
         llms = LangChainFactory.create_llms_from_infos(llms_infos)
-        paths_and_codes = file.get_files_paths_and_contents(file_path, 'cs', 'C# code')
+        paths_and_codes = file.get_files_paths_and_contents(code_file_path, 'cs', 'C# code')
         SummaryGenerationService.remove_already_analysed_files(existing_structs_desc, paths_and_codes)
         paths_and_codes = SummaryGenerationService.remove_auto_generated_files(paths_and_codes)
 

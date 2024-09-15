@@ -129,7 +129,7 @@ class file:
                     elif os.path.isdir(file_path):
                         shutil.rmtree(file_path)
                 except Exception as e:
-                    print(f'{file_path} deletion failed: {e}')
+                    print(f"File deletion failed: '{file_path}'. With error: {e}")
     
     @staticmethod
     def get_all_folder_and_subfolders_files_path(path, extension=None):
