@@ -46,6 +46,7 @@ class ChatbotFront:
         
         with st.sidebar:
             st.button("🔍 Utilisez le chatbot pour Rechercher  ➺", disabled=True)
+            st.button("🧽 Effacer la conversation du chatbot", on_click=ChatbotFront.clear_conversation)
             st.sidebar.markdown("---")
             st.subheader("🚀 Autres actions :")
             st.button("✨ Générer les résumés des fichiers C#", on_click=ChatbotFront.generate_summaries)
@@ -77,7 +78,11 @@ class ChatbotFront:
                 st.session_state.messages.append({"role": "user", "content": txt.remove_markdown(prompt)})
                 st.chat_message("user").write(prompt)
                 AvailableActions.rag_querying_from_sl_chatbot(ChatbotFront.rag, prompt, st)
-            
+
+    def clear_conversation():
+        st.session_state.messages = []
+        st.session_state.messages.append({"role": "assistant", "content": ChatbotFront.start_caption()})
+        
     def generate_summaries():
         ChatbotFront.ongoing_action = "generate_summary"
         prompt = f"Génération et remplacement des résumés des méthodes et classes pour tous les fichiers C# du dossier : '{ChatbotFront.folder_path}'"
