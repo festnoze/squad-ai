@@ -1,6 +1,6 @@
 import json
 from typing import List
-from langchain.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 
 from helpers.txt_helper import txt
 from models.param_doc import ParameterDocumentation, ParameterDocumentationPydantic

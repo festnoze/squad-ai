@@ -3,7 +3,6 @@ from helpers.file_helper import file
 from typing import List
 from langchain_community.embeddings.openai import OpenAIEmbeddings
 from langchain_core.embeddings import Embeddings
-from langchain_core.pydantic_v1 import Field, root_validator
 
 # RAG imports
 from langchain_core.language_models import BaseChatModel

@@ -1,13 +1,10 @@
 from typing import List
-
-from pydantic import BaseModel, Field
 from helpers.txt_helper import txt
 from models.base_desc import BaseDesc
 from models.enum_desc import EnumMembersDesc
-from models.method_desc import MethodDesc, MethodDescPydantic
-from models.param_desc import ParameterDesc
+from models.method_desc import MethodDesc
 from models.param_doc import ParameterDocumentation
-from models.prop_desc import PropertyDesc, PropertyDescPydantic
+from models.prop_desc import PropertyDesc
 from models.structure_functional_type import StructureFunctionalType
 from models.structure_type import StructureType
 import json
