@@ -49,9 +49,9 @@ class ChatbotFront:
             st.button("🧽 Effacer la conversation du chatbot", on_click=ChatbotFront.clear_conversation)
             st.sidebar.markdown("---")
             st.subheader("🚀 Autres actions :")
-            st.button("✨ Générer les résumés des fichiers C#", on_click=ChatbotFront.generate_summaries)
+            st.button("✨ Générer summaries des fichiers C#", on_click=ChatbotFront.generate_summaries)
             st.button("📊 Analyser structures des fichiers C#", on_click=ChatbotFront.analyse_files_code_structures)
-            st.button("🗃️ Ajouter fichiers analysés à la base", on_click= ChatbotFront.vectorize_summaries)
+            st.button("📦 Ajouter fichiers analysés à la base", on_click= ChatbotFront.vectorize_summaries)
             st.button("📚 Créer documentation du code C#", on_click= ChatbotFront.generate_documentations, disabled=True)
             ChatbotFront.folder_path = st.text_input("Dossier à traiter", value=ChatbotFront.folder_path)#, disabled=True)
 
@@ -82,7 +82,7 @@ class ChatbotFront:
     def clear_conversation():
         st.session_state.messages = []
         st.session_state.messages.append({"role": "assistant", "content": ChatbotFront.start_caption()})
-        
+
     def generate_summaries():
         ChatbotFront.ongoing_action = "generate_summary"
         prompt = f"Génération et remplacement des résumés des méthodes et classes pour tous les fichiers C# du dossier : '{ChatbotFront.folder_path}'"
