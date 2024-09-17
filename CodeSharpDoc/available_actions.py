@@ -102,9 +102,7 @@ class AvailableActions:
 
     @staticmethod
     def rag_querying_from_sl_chatbot(rag: RAGService, query: str, st):
-        additionnal_context = ""#file.get_as_str("prompts/rag_query_code_additionnal_instructions.txt")
-        
-        answer, sources = rag.query(query, additionnal_context, include_bm25_retieval= False, give_score= True)
+        answer, sources = rag.query(query, include_bm25_retieval= False, give_score= True)
         answer = txt.remove_markdown(answer) 
         st.session_state.messages.append({"role": "assistant", "content": answer})
         st.chat_message("assistant").write(answer)

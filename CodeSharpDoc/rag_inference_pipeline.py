@@ -60,10 +60,9 @@ class RagInferencePipeline:
     # Pre-treatment subflow
     @flow(task_runner=ConcurrentTaskRunner())  # Allows parallelism
     def rag_pre_treatment(self, query):
-
         guardrails_result = self.guardrails_query_analysis.submit(query)
         questionAnalysis = self.analyse_query_language.submit(query)
-        metadata = self.extract_metadata.submit(questionAnalysis.translated_question)
+        metadata = self.extract_explicit_metadata.submit(questionAnalysis.translated_question)
 
         # Wait for tasks completion
         guardrails_result = guardrails_result.result()
@@ -91,7 +90,7 @@ class RagInferencePipeline:
             questionAnalysis.translated_question = question
         return QuestionAnalysis(**questionAnalysis)
     
-    def extract_metadata(self, question):
+    def extract_explicit_metadata(self, question):
         filters = {}
         if self.has_manual_filters(question):
             filters, question = self.extract_manual_filters(question)
@@ -119,19 +118,23 @@ class RagInferencePipeline:
         filters = self.get_filters_from_str(filters_str)
         return filters, question
 
-
     # Data Retrieval subflow with parallel RAG and BM25 retrieval
     @flow(task_runner=ConcurrentTaskRunner())
     def rag_hybrid_retrieval(self, analysed_query: QuestionAnalysis, include_bm25_retieval: bool = False, give_score: bool = True):
+       
         retrieved_chunks = self.rag_retrieval.submit(analysed_query)
         if include_bm25_retieval:
             bm25_chunks = self.bm25_retrieval.submit(analysed_query, give_score)
-        return retrieved_chunks, bm25_chunks
-        
 
+        retrieved_chunks = retrieved_chunks.result()
+        bm25_chunks = bm25_chunks.result() if include_bm25_retieval else []
+        retained_chunks = hybrid_chunks_selection(retrieved_chunks, bm25_chunks)
+        return retained_chunks
+        
     @task
-    def rag_retrieval(self, query, additionnal_context, filters, give_score):
-        retrieved_chunks = langchain_rag.retrieve(self.rag.llm, self.vectorstore, query, additionnal_context, filters, give_score, 10, 0.2, 2)
+    def rag_retrieval(self, query, filters, give_score):
+        retrieved_chunks = langchain_rag.retrieve(self.rag.llm, self.vectorstore, query, None, filters, give_score, 10, 0.2, 2)
+        return retrieved_chunks
     
     @task
     def bm25_retrieval(query, give_score, filters, k = 3):
@@ -139,7 +142,7 @@ class RagInferencePipeline:
             bm25_retriever = langchain_rag.build_bm25_retriever([doc for doc in self.langchain_documents if RAGService.filters_predicate(doc, filters)], len(retrieved_chunks))
         bm25_retriever.k = k
         bm25_retrieved_chunks = bm25_retriever.invoke(query)
-        retrieved_chunks.extend([(chunk, 0) for chunk in bm25_retrieved_chunks] if give_score else bm25_retrieved_chunks)
+        return bm25_retrieved_chunks
 
     # Augmented answer generation subflow
     @flow
