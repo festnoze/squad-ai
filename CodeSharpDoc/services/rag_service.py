@@ -4,7 +4,9 @@ from typing import Tuple
 from helpers.file_already_exists_policy import FileAlreadyExistsPolicy
 from helpers.file_helper import file
 from helpers.llm_helper import Llm
+from helpers.txt_helper import txt
 from langchains.langchain_factory import LangChainFactory
+from langchains.langgraph_agent_state import AgentState
 from models.llm_info import LlmInfo
 from models.logical_operator import LogicalOperator
 from models.question_analysis import QuestionAnalysis, QuestionAnalysisPydantic
@@ -81,113 +83,8 @@ class RAGService:
                 self.rag_methods_desc.append(RagMethodDesc(method.method_name, method.generated_summary, struct.file_path).to_dict())  
         self.vectorstore = langchain_rag.build_vectorstore(self.rag_methods_desc)
 
-    def query(self, question: str, additionnal_context: str = None, include_bm25_retieval = False, give_score = False) -> Tuple[str, str]:
-        # pre-filtering: analyse used language and need to RAG retieval
-        questionAnalysis = self.prefilter_rag_query(question)
-        if not questionAnalysis.detected_language.__contains__("english"):
-            question = questionAnalysis.translated_question
-
-        #RAG documents retrieval
-        filters = {}
-        if RAGService.has_filters(question):
-            filters, question = RAGService.extract_filters(question)
-        else:
-            filters = {
-                "$and": [
-                    {"functional_type": "Controller"},
-                    {"summary_kind": "method"}
-                ]
-            }
-        retrieved_chunks = langchain_rag.retrieve(self.llm, self.vectorstore, question, additionnal_context, filters, give_score, 10, 0.2, 2)
-        
-        #BM25 retrieval
-        if include_bm25_retieval:
-            if filters:
-                self.bm25_retriever = langchain_rag.build_bm25_retriever([doc for doc in self.langchain_documents if RAGService.filters_predicate(doc, filters)], len(retrieved_chunks))
-            self.bm25_retriever.k = len(retrieved_chunks)
-            bm25_retrieved_chunks = self.bm25_retriever.invoke(question)
-            retrieved_chunks.extend([(chunk, 0) for chunk in bm25_retrieved_chunks] if give_score else bm25_retrieved_chunks)
-
-        answer = langchain_rag.generate_response_from_retrieved_chunks(self.llm, retrieved_chunks, questionAnalysis)
-        return answer, retrieved_chunks
-
-    def prefilter_rag_query(self, question)-> QuestionAnalysis:
-        prefilter_prompt = file.get_as_str("prompts/rag_prefiltering_query.txt", remove_comments= True)
-        prefilter_prompt = prefilter_prompt.replace("{question}", question)
-        prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(prefilter_prompt, QuestionAnalysisPydantic, QuestionAnalysis)
-        self.llm_batch_size = 100
-        response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks("RAG prefiltering", [self.llm, self.llm], output_parser, self.llm_batch_size, *[prompt_for_output_parser])
-        questionAnalysis = response[0]
-        questionAnalysis['question'] = question
-        return QuestionAnalysis(**questionAnalysis)
-    
-    # Helper function to evaluate single filter (handling nested operators)
-    def filters_predicate(doc, filters, operator=LogicalOperator.AND):
-        # If filters is a dictionary (single filter or operator like $and/$or)
-        if isinstance(filters, dict):
-            if "$and" in filters:
-                # Recursively handle $and with multiple conditions
-                return RAGService.filters_predicate(doc, filters["$and"], LogicalOperator.AND)
-            elif "$or" in filters:
-                # Recursively handle $or with multiple conditions
-                return RAGService.filters_predicate(doc, filters["$or"], LogicalOperator.OR)
-            else:
-                # Handle single key-value filter (field-value pair)
-                return all(doc.metadata.get(key) == value for key, value in filters.items())
-
-        # If filters is a list, apply the operator (AND/OR)
-        elif isinstance(filters, list):
-            if operator == LogicalOperator.AND:
-                return all(
-                    RAGService.filters_predicate(doc, sub_filter, LogicalOperator.AND)
-                    for sub_filter in filters
-                )
-            elif operator == LogicalOperator.OR:
-                return any(
-                    RAGService.filters_predicate(doc, sub_filter, LogicalOperator.OR)
-                    for sub_filter in filters
-                )
-            else:
-                raise ValueError(f"Unhandled operator: {operator}")
-
-        return False
-    
-    def has_filters(question: str) -> bool:
-        return  question.__contains__("filters:") or question.__contains__("filtres :")
-    
-    def extract_filters(question: str) -> Tuple[dict, str]:
-        filters = {}
-        if question.__contains__("filters:"):
-            filters_str = question.split("filters:")[1]
-            question = question.split("filters:")[0]
-        elif question.__contains__("filtres :"):
-            filters_str = question.split("filtres :")[1]
-            question = question.split("filtres :")[0]
-        filters_str = filters_str.strip()
-        filters = RAGService.get_filters_from_str(filters_str)
-        return filters, question
-    
-    def get_filters_from_str(filters_str: str) -> dict:
-        filters = []
-        filters_list = filters_str.lower().split(',')
-
-        for filter in filters_list:
-            # functional_type: Controller, Service, Repository, ...
-            if "controller" in filter or "service" in filter or "repository" in filter:
-                # Ensure the first letter is uppercase
-                functional_type = filter.strip().capitalize()
-                filters.append({"functional_type": functional_type})
-            # summary_kind: class, method, (property, enum_member), ...
-            elif "method" in filter or "méthode" in filter:
-                filters.append({"summary_kind": "method"})
-            elif "class" in filter:
-                filters.append({"summary_kind": "class"})
-
-        # If there are more than one filters, wrap in "$and", otherwise return a single filter
-        if len(filters) > 1:
-            return {"$and": filters}
-        elif len(filters) == 1:
-            return filters[0]  # Just return the single condition directly
-        else:
-            return {}  # Return an empty filter if no conditions
-
+    # def query(self, question: str, additionnal_context: str = None, include_bm25_retieval = False, give_score = False) -> Tuple[str, str]:
+    #     inferencePipeline = RagInferencePipeline(self.llm, None)
+    #     answer, chunks = inferencePipeline.run(query=question, include_bm25=False, give_score=give_score)
+    #     txt.print("Answer: " + Llm.get_llm_answer_content(answer))
+    #     return answer, chunks

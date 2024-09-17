@@ -1,6 +1,6 @@
-<img src="file:///CodeSharpDoc-logo.png" title="" alt="logo" data-align="center">
+<img src="./CodeSharpDoc-logo.png" title="" alt="logo" data-align="center">
 
-<H1>Welcome to CodeSharpDoc</H1>
+<H1 style="text-align: center;">Welcome to CodeSharpDoc</H1>
 
 ### What is it?
 
@@ -50,19 +50,15 @@ Into a Git bash terminal (`ctrl+shift+ù` in VS Code, on Windows, with azerty ke
 
 ***Enjoy!***
 
-
-
-
+__
 
 ### Troubleshooting
 
-If there's an error on destination folder while doing pip install from the 'senv' venv, explicitly define the taget directory: 
+If there's an error on destination folder while doing `pip install` from the `senv `venv, explicitly define the taget directory: 
 
 `pip install --target=C:\Dev\squad-ai\CodeSharpDoc\senv\Lib\site-packages -r requirements.txt`
-
-
 
 To reinstall 'pip' on venv if `pip` don't work anymore, do:
 `python -m ensurepip --upgrade
 python -m pip install --upgrade pip`
-then do: `Get-Command pip` and check the 'source' column value
+then: `Get-Command pip` and check the value of 'source' column
