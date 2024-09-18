@@ -4,7 +4,7 @@ from helpers.file_helper import file
 from helpers.txt_helper import txt
 from langchains.langchain_factory import LangChainFactory
 from models.llm_info import LlmInfo
-from rag_inference_pipeline import RagInferencePipeline
+from rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
 from services.analysed_structures_handling import AnalysedStructuresHandling
 from services.rag_service import RAGService
 from services.summary_generation_service import SummaryGenerationService
@@ -101,9 +101,9 @@ class AvailableActions:
             query = input("What next are you looking for? - (empty to quit) - ")
 
     @staticmethod
-    def rag_querying_from_sl_chatbot(rag: RAGService, query: str, st):
-        answer, sources = rag.query(query, include_bm25_retieval= False, give_score= True)
-        answer = txt.remove_markdown(answer) 
+    def rag_querying_from_sl_chatbot(inference_pipeline: RagInferencePipeline, query: str, st):
+        answer, sources = inference_pipeline.run(query, include_bm25_retrieval= False, give_score= True)
+        answer = txt.remove_markdown(answer)
         st.session_state.messages.append({"role": "assistant", "content": answer})
         st.chat_message("assistant").write(answer)
 

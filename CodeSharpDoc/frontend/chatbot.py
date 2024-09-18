@@ -4,6 +4,7 @@ import streamlit as st
 from helpers.txt_helper import txt
 from models.llm_info import LlmInfo
 from available_actions import AvailableActions
+from rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
 from services.rag_service import RAGService
 from startup import Startup
 
@@ -15,13 +16,10 @@ class ChatbotFront:
     is_waiting: bool = False
     llms_infos: list[LlmInfo] = None
     rag: RAGService = None
+    inference_pipeline: RagInferencePipeline = None
 
     def main():
-        txt.activate_print = True
-        if not ChatbotFront.llms_infos:
-            ChatbotFront.llms_infos = Startup.initialize()
-        if not ChatbotFront.rag:
-            ChatbotFront.rag = AvailableActions.init_rag_service(ChatbotFront.llms_infos)
+        ChatbotFront.initialize()
 
         st.set_page_config(
             page_title="DRY C# Chatbot",
@@ -77,7 +75,16 @@ class ChatbotFront:
             with st.spinner("Recherche de réponses en cours ..."):
                 st.session_state.messages.append({"role": "user", "content": txt.remove_markdown(prompt)})
                 st.chat_message("user").write(prompt)
-                AvailableActions.rag_querying_from_sl_chatbot(ChatbotFront.rag, prompt, st)
+                AvailableActions.rag_querying_from_sl_chatbot(ChatbotFront.inference_pipeline, prompt, st)
+
+    def initialize():
+        txt.activate_print = True
+        if not ChatbotFront.llms_infos:
+            ChatbotFront.llms_infos = Startup.initialize()
+        if not ChatbotFront.rag:
+            ChatbotFront.rag = AvailableActions.init_rag_service(ChatbotFront.llms_infos)
+        if not ChatbotFront.inference_pipeline:
+            ChatbotFront.inference_pipeline = RagInferencePipeline(ChatbotFront.rag, None)
 
     def clear_conversation():
         st.session_state.messages = []

@@ -82,12 +82,12 @@ def retrieve(llm: BaseChatModel, vectorstore, question: str, additionnal_context
 
     if give_score:
         results = vectorstore.similarity_search_with_score(full_question, k=max_retrived_count, filter=filters)
-        if min_retrived_count and min_score and min_retrived_count > len(results):
-            lim_res = []
+        if min_score and min_retrived_count and len(results) > min_retrived_count:
+            top_results = []
             for result in results:
-                if isinstance(result, tuple) and result[1] >= min_score or len(lim_res) < min_retrived_count:
-                    lim_res.append(result)
-            results = lim_res
+                if isinstance(result, tuple) and result[1] >= min_score or len(top_results) < min_retrived_count:
+                    top_results.append(result)
+            results = top_results
     else:
         results = vectorstore.similarity_search(full_question, k=max_retrived_count, filter=filters)
     return results

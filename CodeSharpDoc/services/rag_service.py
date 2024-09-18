@@ -83,8 +83,5 @@ class RAGService:
                 self.rag_methods_desc.append(RagMethodDesc(method.method_name, method.generated_summary, struct.file_path).to_dict())  
         self.vectorstore = langchain_rag.build_vectorstore(self.rag_methods_desc)
 
-    # def query(self, question: str, additionnal_context: str = None, include_bm25_retieval = False, give_score = False) -> Tuple[str, str]:
-    #     inferencePipeline = RagInferencePipeline(self.llm, None)
-    #     answer, chunks = inferencePipeline.run(query=question, include_bm25=False, give_score=give_score)
-    #     txt.print("Answer: " + Llm.get_llm_answer_content(answer))
-    #     return answer, chunks
+    def rag_retrieval(self, question: str, additionnal_context: str = None, filters: dict = None, give_score: bool = False, max_retrived_count: int = 10, min_score: float = None, min_retrived_count: int = None) -> list[Document]:
+        return langchain_rag.retrieve(self.llm, self.vectorstore, question, additionnal_context, filters, give_score, max_retrived_count, min_score, min_retrived_count)
