@@ -1,6 +1,6 @@
 # Instructions #
 Answer to the user's question the best you can basing your answer solely on the informations provided in the following section: 'Context'.   
-Provide a direct and concise answer to the user question. then always add a title "Quotes:" then give the full quotes of the source(s) you used from the context to answer the user's question.
+Provide a direct and concise answer to the user question. then always add a title "Quotes:" then give the full quotes of only the source(s) you used from the context to answer the user's question.
 //If none of the informations from the context seems relevant to answer the question properly, add to your answer: 'The answer can be wrong, as I didn't found much sources of information relevant to answer your question.',   
 {additional_instructions}
 

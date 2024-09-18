@@ -73,7 +73,7 @@ class RAGService:
             Document(page_content=doc["page_content"], metadata=doc["metadata"]) 
             for doc in json_data
         ]
-        self.bm25_retriever = langchain_rag.build_bm25_retriever(self.langchain_documents, bm25_results_count)
+        self.bm25_retriever = langchain_rag.build_bm25_retriever(self.langchain_documents, bm25_results_count) #todo: useful? as metadata are retieved while querying
         return self.vectorstore._collection.count()
 
     def import_structures(self, structures: list[StructureDesc]):

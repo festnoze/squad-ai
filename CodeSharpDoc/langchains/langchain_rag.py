@@ -13,6 +13,7 @@ from langchain_community.document_loaders import TextLoader
 from langchain_core.documents import Document
 #from langchain_community.vectorstores import FAISS
 from langchain_community.retrievers import BM25Retriever
+from rank_bm25 import BM25Okapi
 from langchain.retrievers import EnsembleRetriever
 from langchain_chroma import Chroma
 from langchain_community.embeddings.sentence_transformer import SentenceTransformerEmbeddings
@@ -58,8 +59,11 @@ def build_vectorstore(documents: List[dict], doChunkContent = True) -> any:
         db = Chroma.from_documents(documents= langchain_documents, embedding = embeddings, persist_directory= vectorstore_chroma_db_path)
     return db
 
-def build_bm25_retriever(documents: List[Document], k: int) -> any:
-    bm25_retriever = BM25Retriever.from_documents(documents)
+def build_bm25_retriever(documents: List[Document], k: int = 10, metadata: dict = None) -> any:
+    if metadata:
+        bm25_retriever = BM25Retriever.from_texts([doc.page_content for doc in documents], metadata)
+    else:
+        bm25_retriever = BM25Retriever.from_documents(documents)
     bm25_retriever.k = k
     return bm25_retriever
 

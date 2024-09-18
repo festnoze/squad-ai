@@ -102,7 +102,7 @@ class AvailableActions:
 
     @staticmethod
     def rag_querying_from_sl_chatbot(inference_pipeline: RagInferencePipeline, query: str, st):
-        answer, sources = inference_pipeline.run(query, include_bm25_retrieval= False, give_score= True)
+        answer, sources = inference_pipeline.run(query, include_bm25_retrieval= True, give_score= True)
         answer = txt.remove_markdown(answer)
         st.session_state.messages.append({"role": "assistant", "content": answer})
         st.chat_message("assistant").write(answer)

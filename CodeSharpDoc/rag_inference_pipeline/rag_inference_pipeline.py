@@ -148,10 +148,10 @@ class RagInferencePipeline:
     # Data Retrieval subflow with parallel RAG and BM25 retrieval
     @flow(task_runner=ConcurrentTaskRunner())
     def rag_hybrid_retrieval(self, analysed_query: QuestionAnalysis, metadata, include_bm25_retrieval: bool = False, give_score: bool = True, max_retrived_count: int = 10):
-       
+ 
         rag_retrieved_chunks = self.rag_retrieval.submit(analysed_query, metadata, give_score, max_retrived_count)
         if include_bm25_retrieval:
-            bm25_retrieved_chunks = self.bm25_retrieval.submit(analysed_query, metadata, give_score, max_retrived_count)
+            bm25_retrieved_chunks = self.bm25_retrieval.submit(analysed_query.translated_question, metadata, give_score, max_retrived_count)
 
         rag_retrieved_chunks = rag_retrieved_chunks.result()
         bm25_retrieved_chunks = bm25_retrieved_chunks.result() if include_bm25_retrieval else []
@@ -178,10 +178,13 @@ class RagInferencePipeline:
         return retrieved_chunks
     
     @task
-    def bm25_retrieval(self, query, filters, give_score, k = 3):
-        if filters:
-            bm25_retriever = langchain_rag.build_bm25_retriever([doc for doc in self.rag.langchain_documents if RagInferencePipeline.filters_predicate(doc, filters)], k)
-        bm25_retriever.k = k
+    def bm25_retrieval(self, query: str, filters: dict, give_score: bool, k = 3):
+        if filters and any(filters):
+            filtered_docs = [doc for doc in self.rag.langchain_documents if RagInferencePipeline.filters_predicate(doc, filters)]
+        else:
+            filtered_docs = self.rag.langchain_documents
+
+        bm25_retriever = langchain_rag.build_bm25_retriever(filtered_docs, k)#, filters
         bm25_retrieved_chunks = bm25_retriever.invoke(query)
        
         if give_score:
