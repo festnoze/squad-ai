@@ -4,7 +4,7 @@ import streamlit as st
 from helpers.txt_helper import txt
 from models.llm_info import LlmInfo
 from available_actions import AvailableActions
-from rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
+from rag_inference_pipeline import RagInferencePipeline
 from services.rag_service import RAGService
 from startup import Startup
 

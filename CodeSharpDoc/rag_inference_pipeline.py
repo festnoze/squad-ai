@@ -9,9 +9,11 @@ from langchain_core.documents import Document
 
 from helpers.file_helper import file
 from helpers.llm_helper import Llm
+from helpers.rag_metadat_helper import RagMetadataHelper
 from models.logical_operator import LogicalOperator
 from models.question_analysis import QuestionAnalysis, QuestionAnalysisPydantic
 from services.rag_service import RAGService
+import time
 import langchains.langchain_rag as langchain_rag
 
 class RagInferencePipeline:
@@ -40,14 +42,12 @@ class RagInferencePipeline:
     # Main flow
     @flow(task_runner=ConcurrentTaskRunner())
     def run(self, query: str, include_bm25_retrieval: bool = False, give_score = True):
+                
+        guardrails_result = self.guardrails_query_analysis.submit(query)
         
         # Pre-treatment query: translate, search for meta-data
-        analysed_query, metadata, guardrails_result = self.rag_pre_treatment(query)
+        analysed_query, metadata = self.rag_pre_treatment(query)
         
-        if not guardrails_result:
-            print("Query rejected by guardrails")
-            return "Cannot answer this question"
-
         # Data Retrieval subflow (runs in parallel for RAG and BM25)
         retrieved_chunks = self.rag_hybrid_retrieval(analysed_query, metadata, include_bm25_retrieval, give_score)
 
@@ -56,28 +56,38 @@ class RagInferencePipeline:
 
         # Post-treatment subflow
         final_response = self.rag_post_treatment(response)
+        
+        # Wait for guardrails analysis to finish        
+        guardrails_result = guardrails_result.result()
+        if not guardrails_result:
+            print("Query rejected by guardrails")
+            return "I cannot answer your question, because its topic is explicitly forbidden.", retrieved_chunks #todo: translate when needed
 
+        min_score = 0.5
+        if give_score and min(chunk[1] for chunk in retrieved_chunks) > min_score:
+            print("Query rejected by guardrails")
+            return "I cannot answer your question, as I found no relevant information about your query.", retrieved_chunks
+        
         return final_response, retrieved_chunks
     
     # Pre-treatment subflow
-    @flow(task_runner=ConcurrentTaskRunner())  # Allows parallelism
+    @flow(task_runner=ConcurrentTaskRunner())
     def rag_pre_treatment(self, query):
-        guardrails_result = self.guardrails_query_analysis.submit(query)
         questionAnalysis = self.analyse_query_language(query)
         extracted_metadata = self.extract_explicit_metadata(questionAnalysis.translated_question)
-
         
         questionAnalysis.translated_question = extracted_metadata[0].strip()
         metadata = extracted_metadata[1]
 
-        guardrails_result = guardrails_result.result()
-        return questionAnalysis, metadata, guardrails_result
+        return questionAnalysis, metadata
     
     @task
     def guardrails_query_analysis(self, query) -> bool:
         # Logic for guardrails analysis (returns True if OK, False if rejected)
+        time.sleep(5)
         if "bad query" in query:  # Example check
             return False
+        print(">>> Query accepted by guardrails")
         return True
     
     @task
@@ -95,60 +105,15 @@ class RagInferencePipeline:
     @task
     def extract_explicit_metadata(self, question) -> tuple[str, dict]:
         filters = {}
-        if self.has_manual_filters(question):
-            filters, question = self.extract_manual_filters(question)
+        if RagMetadataHelper.has_manual_filters(question):
+            filters, question = RagMetadataHelper.extract_manual_filters(question)
         else:
-            filters = {
-                "$and": [
-                    {"functional_type": "Controller"},
-                    {"summary_kind": "method"}
-                ]
-            }        
+            filters = RagMetadataHelper.get_default_filters()        
         return question, filters
 
-    def has_manual_filters(self, question: str) -> bool:
-        return  question.__contains__("filters:") or question.__contains__("filtres :")
-    
-    def extract_manual_filters(self, question: str) -> tuple[dict, str]:
-        filters = {}
-        if question.__contains__("filters:"):
-            filters_str = question.split("filters:")[1]
-            question = question.split("filters:")[0]
-        elif question.__contains__("filtres :"):
-            filters_str = question.split("filtres :")[1]
-            question = question.split("filtres :")[0]
-        filters_str = filters_str.strip()
-        filters = self.get_filters_from_str(filters_str)
-        return filters, question
-    
-    def get_filters_from_str(self, filters_str: str) -> dict:
-        filters = []
-        filters_list = filters_str.lower().split(',')
-
-        for filter in filters_list:
-            # functional_type: Controller, Service, Repository, ...
-            if "controller" in filter or "service" in filter or "repository" in filter:
-                # Ensure the first letter is uppercase
-                functional_type = filter.strip().capitalize()
-                filters.append({"functional_type": functional_type})
-            # summary_kind: class, method, (property, enum_member), ...
-            elif "method" in filter or "méthode" in filter:
-                filters.append({"summary_kind": "method"})
-            elif "class" in filter:
-                filters.append({"summary_kind": "class"})
-
-        # If there are more than one filters, wrap in "$and", otherwise return a single filter
-        if len(filters) > 1:
-            return {"$and": filters}
-        elif len(filters) == 1:
-            return filters[0]  # Just return the single condition directly
-        else:
-            return {}  # Return an empty filter if no conditions found
-
-    # Data Retrieval subflow with parallel RAG and BM25 retrieval
+    # Data Retrieval sub-flow with parallel RAG and BM25 retrieval
     @flow(task_runner=ConcurrentTaskRunner())
     def rag_hybrid_retrieval(self, analysed_query: QuestionAnalysis, metadata, include_bm25_retrieval: bool = False, give_score: bool = True, max_retrived_count: int = 10):
- 
         rag_retrieved_chunks = self.rag_retrieval.submit(analysed_query, metadata, give_score, max_retrived_count)
         if include_bm25_retrieval:
             bm25_retrieved_chunks = self.bm25_retrieval.submit(analysed_query.translated_question, metadata, give_score, max_retrived_count)
