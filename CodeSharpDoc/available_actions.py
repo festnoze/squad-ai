@@ -103,7 +103,7 @@ class AvailableActions:
     @staticmethod
     def rag_querying_from_sl_chatbot(inference_pipeline: RagInferencePipeline, query: str, st):
         txt.print_with_spinner("Querying RAG service.")
-        answer, sources = inference_pipeline.run(query=query, include_bm25_retrieval= True, give_score= True)
+        answer, sources = inference_pipeline.run(query=query, include_bm25_retrieval= False, give_score= True)
         txt.stop_spinner_replace_text("RAG retieval done")
         answer = txt.remove_markdown(answer)
         st.session_state.messages.append({"role": "assistant", "content": answer})

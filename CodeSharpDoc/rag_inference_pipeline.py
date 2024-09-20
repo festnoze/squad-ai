@@ -1,19 +1,22 @@
 from langchain.tools import tool
+from langchain_core.documents import Document
+import time
 from langgraph.prebuilt.tool_executor import ToolExecutor
 from langchain.tools.render import format_tool_to_openai_function
 from langchain.agents import Tool
 from langchain_experimental.utilities import PythonREPL
 from prefect import flow, task
-from prefect.task_runners import ConcurrentTaskRunner
-from langchain_core.documents import Document
+from prefect.task_runners import ConcurrentTaskRunner, ThreadPoolTaskRunner
+from prefect.logging import get_run_logger
 
 from helpers.file_helper import file
 from helpers.llm_helper import Llm
 from helpers.rag_metadat_helper import RagMetadataHelper
+from helpers.txt_helper import txt
 from models.logical_operator import LogicalOperator
 from models.question_analysis import QuestionAnalysis, QuestionAnalysisPydantic
 from services.rag_service import RAGService
-import time
+
 import langchains.langchain_rag as langchain_rag
 
 class RagInferencePipeline:
@@ -40,9 +43,16 @@ class RagInferencePipeline:
 
 
     # Main flow
-    @flow(task_runner=ConcurrentTaskRunner())
+    @flow(
+            name="RAG inference pipeline flow", 
+            task_runner=ThreadPoolTaskRunner(max_workers=10),
+            retries=0,
+            log_prints=True)
     def run(self, query: str, include_bm25_retrieval: bool = False, give_score = True):
-                
+        logger = get_run_logger()
+        logger.info("Starting RAG inference pipeline")
+        start_time = time.time()
+
         guardrails_result = self.guardrails_query_analysis.submit(query)
         
         # Pre-treatment query: translate, search for meta-data
@@ -71,7 +81,7 @@ class RagInferencePipeline:
         return final_response, retrieved_chunks
     
     # Pre-treatment subflow
-    @flow(task_runner=ConcurrentTaskRunner())
+    @flow(name="RAG pre-treatment", task_runner=ThreadPoolTaskRunner(max_workers=3))
     def rag_pre_treatment(self, query):
         questionAnalysis = self.analyse_query_language(query)
         extracted_metadata = self.extract_explicit_metadata(questionAnalysis.translated_question)
@@ -81,7 +91,7 @@ class RagInferencePipeline:
 
         return questionAnalysis, metadata
     
-    @task
+    @task(log_prints=True)
     def guardrails_query_analysis(self, query) -> bool:
         # Logic for guardrails analysis (returns True if OK, False if rejected)
         time.sleep(5)
@@ -112,7 +122,7 @@ class RagInferencePipeline:
         return question, filters
 
     # Data Retrieval sub-flow with parallel RAG and BM25 retrieval
-    @flow(task_runner=ConcurrentTaskRunner())
+    @flow(name="RAG hybrid retrieval", task_runner=ThreadPoolTaskRunner(max_workers=3))
     def rag_hybrid_retrieval(self, analysed_query: QuestionAnalysis, metadata, include_bm25_retrieval: bool = False, give_score: bool = True, max_retrived_count: int = 10):
         rag_retrieved_chunks = self.rag_retrieval.submit(analysed_query, metadata, give_score, max_retrived_count)
         if include_bm25_retrieval:
@@ -192,7 +202,7 @@ class RagInferencePipeline:
     
     
     # Augmented answer generation subflow
-    @flow
+    @flow(name="RAG answer generation")
     def rag_augmented_answer_generation(self, retrieved_chunks: list, questionAnalysis: QuestionAnalysis):
         return self.rag_response_generation(retrieved_chunks, questionAnalysis)
 
@@ -203,7 +213,7 @@ class RagInferencePipeline:
         return langchain_rag.generate_response_from_retrieved_chunks(self.rag.llm, retrieved_chunks, questionAnalysis)
         
     # Post-treatment subflow
-    @flow
+    @flow(name="RAG post-treatment")
     def rag_post_treatment(self, response):
         return self.response_post_treatment(response)
         

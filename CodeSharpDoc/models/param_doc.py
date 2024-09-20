@@ -1,7 +1,7 @@
 from models.base_desc import BaseDesc
 
 from langchain.tools import tool
-from langchain.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 
 class ParameterDocumentation(BaseDesc):
     """
