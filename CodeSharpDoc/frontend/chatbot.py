@@ -18,6 +18,7 @@ class ChatbotFront:
     llms_infos: list[LlmInfo] = None
     rag: RAGService = None
     inference_pipeline = None
+    use_prefect = False
 
     def main():
         ChatbotFront.initialize()
@@ -85,8 +86,10 @@ class ChatbotFront:
         if not ChatbotFront.rag:
             ChatbotFront.rag = AvailableActions.init_rag_service(ChatbotFront.llms_infos)
         if not ChatbotFront.inference_pipeline:
-            ChatbotFront.inference_pipeline = RagInferencePipelineWithPrefect(ChatbotFront.rag, None)            
-            #ChatbotFront.inference_pipeline = RagInferencePipeline(ChatbotFront.rag, None)
+            if ChatbotFront.use_prefect:
+                ChatbotFront.inference_pipeline = RagInferencePipelineWithPrefect(ChatbotFront.rag, None)            
+            else:
+                ChatbotFront.inference_pipeline = RagInferencePipeline(ChatbotFront.rag, None)
 
     def clear_conversation():
         st.session_state.messages = []

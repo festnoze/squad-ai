@@ -33,15 +33,19 @@ class RagInferencePipeline:
     # Main workflow
     def run(self, query: str, include_bm25_retrieval: bool = False, give_score=True):
 
-        guardrails_result, (analysed_query, metadata) = Execute.run_parallel( 
-            (self.guardrails_query_analysis, (query)), # Guardrails check: query analysis
-            (self.rag_pre_treatment, (query)) # Pre-treatment query: translate, search for meta-data
+        guardrails_result, run_inference_pipeline_results = Execute.run_parallel( 
+            (RAGGuardrails.guardrails_query_analysis, (query)), # Guardrails check: query analysis
+            (RagInferencePipeline.run_inference_pipeline_but_guardrails, (self, query), {'include_bm25_retrieval': include_bm25_retrieval, 'give_score': give_score})
         )
-        # # Guardrails check
-        # RAGGuardrails.guardrails_query_analysis(query)
 
-        # # Pre-treatment
-        # analysed_query, metadata = RAGPreTreatment.rag_pre_treatment(self.rag, query)
+        self.check_for_guardrails(guardrails_result)
+        final_response, retrieved_chunks = run_inference_pipeline_results
+        return final_response, retrieved_chunks
+    
+    def run_inference_pipeline_but_guardrails(self, query: str, include_bm25_retrieval: bool = False, give_score=True):
+        
+        # Pre-treatment
+        analysed_query, metadata = RAGPreTreatment.rag_pre_treatment(self.rag, query)
 
         # Data Retrieval
         retrieved_chunks = RAGHybridRetrieval.rag_hybrid_retrieval(self.rag, analysed_query, metadata, include_bm25_retrieval, give_score)
@@ -54,14 +58,7 @@ class RagInferencePipeline:
 
         return final_response, retrieved_chunks
     
-    def check_for_guardrails(self, guardrails_future, wait_for_completion:bool) -> bool:
-        """Return true if guardrails analysis is done. If so, also raise an error if the query has been rejected"""
-        if wait_for_completion:
-            guardrails_result = guardrails_future.compute()
-
-        if guardrails_future.done():
-            guardrails_result = guardrails_future.result()
-            if not guardrails_result:
-                raise Exception("Query rejected by guardrails")
-            
-        return guardrails_future.done()
+    def check_for_guardrails(self, guardrails_result:bool):
+        """Raise an error if the query has been rejected by guardrails"""
+        if not guardrails_result:
+            raise Exception("Query rejected by guardrails")

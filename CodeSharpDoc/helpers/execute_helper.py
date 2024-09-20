@@ -12,34 +12,39 @@ class Execute:
         :param functions_with_args: Functions with optional args/kwargs
         :return: Tuple of results in the same order as the provided functions
         """
-        results = []
 
         # Dynamically set max_workers based on the number of functions
         num_functions = len(functions_with_args)
-        if num_functions == 0:
-            return ()  # Return empty tuple if no functions are provided
-
-        # Use ThreadPoolExecutor to execute the functions in parallel
+        if num_functions == 0: return ()
+        
+        results = [None] * len(functions_with_args) 
+        
+         # Use ThreadPoolExecutor to execute the functions in parallel
         with ThreadPoolExecutor(max_workers=num_functions) as executor:
             futures = []
 
-            for item in functions_with_args:
+            for index, item in enumerate(functions_with_args):
                 # If the item is a function without arguments
                 if callable(item):
-                    futures.append(executor.submit(item))
+                    futures.append((executor.submit(item), index))
 
                 # If the item is a tuple with a function and its arguments
                 elif isinstance(item, tuple):
                     func = item[0]
                     args = item[1] if len(item) > 1 else ()
                     kwargs = item[2] if len(item) > 2 else {}
-                    futures.append(executor.submit(func, *args, **kwargs))
-                
+
+                    # Ensure args is a tuple, even if it's a single string
+                    if isinstance(args, str):
+                        args = (args,)
+
+                    futures.append((executor.submit(func, *args, **kwargs), index))
+
                 else:
                     raise ValueError(f"Invalid input: {item}")
 
-            # Wait for all futures to complete and collect results
-            for future in as_completed(futures):
-                results.append(future.result())
+            # Collect results based on the original order of submission
+            for future, index in futures:
+                results[index] = future.result()
 
         return tuple(results)

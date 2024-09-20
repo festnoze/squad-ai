@@ -11,7 +11,7 @@ from prefect.logging import get_run_logger
 
 from helpers.file_helper import file
 from helpers.llm_helper import Llm
-from helpers.rag_metadat_helper import RagMetadataHelper
+from helpers.rag_filtering_metadata_helper import RagFilteringMetadataHelper
 from helpers.txt_helper import txt
 from models.logical_operator import LogicalOperator
 from models.question_analysis import QuestionAnalysis, QuestionAnalysisPydantic
@@ -19,7 +19,7 @@ from services.rag_service import RAGService
 
 import langchains.langchain_rag as langchain_rag
 
-class RagInferencePipeline:
+class RagInferencePipelineWithPrefect:
     
     def __init__(self, rag: RAGService, tools: list = None):
         self.rag: RAGService = rag
@@ -51,7 +51,6 @@ class RagInferencePipeline:
     def run(self, query: str, include_bm25_retrieval: bool = False, give_score = True):
         logger = get_run_logger()
         logger.info("Starting RAG inference pipeline")
-        start_time = time.time()
 
         guardrails_result = self.guardrails_query_analysis.submit(query)
         
@@ -115,10 +114,10 @@ class RagInferencePipeline:
     @task
     def extract_explicit_metadata(self, question) -> tuple[str, dict]:
         filters = {}
-        if RagMetadataHelper.has_manual_filters(question):
-            filters, question = RagMetadataHelper.extract_manual_filters(question)
+        if RagFilteringMetadataHelper.has_manual_filters(question):
+            filters, question = RagFilteringMetadataHelper.extract_manual_filters(question)
         else:
-            filters = RagMetadataHelper.get_default_filters()        
+            filters = RagFilteringMetadataHelper.get_default_filters()        
         return question, filters
 
     # Data Retrieval sub-flow with parallel RAG and BM25 retrieval
