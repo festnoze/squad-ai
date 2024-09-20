@@ -1,3 +1,4 @@
+from helpers.execute_helper import Execute
 from helpers.file_helper import file
 from helpers.llm_helper import Llm
 from helpers.rag_filtering_metadata_helper import RagFilteringMetadataHelper
@@ -7,8 +8,12 @@ from services.rag_service import RAGService
 class RAGPreTreatment:
     @staticmethod
     def rag_pre_treatment(rag:RAGService, query:str) -> tuple[QuestionAnalysis, dict]:
-        question_analysis = RAGPreTreatment.analyse_query_language(rag, query)
-        extracted_metadata = RAGPreTreatment.extract_explicit_metadata(question_analysis.translated_question)
+        question_analysis, found_metadata, extracted_metadata = Execute.run_parallel(
+            (RAGPreTreatment.analyse_query_language, (rag, query)),
+            (RAGPreTreatment.analyse_query_metadata, (rag, query)),
+            (RAGPreTreatment.extract_explicit_metadata, (query))
+        )
+
         question_analysis.translated_question = extracted_metadata[0].strip()
         metadata = extracted_metadata[1]
         return question_analysis, metadata
@@ -28,6 +33,19 @@ class RAGPreTreatment:
         if question_analysis['detected_language'].__contains__("english"):
             question_analysis['translated_question'] = question
         return QuestionAnalysis(**question_analysis)
+
+    @staticmethod
+    def analyse_query_metadata(rag:RAGService, question:str) -> dict:
+        return None #todo: implement this method
+        prefilter_prompt = file.get_as_str("prompts/rag_metadata_detection_query.txt", remove_comments=True)
+        prefilter_prompt = prefilter_prompt.replace("{question}", question)
+        prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(
+            prefilter_prompt, QuestionAnalysisPydantic, QuestionAnalysis
+        )
+        response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(
+            "RAG prefiltering", [rag.llm, rag.llm], output_parser, 10, *[prompt_for_output_parser]
+        )
+        return metadata
 
     @staticmethod   
     def extract_explicit_metadata(question:str) -> tuple[str, dict]:
