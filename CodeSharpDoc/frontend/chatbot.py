@@ -4,7 +4,8 @@ import streamlit as st
 from helpers.txt_helper import txt
 from models.llm_info import LlmInfo
 from available_actions import AvailableActions
-from rag_inference_pipeline import RagInferencePipeline
+from raginferencepipeline.rag_inference_pipeline import RagInferencePipeline
+from raginferencepipeline.rag_inference_pipeline_with_prefect import RagInferencePipelineWithPrefect
 from services.rag_service import RAGService
 from startup import Startup
 
@@ -16,7 +17,7 @@ class ChatbotFront:
     is_waiting: bool = False
     llms_infos: list[LlmInfo] = None
     rag: RAGService = None
-    inference_pipeline: RagInferencePipeline = None
+    inference_pipeline = None
 
     def main():
         ChatbotFront.initialize()
@@ -84,7 +85,8 @@ class ChatbotFront:
         if not ChatbotFront.rag:
             ChatbotFront.rag = AvailableActions.init_rag_service(ChatbotFront.llms_infos)
         if not ChatbotFront.inference_pipeline:
-            ChatbotFront.inference_pipeline = RagInferencePipeline(ChatbotFront.rag, None)
+            ChatbotFront.inference_pipeline = RagInferencePipelineWithPrefect(ChatbotFront.rag, None)            
+            #ChatbotFront.inference_pipeline = RagInferencePipeline(ChatbotFront.rag, None)
 
     def clear_conversation():
         st.session_state.messages = []

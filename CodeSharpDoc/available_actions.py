@@ -2,9 +2,8 @@
 from typing import List
 from helpers.file_helper import file
 from helpers.txt_helper import txt
-from langchains.langchain_factory import LangChainFactory
 from models.llm_info import LlmInfo
-from rag_inference_pipeline import RagInferencePipeline
+from raginferencepipeline.rag_inference_pipeline import RagInferencePipeline
 from services.analysed_structures_handling import AnalysedStructuresHandling
 from services.rag_service import RAGService
 from services.summary_generation_service import SummaryGenerationService
@@ -86,12 +85,12 @@ class AvailableActions:
                 continue
 
     @staticmethod
-    def rag_querying_from_console(rag: RAGService):
+    def rag_querying_from_console(inference_pipeline: RagInferencePipeline):
         query = input("What are you looking for? ")
         additionnal_context = file.get_as_str("prompts/rag_query_code_additionnal_instructions.txt")
 
         while query != '':
-            answer, sources = RagInferencePipeline(rag, query, additionnal_context, include_bm25_retieval= False, give_score= True)
+            answer, sources = inference_pipeline(query=query, include_bm25_retieval= False, give_score= True)
             print(answer)
             if input("Do you want to see all raw retrieved documents? (y/_) ") == 'y':
                 print(">>>>> Sources: <<<<<<")
@@ -101,7 +100,7 @@ class AvailableActions:
             query = input("What next are you looking for? - (empty to quit) - ")
 
     @staticmethod
-    def rag_querying_from_sl_chatbot(inference_pipeline: RagInferencePipeline, query: str, st):
+    def rag_querying_from_sl_chatbot(inference_pipeline, query: str, st):
         txt.print_with_spinner("Querying RAG service.")
         answer, sources = inference_pipeline.run(query=query, include_bm25_retrieval= False, give_score= True)
         txt.stop_spinner_replace_text("RAG retieval done")

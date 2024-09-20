@@ -1,4 +1,7 @@
-class RagMetadataHelper:
+from models.logical_operator import LogicalOperator
+
+
+class RagFilteringMetadataHelper:
     
     @staticmethod
     def has_manual_filters(question: str) -> bool:
@@ -14,7 +17,7 @@ class RagMetadataHelper:
             filters_str = question.split("filtres :")[1]
             question = question.split("filtres :")[0]
         filters_str = filters_str.strip()
-        filters = RagMetadataHelper.get_filters_from_str(filters_str)
+        filters = RagFilteringMetadataHelper.get_filters_from_str(filters_str)
         return filters, question
     
     @staticmethod
@@ -41,6 +44,39 @@ class RagMetadataHelper:
             return filters[0]  # Just return the single condition directly
         else:
             return {}  # Return an empty filter if no conditions found
+        
+    @staticmethod
+    def filters_predicate(doc, filters, operator=LogicalOperator.AND):
+        """Predicate to evaluate filter(s) (handle nested operators)"""
+
+        # If filters is a dictionary (single filter or operator like $and/$or)
+        if isinstance(filters, dict):
+            if "$and" in filters:
+                # Recursively handle $and with multiple conditions
+                return RagFilteringMetadataHelper.filters_predicate(doc, filters["$and"], LogicalOperator.AND)
+            elif "$or" in filters:
+                # Recursively handle $or with multiple conditions
+                return RagFilteringMetadataHelper.filters_predicate(doc, filters["$or"], LogicalOperator.OR)
+            else:
+                # Handle single key-value filter (field-value pair)
+                return all(doc.metadata.get(key) == value for key, value in filters.items())
+
+        # If filters is a list, apply the operator (AND/OR)
+        elif isinstance(filters, list):
+            if operator == LogicalOperator.AND:
+                return all(
+                    RagFilteringMetadataHelper.filters_predicate(doc, sub_filter, LogicalOperator.AND)
+                    for sub_filter in filters
+                )
+            elif operator == LogicalOperator.OR:
+                return any(
+                    RagFilteringMetadataHelper.filters_predicate(doc, sub_filter, LogicalOperator.OR)
+                    for sub_filter in filters
+                )
+            else:
+                raise ValueError(f"Unhandled operator: {operator}")
+
+        return False
         
     @staticmethod
     def get_default_filters() -> dict:
