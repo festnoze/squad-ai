@@ -3,6 +3,7 @@ from helpers.rag_filtering_metadata_helper import RagFilteringMetadataHelper
 from langchains import langchain_rag
 from models.question_analysis import QuestionAnalysis
 from services.rag_service import RAGService
+from langchain_core.documents import Document
 
 class RAGHybridRetrieval:
     @staticmethod    
@@ -38,3 +39,18 @@ class RAGHybridRetrieval:
             return [(doc, score) for doc in bm25_retrieved_chunks]
         else:
             return bm25_retrieved_chunks
+
+    @staticmethod   
+    def hybrid_chunks_selection(rag_retrieved_chunks: list[Document], bm25_retrieved_chunks: list[Document] = None, give_score: bool = False, max_retrived_count: int = None):
+        if not bm25_retrieved_chunks or not any(bm25_retrieved_chunks):
+            return rag_retrieved_chunks
+        
+        rag_retrieved_chunks.extend([(chunk, 0) for chunk in bm25_retrieved_chunks] if give_score else bm25_retrieved_chunks)
+        
+        if max_retrived_count:
+            if give_score:
+                rag_retrieved_chunks = sorted(rag_retrieved_chunks, key=lambda x: x[1], reverse=True)
+            rag_retrieved_chunks = rag_retrieved_chunks[:max_retrived_count]
+
+        return rag_retrieved_chunks
+    

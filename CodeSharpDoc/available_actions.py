@@ -85,7 +85,7 @@ class AvailableActions:
                 continue
 
     @staticmethod
-    def rag_querying_from_console(inference_pipeline: RagInferencePipeline):
+    def rag_querying_from_console(inference_pipeline):
         query = input("What are you looking for? ")
         additionnal_context = file.get_as_str("prompts/rag_query_code_additionnal_instructions.txt")
 
@@ -100,9 +100,9 @@ class AvailableActions:
             query = input("What next are you looking for? - (empty to quit) - ")
 
     @staticmethod
-    def rag_querying_from_sl_chatbot(inference_pipeline, query: str, st):
+    def rag_querying_from_sl_chatbot(inference_pipeline, query: str, st, include_bm25_retrieval:bool = False):
         txt.print_with_spinner("Querying RAG service.")
-        answer, sources = inference_pipeline.run(query=query, include_bm25_retrieval= False, give_score= True)
+        answer, sources = inference_pipeline.run(query=query, include_bm25_retrieval= include_bm25_retrieval, give_score= True)
         txt.stop_spinner_replace_text("RAG retieval done")
         answer = txt.remove_markdown(answer)
         st.session_state.messages.append({"role": "assistant", "content": answer})

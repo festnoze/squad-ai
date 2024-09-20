@@ -18,6 +18,8 @@ class ChatbotFront:
     llms_infos: list[LlmInfo] = None
     rag: RAGService = None
     inference_pipeline = None
+    #
+    include_bm25_retrieval= True
     use_prefect = False
 
     def main():
@@ -77,7 +79,7 @@ class ChatbotFront:
             with st.spinner("Recherche de réponses en cours ..."):
                 st.session_state.messages.append({"role": "user", "content": txt.remove_markdown(prompt)})
                 st.chat_message("user").write(prompt)
-                AvailableActions.rag_querying_from_sl_chatbot(ChatbotFront.inference_pipeline, prompt, st)
+                AvailableActions.rag_querying_from_sl_chatbot(ChatbotFront.inference_pipeline, prompt, st, ChatbotFront.include_bm25_retrieval)
 
     def initialize():
         txt.activate_print = True

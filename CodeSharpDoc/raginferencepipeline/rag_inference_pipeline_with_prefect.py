@@ -129,11 +129,11 @@ class RagInferencePipelineWithPrefect:
 
         rag_retrieved_chunks = rag_retrieved_chunks.result()
         bm25_retrieved_chunks = bm25_retrieved_chunks.result() if include_bm25_retrieval else []
-        retained_chunks = self.hybrid_chunks_selection(rag_retrieved_chunks, bm25_retrieved_chunks, give_score, max_retrived_count)
+        retained_chunks = RagInferencePipelineWithPrefect.hybrid_chunks_selection(rag_retrieved_chunks, bm25_retrieved_chunks, give_score, max_retrived_count)
         return retained_chunks
 
     @task    
-    def hybrid_chunks_selection(self, rag_retrieved_chunks: list[Document], bm25_retrieved_chunks: list[Document] = None, give_score: bool = False, max_retrived_count: int = None):
+    def hybrid_chunks_selection(rag_retrieved_chunks: list[Document], bm25_retrieved_chunks: list[Document] = None, give_score: bool = False, max_retrived_count: int = None):
         if not bm25_retrieved_chunks or not any(bm25_retrieved_chunks):
             return rag_retrieved_chunks
         

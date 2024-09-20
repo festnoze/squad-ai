@@ -35,7 +35,7 @@ class RagInferencePipeline:
 
         guardrails_result, run_inference_pipeline_results = Execute.run_parallel( 
             (RAGGuardrails.guardrails_query_analysis, (query)), # Guardrails check: query analysis
-            (RagInferencePipeline.run_inference_pipeline_but_guardrails, (self, query), {'include_bm25_retrieval': include_bm25_retrieval, 'give_score': give_score})
+            (self.run_inference_pipeline_but_guardrails, (), {'query': query, 'include_bm25_retrieval': include_bm25_retrieval, 'give_score': give_score})
         )
 
         self.check_for_guardrails(guardrails_result)
