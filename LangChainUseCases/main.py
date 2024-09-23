@@ -1,6 +1,9 @@
 # internal import
+import json
 from csharp_code_reviewer import CSharpCodeReviewer
+from drupaljsonapi import DrupalJsonApiClient
 from function_call_examples import FunctionCallExamples
+from helpers.file_already_exists_policy import FileAlreadyExistsPolicy
 from helpers.file_helper import file
 from helpers.langgraph_llm_generated_code_execution import LangGraphLlmGeneratedCodeExecution
 from helpers.langgraph_tools_supervisor import LangGraphToolsSupervisor
@@ -44,8 +47,8 @@ anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
 # exit()
 
 
-langsmith = Langsmith()
-langsmith.create_project()
+# langsmith = Langsmith()
+# langsmith.create_project()
 
 # Select the LLM to be used
 llms_infos = []
@@ -75,24 +78,45 @@ llms_infos = []
 llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout= 60, temperature = 1, api_key= openai_api_key))
 llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout= 80, temperature = 0.1, api_key= openai_api_key))
 
-# Test BM25 retriever
-rag_structs_summaries_csv = "outputs/rag_structs_summaries.csv"
-documents = file.read_csv(rag_structs_summaries_csv)
-documents = [doc[0] for doc in documents]
+txt.activate_print = True
+out_dir = "C:/Dev/squad-ai/LangChainUseCases/outputs/"
 
-bm25_retriever = BM25Retriever.from_texts(documents)
-bm25_retriever.k = 7
+# studiClient = DrupalJsonApiClient()
+# jobs = studiClient.get_jobs()
+# jobs = studiClient.get_jobs_details_parallel(jobs)
+# file.write_file(jobs, out_dir + "jobs.json", FileAlreadyExistsPolicy.Override)
 
-results = bm25_retriever.invoke("Which method speak about answers?")
-for result in results:
-    print(result.page_content)
-    print("----")
+data = file.get_as_str(out_dir + "jobs.json", encoding = 'utf-8-sig')
+data = json.loads(data)
+txt.print_json(data[0])
+
+# jobs_details = studiClient.get_jobs_with_details()
+# if jobs_details:
+#     file.write_file(jobs_details, out_dir + "jobs_details.json", FileAlreadyExistsPolicy.Override)
+
+# trainings = studiClient.get_trainings()
+# file.write_file(trainings, out_dir + "trainings.json", FileAlreadyExistsPolicy.Override)
+
+# # Test BM25 retriever
+# rag_structs_summaries_csv = "outputs/rag_structs_summaries.csv"
+# documents = file.read_csv(rag_structs_summaries_csv)
+# documents = [doc[0] for doc in documents]
+
+# bm25_retriever = BM25Retriever.from_texts(documents)
+# bm25_retriever.k = 7
+
+# results = bm25_retriever.invoke("Which method speak about answers?")
+# for result in results:
+#     print(result.page_content)
+#     print("----")
 
 # Examples of resolution with agent and tools or code generation
 #FunctionCallExamples.resolve_using_llm_direct(llms_infos)
 #FunctionCallExamples.resolve_using_agent_executor_with_tools(llms_infos)
 #FunctionCallExamples.resolve_using_agent_with_tools(llms_infos)
-FunctionCallExamples.resolve_using_codeact_code_execution(llms_infos)
+
+#FunctionCallExamples.resolve_using_codeact_code_execution(llms_infos)
+
 
 # Test Groq through its own client (no langchain)
 #GroqHelper.test_query(llms_infos[0])
@@ -112,25 +136,25 @@ FunctionCallExamples.resolve_using_codeact_code_execution(llms_infos)
 # code_review.evaluate_code_review()
 # exit()
 
-# Test parallel invocations
-llm = LangChainFactory.create_llms_from_infos(llms_infos)[0]
-test_parallel_invocations_with_homemade_parallel_prompts_invocations(llm)
-test_parallel_invocations_with_homemade_parallel_chains_invocations(llm)
-test_parallel_chains_invocations_with_imputs(llm)
+# # Test parallel invocations
+# llm = LangChainFactory.create_llms_from_infos(llms_infos)[0]
+# test_parallel_invocations_with_homemade_parallel_prompts_invocations(llm)
+# test_parallel_invocations_with_homemade_parallel_chains_invocations(llm)
+# test_parallel_chains_invocations_with_imputs(llm)
 
-# Use web search tool
-from langchain_community.utilities import GoogleSerperAPIWrapper
-web_search = GoogleSerperAPIWrapper()
-res = web_search.run("what's Obama's first name?")
-print(res)
+# # Use web search tool
+# from langchain_community.utilities import GoogleSerperAPIWrapper
+# web_search = GoogleSerperAPIWrapper()
+# res = web_search.run("what's Obama's first name?")
+# print(res)
 
-## Use tools through agent executor
-test_agent_executor_with_tools(llm)
+# ## Use tools through agent executor
+# test_agent_executor_with_tools(llm)
 
-# Summarize short text
-text = file.get_as_str("short-text.txt")
-res = Summarize.summarize_short_text(llm, text)
+# # Summarize short text
+# text = file.get_as_str("short-text.txt")
+# res = Summarize.summarize_short_text(llm, text)
 
-# Summarize long text
-text = file.get_as_str("LLM agents PhD thesis full.txt")
-res = Summarize.summarize_long_text(llm, text, 15000)
+# # Summarize long text
+# text = file.get_as_str("LLM agents PhD thesis full.txt")
+# res = Summarize.summarize_long_text(llm, text, 15000)

@@ -11,3 +11,4 @@ langsmith
 langchain-anthropic
 langchain_chroma
 google-generativeai
+pytest

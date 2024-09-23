@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 import glob
@@ -53,6 +54,10 @@ class file:
                 txt.print(f"File '{filepath}' exists. Renaming to '{filepath}' as per policy.")
             elif file_exists_policy == FileAlreadyExistsPolicy.Fail:
                 raise FileExistsError(f"File '{filepath}' already exists. Failing as per policy.")            
+        
+        # Transform dict into its json string representation
+        if isinstance(content, dict):
+            content = json.dumps(content, indent=4)            
 
         # Write the content to the file
         with open(filepath, 'w', encoding='utf-8-sig') as file_handler:

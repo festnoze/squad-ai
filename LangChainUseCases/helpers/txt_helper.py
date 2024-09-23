@@ -1,6 +1,8 @@
+import json
+import re
 import sys
-import threading
 import time
+from typing import Optional, Union
 from helpers.python_helpers import staticproperty
 from threading import Event, Thread
 
@@ -57,10 +59,40 @@ class txt:
         cls._activate_print = value
     
     @staticmethod
-    def print(text: str):
+    def print(text: str= "", end='\n'):
         if txt.activate_print:
-            print(text)
+            print(text, end=end)
 
+    @staticmethod
+    def print_json(data, indent=0):
+        """
+        Recursively prints JSON data with indentation, handling nested structures.
+        
+        :param data: The JSON data to print (can be a dictionary or list)
+        :param indent: The current level of indentation (default is 0)
+        """
+        if not txt.activate_print:
+            return
+        spacing = ' ' * indent
+        
+        # If data is a dictionary, iterate over key-value pairs
+        if isinstance(data, dict):
+            for key, value in data.items():
+                txt.print(f"{spacing}'{key}':", end=" ")
+                if isinstance(value, (dict, list)):
+                    txt.print()  # Print a newline for clarity before nested items
+                    txt.print_json(value, indent + 4)
+                else:
+                    txt.print(value)
+
+        elif isinstance(data, list):
+            for item in data:
+                if isinstance(item, (dict, list)):
+                    txt.print_json(item, indent + 4)
+                else:
+                    print(f"{spacing}- {item}")
+
+    @staticmethod
     def print_with_spinner(text: str) -> Thread:
         if not txt.activate_print:
             return None
@@ -76,9 +108,11 @@ class txt:
         txt.waiting_spinner_thread.start()
         return txt.waiting_spinner_thread
     
+    @staticmethod
     def to_python_case(text: str) -> str:
         return ''.join(['_' + c.lower() if c.isupper() else c for c in text]).lstrip('_')
 
+    @staticmethod
     def wait_spinner(prefix):
         chars = "⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹"
         while not txt.stop_event.is_set():
@@ -89,12 +123,14 @@ class txt:
                 sys.stdout.flush()
                 time.sleep(0.1)
 
+    @staticmethod
     def stop_spinner():
         txt.stop_event.set()  # Signal the thread to stop
         if txt.waiting_spinner_thread:
             txt.waiting_spinner_thread.join()
             txt.waiting_spinner_thread = None
 
+    @staticmethod
     def stop_spinner_replace_text(text=None):
         txt.stop_spinner()
         if not txt.activate_print:
@@ -115,3 +151,66 @@ class txt:
             text = f"✓ {text}{elapsed_str}" 
             sys.stdout.write(f'\r{empty}')
             sys.stdout.write(f'\r{text}\r\n')
+
+    @staticmethod
+    def apply_to_all_str(input: Optional[Union[str, dict, list]], delegate) -> Optional[Union[str, dict, list]]:
+        """Apply a delegate function to all strings in a nested structure (str/dict/list)."""
+        try:
+            if isinstance(input, dict):
+                return {key: txt.apply_to_all_str(value, delegate) for key, value in input.items()}
+            elif isinstance(input, list):
+                return [txt.apply_to_all_str(value, delegate) for value in input]
+            elif isinstance(input, str):
+                return delegate(input)
+            else:
+                return input
+        except UnicodeDecodeError as e:
+            print(f"Error while applying '{delegate.__name__}': {e}. In method: '{txt.apply_to_all_str.__name__}'")
+            return input
+    
+    @staticmethod
+    def fix_special_chars(input: Optional[Union[str, dict, list]]) -> Optional[Union[str, dict, list]]:
+            input = txt.replace_unicode_special_chars(input)           
+            input = txt.remove_html_tags(input)
+            input = txt.handle_latin_encoding(input)
+            return input
+    
+    @staticmethod
+    def replace_unicode_special_chars(input: Optional[Union[str, dict, list]]) -> Optional[Union[str, dict, list]]:
+        """Replace unicode special characters in a string/dictionary/list of strings."""
+        def replace_unicode_special_chars_str(text: str) -> str:
+            text = text.encode('utf-8').decode('unicode_escape')
+            return text
+            # try:
+            #     return json.loads(f'"{text}"')
+            # except json.JSONDecodeError as e:
+            #     return text
+        return txt.apply_to_all_str(input, replace_unicode_special_chars_str)
+    
+    def replace_unicode_special_chars_dict(input: dict) -> dict:
+        text = json.dumps(input)
+        text = txt.replace_unicode_special_chars(text)
+        text = text.replace('\r', '\\r').replace('\n', '\\n').replace('\t', '\\t')
+        return json.loads(text)
+    
+    @staticmethod
+    def remove_html_tags(input: Optional[Union[str, dict, list]]) -> Optional[Union[str, dict, list]]:
+        """Remove HTML tags from a string/dictionary/list of strings."""
+        def remove_html_tags_str(text: str) -> str:
+            html_tags = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'br', 'blockquote']
+            for tag in html_tags:
+                text = re.sub(f'<{tag}\\s*>', '', text, flags=re.IGNORECASE)
+                text = re.sub(f'</{tag}\\s*>', '', text, flags=re.IGNORECASE)
+            text = text.replace('&nbsp;', ' ').strip()            
+            return text        
+        return txt.apply_to_all_str(input, remove_html_tags_str)
+    
+    @staticmethod
+    def handle_latin_encoding(input: Optional[Union[str, dict, list]]) -> Optional[Union[str, dict, list]]:
+        """WORK? Handle latin special chars encoding converstion to UTF-8 from a string/dictionary/list of strings."""
+        def handle_latin_encoding_str(text: str) -> str:
+            try:
+                return text.replace("’", "'").replace("œ", "oe").encode('latin1').decode('utf-8')
+            except UnicodeDecodeError as e:
+                return text
+        return txt.apply_to_all_str(input, handle_latin_encoding_str)

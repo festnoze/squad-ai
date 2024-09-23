@@ -19,7 +19,7 @@ class ChatbotFront:
     rag: RAGService = None
     inference_pipeline = None
     #
-    include_bm25_retrieval= True
+    include_bm25_retrieval= False
     use_prefect = False
 
     def main():

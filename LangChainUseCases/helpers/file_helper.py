@@ -4,16 +4,23 @@ import shutil
 import glob
 import csv
 
+from helpers.file_already_exists_policy import FileAlreadyExistsPolicy
+from helpers.txt_helper import txt
+
 class file:
-    def get_as_str(filename):
+    def get_as_str(filename, encoding='utf-8'):
         """
         Get the specified file content as string
 
         Args:
             filename (str): the name of the file in the current directory
         """
+        if '/' in filename or '\\' in filename:
+            path = filename
+        else:
+            path = f"inputs\\{filename}" 
         try:
-            with open(f"inputs\\{filename}", 'r', encoding='utf-8') as file_reader:
+            with open(path, 'r', encoding=encoding) as file_reader:
                 content = file_reader.read()
                 return content
         except FileNotFoundError:
@@ -28,8 +35,9 @@ class file:
         with open(f"inputs\\{file_path}", 'r') as file:
             data = json.load(file)
         return data
-        
-    def write_file(content, path, filename):
+      
+    @staticmethod
+    def write_file(content: str, filepath: str, file_exists_policy: FileAlreadyExistsPolicy):
         """
         Writes content to a file specified by path and filename.
 
@@ -39,15 +47,51 @@ class file:
             filename (str): The name of the file, including its extension.
         """
         # Ensure the directory exists
-        os.makedirs(path, exist_ok=True)
+        os.makedirs(os.path.dirname(filepath), exist_ok=True)
         
-        # Construct the full path
-        full_path = os.path.join(path, filename)
+        # Apply policy in case the file already exists
+        if os.path.exists(filepath):
+            if file_exists_policy == FileAlreadyExistsPolicy.Override:
+                pass # continue overwrites the file
+            elif file_exists_policy == FileAlreadyExistsPolicy.Skip:
+                txt.print(f"File '{filepath}' already exists. Skipping writing as per policy.")
+                return # skip writing the file
+            elif file_exists_policy == FileAlreadyExistsPolicy.AutoRename:
+                filepath = file._get_unique_filename(filepath)
+                txt.print(f"File '{filepath}' exists. Renaming to '{filepath}' as per policy.")
+            elif file_exists_policy == FileAlreadyExistsPolicy.Fail:
+                raise FileExistsError(f"File '{filepath}' already exists. Failing as per policy.")            
         
+        # Transform dict into its json string representation
+        if isinstance(content, dict):
+            content = json.dumps(content, indent=4) 
+
+        elif isinstance(content, list):
+            content = json.dumps(content, indent=4)
+
         # Write the content to the file
-        with open(full_path, 'w', encoding='utf-8') as file:
-            file.write(content)
-    
+        with open(filepath, 'w', encoding='utf-8-sig') as file_handler:
+            file_handler.write(content)
+
+    @staticmethod
+    def _get_unique_filename(filepath: str) -> str:
+        """
+        Generate a unique filename by appending a number if the file already exists.
+        
+        Args:
+            filepath (str): The original filepath to check for uniqueness.
+        
+        Returns:
+            str: A new unique filepath.
+        """
+        base, extension = os.path.splitext(filepath)
+        counter = 1
+        new_filepath = f"{base}_{counter}{extension}"
+        while os.path.exists(new_filepath):
+            counter += 1
+            new_filepath = f"{base}_{counter}{extension}"
+        return new_filepath
+
     def write_csv(filepath, data):
         with open(filepath, 'w', newline='\r\n', encoding='utf-8-sig') as file:
             writer = csv.writer(file)
