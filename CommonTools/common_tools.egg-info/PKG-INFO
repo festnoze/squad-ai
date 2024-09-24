@@ -1,0 +1,20 @@
+Metadata-Version: 2.1
+Name: common_tools
+Version: 0.1
+Summary: Common tools for AI and generic needs on file, console, json, ...
+Home-page: https://github.com/festnoze/common_tools
+Author: Etienne Millerioux
+Author-email: eemillerioux@gmail.com
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.6
+License-File: LICENSE
+Requires-Dist: requests
+Requires-Dist: pydantic
+Requires-Dist: langchain
+Requires-Dist: langchain-experimental
+Requires-Dist: langgraph
+Requires-Dist: langsmith
+Requires-Dist: openai
+Requires-Dist: groq

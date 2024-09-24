@@ -1,0 +1,8 @@
+requests
+pydantic
+langchain
+langchain-experimental
+langgraph
+langsmith
+openai
+groq
