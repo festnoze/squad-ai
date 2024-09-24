@@ -4,31 +4,44 @@ import shutil
 import glob
 import csv
 
-from helpers.file_already_exists_policy import FileAlreadyExistsPolicy
-from helpers.txt_helper import txt
+from common_tools.models.file_already_exists_policy import FileAlreadyExistsPolicy
+
+from .txt_helper import txt
 
 class file:
     @staticmethod
-    def get_as_str(filepath, remove_comments= False):
+    def get_as_str(filename, encoding='utf-8', remove_comments= False):
         """
-        Get the specified file content as string (removing '//' commented lines)
+        Get the specified file content as string (removing '//' or '#' commented lines)
 
         Args:
             filename (str): the name of the file in the current directory
         """
+        if '/' in filename or '\\' in filename:
+            path = filename
+        else:
+            path = f"inputs\\{filename}" 
         try:
-            with open(f"{filepath}", 'r', encoding='utf-8-sig') as file_handler:
-                content = file_handler.read()
+            with open(path, 'r', encoding=encoding) as file_reader:
+                content = file_reader.read()
                 if remove_comments:
-                    content = '\n'.join([line for line in content.split('\n') if not line.strip().startswith('//')])
+                    content = '\n'.join([line for line in content.split('\n') if not line.strip().startswith('//') and not line.strip().startswith('#') ])
+
                 return content
         except FileNotFoundError:
-            print(f"file: {filepath} cannot be found.")
+            print(f"file: {filename} cannot be found.")
             return None
         except Exception as e:
-            print(f"Error happends while reading file: {filepath}: {e}")
+            print(f"Error happends while reading file: {filename}: {e}")
             return None
         
+    @staticmethod 
+    def get_as_json(file_path):
+        """Get the specified file content as a JSON object."""
+        with open(f"inputs\\{file_path}", 'r') as file:
+            data = json.load(file)
+        return data
+    
     @staticmethod
     def write_file(content: str, filepath: str, file_exists_policy: FileAlreadyExistsPolicy):
         """

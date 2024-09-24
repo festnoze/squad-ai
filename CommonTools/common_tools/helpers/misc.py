@@ -1,15 +1,20 @@
 import time
 import json
 from datetime import datetime
-# internal import
-from file_helper import file
-from models.conversation import Message
 
 class misc: 
     sharedFolder = "..\\Shared"
 
-    def print_message(message: Message):
-        print(f"{message.role} ({message.elapsed_seconds}s.):\n{message.content}\n")
+    # def print_message(message: Message):
+    #     print(f"{message.role} ({message.elapsed_seconds}s.):\n{message.content}\n")
+    
+    
+    # def get_message_as_json(message: Message):
+    #     return  {
+    #                 "source": message.role,
+    #                 "content": message.content,
+    #                 "duration": message.elapsed_seconds
+    #             }
 
     def pause(duration):        
         time.sleep(duration)
@@ -84,14 +89,7 @@ class misc:
         for i in range(1, 10):
             gherkin_string = gherkin_string.replace(f" {str(i)}", "")
         return gherkin_string
-    
-    def get_message_as_json(message: Message):
-        return  {
-                    "source": message.role,
-                    "content": message.content,
-                    "duration": message.elapsed_seconds
-                }
-    
+        
     def output_parser_gherkin(feature_content: str):
         return feature_content.replace(" :", ":").replace("gherkin", "").replace("Feature:", "Fonctionnalité:").replace("Scenario:", "Scénario:")
                 

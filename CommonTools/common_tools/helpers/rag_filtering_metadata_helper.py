@@ -1,5 +1,4 @@
-from models.logical_operator import LogicalOperator
-
+from common_tools.models.logical_operator import LogicalOperator
 
 class RagFilteringMetadataHelper:
     

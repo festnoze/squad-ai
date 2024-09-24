@@ -13,10 +13,14 @@ setup(
         'pydantic',
         'langchain',
         'langchain-experimental',
+        'langchain-openai',
+        'langchain-community',
+        'langchain-groq',
         'langgraph',
         'langsmith',
         'openai',
-        'groq'
+        'groq',
+        'prefect'
     ],
     classifiers=[
         'Programming Language :: Python :: 3',

@@ -1,6 +1,6 @@
 
 from groq import Groq
-from models.llm_info import LlmInfo
+from common_tools.models.llm_info import LlmInfo
 
 class GroqHelper:
     @staticmethod

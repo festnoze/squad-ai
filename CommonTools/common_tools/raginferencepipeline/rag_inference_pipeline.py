@@ -4,13 +4,13 @@ from langchain.agents import Tool
 from langchain_experimental.utilities import PythonREPL
 
 # Import the task classes from other files
-from helpers.execute_helper import Execute
-from services.rag_service import RAGService
-from raginferencepipeline.rag_pre_treatment_tasks import RAGPreTreatment
-from raginferencepipeline.guardrails_tasks import RAGGuardrails
-from raginferencepipeline.rag_hybrid_retrieval_tasks import RAGHybridRetrieval
-from raginferencepipeline.rag_answer_generation_tasks import RAGAugmentedGeneration
-from raginferencepipeline.rag_post_treatment_tasks import RAGPostTreatment
+from common_tools.helpers.execute_helper import Execute
+from common_tools.helpers.rag_service import RAGService
+from common_tools.raginferencepipeline.rag_pre_treatment_tasks import RAGPreTreatment
+from common_tools.raginferencepipeline.guardrails_tasks import RAGGuardrails
+from common_tools.raginferencepipeline.rag_hybrid_retrieval_tasks import RAGHybridRetrieval
+from common_tools.raginferencepipeline.rag_answer_generation_tasks import RAGAugmentedGeneration
+from common_tools.raginferencepipeline.rag_post_treatment_tasks import RAGPostTreatment
 
 class RagInferencePipeline:
     def __init__(self, rag: RAGService, tools: list = None):

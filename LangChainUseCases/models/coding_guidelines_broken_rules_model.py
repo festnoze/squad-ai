@@ -2,7 +2,7 @@ import json
 from typing import List
 from langchain.pydantic_v1 import BaseModel, Field
 
-from helpers.txt_helper import txt
+from common_tools.helpers.txt_helper import txt
 from models.coding_guidelines_broken_rule_model import Coding_Guidelines_BrokenRule_Model, Coding_Guidelines_BrokenRule_ModelPydantic
 
 class Coding_Guidelines_BrokenRules_Model:

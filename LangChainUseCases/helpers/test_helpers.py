@@ -6,8 +6,8 @@ from langchain_core.runnables import Runnable, RunnablePassthrough
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.schema.runnable import RunnableParallel
 
-from helpers.llm_helper import Llm
-from helpers.tools_helpers import MathToolBox
+from common_tools.helpers.tools_helpers import MathToolBox
+from common_tools.helpers.llm_helper import Llm
 
 def test_agent_executor_with_tools(llm):
     tools = [MathToolBox.multiply, MathToolBox.divide, MathToolBox.add, MathToolBox.subtract, MathToolBox.power, MathToolBox.root, MathToolBox.get_random_string, MathToolBox.get_random_number]

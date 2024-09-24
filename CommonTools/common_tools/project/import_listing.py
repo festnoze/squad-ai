@@ -2,7 +2,7 @@ import os
 import pkg_resources
 from collections import defaultdict
 
-class ImportDiscoveryHelper:
+class ImportListing:
     @staticmethod
     def find_imports(path):
         imports = defaultdict(list)
@@ -26,9 +26,7 @@ class ImportDiscoveryHelper:
         for file, lines in imports.items():
             for line in lines:
                 parts = line.split()
-                if parts[0] == 'import':
-                    package = parts[1].split('.')[0]
-                elif parts[0] == 'from':
+                if parts[0] == 'import' or parts[0] == 'from':
                     package = parts[1].split('.')[0]
                 else:
                     continue
@@ -40,11 +38,11 @@ class ImportDiscoveryHelper:
 
     @staticmethod
     def discover_imports(project_path):
-        imports = ImportDiscoveryHelper.find_imports(project_path)
-        return ImportDiscoveryHelper.get_used_packages(imports)
+        imports = ImportListing.find_imports(project_path)
+        return ImportListing.get_used_packages(imports)
 
-print("Packages used in this project:")
-used_packages = ImportDiscoveryHelper.discover_imports(".")
-for pkg in sorted(used_packages):
-    print(pkg)
-pass
+# print("Packages used in this project:")
+# used_packages = ImportListing.discover_imports(".")
+# for pkg in sorted(used_packages):
+#     print(pkg)
+# pass

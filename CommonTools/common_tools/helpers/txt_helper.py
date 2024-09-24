@@ -1,9 +1,8 @@
 import re
 import sys
-import threading
 import time
-from helpers.python_helpers import staticproperty
 from threading import Event, Thread
+from common_tools.helpers.python_helpers import staticproperty
 
 class txt:    
     waiting_spinner_thread = None
@@ -58,10 +57,40 @@ class txt:
         cls._activate_print = value
     
     @staticmethod
-    def print(text: str):
+    def print(text: str= "", end='\n'):
         if txt.activate_print:
-            print(text)
+            print(text, end=end)
 
+    @staticmethod
+    def print_json(data, indent=0):
+        """
+        Recursively prints JSON data with indentation, handling nested structures.
+        
+        :param data: The JSON data to print (can be a dictionary or list)
+        :param indent: The current level of indentation (default is 0)
+        """
+        if not txt.activate_print:
+            return
+        spacing = ' ' * indent
+        
+        # If data is a dictionary, iterate over key-value pairs
+        if isinstance(data, dict):
+            for key, value in data.items():
+                txt.print(f"{spacing}'{key}':", end=" ")
+                if isinstance(value, (dict, list)):
+                    txt.print()  # Print a newline for clarity before nested items
+                    txt.print_json(value, indent + 4)
+                else:
+                    txt.print(value)
+
+        elif isinstance(data, list):
+            for item in data:
+                if isinstance(item, (dict, list)):
+                    txt.print_json(item, indent + 4)
+                else:
+                    print(f"{spacing}- {item}")
+
+    @staticmethod
     def print_with_spinner(text: str) -> Thread:
         if not txt.activate_print:
             return None

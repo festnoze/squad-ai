@@ -1,5 +1,5 @@
 import os
-from helpers.file_helper import file
+from common_tools.helpers.file_helper import file
 from typing import List
 from langchain_community.embeddings.openai import OpenAIEmbeddings
 from langchain_core.embeddings import Embeddings
@@ -20,8 +20,8 @@ from langchain_community.embeddings.sentence_transformer import SentenceTransfor
 from langchain.retrievers.multi_query import MultiQueryRetriever
 from langchain_openai import OpenAIEmbeddings
 
-from helpers.llm_helper import Llm
-from models.question_analysis import QuestionAnalysis
+from common_tools.helpers.llm_helper import Llm
+from common_tools.models.question_analysis import QuestionAnalysis
 
 def split_text_into_chunks(text: str) -> List[str]:
     txt_splitter = CharacterTextSplitter(

@@ -1,7 +1,5 @@
 import json
 import os
-
-from models.structure_desc import StructureDesc
 #import xmltodict
 
 class JsonHelper:

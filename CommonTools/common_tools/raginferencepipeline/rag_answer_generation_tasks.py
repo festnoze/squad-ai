@@ -1,6 +1,6 @@
-from langchains import langchain_rag
-from models.question_analysis import QuestionAnalysis
-from services.rag_service import RAGService
+from common_tools.langchains import langchain_rag
+from common_tools.models.question_analysis import QuestionAnalysis
+from common_tools.helpers.rag_service import RAGService
 
 
 class RAGAugmentedGeneration:

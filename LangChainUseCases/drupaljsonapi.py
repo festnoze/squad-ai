@@ -1,7 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
 
-from helpers.txt_helper import txt
+from common_tools.helpers.txt_helper import txt
 
 class DrupalJsonApiClient:
     BASE_URL = "https://www.studi.com"
