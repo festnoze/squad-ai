@@ -1,14 +1,15 @@
 
 from typing import List
+
 from common_tools.helpers.file_helper import file
 from common_tools.helpers.txt_helper import txt
 from common_tools.models.llm_info import LlmInfo
 from common_tools.raginferencepipeline.rag_inference_pipeline import RagInferencePipeline
-from services.analysed_structures_handling import AnalysedStructuresHandling
-from services.rag_service import RAGService
-from services.summary_generation_service import SummaryGenerationService
-import langchains.langchain_rag as langchain_rag
+from common_tools.helpers.rag_service import RAGService
+import common_tools.langchains.langchain_rag as langchain_rag
 
+from services.analysed_structures_handling import AnalysedStructuresHandling
+from services.summary_generation_service import SummaryGenerationService
 
 class AvailableActions:
 

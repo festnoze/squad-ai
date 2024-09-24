@@ -1,6 +1,6 @@
-from common_tools.helpers.file_already_exists_policy import FileAlreadyExistsPolicy
+from common_tools.models.file_already_exists_policy import FileAlreadyExistsPolicy
 from common_tools.helpers.file_helper import file
-from common_tools.models.params_doc import MethodParametersDocumentation
+from models.params_doc import MethodParametersDocumentation
 
 class CSharpHelper:    
     #obsolete

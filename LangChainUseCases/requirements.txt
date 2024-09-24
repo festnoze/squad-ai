@@ -12,4 +12,4 @@ langchain-anthropic
 langchain_chroma
 google-generativeai
 pytest
--e C:\Dev\squad-ai\CommonTools # local package to internal tooling
+-e C:/Dev/squad-ai/CommonTools # local package to internal tooling

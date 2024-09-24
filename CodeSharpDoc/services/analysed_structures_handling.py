@@ -1,10 +1,12 @@
 import json
 import os
-from common_tools.helpers.file_already_exists_policy import FileAlreadyExistsPolicy
+
+from common_tools.models.file_already_exists_policy import FileAlreadyExistsPolicy
 from common_tools.helpers.file_helper import file
 from common_tools.helpers.txt_helper import txt
-from common_tools.models.struct_summaries_infos import MethodSummaryInfo, StructSummariesInfos
-from common_tools.models.structure_desc import StructureDesc
+
+from models.struct_summaries_infos import MethodSummaryInfo, StructSummariesInfos
+from models.structure_desc import StructureDesc
 from services.code_analyser_client import code_analyser_client
 from services.csharp_code_analyser_service import CSharpCodeStructureAnalyser
 from services.summary_generation_service import SummaryGenerationService

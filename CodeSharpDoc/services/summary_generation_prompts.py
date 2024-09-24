@@ -2,9 +2,10 @@ from typing import List, Callable, Any
 #
 from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.llm_helper import Llm
-from common_tools.models.method_desc import MethodDesc
-from common_tools.models.structure_desc import StructureDesc
-from common_tools.models.structure_type import StructureType
+
+from models.method_desc import MethodDesc
+from models.structure_desc import StructureDesc
+from models.structure_type import StructureType
 
 class SummaryGenerationPrompts:    
     ctor_txt = "Take into account that this method is a constructor for the containing class of the same name."

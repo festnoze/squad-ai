@@ -1,20 +1,19 @@
 from typing import Callable
 from langchain_core.language_models import BaseChatModel
 from langsmith import traceable
-import json
 #
 from common_tools.helpers.json_helper import JsonHelper
 from common_tools.langchains.langchain_factory import LangChainFactory
 from common_tools.helpers.file_helper import file
 from common_tools.helpers.txt_helper import txt
-from common_tools.helpers.c_sharp_helper import CSharpHelper, CSharpXMLDocumentation
 from common_tools.helpers.llm_helper import Llm
 from common_tools.models.llm_info import LlmInfo
-from common_tools.models.method_desc import MethodDesc
-from common_tools.models.params_doc import MethodParametersDocumentation, MethodParametersDocumentationPydantic
-from common_tools.models.struct_summaries_infos import MethodSummaryInfo, StructSummariesInfos
-from common_tools.models.structure_desc import StructureDesc
-from common_tools.models.structure_type import StructureType
+#
+from models.params_doc import MethodParametersDocumentation, MethodParametersDocumentationPydantic
+from helpers.c_sharp_helper import CSharpHelper, CSharpXMLDocumentation
+from models.struct_summaries_infos import MethodSummaryInfo, StructSummariesInfos
+from models.structure_desc import StructureDesc
+from models.structure_type import StructureType
 from services.code_analyser_client import code_analyser_client
 from services.csharp_code_analyser_service import CSharpCodeStructureAnalyser
 from services.summary_generation_prompts import SummaryGenerationPrompts

@@ -20,6 +20,7 @@ common_tools/helpers/misc.py
 common_tools/helpers/openai_helper.py
 common_tools/helpers/python_helpers.py
 common_tools/helpers/rag_filtering_metadata_helper.py
+common_tools/helpers/rag_service.py
 common_tools/helpers/tools_helpers.py
 common_tools/helpers/txt_helper.py
 common_tools/langchains/__init__.py

@@ -1,13 +1,15 @@
 from typing import List
-from common_tools.helpers.txt_helper import txt
-from common_tools.models.base_desc import BaseDesc
-from common_tools.models.enum_desc import EnumMembersDesc
-from common_tools.models.method_desc import MethodDesc
-from common_tools.models.param_doc import ParameterDocumentation
-from common_tools.models.prop_desc import PropertyDesc
-from common_tools.models.structure_functional_type import StructureFunctionalType
-from common_tools.models.structure_type import StructureType
 import json
+
+from common_tools.helpers.txt_helper import txt
+from models.base_desc import BaseDesc
+from common_tools.models.enum_desc import EnumMembersDesc
+
+from models.method_desc import MethodDesc
+from models.param_doc import ParameterDocumentation
+from models.prop_desc import PropertyDesc
+from models.structure_functional_type import StructureFunctionalType
+from models.structure_type import StructureType
 
 class StructureDesc(BaseDesc):
     #def __init__(self, file_path: str, index_shift_code: int, indent_level: int, struct_type: StructureType, namespace_name: str, usings: list[str], struct_name: str, access_modifier: str, base_class_name: str, interfaces_names: list[str] = [], existingSummary = '', attributs = None, methods: list[MethodDesc] = [], properties: list[PropertyDesc] = []):

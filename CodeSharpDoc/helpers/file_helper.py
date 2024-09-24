@@ -4,7 +4,7 @@ import shutil
 import glob
 import csv
 
-from common_tools.helpers.file_already_exists_policy import FileAlreadyExistsPolicy
+from common_tools.models.file_already_exists_policy import FileAlreadyExistsPolicy
 from common_tools.helpers.txt_helper import txt
 
 class file:
