@@ -12,8 +12,9 @@ site-packages/
 /Scripts
 /__pycache__
 
-# CodeSharpDoc
+# CodeSharpDoc & others
 senv/
+studienv/
 code_files_generated/
 code_files_saved/
 
