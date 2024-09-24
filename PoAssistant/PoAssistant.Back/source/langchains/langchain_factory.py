@@ -2,7 +2,7 @@ from langchain_openai import ChatOpenAI
 from langchain_community.chat_models import ChatOllama
 from langchain_groq import ChatGroq
 from langchain_core.language_models import BaseChatModel
-from langchains.langchain_adapter_type import LangChainAdapterType
+from common_tools.langchains.langchain_adapter_type import LangChainAdapterType
 import uuid
 
 class LangChainFactory():

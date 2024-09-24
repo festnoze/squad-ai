@@ -4,7 +4,7 @@ import requests
 from requests.exceptions import HTTPError
 import json
 # internal import
-from misc import misc
+from common_tools.helpers.misc import misc
 from models.conversation import Message
 
 class front_client:
@@ -63,14 +63,14 @@ class front_client:
         return metier_answer_str
     
     def post_new_metier_or_pm_answer(message: Message):
-        message_json = misc.get_message_as_json(message)
+        message_json = front_client.get_message_as_json(message)
         url = f"{front_client.host_uri}/{front_client.frontend_proxy_subpath}/{front_client.new_metier_pm_message_url_post}"        
         headers = {'Content-Type': 'application/json'}
         response = requests.post(url, data= json.dumps(message_json), headers= headers)
         front_client.print_response_status(response, front_client.post_new_metier_or_pm_answer.__name__)
 
     def post_update_last_metier_or_pm_answer(message: Message):
-        message_json = misc.get_message_as_json(message)
+        message_json = front_client.get_message_as_json(message)
         url = f"{front_client.host_uri}/{front_client.frontend_proxy_subpath}/{front_client.update_last_metier_pm_message_url_post}"        
         headers = {'Content-Type': 'application/json'}
         response = requests.post(url, data= json.dumps(message_json), headers= headers)
@@ -112,3 +112,10 @@ class front_client:
             
     def does_request_succeed(response):
         return response.status_code >= 200 and response.status_code < 300
+    
+    def get_message_as_json(message: Message):
+        return  {
+                    "source": message.role,
+                    "content": message.content,
+                    "duration": message.elapsed_seconds
+                }

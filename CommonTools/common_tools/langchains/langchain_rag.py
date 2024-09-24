@@ -13,7 +13,7 @@ from langchain_community.document_loaders import TextLoader
 from langchain_core.documents import Document
 #from langchain_community.vectorstores import FAISS
 from langchain_community.retrievers import BM25Retriever
-from rank_bm25 import BM25Okapi
+#from rank_bm25 import BM25Okapi
 from langchain.retrievers import EnsembleRetriever
 from langchain_chroma import Chroma
 from langchain_community.embeddings.sentence_transformer import SentenceTransformerEmbeddings

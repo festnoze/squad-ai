@@ -43,7 +43,7 @@ class file:
         return data
     
     @staticmethod
-    def write_file(content: str, filepath: str, file_exists_policy: FileAlreadyExistsPolicy):
+    def write_file(content: str, filepath: str, file_exists_policy: FileAlreadyExistsPolicy = FileAlreadyExistsPolicy.Override):
         """
         Writes content to a file specified by path and filename.
 
@@ -53,7 +53,9 @@ class file:
             filename (str): The name of the file, including its extension.
         """
         # Ensure the directory exists
-        os.makedirs(os.path.dirname(filepath), exist_ok=True)
+        dirpath = os.path.dirname(filepath)
+        if not os.path.exists(dirpath) : #or os.path.isdir(dirpath):
+            os.makedirs(os.path.dirname(dirpath), exist_ok=True)
         
         # Apply policy in case the file already exists
         if os.path.exists(filepath):

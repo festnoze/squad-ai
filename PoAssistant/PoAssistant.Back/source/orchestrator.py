@@ -1,12 +1,18 @@
-from misc import misc
-from display_helper import display
+
 from datetime import datetime
-# internal import
-from front_client import front_client
-from models.conversation import Conversation, Message
 from langchain.schema.messages import HumanMessage, AIMessage, SystemMessage
-from openai_helper import ai
-from file_helper import file
+
+from front_client import front_client
+
+# common tools import
+from common_tools.helpers.display_helper import display
+from common_tools.helpers.openai_helper import ai
+from common_tools.helpers.misc import misc
+from common_tools.helpers.file_helper import file
+
+
+# internal import
+from models.conversation import Conversation, Message
 from langchains.langchain_adapter_generic import LangChainAdapter
 
 class Orchestrator:
@@ -17,6 +23,7 @@ class Orchestrator:
     qa_role = "QA"
     tag_end_exchange = "[ENDS_EXCHANGE]"
     tag_end_pm_questions = "[FIN_PM_ASSIST]"
+    sharedFolder = "../Shared/"
 
     def __init__(self, langchain_adapter: LangChainAdapter, max_exchanges_count: int):
         self.max_exchanges_count: int = max_exchanges_count
@@ -35,11 +42,11 @@ class Orchestrator:
         self.po_instructions= file.get_as_str("po_us_assistant_instructions.txt")
         self.qa_instructions= file.get_as_str("qa_assistant_instructions.txt")
         
-        display.display_llm_infos(self.langchain.llm)
+        print(display.get_llm_infos(self.langchain.llm))
 
         request_message = front_client.wait_need_expression_creation_and_get()
         print(f"Description initiale de l'objectif : {request_message}")
-                
+
         conversation = await self.do_metier_pm_exchanges_async(request_message)
         self.save_metier_pm_exchanges(conversation)
     
@@ -112,7 +119,8 @@ class Orchestrator:
         request_with_instructions.append(HumanMessage(content= f"Voici l'échange sous forme Json :\n{pm_business_exchange_as_json_str}"))        
         
         answer, elapsed = self.langchain.invoke_with_elapse_time(request_with_instructions)
-        misc.print_message(Message(Orchestrator.po_role, answer, elapsed))
+        message = Message(Orchestrator.po_role, answer, elapsed)
+        print(f"{message.role} ({message.elapsed_seconds}s.):\n{message.content}\n")
         return answer
     
     async def write_qa_acceptance_tests_from_us_json_async(self, us_and_usecases_json_str):
@@ -177,15 +185,15 @@ class Orchestrator:
         us_and_usecases_json = misc.extract_json_from_text(us_contents)
         front_client.post_po_us_and_usecases(us_and_usecases_json)
         us_and_usecases_json_str = misc.json_to_str(us_and_usecases_json)
-        file.write_file(us_and_usecases_json_str, misc.sharedFolder, "user_story.json")
+        file.write_file(us_and_usecases_json_str, self.sharedFolder + "user_story.json")
 
     def save_metier_pm_exchanges(self, conversation: Conversation):
         messages_json = conversation.get_all_messages_as_json()
         messages_str = misc.json_to_str(messages_json)
-        file.write_file(messages_str, misc.sharedFolder, "BusinessExpert_ProductOwner_Exchanges.json")
+        file.write_file(messages_str, self.sharedFolder + "BusinessExpert_ProductOwner_Exchanges.json")
         
     def delete_all_outputs(self):
-        file.delete_folder_contents(misc.sharedFolder)
+        file.delete_files_in_folder(self.sharedFolder)
         file.delete_all_files_with_extension("*.feature", "AcceptanceTests")
         file.delete_all_files_with_extension("*StepDefinitions.cs", "AcceptanceTests")
     

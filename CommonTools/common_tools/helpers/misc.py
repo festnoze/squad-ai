@@ -3,8 +3,6 @@ import json
 from datetime import datetime
 
 class misc: 
-    sharedFolder = "..\\Shared"
-
     # def print_message(message: Message):
     #     print(f"{message.role} ({message.elapsed_seconds}s.):\n{message.content}\n")
     
