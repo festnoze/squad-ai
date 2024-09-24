@@ -4,8 +4,8 @@ import shutil
 import glob
 import csv
 
-from helpers.file_already_exists_policy import FileAlreadyExistsPolicy
-from helpers.txt_helper import txt
+from common_tools.helpers.file_already_exists_policy import FileAlreadyExistsPolicy
+from common_tools.helpers.txt_helper import txt
 
 class file:
     @staticmethod

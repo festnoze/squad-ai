@@ -2,7 +2,7 @@ import re
 import sys
 import threading
 import time
-from helpers.python_helpers import staticproperty
+from common_tools.helpers.python_helpers import staticproperty
 from threading import Event, Thread
 
 class txt:    

@@ -1,11 +1,11 @@
 import time
 from openai import OpenAI
 import streamlit as st
-from helpers.txt_helper import txt
-from models.llm_info import LlmInfo
+from common_tools.helpers.txt_helper import txt
+from common_tools.models.llm_info import LlmInfo
 from available_actions import AvailableActions
-from raginferencepipeline.rag_inference_pipeline import RagInferencePipeline
-from raginferencepipeline.rag_inference_pipeline_with_prefect import RagInferencePipelineWithPrefect
+from common_tools.raginferencepipeline.rag_inference_pipeline import RagInferencePipeline
+from common_tools.raginferencepipeline.rag_inference_pipeline_with_prefect import RagInferencePipelineWithPrefect
 from services.rag_service import RAGService
 from startup import Startup
 

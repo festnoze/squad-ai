@@ -1,9 +1,9 @@
 
 from typing import List
-from helpers.file_helper import file
-from helpers.txt_helper import txt
-from models.llm_info import LlmInfo
-from raginferencepipeline.rag_inference_pipeline import RagInferencePipeline
+from common_tools.helpers.file_helper import file
+from common_tools.helpers.txt_helper import txt
+from common_tools.models.llm_info import LlmInfo
+from common_tools.raginferencepipeline.rag_inference_pipeline import RagInferencePipeline
 from services.analysed_structures_handling import AnalysedStructuresHandling
 from services.rag_service import RAGService
 from services.summary_generation_service import SummaryGenerationService

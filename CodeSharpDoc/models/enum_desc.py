@@ -1,5 +1,5 @@
 from typing import List, Optional
-from models.base_desc import BaseDesc
+from common_tools.models.base_desc import BaseDesc
 
 class EnumMemberDesc(BaseDesc):
     def __init__(self, member_name: str, member_value: int):

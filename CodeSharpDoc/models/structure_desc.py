@@ -1,12 +1,12 @@
 from typing import List
-from helpers.txt_helper import txt
-from models.base_desc import BaseDesc
-from models.enum_desc import EnumMembersDesc
-from models.method_desc import MethodDesc
-from models.param_doc import ParameterDocumentation
-from models.prop_desc import PropertyDesc
-from models.structure_functional_type import StructureFunctionalType
-from models.structure_type import StructureType
+from common_tools.helpers.txt_helper import txt
+from common_tools.models.base_desc import BaseDesc
+from common_tools.models.enum_desc import EnumMembersDesc
+from common_tools.models.method_desc import MethodDesc
+from common_tools.models.param_doc import ParameterDocumentation
+from common_tools.models.prop_desc import PropertyDesc
+from common_tools.models.structure_functional_type import StructureFunctionalType
+from common_tools.models.structure_type import StructureType
 import json
 
 class StructureDesc(BaseDesc):
