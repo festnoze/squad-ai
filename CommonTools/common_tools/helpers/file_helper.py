@@ -54,8 +54,8 @@ class file:
         """
         # Ensure the directory exists
         dirpath = os.path.dirname(filepath)
-        if not os.path.exists(dirpath) : #or os.path.isdir(dirpath):
-            os.makedirs(os.path.dirname(dirpath), exist_ok=True)
+        if not os.path.exists(dirpath) or not os.path.isfile(dirpath):
+            os.makedirs(dirpath, exist_ok=True)
         
         # Apply policy in case the file already exists
         if os.path.exists(filepath):
@@ -76,7 +76,14 @@ class file:
 
         # Write the content to the file
         with open(filepath, 'w', encoding='utf-8-sig') as file_handler:
-            file_handler.write(content)
+            if isinstance(content, str):
+                file_handler.write(content)
+            else:
+                json.dump(content, file_handler, ensure_ascii=False, indent=4)
+            # if isinstance(content, list):
+            #     for line in content:
+            #         file_handler.write(f"{line}\n")
+    
 
     @staticmethod
     def _get_unique_filename(filepath: str) -> str:

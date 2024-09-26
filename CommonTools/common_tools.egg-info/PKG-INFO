@@ -17,6 +17,7 @@ Requires-Dist: langchain-experimental
 Requires-Dist: langchain-openai
 Requires-Dist: langchain-community
 Requires-Dist: langchain-groq
+Requires-Dist: langchain-chroma
 Requires-Dist: langgraph
 Requires-Dist: langsmith
 Requires-Dist: openai

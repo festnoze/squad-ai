@@ -1,7 +1,9 @@
+import json
 import re
 import sys
 import time
 from threading import Event, Thread
+from typing import Optional, Union
 from common_tools.helpers.python_helpers import staticproperty
 
 class txt:    
@@ -88,7 +90,7 @@ class txt:
                 if isinstance(item, (dict, list)):
                     txt.print_json(item, indent + 4)
                 else:
-                    print(f"{spacing}- {item}")
+                    print(f"{spacing}-> {item}")
 
     @staticmethod
     def print_with_spinner(text: str) -> Thread:
@@ -153,3 +155,67 @@ class txt:
     def remove_markdown(text):
         remove_chars = r"[*_#+=|{}!]"
         return re.sub(remove_chars, "", text)
+    
+    
+    @staticmethod
+    def apply_to_all_str(input: Optional[Union[str, dict, list]], delegate) -> Optional[Union[str, dict, list]]:
+        """Apply a delegate function to all strings in a nested structure (str/dict/list)."""
+        try:
+            if isinstance(input, dict):
+                return {key: txt.apply_to_all_str(value, delegate) for key, value in input.items()}
+            elif isinstance(input, list):
+                return [txt.apply_to_all_str(value, delegate) for value in input]
+            elif isinstance(input, str):
+                return delegate(input)
+            else:
+                return input
+        except UnicodeDecodeError as e:
+            print(f"Error while applying '{delegate.__name__}': {e}. In method: '{txt.apply_to_all_str.__name__}'")
+            return input
+    
+    @staticmethod
+    def fix_special_chars(input: Optional[Union[str, dict, list]]) -> Optional[Union[str, dict, list]]:
+            input = txt.replace_unicode_special_chars(input)           
+            input = txt.remove_html_tags(input)
+            input = txt.handle_latin_encoding(input)
+            return input
+    
+    @staticmethod
+    def replace_unicode_special_chars(input: Optional[Union[str, dict, list]]) -> Optional[Union[str, dict, list]]:
+        """Replace unicode special characters in a string/dictionary/list of strings."""
+        def replace_unicode_special_chars_str(text: str) -> str:
+            text = text.encode('utf-8').decode('unicode_escape')
+            return text
+            # try:
+            #     return json.loads(f'"{text}"')
+            # except json.JSONDecodeError as e:
+            #     return text
+        return txt.apply_to_all_str(input, replace_unicode_special_chars_str)
+    
+    def replace_unicode_special_chars_dict(input: dict) -> dict:
+        text = json.dumps(input)
+        text = txt.replace_unicode_special_chars(text)
+        text = text.replace('\r', '\\r').replace('\n', '\\n').replace('\t', '\\t')
+        return json.loads(text)
+    
+    @staticmethod
+    def remove_html_tags(input: Optional[Union[str, dict, list]]) -> Optional[Union[str, dict, list]]:
+        """Remove HTML tags from a string/dictionary/list of strings."""
+        def remove_html_tags_str(text: str) -> str:
+            html_tags = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'br', 'blockquote']
+            for tag in html_tags:
+                text = re.sub(f'<{tag}\\s*>', '', text, flags=re.IGNORECASE)
+                text = re.sub(f'</{tag}\\s*>', '', text, flags=re.IGNORECASE)
+            text = text.replace('&nbsp;', ' ').strip()            
+            return text        
+        return txt.apply_to_all_str(input, remove_html_tags_str)
+    
+    @staticmethod
+    def handle_latin_encoding(input: Optional[Union[str, dict, list]]) -> Optional[Union[str, dict, list]]:
+        """WORK? Handle latin special chars encoding converstion to UTF-8 from a string/dictionary/list of strings."""
+        def handle_latin_encoding_str(text: str) -> str:
+            try:
+                return text.replace("’", "'").replace("œ", "oe").encode('latin1').decode('utf-8')
+            except UnicodeDecodeError as e:
+                return text
+        return txt.apply_to_all_str(input, handle_latin_encoding_str)

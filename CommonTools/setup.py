@@ -16,6 +16,7 @@ setup(
         'langchain-openai',
         'langchain-community',
         'langchain-groq',
+        'langchain-chroma',
         'langgraph',
         'langsmith',
         'openai',

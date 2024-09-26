@@ -42,16 +42,15 @@ groq_api_key = os.getenv("GROQ_API_KEY")
 openai_api_key = os.getenv("OPEN_API_KEY")
 google_api_key = os.getenv("GOOGLE_API_KEY")
 anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
-#openai.api_key = openai_api_key
+openai.api_key = openai_api_key
 
 # models = openai.models.list()
 # for model in models:
 #     print(model.id)
 # exit()
 
-
-# langsmith = Langsmith()
-# langsmith.create_project()
+langsmith = Langsmith()
+langsmith.create_project()
 
 # Select the LLM to be used
 llms_infos = []
@@ -82,23 +81,6 @@ llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  t
 llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout= 80, temperature = 0.1, api_key= openai_api_key))
 
 txt.activate_print = True
-out_dir = "C:/Dev/squad-ai/LangChainUseCases/outputs/"
-
-# studiClient = DrupalJsonApiClient()
-# jobs = studiClient.get_jobs()
-# jobs = studiClient.get_jobs_details_parallel(jobs)
-# file.write_file(jobs, out_dir + "jobs.json", FileAlreadyExistsPolicy.Override)
-
-data = file.get_as_str(out_dir + "jobs.json", encoding = 'utf-8-sig')
-data = json.loads(data)
-txt.print_json(data[0])
-
-# jobs_details = studiClient.get_jobs_with_details()
-# if jobs_details:
-#     file.write_file(jobs_details, out_dir + "jobs_details.json", FileAlreadyExistsPolicy.Override)
-
-# trainings = studiClient.get_trainings()
-# file.write_file(trainings, out_dir + "trainings.json", FileAlreadyExistsPolicy.Override)
 
 # # Test BM25 retriever
 # rag_structs_summaries_csv = "outputs/rag_structs_summaries.csv"
