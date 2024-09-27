@@ -1,4 +1,4 @@
-from helpers.txt_helper import txt
+from common_tools.helpers.txt_helper import txt
 from models.base_desc import BaseDesc
 import json
 import re

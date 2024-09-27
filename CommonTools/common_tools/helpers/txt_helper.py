@@ -202,7 +202,7 @@ class txt:
     def remove_html_tags(input: Optional[Union[str, dict, list]]) -> Optional[Union[str, dict, list]]:
         """Remove HTML tags from a string/dictionary/list of strings."""
         def remove_html_tags_str(text: str) -> str:
-            html_tags = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'br', 'blockquote']
+            html_tags = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'br', 'blockquote', 'strong', 'span', 'em', 'i', 'b', 'u', 'a', 'img', 'code', 'pre', 'ul', 'ol', 'li', 'table', 'tr', 'td', 'th', 'tbody', 'thead', 'tfoot', 'div', 'section', 'article', 'aside', 'nav', 'header', 'footer', 'main', 'form', 'input', 'button', 'select', 'option', 'textarea', 'label', 'fieldset', 'legend', 'hr', 'sub', 'sup', 'small', 'big', 'del', 'ins', 's', 'strike', 'center', 'font', 'tt', 'kbd', 'samp', 'var', 'dfn', 'abbr', 'acronym', 'cite', 'q']
             for tag in html_tags:
                 text = re.sub(f'<{tag}\\s*>', '', text, flags=re.IGNORECASE)
                 text = re.sub(f'</{tag}\\s*>', '', text, flags=re.IGNORECASE)
