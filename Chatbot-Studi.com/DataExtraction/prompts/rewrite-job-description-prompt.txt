@@ -1,0 +1,16 @@
+#INSTRUCTIONS#
+
+Analyse la fiche métier fournie dans la section 'CONTEXTE' et réécris-le en entier, en veillant à ce que toutes les informations soient incluses sans omettre de détails. Supprime toutes les informations redondantes afin de ne conserver chaque idée ou donnée qu'une seule fois. Structure le contenu révisé en plusieurs sections claires et logiques pour faciliter la compréhension. Utilise les sections suivantes pour organiser l'information :
+
+- Introduction : Présente brièvement le sujet ou le rôle principal abordé dans le texte, en mettant en avant les éléments clés qui définissent ce rôle ou contexte.
+- Missions et responsabilités : Décris de manière complète et sans redondance les missions principales, tâches, et responsabilités liées au sujet.
+- Compétences requises : Liste et détaille les compétences, connaissances et qualités nécessaires, en regroupant les informations similaires.
+- Formation et expérience : Indique les exigences en matière de formation et d'expérience, en éliminant les répétitions.
+- Conditions de travail : Décris les conditions de travail, y compris les aspects liés au salaire, au lieu de travail, et aux horaires.
+- Évolution professionnelle : Présente les possibilités d'évolution ou de développement professionnel, en synthétisant toutes les informations pertinentes.
+- Fourchette de salaire : Décris la fourchette de salaire en fonction de l'expérience, en distinguant les salaires des débutants, des profils seniors (et des profils intermédiaires si l'information est présnete).
+
+Assure-toi que chaque section soit complète, concise, et que l'ensemble du texte réécrit soit fluide et bien organisé. N'ajoute pas d'informations nouvelles qui ne figurent pas dans le texte d'origine.
+
+#CONTEXTE#
+{input}
