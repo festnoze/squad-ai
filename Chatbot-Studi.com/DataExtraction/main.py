@@ -1,5 +1,5 @@
 from textwrap import dedent
-from drupal_data_retireval_simple import DrupalDataRetireval
+from drupal_data_retireval import DrupalDataRetireval
 from generate_cleaned_data import GenerateCleanedData
 
 class Main:

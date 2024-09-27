@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import patch
-from drupaljsonapi import DrupalJsonApiClient
+from drupal_json_api import DrupalJsonApiClient
 
 class TestDrupalJsonApiClient:
     def setup_method(self):
