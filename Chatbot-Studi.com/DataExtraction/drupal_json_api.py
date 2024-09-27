@@ -40,33 +40,36 @@ class DrupalJsonApiClient:
     #     return self._perform_request('article?sort=created')
 
     def get_jobs(self):
-        jobs = self.get_drupal_data_recursivly('node/jobs', self.get_generic_data_from_node_item, ['field_paragraph'], ['field_domain'])
+        jobs = self.get_drupal_data_recursively('node/jobs', self.get_generic_data_from_node_item, ['field_paragraph'], ['field_domain'])
         jobs = self.parallel_get_items_related_infos(jobs)
         return jobs
-  
+    
+    
     def get_fundings(self):
-        return self.get_drupal_data_recursivly('node/funding?include=field_paragraph', self.get_generic_data_from_node_item)      
+        return self.get_drupal_data_recursively('node/funding', self.get_generic_data_from_node_item, ['field_paragraph'])      
       
-    def get_fundings(self):
-        return self.get_drupal_data_recursivly('taxonomy_term/domain?include=field_school', self.get_generic_data_from_node_item)  
+    def get_domains(self):
+        return self.get_drupal_data_recursively('taxonomy_term/domain', self.get_generic_data_from_node_item, ['field_school'])  
     
     def get_trainings(self):
-        trainings = self.get_drupal_data_recursivly('node/training', self.get_generic_data_from_node_item, ['field_certification', 'field_diploma', 'field_funding', 'field_goal', 'field_job'])
-        trainings = self.parallel_get_items_related_infos(trainings)
+        trainings = self.get_drupal_data_recursively('node/training', self.get_generic_data_from_node_item, [], ['field_content_bloc','field_certification', 'field_diploma', 'field_funding', 'field_goal', 'field_job'])
         return trainings
     
-    # def get_trainings_details(self):
-    #     return self.get_drupal_data_recursivly('training?include=field_certification&include=field_diploma&include=field_funding&include=field_goal&include=field_job', self.get_trainings_from_data)
-    
-
     def get_generic_data_from_node_item(self, items_data, included_rel=[], included_rel_ids=[]):
         items = []
         for i, item in enumerate(items_data):
             new_item ={
                 'id': item['id'],
-                'title': item['attributes']['title'],
                 'type': item['type']
             }
+            if not 'attributes' in item:
+                continue
+            if 'title' in item['attributes'] and item['attributes']['title']:
+                new_item['title'] = item['attributes']['title']
+            if 'name' in item['attributes'] and item['attributes']['name']:
+                new_item['title'] = item['attributes']['name']
+            if 'description' in item['attributes'] and item['attributes']['description']:
+                new_item['title'] = item['attributes']['description']
             if 'related' in item['links']:
                 new_item['related_url'] = item['links']['related']['href']
             if 'field_paragraph' in item['attributes']:
@@ -113,7 +116,7 @@ class DrupalJsonApiClient:
     #         trainings.append(training)
     #     return trainings
     
-    def get_drupal_data_recursivly(self, url: str, delegate, included_relationships=[], included_relationships_ids=[], fetch_all_pages=False):
+    def get_drupal_data_recursively(self, url: str, delegate, included_relationships=[], included_relationships_ids=[], fetch_all_pages=False):
         items_full = self._perform_request(url)
         items_data = items_full['data']
         items = []
@@ -122,7 +125,7 @@ class DrupalJsonApiClient:
         if fetch_all_pages and 'next' in items_full['links']:
             next_url = items_full['links']['next']['href']
             txt.print(f"Loading next page to URL: {next_url}")
-            jobs += self.get_drupal_data_recursivly(next_url, delegate, included_relationships, included_relationships_ids, fetch_all_pages)
+            jobs += self.get_drupal_data_recursively(next_url, delegate, included_relationships, included_relationships_ids, fetch_all_pages)
         return items
     
     def parallel_get_items_related_infos(self, items):
