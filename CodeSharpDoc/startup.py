@@ -31,8 +31,8 @@ class Startup:
 
         load_dotenv(find_dotenv())
 
-        groq_api_key = os.getenv("GROQ_API_KEY")
         openai_api_key = os.getenv("OPEN_API_KEY")
+        groq_api_key = os.getenv("GROQ_API_KEY")
         google_api_key = os.getenv("GOOGLE_API_KEY")
         anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
         #openai.api_key = openai_api_key

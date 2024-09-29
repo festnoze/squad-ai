@@ -10,7 +10,7 @@ from .txt_helper import txt
 
 class file:
     @staticmethod
-    def get_as_str(filename, encoding='utf-8', remove_comments= False):
+    def get_as_str(filename, encoding='utf-8-sig', remove_comments= False):
         """
         Get the specified file content as string (removing '//' or '#' commented lines)
 
@@ -43,7 +43,7 @@ class file:
         return data
     
     @staticmethod
-    def write_file(content: str, filepath: str, file_exists_policy: FileAlreadyExistsPolicy = FileAlreadyExistsPolicy.Override):
+    def write_file(content: str, filepath: str, file_exists_policy: FileAlreadyExistsPolicy = FileAlreadyExistsPolicy.Override, encoding='utf-8-sig'):
         """
         Writes content to a file specified by path and filename.
 
@@ -75,7 +75,7 @@ class file:
             content = json.dumps(content, indent=4)            
 
         # Write the content to the file
-        with open(filepath, 'w', encoding='utf-8-sig') as file_handler:
+        with open(filepath, 'w', encoding=encoding) as file_handler:
             if isinstance(content, str):
                 file_handler.write(content)
             else:

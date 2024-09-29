@@ -16,8 +16,8 @@ from common_tools.helpers.txt_helper import txt
 from common_tools.models.logical_operator import LogicalOperator
 from common_tools.models.question_analysis import QuestionAnalysis, QuestionAnalysisPydantic
 from common_tools.helpers.rag_service import RAGService
-from common_tools.raginferencepipeline.rag_inference_pipeline import RagInferencePipeline
 import common_tools.langchains.langchain_rag as langchain_rag
+from common_tools.RAG.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
 
 class RagInferencePipelineWithPrefect:
     

@@ -156,57 +156,57 @@ class DrupalJsonApiClient:
                     new_item['attributes'][key_str] = txt.fix_special_chars(extracted_value[0])
         return items
                     
-    def get_relationships_values_from_(self, included_rel: List[str], included_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    # def get_relationships_values_from_(self, included_rel: List[str], included_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             
-        items_related_infos = []
-        included_map = None
-        if not any(included_data):
-            return None
+    #     items_related_infos = []
+    #     included_map = None
+    #     if not any(included_data):
+    #         return None
         
-        included_map = {
-            (item['type'], item['id']): item for item in included_data
-        }
-        # Process included relationships
-        if included_rel:
-            item_related_infos = {}
-            for rel in included_rel:
-                rel_data = item.get('relationships', {})
-                if not rel_data:
-                    continue
-                for key, value in rel_data.items():
-                    rel_data = value.get('data', [])
-                    if not rel_data:
-                        continue
-                    related_items = []
-                    if isinstance(rel_data, dict):
-                        # Single relationship
-                        key1 = (rel_data['type'], rel_data['id'])
-                        if included_map and key1 in included_map:
-                            related_item = included_map.get(key1)
-                            if related_item:
-                                extracted_attributes = self.extract_long_string_values(related_item)
-                        else:
-                            extracted_attributes = self.extract_long_string_values(rel_data)
-                        if extracted_attributes:
-                            related_items.extend(extracted_attributes)
-                    elif isinstance(rel_data, list):
-                        # Multiple relationships
-                        for rel_item in rel_data:
-                            key1 = (rel_item['type'], rel_item['id'])
-                            if included_map and key1 in included_map:
-                                related_item = included_map.get(key1)
-                                if related_item:
-                                    extracted_attributes = self.extract_long_string_values(related_item)                                
-                            else:
-                                extracted_attributes = self.extract_long_string_values(rel_item)
-                                if extracted_attributes:
-                                    related_items.extend(extracted_attributes)
-                    if related_items:
-                        new_item['related_infos'][key] = related_items
+    #     included_map = {
+    #         (item['type'], item['id']): item for item in included_data
+    #     }
+    #     # Process included relationships
+    #     if included_rel:
+    #         item_related_infos = {}
+    #         for rel in included_rel:
+    #             rel_data = item.get('relationships', {})
+    #             if not rel_data:
+    #                 continue
+    #             for key, value in rel_data.items():
+    #                 rel_data = value.get('data', [])
+    #                 if not rel_data:
+    #                     continue
+    #                 related_items = []
+    #                 if isinstance(rel_data, dict):
+    #                     # Single relationship
+    #                     key1 = (rel_data['type'], rel_data['id'])
+    #                     if included_map and key1 in included_map:
+    #                         related_item = included_map.get(key1)
+    #                         if related_item:
+    #                             extracted_attributes = self.extract_long_string_values(related_item)
+    #                     else:
+    #                         extracted_attributes = self.extract_long_string_values(rel_data)
+    #                     if extracted_attributes:
+    #                         related_items.extend(extracted_attributes)
+    #                 elif isinstance(rel_data, list):
+    #                     # Multiple relationships
+    #                     for rel_item in rel_data:
+    #                         key1 = (rel_item['type'], rel_item['id'])
+    #                         if included_map and key1 in included_map:
+    #                             related_item = included_map.get(key1)
+    #                             if related_item:
+    #                                 extracted_attributes = self.extract_long_string_values(related_item)                                
+    #                         else:
+    #                             extracted_attributes = self.extract_long_string_values(rel_item)
+    #                             if extracted_attributes:
+    #                                 related_items.extend(extracted_attributes)
+    #                 if related_items:
+    #                     new_item['related_infos'][key] = related_items
 
-        items.append(new_item)
+    #     items.append(new_item)
 
-        return items
+    #     return items
 
     def extract_long_string_values(self, item: Any, min_length=80) -> List[str]:
         """

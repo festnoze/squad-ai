@@ -201,13 +201,27 @@ class txt:
     @staticmethod
     def remove_html_tags(input: Optional[Union[str, dict, list]]) -> Optional[Union[str, dict, list]]:
         """Remove HTML tags from a string/dictionary/list of strings."""
+
         def remove_html_tags_str(text: str) -> str:
-            html_tags = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'br', 'blockquote', 'strong', 'span', 'em', 'i', 'b', 'u', 'a', 'img', 'code', 'pre', 'ul', 'ol', 'li', 'table', 'tr', 'td', 'th', 'tbody', 'thead', 'tfoot', 'div', 'section', 'article', 'aside', 'nav', 'header', 'footer', 'main', 'form', 'input', 'button', 'select', 'option', 'textarea', 'label', 'fieldset', 'legend', 'hr', 'sub', 'sup', 'small', 'big', 'del', 'ins', 's', 'strike', 'center', 'font', 'tt', 'kbd', 'samp', 'var', 'dfn', 'abbr', 'acronym', 'cite', 'q']
+            # Define a list of HTML tags to be removed
+            html_tags = ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'br', 'blockquote', 'strong', 'span', 'em', 'i', 'b', 'u',
+                        'a', 'img', 'code', 'pre', 'ul', 'ol', 'li', 'table', 'tr', 'td', 'th', 'tbody', 'thead', 'tfoot',
+                        'div', 'section', 'article', 'aside', 'nav', 'header', 'footer', 'main', 'form', 'input', 'button',
+                        'select', 'option', 'textarea', 'label', 'fieldset', 'legend', 'hr', 'sub', 'sup', 'small', 'big',
+                        'del', 'ins', 's', 'strike', 'center', 'font', 'tt', 'kbd', 'samp', 'var', 'dfn', 'abbr', 'acronym',
+                        'cite', 'q']
+
+            # Remove all occurrences of tags, regardless of attributes
             for tag in html_tags:
-                text = re.sub(f'<{tag}\\s*>', '', text, flags=re.IGNORECASE)
+                # Regex to remove opening tags with or without attributes
+                text = re.sub(f'<{tag}[^>]*>', '', text, flags=re.IGNORECASE)
+                # Regex to remove closing tags
                 text = re.sub(f'</{tag}\\s*>', '', text, flags=re.IGNORECASE)
-            text = text.replace('&nbsp;', ' ').strip()            
-            return text        
+
+            # Replace common HTML entities like &nbsp;
+            text = text.replace('&nbsp;', ' ').strip()
+            return text
+
         return txt.apply_to_all_str(input, remove_html_tags_str)
     
     @staticmethod

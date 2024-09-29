@@ -52,10 +52,15 @@ def build_vectorstore(documents: List[dict], doChunkContent = True) -> any:
                 chunks.extend(split_text_into_chunks(document['page_content']))                
         db = Chroma.from_texts(texts= chunks, embedding = embeddings, persist_directory= vectorstore_chroma_db_path)
     else:
-        langchain_documents = [
-            Document(page_content=doc["page_content"], metadata=doc["metadata"]) 
-            for doc in documents
-        ]
+        if not documents or not any(documents):
+            return None
+        if isinstance(documents[0], Document):
+            langchain_documents = documents
+        else:
+            langchain_documents = [
+                Document(page_content=doc["page_content"], metadata=doc["metadata"]) 
+                for doc in documents
+            ]
         db = Chroma.from_documents(documents= langchain_documents, embedding = embeddings, persist_directory= vectorstore_chroma_db_path)
     return db
 

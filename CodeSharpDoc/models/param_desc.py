@@ -1,5 +1,5 @@
 import re
-from helpers.txt_helper import txt
+from common_tools.helpers.txt_helper import txt
 from models.base_desc import BaseDesc
 from typing import List, Tuple, Optional
 import json

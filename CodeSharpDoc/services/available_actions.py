@@ -1,12 +1,12 @@
 
+import json
 from typing import List
 
 from common_tools.helpers.file_helper import file
 from common_tools.helpers.txt_helper import txt
 from common_tools.models.llm_info import LlmInfo
-from common_tools.raginferencepipeline.rag_inference_pipeline import RagInferencePipeline
+from common_tools.RAG.rag_inference_pipeline import RagInferencePipeline
 from common_tools.helpers.rag_service import RAGService
-import common_tools.langchains.langchain_rag as langchain_rag
 
 from services.analysed_structures_handling import AnalysedStructuresHandling
 from services.summary_generation_service import SummaryGenerationService
@@ -69,7 +69,7 @@ class AvailableActions:
 
             # Query the RAG service on methods summaries vector database
             elif choice == '4' or choice == 'q':            
-                AvailableActions.rag_querying_from_console(RAGService(llms_infos))
+                AvailableActions.rag_querying_from_console(RagInferencePipeline(RAGService(llms_infos)))
                 continue
             
             elif choice == '5' or choice == 'h':
@@ -117,7 +117,7 @@ class AvailableActions:
     def rebuild_vectorstore(llms_infos: List[LlmInfo]):
         AvailableActions.init_rag_service(llms_infos)
         AvailableActions.rag_service.empty_vectorstore() # delete or empty DB first
-        docs = AvailableActions.rag_service.get_documents_to_vectorize_from_loaded_analysed_structures(AvailableActions.struct_desc_folder_path)
+        docs = AvailableActions.get_documents_to_vectorize_from_loaded_analysed_structures(AvailableActions.struct_desc_folder_path)
         count = AvailableActions.rag_service.build_vectorstore_from(docs, doChunkContent=False)
         print(f"Vector store built with {count} items")
 
@@ -130,3 +130,21 @@ class AvailableActions:
     def generate_all_summaries(llms_infos: List[LlmInfo], files_batch_size: int, llm_batch_size: int, code_folder_path: str):
         existing_structs_analysis = AnalysedStructuresHandling.load_json_structs_from_folder_and_ask_to_replace(AvailableActions.struct_desc_folder_path)
         SummaryGenerationService.generate_and_save_all_summaries_all_csharp_files_from_folder(code_folder_path, files_batch_size, llm_batch_size, existing_structs_analysis, llms_infos)
+
+
+    @staticmethod
+    def get_documents_to_vectorize_from_loaded_analysed_structures(self, struct_desc_folder_path: str) -> list[str]:
+        docs: list[str] = []
+        structs_str = file.get_files_contents(struct_desc_folder_path, 'json')
+        for struct_str in structs_str:
+            struct = json.loads(struct_str)
+            summary = struct['generated_summary'] if hasattr(struct, 'generated_summary') and getattr(struct, 'generated_summary') else struct['existing_summary']
+            if summary:
+                doc = self.build_document(content=summary, metadata= {'struct_type': struct['struct_type'], 'struct_name': struct['struct_name'], 'namespace': struct['namespace_name'], 'summary_kind': 'method', 'functional_type': struct['functional_type'] })
+                docs.append(doc)
+            for method in struct['methods']:
+                summary = method['generated_summary'] if hasattr(method, 'generated_summary') and getattr(method, 'generated_summary') else method['existing_summary']
+                if summary:
+                    doc = self.build_document(content=summary, metadata= {'struct_type': struct['struct_type'], 'struct_name': struct['struct_name'], 'method_name': method['method_name'], 'namespace': struct['namespace_name'], 'summary_kind': 'method', 'functional_type': struct['functional_type'] })
+                    docs.append(doc)
+        return docs

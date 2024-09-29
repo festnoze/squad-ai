@@ -1,6 +1,5 @@
 import json
 import os
-#import xmltodict
 
 class JsonHelper:
     def fix_invalid_json(json_str: str) -> str:
@@ -18,8 +17,10 @@ class JsonHelper:
         except json.JSONDecodeError as e:
             return False
     
-    def load_structures_from_json(file_path: str):
-        with open(file_path, 'r') as file_handler:
-            structures = json.load(file_handler)
-        return structures
+    def load_from_json(file_path: str, encoding='utf-8-sig'):
+        if not os.path.exists(file_path):
+            return None
+        with open(file_path, 'r', encoding=encoding) as file_handler:
+            content = json.load(file_handler)
+        return content
     

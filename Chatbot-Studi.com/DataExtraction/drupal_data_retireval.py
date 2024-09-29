@@ -5,9 +5,9 @@ from helpers.unicode_helper import UnicodeHelper
 from textwrap import dedent
 
 class DrupalDataRetireval:
-    def __init__(self):
+    def __init__(self, outdir):
         txt.activate_print = True
-        self.out_dir = "C:/Dev/squad-ai/Chatbot-Studi.com/DataExtraction/outputs/"
+        self.out_dir = outdir
         self.studiClient = DrupalJsonApiClient()
         self.diplay_select_menu()
 
@@ -17,6 +17,8 @@ class DrupalDataRetireval:
         self.retrieve_fundings()
         self.retrieve_trainings()
         self.retrieve_domains()
+        self.retrieve_diplomas()
+        self.retrieve_certifications()
         txt.print(">>>>> Finished all drupal data retireval.")
 
     def retrieve_jobs(self):
@@ -37,6 +39,18 @@ class DrupalDataRetireval:
         self.save_json_file("trainings", trainings)
         txt.print(">>> Finished trainings drupal data retireval ...")
 
+    def retrieve_diplomas(self):
+        """ Retrieve all diplomas from studi.com """
+        diplomas = self.studiClient.get_diplomas()
+        self.save_json_file("diplomas", diplomas)
+        txt.print(">>> Finished diplomas drupal data retireval ...")
+
+    def retrieve_certifications(self):
+        """ Retrieve all certifications from studi.com """
+        certifications = self.studiClient.get_certifications()
+        self.save_json_file("certifications", certifications)
+        txt.print(">>> Finished certifications drupal data retireval ...")
+
     def retrieve_domains(self):
         """ Retrieve all domains from studi.com """
         domains = self.studiClient.get_domains()
@@ -54,15 +68,17 @@ class DrupalDataRetireval:
                 ┌──────────────────────────────┐
                 │ DRUPAL DATA RETRIEVAL MENU   │
                 └──────────────────────────────┘
-                Choose an action:  ① ② ③ ④ ⑤ ⑥ ⑦
+                Choose an action:  ① ② ③ ④ ⑤ ⑥ ⑦ ⑧
 
-                1 - Retrieve all data (jobs, fundings, trainings, domains) from Drupal site
-                2 - Retrieve jobs data only from Drupal site
-                3 - Retrieve fundings data only from Drupal site
-                4 - Retrieve trainings data only from Drupal site
-                5 - Retrieve domains data only from Drupal site
-                6 - Display first item of specified type
-                7 - Exit to main menu
+                1 - Retrieve all data (jobs, fundings, trainings, domains, diplomas, certifications) from Drupal
+                2 - Retrieve jobs data only from Drupal
+                3 - Retrieve fundings data only from Drupal
+                4 - Retrieve trainings data only from Drupal
+                5 - Retrieve domains data only from Drupal
+                6 - Retrieve diplomas data only from Drupal
+                7 - Retrieve certifications data only from Drupal
+                d - Display first item of specified type
+                e - Exit to main menu
             """))
             if choice == "1":
                 self.retrieve_all_data()
@@ -74,9 +90,13 @@ class DrupalDataRetireval:
                 self.retrieve_trainings()
             elif choice == "5":
                 self.retrieve_domains()
-            elif choice.startswith("6"):
-                self.display_first_item(choice[1:])
+            elif choice == "6":
+                self.retrieve_diplomas()
             elif choice == "7":
+                self.retrieve_certifications()
+            elif choice.startswith("d"):
+                self.display_first_item(choice[1:])
+            elif choice == "e":
                 txt.print("Exiting to main menu ...")
                 break
     

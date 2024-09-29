@@ -19,22 +19,6 @@ class RAGService:
         else:
             raise ValueError("Invalid llm_or_infos parameter")
         self.load_vectorstore()
-
-    def get_documents_to_vectorize_from_loaded_analysed_structures(self, struct_desc_folder_path: str) -> list[str]:
-        docs: list[str] = []
-        structs_str = file.get_files_contents(struct_desc_folder_path, 'json')
-        for struct_str in structs_str:
-            struct = json.loads(struct_str)
-            summary = struct['generated_summary'] if hasattr(struct, 'generated_summary') and getattr(struct, 'generated_summary') else struct['existing_summary']
-            if summary:
-                doc = self.build_document(content=summary, metadata= {'struct_type': struct['struct_type'], 'struct_name': struct['struct_name'], 'namespace': struct['namespace_name'], 'summary_kind': 'method', 'functional_type': struct['functional_type'] })
-                docs.append(doc)
-            for method in struct['methods']:
-                summary = method['generated_summary'] if hasattr(method, 'generated_summary') and getattr(method, 'generated_summary') else method['existing_summary']
-                if summary:
-                    doc = self.build_document(content=summary, metadata= {'struct_type': struct['struct_type'], 'struct_name': struct['struct_name'], 'method_name': method['method_name'], 'namespace': struct['namespace_name'], 'summary_kind': 'method', 'functional_type': struct['functional_type'] })
-                    docs.append(doc)
-        return docs
     
     def build_document(self, content: str, metadata: dict):
         return {'page_content': content, 'metadata': metadata}

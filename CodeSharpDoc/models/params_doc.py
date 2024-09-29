@@ -1,8 +1,8 @@
 import json
 from typing import List
 from pydantic import BaseModel, Field
-
-from helpers.txt_helper import txt
+#
+from common_tools.helpers.txt_helper import txt
 from models.param_doc import ParameterDocumentation, ParameterDocumentationPydantic
 
 class MethodParametersDocumentation:

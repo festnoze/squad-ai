@@ -1,7 +1,7 @@
 from langchain_text_splitters import Language, RecursiveCharacterTextSplitter
 import re
 # internal imports
-from helpers.txt_helper import txt
+from common_tools.helpers.txt_helper import txt
 from models.structure_desc import StructureDesc
 from models.method_desc import MethodDesc
 from models.prop_desc import PropertyDesc

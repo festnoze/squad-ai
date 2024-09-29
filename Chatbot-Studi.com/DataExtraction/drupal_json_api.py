@@ -7,7 +7,33 @@ from common_tools.helpers import txt
 class DrupalJsonApiClient:
     BASE_URL = "https://www.studi.com/jsonapi/"
 
-    def _perform_request(self, endpoint):
+    def get_jobs(self):
+        jobs = self.get_drupal_data_recursively('node/jobs', self.get_generic_data_from_node_item, ['field_paragraph'], ['field_domain'])
+        jobs = self.parallel_get_items_related_infos(jobs)
+        return jobs
+    
+    def get_fundings(self):
+        fundings = self.get_drupal_data_recursively('node/funding', self.get_generic_data_from_node_item, ['field_paragraph'])      
+        fundings = self.parallel_get_items_related_infos(fundings)
+        return fundings
+    
+    def get_trainings(self):
+        trainings = self.get_drupal_data_recursively('node/training', self.get_generic_data_from_node_item, ['field_paragraph'], ['field_content_bloc','field_certification', 'field_diploma', 'field_domain', 'field_job', 'field_funding', 'field_goal', 'field_job'])
+        return trainings
+
+    def get_diplomas(self):
+        diplomas = self.get_drupal_data_recursively('node/diploma', self.get_generic_data_from_node_item, ['field_paragraph'], ['field_content_bloc','field_certification', 'field_diploma', 'field_domain', 'field_job', 'field_funding', 'field_goal', 'field_job'])
+        diplomas = self.parallel_get_items_related_infos(diplomas)
+        return diplomas
+    
+    def get_certifications(self):
+        return self.get_drupal_data_recursively('taxonomy_term/certification', self.get_generic_data_from_node_item, ['field_paragraph'])
+    
+    def get_domains(self):
+        return self.get_drupal_data_recursively('taxonomy_term/domain', self.get_generic_data_from_node_item, ['field_paragraph', 'field_school'], ['field_jobs'])  
+    
+
+    def _perform_request(self, endpoint, allowed_retries=3):
         """
         Makes a GET request to the specified JSON:API endpoint.
         
@@ -25,7 +51,9 @@ class DrupalJsonApiClient:
             return response.json()  # Return the JSON response if the request is successful
         except requests.RequestException as e:
             print(f"Error fetching data from {url}: {e}")
-            return None
+            if allowed_retries > 0: # Retry 'allowed_retries' times upon request failure
+                return self._perform_request(endpoint, allowed_retries=allowed_retries-1)
+            raise e
 
     # def get_articles_filter_status_1(self):
     #     return self._perform_request('article?filter[status]=1')
@@ -38,22 +66,6 @@ class DrupalJsonApiClient:
 
     # def get_article_sort_created(self):
     #     return self._perform_request('article?sort=created')
-
-    def get_jobs(self):
-        jobs = self.get_drupal_data_recursively('node/jobs', self.get_generic_data_from_node_item, ['field_paragraph'], ['field_domain'])
-        jobs = self.parallel_get_items_related_infos(jobs)
-        return jobs
-    
-    
-    def get_fundings(self):
-        return self.get_drupal_data_recursively('node/funding', self.get_generic_data_from_node_item, ['field_paragraph'])      
-      
-    def get_domains(self):
-        return self.get_drupal_data_recursively('taxonomy_term/domain', self.get_generic_data_from_node_item, ['field_school'])  
-    
-    def get_trainings(self):
-        trainings = self.get_drupal_data_recursively('node/training', self.get_generic_data_from_node_item, [], ['field_content_bloc','field_certification', 'field_diploma', 'field_funding', 'field_goal', 'field_job'])
-        return trainings
     
     def get_generic_data_from_node_item(self, items_data, included_rel=[], included_rel_ids=[]):
         items = []
@@ -65,18 +77,27 @@ class DrupalJsonApiClient:
             if not 'attributes' in item:
                 continue
             if 'title' in item['attributes'] and item['attributes']['title']:
-                new_item['title'] = item['attributes']['title']
-            if 'name' in item['attributes'] and item['attributes']['name']:
-                new_item['title'] = item['attributes']['name']
+                if isinstance(item['attributes']['title'], dict) and 'value' in item['attributes']['title']:
+                    new_item['title'] = item['attributes']['title']['value']
+                else:
+                    new_item['title'] = item['attributes']['title']
+            elif 'name' in item['attributes'] and item['attributes']['name']:
+                if isinstance(item['attributes']['name'], dict) and 'value' in item['attributes']['name']:
+                    new_item['title'] = item['attributes']['name']['value']
+                else:
+                    new_item['title'] = item['attributes']['name']
             if 'description' in item['attributes'] and item['attributes']['description']:
-                new_item['title'] = item['attributes']['description']
+                if isinstance(item['attributes']['description'], dict) and 'value' in item['attributes']['description']:
+                    new_item['description'] = item['attributes']['description']['value']
+                else:
+                    new_item['description'] = item['attributes']['description']
             if 'related' in item['links']:
                 new_item['related_url'] = item['links']['related']['href']
             if 'field_paragraph' in item['attributes']:
                 new_item['field_paragraph'] = item['attributes']['field_paragraph']
             if 'field_text' in item['attributes']:
                 new_item['field_text'] = item['attributes']['field_text']['value']
-            if 'field_metatag' in item['attributes'] and item['attributes']['field_metatag'] and 'value' in item['attributes']['field_metatag']:
+            if 'field_metatag' in item['attributes'] and item['attributes']['field_metatag'] and isinstance(item['attributes']['field_metatag'], dict) and 'value' in item['attributes']['field_metatag']:
                 new_item['field_metatag'] = item['attributes']['field_metatag']['value']['description']
             if 'changed' in item['attributes'] and item['attributes']['changed']:
                 new_item['changed'] = item['attributes']['changed']
@@ -84,15 +105,16 @@ class DrupalJsonApiClient:
                 new_item['related_url'] = {}
                 for rel in included_rel:
                     if rel in item['relationships'] and 'related' in item['relationships'][rel]['links']:
-                        new_item['related_url'][rel] = item['relationships'][rel]['links']['related']['href']
+                        new_item['related_url'][rel if not rel.startswith('field_') else rel[6:]] = item['relationships'][rel]['links']['related']['href']
             if any(included_rel_ids):
                 new_item['related_ids'] = {}
                 for rel in included_rel_ids:
-                    if rel in item['relationships'] and 'data' in item['relationships'][rel] and 'id' in item['relationships'][rel]['data']:
-                        new_item['related_ids'][rel] = item['relationships'][rel]['data']['id']
-            # if 'field_paragraph' in  item['relationships'] and 'related' in item['relationships']['field_paragraph']['links']:
-            #     new_item['related_url'] =  item['relationships']['field_paragraph']['links']['related']['href']
-            
+                    if rel in item['relationships'] and 'data' in item['relationships'][rel] and item['relationships'][rel] and item['relationships'][rel]['data']:
+                        if isinstance(item['relationships'][rel]['data'], list):
+                            new_item['related_ids'][rel if not rel.startswith('field_') else rel[6:]] = [x['id'] for x in item['relationships'][rel]['data']]
+                        elif 'id' in item['relationships'][rel]['data']:
+                            new_item['related_ids'][rel if not rel.startswith('field_') else rel[6:]] = item['relationships'][rel]['data']['id']
+
             new_item = txt.fix_special_chars(new_item)
             items.append(new_item)
         return items
@@ -116,7 +138,7 @@ class DrupalJsonApiClient:
     #         trainings.append(training)
     #     return trainings
     
-    def get_drupal_data_recursively(self, url: str, delegate, included_relationships=[], included_relationships_ids=[], fetch_all_pages=False):
+    def get_drupal_data_recursively(self, url: str, delegate, included_relationships=[], included_relationships_ids=[], fetch_all_pages=True):
         items_full = self._perform_request(url)
         items_data = items_full['data']
         items = []
@@ -125,7 +147,7 @@ class DrupalJsonApiClient:
         if fetch_all_pages and 'next' in items_full['links']:
             next_url = items_full['links']['next']['href']
             txt.print(f"Loading next page to URL: {next_url}")
-            jobs += self.get_drupal_data_recursively(next_url, delegate, included_relationships, included_relationships_ids, fetch_all_pages)
+            items += self.get_drupal_data_recursively(next_url, delegate, included_relationships, included_relationships_ids, fetch_all_pages)
         return items
     
     def parallel_get_items_related_infos(self, items):

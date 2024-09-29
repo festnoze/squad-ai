@@ -1,12 +1,10 @@
 from typing import AsyncGenerator
 from urllib.parse import urlencode
-import requests 
-from requests.exceptions import HTTPError
-import json
+import requests
 
+# internal import
 from models.struct_summaries_infos import StructSummariesInfos
 from models.structure_desc import StructureDesc
-# internal import
 
 class code_analyser_client:
     host_uri = "http://localhost:5230"
