@@ -35,7 +35,14 @@ class RAGService:
             return 0
         self.rag_methods_desc = []
         self.vectorstore = langchain_rag.build_vectorstore(data, doChunkContent)
-        json_data = json.dumps(data)
+        documents_dict = [
+            {
+                "page_content": datum.page_content,
+                "metadata": datum.metadata
+            }
+            for datum in data
+        ]
+        json_data = json.dumps(documents_dict, ensure_ascii=False, indent=4)
         file.write_file(json_data, RAGService.rag_structs_summaries_json_filepath, file_exists_policy= FileAlreadyExistsPolicy.Override)
         return self.vectorstore._collection.count()
     

@@ -15,36 +15,6 @@ class DrupalJsonApiClient:
         else:
             raise ValueError("Base URL is required to initialize the DrupalJsonApiClient")
 
-    def get_jobs(self):
-        jobs = self.get_drupal_data_recursively('node/jobs', self.extract_common_data_from_nodes, ['field_paragraph'], ['field_domain'])
-        jobs = self.parallel_get_items_related_infos(jobs)
-        return jobs
-    
-    def get_fundings(self):
-        fundings = self.get_drupal_data_recursively('node/funding', self.extract_common_data_from_nodes, ['field_paragraph'])      
-        fundings = self.parallel_get_items_related_infos(fundings)
-        return fundings
-    
-    def get_trainings(self):
-        trainings = self.get_drupal_data_recursively(
-            'node/training', 
-            self.extract_common_data_from_nodes, 
-            ['field_paragraph'], 
-            ['field_content_bloc','field_certification', 'field_diploma', 'field_domain', 'field_job', 'field_funding', 'field_goal', 'field_job'])
-        return trainings
-
-    def get_diplomas(self):
-        diplomas = self.get_drupal_data_recursively('node/diploma', self.extract_common_data_from_nodes, ['field_paragraph'], ['field_content_bloc','field_certification', 'field_diploma', 'field_domain', 'field_job', 'field_funding', 'field_goal', 'field_job'])
-        diplomas = self.parallel_get_items_related_infos(diplomas)
-        return diplomas
-    
-    def get_certifications(self):
-        return self.get_drupal_data_recursively('taxonomy_term/certification', self.extract_common_data_from_nodes, ['field_paragraph'])
-    
-    def get_domains(self):
-        return self.get_drupal_data_recursively('taxonomy_term/domain', self.extract_common_data_from_nodes, ['field_paragraph', 'field_school'], ['field_jobs'])  
-    
-
     def _perform_request(self, endpoint, remaining_retries=5, allowed_retries=5):
         """
         Makes a GET request to the specified JSON:API endpoint.
@@ -82,7 +52,7 @@ class DrupalJsonApiClient:
     #     return self._perform_request('article?sort=created')
 
     
-    def extract_common_data_from_nodes(self, nodes:list, included_rel=[], included_rel_ids=[]):
+    def extract_common_data_from_nodes(self, nodes:list, included_relationships=[], included_relationships_ids=[]):
         items = []
         for i, source_node in enumerate(nodes):
             target_node ={
@@ -118,15 +88,15 @@ class DrupalJsonApiClient:
                     agglo_value = '\r\n'.join(extracted_value)
                     target_node['attributes'][key_str] = txt.fix_special_chars(agglo_value)
 
-            if any(included_rel):
+            if any(included_relationships):
                 target_node['related_url'] = {}
-                for rel in included_rel:
+                for rel in included_relationships:
                     if rel in source_node['relationships'] and 'related' in source_node['relationships'][rel]['links']:
                         target_node['related_url'][rel if not rel.startswith('field_') else rel[6:]] = source_node['relationships'][rel]['links']['related']['href']
             
-            if any(included_rel_ids):
+            if any(included_relationships_ids):
                 target_node['related_ids'] = {}
-                for rel in included_rel_ids:
+                for rel in included_relationships_ids:
                     if rel in source_node['relationships'] and 'data' in source_node['relationships'][rel] and source_node['relationships'][rel] and source_node['relationships'][rel]['data']:
                         if isinstance(source_node['relationships'][rel]['data'], list):
                             target_node['related_ids'][rel if not rel.startswith('field_') else rel[6:]] = [x['id'] for x in source_node['relationships'][rel]['data']]
@@ -138,17 +108,23 @@ class DrupalJsonApiClient:
         return items
     
     def set_attribut_value_from_source(self, target_node, source_node, attribut_name:str):
-        if not attribut_name in source_node['attributes'] or not source_node['attributes'][attribut_name]:
-            return
-        if isinstance(source_node['attributes'][attribut_name], dict) and 'value' in source_node['attributes'][attribut_name]:
-            if source_node['attributes'][attribut_name]['value'] and isinstance(source_node['attributes'][attribut_name]['value'], list):
-                target_node[attribut_name] = '\r\n'.join(source_node['attributes'][attribut_name]['value'])
-            else:
-                target_node[attribut_name] = source_node['attributes'][attribut_name]['value']
-        elif isinstance(source_node['attributes'][attribut_name], str):
-            target_node[attribut_name] = source_node['attributes'][attribut_name]
+        value = self.get_value_from_source(source_node['attributes'], attribut_name)
+        if value:
+            target_node[attribut_name] = value
 
-    def extract_long_string_values(self, item: any, min_length:int=80) -> list[str]:
+    def get_value_from_source(self, source_node, attribut_name:str):
+        if not attribut_name in source_node or not source_node[attribut_name]:
+            return None
+        if isinstance(source_node[attribut_name], dict) and 'value' in source_node[attribut_name]:
+            if source_node[attribut_name]['value'] and isinstance(source_node[attribut_name]['value'], list):
+                return '\r\n'.join(source_node[attribut_name]['value'])
+            else:
+                return source_node[attribut_name]['value']
+        elif isinstance(source_node[attribut_name], str):
+            return source_node[attribut_name]
+        return None
+
+    def extract_long_string_values(self, item: any, min_length:int=80, auto_include_exceptions:list[str]=['title', 'name', 'description']) -> list[str]:
         """
         Recursively extract string values from an item where the values are strings longer than the specified length.
 
@@ -162,23 +138,30 @@ class DrupalJsonApiClient:
                 extracted_values.append(txt.fix_special_chars(item))
         elif isinstance(item, dict):
             for key, value in item.items():
-                if key not in ['relationships', 'links']:
+                if key not in ['relationships', 'links'] + auto_include_exceptions:
                     extracted_values.extend(self.extract_long_string_values(value, min_length))
+                elif key in auto_include_exceptions:
+                    auto_inc_value = self.get_value_from_source(item, key)
+                    if auto_inc_value:
+                        if isinstance(auto_inc_value, str):
+                            extracted_values.append(auto_inc_value)
+                        elif isinstance(auto_inc_value, list):
+                            extracted_values.extend(auto_inc_value)
         elif isinstance(item, list):
             for element in item:
                 extracted_values.extend(self.extract_long_string_values(element, min_length))
         return extracted_values
 
-    def get_drupal_data_recursively(self, url: str, delegate, included_relationships=[], included_relationships_ids=[], fetch_all_pages=True):
+    def get_drupal_data_recursively(self, url: str, fetch_all_pages=True):
         items_full = self._perform_request(url)
         items_data = items_full['data']
         items = []
-        items.extend(delegate(items_data, included_relationships, included_relationships_ids))
+        items.extend(items_data)
 
         if fetch_all_pages and 'next' in items_full['links']:
             next_url = items_full['links']['next']['href']
             txt.print(f"Loading next page to URL: {next_url}")
-            items += self.get_drupal_data_recursively(next_url, delegate, included_relationships, included_relationships_ids, fetch_all_pages)
+            items += self.get_drupal_data_recursively(next_url, fetch_all_pages)
         return items
     
     def parallel_get_items_related_infos(self, items):

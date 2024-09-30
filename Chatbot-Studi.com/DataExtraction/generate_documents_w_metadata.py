@@ -10,9 +10,13 @@ class GenerateDocumentsWithMetadataFromFiles:
     def process_all_data(self, path: str) -> List[Document]:
         all_docs = []
 
+        # Process certifiers
+        certifiers_data = JsonHelper.load_from_json(path + 'certifiers.json')
+        all_docs.extend(self.process_certifiers(certifiers_data))
+
         # Process certifications
-        certifications_data = JsonHelper.load_from_json(path + 'certifications.json')
-        all_docs.extend(self.process_certifications(certifications_data))
+        certifiers_data = JsonHelper.load_from_json(path + 'certifications.json')
+        all_docs.extend(self.process_certifications(certifiers_data))
 
         # Process diplomas
         diplomas_data = JsonHelper.load_from_json(path + 'diplomas.json')
@@ -36,7 +40,8 @@ class GenerateDocumentsWithMetadataFromFiles:
 
         print(f"Total documents created: {len(all_docs)}")
         print(f"---------------------------------")
-        print(f"Certifications count: {len(certifications_data)}")
+        print(f"Certifiers count: {len(certifiers_data)}")
+        print(f"Certifications count: {len(certifiers_data)}")
         print(f"Diplomas count: {len(diplomas_data)}")
         print(f"Domains count: {len(domains_data)}")
         print(f"Fundings count: {len(fundings_data)}")
@@ -45,6 +50,21 @@ class GenerateDocumentsWithMetadataFromFiles:
         print(f"---------------------------------")
         return all_docs
 
+    def process_certifiers(self, data: List[Dict]) -> List[Document]:
+        if not data:
+            return []
+        docs = []
+        for item in data:
+            metadata = {
+                "type": "certifieur",
+                "name": item.get("name"),
+                "changed": item.get("changed"),
+            }
+            content = f"{item.get('name', '')}"
+            doc = Document(page_content=content, metadata=metadata)
+            docs.append(doc)
+        return docs
+    
     def process_certifications(self, data: List[Dict]) -> List[Document]:
         if not data:
             return []
@@ -52,10 +72,10 @@ class GenerateDocumentsWithMetadataFromFiles:
         for item in data:
             metadata = {
                 "type": "certification",
-                "title": item.get("title"),
+                "name": item.get("name"),
                 "changed": item.get("changed"),
             }
-            content = f"{item.get('title', '')}"
+            content = f"{item.get('name', '')}"
             doc = Document(page_content=content, metadata=metadata)
             docs.append(doc)
         return docs
@@ -67,7 +87,7 @@ class GenerateDocumentsWithMetadataFromFiles:
         for item in data:
             metadata = {
                 "type": "diplôme",
-                "title": item.get("title"),
+                "name": item.get("title"),
                 "changed": item.get("changed"),
             }
             related_paragraphs = item.get("related_infos", {}).get("paragraph", [])
@@ -83,10 +103,10 @@ class GenerateDocumentsWithMetadataFromFiles:
         for item in data:
             metadata = {
                 "type": "domaine",
-                "title": item.get("title"),
+                "name": item.get("name"),
                 "changed": item.get("changed"),
             }
-            content = f"{item.get('title', '')}"
+            content = f"{item.get('name', '')}"
             doc = Document(page_content=content, metadata=metadata)
             docs.append(doc)
         return docs
@@ -98,7 +118,7 @@ class GenerateDocumentsWithMetadataFromFiles:
         for item in data:
             metadata = {
                 "type": "financement",
-                "title": item.get("title"),
+                "name": item.get("title"),
                 "changed": item.get("changed"),
             }
             related_paragraphs = item.get("related_infos", {}).get("paragraph", [])
@@ -114,7 +134,7 @@ class GenerateDocumentsWithMetadataFromFiles:
         for item in data:
             metadata = {
                 "type": "métier",
-                "title": item.get("title"),
+                "name": item.get("title"),
                 "changed": item.get("changed"),
             }
             domain = item.get("related_ids", {}).get("domain", "")
@@ -130,7 +150,7 @@ class GenerateDocumentsWithMetadataFromFiles:
         for item in data:
             metadata = {
                 "type": "formation",
-                "title": item.get("title"),
+                "name": item.get("title"),
                 "changed": item.get("changed"),
             }
             related_ids = item.get("related_ids", {})
@@ -142,6 +162,6 @@ class GenerateDocumentsWithMetadataFromFiles:
                 "funding": related_ids.get("funding", []),
             }
             content = f"{item.get('title', '')}\r\n{item.get('field_metatag', '')}"
-            doc = Document(page_content=content, metadata={**metadata, **out})
+            doc = Document(page_content=content, metadata=metadata)#todo: add ids: {**metadata, **out})
             docs.append(doc)
         return docs

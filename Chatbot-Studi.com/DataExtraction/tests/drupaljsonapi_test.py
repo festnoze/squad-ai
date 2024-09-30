@@ -142,8 +142,8 @@ class TestDrupalJsonApiClient:
         # Call the method under test with the updated parameters
         items = self.client.extract_common_data_from_nodes(
             items_data,
-            included_rel= [], 
-            included_rel_ids=included_rel_ids
+            included_relationships= [], 
+            included_relationships_ids=included_rel_ids
         )
 
         # Assertions

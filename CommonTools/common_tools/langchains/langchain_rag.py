@@ -40,7 +40,7 @@ def build_vectorstore_from_folder_files(folder_path: str):
 
 vectorstore_chroma_db_path = "./chroma_db"
 
-def build_vectorstore(documents: List[dict], doChunkContent = True) -> any:
+def build_vectorstore(documents: list, doChunkContent = True) -> any:
     if not documents or len(documents) == 0:
         return None
         
@@ -49,7 +49,10 @@ def build_vectorstore(documents: List[dict], doChunkContent = True) -> any:
     if doChunkContent:
         chunks = []
         for document in documents:
-                chunks.extend(split_text_into_chunks(document['page_content']))                
+                if isinstance(document, Document):
+                    chunks.extend(split_text_into_chunks(document.page_content))
+                else:
+                    chunks.extend(split_text_into_chunks(document['page_content']))                
         db = Chroma.from_texts(texts= chunks, embedding = embeddings, persist_directory= vectorstore_chroma_db_path)
     else:
         if not documents or not any(documents):
@@ -58,7 +61,8 @@ def build_vectorstore(documents: List[dict], doChunkContent = True) -> any:
             langchain_documents = documents
         else:
             langchain_documents = [
-                Document(page_content=doc["page_content"], metadata=doc["metadata"]) 
+                Document(page_content=doc["page_content"], 
+                         metadata=doc["metadata"] if doc["metadata"] else '') 
                 for doc in documents
             ]
         db = Chroma.from_documents(documents= langchain_documents, embedding = embeddings, persist_directory= vectorstore_chroma_db_path)

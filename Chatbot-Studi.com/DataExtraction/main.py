@@ -7,6 +7,7 @@ from drupal_data_retireval import DrupalDataRetireval
 from generate_cleaned_data import GenerateCleanedData
 from generate_documents_w_metadata import GenerateDocumentsWithMetadataFromFiles
 #
+from common_tools.helpers import txt
 from common_tools.models.llm_info import LlmInfo
 from common_tools.langchains.langchain_adapter_type import LangChainAdapterType
 from common_tools.helpers.rag_service import RAGService
@@ -38,15 +39,11 @@ class Main:
         elif choice == "2":
             all_docs = GenerateDocumentsWithMetadataFromFiles().process_all_data(out_dir)
             llms_infos = []
-            llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0125",  timeout= 60, temperature = 0.5, api_key= openai_api_key))
-            # llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo",  timeout= 60, temperature = 0.5, api_key= openai_api_key))
-            # llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo",  timeout= 120, temperature = 0.5, api_key= openai_api_key))
-            # llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout= 80, temperature = 1, api_key= openai_api_key))
             llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout= 80, temperature = 0.1, api_key= openai_api_key))
             rag_service = RAGService(llms_infos)
-            rag_service.build_vectorstore_from(all_docs, doChunkContent=False)
             rag_injection = RagInjectionPipeline(rag_service)
-            rag_injection.inject_documents(all_docs)
+            injected = rag_injection.inject_documents(all_docs)
+            txt.print(f"Injected {injected} documents")
         elif choice == "3":
             GenerateCleanedData()
         elif choice == "4" or choice.lower() == "e":
