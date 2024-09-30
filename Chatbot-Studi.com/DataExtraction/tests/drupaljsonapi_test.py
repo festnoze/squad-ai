@@ -35,7 +35,7 @@ class TestDrupalJsonApiClient:
                         'title': 'Job 1',
                         'field_text': {'value': 'Job 1 description'}
                     },
-                    'relationships': {}
+                    'relationships': {},
                 },
                 {
                     'id': '2',
@@ -81,8 +81,9 @@ class TestDrupalJsonApiClient:
         # Call the method under test
         items = self.client.get_drupal_data_recursively(
             'node/jobs',
-            self.client.get_attributes_values_from_node_item,
-            included_rels=[]
+            self.client.get_generic_data_from_node_item,
+            included_relationships=[], 
+            included_relationships_ids=[]
         )
 
         # Assertions to verify the expected behavior
@@ -94,8 +95,9 @@ class TestDrupalJsonApiClient:
 
     def test_get_generic_data_from_node_item_with_relationships(self):
         """
-        Test the get_generic_data_from_node_item method with generalized relationship processing.
+        Test the get_generic_data_from_node_item method with generalized relationship processing and updated parameters.
         """
+        # Prepare fake list of items_data
         items_data = [
             {
                 'id': '1',
@@ -111,10 +113,12 @@ class TestDrupalJsonApiClient:
                             {'type': 'paragraph--text', 'id': 'p2'}
                         ]
                     }
-                }
+                },
+                'links': {}
             }
         ]
 
+        # Included data representing paragraphs linked in the relationships
         included_data = [
             {
                 'id': 'p1',
@@ -132,11 +136,12 @@ class TestDrupalJsonApiClient:
             }
         ]
 
-        included_rel = ['field_paragraph']
+        # Relationships to include as 'included_rel_ids'
+        included_rel_ids = ['field_paragraph']
 
-        # Call the method under test
-        items = self.client.get_attributes_values_from_node_item(
-            items_data, included_rel, included_data
+        # Call the method under test with the updated parameters
+        items = self.client.get_generic_data_from_node_item(
+            items_data, included_rel_ids=included_rel_ids
         )
 
         # Assertions
@@ -144,15 +149,16 @@ class TestDrupalJsonApiClient:
         item = items[0]
         assert item['id'] == '1'
         assert item['title'] == 'Article 1'
-        assert 'body' in item
-        assert 'related_infos' in item
-        assert 'field_paragraph' in item['related_infos']
-        related_infos = item['related_infos']['field_paragraph']
-        assert len(related_infos) == 1  # Only one related item has long text
-        related_item = related_infos[0]
-        assert 'field_text' in related_item
-        assert len(related_item['field_text']) > 80
+        #assert 'body' in item
+        assert 'related_ids' in item
+        assert 'paragraph' in item['related_ids']
+        related_ids = item['related_ids']['paragraph']
+        assert len(related_ids) == 2
+        assert 'p1' in related_ids
+        assert 'p2' in related_ids
 
+        # Validate that related_infos and length checks for paragraphs are correct
+        assert 'related_infos' not in item  # As the new method does not generate 'related_infos'
 
     def test_extract_field_text_values(self):
         """
@@ -172,7 +178,7 @@ class TestDrupalJsonApiClient:
             },
             {
                 'attributes': {
-                    'field_text': {'value': 'Text 3'}
+                    'field_text': {'value': ['Text 3', 'Text 4']}
                 }
             }
         ]
@@ -181,4 +187,49 @@ class TestDrupalJsonApiClient:
         texts = self.client.extract_field_text_values(items)
 
         # Assertions to verify the expected behavior
-        assert texts == ['Text 1', 'Text 2', 'Text 3']
+        assert texts == ['Text 1', 'Text 2', 'Text 3', 'Text 4']
+
+    def test_remove_redundant_str(self):
+        """
+        Test the remove_redundant_str static method.
+        """
+        # Prepare fake list of strings
+        strings = [
+            "The quick brown fox jumps over the lazy dog.",
+            "The quick brown fox jumps over a lazy dog.",
+            "A quick brown fox leaps over the lazy dog with grace and agility.",
+            "The quick brown fox jumps.",
+            "A fast brown fox jumped over the lazy dog."
+        ]
+
+        # Call the method under test
+        unique_strings = DrupalJsonApiClient.remove_redundant_strings_based_on_similarity_threshold(phrases=strings, similarity_threshold=0.30)
+
+        # Assertions to verify the expected behavior
+        assert len(unique_strings) == 2
+        assert "A quick brown fox leaps over the lazy dog with grace and agility." in unique_strings
+        assert "The quick brown fox jumps." in unique_strings
+
+    def test_remove_redundant_str_no_removal(self):
+        """
+        Test the remove_redundant_str static method when sentences are unique and should not be removed.
+        """
+        # Prepare fake list of strings with unique information
+        strings = [
+            "The quick brown fox jumps over the lazy dog.",
+            "The quick brown fox quickly finds shelter.",
+            "A red fox hunts in the moonlight.",
+            "The fox is known for its cunning nature.",
+            "Foxes adapt to various environments worldwide."
+        ]
+
+        # Call the method under test with a low similarity threshold to ensure no removal
+        unique_strings = DrupalJsonApiClient.remove_redundant_strings_based_on_similarity_threshold(phrases=strings, similarity_threshold=0.30)
+
+        # Assertions to verify that all strings are retained as they are unique
+        assert len(unique_strings) == len(strings)
+        assert set(unique_strings) == set(strings)
+
+
+
+

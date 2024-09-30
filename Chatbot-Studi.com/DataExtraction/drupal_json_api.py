@@ -1,11 +1,18 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import re
 import requests
-
+from langchain.retrievers import BM25Retriever
+from rank_bm25 import BM25Okapi
+from langchain.docstore.document import Document
+import numpy as np
+#
 from common_tools.helpers import txt
 
 class DrupalJsonApiClient:
-    BASE_URL = "https://www.studi.com/jsonapi/"
+    def __init__(self, base_url):
+        if base_url:
+            self.base_url = base_url
+        else:
+            raise ValueError("Base URL is required to initialize the DrupalJsonApiClient")
 
     def get_jobs(self):
         jobs = self.get_drupal_data_recursively('node/jobs', self.get_generic_data_from_node_item, ['field_paragraph'], ['field_domain'])
@@ -43,7 +50,7 @@ class DrupalJsonApiClient:
         if endpoint.startswith('http'):
             url = endpoint
         else:
-            url = f"{self.BASE_URL}{endpoint}"
+            url = f"{self.base_url}{endpoint}"
         
         try:
             response = requests.get(url)
@@ -91,7 +98,7 @@ class DrupalJsonApiClient:
                     new_item['description'] = item['attributes']['description']['value']
                 else:
                     new_item['description'] = item['attributes']['description']
-            if 'related' in item['links']:
+            if 'links' in item and 'related' in item['links']:
                 new_item['related_url'] = item['links']['related']['href']
             if 'field_paragraph' in item['attributes']:
                 new_item['field_paragraph'] = item['attributes']['field_paragraph']
@@ -118,25 +125,6 @@ class DrupalJsonApiClient:
             new_item = txt.fix_special_chars(new_item)
             items.append(new_item)
         return items
-    
-    # def get_trainings_from_data(self, trainings_data):
-    #     trainings = []
-    #     for i, training in enumerate(trainings_data):
-    #         new_training ={
-    #             'id': training['id'],
-    #             'title': training['attributes']['title'],
-    #             'type': training['type']
-    #         }
-    #         if 'field_paragraph' in training['attributes']:
-    #             new_training['field_paragraph'] = training['attributes']['field_paragraph']
-    #         if 'field_text' in training['attributes']:
-    #             new_training['field_text'] = training['attributes']['field_text']['value']
-    #         if 'field_metatag' in training['attributes'] and training['attributes']['field_metatag'] and 'value' in training['attributes']['field_metatag']:
-    #             new_training['field_metatag'] = training['attributes']['field_metatag']['value']['description']
-            
-    #         new_training = txt.fix_special_chars(new_training)
-    #         trainings.append(training)
-    #     return trainings
     
     def get_drupal_data_recursively(self, url: str, delegate, included_relationships=[], included_relationships_ids=[], fetch_all_pages=True):
         items_full = self._perform_request(url)
@@ -192,9 +180,15 @@ class DrupalJsonApiClient:
             # Check if 'field_text' with 'value' exists in current dict
             if isinstance(data, dict):
                 if 'field_text' in data and data['field_text'] and 'value' in data['field_text'] and data['field_text']['value']:
-                    datum = data['field_text']['value']
+                    datum = data['field_text']['value']                    
                     datum = txt.fix_special_chars(datum)
-                    field_text_values.append(datum)
+                    if isinstance(datum, list):
+                        for single_datum in datum:
+                            field_text_values.append(single_datum)
+                    elif isinstance(datum, str):
+                        field_text_values.append(datum)
+                    else:
+                        raise ValueError(f"Unexpected data type in field_text 'value' field. Only str and list are supported, but got: {type(datum)}")
                 # Recursively check nested dictionaries and lists
                 for key, value in data.items():
                     extract_values(value)
@@ -203,4 +197,103 @@ class DrupalJsonApiClient:
                     extract_values(item)
 
         extract_values(json_data)
+        field_text_values = DrupalJsonApiClient.remove_redundant_strings_based_on_similarity_threshold(field_text_values, similarity_threshold=0.3)
         return field_text_values
+    
+    @staticmethod
+    def remove_redundant_strings_based_on_similarity_threshold(phrases: list[str], similarity_threshold: float = 0.5) -> list[str]:
+        """
+        Removes similar phrases from a list, retaining the most informative one based on BM25 similarity.
+
+        :param phrases: List of strings to analyze for redundancy.
+        :param similarity_threshold: A threshold (0 to 1) above which phrases are considered redundant.
+        :return: A list of unique phrases with redundancy removed, keeping the most informative ones.
+        """
+        # Tokenize the phrases
+        tokenized_phrases = [phrase.split() for phrase in phrases]
+        
+        # Initialize BM25 model
+        bm25 = BM25Okapi(tokenized_phrases)
+        
+        # Keep track of which phrases to retain
+        to_keep = np.ones(len(phrases), dtype=bool)
+        
+        # Iterate over each phrase to compare it with others using BM25
+        for i, phrase in enumerate(phrases):
+            if to_keep[i]:
+                # Query BM25 with the current phrase
+                scores = bm25.get_scores(phrase.split())
+                
+                # Identify similar phrases based on the similarity threshold
+                similar_indices = [j for j, score in enumerate(scores) if score / max(scores) >= similarity_threshold and j != i]
+                
+                # Include the current phrase's index in the list of similar phrases
+                similar_indices.append(i)
+                
+                # Find the most informative phrase (longest one)
+                most_informative_index = max(similar_indices, key=lambda idx: len(phrases[idx].split()))
+                
+                # Mark all other similar phrases for deletion except the most informative
+                for idx in similar_indices:
+                    if idx != most_informative_index:
+                        to_keep[idx] = False
+        
+        # Return the filtered list containing the most informative phrases
+        return [phrase for i, phrase in enumerate(phrases) if to_keep[i]]
+
+
+    @staticmethod
+    def remove_redundant_strings_wo_score(phrases: list[str]) -> list[str]:
+        """
+        Removes similar phrases from a list, retaining the most informative one based on BM25 similarity.
+
+        :param phrases: List of strings to analyze for redundancy.
+        :param similarity_threshold: A threshold (0 to 1) above which phrases are considered redundant.
+        :return: A list of unique phrases with redundancy removed, keeping the most informative ones.
+        """
+        # Convert the input list to LangChain Document objects
+        documents = [Document(page_content=phrase) for phrase in phrases]
+        
+        # Initialize the BM25Retriever with the documents
+        bm25_retriever = BM25Retriever.from_texts([doc.page_content for doc in documents])
+        
+        # Keep track of which phrases to retain
+        to_keep = np.ones(len(phrases), dtype=bool)
+        
+        # Iterate over each phrase to compare it with others using BM25
+        for i, phrase in enumerate(phrases):
+            if to_keep[i]:
+                # Get the scores for the phrase against the entire list
+                results = bm25_retriever.get_relevant_documents(phrase)
+                
+                # Collect indices of similar phrases
+                similar_indices = []
+                
+                for result in results:
+                    # Get the index of the matching document
+                    j = phrases.index(result.page_content)
+                    
+                    # Skip if it's the same document or already marked for removal
+                    if i != j and to_keep[j]:
+                        # Normalize the BM25 score
+                        max_score = results[0].metadata['score']
+                        normalized_score = result.metadata['score'] / max_score if max_score > 0 else 0
+                        
+                        if normalized_score >= similarity_threshold:
+                            similar_indices.append(j)
+                            to_keep[j] = False  # Mark as redundant initially
+                
+                # Include the current phrase's index in the list of similar phrases
+                similar_indices.append(i)
+                
+                # Find the most informative phrase (longest one)
+                most_informative_index = max(similar_indices, key=lambda idx: len(phrases[idx].split()))
+                
+                # Mark all other similar phrases for deletion except the most informative
+                for idx in similar_indices:
+                    if idx != most_informative_index:
+                        to_keep[idx] = False
+        
+        # Return the filtered list containing the most informative phrases
+        return [phrase for i, phrase in enumerate(phrases) if to_keep[i]]
+

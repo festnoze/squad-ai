@@ -8,7 +8,7 @@ class DrupalDataRetireval:
     def __init__(self, outdir):
         txt.activate_print = True
         self.out_dir = outdir
-        self.studiClient = DrupalJsonApiClient()
+        self.studiClient = DrupalJsonApiClient("https://www.studi.com/jsonapi/")
         self.diplay_select_menu()
 
     def retrieve_all_data(self):
