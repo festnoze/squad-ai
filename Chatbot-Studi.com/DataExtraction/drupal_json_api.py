@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import time
 import requests
 from langchain.retrievers import BM25Retriever
 from rank_bm25 import BM25Okapi
@@ -25,7 +26,11 @@ class DrupalJsonApiClient:
         return fundings
     
     def get_trainings(self):
-        trainings = self.get_drupal_data_recursively('node/training', self.extract_common_data_from_nodes, ['field_paragraph'], ['field_content_bloc','field_certification', 'field_diploma', 'field_domain', 'field_job', 'field_funding', 'field_goal', 'field_job'])
+        trainings = self.get_drupal_data_recursively(
+            'node/training', 
+            self.extract_common_data_from_nodes, 
+            ['field_paragraph'], 
+            ['field_content_bloc','field_certification', 'field_diploma', 'field_domain', 'field_job', 'field_funding', 'field_goal', 'field_job'])
         return trainings
 
     def get_diplomas(self):
@@ -40,7 +45,7 @@ class DrupalJsonApiClient:
         return self.get_drupal_data_recursively('taxonomy_term/domain', self.extract_common_data_from_nodes, ['field_paragraph', 'field_school'], ['field_jobs'])  
     
 
-    def _perform_request(self, endpoint, allowed_retries=3):
+    def _perform_request(self, endpoint, remaining_retries=5, allowed_retries=5):
         """
         Makes a GET request to the specified JSON:API endpoint.
         
@@ -58,8 +63,10 @@ class DrupalJsonApiClient:
             return response.json()  # Return the JSON response if the request is successful
         except requests.RequestException as e:
             print(f"Error fetching data from {url}: {e}")
-            if allowed_retries > 0: # Retry 'allowed_retries' times upon request failure
-                return self._perform_request(endpoint, allowed_retries=allowed_retries-1)
+            if remaining_retries > 0: # Retry 'allowed_retries' times upon request failure
+                remaining_retries = remaining_retries - 1
+                time.sleep((allowed_retries-remaining_retries) * 3)
+                return self._perform_request(endpoint, remaining_retries=remaining_retries, allowed_retries=allowed_retries)
             raise e
 
     # def get_articles_filter_status_1(self):
@@ -91,15 +98,26 @@ class DrupalJsonApiClient:
 
             if 'links' in source_node and 'related' in source_node['links']:
                 target_node['related_url'] = source_node['links']['related']['href']
-            if 'field_paragraph' in source_node['attributes'] and source_node['attributes']['field_paragraph']:
-                target_node['field_paragraph'] = source_node['attributes']['field_paragraph']
-            if 'field_text' in source_node['attributes'] and source_node['attributes']['field_text'] and 'value' in source_node['attributes']['field_text'] and source_node['attributes']['field_text']['value']:
-                target_node['field_text'] = source_node['attributes']['field_text']['value']
-            if 'field_metatag' in source_node['attributes'] and source_node['attributes']['field_metatag'] and isinstance(source_node['attributes']['field_metatag'], dict) and 'value' in source_node['attributes']['field_metatag']:
-                target_node['field_metatag'] = source_node['attributes']['field_metatag']['value']['description']
             if 'changed' in source_node['attributes']:
                 target_node['changed'] = source_node['attributes']['changed']
+            # if 'field_paragraph' in source_node['attributes'] and source_node['attributes']['field_paragraph']:
+            #     target_node['paragraph'] = source_node['attributes']['field_paragraph']
+            # if 'field_text' in source_node['attributes'] and source_node['attributes']['field_text'] and 'value' in source_node['attributes']['field_text'] and source_node['attributes']['field_text']['value']:
+            #     target_node['text'] = source_node['attributes']['field_text']['value']
+            # if 'field_metatag' in source_node['attributes'] and source_node['attributes']['field_metatag'] and isinstance(source_node['attributes']['field_metatag'], dict) and 'value' in source_node['attributes']['field_metatag']:
+            #     target_node['metatag'] = source_node['attributes']['field_metatag']['value']['description']
             
+            # Extract all attributes with string values longer than 80 characters
+            attributes = source_node.get('attributes', {})
+            for key, value in attributes.items():
+                extracted_value = self.extract_long_string_values(value)
+                if extracted_value:
+                    if not target_node.get('attributes', {}):
+                        target_node['attributes'] = {}
+                    key_str = key if not key.startswith('field_') else key[6:]
+                    agglo_value = '\r\n'.join(extracted_value)
+                    target_node['attributes'][key_str] = txt.fix_special_chars(agglo_value)
+
             if any(included_rel):
                 target_node['related_url'] = {}
                 for rel in included_rel:
@@ -130,6 +148,27 @@ class DrupalJsonApiClient:
         elif isinstance(source_node['attributes'][attribut_name], str):
             target_node[attribut_name] = source_node['attributes'][attribut_name]
 
+    def extract_long_string_values(self, item: any, min_length:int=80) -> list[str]:
+        """
+        Recursively extract string values from an item where the values are strings longer than the specified length.
+
+        :param item: The item to extract values from
+        :param min_length: The minimum length of the string to be extracted
+        :return: A list of extracted strings longer than min_length
+        """
+        extracted_values = []
+        if isinstance(item, str):
+            if len(item) > min_length and not item.startswith('https://') and not item.startswith('http://'):
+                extracted_values.append(txt.fix_special_chars(item))
+        elif isinstance(item, dict):
+            for key, value in item.items():
+                if key not in ['relationships', 'links']:
+                    extracted_values.extend(self.extract_long_string_values(value, min_length))
+        elif isinstance(item, list):
+            for element in item:
+                extracted_values.extend(self.extract_long_string_values(element, min_length))
+        return extracted_values
+
     def get_drupal_data_recursively(self, url: str, delegate, included_relationships=[], included_relationships_ids=[], fetch_all_pages=True):
         items_full = self._perform_request(url)
         items_data = items_full['data']
@@ -148,7 +187,7 @@ class DrupalJsonApiClient:
                 item['related_infos'] = {}
                 for rel in item['related_url']:
                     related_infos = self._perform_request(item['related_url'][rel])
-                    item['related_infos'][rel] = DrupalJsonApiClient.extract_field_text_values(related_infos)
+                    item['related_infos'][rel] = DrupalJsonApiClient.extract_all_field_text_values(related_infos)
             return item
 
         txt.print(f"Fetching related infos on {len(items)} items, for a global requests count of  {len(items)* len(items[0]['related_url'].keys())}...")
@@ -171,16 +210,16 @@ class DrupalJsonApiClient:
         return items
 
     @staticmethod
-    def extract_field_text_values(json_data):
+    def extract_all_field_text_values(json_data):
         """
-        Extract all 'value' fields from 'field_text' attributes in a given JSON structure.
+        Extract all 'value' as str from all found 'field_text' keys in the given JSON structure.
         
         :param json_data: The JSON data to search within
         :return: A list of all extracted 'value' fields
         """
         field_text_values = []
 
-        def extract_values(data):
+        def extract_field_text_values(data):
             # Check if 'field_text' with 'value' exists in current dict
             if isinstance(data, dict):
                 if 'field_text' in data and data['field_text'] and 'value' in data['field_text'] and data['field_text']['value']:
@@ -195,12 +234,12 @@ class DrupalJsonApiClient:
                         raise ValueError(f"Unexpected data type in field_text 'value' field. Only str and list are supported, but got: {type(datum)}")
                 # Recursively check nested dictionaries and lists
                 for key, value in data.items():
-                    extract_values(value)
+                    extract_field_text_values(value)
             elif isinstance(data, list):
                 for item in data:
-                    extract_values(item)
+                    extract_field_text_values(item)
 
-        extract_values(json_data)
+        extract_field_text_values(json_data)
         field_text_values = DrupalJsonApiClient.remove_redundant_strings_based_on_similarity_threshold(field_text_values, similarity_threshold=0.3)
         return field_text_values
     
@@ -279,13 +318,8 @@ class DrupalJsonApiClient:
                     
                     # Skip if it's the same document or already marked for removal
                     if i != j and to_keep[j]:
-                        # Normalize the BM25 score
-                        max_score = results[0].metadata['score']
-                        normalized_score = result.metadata['score'] / max_score if max_score > 0 else 0
-                        
-                        if normalized_score >= similarity_threshold:
-                            similar_indices.append(j)
-                            to_keep[j] = False  # Mark as redundant initially
+                        similar_indices.append(j)
+                        to_keep[j] = False
                 
                 # Include the current phrase's index in the list of similar phrases
                 similar_indices.append(i)

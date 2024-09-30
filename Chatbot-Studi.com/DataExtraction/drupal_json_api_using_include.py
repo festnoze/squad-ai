@@ -94,7 +94,7 @@ class DrupalJsonApiClient:
                         success = True
                 except Exception as e:
                     retries += 1
-                    time.sleep(5)
+                    time.sleep(retries * 3)
                     if page_limit >= 2:
                         page_limit = int(page_limit / 2)
                         txt.print(f"Reducing page_limit to {page_limit} and retrying.")
