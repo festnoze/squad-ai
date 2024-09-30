@@ -1,8 +1,7 @@
 from common_tools.helpers.execute_helper import Execute
-from common_tools.helpers.rag_filtering_metadata_helper import RagFilteringMetadataHelper
-from common_tools.langchains import langchain_rag
+from common_tools.RAG.rag_filtering_metadata_helper import RagFilteringMetadataHelper
 from common_tools.models.question_analysis import QuestionAnalysis
-from common_tools.helpers.rag_service import RAGService
+from common_tools.RAG.rag_service import RAGService
 #
 from langchain_core.documents import Document
 
@@ -32,7 +31,7 @@ class RAGHybridRetrieval:
         else:
             filtered_docs = rag.langchain_documents
 
-        bm25_retriever = langchain_rag.build_bm25_retriever(filtered_docs, k)#, filters
+        bm25_retriever = rag._build_bm25_retriever(filtered_docs, k)#, filters
         bm25_retrieved_chunks = bm25_retriever.invoke(query)
        
         if give_score:

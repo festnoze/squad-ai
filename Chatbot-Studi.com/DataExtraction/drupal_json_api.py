@@ -226,6 +226,7 @@ class DrupalJsonApiClient:
         field_text_values = DrupalJsonApiClient.remove_redundant_strings_based_on_similarity_threshold(field_text_values, similarity_threshold=0.3)
         return field_text_values
     
+    #todo: to move to common_tools, BM25 section
     @staticmethod
     def remove_redundant_strings_based_on_similarity_threshold(phrases: list[str], similarity_threshold: float = 0.5) -> list[str]:
         """

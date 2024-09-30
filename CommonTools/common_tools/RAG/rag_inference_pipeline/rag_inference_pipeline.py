@@ -5,7 +5,7 @@ from langchain_experimental.utilities import PythonREPL
 
 # Import the task classes from other files
 from common_tools.helpers.execute_helper import Execute
-from common_tools.helpers.rag_service import RAGService
+from common_tools.RAG.rag_service import RAGService
 from common_tools.RAG.rag_inference_pipeline.rag_pre_treatment_tasks import RAGPreTreatment
 from common_tools.RAG.rag_inference_pipeline.guardrails_tasks import RAGGuardrails
 from common_tools.RAG.rag_inference_pipeline.rag_hybrid_retrieval_tasks import RAGHybridRetrieval

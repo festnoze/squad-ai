@@ -6,7 +6,7 @@ setup(
     description='Common tools for AI and generic needs on file, console, json, ...',
     author='Etienne Millerioux',
     author_email='eemillerioux@gmail.com',  # Replace with your email
-    url='https://github.com/festnoze/common_tools',  # Replace with your project URL
+    url='https://github.com/festnoze/common_tools',
     packages=find_packages(),
     install_requires=[
         'requests',
@@ -21,7 +21,8 @@ setup(
         'langsmith',
         'openai',
         'groq',
-        'prefect'
+        #'prefect',
+        'sentence-transformers',
     ],
     classifiers=[
         'Programming Language :: Python :: 3',

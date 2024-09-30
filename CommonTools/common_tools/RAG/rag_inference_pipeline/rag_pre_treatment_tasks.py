@@ -1,9 +1,9 @@
 from common_tools.helpers.execute_helper import Execute
 from common_tools.helpers.file_helper import file
 from common_tools.helpers.llm_helper import Llm
-from common_tools.helpers.rag_filtering_metadata_helper import RagFilteringMetadataHelper
+from common_tools.RAG.rag_filtering_metadata_helper import RagFilteringMetadataHelper
 from common_tools.models.question_analysis import QuestionAnalysis, QuestionAnalysisPydantic
-from common_tools.helpers.rag_service import RAGService
+from common_tools.RAG.rag_service import RAGService
 
 class RAGPreTreatment:
     @staticmethod

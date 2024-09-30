@@ -10,7 +10,6 @@ from .llm_helper import *
 from .misc import *
 from .openai_helper import *
 from .python_helpers import *
-from .rag_filtering_metadata_helper import *
 from .tools_helpers import *
 from .txt_helper import *
 
@@ -27,7 +26,6 @@ __all__ = [
     "misc",
     "openai_helper",
     "python_helpers",
-    "rag_filtering_metadata_helper",
     "tools_helpers",
     "txt_helper"
 ]

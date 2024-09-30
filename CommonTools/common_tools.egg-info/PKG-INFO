@@ -22,4 +22,4 @@ Requires-Dist: langgraph
 Requires-Dist: langsmith
 Requires-Dist: openai
 Requires-Dist: groq
-Requires-Dist: prefect
+Requires-Dist: sentence-transformers

@@ -10,4 +10,4 @@ langgraph
 langsmith
 openai
 groq
-prefect
+sentence-transformers

@@ -32,14 +32,12 @@ class GenerateDocumentsWithMetadataFromFiles:
 
         # Process jobs
         jobs_data = JsonHelper.load_from_json(path + 'jobs.json')
-        all_docs.extend(self.process_jobs(jobs_data))
+        all_docs.extend(self.process_jobs(jobs_data, domains_data))
 
         # Process trainings
         trainings_data = JsonHelper.load_from_json(path + 'trainings.json')
         all_docs.extend(self.process_trainings(trainings_data))
 
-        print(f"Total documents created: {len(all_docs)}")
-        print(f"---------------------------------")
         print(f"Certifiers count: {len(certifiers_data)}")
         print(f"Certifications count: {len(certifiers_data)}")
         print(f"Diplomas count: {len(diplomas_data)}")
@@ -48,6 +46,7 @@ class GenerateDocumentsWithMetadataFromFiles:
         print(f"Jobs count: {len(jobs_data)}")
         print(f"Trainings count: {len(trainings_data)}")
         print(f"---------------------------------")
+        print(f"Total documents created: {len(all_docs)}")
         return all_docs
 
     def process_certifiers(self, data: List[Dict]) -> List[Document]:
@@ -56,6 +55,7 @@ class GenerateDocumentsWithMetadataFromFiles:
         docs = []
         for item in data:
             metadata = {
+                "id": item.get("id"),
                 "type": "certifieur",
                 "name": item.get("name"),
                 "changed": item.get("changed"),
@@ -71,6 +71,7 @@ class GenerateDocumentsWithMetadataFromFiles:
         docs = []
         for item in data:
             metadata = {
+                "id": item.get("id"),
                 "type": "certification",
                 "name": item.get("name"),
                 "changed": item.get("changed"),
@@ -86,6 +87,7 @@ class GenerateDocumentsWithMetadataFromFiles:
         docs = []
         for item in data:
             metadata = {
+                "id": item.get("id"),
                 "type": "diplôme",
                 "name": item.get("title"),
                 "changed": item.get("changed"),
@@ -102,6 +104,7 @@ class GenerateDocumentsWithMetadataFromFiles:
         docs = []
         for item in data:
             metadata = {
+                "id": item.get("id"),
                 "type": "domaine",
                 "name": item.get("name"),
                 "changed": item.get("changed"),
@@ -117,6 +120,7 @@ class GenerateDocumentsWithMetadataFromFiles:
         docs = []
         for item in data:
             metadata = {
+                "id": item.get("id"),
                 "type": "financement",
                 "name": item.get("title"),
                 "changed": item.get("changed"),
@@ -127,18 +131,25 @@ class GenerateDocumentsWithMetadataFromFiles:
             docs.append(doc)
         return docs
 
-    def process_jobs(self, data: List[Dict]) -> List[Document]:
+    def process_jobs(self, data: List[Dict], domains) -> List[Document]:
         if not data:
             return []
         docs = []
         for item in data:
             metadata = {
+                "id": item.get("id"),
                 "type": "métier",
                 "name": item.get("title"),
                 "changed": item.get("changed"),
+                "rel_ids": self.get_all_ids_as_str(item.get("related_ids", {}))
             }
-            domain = item.get("related_ids", {}).get("domain", "")
-            content = f"{item.get('title', '')}\r\nDomaine/Filière : {domain}"
+            domain_id = item.get("related_ids", {}).get("domain", "")
+            domain = ''
+            if domain_id:
+                domain = next((d.get("name") for d in domains if d.get("id") == domain_id), "")
+                if not domain:
+                    domain = ''
+            content = f"{item.get('title', '')} {('\r\nMétier appartenant au Domaine/Filière :' + domain) if domain else ''}"
             doc = Document(page_content=content, metadata=metadata)
             docs.append(doc)
         return docs
@@ -149,19 +160,42 @@ class GenerateDocumentsWithMetadataFromFiles:
         docs = []
         for item in data:
             metadata = {
+                "id": item.get("id"),
                 "type": "formation",
                 "name": item.get("title"),
                 "changed": item.get("changed"),
+                "rel_ids": self.get_all_ids_as_str(item.get("related_ids", {})),
             }
-            related_ids = item.get("related_ids", {})
-            out = {
-                "certification_title": related_ids.get("certification", ""),
-                "diploma": related_ids.get("diploma", []),
-                "domain": related_ids.get("domain", ""),
-                "job": related_ids.get("job", []),
-                "funding": related_ids.get("funding", []),
-            }
+            # ext_ids = {
+            #     "certification_id": related_ids.get("certification", ""),
+            #     "diploma_ids": self.as_str(related_ids.get("diploma", [])),
+            #     "domain_id": related_ids.get("domain", ""),
+            #     "job_ids": self.as_str(related_ids.get("job", [])),
+            #     "funding_ids": self.as_str(related_ids.get("funding", [])),
+            #     "goal_ids": self.as_str(related_ids.get("goal", [])),
+            # }
             content = f"{item.get('title', '')}\r\n{item.get('field_metatag', '')}"
-            doc = Document(page_content=content, metadata=metadata)#todo: add ids: {**metadata, **out})
+            doc = Document(page_content=content, metadata=metadata)#{**metadata, **ext_ids})
             docs.append(doc)
         return docs
+    
+    def as_str(self, lst: list):
+        if not lst:
+            return []
+        return [str(uid) for uid in lst]
+    
+    def get_all_ids_as_str(self, related_ids):
+        all_ids = []
+
+        # Iterate over all keys and values in related_ids
+        for key, value in related_ids.items():
+            if isinstance(value, list):
+                # Extend the list if the value is a list of IDs
+                all_ids.extend(value)
+            elif isinstance(value, str):
+                # Add the single string value directly
+                all_ids.append(value)
+
+        # Join all IDs into a single comma-separated string
+        all_ids_str = ",".join(all_ids)
+        return all_ids_str

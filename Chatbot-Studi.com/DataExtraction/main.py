@@ -10,45 +10,61 @@ from generate_documents_w_metadata import GenerateDocumentsWithMetadataFromFiles
 from common_tools.helpers import txt
 from common_tools.models.llm_info import LlmInfo
 from common_tools.langchains.langchain_adapter_type import LangChainAdapterType
-from common_tools.helpers.rag_service import RAGService
+from common_tools.RAG.rag_service import RAGService
 from common_tools.RAG.rag_injection_pipeline.rag_injection_pipeline import RagInjectionPipeline
 
 class Main:
-    out_dir = "C:/Dev/squad-ai/Chatbot-Studi.com/DataExtraction/outputs/"
-    load_dotenv(find_dotenv())
-    openai_api_key = os.getenv("OPEN_API_KEY")
-    
-    # db_instance = DB()
-    # db_instance.create_database()
-    # # db_instance.add_data()
-    # db_instance.import_data_from_json(out_dir)
-    # exit()
-    while True:
-        choice = input(dedent("""
-            ┌──────────────────────────────┐
-            │ DATA EXTRACTION - MAIN MENU  │
-            └──────────────────────────────┘
-            Tap the number of the selected action:  ① ② ③
-            1 - Retrieve data from Drupal json-api & Save as json files
-            2 - Generate documents with metadata from retrieved data in saved files
-            3 - Generate cleaned data from retrieved ones
-            4 - Exit
-        """))
-        if choice == "1":
-            DrupalDataRetireval(out_dir)
-        elif choice == "2":
-            all_docs = GenerateDocumentsWithMetadataFromFiles().process_all_data(out_dir)
-            llms_infos = []
-            llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout= 80, temperature = 0.1, api_key= openai_api_key))
-            rag_service = RAGService(llms_infos)
-            rag_injection = RagInjectionPipeline(rag_service)
-            injected = rag_injection.inject_documents(all_docs)
-            txt.print(f"Injected {injected} documents")
-        elif choice == "3":
-            GenerateCleanedData()
-        elif choice == "4" or choice.lower() == "e":
-            print("Exiting ...")
-            exit()
+    def __init__(self):
+        self.out_dir = "C:/Dev/squad-ai/Chatbot-Studi.com/DataExtraction/outputs/"
+        load_dotenv(find_dotenv())
+        self.openai_api_key = os.getenv("OPEN_API_KEY")
+        txt.activate_print = True
+        llms_infos = []
+        llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout= 80, temperature = 0.1, api_key= self.openai_api_key))
+        self.rag_service = RAGService(llms_infos)
+        self.display_select_menu()
+
+    def display_select_menu(self):
+        while True:
+            choice = input(dedent("""
+                ┌──────────────────────────────┐
+                │ DATA EXTRACTION - MAIN MENU  │
+                └──────────────────────────────┘
+                Tap the number of the selected action:  ① ② ③ ④
+                1 - Retrieve data from Drupal json-api & Save as json files
+                2 - Generate documents with metadata from retrieved data in saved files
+                3 - RAG query  
+                4 - Exit
+            """))
+            if choice == "1":
+                DrupalDataRetireval(self.out_dir)
+            elif choice == "2":
+                self.create_vector_db_from_generated_embeded_documents(self.out_dir)
+            elif choice == "3":
+                #GenerateCleanedData()
+                query = input("Enter your question: ")
+                self.rag_query(query)
+            elif choice == "4" or choice.lower() == "e":
+                print("Exiting ...")
+                exit()
+
+    def create_vector_db_from_generated_embeded_documents(self, out_dir):
+        all_docs = GenerateDocumentsWithMetadataFromFiles().process_all_data(out_dir)
+        rag_injection = RagInjectionPipeline(self.rag_service)
+        txt.print_with_spinner(f"Start embedding of {len(all_docs)} documents")
+        injected = rag_injection.inject_documents(all_docs, doChunkContent= False)
+        txt.stop_spinner_replace_text(f"Finished Embedding on: {injected} documents")
+
+    def rag_query(self, query):
+        docs = self.rag_service.retrieve(query)
+        for doc in docs:
+            print(f"({doc.metadata['type']}) {doc.metadata['name']} : {doc.page_content}".strip())
+
+    def create_sqlLite_database(self, out_dir):
+        db_instance = DB()
+        db_instance.create_database()
+        # db_instance.add_data()
+        db_instance.import_data_from_json(out_dir)
 
 if __name__ == '__main__':
     Main()

@@ -11,12 +11,11 @@ from prefect.logging import get_run_logger
 
 from common_tools.helpers.file_helper import file
 from common_tools.helpers.llm_helper import Llm
-from common_tools.helpers.rag_filtering_metadata_helper import RagFilteringMetadataHelper
 from common_tools.helpers.txt_helper import txt
 from common_tools.models.logical_operator import LogicalOperator
 from common_tools.models.question_analysis import QuestionAnalysis, QuestionAnalysisPydantic
-from common_tools.helpers.rag_service import RAGService
-import common_tools.langchains.langchain_rag as langchain_rag
+from common_tools.RAG.rag_filtering_metadata_helper import RagFilteringMetadataHelper
+from common_tools.RAG.rag_service import RAGService
 from common_tools.RAG.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
 
 class RagInferencePipelineWithPrefect:
@@ -158,7 +157,7 @@ class RagInferencePipelineWithPrefect:
         else:
             filtered_docs = self.rag.langchain_documents
 
-        bm25_retriever = langchain_rag.build_bm25_retriever(filtered_docs, k)#, filters
+        bm25_retriever = self.rag._build_bm25_retriever(filtered_docs, k)#, filters
         bm25_retrieved_chunks = bm25_retriever.invoke(query)
        
         if give_score:
@@ -209,7 +208,7 @@ class RagInferencePipelineWithPrefect:
     def rag_response_generation(self, retrieved_chunks: list, questionAnalysis: QuestionAnalysis):
         # Remove score from retrieved docs
         retrieved_chunks = [doc[0] if isinstance(doc, tuple) else doc for doc in retrieved_chunks]
-        return langchain_rag.generate_response_from_retrieved_chunks(self.rag.llm, retrieved_chunks, questionAnalysis)
+        return self.rag.generate_response_from_retrieved_chunks(self.rag.llm, retrieved_chunks, questionAnalysis)
         
     # Post-treatment subflow
     @flow(name="RAG post-treatment")
