@@ -81,7 +81,7 @@ class TestDrupalJsonApiClient:
         # Call the method under test
         items = self.client.get_drupal_data_recursively(
             'node/jobs',
-            self.client.get_generic_data_from_node_item,
+            self.client.extract_common_data_from_nodes,
             included_relationships=[], 
             included_relationships_ids=[]
         )
@@ -93,9 +93,9 @@ class TestDrupalJsonApiClient:
         assert 'Job 2' in titles
         assert 'Job 3' in titles
 
-    def test_get_generic_data_from_node_item_with_relationships(self):
+    def test_extract_common_data_from_nodes_with_relationships(self):
         """
-        Test the get_generic_data_from_node_item method with generalized relationship processing and updated parameters.
+        Test the extract_common_data_from_nodes method with generalized relationship processing and updated parameters.
         """
         # Prepare fake list of items_data
         items_data = [
@@ -140,8 +140,10 @@ class TestDrupalJsonApiClient:
         included_rel_ids = ['field_paragraph']
 
         # Call the method under test with the updated parameters
-        items = self.client.get_generic_data_from_node_item(
-            items_data, included_rel_ids=included_rel_ids
+        items = self.client.extract_common_data_from_nodes(
+            items_data,
+            included_rel= [], 
+            included_rel_ids=included_rel_ids
         )
 
         # Assertions

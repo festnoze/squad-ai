@@ -15,29 +15,29 @@ class DrupalJsonApiClient:
             raise ValueError("Base URL is required to initialize the DrupalJsonApiClient")
 
     def get_jobs(self):
-        jobs = self.get_drupal_data_recursively('node/jobs', self.get_generic_data_from_node_item, ['field_paragraph'], ['field_domain'])
+        jobs = self.get_drupal_data_recursively('node/jobs', self.extract_common_data_from_nodes, ['field_paragraph'], ['field_domain'])
         jobs = self.parallel_get_items_related_infos(jobs)
         return jobs
     
     def get_fundings(self):
-        fundings = self.get_drupal_data_recursively('node/funding', self.get_generic_data_from_node_item, ['field_paragraph'])      
+        fundings = self.get_drupal_data_recursively('node/funding', self.extract_common_data_from_nodes, ['field_paragraph'])      
         fundings = self.parallel_get_items_related_infos(fundings)
         return fundings
     
     def get_trainings(self):
-        trainings = self.get_drupal_data_recursively('node/training', self.get_generic_data_from_node_item, ['field_paragraph'], ['field_content_bloc','field_certification', 'field_diploma', 'field_domain', 'field_job', 'field_funding', 'field_goal', 'field_job'])
+        trainings = self.get_drupal_data_recursively('node/training', self.extract_common_data_from_nodes, ['field_paragraph'], ['field_content_bloc','field_certification', 'field_diploma', 'field_domain', 'field_job', 'field_funding', 'field_goal', 'field_job'])
         return trainings
 
     def get_diplomas(self):
-        diplomas = self.get_drupal_data_recursively('node/diploma', self.get_generic_data_from_node_item, ['field_paragraph'], ['field_content_bloc','field_certification', 'field_diploma', 'field_domain', 'field_job', 'field_funding', 'field_goal', 'field_job'])
+        diplomas = self.get_drupal_data_recursively('node/diploma', self.extract_common_data_from_nodes, ['field_paragraph'], ['field_content_bloc','field_certification', 'field_diploma', 'field_domain', 'field_job', 'field_funding', 'field_goal', 'field_job'])
         diplomas = self.parallel_get_items_related_infos(diplomas)
         return diplomas
     
     def get_certifications(self):
-        return self.get_drupal_data_recursively('taxonomy_term/certification', self.get_generic_data_from_node_item, ['field_paragraph'])
+        return self.get_drupal_data_recursively('taxonomy_term/certification', self.extract_common_data_from_nodes, ['field_paragraph'])
     
     def get_domains(self):
-        return self.get_drupal_data_recursively('taxonomy_term/domain', self.get_generic_data_from_node_item, ['field_paragraph', 'field_school'], ['field_jobs'])  
+        return self.get_drupal_data_recursively('taxonomy_term/domain', self.extract_common_data_from_nodes, ['field_paragraph', 'field_school'], ['field_jobs'])  
     
 
     def _perform_request(self, endpoint, allowed_retries=3):
@@ -73,59 +73,63 @@ class DrupalJsonApiClient:
 
     # def get_article_sort_created(self):
     #     return self._perform_request('article?sort=created')
-    
-    def get_generic_data_from_node_item(self, items_data, included_rel=[], included_rel_ids=[]):
-        items = []
-        for i, item in enumerate(items_data):
-            new_item ={
-                'id': item['id'],
-                'type': item['type']
-            }
-            if not 'attributes' in item:
-                continue
-            if 'title' in item['attributes'] and item['attributes']['title']:
-                if isinstance(item['attributes']['title'], dict) and 'value' in item['attributes']['title']:
-                    new_item['title'] = item['attributes']['title']['value']
-                else:
-                    new_item['title'] = item['attributes']['title']
-            elif 'name' in item['attributes'] and item['attributes']['name']:
-                if isinstance(item['attributes']['name'], dict) and 'value' in item['attributes']['name']:
-                    new_item['title'] = item['attributes']['name']['value']
-                else:
-                    new_item['title'] = item['attributes']['name']
-            if 'description' in item['attributes'] and item['attributes']['description']:
-                if isinstance(item['attributes']['description'], dict) and 'value' in item['attributes']['description']:
-                    new_item['description'] = item['attributes']['description']['value']
-                else:
-                    new_item['description'] = item['attributes']['description']
-            if 'links' in item and 'related' in item['links']:
-                new_item['related_url'] = item['links']['related']['href']
-            if 'field_paragraph' in item['attributes']:
-                new_item['field_paragraph'] = item['attributes']['field_paragraph']
-            if 'field_text' in item['attributes']:
-                new_item['field_text'] = item['attributes']['field_text']['value']
-            if 'field_metatag' in item['attributes'] and item['attributes']['field_metatag'] and isinstance(item['attributes']['field_metatag'], dict) and 'value' in item['attributes']['field_metatag']:
-                new_item['field_metatag'] = item['attributes']['field_metatag']['value']['description']
-            if 'changed' in item['attributes'] and item['attributes']['changed']:
-                new_item['changed'] = item['attributes']['changed']
-            if any(included_rel):
-                new_item['related_url'] = {}
-                for rel in included_rel:
-                    if rel in item['relationships'] and 'related' in item['relationships'][rel]['links']:
-                        new_item['related_url'][rel if not rel.startswith('field_') else rel[6:]] = item['relationships'][rel]['links']['related']['href']
-            if any(included_rel_ids):
-                new_item['related_ids'] = {}
-                for rel in included_rel_ids:
-                    if rel in item['relationships'] and 'data' in item['relationships'][rel] and item['relationships'][rel] and item['relationships'][rel]['data']:
-                        if isinstance(item['relationships'][rel]['data'], list):
-                            new_item['related_ids'][rel if not rel.startswith('field_') else rel[6:]] = [x['id'] for x in item['relationships'][rel]['data']]
-                        elif 'id' in item['relationships'][rel]['data']:
-                            new_item['related_ids'][rel if not rel.startswith('field_') else rel[6:]] = item['relationships'][rel]['data']['id']
 
-            new_item = txt.fix_special_chars(new_item)
-            items.append(new_item)
+    
+    def extract_common_data_from_nodes(self, nodes:list, included_rel=[], included_rel_ids=[]):
+        items = []
+        for i, source_node in enumerate(nodes):
+            target_node ={
+                'id': source_node['id'],
+                'type': source_node['type']
+            }
+            if not 'attributes' in source_node:
+                continue
+
+            self.set_attribut_value_from_source(target_node, source_node, 'title')
+            self.set_attribut_value_from_source(target_node, source_node, 'name')
+            self.set_attribut_value_from_source(target_node, source_node, 'description')
+
+            if 'links' in source_node and 'related' in source_node['links']:
+                target_node['related_url'] = source_node['links']['related']['href']
+            if 'field_paragraph' in source_node['attributes'] and source_node['attributes']['field_paragraph']:
+                target_node['field_paragraph'] = source_node['attributes']['field_paragraph']
+            if 'field_text' in source_node['attributes'] and source_node['attributes']['field_text'] and 'value' in source_node['attributes']['field_text'] and source_node['attributes']['field_text']['value']:
+                target_node['field_text'] = source_node['attributes']['field_text']['value']
+            if 'field_metatag' in source_node['attributes'] and source_node['attributes']['field_metatag'] and isinstance(source_node['attributes']['field_metatag'], dict) and 'value' in source_node['attributes']['field_metatag']:
+                target_node['field_metatag'] = source_node['attributes']['field_metatag']['value']['description']
+            if 'changed' in source_node['attributes']:
+                target_node['changed'] = source_node['attributes']['changed']
+            
+            if any(included_rel):
+                target_node['related_url'] = {}
+                for rel in included_rel:
+                    if rel in source_node['relationships'] and 'related' in source_node['relationships'][rel]['links']:
+                        target_node['related_url'][rel if not rel.startswith('field_') else rel[6:]] = source_node['relationships'][rel]['links']['related']['href']
+            
+            if any(included_rel_ids):
+                target_node['related_ids'] = {}
+                for rel in included_rel_ids:
+                    if rel in source_node['relationships'] and 'data' in source_node['relationships'][rel] and source_node['relationships'][rel] and source_node['relationships'][rel]['data']:
+                        if isinstance(source_node['relationships'][rel]['data'], list):
+                            target_node['related_ids'][rel if not rel.startswith('field_') else rel[6:]] = [x['id'] for x in source_node['relationships'][rel]['data']]
+                        elif 'id' in source_node['relationships'][rel]['data']:
+                            target_node['related_ids'][rel if not rel.startswith('field_') else rel[6:]] = source_node['relationships'][rel]['data']['id']
+
+            target_node = txt.fix_special_chars(target_node)
+            items.append(target_node)
         return items
     
+    def set_attribut_value_from_source(self, target_node, source_node, attribut_name:str):
+        if not attribut_name in source_node['attributes'] or not source_node['attributes'][attribut_name]:
+            return
+        if isinstance(source_node['attributes'][attribut_name], dict) and 'value' in source_node['attributes'][attribut_name]:
+            if source_node['attributes'][attribut_name]['value'] and isinstance(source_node['attributes'][attribut_name]['value'], list):
+                target_node[attribut_name] = '\r\n'.join(source_node['attributes'][attribut_name]['value'])
+            else:
+                target_node[attribut_name] = source_node['attributes'][attribut_name]['value']
+        elif isinstance(source_node['attributes'][attribut_name], str):
+            target_node[attribut_name] = source_node['attributes'][attribut_name]
+
     def get_drupal_data_recursively(self, url: str, delegate, included_relationships=[], included_relationships_ids=[], fetch_all_pages=True):
         items_full = self._perform_request(url)
         items_data = items_full['data']
