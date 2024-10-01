@@ -42,8 +42,7 @@ class Main:
                 self.create_vector_db_from_generated_embeded_documents(self.out_dir)
             elif choice == "3":
                 #GenerateCleanedData()
-                query = input("Enter your question: ")
-                self.rag_query(query)
+                self.rag_query()
             elif choice == "4" or choice.lower() == "e":
                 print("Exiting ...")
                 exit()
@@ -55,10 +54,14 @@ class Main:
         injected = rag_injection.inject_documents(all_docs, doChunkContent= False)
         txt.stop_spinner_replace_text(f"Finished Embedding on: {injected} documents")
 
-    def rag_query(self, query):
-        docs = self.rag_service.retrieve(query)
-        for doc in docs:
-            print(f"({doc.metadata['type']}) {doc.metadata['name']} : {doc.page_content}".strip())
+    def rag_query(self):
+        while True:
+            query = input("Entrez votre question ('exit' pour quitter):\n")
+            if query == "" or query == "exit":
+                return
+            docs = self.rag_service.retrieve(query, give_score=True)
+            for doc, score in docs:
+                print(f"({doc.metadata['type']}) {doc.metadata['name']} : {doc.page_content}".strip() + f" - score: {score}")
 
     def create_sqlLite_database(self, out_dir):
         db_instance = DB()
