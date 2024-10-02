@@ -1,4 +1,4 @@
-from drupal_json_api import DrupalJsonApiClient
+from drupal_json_api_client import DrupalJsonApiClient
 from common_tools.helpers import txt, file, json
 from common_tools.models import FileAlreadyExistsPolicy
 from helpers.unicode_helper import UnicodeHelper

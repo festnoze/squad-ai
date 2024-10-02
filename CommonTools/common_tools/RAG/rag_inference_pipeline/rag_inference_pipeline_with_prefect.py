@@ -1,6 +1,7 @@
 from langchain.tools import tool
 from langchain_core.documents import Document
 import time
+
 from langgraph.prebuilt.tool_executor import ToolExecutor
 from langchain.tools.render import format_tool_to_openai_function
 from langchain.agents import Tool
@@ -9,9 +10,8 @@ from prefect import flow, task
 from prefect.task_runners import ConcurrentTaskRunner, ThreadPoolTaskRunner
 from prefect.logging import get_run_logger
 
-from common_tools.helpers.file_helper import file
 from common_tools.helpers.llm_helper import Llm
-from common_tools.helpers.txt_helper import txt
+from common_tools.helpers.prompts_helper import Prompts
 from common_tools.models.logical_operator import LogicalOperator
 from common_tools.models.question_analysis import QuestionAnalysis, QuestionAnalysisPydantic
 from common_tools.RAG.rag_filtering_metadata_helper import RagFilteringMetadataHelper
@@ -20,8 +20,9 @@ from common_tools.RAG.rag_inference_pipeline.rag_inference_pipeline import RagIn
 
 class RagInferencePipelineWithPrefect:
     
-    def __init__(self, rag: RAGService, tools: list = None):
+    def __init__(self, rag: RAGService, default_filters: dict = {}, tools: list = None):
         self.rag: RAGService = rag
+        self.default_filters = default_filters
         self.tools = tools
 
         if tools and any(tools):
@@ -37,7 +38,7 @@ class RagInferencePipelineWithPrefect:
             
             additionnal_tools = [format_tool_to_openai_function(t) for t in tools] #TODO: check compatibility out of OpenAI
             all_tools.extend(additionnal_tools)
-            self.rag.llm = self.rag.llm.bind_functions(all_tools)
+            self.rag.inference_llm = self.rag.inference_llm.bind_functions(all_tools)
             self.tool_executor = ToolExecutor(all_tools)
 
 
@@ -100,10 +101,10 @@ class RagInferencePipelineWithPrefect:
     
     @task
     def analyse_query_language(self, question):
-        prefilter_prompt = file.get_as_str("prompts/rag_language_detection_query.txt", remove_comments= True)
+        prefilter_prompt = Prompts.get_language_detection_prompt()
         prefilter_prompt = prefilter_prompt.replace("{question}", question)
         prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(prefilter_prompt, QuestionAnalysisPydantic, QuestionAnalysis)
-        response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks("RAG prefiltering", [self.rag.llm, self.rag.llm], output_parser, 10, *[prompt_for_output_parser])
+        response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks("RAG prefiltering", [self.rag.inference_llm, self.rag.inference_llm], output_parser, 10, *[prompt_for_output_parser])
         questionAnalysis = response[0]
         questionAnalysis['question'] = question
         if questionAnalysis['detected_language'].__contains__("english"):
@@ -116,7 +117,7 @@ class RagInferencePipelineWithPrefect:
         if RagFilteringMetadataHelper.has_manual_filters(question):
             filters, question = RagFilteringMetadataHelper.extract_manual_filters(question)
         else:
-            filters = RagFilteringMetadataHelper.get_default_filters()        
+            filters = self.default_filters       
         return question, filters
 
     # Data Retrieval sub-flow with parallel RAG and BM25 retrieval
@@ -208,7 +209,7 @@ class RagInferencePipelineWithPrefect:
     def rag_response_generation(self, retrieved_chunks: list, questionAnalysis: QuestionAnalysis):
         # Remove score from retrieved docs
         retrieved_chunks = [doc[0] if isinstance(doc, tuple) else doc for doc in retrieved_chunks]
-        return self.rag.generate_response_from_retrieved_chunks(self.rag.llm, retrieved_chunks, questionAnalysis)
+        return self.rag.generate_augmented_response_from_retrieved_chunks(self.rag.inference_llm, retrieved_chunks, questionAnalysis)
         
     # Post-treatment subflow
     @flow(name="RAG post-treatment")

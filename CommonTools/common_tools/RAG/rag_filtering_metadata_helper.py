@@ -78,7 +78,7 @@ class RagFilteringMetadataHelper:
         return False
         
     @staticmethod
-    def get_default_filters() -> dict:
+    def get_CodeSharpDoc_default_filters() -> dict:
         return {
                 "$and": [
                     {"functional_type": "Controller"},

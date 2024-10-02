@@ -2,6 +2,8 @@
 from common_tools.helpers import JsonHelper
 from langchain.schema import Document
 from typing import List, Dict
+#
+from common_tools.helpers import txt
 
 class GenerateDocumentsWithMetadataFromFiles:
     def __init__(self):
@@ -9,6 +11,7 @@ class GenerateDocumentsWithMetadataFromFiles:
        
     def process_all_data(self, path: str) -> List[Document]:
         all_docs = []
+        txt.print_with_spinner(f"Build all Langchain documents ...")
 
         # Process certifiers
         certifiers_data = JsonHelper.load_from_json(path + 'certifiers.json')
@@ -38,15 +41,16 @@ class GenerateDocumentsWithMetadataFromFiles:
         trainings_data = JsonHelper.load_from_json(path + 'trainings.json')
         all_docs.extend(self.process_trainings(trainings_data))
 
-        print(f"Certifiers count: {len(certifiers_data)}")
-        print(f"Certifications count: {len(certifiers_data)}")
-        print(f"Diplomas count: {len(diplomas_data)}")
-        print(f"Domains count: {len(domains_data)}")
-        print(f"Fundings count: {len(fundings_data)}")
-        print(f"Jobs count: {len(jobs_data)}")
-        print(f"Trainings count: {len(trainings_data)}")
-        print(f"---------------------------------")
-        print(f"Total documents created: {len(all_docs)}")
+        txt.stop_spinner_replace_text(f"All Langchain documents built successfully.")
+        txt.print(f"Certifiers count: {len(certifiers_data)}")
+        txt.print(f"Certifications count: {len(certifiers_data)}")
+        txt.print(f"Diplomas count: {len(diplomas_data)}")
+        txt.print(f"Domains count: {len(domains_data)}")
+        txt.print(f"Fundings count: {len(fundings_data)}")
+        txt.print(f"Jobs count: {len(jobs_data)}")
+        txt.print(f"Trainings count: {len(trainings_data)}")
+        txt.print(f"---------------------")
+        txt.print(f"Total documents created: {len(all_docs)}")
         return all_docs
 
     def process_certifiers(self, data: List[Dict]) -> List[Document]:
@@ -146,10 +150,10 @@ class GenerateDocumentsWithMetadataFromFiles:
             domain_id = item.get("related_ids", {}).get("domain", "")
             domain = ''
             if domain_id:
-                domain = next((d.get("name") for d in domains if d.get("id") == domain_id), "")
+                domain = next((dom.get("name") for dom in domains if dom.get("id") == domain_id), "")
                 if not domain:
                     domain = ''
-            content = f"{item.get('title', '')} {('\r\nMétier appartenant au Domaine/Filière :' + domain) if domain else ''}"
+            content = f"Métier : '{metadata['name']}'. {('\r\nAppartient au domaine (ou filière) : ' + domain) if domain else ''}"
             doc = Document(page_content=content, metadata=metadata)
             docs.append(doc)
         return docs

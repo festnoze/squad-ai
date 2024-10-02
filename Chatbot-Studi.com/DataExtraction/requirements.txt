@@ -3,3 +3,4 @@ pytest
 sqlalchemy
 rank_bm25
 numpy
+streamlit

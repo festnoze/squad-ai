@@ -2,7 +2,7 @@
 
 import pytest
 from unittest.mock import patch
-from drupal_json_api import DrupalJsonApiClient
+from drupal_json_api_client import DrupalJsonApiClient
 
 class TestDrupalJsonApiClient:
     def setup_method(self):
@@ -79,16 +79,15 @@ class TestDrupalJsonApiClient:
         mock_perform_request.side_effect = side_effect
 
         # Call the method under test
-        items = self.client.get_drupal_data_recursively(
-            'node/jobs',
-            self.client.extract_common_data_from_nodes,
-            included_relationships=[], 
-            included_relationships_ids=[]
-        )
+        items = self.client.get_drupal_data_recursively('node/jobs')
 
         # Assertions to verify the expected behavior
         assert len(items) == 3
-        titles = [item['title'] for item in items]
+        ids = [item['id'] for item in items]
+        assert '1' in ids
+        assert '2' in ids
+        assert '3' in ids
+        titles = [item['attributes']['title'] for item in items]
         assert 'Job 1' in titles
         assert 'Job 2' in titles
         assert 'Job 3' in titles

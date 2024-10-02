@@ -1,13 +1,17 @@
 from common_tools.helpers.execute_helper import Execute
 from common_tools.helpers.file_helper import file
 from common_tools.helpers.llm_helper import Llm
+from common_tools.helpers.prompts_helper import Prompts
 from common_tools.RAG.rag_filtering_metadata_helper import RagFilteringMetadataHelper
 from common_tools.models.question_analysis import QuestionAnalysis, QuestionAnalysisPydantic
 from common_tools.RAG.rag_service import RAGService
 
 class RAGPreTreatment:
+    default_filters = {}
+    
     @staticmethod
-    def rag_pre_treatment(rag:RAGService, query:str) -> tuple[QuestionAnalysis, dict]:
+    def rag_pre_treatment(rag:RAGService, query:str, default_filters:dict = {}) -> tuple[QuestionAnalysis, dict]:
+        RAGPreTreatment.default_filters = default_filters #todo: think to make instanciate the class for specific filters by app.
         question_analysis, found_metadata, extracted_metadata = Execute.run_parallel(
             (RAGPreTreatment.analyse_query_language, (rag, query)),
             (RAGPreTreatment.analyse_query_metadata, (rag, query)),
@@ -20,13 +24,13 @@ class RAGPreTreatment:
 
     @staticmethod    
     def analyse_query_language(rag:RAGService, question:str) -> QuestionAnalysis:
-        prefilter_prompt = file.get_as_str("prompts/rag_language_detection_query.txt", remove_comments=True)
+        prefilter_prompt = Prompts.get_language_detection_prompt()
         prefilter_prompt = prefilter_prompt.replace("{question}", question)
         prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(
             prefilter_prompt, QuestionAnalysisPydantic, QuestionAnalysis
         )
         response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(
-            "RAG prefiltering", [rag.llm, rag.llm], output_parser, 10, *[prompt_for_output_parser]
+            "RAG prefiltering", [rag.inference_llm, rag.inference_llm], output_parser, 10, *[prompt_for_output_parser]
         )
         question_analysis = response[0]
         question_analysis['question'] = question
@@ -36,16 +40,7 @@ class RAGPreTreatment:
 
     @staticmethod
     def analyse_query_metadata(rag:RAGService, question:str) -> dict:
-        return None #todo: implement this method
-        prefilter_prompt = file.get_as_str("prompts/rag_metadata_detection_query.txt", remove_comments=True)
-        prefilter_prompt = prefilter_prompt.replace("{question}", question)
-        prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(
-            prefilter_prompt, QuestionAnalysisPydantic, QuestionAnalysis
-        )
-        response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(
-            "RAG prefiltering", [rag.llm, rag.llm], output_parser, 10, *[prompt_for_output_parser]
-        )
-        return metadata
+        return None #todo: implement this method using langchain self querying insead
 
     @staticmethod   
     def extract_explicit_metadata(question:str) -> tuple[str, dict]:
@@ -53,5 +48,5 @@ class RAGPreTreatment:
         if RagFilteringMetadataHelper.has_manual_filters(question):
             filters, question = RagFilteringMetadataHelper.extract_manual_filters(question)
         else:
-            filters = RagFilteringMetadataHelper.get_default_filters()
+            filters = RAGPreTreatment.default_filters
         return question, filters

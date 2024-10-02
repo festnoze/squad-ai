@@ -20,7 +20,7 @@ class file:
         if '/' in filename or '\\' in filename:
             path = filename
         else:
-            path = f"inputs\\{filename}" 
+            path = f"inputs/{filename}" 
         try:
             with open(path, 'r', encoding=encoding) as file_reader:
                 content = file_reader.read()

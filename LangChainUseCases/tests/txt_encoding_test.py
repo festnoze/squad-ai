@@ -1,6 +1,5 @@
-
 import pytest
-from helpers.txt_helper import txt
+from common_tools.helpers import txt
 
 class TestSampleModule:
 

@@ -1,12 +1,14 @@
 import time
-from openai import OpenAI
 import streamlit as st
+
 # common tools import
 from common_tools.helpers.txt_helper import txt
 from common_tools.models.llm_info import LlmInfo
 from common_tools.RAG.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
 from common_tools.RAG.rag_inference_pipeline.rag_inference_pipeline_with_prefect import RagInferencePipelineWithPrefect
-from common_tools.helpers.rag_service import RAGService
+from common_tools.RAG.rag_service import RAGService
+from common_tools.RAG.rag_filtering_metadata_helper import RagFilteringMetadataHelper
+
 # internal import
 from services.available_actions import AvailableActions
 from startup import Startup
@@ -93,7 +95,8 @@ class ChatbotFront:
             if ChatbotFront.use_prefect:
                 ChatbotFront.inference_pipeline = RagInferencePipelineWithPrefect(ChatbotFront.rag, None)            
             else:
-                ChatbotFront.inference_pipeline = RagInferencePipeline(ChatbotFront.rag, None)
+                default_filters = RagFilteringMetadataHelper.get_CodeSharpDoc_default_filters()
+                ChatbotFront.inference_pipeline = RagInferencePipeline(ChatbotFront.rag, default_filters, None)
 
     def clear_conversation():
         st.session_state.messages = []

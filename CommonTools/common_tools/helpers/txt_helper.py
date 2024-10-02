@@ -26,16 +26,26 @@ class txt:
     def single_line(text: str) -> str:
         return ' '.join([line.strip() for line in text.split('\n')])
         
-    def get_elapsed_seconds(start_time, end_time):
+    def get_elapsed_seconds(start_time, end_time) -> float:
         if not start_time or not end_time:
             return 0
-        return int(end_time - start_time)
+        return float(end_time - start_time)
         
     
-    def get_elapsed_str(elapsed_sec: int):
+    def get_elapsed_str(elapsed_sec: float) -> str:
         elapsed_str = ''
         elapsed_minutes = int(elapsed_sec / 60)
-        elapsed_seconds = int(elapsed_sec % 60)
+        if elapsed_minutes != 0:
+            elapsed_seconds = int(elapsed_sec % 60)
+        else:
+            elapsed_seconds = round(float(elapsed_sec % 60), 2)
+            seconds_int = int(elapsed_seconds)
+            if seconds_int == 0:
+                elapsed_seconds = round(elapsed_seconds, 2)
+            elif seconds_int <= 9:
+                elapsed_seconds = round(elapsed_seconds, 1)
+            else:
+                elapsed_seconds = int(elapsed_seconds)
 
         if elapsed_minutes != 0:
             elapsed_str += f"{elapsed_minutes}m "
@@ -60,7 +70,7 @@ class txt:
     
     @staticmethod
     def print(text: str= "", end='\n'):
-        if txt.activate_print:
+        if txt.activate_print and not txt.waiting_spinner_thread:
             print(text, end=end)
 
     @staticmethod
@@ -100,7 +110,8 @@ class txt:
 
         # Ensure only one spinner thread is running at a time
         if txt.waiting_spinner_thread and txt.waiting_spinner_thread.is_alive():
-            raise Exception("Previous waiting spinner thread wasn't halted before creating a new one")
+            txt.stop_spinner()
+            txt.print("Previous waiting spinner thread wasn't halted before creating a new one")
 
         txt.stop_event.clear()
         txt.waiting_spinner_thread = Thread(target=txt.wait_spinner, args=(text,))

@@ -4,6 +4,7 @@ from typing import List, Dict, Any
 
 from common_tools.helpers import txt
 
+#OBSOLETE - NOT USED
 class DrupalJsonApiClient:
     def __init__(self, base_url="https://www.studi.com/jsonapi/"):
         self.BASE_URL = base_url

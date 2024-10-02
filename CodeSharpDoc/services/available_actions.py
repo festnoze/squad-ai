@@ -1,13 +1,13 @@
-
 import json
 from typing import List
-
+#
 from common_tools.helpers.file_helper import file
 from common_tools.helpers.txt_helper import txt
 from common_tools.models.llm_info import LlmInfo
 from common_tools.RAG.rag_inference_pipeline import RagInferencePipeline
-from common_tools.helpers.rag_service import RAGService
-
+from common_tools.RAG.rag_service import RAGService
+from common_tools.models.embedding_type import EmbeddingModel
+#
 from services.analysed_structures_handling import AnalysedStructuresHandling
 from services.summary_generation_service import SummaryGenerationService
 
@@ -35,7 +35,7 @@ class AvailableActions:
 
     def init_rag_service(llms_infos) -> RAGService:
         if not AvailableActions.rag_service:
-            AvailableActions.rag_service = RAGService(llms_infos)
+            AvailableActions.rag_service = RAGService(llms_infos, EmbeddingModel.OpenAI_TextEmbedding3Large)
         return AvailableActions.rag_service
 
     @staticmethod
@@ -55,7 +55,7 @@ class AvailableActions:
             
             # Generate summaries for all specified C# files
             if choice == "1" or choice == "g":
-                AvailableActions.generate_all_summaries(llms_infos, files_batch_size, llm_batch_size, AvailableActions.local_path, struct_desc_folder_path)
+                AvailableActions.generate_all_summaries(llms_infos, files_batch_size, llm_batch_size, AvailableActions.local_path)
                 continue
 
             elif choice == "2" or choice == "a":
@@ -116,9 +116,9 @@ class AvailableActions:
     @staticmethod
     def rebuild_vectorstore(llms_infos: List[LlmInfo]):
         AvailableActions.init_rag_service(llms_infos)
-        AvailableActions.rag_service.empty_vectorstore() # delete or empty DB first
+        AvailableActions.rag_service.reset_vectorstore() # delete or empty DB first
         docs = AvailableActions.get_documents_to_vectorize_from_loaded_analysed_structures(AvailableActions.struct_desc_folder_path)
-        count = AvailableActions.rag_service.build_vectorstore_from(docs, doChunkContent=False)
+        count = AvailableActions.rag_service.build_vectorstore_and_bm25_store(docs, chunk_size=0, delete_existing=True)
         print(f"Vector store built with {count} items")
 
     @staticmethod
@@ -133,18 +133,22 @@ class AvailableActions:
 
 
     @staticmethod
-    def get_documents_to_vectorize_from_loaded_analysed_structures(self, struct_desc_folder_path: str) -> list[str]:
+    def get_documents_to_vectorize_from_loaded_analysed_structures(struct_desc_folder_path: str) -> list[str]:
         docs: list[str] = []
         structs_str = file.get_files_contents(struct_desc_folder_path, 'json')
         for struct_str in structs_str:
             struct = json.loads(struct_str)
             summary = struct['generated_summary'] if hasattr(struct, 'generated_summary') and getattr(struct, 'generated_summary') else struct['existing_summary']
             if summary:
-                doc = self.build_document(content=summary, metadata= {'struct_type': struct['struct_type'], 'struct_name': struct['struct_name'], 'namespace': struct['namespace_name'], 'summary_kind': 'method', 'functional_type': struct['functional_type'] })
+                doc = AvailableActions.build_document(content=summary, metadata= {'struct_type': struct['struct_type'], 'struct_name': struct['struct_name'], 'namespace': struct['namespace_name'], 'summary_kind': 'method', 'functional_type': struct['functional_type'] })
                 docs.append(doc)
             for method in struct['methods']:
                 summary = method['generated_summary'] if hasattr(method, 'generated_summary') and getattr(method, 'generated_summary') else method['existing_summary']
                 if summary:
-                    doc = self.build_document(content=summary, metadata= {'struct_type': struct['struct_type'], 'struct_name': struct['struct_name'], 'method_name': method['method_name'], 'namespace': struct['namespace_name'], 'summary_kind': 'method', 'functional_type': struct['functional_type'] })
+                    doc = AvailableActions.build_document(content=summary, metadata= {'struct_type': struct['struct_type'], 'struct_name': struct['struct_name'], 'method_name': method['method_name'], 'namespace': struct['namespace_name'], 'summary_kind': 'method', 'functional_type': struct['functional_type'] })
                     docs.append(doc)
         return docs
+    
+    @staticmethod
+    def build_document(content: str, metadata: dict):
+        return {'page_content': content, 'metadata': metadata}

@@ -13,8 +13,9 @@ from common_tools.RAG.rag_inference_pipeline.rag_answer_generation_tasks import 
 from common_tools.RAG.rag_inference_pipeline.rag_post_treatment_tasks import RAGPostTreatment
 
 class RagInferencePipeline:
-    def __init__(self, rag: RAGService, tools: list = None):
+    def __init__(self, rag: RAGService, default_filters: dict = {}, tools: list = None):
         self.rag: RAGService = rag
+        self.default_filters = default_filters
         self.tools: list = tools
 
         if tools and any(tools):
@@ -27,11 +28,11 @@ class RagInferencePipeline:
             all_tools = [repl_tool]            
             additionnal_tools = [format_tool_to_openai_function(t) for t in tools] #TODO: check compatibility out of OpenAI
             all_tools.extend(additionnal_tools)
-            self.rag.llm = self.rag.llm.bind_functions(all_tools)
+            self.rag.inference_llm = self.rag.inference_llm.bind_functions(all_tools)
             self.tool_executor = ToolExecutor(all_tools)
 
     # Main workflow
-    def run(self, query: str, include_bm25_retrieval: bool = False, give_score=True):
+    def run(self, query: str, include_bm25_retrieval: bool = False, give_score=True) -> tuple:
 
         guardrails_result, run_inference_pipeline_results = Execute.run_parallel( 
             (RAGGuardrails.guardrails_query_analysis, (query)), # Guardrails check: query analysis
@@ -45,13 +46,13 @@ class RagInferencePipeline:
     def run_inference_pipeline_but_guardrails(self, query: str, include_bm25_retrieval: bool = False, give_score=True):
         
         # Pre-treatment
-        analysed_query, metadata = RAGPreTreatment.rag_pre_treatment(self.rag, query)
+        analysed_query, metadata = RAGPreTreatment.rag_pre_treatment(self.rag, query, self.default_filters)
 
         # Data Retrieval
         retrieved_chunks = RAGHybridRetrieval.rag_hybrid_retrieval(self.rag, analysed_query, metadata, include_bm25_retrieval, give_score)
 
         # Augmented Answer Generation
-        response = RAGAugmentedGeneration.rag_augmented_answer_generation(self.rag, retrieved_chunks, analysed_query)
+        response = RAGAugmentedGeneration.rag_augmented_answer_generation(self.rag, retrieved_chunks, analysed_query, give_score)
 
         # Post-treatment
         final_response = RAGPostTreatment.rag_post_treatment(response)

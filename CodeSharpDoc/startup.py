@@ -4,10 +4,10 @@ from common_tools.langchains.langsmith_client import Langsmith
 from common_tools.helpers.llm_helper import Llm
 from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.groq_helper import GroqHelper
-from common_tools.langchains.langchain_adapter_type import LangChainAdapterType
+from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.langchains.langchain_factory import LangChainFactory
 from common_tools.models.llm_info import LlmInfo
-from common_tools.helpers.rag_service import RAGService
+from common_tools.RAG.rag_service import RAGService
 # internal import
 from services.summary_generation_service import SummaryGenerationService
 

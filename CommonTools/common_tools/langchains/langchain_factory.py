@@ -6,7 +6,7 @@ import uuid
 #from langchain_google_genai import GoogleGenerativeAI
 from langchain_core.language_models import BaseChatModel
 from common_tools.helpers.txt_helper import txt
-from common_tools.langchains.langchain_adapter_type import LangChainAdapterType
+from common_tools.models.langchain_adapter_type import LangChainAdapterType
 
 from common_tools.models.llm_info import LlmInfo
 
