@@ -21,7 +21,7 @@ class AvailableService:
         self.openai_api_key = os.getenv("OPEN_API_KEY")
         txt.activate_print = True
         llms_infos = []
-        llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout= 80, temperature = 0.1, api_key= None))
+        llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout= 80, temperature = 0.1))
         self.rag_service = RAGService(llms_infos, EmbeddingModel.OpenAI_TextEmbedding3Small) #EmbeddingModel.Ollama_AllMiniLM
 
 
@@ -45,7 +45,7 @@ class AvailableService:
             elif choice == "3":
                 self.docs_retrieval_query()
             elif choice == "4":
-                self.rag_query()
+                self.rag_query_console()
             elif choice == "5" or choice.lower() == "e":
                 print("Exiting ...")
                 exit()
@@ -73,7 +73,7 @@ class AvailableService:
             txt.print(f"[{score:.4f}] ({doc.metadata['type']}) {doc.metadata['name']} : {doc.page_content}".strip())
         return docs
     
-    def rag_query(self):
+    def rag_query_console(self):
         inference = RagInferencePipeline(self.rag_service)
         while True:
             query = input("Entrez votre question ('exit' pour quitter):\n")
@@ -86,6 +86,29 @@ class AvailableService:
                 for source in sources:
                     txt.print(source[0])
 
+    def rag_query(self, query):
+        inference = RagInferencePipeline(self.rag_service)
+        response, sources = inference.run(query, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
+        return response, sources
+
+    #todo: to delete or write to add metadata to context
+    @staticmethod
+    def format_retrieved_docs_function(retrieved_docs):
+        if not any(retrieved_docs):
+            return 'not a single information were found. Don\'t answer the question.'
+        return retrieved_docs
+        # context = ''
+        # for retrieved_doc in retrieved_docs:
+        #     doc = retrieved_doc[0] if isinstance(retrieved_doc, tuple) else retrieved_doc
+        #     summary = doc.page_content
+        #     functional_type = doc.metadata.get('functional_type')
+        #     method_name = doc.metadata.get('method_name')
+        #     namespace = doc.metadata.get('namespace')
+        #     struct_name = doc.metadata.get('struct_name')
+        #     struct_type = doc.metadata.get('struct_type')
+
+        #     context += f"• {summary}. In {functional_type.lower()} {struct_type.lower()}  '{struct_name}',{" method '" + method_name + "'," if method_name else ''} from namespace '{namespace}'.\n"
+        return context
 
     def create_sqlLite_database(self, out_dir):
         db_instance = DB()

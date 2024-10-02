@@ -17,6 +17,10 @@ from common_tools.models.question_analysis import QuestionAnalysis, QuestionAnal
 from common_tools.RAG.rag_filtering_metadata_helper import RagFilteringMetadataHelper
 from common_tools.RAG.rag_service import RAGService
 from common_tools.RAG.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
+from langchain_core.language_models import BaseChatModel
+from langchain_core.documents import Document
+from langchain_core.runnables import Runnable, RunnablePassthrough
+from langchain_core.prompts import ChatPromptTemplate
 
 class RagInferencePipelineWithPrefect:
     
@@ -96,7 +100,7 @@ class RagInferencePipelineWithPrefect:
         time.sleep(5)
         if "bad query" in query:  # Example check
             return False
-        print(">>> Query accepted by guardrails")
+        #print(">>> Query accepted by guardrails")
         return True
     
     @task
@@ -209,7 +213,7 @@ class RagInferencePipelineWithPrefect:
     def rag_response_generation(self, retrieved_chunks: list, questionAnalysis: QuestionAnalysis):
         # Remove score from retrieved docs
         retrieved_chunks = [doc[0] if isinstance(doc, tuple) else doc for doc in retrieved_chunks]
-        return self.rag.generate_augmented_response_from_retrieved_chunks(self.rag.inference_llm, retrieved_chunks, questionAnalysis)
+        return self.generate_augmented_response_from_retrieved_chunks(self.rag.inference_llm, retrieved_chunks, questionAnalysis)
         
     # Post-treatment subflow
     @flow(name="RAG post-treatment")
@@ -219,3 +223,24 @@ class RagInferencePipelineWithPrefect:
     @task
     def response_post_treatment(self, response):
         return response
+    
+    @staticmethod
+    def generate_augmented_response_from_retrieved_chunks(self, llm: BaseChatModel, retrieved_docs: list[Document], questionAnalysis: QuestionAnalysis, format_retrieved_docs_function = None) -> str:
+        retrieval_prompt = Prompts.get_rag_retriever_query_prompt()
+        retrieval_prompt = retrieval_prompt.replace("{question}", questionAnalysis.translated_question)
+        additional_instructions = ''
+        if not questionAnalysis.detected_language.__contains__("english"):
+            additional_instructions = Prompts.get_prefiltering_translation_instructions_prompt()
+            additional_instructions = additional_instructions.replace("{target_language}", questionAnalysis.detected_language)
+        retrieval_prompt = retrieval_prompt.replace("{additional_instructions}", additional_instructions)
+        rag_custom_prompt = ChatPromptTemplate.from_template(retrieval_prompt)
+
+        if format_retrieved_docs_function is None:
+            context = retrieved_docs
+        else:
+            context = format_retrieved_docs_function(retrieved_docs)
+        
+        rag_chain = rag_custom_prompt | llm | RunnablePassthrough()
+        answer = rag_chain.invoke(input= context)
+
+        return Llm.get_content(answer)  

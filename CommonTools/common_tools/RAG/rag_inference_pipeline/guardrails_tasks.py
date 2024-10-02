@@ -8,5 +8,5 @@ class RAGGuardrails:
         time.sleep(0.5) #todo: to implement
         if "bad query" in query:
             return False
-        txt.print(">>> Query accepted by guardrails")
+        #txt.print(">>> Query accepted by guardrails")
         return True

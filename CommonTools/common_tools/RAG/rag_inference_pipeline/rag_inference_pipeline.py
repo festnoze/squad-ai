@@ -32,19 +32,19 @@ class RagInferencePipeline:
             self.tool_executor = ToolExecutor(all_tools)
 
     # Main workflow
-    def run(self, query: str, include_bm25_retrieval: bool = False, give_score=True) -> tuple:
-
+    def run(self, query: str, include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None) -> tuple:
+        """Run the full RAG inference pipeline including guardrails"""
         guardrails_result, run_inference_pipeline_results = Execute.run_parallel( 
             (RAGGuardrails.guardrails_query_analysis, (query)), # Guardrails check: query analysis
-            (self.run_inference_pipeline_but_guardrails, (), {'query': query, 'include_bm25_retrieval': include_bm25_retrieval, 'give_score': give_score})
+            (self.run_inference_pipeline, (), {'query': query, 'include_bm25_retrieval': include_bm25_retrieval, 'give_score': give_score, 'format_retrieved_docs_function': format_retrieved_docs_function})
         )
 
-        self.check_for_guardrails(guardrails_result)
+        self.check_for_guardrails(guardrails_result) # todo: could rather be awaited before augmentated generation (cf. diagram)
         final_response, retrieved_chunks = run_inference_pipeline_results
         return final_response, retrieved_chunks
     
-    def run_inference_pipeline_but_guardrails(self, query: str, include_bm25_retrieval: bool = False, give_score=True):
-        
+    def run_inference_pipeline(self, query: str, include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None) -> tuple:
+        """Run the full RAG inference pipeline, but without guardrails"""
         # Pre-treatment
         analysed_query, metadata = RAGPreTreatment.rag_pre_treatment(self.rag, query, self.default_filters)
 
@@ -52,7 +52,7 @@ class RagInferencePipeline:
         retrieved_chunks = RAGHybridRetrieval.rag_hybrid_retrieval(self.rag, analysed_query, metadata, include_bm25_retrieval, give_score)
 
         # Augmented Answer Generation
-        response = RAGAugmentedGeneration.rag_augmented_answer_generation(self.rag, retrieved_chunks, analysed_query, give_score)
+        response = RAGAugmentedGeneration.rag_augmented_answer_generation(self.rag, retrieved_chunks, analysed_query, give_score, format_retrieved_docs_function)
 
         # Post-treatment
         final_response = RAGPostTreatment.rag_post_treatment(response)

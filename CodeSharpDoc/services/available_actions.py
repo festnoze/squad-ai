@@ -103,7 +103,7 @@ class AvailableActions:
     @staticmethod
     def rag_querying_from_sl_chatbot(inference_pipeline, query: str, st, include_bm25_retrieval:bool = False):
         txt.print_with_spinner("Querying RAG service.")
-        answer, sources = inference_pipeline.run(query=query, include_bm25_retrieval= include_bm25_retrieval, give_score= True)
+        answer, sources = inference_pipeline.run(query=query, include_bm25_retrieval= include_bm25_retrieval, give_score= True, format_retrieved_docs_function = AvailableActions.format_retrieved_docs_function)
         txt.stop_spinner_replace_text("RAG retieval done")
         answer = txt.remove_markdown(answer)
         st.session_state.messages.append({"role": "assistant", "content": answer})
@@ -113,6 +113,24 @@ class AvailableActions:
         #st.session_state.messages.append({"role": "assistant", "content": txt.remove_markdown(sources)})
         #st.text(sources)
 
+    @staticmethod
+    def format_retrieved_docs_function(retrieved_docs):
+        """Formating of retrieved documents for augmented generation"""
+        if not any(retrieved_docs):
+            return 'not a single information were found. Don\'t answer the question.'
+        context = ''
+        for retrieved_doc in retrieved_docs:
+            doc = retrieved_doc[0] if isinstance(retrieved_doc, tuple) else retrieved_doc
+            summary = doc.page_content
+            functional_type = doc.metadata.get('functional_type')
+            method_name = doc.metadata.get('method_name')
+            namespace = doc.metadata.get('namespace')
+            struct_name = doc.metadata.get('struct_name')
+            struct_type = doc.metadata.get('struct_type')
+
+            context += f"• {summary}. In {functional_type.lower()} {struct_type.lower()}  '{struct_name}',{" method '" + method_name + "'," if method_name else ''} from namespace '{namespace}'.\n"
+        return context
+    
     @staticmethod
     def rebuild_vectorstore(llms_infos: List[LlmInfo]):
         AvailableActions.init_rag_service(llms_infos)

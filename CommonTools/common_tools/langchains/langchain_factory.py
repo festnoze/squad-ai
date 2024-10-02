@@ -1,3 +1,4 @@
+import os
 from langchain_openai import ChatOpenAI
 from langchain_community.chat_models import ChatOllama, ChatAnthropic
 from langchain_groq import ChatGroq
@@ -35,6 +36,8 @@ class LangChainFactory():
     def create_llm(adapter_type: LangChainAdapterType, llm_model_name: str, timeout_seconds: int = 50, temperature: float = 0.1, api_key: str = None) -> BaseChatModel:
         llm: BaseChatModel = None
         if adapter_type == LangChainAdapterType.OpenAI:
+            if not api_key:
+                api_key = os.getenv("OPEN_API_KEY")
             llm = LangChainFactory.create_llm_openai(llm_model_name, api_key, timeout_seconds, temperature)
         elif adapter_type == LangChainAdapterType.Ollama:
             llm = LangChainFactory.create_llm_ollama(llm_model_name, timeout_seconds, temperature)

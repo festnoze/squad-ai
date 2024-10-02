@@ -5,8 +5,6 @@ import json
 # langchain related imports
 from langchain_core.language_models import BaseChatModel
 from langchain_core.documents import Document
-from langchain_core.runnables import Runnable, RunnablePassthrough
-from langchain_core.prompts import ChatPromptTemplate
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.document_loaders import TextLoader
 #from langchain_community.vectorstores import FAISS
@@ -174,36 +172,3 @@ class RAGService:
         )
         chunks = txt_splitter.split_text(text)
         return chunks
-
-    #todo: to move to docSharp or to generalize
-    def generate_augmented_response_from_retrieved_chunks(self, llm: BaseChatModel, retrieved_docs: list[Document], questionAnalysis: QuestionAnalysis) -> str:
-        retrieval_prompt = Prompts.get_rag_retriever_query_prompt()
-        retrieval_prompt = retrieval_prompt.replace("{question}", questionAnalysis.translated_question)
-        additional_instructions = ''
-        if not questionAnalysis.detected_language.__contains__("english"):
-            additional_instructions = Prompts.get_prefiltering_translation_instructions_prompt()
-            additional_instructions = additional_instructions.replace("{target_language}", questionAnalysis.detected_language)
-        retrieval_prompt = retrieval_prompt.replace("{additional_instructions}", additional_instructions)
-        rag_custom_prompt = ChatPromptTemplate.from_template(retrieval_prompt)
-
-        context = self.get_str_from_rag_retrieved_docs(retrieved_docs)
-        rag_chain = rag_custom_prompt | llm | RunnablePassthrough()
-        answer = rag_chain.invoke(input= context)
-        return Llm.get_content(answer)
-
-    #todo: to move to docSharp or to generalize
-    def get_str_from_rag_retrieved_docs(self, retrieved_docs):
-        if not any(retrieved_docs):
-            return 'not a single information were found. Don\'t answer the question.'
-        context = ''
-        for retrieved_doc in retrieved_docs:
-            doc = retrieved_doc[0] if isinstance(retrieved_doc, tuple) else retrieved_doc
-            summary = doc.page_content
-            functional_type = doc.metadata.get('functional_type')
-            method_name = doc.metadata.get('method_name')
-            namespace = doc.metadata.get('namespace')
-            struct_name = doc.metadata.get('struct_name')
-            struct_type = doc.metadata.get('struct_type')
-
-            context += f"• {summary}. In {functional_type.lower()} {struct_type.lower()}  '{struct_name}',{" method '" + method_name + "'," if method_name else ''} from namespace '{namespace}'.\n"
-        return context

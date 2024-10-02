@@ -84,13 +84,10 @@ class ChatbotFront:
             with st.spinner("Recherche de réponses en cours ..."):
                 st.session_state.messages.append({"role": "user", "content": txt.remove_markdown(prompt)})
                 st.chat_message("user").write(prompt)
-                llms_infos = []
-                llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout= 80, temperature = 0.1, api_key= os.getenv("OPEN_API_KEY")))
-                rag_service = RAGService(llms_infos, EmbeddingModel.OpenAI_TextEmbedding3Small) #EmbeddingModel.Ollama_AllMiniLM
-
-                inference = RagInferencePipeline(rag_service)
-                response, sources = inference.run(prompt, include_bm25_retrieval= True, give_score=True)
-                st.session_state.messages.append({"role": "assistant", "content": txt.remove_markdown(response)})
+                services = AvailableService()
+                response, sources = services.rag_query(prompt)
+                st.session_state.messages.append({"role": "assistant", "content": response})
+                st.chat_message("user").write(response)
 
     def initialize():
         txt.activate_print = True
