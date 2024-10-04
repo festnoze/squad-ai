@@ -34,15 +34,18 @@ class RagInferencePipeline:
             self.rag.inference_llm = self.rag.inference_llm.bind_functions(all_tools)
             self.tool_executor = ToolExecutor(all_tools)
 
-    def run(self, query: str, include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None) -> tuple:
+    def run(self, query: str, include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None, override_workflow_available_classes:dict = None) -> tuple:
         config = Ressource.get_rag_pipeline_default_config_1()
-        workflow_available_classes = {
-                'RAGGuardrails': RAGGuardrails,
-                'RAGPreTreatment': RAGPreTreatment,
-                'RAGHybridRetrieval': RAGHybridRetrieval,
-                'RAGAugmentedGeneration': RAGAugmentedGeneration,
-                'RAGPostTreatment': RAGPostTreatment
-            }
+        if override_workflow_available_classes:
+            workflow_available_classes = override_workflow_available_classes
+        else:
+            workflow_available_classes = {
+                    'RAGGuardrails': RAGGuardrails,
+                    'RAGPreTreatment': RAGPreTreatment,
+                    'RAGHybridRetrieval': RAGHybridRetrieval,
+                    'RAGAugmentedGeneration': RAGAugmentedGeneration,
+                    'RAGPostTreatment': RAGPostTreatment
+                }
         workflow_executor = WorkflowExecutor(config, workflow_available_classes)
         
         kwargs = {

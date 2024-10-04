@@ -14,6 +14,7 @@ from common_tools.RAG.rag_service import RAGService
 from common_tools.RAG.rag_injection_pipeline.rag_injection_pipeline import RagInjectionPipeline
 from common_tools.RAG.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
 from common_tools.models.embedding_type import EmbeddingModel
+
 class AvailableService:
     def __init__(self):
         self.out_dir = "C:/Dev/squad-ai/Chatbot-Studi.com/DataExtraction/outputs/"

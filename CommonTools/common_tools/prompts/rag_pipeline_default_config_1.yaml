@@ -19,12 +19,13 @@ pre_treatment_steps:
       - RAGPreTreatment.extract_explicit_metadata
 
 data_retrieval_steps:
+  - RAGHybridRetrieval.map_previous_results
   - parallel_threads:
       - RAGHybridRetrieval.rag_retrieval
       - RAGHybridRetrieval.bm25_retrieval
 
 augmented_generation_steps:
-  - RAGAnswerGeneration.answer_generation
+  - RAGAugmentedGeneration.answer_generation
 
 post_treatment_steps:
   - RAGPostTreatment.response_post_treatment
