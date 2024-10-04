@@ -20,8 +20,8 @@ class RAGHybridRetrieval:
         return retained_chunks
     
     @staticmethod    
-    def rag_retrieval(rag: RAGService, analysed_query: QuestionAnalysis, filters, give_score: bool = False, max_retrieved_count: int = 10, min_score: float = None, min_retrived_count: int = None):
-        retrieved_chunks = rag.retrieve(analysed_query.translated_question, None, filters, give_score, max_retrieved_count, min_score, min_retrived_count)
+    def rag_retrieval(rag: RAGService, analysed_query: QuestionAnalysis, metadata_filters, give_score: bool = False, max_retrieved_count: int = 10, min_score: float = None, min_retrived_count: int = None):
+        retrieved_chunks = rag.retrieve(analysed_query.translated_question, None, metadata_filters, give_score, max_retrieved_count, min_score, min_retrived_count)
         return retrieved_chunks
     
     @staticmethod    

@@ -3,6 +3,8 @@ import os
 import shutil
 import glob
 import csv
+from typing import Any
+import yaml
 
 from common_tools.models.file_already_exists_policy import FileAlreadyExistsPolicy
 
@@ -34,14 +36,7 @@ class file:
         except Exception as e:
             print(f"Error happends while reading file: {filename}: {e}")
             return None
-        
-    @staticmethod 
-    def get_as_json(file_path):
-        """Get the specified file content as a JSON object."""
-        with open(f"inputs\\{file_path}", 'r') as file:
-            data = json.load(file)
-        return data
-    
+            
     @staticmethod
     def write_file(content: str, filepath: str, file_exists_policy: FileAlreadyExistsPolicy = FileAlreadyExistsPolicy.Override, encoding='utf-8-sig'):
         """
@@ -104,49 +99,45 @@ class file:
             new_filepath = f"{base}_{counter}{extension}"
         return new_filepath
 
-    def write_csv(filepath, data):
+    def write_csv(filepath:str, data:Any):
         with open(filepath, 'w', newline='\r\n', encoding='utf-8-sig') as file_handler:
             writer = csv.writer(file_handler)
             #writer.writerows(data)
             for line in data:
                 writer.writerow([line])
 
-    def read_csv(filepath):
+    def read_csv(filepath:str):
         with open(filepath, 'r', newline='\r\n', encoding='utf-8-sig') as file_handler:
             reader = csv.reader(file_handler)
             data = list(reader)
         return data
     
-    def read_file(filepath):
+    def read_file(filepath:str):
         with open(filepath, 'r', encoding='utf-8-sig') as file_handler:
             data = file_handler.read()
         return data
     
-    def file_exists(filepath):
+    def file_exists(filepath:str):
         return os.path.exists(filepath)
     
     @staticmethod
-    def delete_all_files_with_extension(extension, folder_path):
-        files_to_delete = glob.glob(os.path.join(folder_path, f"{extension}"))
+    def delete_all_files_with_extension(extension_to_delete:str, folder_path:str):
+        files_to_delete = glob.glob(os.path.join(folder_path, f"{extension_to_delete}"))
         for file_to_delete in files_to_delete:
             os.remove(file_to_delete)
     
     @staticmethod
-    def delete_file(path_and_name):
+    def delete_file(path_and_name:str):
         if file.file_exists(path_and_name):
             os.remove(path_and_name)
-    
+        
     @staticmethod
-    def file_exists(filepath):
-        return os.path.exists(filepath)
-    
-    @staticmethod
-    def delete_folder(folder_path):
+    def delete_folder(folder_path:str):
         if os.path.exists(folder_path):
             shutil.rmtree(folder_path) # Delete the folder and all its contents
 
     @staticmethod
-    def delete_files_in_folder(folder_path):
+    def delete_files_in_folder(folder_path:str):
         if os.path.exists(folder_path):
             for filename in os.listdir(folder_path):
                 file_path = os.path.join(folder_path, filename)
@@ -159,7 +150,7 @@ class file:
                     print(f"File deletion failed: '{file_path}'. With error: {e}")
     
     @staticmethod
-    def get_all_folder_and_subfolders_files_path(path, extension=None):
+    def get_all_folder_and_subfolders_files_path(path:str, extension:str=None):
         all_files = []        
         for root, dirs, files in os.walk(path):
             for file in files:
@@ -167,7 +158,7 @@ class file:
                     all_files.append(os.path.join(root, file))        
         return all_files
     
-    def copy_folder_files_and_folders_to_folder(source_folder, destination_folder):
+    def copy_folder_files_and_folders_to_folder(source_folder:str, destination_folder:str):
         if not os.path.exists(destination_folder):
             os.makedirs(destination_folder)
         shutil.copytree(source_folder, destination_folder, dirs_exist_ok=True)
@@ -184,9 +175,26 @@ class file:
         return paths_and_contents
     
     @staticmethod
-    def get_files_contents(file_path, extension):
+    def get_files_contents(file_path:str, extension:str):
         contents = []
         files = file.get_all_folder_and_subfolders_files_path(file_path, '.' + extension)
         for file_path in files:
             contents.append(file.get_as_str(file_path))
         return contents
+    
+    @staticmethod 
+    def get_as_json(file_path:str):
+        """Get the specified file content as a JSON object."""
+        with open(f"{file_path}", 'r') as file:
+            data = json.load(file)
+        return data
+    
+    @staticmethod
+    def get_as_yaml(file_path:str):
+        """Load the specified YAML file."""
+        if not file_path.endswith('.yaml') and not file_path.endswith('.yml'):
+            file_path += '.yaml'
+        if not os.path.exists(file_path):
+            return None
+        with open(file_path, 'r') as file:
+            return yaml.safe_load(file)

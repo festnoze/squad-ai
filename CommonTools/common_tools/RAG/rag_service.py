@@ -15,7 +15,7 @@ from langchain_chroma import Chroma
 from langchain.retrievers.multi_query import MultiQueryRetriever
 
 # common tools imports
-from common_tools.helpers.prompts_helper import Prompts
+from common_tools.helpers.ressource_helper import Ressource
 from common_tools.models.file_already_exists_policy import FileAlreadyExistsPolicy
 from common_tools.models.llm_info import LlmInfo
 from common_tools.models.question_analysis import QuestionAnalysis
@@ -48,10 +48,10 @@ class RAGService:
         else:
             raise ValueError("Invalid llm_or_infos parameter")
     
-    def retrieve(self, question: str, additionnal_context: str = None, filters: dict = None, give_score: bool = False, max_retrived_count: int = 10, min_score: float = None, min_retrived_count: int = None) -> list[Document]:
-        return self._retrieve(self.vectorstore, question, additionnal_context, filters, give_score, max_retrived_count, min_score, min_retrived_count)
+    def retrieve(self, question: str, additionnal_context: str = None, metadata_filters: dict = None, give_score: bool = False, max_retrived_count: int = 10, min_score: float = None, min_retrived_count: int = None) -> list[Document]:
+        return self._retrieve(self.vectorstore, question, additionnal_context, metadata_filters, give_score, max_retrived_count, min_score, min_retrived_count)
     
-    def _retrieve(self, vectorstore, question: str, additionnal_context: str = None, filters: dict = None, give_score: bool = False, max_retrived_count: int = 10, min_score: float = None, min_retrived_count: int = None) -> List[Document]:
+    def _retrieve(self, vectorstore, question: str, additionnal_context: str = None, metadata_filters: dict = None, give_score: bool = False, max_retrived_count: int = 10, min_score: float = None, min_retrived_count: int = None) -> List[Document]:
         if additionnal_context:
             full_question = f"### User Question:\n {question}\n\n### Context:\n{additionnal_context}" 
         else:
@@ -61,7 +61,7 @@ class RAGService:
         #results = retriever_from_llm.invoke(input==full_question)
 
         if give_score:
-            results = vectorstore.similarity_search_with_score(full_question, k=max_retrived_count, filter=filters)
+            results = vectorstore.similarity_search_with_score(full_question, k=max_retrived_count, filter=metadata_filters)
             if min_score and min_retrived_count and len(results) > min_retrived_count:
                 top_results = []
                 for result in results:
@@ -69,7 +69,7 @@ class RAGService:
                         top_results.append(result)
                 results = top_results
         else:
-            results = vectorstore.similarity_search(full_question, k=max_retrived_count, filter=filters)
+            results = vectorstore.similarity_search(full_question, k=max_retrived_count, filter=metadata_filters)
         return results
             
     def _load_bm25_store(self, bm25_results_count: int = 1) -> tuple:

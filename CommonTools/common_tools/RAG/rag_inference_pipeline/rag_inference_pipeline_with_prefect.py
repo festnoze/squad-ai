@@ -11,7 +11,7 @@ from prefect.task_runners import ConcurrentTaskRunner, ThreadPoolTaskRunner
 from prefect.logging import get_run_logger
 
 from common_tools.helpers.llm_helper import Llm
-from common_tools.helpers.prompts_helper import Prompts
+from common_tools.helpers.ressource_helper import Ressource
 from common_tools.models.logical_operator import LogicalOperator
 from common_tools.models.question_analysis import QuestionAnalysis, QuestionAnalysisPydantic
 from common_tools.RAG.rag_filtering_metadata_helper import RagFilteringMetadataHelper
@@ -104,25 +104,25 @@ class RagInferencePipelineWithPrefect:
         return True
     
     @task
-    def analyse_query_language(self, question):
-        prefilter_prompt = Prompts.get_language_detection_prompt()
-        prefilter_prompt = prefilter_prompt.replace("{question}", question)
+    def analyse_query_language(self, query):
+        prefilter_prompt = Ressource.get_language_detection_prompt()
+        prefilter_prompt = prefilter_prompt.replace("{question}", query)
         prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(prefilter_prompt, QuestionAnalysisPydantic, QuestionAnalysis)
         response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks("RAG prefiltering", [self.rag.inference_llm, self.rag.inference_llm], output_parser, 10, *[prompt_for_output_parser])
         questionAnalysis = response[0]
-        questionAnalysis['question'] = question
+        questionAnalysis['question'] = query
         if questionAnalysis['detected_language'].__contains__("english"):
-            questionAnalysis['translated_question'] = question
+            questionAnalysis['translated_question'] = query
         return QuestionAnalysis(**questionAnalysis)
     
     @task
-    def extract_explicit_metadata(self, question) -> tuple[str, dict]:
+    def extract_explicit_metadata(self, query) -> tuple[str, dict]:
         filters = {}
-        if RagFilteringMetadataHelper.has_manual_filters(question):
-            filters, question = RagFilteringMetadataHelper.extract_manual_filters(question)
+        if RagFilteringMetadataHelper.has_manual_filters(query):
+            filters, query = RagFilteringMetadataHelper.extract_manual_filters(query)
         else:
             filters = self.default_filters       
-        return question, filters
+        return query, filters
 
     # Data Retrieval sub-flow with parallel RAG and BM25 retrieval
     @flow(name="RAG hybrid retrieval", task_runner=ThreadPoolTaskRunner(max_workers=3))
@@ -226,11 +226,11 @@ class RagInferencePipelineWithPrefect:
     
     @staticmethod
     def generate_augmented_response_from_retrieved_chunks(self, llm: BaseChatModel, retrieved_docs: list[Document], questionAnalysis: QuestionAnalysis, format_retrieved_docs_function = None) -> str:
-        retrieval_prompt = Prompts.get_rag_retriever_query_prompt()
+        retrieval_prompt = Ressource.get_rag_retriever_query_prompt()
         retrieval_prompt = retrieval_prompt.replace("{question}", questionAnalysis.translated_question)
         additional_instructions = ''
         if not questionAnalysis.detected_language.__contains__("english"):
-            additional_instructions = Prompts.get_prefiltering_translation_instructions_prompt()
+            additional_instructions = Ressource.get_prefiltering_translation_instructions_prompt()
             additional_instructions = additional_instructions.replace("{target_language}", questionAnalysis.detected_language)
         retrieval_prompt = retrieval_prompt.replace("{additional_instructions}", additional_instructions)
         rag_custom_prompt = ChatPromptTemplate.from_template(retrieval_prompt)

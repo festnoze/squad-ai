@@ -21,6 +21,7 @@ setup(
         'langsmith',
         'openai',
         'groq',
+        'yaml'
         #'prefect',
         #'sentence-transformers',
     ],
@@ -32,6 +33,6 @@ setup(
     python_requires='>=3.6',
     include_package_data=True,
     package_data={
-        'your_package': ['prompts/*.txt'],  # Include all prompts files as ressources
+        'common_prompts': ['prompts/*.txt'],  # Include all prompts files as ressources
     },
 )

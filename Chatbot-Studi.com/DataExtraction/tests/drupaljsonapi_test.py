@@ -1,6 +1,5 @@
 # test_drupal_client.py
 
-import pytest
 from unittest.mock import patch
 from drupal_json_api_client import DrupalJsonApiClient
 

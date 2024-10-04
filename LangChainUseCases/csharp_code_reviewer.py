@@ -23,7 +23,7 @@ class CSharpCodeReviewer:
         self.llms = llms
 
     def load_coding_guidelines(self) -> Coding_Guidelines_Rules_Model:
-        json = file.get_as_json("coding_guidelines_rules_list.json")
+        json = file.get_as_json("inputs/coding_guidelines_rules_list.json")
         return Coding_Guidelines_Rules_Model(**json)
 
     def review_code_dict(self, inputs: dict) -> Coding_Guidelines_BrokenRules_Model:

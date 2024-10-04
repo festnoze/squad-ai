@@ -7,17 +7,17 @@ class RagFilteringMetadataHelper:
         return  question.__contains__("filters:") or question.__contains__("filtres :")
     
     @staticmethod
-    def extract_manual_filters(question: str) -> tuple[dict, str]:
+    def extract_manual_filters(query: str) -> tuple[dict, str]:
         filters = {}
-        if question.__contains__("filters:"):
-            filters_str = question.split("filters:")[1]
-            question = question.split("filters:")[0]
-        elif question.__contains__("filtres :"):
-            filters_str = question.split("filtres :")[1]
-            question = question.split("filtres :")[0]
+        if query.__contains__("filters:"):
+            filters_str = query.split("filters:")[1]
+            query = query.split("filters:")[0]
+        elif query.__contains__("filtres :"):
+            filters_str = query.split("filtres :")[1]
+            query = query.split("filtres :")[0]
         filters_str = filters_str.strip()
         filters = RagFilteringMetadataHelper.get_filters_from_str(filters_str)
-        return filters, question
+        return filters, query
     
     @staticmethod
     def get_filters_from_str(filters_str: str) -> dict:

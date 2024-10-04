@@ -1,7 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
 import requests
-from langchain.retrievers import BM25Retriever
+from langchain_community.retrievers import BM25Retriever
 from rank_bm25 import BM25Okapi
 from langchain.docstore.document import Document
 import numpy as np

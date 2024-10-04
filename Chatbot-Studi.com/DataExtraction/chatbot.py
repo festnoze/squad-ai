@@ -133,7 +133,7 @@ class ChatbotFront:
         st.chat_message("assistant").write(prompt)
 
     def start_caption():
-        return "Bonjour, je m'appele Studia, et je suis un agent virtuel. \nComment puis-je t'aider ?"
+        return "Bonjour, je suis Studia, votre agent virtuel. \nComment puis-je vous aider ?"
 
 if __name__ == "__main__":
     ChatbotFront.main()

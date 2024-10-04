@@ -1,5 +1,5 @@
 from common_tools.helpers.llm_helper import Llm
-from common_tools.helpers.prompts_helper import Prompts
+from common_tools.helpers.ressource_helper import Ressource
 from common_tools.models.question_analysis import QuestionAnalysis
 from common_tools.RAG.rag_service import RAGService
 from langchain_core.language_models import BaseChatModel
@@ -22,11 +22,11 @@ class RAGAugmentedGeneration:
 
     @staticmethod
     def generate_augmented_response_from_retrieved_chunks(llm: BaseChatModel, retrieved_docs: list[Document], questionAnalysis: QuestionAnalysis, format_retrieved_docs_function = None) -> str:
-        retrieval_prompt = Prompts.get_rag_retriever_query_prompt()
+        retrieval_prompt = Ressource.get_rag_retriever_query_prompt()
         retrieval_prompt = retrieval_prompt.replace("{question}", questionAnalysis.translated_question)
         additional_instructions = ''
         if not questionAnalysis.detected_language.__contains__("english"):
-            additional_instructions = Prompts.get_prefiltering_translation_instructions_prompt()
+            additional_instructions = Ressource.get_prefiltering_translation_instructions_prompt()
             additional_instructions = additional_instructions.replace("{target_language}", questionAnalysis.detected_language)
         retrieval_prompt = retrieval_prompt.replace("{additional_instructions}", additional_instructions)
         rag_custom_prompt = ChatPromptTemplate.from_template(retrieval_prompt)
