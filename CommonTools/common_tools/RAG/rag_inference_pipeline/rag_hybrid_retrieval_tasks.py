@@ -54,7 +54,3 @@ class RAGHybridRetrieval:
 
         return rag_retrieved_chunks
     
-    @staticmethod
-    def map_previous_results(results, **kwargs):
-        return results, kwargs
-    

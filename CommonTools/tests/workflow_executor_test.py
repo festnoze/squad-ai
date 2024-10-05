@@ -32,9 +32,79 @@ class Test_WorkflowExecutor:
         result = self.executor.flatten(nested)
         assert result == expected
 
+    def test_prepare_arguments_simple_case(self):
+        func = workflow_executor_test_methods.sample_function
+        previous_results = [42, "test", 3.14]
+        kwargs_value = {}
+
+        kwargs = self.executor._prepare_arguments_for_function(func, previous_results, kwargs_value)
+        assert kwargs == {'arg1': 42, 'arg2': 'test', 'arg3': 3.14}
+
+    def test_prepare_arguments_mixed_case(self):
+        func = workflow_executor_test_methods.sample_function
+        previous_results = ["test", 3.14]  # 3.14 should not be used due to type mismatch with arg4 (bool)
+        kwargs_value = {'arg1': 42, 'arg3': 2.71}
+
+        kwargs = self.executor._prepare_arguments_for_function(func, previous_results, kwargs_value)
+        assert kwargs == {'arg1': 42, 'arg2': 'test', 'arg3': 2.71}
+        assert previous_results == [3.14]
+
+    def test_prepare_arguments_complex_case(self):
+        func = workflow_executor_test_methods.sample_function
+        previous_results = ["from_previous_results", 123]  # 123 is an int, type mismatch for arg4 (bool)
+        kwargs_value = {'arg1': 1, 'arg3': 3.14}
+
+        kwargs = self.executor._prepare_arguments_for_function(func, previous_results, kwargs_value)
+        assert kwargs == {'arg1': 1, 'arg2': 'from_previous_results', 'arg3': 3.14}
+        assert previous_results == [123]
+
+    def test_missing_required_argument(self):
+        func = workflow_executor_test_methods.sample_function
+        previous_results = []
+        kwargs_value = {}
+
+        with pytest.raises(TypeError, match="Missing required argument: arg1"):
+            self.executor._prepare_arguments_for_function(func, previous_results, kwargs_value)
+
+    def test_prepare_arguments_with_defaults(self):
+        func = workflow_executor_test_methods.another_function
+        previous_results = [5]
+        kwargs_value = {}
+
+        kwargs = self.executor._prepare_arguments_for_function(func, previous_results, kwargs_value)
+        assert kwargs == {'arg1': 5, 'arg2': 'default', 'arg3': None}
+        assert previous_results == []
+
+    def test_prepare_arguments_varargs_case(self):
+        func = workflow_executor_test_methods.varargs_function
+        previous_results = [10, "extra", 2.5]
+        kwargs_value = {}
+
+        kwargs = self.executor._prepare_arguments_for_function(func, previous_results, kwargs_value)
+        assert kwargs == {'arg1': 10, 'arg2': 'default', 'arg3': 2.5}
+        assert previous_results == ["extra"]
+
+    def test_type_mismatch_with_defaults(self):
+        func = workflow_executor_test_methods.sample_function
+        previous_results = ["wrong_type", 3.14]
+        kwargs_value = {}
+
+        kwargs = self.executor._prepare_arguments_for_function(func, previous_results, kwargs_value)
+        assert kwargs == {'arg2': 3.14, 'arg4': True}  # Default value used for arg4
+        assert previous_results == ["wrong_type"]
+
+    def test_kwarg_override(self):
+        func = workflow_executor_test_methods.sample_function
+        previous_results = [42, "test"]
+        kwargs_value = {'arg3': 6.28, 'arg4': False}
+
+        kwargs = self.executor._prepare_arguments_for_function(func, previous_results, kwargs_value)
+        assert kwargs == {'arg1': 42, 'arg2': 'test', 'arg3': 6.28, 'arg4': False}
+        assert previous_results == []
+
     def test_execute_step_first_step(self):
         kwargs = {'a': 1, 'b': 2}
-        result = self.executor.execute_function('workflow_executor_test_methods.step_one', [], kwargs)
+        result = self.executor.execute_function('workflow_executor_test_methods.step_one', [], **kwargs)
         assert result == 3
 
     def test_execute_step_subsequent_step(self):
@@ -284,3 +354,12 @@ class workflow_executor_test_methods:
     async def step_async(e):
         await asyncio.sleep(0.1)
         return e ** 2
+    
+    def sample_function(arg1: int, arg2: str, arg3: float, arg4: bool = True):
+        pass
+
+    def another_function(arg1: int, arg2: str = "default", arg3: list = None):
+        pass
+
+    def varargs_function(arg1: int, *args, arg2: str = "default", arg3: float = 1.0):
+        pass

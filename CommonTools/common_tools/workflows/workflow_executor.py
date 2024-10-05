@@ -125,72 +125,70 @@ class WorkflowExecutor:
             return await self.execute_step_async(step, previous_results, kwargs)
 
 
-    def execute_function(self, class_and_function_name, previous_results, kwargs_value):
-        """
-        Execute a single step.
-        """
-        func = self.get_static_method(class_and_function_name)
-
-        # Prepare arguments
-        args, kwargs = self._prepare_arguments(func, previous_results, kwargs_value)
-
-        # Call the function
-        result = func(*args, **kwargs)
-
-        return result
+    def execute_function(self, class_and_function_name, previous_results: list, kwargs_value: dict):
+        try:
+            func = self.get_static_method(class_and_function_name)
+            kwargs = self._prepare_arguments_for_function(func, previous_results, kwargs_value)
+            result = func(**kwargs)
+            return result
+        except Exception as e:
+            error_message = (
+                f"Error occurred in execute_function: {str(e)}\n"
+                f"Class and function name: {class_and_function_name}\n"
+                f"Previous results: {previous_results}\n"
+                f"Kwargs values: {kwargs_value}"
+            )
+            raise RuntimeError(error_message) from e
 
     async def execute_step_async(self, step_name, previous_results, kwargs_value):
         func = self.get_static_method(step_name)
 
         # Prepare arguments
-        args, kwargs = self._prepare_arguments(func, previous_results, kwargs_value)
+        kwargs = self._prepare_arguments_for_function(func, previous_results, kwargs_value)
 
         # Call the function
         if inspect.iscoroutinefunction(func):
-            result = await func(*args, **kwargs)
+            result = await func(**kwargs)
         else:
-            result = func(*args, **kwargs)
+            result = func(**kwargs)
 
         return result
 
-    def _prepare_arguments(self, func, previous_results, kwargs_value):
+    def _prepare_arguments_for_function(self, func, args_value: list, kwargs_value: dict):
         """
-        Prepares positional and keyword arguments for a function call.
+        Prepares keyword arguments for a function call.
 
         Arguments are filled from kwargs_value first (matching by parameter names),
-        and then from previous_results. Each argument from previous_results is used
-        only once and removed from the list. If there are not enough arguments to
-        satisfy the function's required parameters (considering default values),
-        raises an error.
+        and then from args_value (previous results) if not already in kwargs_value. Each argument
+        from previous_results is used only once and removed from the list. If there
+        are not enough arguments to satisfy the function's required parameters
+        (considering default values), raises an error.
+
+        If the type of a value from previous_results does not match the expected
+        type of the function parameter, it and the following values are not used.
         """
         sig = inspect.signature(func)
         params = sig.parameters  # OrderedDict of parameter names to Parameter objects
 
-        args = []
         kwargs = {}
-        prev_results = previous_results if previous_results is not None else []
+        prev_results = args_value if args_value is not None else []
         prev_results_index = 0
 
         for param_name, param in params.items():
-            if param.kind == inspect.Parameter.VAR_POSITIONAL:
-                # *args - consume the rest of previous_results
-                args.extend(prev_results[prev_results_index:])
-                prev_results_index = len(prev_results)
-                continue
-            elif param.kind == inspect.Parameter.VAR_KEYWORD:
-                # **kwargs - include any remaining kwargs_value
-                if kwargs_value:
-                    remaining_kwargs = {k: v for k, v in kwargs_value.items() if k not in kwargs}
-                    kwargs.update(remaining_kwargs)
+            if param.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
+                # Skip *args and **kwargs handling
                 continue
 
             if kwargs_value and param_name in kwargs_value:
                 # Use the value from kwargs_value
                 kwargs[param_name] = kwargs_value[param_name]
             elif prev_results_index < len(prev_results):
-                # Use the next value from previous_results
+                # Use the next value from previous_results if not already set in kwargs
                 arg_value = prev_results[prev_results_index]
-                args.append(arg_value)
+                if param.annotation != inspect.Parameter.empty and not isinstance(arg_value, param.annotation):
+                    # Type does not match, stop using previous_results
+                    break
+                kwargs[param_name] = arg_value
                 prev_results_index += 1
             elif param.default is not inspect.Parameter.empty:
                 # Parameter has a default value; it will be used automatically
@@ -203,7 +201,7 @@ class WorkflowExecutor:
         if prev_results_index > 0:
             del prev_results[:prev_results_index]
 
-        return args, kwargs
+        return kwargs
 
     def get_function_by_name_dynamic(self, step_name):
         """

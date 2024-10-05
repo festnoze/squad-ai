@@ -19,7 +19,6 @@ pre_treatment_steps:
       - RAGPreTreatment.extract_explicit_metadata
 
 data_retrieval_steps:
-  - RAGHybridRetrieval.map_previous_results
   - parallel_threads:
       - RAGHybridRetrieval.rag_retrieval
       - RAGHybridRetrieval.bm25_retrieval
