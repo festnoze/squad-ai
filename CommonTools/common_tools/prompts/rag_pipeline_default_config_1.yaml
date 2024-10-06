@@ -15,16 +15,18 @@ guardrails_steps:
 pre_treatment_steps:  
   - parallel_threads:
       - RAGPreTreatment.analyse_query_language
-      - RAGPreTreatment.analyse_query_for_metadata
       - RAGPreTreatment.extract_explicit_metadata
+      - RAGPreTreatment.analyse_query_for_metadata
+  - RAGPreTreatment.output_mapper
 
 data_retrieval_steps:
   - parallel_threads:
       - RAGHybridRetrieval.rag_retrieval
       - RAGHybridRetrieval.bm25_retrieval
+  - RAGHybridRetrieval.hybrid_chunks_selection
 
 augmented_generation_steps:
-  - RAGAugmentedGeneration.answer_generation
+  - RAGAugmentedGeneration.rag_augmented_answer_generation
 
 post_treatment_steps:
   - RAGPostTreatment.response_post_treatment

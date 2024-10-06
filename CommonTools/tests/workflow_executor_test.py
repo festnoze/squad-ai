@@ -1,5 +1,7 @@
 import asyncio
+import uuid
 import pytest
+from langchain_core.documents import Document
 from common_tools.workflows.workflow_executor import WorkflowExecutor
 
 class Test_WorkflowExecutor:
@@ -20,16 +22,20 @@ class Test_WorkflowExecutor:
         expected = {'a': 1, 'b': 2}
         assert self.executor.get_function_kwargs_with_values(func, provided_kwargs) == expected
 
-    def test_flatten(self):
-        nested_list = [1, [2, [3, 4], 5], 6, 'string', (7, 8)]
-        expected = [1, 2, 3, 4, 5, 6, 'string', 7, 8]
-        result = self.executor.flatten(nested_list)
+    @pytest.mark.parametrize("nested_list, expected", [
+        ([1, [2, [3, 4], 5], 6, 'string', (7, 8)], [1, 2, [3, 4], 5, 6, 'string', 7, 8]),
+        ([1, [2, 3], 4], [1, 2, 3, 4]),
+        ([[], [1, 2], 3], [1, 2, 3]),
+        ([None, [1, 2]], [None, 1, 2])
+    ])
+    def test_flatten(self, nested_list, expected):
+        result = self.executor.flatten_tuples(nested_list)
         assert result == expected
 
     def test_flatten_complex(self):
         nested = [1, ['a', [True, [3.14, None]]], {'key': 'value'}]
         expected = [1, 'a', True, 3.14, None, {'key': 'value'}]
-        result = self.executor.flatten(nested)
+        result = self.executor.flatten_tuples(nested)
         assert result == expected
 
     def test_prepare_arguments_simple_case(self):
@@ -72,7 +78,7 @@ class Test_WorkflowExecutor:
         kwargs_value = {}
 
         kwargs = self.executor._prepare_arguments_for_function(func, previous_results, kwargs_value)
-        assert kwargs == {'arg1': 5, 'arg2': 'default', 'arg3': None}
+        assert kwargs == {'arg1': 5}
         assert previous_results == []
 
     def test_prepare_arguments_varargs_case(self):
@@ -81,17 +87,8 @@ class Test_WorkflowExecutor:
         kwargs_value = {}
 
         kwargs = self.executor._prepare_arguments_for_function(func, previous_results, kwargs_value)
-        assert kwargs == {'arg1': 10, 'arg2': 'default', 'arg3': 2.5}
-        assert previous_results == ["extra"]
-
-    def test_type_mismatch_with_defaults(self):
-        func = workflow_executor_test_methods.sample_function
-        previous_results = ["wrong_type", 3.14]
-        kwargs_value = {}
-
-        kwargs = self.executor._prepare_arguments_for_function(func, previous_results, kwargs_value)
-        assert kwargs == {'arg2': 3.14, 'arg4': True}  # Default value used for arg4
-        assert previous_results == ["wrong_type"]
+        assert kwargs == {'arg1': 10, 'arg2': 'extra', 'arg3': 2.5}
+        assert not any(previous_results)
 
     def test_kwarg_override(self):
         func = workflow_executor_test_methods.sample_function
@@ -102,10 +99,16 @@ class Test_WorkflowExecutor:
         assert kwargs == {'arg1': 42, 'arg2': 'test', 'arg3': 6.28, 'arg4': False}
         assert previous_results == []
 
-    def test_execute_step_first_step(self):
-        kwargs = {'a': 1, 'b': 2}
-        result = self.executor.execute_function('workflow_executor_test_methods.step_one', [], **kwargs)
+    def test_execute_from_kwargs(self):
+        kwargs_values = {'a': 1, 'b': 2}
+        result = self.executor.execute_function('workflow_executor_test_methods.step_one', [], kwargs_values)
         assert result == 3
+
+    def test_execute_from_kwargs_and_previous_results(self):
+        kwargs_values = {'a': 1}
+        previous_results = [51]
+        result = self.executor.execute_function('workflow_executor_test_methods.step_one', previous_results, kwargs_values)
+        assert result == 52
 
     def test_execute_step_subsequent_step(self):
         previous_results = [3]
@@ -333,7 +336,44 @@ class Test_WorkflowExecutor:
     def test_flatten_invalid_input(self):
         invalid_input = 123  # Non-iterable input
         with pytest.raises(TypeError):
-            self.executor.flatten(invalid_input)
+            self.executor.flatten_tuples(invalid_input)
+
+    @pytest.mark.parametrize("data, expected", [
+        ([(Document(page_content=f"content_{uuid.uuid4()}", metadata={}), 0.5), (Document(page_content=f"content_{uuid.uuid4()}", metadata={}), 1.0)], True),
+        ([(Document(page_content=f"content_{uuid.uuid4()}", metadata={}), 0.5), (1.5, 2.0)], False)
+    ])
+    def test_type_matching_list_of_tuples_document_float(self, data, expected):
+        param_annotation = list[tuple[Document, float]]
+        assert WorkflowExecutor.is_matching_type_and_subtypes(data, param_annotation) == expected
+
+    @pytest.mark.parametrize("data, expected", [
+        ((1, 2), True),
+        ((1, "two"), False)
+    ])
+    def test_type_matching_tuple_of_ints(self, data, expected):
+        param_annotation = tuple[int, int]
+        assert WorkflowExecutor.is_matching_type_and_subtypes(data, param_annotation) == expected
+    
+    @pytest.mark.parametrize("data, expected", [
+        ({"one": 1, "two": 2}, True),
+        ({1: "one", 2: "two"}, False)
+    ])
+    def test_type_matching_dict_str_int(self, data, expected):
+        param_annotation = dict[str, int]
+        assert WorkflowExecutor.is_matching_type_and_subtypes(data, param_annotation) == expected
+
+    def test_type_matching_list_of_documents(self):
+        documents = [Document(page_content=f"content_{uuid.uuid4()}", metadata={}), Document(page_content=f"content_{uuid.uuid4()}", metadata={})]
+        param_annotation = list[Document]
+        assert WorkflowExecutor.is_matching_type_and_subtypes(documents, param_annotation)
+
+    def test_type_matching_none_value(self):
+        param_annotation = list[Document]
+        assert WorkflowExecutor.is_matching_type_and_subtypes(None, param_annotation)
+
+    def test_type_matching_empty_list(self):
+        param_annotation = list[Document]
+        assert WorkflowExecutor.is_matching_type_and_subtypes([], param_annotation)
 
 
 # Helper class to provide methods for testing functions calling in WorkflowExecutor

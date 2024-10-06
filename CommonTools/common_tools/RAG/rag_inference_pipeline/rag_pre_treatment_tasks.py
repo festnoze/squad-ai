@@ -5,6 +5,7 @@ from common_tools.helpers.ressource_helper import Ressource
 from common_tools.RAG.rag_filtering_metadata_helper import RagFilteringMetadataHelper
 from common_tools.models.question_analysis import QuestionAnalysis, QuestionAnalysisPydantic
 from common_tools.RAG.rag_service import RAGService
+from common_tools.workflows.output_name_decorator import output_name
 
 class RAGPreTreatment:
     default_filters = {}
@@ -14,8 +15,8 @@ class RAGPreTreatment:
         RAGPreTreatment.default_filters = default_filters #todo: think to make instanciate the class for specific filters by app.
         question_analysis, found_metadata, extracted_metadata = Execute.run_parallel(
             (RAGPreTreatment.analyse_query_language, (rag, query)),
+            (RAGPreTreatment.extract_explicit_metadata, (query)),
             (RAGPreTreatment.analyse_query_for_metadata, (rag, query)),
-            (RAGPreTreatment.extract_explicit_metadata, (query))
         )
 
         question_analysis.translated_question = extracted_metadata[0].strip()
@@ -23,6 +24,7 @@ class RAGPreTreatment:
         return question_analysis, metadata
 
     @staticmethod    
+    @output_name('analysed_query')
     def analyse_query_language(rag:RAGService, query:str) -> QuestionAnalysis:
         prefilter_prompt = Ressource.get_language_detection_prompt()
         prefilter_prompt = prefilter_prompt.replace("{question}", query)
@@ -38,9 +40,6 @@ class RAGPreTreatment:
             question_analysis['translated_question'] = query
         return QuestionAnalysis(**question_analysis)
 
-    @staticmethod
-    def analyse_query_for_metadata(rag:RAGService, query:str) -> dict:
-        return None #todo: implement this method using langchain self querying insead
 
     @staticmethod   
     def extract_explicit_metadata(query:str) -> tuple[str, dict]:
@@ -50,3 +49,23 @@ class RAGPreTreatment:
         else:
             filters = RAGPreTreatment.default_filters
         return query, filters
+    
+    @staticmethod
+    def analyse_query_for_metadata(rag:RAGService, query:str) -> dict:
+        return None #todo: implement this method using langchain self querying insead
+    
+    @staticmethod
+    def output_mapper(question_analysis :QuestionAnalysis, query_wo_metadata:str, explicit_metadata:dict, implicit_metadata:dict) -> tuple[QuestionAnalysis, dict]:
+        return question_analysis, RAGPreTreatment.merge_metadata(explicit_metadata, implicit_metadata)
+    
+    @staticmethod
+    def merge_metadata(explicit_metadata:dict, implicit_metadata:dict) -> dict:
+        if explicit_metadata and any(explicit_metadata):
+            merged = explicit_metadata.copy()
+        else:
+            merged = {}
+        if implicit_metadata and any(implicit_metadata):
+            for key, value in implicit_metadata.items():
+                if key not in merged:
+                    merged[key] = value
+        return merged

@@ -2,6 +2,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import importlib
 import inspect
+import typing
 from collections.abc import Iterable
 #
 from common_tools.helpers.file_helper import file
@@ -17,7 +18,7 @@ class WorkflowExecutor:
         
         self.available_classes = available_classes
 
-    def execute_workflow(self, workflow_config=None, previous_results=None, config_entry_point_name:str=None, **kwargs):
+    def execute_workflow(self, workflow_config=None, previous_results=None, config_entry_point_name: str = None, **kwargs):
         """
         Execute the workflow defined in steps_config.
         """
@@ -28,7 +29,7 @@ class WorkflowExecutor:
                 workflow_config = self.config['start']
             else:
                 raise ValueError('Starting step must either be provided or a step named: "start" must be set in config.')
-        else:            
+        else:
             if config_entry_point_name:
                 workflow_config = workflow_config[config_entry_point_name]
 
@@ -43,32 +44,32 @@ class WorkflowExecutor:
                 if 'parallel_threads' in step:
                     parallel_steps = step['parallel_threads']
                     parallel_results = self.execute_steps_as_parallel_threads(parallel_steps, previous_results, kwargs)
-                    results = parallel_results
+                    results = self.flatten_tuples(parallel_results)  # Flatten the results after parallel execution
                 elif 'parallel_async' in step:
                     parallel_steps = step['parallel_async']
                     parallel_results = asyncio.run(self.execute_steps_as_parallel_async(parallel_steps, previous_results, kwargs))
-                    results = parallel_results
+                    results = self.flatten_tuples(parallel_results)  # Flatten the results after parallel execution
                 else:
                     # Handle nested steps
                     for sub_workflow_name in step.keys():
                         sub_workflow_results = self.execute_workflow(self.config, previous_results, sub_workflow_name, **kwargs)
-                        results = sub_workflow_results
+                        results = self.flatten_tuples(sub_workflow_results)  # Flatten after nested workflow execution
             elif isinstance(step, list):
                 # Handle list of steps
                 sub_workflow_results = self.execute_workflow(step, previous_results, **kwargs)
-                results = sub_workflow_results
+                results = self.flatten_tuples(sub_workflow_results)  # Flatten after list of steps
             elif isinstance(step, str):
                 # Handle parallel keywords
                 if step == 'parallel_threads':
                     parallel_results = self.execute_steps_as_parallel_threads(workflow_config[step], previous_results, kwargs)
-                    results = parallel_results
+                    results = self.flatten_tuples(parallel_results)  # Flatten after parallel threads
                 elif step == 'parallel_async':
                     parallel_results = asyncio.run(self.execute_steps_as_parallel_async(workflow_config[step], previous_results, kwargs))
-                    results = parallel_results
+                    results = self.flatten_tuples(parallel_results)  # Flatten after parallel async
                 # Handle step references
                 elif step in self.config and isinstance(self.config[step], (list, dict)):
                     sub_workflow_results = self.execute_workflow(self.config, previous_results, step, **kwargs)
-                    results = sub_workflow_results
+                    results = self.flatten_tuples(sub_workflow_results)  # Flatten after executing a sub-workflow
                 # Handle direct function calls
                 else:
                     result = self.execute_function(step, previous_results, kwargs)
@@ -125,15 +126,15 @@ class WorkflowExecutor:
             return await self.execute_step_async(step, previous_results, kwargs)
 
 
-    def execute_function(self, class_and_function_name, previous_results: list, kwargs_value: dict):
+    def execute_function(self, class_and_function_name:str, previous_results: list, kwargs_value: dict):
+        func = self.get_static_method(class_and_function_name)       
+        kwargs = self._prepare_arguments_for_function(func, previous_results, kwargs_value)
         try:
-            func = self.get_static_method(class_and_function_name)
-            kwargs = self._prepare_arguments_for_function(func, previous_results, kwargs_value)
             result = func(**kwargs)
-            return result
+            return result            
         except Exception as e:
             error_message = (
-                f"Error occurred in execute_function: {str(e)}\n"
+                f"Error occurred while executing function: {str(e)}\n"
                 f"Class and function name: {class_and_function_name}\n"
                 f"Previous results: {previous_results}\n"
                 f"Kwargs values: {kwargs_value}"
@@ -168,13 +169,13 @@ class WorkflowExecutor:
         type of the function parameter, it and the following values are not used.
         """
         sig = inspect.signature(func)
-        params = sig.parameters  # OrderedDict of parameter names to Parameter objects
+        params = sig.parameters.items()  # OrderedDict of parameter names to Parameter objects
 
         kwargs = {}
         prev_results = args_value if args_value is not None else []
         prev_results_index = 0
 
-        for param_name, param in params.items():
+        for param_name, param in params:
             if param.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
                 # Skip *args and **kwargs handling
                 continue
@@ -185,8 +186,8 @@ class WorkflowExecutor:
             elif prev_results_index < len(prev_results):
                 # Use the next value from previous_results if not already set in kwargs
                 arg_value = prev_results[prev_results_index]
-                if param.annotation != inspect.Parameter.empty and not isinstance(arg_value, param.annotation):
-                    # Type does not match, stop using previous_results
+                if not WorkflowExecutor.is_matching_type_and_subtypes(arg_value, param.annotation):
+                    # If type does not match, stop using previous_results
                     break
                 kwargs[param_name] = arg_value
                 prev_results_index += 1
@@ -194,14 +195,42 @@ class WorkflowExecutor:
                 # Parameter has a default value; it will be used automatically
                 pass
             else:
-                # Required parameter missing
                 raise TypeError(f"Missing required argument: {param_name}")
 
-        # Remove used previous_results
-        if prev_results_index > 0:
-            del prev_results[:prev_results_index]
+        # # Remove used previous_results
+        # if prev_results_index > 0:
+        #     del prev_results[:prev_results_index]
 
         return kwargs
+    
+    @staticmethod
+    def is_matching_type_and_subtypes(arg_value, param_annotation):
+        # If value has no type (=None), or the receiving parameter has no defined type, it's a match
+        if arg_value is None or param_annotation is inspect.Parameter.empty:
+            return True
+        
+        origin, args = typing.get_origin(param_annotation), typing.get_args(param_annotation)
+
+        if origin in {list, tuple, set}:
+            if not isinstance(arg_value, origin):
+                return False
+            if not args:
+                return True
+            if origin in {list, set}:
+                return all(WorkflowExecutor.is_matching_type_and_subtypes(item, args[0]) for item in arg_value)
+            elif origin is tuple:
+                return all(WorkflowExecutor.is_matching_type_and_subtypes(item, args[i]) for i, item in enumerate(arg_value))
+            else:
+                raise ValueError(f"Unhandled origin type: {origin}")
+        
+        if origin is dict:
+            return isinstance(arg_value, dict) and (not args or all(
+                WorkflowExecutor.is_matching_type_and_subtypes(k, args[0]) and 
+                WorkflowExecutor.is_matching_type_and_subtypes(v, args[1])
+                for k, v in arg_value.items()
+            ))
+
+        return isinstance(arg_value, origin or param_annotation)
 
     def get_function_by_name_dynamic(self, step_name):
         """
@@ -286,14 +315,14 @@ class WorkflowExecutor:
 
         return required_args
 
-    def flatten(self, items):
+    def flatten_tuples(self, items):
         """
         Flatten a list or tuple to make sure we pass a single-level list as *args.
         """
         flat_list = []
         for item in items:
-            if isinstance(item, Iterable) and not isinstance(item, (str, bytes, dict)):
-                flat_list.extend(self.flatten(item))  # Recursively flatten if it's a nested iterable
+            if isinstance(item, Iterable) and not isinstance(item, (str, bytes, dict, list)):
+                flat_list.extend(self.flatten_tuples(item))  # Recursively flatten if it's a nested iterable (tuple/set)
             else:
                 flat_list.append(item)
         return flat_list

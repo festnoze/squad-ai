@@ -46,7 +46,7 @@ class TestRagInferencePipelineIntegration:
             query,
             include_bm25_retrieval=False, 
             give_score=True, 
-            format_retrieved_docs_function=AvailableService.format_retrieved_docs_function
+            format_retrieved_docs_function=TestRagInferencePipelineIntegration.format_retrieved_docs_function
         )
 
         # Assertions to verify that the response and sources are valid
@@ -54,6 +54,12 @@ class TestRagInferencePipelineIntegration:
         assert isinstance(sources, list), "The sources should be a list"
         assert len(sources) > 0, "There should be at least one source retrieved"
         assert "AI" in response, "The response should mention AI"
+
+    @staticmethod
+    def format_retrieved_docs_function(retrieved_docs):
+        if not any(retrieved_docs):
+            return 'not a single information were found. Don\'t answer the question.'
+        return retrieved_docs
 
     def test_inference_pipeline_custom_format_function(self):
         # Define the query for the test

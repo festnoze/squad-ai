@@ -156,14 +156,14 @@ class RagInferencePipelineWithPrefect:
         return retrieved_chunks
     
     @task
-    def bm25_retrieval(self, query: str, filters: dict, give_score: bool, k = 3):
+    def bm25_retrieval(self, analysed_query: QuestionAnalysis, filters: dict, give_score: bool, k = 3):
         if filters and any(filters):
             filtered_docs = [doc for doc in self.rag.langchain_documents if RagInferencePipeline.filters_predicate(doc, filters)]
         else:
             filtered_docs = self.rag.langchain_documents
 
         bm25_retriever = self.rag._build_bm25_retriever(filtered_docs, k)#, filters
-        bm25_retrieved_chunks = bm25_retriever.invoke(query)
+        bm25_retrieved_chunks = bm25_retriever.invoke(analysed_query.translated_question)
        
         if give_score:
             score = 0.1
