@@ -169,7 +169,7 @@ class Test_WorkflowExecutor:
             }
         }
         kwargs = {'a': 2, 'b': 3, 'd': 5}
-        results = self.executor.execute_workflow(**kwargs)
+        results = self.executor.execute_workflow(kwargs_values=kwargs)
         assert results == [5, 4]
 
     def test_execute_parallel_async(self):
@@ -182,7 +182,7 @@ class Test_WorkflowExecutor:
             }
         }
         kwargs = {'d': 5, 'e': 4}
-        results = self.executor.execute_workflow(**kwargs)
+        results = self.executor.execute_workflow(kwargs_values=kwargs)
         assert results == [16, 4]
 
     def test_execute_parallel_async_sub_workflow(self):
@@ -283,7 +283,7 @@ class Test_WorkflowExecutor:
             }
         }
         kwargs = {'a': 1, 'b': 2, 'c': 3, 'd': 8}
-        results = self.executor.execute_workflow(**kwargs)
+        results = self.executor.execute_workflow(kwargs_values=kwargs)
         assert results == [3, [6, 7]]
 
     def test_nested_parallel_async(self):
@@ -302,7 +302,7 @@ class Test_WorkflowExecutor:
             }
         }
         kwargs = {'c': 3, 'd': 4, 'e': 2}
-        results = self.executor.execute_workflow(**kwargs)
+        results = self.executor.execute_workflow(kwargs_values=kwargs)
         assert results == [6, [4, 3]]
 
     def test_get_function_kwargs_missing_required_arg(self):

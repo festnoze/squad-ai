@@ -85,7 +85,10 @@ class AvailableService:
 
     def rag_query(self, query):
         inference = RagInferencePipeline(self.rag_service)
-        response = inference.run_static_pipeline(query, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
+        if query.startswith('!'):
+            response = inference.run_static_pipeline(query[1:], include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
+        else:
+            response = inference.run_static_pipeline(query, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
         return response
 
     #todo: to delete or write to add metadata to context

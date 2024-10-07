@@ -29,7 +29,7 @@ class RagInferencePipeline:
                 func=python_repl.run,
             )
             all_tools = [repl_tool]            
-            additionnal_tools = [format_tool_to_openai_function(t) for t in tools] #TODO: check compatibility out of OpenAI
+            additionnal_tools = [format_tool_to_openai_function(t) for t in tools]
             all_tools.extend(additionnal_tools)
             self.rag.inference_llm = self.rag.inference_llm.bind_functions(all_tools)
             self.tool_executor = ToolExecutor(all_tools)
@@ -69,7 +69,7 @@ class RagInferencePipeline:
             (self.run_inference_pipeline, (), {'query': query, 'include_bm25_retrieval': include_bm25_retrieval, 'give_score': give_score, 'format_retrieved_docs_function': format_retrieved_docs_function})
         )
 
-        self.check_for_guardrails(guardrails_result) # todo: could rather be awaited before augmentated generation (cf. diagram)
+        self.check_for_guardrails(guardrails_result)
         response, analysed_query, retrieved_chunks = run_inference_pipeline_results
         
         # Post-treatment

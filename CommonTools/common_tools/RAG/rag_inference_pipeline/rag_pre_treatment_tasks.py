@@ -12,16 +12,17 @@ class RAGPreTreatment:
     
     @staticmethod
     def rag_pre_treatment(rag:RAGService, query:str, default_filters:dict = {}) -> tuple[QuestionAnalysis, dict]:
-        RAGPreTreatment.default_filters = default_filters #todo: think to make instanciate the class for specific filters by app.
-        question_analysis, found_metadata, extracted_metadata = Execute.run_parallel(
+        RAGPreTreatment.default_filters = default_filters #todo: think to rather instanciate current class for setting specific filters by app.
+        question_analysis, found_metadata, extracted_explicit_metadata = Execute.run_parallel(
             (RAGPreTreatment.analyse_query_language, (rag, query)),
             (RAGPreTreatment.analyse_query_for_metadata, (rag, query)),
             (RAGPreTreatment.extract_explicit_metadata, (query)),
         )
+        query_wo_metadata = extracted_explicit_metadata[0]
+        explicit_metadata = extracted_explicit_metadata[1]
 
-        question_analysis.translated_question = extracted_metadata[0].strip()
-        metadata = extracted_metadata[1]
-        return question_analysis, metadata
+        merged_metadata = RAGPreTreatment.get_merged_metadata(question_analysis, found_metadata, query_wo_metadata, explicit_metadata)
+        return question_analysis, merged_metadata
 
     @staticmethod    
     @output_name('analysed_query')
@@ -52,14 +53,15 @@ class RAGPreTreatment:
     
     @staticmethod
     def analyse_query_for_metadata(rag:RAGService, query:str) -> dict:
-        return {} #todo: implement this method using langchain self querying insead
+        return {} #todo: implement this method using langchain self-querying
     
     @staticmethod
-    def output_mapper(question_analysis :QuestionAnalysis, query_wo_metadata:str, explicit_metadata:dict, implicit_metadata:dict) -> dict:
+    def get_merged_metadata(question_analysis :QuestionAnalysis, implicit_metadata:dict, query_wo_metadata:str, explicit_metadata:dict) -> dict:
+        question_analysis.translated_question = query_wo_metadata.strip()
+        merged = {}
         if explicit_metadata and any(explicit_metadata):
             merged = explicit_metadata.copy()
-        else:
-            merged = {}
+        
         if implicit_metadata and any(implicit_metadata):
             for key, value in implicit_metadata.items():
                 if key not in merged:
