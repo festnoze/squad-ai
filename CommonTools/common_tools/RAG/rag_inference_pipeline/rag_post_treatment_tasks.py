@@ -8,7 +8,10 @@ class RAGPostTreatment:
     @staticmethod
     def response_post_treatment(guardrails_result: bool, rag_answer: list[str], analysed_query: QuestionAnalysis):
         if guardrails_result == True:
-            return rag_answer[0]
+            if isinstance(rag_answer, list):
+                return rag_answer[0]
+            else:
+                return rag_answer
         else:
             if analysed_query.detected_language == "french":
                 return "Je ne peux pas répondre à votre question, car son sujet est explicitement interdit."

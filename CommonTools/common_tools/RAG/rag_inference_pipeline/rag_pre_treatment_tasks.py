@@ -15,8 +15,8 @@ class RAGPreTreatment:
         RAGPreTreatment.default_filters = default_filters #todo: think to make instanciate the class for specific filters by app.
         question_analysis, found_metadata, extracted_metadata = Execute.run_parallel(
             (RAGPreTreatment.analyse_query_language, (rag, query)),
-            (RAGPreTreatment.extract_explicit_metadata, (query)),
             (RAGPreTreatment.analyse_query_for_metadata, (rag, query)),
+            (RAGPreTreatment.extract_explicit_metadata, (query)),
         )
 
         question_analysis.translated_question = extracted_metadata[0].strip()
@@ -55,7 +55,7 @@ class RAGPreTreatment:
         return {} #todo: implement this method using langchain self querying insead
     
     @staticmethod
-    def get_merged_metadata(question_analysis :QuestionAnalysis, query_wo_metadata:str, explicit_metadata:dict, implicit_metadata:dict) -> dict:
+    def output_mapper(question_analysis :QuestionAnalysis, query_wo_metadata:str, explicit_metadata:dict, implicit_metadata:dict) -> dict:
         if explicit_metadata and any(explicit_metadata):
             merged = explicit_metadata.copy()
         else:

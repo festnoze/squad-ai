@@ -80,16 +80,12 @@ class AvailableService:
             query = input("Entrez votre question ('exit' pour quitter):\n")
             if query == "" or query == "exit":
                 return None
-            response, sources = inference.run(query, include_bm25_retrieval= True, give_score=True)
+            response = inference.run(query, include_bm25_retrieval= True, give_score=True)
             txt.print(response)
-            display_sources = input("afficher les documents ? (vide si non)")
-            if display_sources:
-                for source in sources:
-                    txt.print(source[0])
 
     def rag_query(self, query):
         inference = RagInferencePipeline(self.rag_service)
-        response = inference.run(query, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
+        response = inference.run_static_pipeline(query, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
         return response
 
     #todo: to delete or write to add metadata to context

@@ -70,8 +70,12 @@ class RagInferencePipeline:
         )
 
         self.check_for_guardrails(guardrails_result) # todo: could rather be awaited before augmentated generation (cf. diagram)
-        final_response, retrieved_chunks = run_inference_pipeline_results
-        return final_response, retrieved_chunks
+        response, analysed_query, retrieved_chunks = run_inference_pipeline_results
+        
+        # Post-treatment
+        final_response = RAGPostTreatment.rag_post_treatment(guardrails_result, response, analysed_query)
+        return final_response
+    
     
     def run_inference_pipeline(self, query: str, include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None) -> tuple:
         """Run the full RAG inference pipeline, but without guardrails"""
@@ -84,10 +88,7 @@ class RagInferencePipeline:
         # Augmented Answer Generation
         response = RAGAugmentedGeneration.rag_augmented_answer_generation(self.rag, retrieved_chunks, analysed_query, give_score, format_retrieved_docs_function)
 
-        # Post-treatment
-        final_response = RAGPostTreatment.rag_post_treatment(response)
-
-        return final_response, retrieved_chunks
+        return response, analysed_query, retrieved_chunks
     
     def check_for_guardrails(self, guardrails_result:bool):
         """Raise an error if the query has been rejected by guardrails"""
