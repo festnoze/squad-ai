@@ -59,7 +59,7 @@ class RagInferencePipeline:
 
         answer = workflow_executor.execute_workflow(kwargs_values=kwargs_values)
 
-        return answer
+        return answer[0]
 
     # Main workflow using the static pipeline
     def run_static_pipeline(self, query: str, include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None) -> tuple:

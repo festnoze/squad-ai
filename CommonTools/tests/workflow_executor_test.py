@@ -33,7 +33,7 @@ class Test_WorkflowExecutor:
         ([1, ('a', {True, 3.14}), 8], [1, 'a', True, 3.14, 8]), # Mixed data types with tuples and sets
         ([1, 2, 3, 4], [1, 2, 3, 4]), # Completely flat list - should return as is
         ([1, (2, (3, {4, 5})), 6], [1, 2, 3, 4, 5, 6]), # Deeply nested with tuples and sets
-        ([1, ((), set(), (2, 3))], [1, 2, 3]), # Nested tuples containing empty sets or tuples
+        ([1, ((), set(), (2, 3)), {}, []], [1, 2, 3, {}, []]), # Empty sets or tuples removed, not empty list or dict
         ([1, ['a', [True, [3.14, None]]], {'key': 'value'}], [1, ['a', [True, [3.14, None]]], {'key': 'value'}]), # Nested lists of lists
         ([1, (2, {'a': 10, 'b': 20}), 3], [1, 2, {'a': 10, 'b': 20}, 3]), # List containing dictionary - dicts shouldn't be flattened
     ])
@@ -117,7 +117,7 @@ class Test_WorkflowExecutor:
     def test_execute_workflow_single_step(self):    
         steps_config = ['workflow_executor_test_methods.step_one']
         kwargs = {'a': 2, 'b': 3}
-        results = self.executor.execute_workflow(steps_config, **kwargs)
+        results = self.executor.execute_workflow(steps_config, kwargs_values=kwargs)
         assert results == [5]
 
     def test_execute_workflow_sequential_steps(self):
@@ -127,7 +127,7 @@ class Test_WorkflowExecutor:
             'workflow_executor_test_methods.step_three'
         ]
         kwargs = {'a': 2, 'b': 3}
-        results = self.executor.execute_workflow(steps_config, **kwargs)
+        results = self.executor.execute_workflow(steps_config, kwargs_values=kwargs)
         assert results == [9]
 
     def test_execute_workflow_parallel_threads(self):
@@ -141,13 +141,13 @@ class Test_WorkflowExecutor:
             }
         ]
         kwargs = {'a': 2, 'b': 3, 'd': 5}
-        results = self.executor.execute_workflow(steps_config, **kwargs)
+        results = self.executor.execute_workflow(steps_config, kwargs_values=kwargs)
         assert results == [5, 4]
 
     def test_execute_workflow_parallel_async(self):
         steps_config = [{'parallel_async': ['workflow_executor_test_methods.step_async', 'workflow_executor_test_methods.step_three']}]
         kwargs = {'e': 3, 'd': 10}
-        results = self.executor.execute_workflow(steps_config, **kwargs)
+        results = self.executor.execute_workflow(steps_config, kwargs_values=kwargs)
         assert results == [9, 9]
 
     def test_execute_workflow_nested_steps(self):
@@ -156,7 +156,7 @@ class Test_WorkflowExecutor:
         }
         steps_config = ['workflow_executor_test_methods.step_one', 'nested_steps']
         kwargs = {'a': 2, 'b': 3}
-        results = self.executor.execute_workflow(steps_config, **kwargs)
+        results = self.executor.execute_workflow(steps_config, kwargs_values=kwargs)
         assert results == [9]
 
     def test_execute_parallel_threads(self):
@@ -195,7 +195,7 @@ class Test_WorkflowExecutor:
             }
         }
         kwargs = {'d': 5, 'e': 4}
-        results = self.executor.execute_workflow(self_config, None, 'sub1', **kwargs)
+        results = self.executor.execute_workflow(self_config, kwargs_values=kwargs, config_entry_point_name='sub1')
         assert results == [16, 4]
 
     def test_execute_step_missing_args(self):
@@ -232,7 +232,7 @@ class Test_WorkflowExecutor:
         }
         steps_config = ['workflow_executor_test_methods.step_one', 'sub_workflow']
         kwargs = {'a': 2, 'b': 3, 'c': 4, 'd': 6}
-        results = self.executor.execute_workflow(steps_config, **kwargs)
+        results = self.executor.execute_workflow(steps_config, kwargs_values=kwargs)
         assert results == [8, 5]
 
     def test_invalid_workflow_config(self):
@@ -249,12 +249,6 @@ class Test_WorkflowExecutor:
         previous_results = [1, 2]
         result = self.executor.execute_function('workflow_executor_test_methods.step_one', previous_results, {})
         assert result == 3 
-
-    # def test_using_splitted_previous_results(self):
-    #     previous_results = [3, 2]
-    #     config = ['workflow_executor_test_methods.step_two', 'workflow_executor_test_methods.step_two']
-    #     result = self.executor.execute_workflow(config, previous_results, {})
-    #     assert result == [6, 4]
 
     def test_parallel_threads_with_empty_steps(self):
         results = self.executor.execute_steps_as_parallel_threads([], [], {})
@@ -413,8 +407,19 @@ class Test_WorkflowExecutor:
 
         steps_config = ['step_one', 'step_two']
         kwargs = {'a': 2, 'b': 3}
-        results = self.executor.execute_workflow(steps_config, **kwargs)
+        results = self.executor.execute_workflow(steps_config, kwargs_values=kwargs)
+        assert kwargs['sum'] == 5
+        assert kwargs['double'] == 10
         assert results == [10]
+
+    @pytest.mark.parametrize("kwargs_value, previous_results, expected_kwargs", [
+        ({'x': 1}, [1, 2, 3], {'x': 1, 'y': 2, 'z': 3}),
+        ({'y': 3}, [2, 3, 4], {'x': 2, 'y': 3, 'z': 4}),
+    ])
+    def test_prepare_arguments_for_function(self, kwargs_value, previous_results, expected_kwargs):
+        prepared_kwargs = self.executor._prepare_arguments_for_function(workflow_executor_test_methods.step_five, previous_results, kwargs_value)
+        assert prepared_kwargs == expected_kwargs, f"Expected {expected_kwargs} but got {prepared_kwargs}"
+
 
     def test_prepare_arguments_simple_case(self):
         func = workflow_executor_test_methods.sample_function
@@ -495,6 +500,9 @@ class workflow_executor_test_methods:
     
     def step_four():
         return 7
+    
+    def step_five(x, y, z):
+        return x + y + z
     
     
     @output_name('sum')

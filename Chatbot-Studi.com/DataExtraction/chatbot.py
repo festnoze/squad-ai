@@ -85,9 +85,9 @@ class ChatbotFront:
                 st.session_state.messages.append({"role": "user", "content": txt.remove_markdown(prompt)})
                 st.chat_message("user").write(prompt)
                 services = AvailableService()
-                response, sources = services.rag_query(prompt)
-                st.session_state.messages.append({"role": "assistant", "content": response})
-                st.chat_message("user").write(response)
+                rag_answer = services.rag_query(prompt)
+                st.session_state.messages.append({"role": "assistant", "content": rag_answer})
+                st.chat_message("user").write(rag_answer)
 
     def initialize():
         txt.activate_print = True

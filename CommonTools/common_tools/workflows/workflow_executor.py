@@ -191,25 +191,32 @@ class WorkflowExecutor:
             if kwargs_value and arg_name in kwargs_value:
                 # Use the value from kwargs_value
                 func_kwargs[arg_name] = kwargs_value[arg_name]
+                # Check if it also matches the next value from previous_results
+                if prev_results_index < len(prev_results):
+                    arg_value = prev_results[prev_results_index]
+                    if isinstance(arg_value, list) and len(arg_value) == 1 and arg_value[0] == kwargs_value[arg_name]:
+                        prev_results_index += 1
+                    elif arg_value == kwargs_value[arg_name] and (arg.annotation == inspect.Parameter.empty or isinstance(arg_value, arg.annotation)):
+                        prev_results_index += 1
             elif prev_results_index < len(prev_results):
                 # Use the next value from previous_results if not already set in kwargs
                 arg_value = prev_results[prev_results_index]
-                # Raise an error only if: The arg type is specify, the previous_results value type does not match it, and the arg has no default value
+                # Raise an error only if: The arg type is specified, the previous_results value type does not match it, and the arg has no default value
                 if arg.annotation != inspect.Parameter.empty and not WorkflowExecutor.is_matching_type_and_subtypes(arg_value, arg.annotation):
                     if arg.default is not inspect.Parameter.empty:
-                        return func_kwargs # Stop affecting args values once one default value is used. Could do: 'continue' instead to continue with the args values affectation.
+                        continue
                     else:
                         raise TypeError(f"Type mismatch for argument '{arg_name}': expected {arg.annotation}, got {type(arg_value)}")
                 func_kwargs[arg_name] = arg_value
                 prev_results_index += 1
             else:
                 if arg.default is not inspect.Parameter.empty:
-                        return func_kwargs # Stop affecting args values once one default value is used. Could do: 'continue' instead to continue with the args values affectation.
+                    continue
                 else:
                     raise TypeError(f"Missing argument: '{arg_name}', which is required, because it has no default value.")
 
         return func_kwargs
-    
+
     def _get_return_infos_for_function(self, func):
         output_names = getattr(func, '_output_name', None)
         if output_names is not None:
