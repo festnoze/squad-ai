@@ -52,14 +52,10 @@ class RAGPreTreatment:
     
     @staticmethod
     def analyse_query_for_metadata(rag:RAGService, query:str) -> dict:
-        return None #todo: implement this method using langchain self querying insead
+        return {} #todo: implement this method using langchain self querying insead
     
     @staticmethod
-    def output_mapper(question_analysis :QuestionAnalysis, query_wo_metadata:str, explicit_metadata:dict, implicit_metadata:dict) -> tuple[QuestionAnalysis, dict]:
-        return question_analysis, RAGPreTreatment.merge_metadata(explicit_metadata, implicit_metadata)
-    
-    @staticmethod
-    def merge_metadata(explicit_metadata:dict, implicit_metadata:dict) -> dict:
+    def get_merged_metadata(question_analysis :QuestionAnalysis, query_wo_metadata:str, explicit_metadata:dict, implicit_metadata:dict) -> dict:
         if explicit_metadata and any(explicit_metadata):
             merged = explicit_metadata.copy()
         else:

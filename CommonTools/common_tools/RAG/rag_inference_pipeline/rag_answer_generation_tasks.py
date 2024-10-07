@@ -10,8 +10,8 @@ from langchain_core.prompts import ChatPromptTemplate
 class RAGAugmentedGeneration:
 
     @staticmethod
-    def rag_augmented_answer_generation(rag: RAGService, retrieved_chunks: list, questionAnalysis: QuestionAnalysis, give_score: bool = True, format_retrieved_docs_function = None):
-        return RAGAugmentedGeneration.rag_response_generation(rag, retrieved_chunks, questionAnalysis, give_score, format_retrieved_docs_function)
+    def rag_augmented_answer_generation(rag: RAGService, retrieved_chunks: list, analysed_query: QuestionAnalysis, give_score: bool = True, format_retrieved_docs_function = None):
+        return RAGAugmentedGeneration.rag_response_generation(rag, retrieved_chunks, analysed_query, give_score, format_retrieved_docs_function)
 
     @staticmethod
     def rag_response_generation(rag: RAGService, retrieved_chunks: list, questionAnalysis: QuestionAnalysis, give_score: bool = True, format_retrieved_docs_function = None):
@@ -21,13 +21,13 @@ class RAGAugmentedGeneration:
         return RAGAugmentedGeneration.generate_augmented_response_from_retrieved_chunks(rag.inference_llm, retrieved_chunks, questionAnalysis, format_retrieved_docs_function)
 
     @staticmethod
-    def generate_augmented_response_from_retrieved_chunks(llm: BaseChatModel, retrieved_docs: list[Document], questionAnalysis: QuestionAnalysis, format_retrieved_docs_function = None) -> str:
+    def generate_augmented_response_from_retrieved_chunks(llm: BaseChatModel, retrieved_docs: list[Document], analysed_query: QuestionAnalysis, format_retrieved_docs_function = None) -> str:
         retrieval_prompt = Ressource.get_rag_retriever_query_prompt()
-        retrieval_prompt = retrieval_prompt.replace("{question}", questionAnalysis.translated_question)
+        retrieval_prompt = retrieval_prompt.replace("{question}", analysed_query.translated_question)
         additional_instructions = ''
-        if not questionAnalysis.detected_language.__contains__("english"):
+        if not analysed_query.detected_language.__contains__("english"):
             additional_instructions = Ressource.get_prefiltering_translation_instructions_prompt()
-            additional_instructions = additional_instructions.replace("{target_language}", questionAnalysis.detected_language)
+            additional_instructions = additional_instructions.replace("{target_language}", analysed_query.detected_language)
         retrieval_prompt = retrieval_prompt.replace("{additional_instructions}", additional_instructions)
         rag_custom_prompt = ChatPromptTemplate.from_template(retrieval_prompt)
 

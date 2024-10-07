@@ -7,7 +7,7 @@ from langchain_experimental.utilities import PythonREPL
 from common_tools.helpers.execute_helper import Execute
 from common_tools.RAG.rag_service import RAGService
 from common_tools.RAG.rag_inference_pipeline.rag_pre_treatment_tasks import RAGPreTreatment
-from common_tools.RAG.rag_inference_pipeline.guardrails_tasks import RAGGuardrails
+from common_tools.RAG.rag_inference_pipeline.rag_guardrails_tasks import RAGGuardrails
 from common_tools.RAG.rag_inference_pipeline.rag_hybrid_retrieval_tasks import RAGHybridRetrieval
 from common_tools.RAG.rag_inference_pipeline.rag_answer_generation_tasks import RAGAugmentedGeneration
 from common_tools.RAG.rag_inference_pipeline.rag_post_treatment_tasks import RAGPostTreatment
@@ -34,6 +34,7 @@ class RagInferencePipeline:
             self.rag.inference_llm = self.rag.inference_llm.bind_functions(all_tools)
             self.tool_executor = ToolExecutor(all_tools)
 
+    # Main workflow using the dynamic pipeline
     def run(self, query: str, include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None, override_workflow_available_classes:dict = None) -> tuple:
         config = Ressource.get_rag_pipeline_default_config_1()
         if override_workflow_available_classes:
@@ -48,27 +49,29 @@ class RagInferencePipeline:
                 }
         workflow_executor = WorkflowExecutor(config, workflow_available_classes)
         
-        kwargs = {
+        kwargs_values = {
             'rag': self.rag,
             'query': query,
             'include_bm25_retrieval': include_bm25_retrieval,
             'give_score': give_score,
             'format_retrieved_docs_function': format_retrieved_docs_function
         }
-        results = workflow_executor.execute_workflow(**kwargs)
-        return tuple(results)
 
-    # Main workflow
-    # def run(self, query: str, include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None) -> tuple:
-    #     """Run the full RAG inference pipeline including guardrails"""
-    #     guardrails_result, run_inference_pipeline_results = Execute.run_parallel( 
-    #         (RAGGuardrails.guardrails_query_analysis, (query)), # Guardrails check: query analysis
-    #         (self.run_inference_pipeline, (), {'query': query, 'include_bm25_retrieval': include_bm25_retrieval, 'give_score': give_score, 'format_retrieved_docs_function': format_retrieved_docs_function})
-    #     )
+        answer = workflow_executor.execute_workflow(kwargs_values=kwargs_values)
 
-    #     self.check_for_guardrails(guardrails_result) # todo: could rather be awaited before augmentated generation (cf. diagram)
-    #     final_response, retrieved_chunks = run_inference_pipeline_results
-    #     return final_response, retrieved_chunks
+        return answer
+
+    # Main workflow using the static pipeline
+    def run_static_pipeline(self, query: str, include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None) -> tuple:
+        """Run the full RAG inference pipeline including guardrails"""
+        guardrails_result, run_inference_pipeline_results = Execute.run_parallel( 
+            (RAGGuardrails.guardrails_query_analysis, (query)), # Guardrails check: query analysis
+            (self.run_inference_pipeline, (), {'query': query, 'include_bm25_retrieval': include_bm25_retrieval, 'give_score': give_score, 'format_retrieved_docs_function': format_retrieved_docs_function})
+        )
+
+        self.check_for_guardrails(guardrails_result) # todo: could rather be awaited before augmentated generation (cf. diagram)
+        final_response, retrieved_chunks = run_inference_pipeline_results
+        return final_response, retrieved_chunks
     
     def run_inference_pipeline(self, query: str, include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None) -> tuple:
         """Run the full RAG inference pipeline, but without guardrails"""

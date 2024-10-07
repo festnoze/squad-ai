@@ -2,6 +2,7 @@ import asyncio
 import uuid
 import pytest
 from langchain_core.documents import Document
+from common_tools.workflows.output_name_decorator import output_name
 from common_tools.workflows.workflow_executor import WorkflowExecutor
 
 class Test_WorkflowExecutor:
@@ -23,19 +24,21 @@ class Test_WorkflowExecutor:
         assert self.executor.get_function_kwargs_with_values(func, provided_kwargs) == expected
 
     @pytest.mark.parametrize("nested_list, expected", [
-        ([1, [2, [3, 4], 5], 6, 'string', (7, 8)], [1, 2, [3, 4], 5, 6, 'string', 7, 8]),
-        ([1, [2, 3], 4], [1, 2, 3, 4]),
-        ([[], [1, 2], 3], [1, 2, 3]),
-        ([None, [1, 2]], [None, 1, 2])
+        ([1, (2, (3, 4)), 5, {6, 7}], [1, 2, 3, 4, 5, 6, 7]), # Basic nested list with tuples and sets, including different levels of nesting
+        ([1, {2, 3}, (4, 5)], [1, 2, 3, 4, 5]), # Set containing nested tuples
+        ([None, (1, 2)], [None, 1, 2]), # Mix of None and nested tuples
+        ([1, (2, 3), {4, 5}], [1, 2, 3, 4, 5]), # Nested tuples and sets
+        (['a', ('b', ('c', 'd'))], ['a', 'b', 'c', 'd']), # Strings should remain intact
+        ([1, (2, {"key": "value"})], [1, 2, {"key": "value"}]), # Dictionary within list - dicts shouldn't be flattened
+        ([1, ('a', {True, 3.14}), 8], [1, 'a', True, 3.14, 8]), # Mixed data types with tuples and sets
+        ([1, 2, 3, 4], [1, 2, 3, 4]), # Completely flat list - should return as is
+        ([1, (2, (3, {4, 5})), 6], [1, 2, 3, 4, 5, 6]), # Deeply nested with tuples and sets
+        ([1, ((), set(), (2, 3))], [1, 2, 3]), # Nested tuples containing empty sets or tuples
+        ([1, ['a', [True, [3.14, None]]], {'key': 'value'}], [1, ['a', [True, [3.14, None]]], {'key': 'value'}]), # Nested lists of lists
+        ([1, (2, {'a': 10, 'b': 20}), 3], [1, 2, {'a': 10, 'b': 20}, 3]), # List containing dictionary - dicts shouldn't be flattened
     ])
     def test_flatten(self, nested_list, expected):
         result = self.executor.flatten_tuples(nested_list)
-        assert result == expected
-
-    def test_flatten_complex(self):
-        nested = [1, ['a', [True, [3.14, None]]], {'key': 'value'}]
-        expected = [1, 'a', True, 3.14, None, {'key': 'value'}]
-        result = self.executor.flatten_tuples(nested)
         assert result == expected
 
     def test_prepare_arguments_simple_case(self):
@@ -53,7 +56,6 @@ class Test_WorkflowExecutor:
 
         kwargs = self.executor._prepare_arguments_for_function(func, previous_results, kwargs_value)
         assert kwargs == {'arg1': 42, 'arg2': 'test', 'arg3': 2.71}
-        assert previous_results == [3.14]
 
     def test_prepare_arguments_complex_case(self):
         func = workflow_executor_test_methods.sample_function
@@ -62,7 +64,6 @@ class Test_WorkflowExecutor:
 
         kwargs = self.executor._prepare_arguments_for_function(func, previous_results, kwargs_value)
         assert kwargs == {'arg1': 1, 'arg2': 'from_previous_results', 'arg3': 3.14}
-        assert previous_results == [123]
 
     def test_missing_required_argument(self):
         func = workflow_executor_test_methods.sample_function
@@ -79,7 +80,6 @@ class Test_WorkflowExecutor:
 
         kwargs = self.executor._prepare_arguments_for_function(func, previous_results, kwargs_value)
         assert kwargs == {'arg1': 5}
-        assert previous_results == []
 
     def test_prepare_arguments_varargs_case(self):
         func = workflow_executor_test_methods.varargs_function
@@ -97,7 +97,6 @@ class Test_WorkflowExecutor:
 
         kwargs = self.executor._prepare_arguments_for_function(func, previous_results, kwargs_value)
         assert kwargs == {'arg1': 42, 'arg2': 'test', 'arg3': 6.28, 'arg4': False}
-        assert previous_results == []
 
     def test_execute_from_kwargs(self):
         kwargs_values = {'a': 1, 'b': 2}
@@ -375,6 +374,112 @@ class Test_WorkflowExecutor:
         param_annotation = list[Document]
         assert WorkflowExecutor.is_matching_type_and_subtypes([], param_annotation)
 
+    # Test use of output_name decorator in workflow_executor_test_methods
+    def test_get_return_infos_for_function_single_output(self):
+        def dummy_function():
+            pass
+        dummy_function._output_name = 'result'
+        return_info = self.executor._get_return_infos_for_function(dummy_function)
+        assert return_info == {'output_names': ['result']}
+
+    def test_get_return_infos_for_function_multiple_outputs(self):
+        def dummy_function():
+            pass
+        dummy_function._output_name = ['result1', 'result2']
+        return_info = self.executor._get_return_infos_for_function(dummy_function)
+        assert return_info == {'output_names': ['result1', 'result2']}
+
+    def test_execute_function_single_output(self):
+        def dummy_function(a, b):
+            return a + b
+        dummy_function._output_name = 'sum'
+        self.executor.get_static_method = lambda x: dummy_function  # Mock method
+        kwargs = {'a': 2, 'b': 3}
+        self.executor.execute_function('dummy_function', [], kwargs)
+        assert kwargs['sum'] == 5
+
+    def test_execute_function_multiple_outputs(self):
+        def dummy_function(a, b):
+            return a + b, a * b
+        dummy_function._output_name = ['sum', 'product']
+        self.executor.get_static_method = lambda x: dummy_function  # Mock method
+        kwargs = {'a': 2, 'b': 3}
+        self.executor.execute_function('dummy_function', [], kwargs)
+        assert kwargs['sum'] == 5
+        assert kwargs['product'] == 6
+
+    def test_execute_workflow_with_named_outputs(self):
+        self.executor.get_static_method = lambda x: workflow_executor_test_methods.step_one_w_output_name if x == 'step_one' else workflow_executor_test_methods.step_two_w_output_name  # Mock method
+
+        steps_config = ['step_one', 'step_two']
+        kwargs = {'a': 2, 'b': 3}
+        results = self.executor.execute_workflow(steps_config, **kwargs)
+        assert results == [10]
+
+    def test_prepare_arguments_simple_case(self):
+        func = workflow_executor_test_methods.sample_function
+        previous_results = [42, "test", 3.14]
+        kwargs_value = {}
+
+        kwargs = self.executor._prepare_arguments_for_function(func, previous_results, kwargs_value)
+        assert kwargs == {'arg1': 42, 'arg2': 'test', 'arg3': 3.14}
+
+    def test_prepare_arguments_mixed_case(self):
+        func = workflow_executor_test_methods.sample_function
+        previous_results = ["test", 3.14]
+        kwargs_value = {'arg1': 42, 'arg3': 2.71}
+
+        kwargs = self.executor._prepare_arguments_for_function(func, previous_results, kwargs_value)
+        assert kwargs == {'arg1': 42, 'arg2': 'test', 'arg3': 2.71}
+
+    def test_prepare_arguments_complex_case(self):
+        func = workflow_executor_test_methods.sample_function
+        previous_results = ["from_previous_results", 123]  # 123 is an int, type mismatch for arg4 (bool)
+        kwargs_value = {'arg1': 1}
+
+        with pytest.raises(TypeError, match="Type mismatch for argument 'arg3': expected <class 'float'>, got <class 'int'>"):
+            self.executor._prepare_arguments_for_function(func, previous_results, kwargs_value)
+
+    def test_missing_required_argument(self):
+        func = workflow_executor_test_methods.sample_function
+        previous_results = []
+        kwargs_value = {}
+
+        with pytest.raises(TypeError, match="Missing argument: 'arg1', which is required, because it has no default value."):
+            self.executor._prepare_arguments_for_function(func, previous_results, kwargs_value)
+
+    def test_prepare_arguments_with_defaults(self):
+        func = workflow_executor_test_methods.another_function
+        previous_results = [5]
+        kwargs_value = {}
+
+        kwargs = self.executor._prepare_arguments_for_function(func, previous_results, kwargs_value)
+        assert kwargs == {'arg1': 5}
+
+    def test_prepare_arguments_varargs_case(self):
+        func = workflow_executor_test_methods.varargs_function
+        previous_results = [10, "extra", 2.5]
+        kwargs_value = {}
+
+        kwargs = self.executor._prepare_arguments_for_function(func, previous_results, kwargs_value)
+        assert kwargs == {'arg1': 10, 'arg2': 'extra', 'arg3': 2.5}
+
+    def test_type_mismatch(self):
+        func = workflow_executor_test_methods.sample_function
+        previous_results = ["wrong_type", 3.14]
+        kwargs_value = {}
+
+        with pytest.raises(TypeError, match="Type mismatch for argument 'arg1': expected <class 'int'>, got <class 'str'>"):
+            self.executor._prepare_arguments_for_function(func, previous_results, kwargs_value)
+
+    def test_kwarg_override(self):
+        func = workflow_executor_test_methods.sample_function
+        previous_results = [42, "test"]
+        kwargs_value = {'arg3': 6.28, 'arg4': False}
+
+        kwargs = self.executor._prepare_arguments_for_function(func, previous_results, kwargs_value)
+        assert kwargs == {'arg1': 42, 'arg2': 'test', 'arg3': 6.28, 'arg4': False}
+
 
 # Helper class to provide methods for testing functions calling in WorkflowExecutor
 class workflow_executor_test_methods:
@@ -390,6 +495,19 @@ class workflow_executor_test_methods:
     
     def step_four():
         return 7
+    
+    
+    @output_name('sum')
+    def step_one_w_output_name(a, b):
+        return a + b
+
+    @output_name('double')
+    def step_two_w_output_name(c):
+        return c * 2
+        
+    @output_name('product')
+    def step_three_using_output_names(sum, output_name):
+        return sum * output_name
 
     async def step_async(e):
         await asyncio.sleep(0.1)

@@ -1,32 +1,32 @@
 start:
   - parallel_threads:
-      - guardrails_steps
-      - inference_pipeline_steps
+      - guardrails
+      - inference_pipeline
+  - post_treatment
 
-inference_pipeline_steps:
-  - pre_treatment_steps
-  - data_retrieval_steps
-  - augmented_generation_steps
-  - post_treatment_steps
+inference_pipeline:
+  - pre_treatment
+  - data_retrieval
+  - augmented_generation
 
-guardrails_steps:
+guardrails:
   - RAGGuardrails.guardrails_query_analysis
 
-pre_treatment_steps:  
+pre_treatment:  
   - parallel_threads:
       - RAGPreTreatment.analyse_query_language
       - RAGPreTreatment.extract_explicit_metadata
       - RAGPreTreatment.analyse_query_for_metadata
-  - RAGPreTreatment.output_mapper
+  - RAGPreTreatment.get_merged_metadata
 
-data_retrieval_steps:
+data_retrieval:
   - parallel_threads:
       - RAGHybridRetrieval.rag_retrieval
       - RAGHybridRetrieval.bm25_retrieval
   - RAGHybridRetrieval.hybrid_chunks_selection
 
-augmented_generation_steps:
+augmented_generation:
   - RAGAugmentedGeneration.rag_augmented_answer_generation
 
-post_treatment_steps:
+post_treatment:
   - RAGPostTreatment.response_post_treatment
