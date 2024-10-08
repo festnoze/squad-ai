@@ -16,6 +16,7 @@ from langchain.retrievers.multi_query import MultiQueryRetriever
 
 # common tools imports
 from common_tools.helpers.ressource_helper import Ressource
+from common_tools.helpers.txt_helper import txt
 from common_tools.models.file_already_exists_policy import FileAlreadyExistsPolicy
 from common_tools.models.llm_info import LlmInfo
 from common_tools.models.question_analysis import QuestionAnalysis
@@ -29,11 +30,11 @@ class RAGService:
     def __init__(self, inference_llm_or_info: Optional[Union[LlmInfo, BaseChatModel]], embedding_model:EmbeddingModel=None, vector_db_and_docs_path = "./storage", documents_json_filename = "bm25_documents.json"):
         self.init_embedding(embedding_model)
         self.init_inference_llm(inference_llm_or_info) #todo: add fallbacks with specifying multiple llms or llms infos
-        #
+
         self.vector_db_path = vector_db_and_docs_path + '/' + self.embedding_model_name
         self.documents_json_filepath = vector_db_and_docs_path + '/' +  documents_json_filename
-        #
-        self._load_bm25_store()
+
+        self._load_bm25_retriever()
         self._load_vectorstore()
 
     def init_embedding(self, embedding_model:EmbeddingModel=None):
@@ -72,8 +73,9 @@ class RAGService:
             results = vectorstore.similarity_search(full_question, k=max_retrived_count, filter=metadata_filters)
         return results
             
-    def _load_bm25_store(self, bm25_results_count: int = 1) -> tuple:
+    def _load_bm25_retriever(self, bm25_results_count: int = 1) -> tuple:
         if not file.file_exists(self.documents_json_filepath):
+            txt.print(">>> No BM25 store found!")
             return None
                         
         json_as_str = file.read_file(self.documents_json_filepath)
@@ -93,12 +95,12 @@ class RAGService:
     def build_vectorstore_and_bm25_store(self, data: list, chunk_size:int = 0, delete_existing=True)-> int:
         if not data or len(data) == 0: return 0
 
-        self.vectorstore = self.build_vectorstore(data, chunk_size, delete_existing)
-        self.build_bm25_store(data)
+        self.vectorstore = self._build_vectorstore(data, chunk_size, delete_existing)
+        self._build_bm25_store(data)
 
         return self.vectorstore._collection.count()
 
-    def build_vectorstore(self, documents: list, chunk_size:int = 0, delete_existing=True) -> any:
+    def _build_vectorstore(self, documents: list, chunk_size:int = 0, delete_existing=True) -> any:
         if not documents or len(documents) == 0: raise ValueError("No documents provided")
         if not self.embedding: raise ValueError("No embedding model specified")
         if delete_existing:
@@ -125,7 +127,7 @@ class RAGService:
             db = Chroma.from_documents(documents= langchain_documents, embedding = self.embedding, persist_directory= self.vector_db_path)
         return db
     
-    def build_bm25_store(self, data):
+    def _build_bm25_store(self, data):
         documents_dict = []
         for datum in data:
             if isinstance(datum, Document):
@@ -142,7 +144,7 @@ class RAGService:
     def build_vectorstore_from_folder_files(self, folder_path: str, perform_chunking = True):
         txt_loader = TextLoader()
         documents = txt_loader.load(folder_path)
-        return self.build_vectorstore(documents, perform_chunking)
+        return self._build_vectorstore(documents, perform_chunking)
 
     def _build_bm25_retriever(self, documents: List[Document], k: int = 20, metadata: dict = None) -> any:
         if metadata:
@@ -153,7 +155,7 @@ class RAGService:
         return bm25_retriever
         
     def reset_vectorstore(self):
-        if self.vectorstore:
+        if hasattr(self, 'vectorstore') and self.vectorstore:
             self.vectorstore.reset_collection()
             #self._delete_vectorstore_files()
 
