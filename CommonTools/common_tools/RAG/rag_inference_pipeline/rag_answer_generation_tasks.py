@@ -1,7 +1,7 @@
 from common_tools.helpers.llm_helper import Llm
 from common_tools.helpers.ressource_helper import Ressource
 from common_tools.models.question_analysis import QuestionAnalysis
-from common_tools.RAG.rag_service import RAGService
+from common_tools.rag.rag_service import RagService
 from langchain_core.language_models import BaseChatModel
 from langchain_core.documents import Document
 from langchain_core.runnables import Runnable, RunnablePassthrough
@@ -10,11 +10,11 @@ from langchain_core.prompts import ChatPromptTemplate
 class RAGAugmentedGeneration:
 
     @staticmethod
-    def rag_augmented_answer_generation(rag: RAGService, retrieved_chunks: list, analysed_query: QuestionAnalysis, give_score: bool = True, format_retrieved_docs_function = None):
+    def rag_augmented_answer_generation(rag: RagService, retrieved_chunks: list, analysed_query: QuestionAnalysis, give_score: bool = True, format_retrieved_docs_function = None):
         return RAGAugmentedGeneration.rag_response_generation(rag, retrieved_chunks, analysed_query, give_score, format_retrieved_docs_function)
 
     @staticmethod
-    def rag_response_generation(rag: RAGService, retrieved_chunks: list, questionAnalysis: QuestionAnalysis, give_score: bool = True, format_retrieved_docs_function = None):
+    def rag_response_generation(rag: RagService, retrieved_chunks: list, questionAnalysis: QuestionAnalysis, give_score: bool = True, format_retrieved_docs_function = None):
         if give_score:
             retrieved_chunks = [doc[0] for doc in retrieved_chunks]
 

@@ -1,16 +1,12 @@
-import os
 import time
 import streamlit as st
 
 # common tools import
 from common_tools.helpers.txt_helper import txt
 from common_tools.models.llm_info import LlmInfo
-from common_tools.RAG.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
-from common_tools.RAG.rag_inference_pipeline.rag_inference_pipeline_with_prefect import RagInferencePipelineWithPrefect
-from common_tools.RAG.rag_service import RAGService
+from common_tools.rag.rag_service import RagService
 from common_tools.models.llm_info import LlmInfo
-from common_tools.models.langchain_adapter_type import LangChainAdapterType
-from common_tools.models.embedding_type import EmbeddingModel
+
 # internal import
 from available_service import AvailableService
 
@@ -21,7 +17,7 @@ class ChatbotFront:
     llm_batch_size: int = 100
     is_waiting: bool = False
     llms_infos: list[LlmInfo] = None
-    rag: RAGService = None
+    rag: RagService = None
     inference_pipeline = None
     #
     include_bm25_retrieval= False
@@ -82,10 +78,12 @@ class ChatbotFront:
             
         if prompt := st.chat_input():
             with st.spinner("Recherche de réponses en cours ..."):
-                st.session_state.messages.append({"role": "user", "content": txt.remove_markdown(prompt)})
+                prompt = txt.remove_markdown(prompt)
+                st.session_state.messages.append({"role": "user", "content": prompt})
                 st.chat_message("user").write(prompt)
-                services = AvailableService()
-                rag_answer = services.rag_query(prompt)
+                rag_answer = AvailableService().rag_query(prompt)
+                
+                rag_answer = txt.remove_markdown(rag_answer)
                 st.session_state.messages.append({"role": "assistant", "content": rag_answer})
                 st.chat_message("user").write(rag_answer)
 

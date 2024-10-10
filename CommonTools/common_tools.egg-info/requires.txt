@@ -10,3 +10,5 @@ langgraph
 langsmith
 openai
 groq
+pyyaml
+ragas

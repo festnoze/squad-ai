@@ -13,7 +13,7 @@ The provided tools range from:
   
   - **LLM querying** tools (including: output parsing, fallbacks, paralellization and batching) powered by Langchain,
   
-  - **RAG** toolbox, including:
+  - **rag** toolbox, including:
     
     - A complete and modulable **injection pipeline** with: metadata handling, chunking, embedding, vector database creation, and querying.
     

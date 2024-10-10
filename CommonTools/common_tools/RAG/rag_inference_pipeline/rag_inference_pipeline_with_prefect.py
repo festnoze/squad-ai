@@ -14,9 +14,9 @@ from common_tools.helpers.llm_helper import Llm
 from common_tools.helpers.ressource_helper import Ressource
 from common_tools.models.logical_operator import LogicalOperator
 from common_tools.models.question_analysis import QuestionAnalysis, QuestionAnalysisPydantic
-from common_tools.RAG.rag_filtering_metadata_helper import RagFilteringMetadataHelper
-from common_tools.RAG.rag_service import RAGService
-from common_tools.RAG.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
+from common_tools.rag.rag_filtering_metadata_helper import RagFilteringMetadataHelper
+from common_tools.rag.rag_service import RagService
+from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
 from langchain_core.language_models import BaseChatModel
 from langchain_core.documents import Document
 from langchain_core.runnables import Runnable, RunnablePassthrough
@@ -24,8 +24,8 @@ from langchain_core.prompts import ChatPromptTemplate
 
 class RagInferencePipelineWithPrefect:
     
-    def __init__(self, rag: RAGService, default_filters: dict = {}, tools: list = None):
-        self.rag: RAGService = rag
+    def __init__(self, rag: RagService, default_filters: dict = {}, tools: list = None):
+        self.rag: RagService = rag
         self.default_filters = default_filters
         self.tools = tools
 
@@ -48,20 +48,20 @@ class RagInferencePipelineWithPrefect:
 
     # Main flow
     @flow(
-            name="RAG inference pipeline flow", 
+            name="rag inference pipeline flow", 
             task_runner=ThreadPoolTaskRunner(max_workers=10),
             retries=0,
             log_prints=True)
     def run(self, query: str, include_bm25_retrieval: bool = False, give_score = True):
         logger = get_run_logger()
-        logger.info("Starting RAG inference pipeline")
+        logger.info("Starting rag inference pipeline")
 
         guardrails_result = self.guardrails_query_analysis.submit(query)
         
         # Pre-treatment query: translate, search for meta-data
         analysed_query, metadata = self.rag_pre_treatment(query)
         
-        # Data Retrieval subflow (runs in parallel for RAG and BM25)
+        # Data Retrieval subflow (runs in parallel for rag and BM25)
         retrieved_chunks = self.rag_hybrid_retrieval(analysed_query, metadata, include_bm25_retrieval, give_score)
 
         # Augmented Answer Generation subflow
@@ -84,7 +84,7 @@ class RagInferencePipelineWithPrefect:
         return final_response, retrieved_chunks
     
     # Pre-treatment subflow
-    @flow(name="RAG pre-treatment", task_runner=ThreadPoolTaskRunner(max_workers=3))
+    @flow(name="rag pre-treatment", task_runner=ThreadPoolTaskRunner(max_workers=3))
     def rag_pre_treatment(self, query):
         questionAnalysis = self.analyse_query_language(query)
         extracted_metadata = self.extract_explicit_metadata(questionAnalysis.translated_question)
@@ -108,7 +108,7 @@ class RagInferencePipelineWithPrefect:
         prefilter_prompt = Ressource.get_language_detection_prompt()
         prefilter_prompt = prefilter_prompt.replace("{question}", query)
         prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(prefilter_prompt, QuestionAnalysisPydantic, QuestionAnalysis)
-        response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks("RAG prefiltering", [self.rag.inference_llm, self.rag.inference_llm], output_parser, 10, *[prompt_for_output_parser])
+        response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks("rag prefiltering", [self.rag.inference_llm, self.rag.inference_llm], output_parser, 10, *[prompt_for_output_parser])
         questionAnalysis = response[0]
         questionAnalysis['question'] = query
         if questionAnalysis['detected_language'].__contains__("english"):
@@ -124,8 +124,8 @@ class RagInferencePipelineWithPrefect:
             filters = self.default_filters       
         return query, filters
 
-    # Data Retrieval sub-flow with parallel RAG and BM25 retrieval
-    @flow(name="RAG hybrid retrieval", task_runner=ThreadPoolTaskRunner(max_workers=3))
+    # Data Retrieval sub-flow with parallel rag and BM25 retrieval
+    @flow(name="rag hybrid retrieval", task_runner=ThreadPoolTaskRunner(max_workers=3))
     def rag_hybrid_retrieval(self, analysed_query: QuestionAnalysis, metadata, include_bm25_retrieval: bool = False, give_score: bool = True, max_retrived_count: int = 10):
         rag_retrieved_chunks = self.rag_retrieval.submit(analysed_query, metadata, give_score, max_retrived_count)
         if include_bm25_retrieval:
@@ -205,7 +205,7 @@ class RagInferencePipelineWithPrefect:
     
     
     # Augmented answer generation subflow
-    @flow(name="RAG answer generation")
+    @flow(name="rag answer generation")
     def rag_augmented_answer_generation(self, retrieved_chunks: list, questionAnalysis: QuestionAnalysis):
         return self.rag_response_generation(retrieved_chunks, questionAnalysis)
 
@@ -216,7 +216,7 @@ class RagInferencePipelineWithPrefect:
         return self.generate_augmented_response_from_retrieved_chunks(self.rag.inference_llm, retrieved_chunks, questionAnalysis)
         
     # Post-treatment subflow
-    @flow(name="RAG post-treatment")
+    @flow(name="rag post-treatment")
     def rag_post_treatment(self, response):
         return self.response_post_treatment(response)
         

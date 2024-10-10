@@ -5,19 +5,19 @@ from langchain_experimental.utilities import PythonREPL
 
 # Import the task classes from other files
 from common_tools.helpers.execute_helper import Execute
-from common_tools.RAG.rag_service import RAGService
-from common_tools.RAG.rag_inference_pipeline.rag_pre_treatment_tasks import RAGPreTreatment
-from common_tools.RAG.rag_inference_pipeline.rag_guardrails_tasks import RAGGuardrails
-from common_tools.RAG.rag_inference_pipeline.rag_hybrid_retrieval_tasks import RAGHybridRetrieval
-from common_tools.RAG.rag_inference_pipeline.rag_answer_generation_tasks import RAGAugmentedGeneration
-from common_tools.RAG.rag_inference_pipeline.rag_post_treatment_tasks import RAGPostTreatment
+from common_tools.rag.rag_service import RagService
+from common_tools.rag.rag_inference_pipeline.rag_pre_treatment_tasks import RAGPreTreatment
+from common_tools.rag.rag_inference_pipeline.rag_guardrails_tasks import RAGGuardrails
+from common_tools.rag.rag_inference_pipeline.rag_hybrid_retrieval_tasks import RAGHybridRetrieval
+from common_tools.rag.rag_inference_pipeline.rag_answer_generation_tasks import RAGAugmentedGeneration
+from common_tools.rag.rag_inference_pipeline.rag_post_treatment_tasks import RAGPostTreatment
 from common_tools.helpers.file_helper import file
 from common_tools.helpers.ressource_helper import Ressource
 from common_tools.workflows.workflow_executor import WorkflowExecutor
 
 class RagInferencePipeline:
-    def __init__(self, rag: RAGService, default_filters: dict = {}, tools: list = None):
-        self.rag: RAGService = rag
+    def __init__(self, rag: RagService, default_filters: dict = {}, tools: list = None):
+        self.rag: RagService = rag
         self.default_filters = default_filters
         self.tools: list = tools
 
@@ -63,7 +63,7 @@ class RagInferencePipeline:
 
     # Main workflow using the static pipeline
     def run_static_pipeline(self, query: str, include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None) -> tuple:
-        """Run the full RAG inference pipeline including guardrails"""
+        """Run the full rag inference pipeline including guardrails"""
         guardrails_result, run_inference_pipeline_results = Execute.run_parallel( 
             (RAGGuardrails.guardrails_query_analysis, (query)), # Guardrails check: query analysis
             (self.run_inference_pipeline, (), {'query': query, 'include_bm25_retrieval': include_bm25_retrieval, 'give_score': give_score, 'format_retrieved_docs_function': format_retrieved_docs_function})
@@ -78,7 +78,7 @@ class RagInferencePipeline:
     
     
     def run_inference_pipeline(self, query: str, include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None) -> tuple:
-        """Run the full RAG inference pipeline, but without guardrails"""
+        """Run the full rag inference pipeline, but without guardrails"""
         # Pre-treatment
         analysed_query, metadata = RAGPreTreatment.rag_pre_treatment(self.rag, query, self.default_filters)
 

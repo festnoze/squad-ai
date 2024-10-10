@@ -1,13 +1,13 @@
 from common_tools.helpers.execute_helper import Execute
-from common_tools.RAG.rag_filtering_metadata_helper import RagFilteringMetadataHelper
+from common_tools.rag.rag_filtering_metadata_helper import RagFilteringMetadataHelper
 from common_tools.models.question_analysis import QuestionAnalysis
-from common_tools.RAG.rag_service import RAGService
+from common_tools.rag.rag_service import RagService
 #
 from langchain_core.documents import Document
 
 class RAGHybridRetrieval:
     @staticmethod    
-    def rag_hybrid_retrieval(rag: RAGService, analysed_query: QuestionAnalysis, metadata:dict, include_bm25_retrieval: bool = False, give_score: bool = True, max_retrived_count: int = 10):
+    def rag_hybrid_retrieval(rag: RagService, analysed_query: QuestionAnalysis, metadata:dict, include_bm25_retrieval: bool = False, give_score: bool = True, max_retrived_count: int = 10):
         if not include_bm25_retrieval:
             rag_retrieved_chunks = RAGHybridRetrieval.rag_retrieval(rag, analysed_query, metadata, give_score, max_retrived_count)
             return rag_retrieved_chunks
@@ -20,12 +20,12 @@ class RAGHybridRetrieval:
         return retained_chunks
     
     @staticmethod    
-    def rag_retrieval(rag: RAGService, analysed_query: QuestionAnalysis, metadata_filters:dict, give_score: bool = False, max_retrieved_count: int = 10, min_score: float = None, min_retrived_count: int = None):
+    def rag_retrieval(rag: RagService, analysed_query: QuestionAnalysis, metadata_filters:dict, give_score: bool = False, max_retrieved_count: int = 10, min_score: float = None, min_retrived_count: int = None):
         retrieved_chunks = rag.retrieve(analysed_query.translated_question, None, metadata_filters, give_score, max_retrieved_count, min_score, min_retrived_count)
         return retrieved_chunks
     
     @staticmethod    
-    def bm25_retrieval(rag: RAGService, analysed_query: QuestionAnalysis, filters: dict, give_score: bool, k = 3):
+    def bm25_retrieval(rag: RagService, analysed_query: QuestionAnalysis, filters: dict, give_score: bool, k = 3):
         if filters and any(filters):
             filtered_docs = [doc for doc in rag.langchain_documents if RagFilteringMetadataHelper.filters_predicate(doc, filters)]
         else:

@@ -1,4 +1,3 @@
-import os
 from typing import List, Optional, Union
 import json
 
@@ -24,9 +23,9 @@ from common_tools.helpers.file_helper import file
 from common_tools.helpers.llm_helper import Llm
 from common_tools.langchains.langchain_factory import LangChainFactory
 from common_tools.models.embedding_type import EmbeddingModel
-from common_tools.RAG.embedding_service import EmbeddingService
+from common_tools.rag.embedding_service import EmbeddingService
 
-class RAGService:
+class RagService:
     def __init__(self, inference_llm_or_info: Optional[Union[LlmInfo, BaseChatModel]], embedding_model:EmbeddingModel=None, vector_db_and_docs_path = "./storage", documents_json_filename = "bm25_documents.json"):
         self.init_embedding(embedding_model)
         self.init_inference_llm(inference_llm_or_info) #todo: add fallbacks with specifying multiple llms or llms infos
@@ -74,18 +73,21 @@ class RAGService:
         return results
             
     def _load_bm25_retriever(self, bm25_results_count: int = 1) -> tuple:
-        if not file.file_exists(self.documents_json_filepath):
-            txt.print(">>> No BM25 store found!")
-            return None
-                        
-        json_as_str = file.read_file(self.documents_json_filepath)
-        json_data = json.loads(json_as_str)
-        self.langchain_documents = [
-            Document(page_content=doc["page_content"], metadata=doc["metadata"]) 
-            for doc in json_data
-        ]
+        self.langchain_documents = RagService.load_langchain_documents(self.documents_json_filepath)
         self.bm25_retriever = self._build_bm25_retriever(self.langchain_documents, bm25_results_count) #todo: useful? as metadata are retieved while querying
         return self.bm25_retriever, self.langchain_documents
+    
+    def load_langchain_documents(filepath:str = None) -> List[Document]:
+        if not file.file_exists(filepath):
+            txt.print(">>> No file found with langchain documents. Please provide a valid file path.")
+            return None
+                        
+        json_as_str = file.read_file(filepath)
+        json_data = json.loads(json_as_str)
+        docs = [
+            Document(page_content=doc["page_content"], metadata=doc["metadata"]) 
+            for doc in json_data ]
+        return docs
     
     def _load_vectorstore(self):
         if not self.embedding: raise ValueError("No embedding model specified")
@@ -94,10 +96,8 @@ class RAGService:
     
     def build_vectorstore_and_bm25_store(self, data: list, chunk_size:int = 0, delete_existing=True)-> int:
         if not data or len(data) == 0: return 0
-
         self.vectorstore = self._build_vectorstore(data, chunk_size, delete_existing)
         self._build_bm25_store(data)
-
         return self.vectorstore._collection.count()
 
     def _build_vectorstore(self, documents: list, chunk_size:int = 0, delete_existing=True) -> any:

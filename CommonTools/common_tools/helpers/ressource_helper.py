@@ -5,7 +5,7 @@ import yaml
 class Ressource:
     
     prompts_package_name = 'common_tools.prompts'
-    rag_configs_package_name = 'common_tools.RAG.configs'
+    rag_configs_package_name = 'common_tools.rag.configs'
 
     @staticmethod
     def get_language_detection_prompt() -> str:

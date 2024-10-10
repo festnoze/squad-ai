@@ -22,3 +22,5 @@ Requires-Dist: langgraph
 Requires-Dist: langsmith
 Requires-Dist: openai
 Requires-Dist: groq
+Requires-Dist: pyyaml
+Requires-Dist: ragas

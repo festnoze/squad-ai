@@ -1,6 +1,7 @@
 -e C:/Dev/squad-ai/CommonTools # local package to internal tooling
 pytest
-sqlalchemy
+#sqlalchemy
 rank_bm25
 numpy
 streamlit
+git+https://github.com/explodinggradients/ragas.git

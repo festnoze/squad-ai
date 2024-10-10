@@ -1,10 +1,10 @@
 from unittest.mock import MagicMock, patch
-from common_tools.RAG.rag_inference_pipeline.rag_answer_generation_tasks import RAGAugmentedGeneration
-from common_tools.RAG.rag_inference_pipeline.rag_guardrails_tasks import RAGGuardrails
-from common_tools.RAG.rag_inference_pipeline.rag_hybrid_retrieval_tasks import RAGHybridRetrieval
-from common_tools.RAG.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
-from common_tools.RAG.rag_inference_pipeline.rag_post_treatment_tasks import RAGPostTreatment
-from common_tools.RAG.rag_inference_pipeline.rag_pre_treatment_tasks import RAGPreTreatment
+from common_tools.rag.rag_inference_pipeline.rag_answer_generation_tasks import RAGAugmentedGeneration
+from common_tools.rag.rag_inference_pipeline.rag_guardrails_tasks import RAGGuardrails
+from common_tools.rag.rag_inference_pipeline.rag_hybrid_retrieval_tasks import RAGHybridRetrieval
+from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
+from common_tools.rag.rag_inference_pipeline.rag_post_treatment_tasks import RAGPostTreatment
+from common_tools.rag.rag_inference_pipeline.rag_pre_treatment_tasks import RAGPreTreatment
 from common_tools.helpers.test_helper import TestHelper
 
 class Test_RAGInferencePipeline:
@@ -13,7 +13,7 @@ class Test_RAGInferencePipeline:
         self.mock_rag_service = MagicMock()
 
         # Define any methods of the ragService which are expected to be called
-        self.mock_rag_service.retrieve.return_value = "RAG Task Result"
+        self.mock_rag_service.retrieve.return_value = "rag Task Result"
 
         # Create fake classes to override the actual workflow classes
         self.override_workflow_available_classes = {
