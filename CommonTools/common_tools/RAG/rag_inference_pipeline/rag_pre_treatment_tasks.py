@@ -24,23 +24,28 @@ class RAGPreTreatment:
         merged_metadata = RAGPreTreatment.get_merged_metadata(question_analysis, found_metadata, query_wo_metadata, explicit_metadata)
         return question_analysis, merged_metadata
 
-    @staticmethod    
-    @output_name('analysed_query')
-    def analyse_query_language(rag:RagService, query:str) -> QuestionAnalysis:
-        prefilter_prompt = Ressource.get_language_detection_prompt()
-        prefilter_prompt = prefilter_prompt.replace("{question}", query)
-        prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(
-            prefilter_prompt, QuestionAnalysisPydantic, QuestionAnalysis
-        )
-        response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(
-            "rag prefiltering", [rag.inference_llm, rag.inference_llm], output_parser, 10, *[prompt_for_output_parser]
-        )
-        question_analysis = response[0]
-        question_analysis['question'] = query
-        if question_analysis['detected_language'].__contains__("english"):
-            question_analysis['translated_question'] = query
-        return QuestionAnalysis(**question_analysis)
+    # @staticmethod    
+    # @output_name('analysed_query')
+    # def analyse_query_language(rag:RagService, query:str) -> QuestionAnalysis:
+    #     prefilter_prompt = Ressource.get_language_detection_prompt()
+    #     prefilter_prompt = prefilter_prompt.replace("{question}", query)
+    #     prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(
+    #         prefilter_prompt, QuestionAnalysisPydantic, QuestionAnalysis
+    #     )
+    #     response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(
+    #         "rag prefiltering", [rag.inference_llm, rag.inference_llm], output_parser, 10, *[prompt_for_output_parser]
+    #     )
+    #     question_analysis = response[0]
+    #     question_analysis['question'] = query
+    #     if question_analysis['detected_language'].__contains__("english"):
+    #         question_analysis['translated_question'] = query
+    #     return QuestionAnalysis(**question_analysis)
 
+    @staticmethod    
+    @output_name('analysed_query') #todo: to replace with above
+    def analyse_query_language(rag:RagService, query:str) -> QuestionAnalysis:
+        question_analysis = QuestionAnalysis(query, query, "request", "french")
+        return question_analysis
 
     @staticmethod   
     def extract_explicit_metadata(query:str) -> tuple[str, dict]:

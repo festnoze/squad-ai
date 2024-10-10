@@ -30,7 +30,7 @@ class ChatbotFront:
             page_title="Chatbot site public Studi.com",
             page_icon="🔎",
             layout="centered",
-            initial_sidebar_state="collapsed",
+            initial_sidebar_state="collapsed"
         )
 
         # Custom CSS to hide the upper right hamburger menu and footer
@@ -59,8 +59,7 @@ class ChatbotFront:
             ChatbotFront.folder_path = st.text_input("Dossier à traiter", value=ChatbotFront.folder_path)#, disabled=True)
 
         st.title("💬 Chatbot Studi.com")
-        st.markdown("<h4 style='text-align: right;'><strong>🛰️ trouvez votre future formation</strong></h4>", unsafe_allow_html=True)
-        #st.caption("🚀 Générer automatiquement les commentaires de méthodes et de classes pour tout un projet C#")
+        # st.markdown("<h4 style='text-align: right;'><strong>🛰️ trouvez votre future formation</strong></h4>", unsafe_allow_html=True)
         st.caption(" Interroger notre base de connaissance sur : les métiers, nos formations, les financements, l'alternance, ...")
                 
         if "messages" not in st.session_state:
@@ -76,13 +75,13 @@ class ChatbotFront:
             while ChatbotFront.is_waiting == True:
                 time.sleep(1)
             
-        if prompt := st.chat_input():
+        if prompt := st.chat_input(placeholder='Ecrivez votre question ici ...'):
             with st.spinner("Recherche de réponses en cours ..."):
                 prompt = txt.remove_markdown(prompt)
                 st.session_state.messages.append({"role": "user", "content": prompt})
                 st.chat_message("user").write(prompt)
                 rag_answer = AvailableService().rag_query(prompt)
-                
+
                 rag_answer = txt.remove_markdown(rag_answer)
                 st.session_state.messages.append({"role": "assistant", "content": rag_answer})
                 st.chat_message("user").write(rag_answer)
@@ -131,7 +130,7 @@ class ChatbotFront:
         st.chat_message("assistant").write(prompt)
 
     def start_caption():
-        return "Bonjour, je suis Studia, votre agent virtuel. \nComment puis-je vous aider ?"
+        return "Bonjour, je suis Studia, votre agent virtuel. Comment puis-je vous aider ?"
 
 if __name__ == "__main__":
     ChatbotFront.main()

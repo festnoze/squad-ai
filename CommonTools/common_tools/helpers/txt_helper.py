@@ -11,6 +11,7 @@ class txt:
     start_time: float = None
     stop_event = Event()
     
+    @staticmethod
     def indent(indent_level: int, code: str) -> str:
         indent_str = '    '
         lines = code.split('\n')
@@ -23,15 +24,17 @@ class txt:
             new_code += '\n'
         return new_code
     
+    @staticmethod
     def single_line(text: str) -> str:
         return ' '.join([line.strip() for line in text.split('\n')])
-        
+
+    @staticmethod  
     def get_elapsed_seconds(start_time, end_time) -> float:
         if not start_time or not end_time:
             return 0
         return float(end_time - start_time)
         
-    
+    @staticmethod
     def get_elapsed_str(elapsed_sec: float) -> str:
         elapsed_str = ''
         elapsed_minutes = int(elapsed_sec / 60)
@@ -52,6 +55,7 @@ class txt:
         elapsed_str +=  f"{elapsed_seconds}s"
         return '(' + elapsed_str + ')'
     
+    @staticmethod
     def get_prop_or_key(object, prop_to_find):
         if hasattr(object, prop_to_find):
             return getattr(object, prop_to_find)
@@ -119,9 +123,11 @@ class txt:
         txt.waiting_spinner_thread.start()
         return txt.waiting_spinner_thread
     
+    @staticmethod
     def to_python_case(text: str) -> str:
         return ''.join(['_' + c.lower() if c.isupper() else c for c in text]).lstrip('_')
 
+    @staticmethod
     def wait_spinner(prefix):
         chars = "⠸⠼⠴⠦⠧⠇⠏⠋⠙⠹"
         while not txt.stop_event.is_set():
@@ -132,12 +138,14 @@ class txt:
                 sys.stdout.flush()
                 time.sleep(0.1)
 
+    @staticmethod
     def stop_spinner():
         txt.stop_event.set()  # Signal the thread to stop
         if txt.waiting_spinner_thread:
             txt.waiting_spinner_thread.join()
             txt.waiting_spinner_thread = None
 
+    @staticmethod
     def stop_spinner_replace_text(text=None)-> int:
         txt.stop_spinner()
         if not txt.activate_print:
@@ -162,10 +170,16 @@ class txt:
             sys.stdout.write(f'\r{empty}')
             sys.stdout.write(f'\r{text}\r\n')
             return elapsed_sec if elapsed_sec else 0
-        
+    
+    @staticmethod    
     def remove_markdown(text):
         remove_chars = r"[*_#+=|{}!]"
         return re.sub(remove_chars, "", text)
+    
+    @staticmethod
+    def remove_commented_lines(content):
+        content = '\n'.join([line for line in content.split('\n') if not line.strip().startswith('//') and not line.strip().startswith('#') ])
+        return content
     
     
     @staticmethod
@@ -203,6 +217,7 @@ class txt:
             #     return text
         return txt.apply_to_all_str(input, replace_unicode_special_chars_str)
     
+    @staticmethod
     def replace_unicode_special_chars_dict(input: dict) -> dict:
         text = json.dumps(input)
         text = txt.replace_unicode_special_chars(text)

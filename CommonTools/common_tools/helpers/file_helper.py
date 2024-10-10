@@ -27,7 +27,7 @@ class file:
             with open(path, 'r', encoding=encoding) as file_reader:
                 content = file_reader.read()
                 if remove_comments:
-                    content = '\n'.join([line for line in content.split('\n') if not line.strip().startswith('//') and not line.strip().startswith('#') ])
+                    content = txt.remove_commented_lines(content)
 
                 return content
         except FileNotFoundError:
