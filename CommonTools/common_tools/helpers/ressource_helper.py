@@ -37,9 +37,9 @@ class Ressource:
             return content
 
     @staticmethod
-    def get_rag_retriever_query_prompt(remove_comments=True) -> str:
+    def get_rag_augmented_generation_query_prompt(remove_comments=True) -> str:
         """Loads and returns the content of rag_retriever_query.txt"""
-        with importlib.resources.open_text(Ressource.prompts_package_name, 'rag_retriever_query.txt') as file_reader:
+        with importlib.resources.open_text(Ressource.prompts_package_name, 'rag_augmented_generation_query.txt') as file_reader:
             content = file_reader.read()
             if remove_comments:
                 content = txt.remove_commented_lines(content)

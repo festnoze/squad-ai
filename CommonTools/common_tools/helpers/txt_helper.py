@@ -173,7 +173,7 @@ class txt:
     
     @staticmethod    
     def remove_markdown(text):
-        remove_chars = r"[*_#+=|{}!]"
+        remove_chars = r"[*_#=|{}!]" # Miss markdown tags: +, -, ., (, ), [, ], <, >, ", ', `, ~, :, ;, ?, @, &, %, $, /, \
         return re.sub(remove_chars, "", text)
     
     @staticmethod

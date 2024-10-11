@@ -22,7 +22,7 @@ class RAGAugmentedGeneration:
 
     @staticmethod
     def generate_augmented_response_from_retrieved_chunks(llm: BaseChatModel, retrieved_docs: list[Document], analysed_query: QuestionAnalysis, format_retrieved_docs_function = None) -> str:
-        retrieval_prompt = Ressource.get_rag_retriever_query_prompt()
+        retrieval_prompt = Ressource.get_rag_augmented_generation_query_prompt()
         retrieval_prompt = retrieval_prompt.replace("{question}", analysed_query.translated_question)
         additional_instructions = ''
         if not analysed_query.detected_language.__contains__("english"):

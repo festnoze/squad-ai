@@ -232,7 +232,7 @@ class RagInferencePipelineWithPrefect:
     
     @staticmethod
     def generate_augmented_response_from_retrieved_chunks(self, llm: BaseChatModel, retrieved_docs: list[Document], questionAnalysis: QuestionAnalysis, format_retrieved_docs_function = None) -> str:
-        retrieval_prompt = Ressource.get_rag_retriever_query_prompt()
+        retrieval_prompt = Ressource.get_rag_augmented_generation_query_prompt()
         retrieval_prompt = retrieval_prompt.replace("{question}", questionAnalysis.translated_question)
         additional_instructions = ''
         if not questionAnalysis.detected_language.__contains__("english"):

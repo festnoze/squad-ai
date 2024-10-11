@@ -75,19 +75,30 @@ class ChatbotFront:
             while ChatbotFront.is_waiting == True:
                 time.sleep(1)
             
-        if prompt := st.chat_input(placeholder='Ecrivez votre question ici ...'):
-            with st.spinner("Recherche de réponses en cours ..."):
-                prompt = txt.remove_markdown(prompt)
-                st.session_state.messages.append({"role": "user", "content": prompt})
-                st.chat_message("user").write(prompt)
-                rag_answer = AvailableService().rag_query(prompt)
+        custom_css = """
+            <style>
+            .stSpinner {
+                margin-left: 20px;
+            }
+            </style>
+        """
+        st.markdown(custom_css, unsafe_allow_html=True)
 
-                rag_answer = txt.remove_markdown(rag_answer)
-                st.session_state.messages.append({"role": "assistant", "content": rag_answer})
-                st.chat_message("user").write(rag_answer)
+        if prompt := st.chat_input(placeholder='Ecrivez votre question ici ...'):
+            prompt = txt.remove_markdown(prompt)
+            st.session_state.messages.append({"role": "user", "content": prompt})
+            st.chat_message("user").write(prompt)
+
+            with st.spinner("Recherche de réponses en cours ..."):
+                rag_answer = AvailableService.rag_query(prompt)
+                #todo: finish it : rag_answer = AvailableService().rag_query_with_history([f"{msg['content']}" for msg in st.session_state.messages])
+
+            rag_answer = txt.remove_markdown(rag_answer)
+            st.session_state.messages.append({"role": "assistant", "content": rag_answer})
+            st.chat_message("assistant").write(rag_answer)
 
     def initialize():
-        txt.activate_print = True
+        AvailableService.init()
         
         # if not ChatbotFront.rag:
         #     ChatbotFront.rag = AvailableService.init_rag_service(ChatbotFront.llms_infos)

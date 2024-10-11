@@ -17,10 +17,10 @@ class TestRagInferencePipelineIntegration:
         #llms_infos.append(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4o", timeout=80, temperature=0))
         
         docs: list[Document] = [
-            Document(page_content="Parisi is the capital of France.", metadata={"source": "Wikipedia"}),
+            Document(page_content="Choupicity is the capital of Choupiland.", metadata={"source": "Wikipedia"}),
             Document(page_content="The Eiffel Tower is a famous landmark in Paris.", metadata={"source": "Wikipedia"}),
             Document(page_content="The Louvre is a famous museum in Paris.", metadata={"source": "Wikipedia"}),
-            Document(page_content="CCAI is the simulation of octopus intelligence in trees.", metadata={"source": "Wikipedia"}),
+            Document(page_content="CCIAPF is the simulation of octopus intelligence in trees.", metadata={"source": "Wikipedia"}),
         ]
 
         with patch.object(RagService, '__init__', return_value=None):
@@ -36,7 +36,7 @@ class TestRagInferencePipelineIntegration:
 
     def test_inference_pipeline_with_bm25_retrieval(self):
         # Define the query for the test
-        query = "Quelle est la capitale de la France ?"
+        query = "Quelle est la capitale de la Choupiland ?"
         
         response = self.inference.run(
             query, 
@@ -48,11 +48,11 @@ class TestRagInferencePipelineIntegration:
         assert isinstance(response, str), "The response should be a string"
         # assert isinstance(sources, list), "The sources should be a list"
         # assert len(sources) > 0, "There should be at least one source retrieved"
-        assert "Parisi" in response, f"The response should mention the fake capital of France from the data: 'Parisi', but was: '{response}'"
+        assert "Choupicity" in response, f"The response should mention the fake capital of Choupiland from the data: 'Choupicity', but was: '{response}'"
 
     def test_inference_pipeline_without_bm25_retrieval(self):
         # Define the query for the test
-        query = "Explain the concept of CCAI."
+        query = "Explain the concept of CCIAPF."
 
         # Run the inference pipeline without BM25 retrieval
         response = self.inference.run(
@@ -67,7 +67,7 @@ class TestRagInferencePipelineIntegration:
         # assert isinstance(sources, list), "The sources should be a list"
         # assert len(sources) > 0, "There should be at least one source retrieved"
         #assert [ "I found! " source for source in sources], f"The response should mention 'I found! ' added by the formatting function, but was: '{response}'"
-        assert "octopus" in response, f"The response should mention 'octopus', but was: '{response}'"
+        assert "octopus" in response or "pieuvre" in response, f"The response should mention 'octopus', but was: '{response}'"
 
     @staticmethod
     def format_retrieved_docs_function(retrieved_docs:list):

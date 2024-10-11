@@ -16,19 +16,20 @@ from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagIn
 from common_tools.models.embedding_type import EmbeddingModel
 
 class AvailableService:
-    def __init__(self):
-        self.out_dir = "C:/Dev/squad-ai/Chatbot-Studi.com/DataExtraction/outputs/"
-        load_dotenv(find_dotenv())
-        self.openai_api_key = os.getenv("OPEN_API_KEY")
+    def init():
         txt.activate_print = True
-        llms_infos = []
-        #llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "phi3", timeout= 80, temperature = 0.5))
-        #llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0125",  timeout= 60, temperature = 0.5))
-        llms_infos.append(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4o", timeout=80, temperature=0))
-        self.rag_service = RagService(llms_infos, EmbeddingModel.OpenAI_TextEmbedding3Small) #EmbeddingModel.Ollama_AllMiniLM
+        AvailableService.out_dir = "C:/Dev/squad-ai/Chatbot-Studi.com/DataExtraction/outputs/"
+        if not hasattr(AvailableService, 'llms_infos') or not AvailableService.llms_infos:
+            AvailableService.llms_infos = []
+            #llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "phi3", timeout= 80, temperature = 0.5))
+            #llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0125",  timeout= 60, temperature = 0.5))
+            AvailableService.llms_infos.append(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4o", timeout=80, temperature=0))
+        
+        if not hasattr(AvailableService, 'rag_service') or not AvailableService.rag_service:
+            AvailableService.rag_service = RagService(AvailableService.llms_infos, EmbeddingModel.OpenAI_TextEmbedding3Small) #EmbeddingModel.Ollama_AllMiniLM
 
 
-    def display_select_menu(self):
+    def display_select_menu():
         while True:
             choice = input(dedent("""
                 ┌──────────────────────────────┐
@@ -42,42 +43,42 @@ class AvailableService:
                 5 - Exit
             """))
             if choice == "1":
-                DrupalDataRetireval(self.out_dir)
+                DrupalDataRetireval(AvailableService.out_dir)
             elif choice == "2":
-                self.create_vector_db_from_generated_embeded_documents(self.out_dir)
+                AvailableService.create_vector_db_from_generated_embeded_documents(AvailableService.out_dir)
             elif choice == "3":
-                self.docs_retrieval_query()
+                AvailableService.docs_retrieval_query()
             elif choice == "4":
-                self.rag_query_console()
+                AvailableService.rag_query_console()
             elif choice == "5" or choice.lower() == "e":
                 print("Exiting ...")
                 exit()
                 #GenerateCleanedData()
 
-    def create_vector_db_from_generated_embeded_documents(self, out_dir):
+    def create_vector_db_from_generated_embeded_documents(out_dir):
         all_docs = GenerateDocumentsWithMetadataFromFiles().process_all_data(out_dir)
-        rag_injection = RagInjectionPipeline(self.rag_service)
+        rag_injection = RagInjectionPipeline(AvailableService.rag_service)
         txt.print_with_spinner(f"Start embedding of {len(all_docs)} documents")
         injected = rag_injection.inject_documents(all_docs, perform_chunking= False, delete_existing= True)
         txt.stop_spinner_replace_text(f"Finished Embedding on: {injected} documents")
 
-    def docs_retrieval_query(self):
+    def docs_retrieval_query():
         while True:
             query = input("Entrez votre question ('exit' pour quitter):\n")
             if query == "" or query == "exit":
                 return None
-            self.single_docs_retrieval_query(query)
+            AvailableService.single_docs_retrieval_query(query)
 
-    def single_docs_retrieval_query(self, query):        
+    def single_docs_retrieval_query(query):        
         txt.print_with_spinner("Recherche en cours ...")
-        docs = self.rag_service.retrieve(query, give_score=True)
+        docs = AvailableService.rag_service.retrieve(query, give_score=True)
         txt.stop_spinner_replace_text(f"{len(docs)} documents trouvés")
         for doc, score in docs:
             txt.print(f"[{score:.4f}] ({doc.metadata['type']}) {doc.metadata['name']} : {doc.page_content}".strip())
         return docs
     
-    def rag_query_console(self):
-        inference = RagInferencePipeline(self.rag_service)
+    def rag_query_console():
+        inference = RagInferencePipeline(AvailableService.rag_service)
         while True:
             query = input("Entrez votre question ('exit' pour quitter):\n")
             if query == "" or query == "exit":
@@ -85,12 +86,20 @@ class AvailableService:
             response = inference.run(query, include_bm25_retrieval= True, give_score=True)
             txt.print(response)
 
-    def rag_query(self, query):
-        inference = RagInferencePipeline(self.rag_service)
+    def rag_query(query):
+        inference = RagInferencePipeline(AvailableService.rag_service)
         if query.startswith('!'):
             response = inference.run_static_pipeline(query[1:], include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
         else:
             response = inference.run(query, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
+        return response
+    
+    def rag_query_with_history(query_history:list[str]):
+        inference = RagInferencePipeline(AvailableService.rag_service)
+        if len(query_history) % 2 == 0:
+            raise ValueError("Query history length must be odd.")
+        
+        response = inference.run(query_history, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
         return response
 
     #todo: to delete or write to add metadata to context
@@ -112,7 +121,7 @@ class AvailableService:
         #     context += f"• {summary}. In {functional_type.lower()} {struct_type.lower()}  '{struct_name}',{" method '" + method_name + "'," if method_name else ''} from namespace '{namespace}'.\n"
         return context
 
-    # def create_sqlLite_database(self, out_dir):
+    # def create_sqlLite_database(out_dir):
     #     db_instance = DB()
     #     db_instance.create_database()
     #     # db_instance.add_data()
