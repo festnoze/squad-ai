@@ -162,12 +162,10 @@ class Test_WorkflowExecutor:
     def test_execute_parallel_threads(self):
         self.executor.config = {
             'start': {
-                'step1': {
-                    'parallel_threads': [
-                        'workflow_executor_test_methods.step_one', 
-                        'workflow_executor_test_methods.step_three'
-                    ]
-                }
+                'parallel_threads': [
+                    'workflow_executor_test_methods.step_one', 
+                    'workflow_executor_test_methods.step_three'
+                ]
             }
         }
         kwargs = {'a': 2, 'b': 3, 'd': 5}
@@ -177,12 +175,10 @@ class Test_WorkflowExecutor:
     def test_execute_parallel_async(self):
         self.executor.config = {
             'start': {
-                'step1': {
-                    'parallel_async': [
-                        'workflow_executor_test_methods.step_async', 
-                        'workflow_executor_test_methods.step_three'
-                    ]
-                }
+                'parallel_async': [
+                    'workflow_executor_test_methods.step_async', 
+                    'workflow_executor_test_methods.step_three'
+                ]
             }
         }
         kwargs = {'d': 5, 'e': 4}
@@ -273,13 +269,11 @@ class Test_WorkflowExecutor:
 
     def test_nested_parallel_threads(self):
         self.executor.config = {
-            'start': {                
-                'step1': {
-                    'parallel_threads': [
-                        'workflow_executor_test_methods.step_one',
-                        'nested_parallel'
-                    ]
-                }
+            'start': {
+                'parallel_threads': [
+                    'workflow_executor_test_methods.step_one',
+                    'nested_parallel'
+                ]
             },
             'nested_parallel': {
                 'parallel_threads': [
@@ -295,12 +289,10 @@ class Test_WorkflowExecutor:
     def test_nested_parallel_async(self):
         self.executor.config = {
             'start': {
-                'step1': {
-                    'parallel_async': [
-                        'workflow_executor_test_methods.step_two',
-                        'nested_parallel'
-                    ]
-                }
+                'parallel_async': [
+                    'workflow_executor_test_methods.step_two',
+                    'nested_parallel'
+                ]
             },
             'nested_parallel': {
                 'parallel_async': [
