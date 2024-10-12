@@ -18,151 +18,155 @@ class WorkflowExecutor:
         
         self.available_classes = available_classes
 
-    def execute_workflow(self, workflow_config=None, previous_results:list=None, kwargs_values: dict = {}, config_entry_point_name: str = None):
-        if not workflow_config:
-            if config_entry_point_name:
-                workflow_config = self.config[config_entry_point_name]
-            elif 'start' in self.config:
-                workflow_config = self.config['start']
-            else:
-                raise ValueError('Starting step must either be provided or a step named: "start" must be set in config.')
+    def execute_workflow(self, workflow_config=None, previous_results=None, kwargs_values=None, config_entry_point_name=None):
+        if workflow_config is None:
+            workflow_config = self._determine_workflow_config(config_entry_point_name)
         else:
             if config_entry_point_name:
                 workflow_config = workflow_config[config_entry_point_name]
-
-        if not previous_results:
+        if previous_results is None:
             previous_results = []
         if kwargs_values is None:
             kwargs_values = {}
-
+        
         results = []
         for step in workflow_config:
-            if isinstance(step, dict):
-                if 'parallel_threads' in step:
-                    parallel_steps = step['parallel_threads']
-                    parallel_results = self.execute_steps_as_parallel_threads(parallel_steps, previous_results, kwargs_values)
-                    results = self.flatten_tuples(parallel_results)
-                elif 'parallel_async' in step:
-                    parallel_steps = step['parallel_async']
-                    parallel_results = asyncio.run(self.execute_steps_as_parallel_async(parallel_steps, previous_results, kwargs_values))
-                    results = self.flatten_tuples(parallel_results)
-                else:
-                    for sub_workflow_name in step.keys():
-                        sub_workflow_results = self.execute_workflow(self.config, previous_results, kwargs_values, sub_workflow_name)
-                        results = self.flatten_tuples(sub_workflow_results)
-            elif isinstance(step, list):
-                sub_workflow_results = self.execute_workflow(step, previous_results, kwargs_values)
-                results = self.flatten_tuples(sub_workflow_results)
-            elif isinstance(step, str):
-                if step == 'parallel_threads':
-                    parallel_results = self.execute_steps_as_parallel_threads(workflow_config[step], previous_results, kwargs_values)
-                    results = self.flatten_tuples(parallel_results)
-                elif step == 'parallel_async':
-                    parallel_results = asyncio.run(self.execute_steps_as_parallel_async(workflow_config[step], previous_results, kwargs_values))
-                    results = self.flatten_tuples(parallel_results)
-                elif step in self.config and isinstance(self.config[step], (list, dict)):
-                    sub_workflow_results = self.execute_workflow(self.config, previous_results, kwargs_values, step)
-                    results = self.flatten_tuples(sub_workflow_results)
-                else:
-                    result = self.execute_function(step, previous_results, kwargs_values)
-                    results = [result]
-                    # Update kwargs with any named outputs from the executed function
-                    return_info = self._get_return_infos_for_function(self.get_static_method(step))
-                    if return_info:
-                        output_names = return_info['output_names']
-                        if len(output_names) == 1:
-                            kwargs_values[output_names[0]] = result
-                        elif len(output_names) > 1 and isinstance(result, tuple):
-                            for name, value in zip(output_names, result):
-                                kwargs_values[name] = value
-            else:
-                pass
+            results = self.execute_step(step, previous_results, kwargs_values, workflow_config)
             previous_results = results
         return results
 
-    def execute_steps_as_parallel_threads(self, steps, previous_results, kwargs_values):
-        """
-        Execute steps in parallel using ThreadPoolExecutor.
-        """
+    def _determine_workflow_config(self, config_entry_point_name):
+        if config_entry_point_name:
+            return self.config[config_entry_point_name]
+        elif 'start' in self.config:
+            return self.config['start']
+        else:
+            raise ValueError('Starting step must either be provided or a step named "start" must be set in config.')
+
+    def execute_step(self, step, previous_results, kwargs_values, workflow_config):
+        if isinstance(step, dict):
+            return self.execute_dict_step(step, previous_results, kwargs_values)
+        elif isinstance(step, list):
+            return self.execute_list_step(step, previous_results, kwargs_values)
+        elif isinstance(step, str):
+            return self.execute_str_step(step, previous_results, kwargs_values, workflow_config)
+        else:
+            raise TypeError(f"Invalid step type: {type(step).__name__}")
+
+    def execute_dict_step(self, step, previous_results, kwargs_values):
+        if 'parallel_threads' in step or 'parallel_async' in step:
+            parallel_type = 'threads' if 'parallel_threads' in step else 'async'
+            parallel_steps = step.get('parallel_threads') or step.get('parallel_async')
+            parallel_results = self.execute_parallel_steps(parallel_steps, previous_results, kwargs_values, parallel_type)
+            return self.flatten_tuples(parallel_results)
+        else:
+            # Treat the dict as a sub-workflow
+            sub_workflow_results = self.execute_workflow(step, previous_results, kwargs_values)
+            return self.flatten_tuples(sub_workflow_results)
+
+    def execute_list_step(self, step, previous_results, kwargs_values):
+        sub_workflow_results = self.execute_workflow(step, previous_results, kwargs_values)
+        return self.flatten_tuples(sub_workflow_results)
+
+    def execute_str_step(self, step, previous_results, kwargs_values, workflow_config):
+        if step in ['parallel_threads', 'parallel_async']:
+            parallel_type = 'threads' if step == 'parallel_threads' else 'async'
+            if step in workflow_config:
+                parallel_steps = workflow_config[step]
+                parallel_results = self.execute_parallel_steps(parallel_steps, previous_results, kwargs_values, parallel_type)
+                return self.flatten_tuples(parallel_results)
+            else:
+                raise KeyError(f"Key '{step}' not found in the current workflow configuration.")
+        elif step in self.config and isinstance(self.config[step], (list, dict)):
+            sub_workflow_results = self.execute_workflow(self.config[step], previous_results, kwargs_values)
+            return self.flatten_tuples(sub_workflow_results)
+        else:
+            result = self.execute_function(step, previous_results, kwargs_values)
+            return [result]
+
+    def execute_parallel_steps(self, steps, previous_results, kwargs_values, parallel_type):
+        if parallel_type == 'threads':
+            return self._execute_steps_in_threads(steps, previous_results, kwargs_values)
+        elif parallel_type == 'async':
+            return asyncio.run(self._execute_steps_in_async(steps, previous_results, kwargs_values))
+        else:
+            raise ValueError(f"Unknown parallel execution type: {parallel_type}")
+
+    def _execute_steps_in_threads(self, steps, previous_results, kwargs_values):
         with ThreadPoolExecutor(max_workers=5) as executor:
-            futures = []
-            for step in steps:
-                future = executor.submit(self.execute_func_or_workflow, step, previous_results, kwargs_values)
-                futures.append(future)
+            futures = [executor.submit(self.execute_func_or_workflow, step, previous_results, kwargs_values) for step in steps]
+            return [future.result() for future in futures]
 
-            results = []
-            for future in futures:
-                result = future.result()
-                results.append(result)
-
-        return results
-
-    async def execute_steps_as_parallel_async(self, steps, previous_results, kwargs_values):
-        """
-        Execute steps in parallel using asyncio coroutines.
-        """
+    async def _execute_steps_in_async(self, steps, previous_results, kwargs_values):
         tasks = [self.execute_async_func_or_workflow(step, previous_results, kwargs_values) for step in steps]
-        results = await asyncio.gather(*tasks)
-        return results
+        return await asyncio.gather(*tasks)
 
     def execute_func_or_workflow(self, step, previous_results, kwargs_values):
-        """
-        Helper method to decide whether to execute a step or a nested workflow.
-        """
-        if isinstance(step, str) and step in self.config and isinstance(self.config[step], (list, dict)):
+        if self._is_sub_workflow(step):
             inner_workflow_config = self.config[step]
             return self.execute_workflow(inner_workflow_config, previous_results, kwargs_values)
         else:
             return self.execute_function(step, previous_results, kwargs_values)
 
     async def execute_async_func_or_workflow(self, step, previous_results, kwargs_values):
-        """
-        Async helper method to decide whether to execute a step or a nested workflow.
-        """
-        if isinstance(step, str) and step in self.config and isinstance(self.config[step], (list, dict)):
+        if self._is_sub_workflow(step):
             inner_workflow_config = self.config[step]
             return await asyncio.to_thread(self.execute_workflow, inner_workflow_config, previous_results, kwargs_values)
         else:
             return await self.execute_function_async(step, previous_results, kwargs_values)
 
+    def _is_sub_workflow(self, step):
+        return isinstance(step, str) and step in self.config and isinstance(self.config[step], (list, dict))
 
-    async def execute_function_async(self, class_and_function_name, previous_results, kwargs_value):
+    def execute_function(self, class_and_function_name, previous_results, kwargs_values):
         func = self.get_static_method(class_and_function_name)
-        func_kwargs = self._prepare_arguments_for_function(func, previous_results, kwargs_value)
+        func_kwargs = self._prepare_arguments_for_function(func, previous_results, kwargs_values)
+        
+        try:
+            result = func(**func_kwargs)
+        except Exception as e:
+            self._raise_fail_func_execution(class_and_function_name, previous_results, kwargs_values, e)
+
+        self._add_function_output_names_and_values_to_kwargs(func, result, kwargs_values)
+        return result
+
+    async def execute_function_async(self, class_and_function_name, previous_results, kwargs_values):
+        func = self.get_static_method(class_and_function_name)
+        func_kwargs = self._prepare_arguments_for_function(func, previous_results, kwargs_values)
         try:
             if inspect.iscoroutinefunction(func):
                 result = await func(**func_kwargs)
             else:
                 result = func(**func_kwargs)
-            return result        
+            self._add_function_output_names_and_values_to_kwargs(func, result, kwargs_values)
+            return result
         except Exception as e:
-            self._raise_fail_func_exection(class_and_function_name, previous_results, kwargs_value, e)
+            self._raise_fail_func_execution(class_and_function_name, previous_results, kwargs_values, e)
 
-    def execute_function(self, class_and_function_name: str, previous_results: list, kwargs_value: dict):
-        func = self.get_static_method(class_and_function_name)       
-        func_kwargs = self._prepare_arguments_for_function(func, previous_results, kwargs_value)
-        try:
-            result = func(**func_kwargs)
-            return_info = self._get_return_infos_for_function(func)
-            if return_info:
-                output_names = return_info['output_names']
-                if len(output_names) == 1:
-                    kwargs_value[output_names[0]] = result
-                elif len(output_names) > 1 and isinstance(result, tuple):
-                    for name, value in zip(output_names, result):
-                        kwargs_value[name] = value
-            return result            
-        except Exception as e:
-            self._raise_fail_func_exection(class_and_function_name, previous_results, kwargs_value, e)        
+    def _add_function_output_names_and_values_to_kwargs(self, func, function_results, kwargs_values):
+        return_info = self._get_function_output_names(func)
+        if return_info:
+            output_names = return_info['output_names']
+            output_names_count = len(output_names)
+            
+            if output_names_count == 0:
+                return
+            elif output_names_count == 1:
+                kwargs_values[output_names[0]] = function_results
+            elif output_names_count > 1:
+                if not isinstance(function_results, tuple) or output_names_count > len(function_results):
+                    raise ValueError(f"Function only returned {len(function_results) if isinstance(function_results, tuple) else 1} values, but at least {output_names_count} were expected to match with output names decorator.")
+                for name, value in zip(output_names, function_results[:output_names_count]):
+                    kwargs_values[name] = value 
     
-    def _raise_fail_func_exection(self, class_and_function_name, previous_results, kwargs_value, e):
+    def _raise_fail_func_execution(self, class_and_function_name, previous_results, kwargs_value, exception):
         error_message = (
-                f"Error occurred while executing function: {str(e)}\n"
-                f"Class and function name: {class_and_function_name}\n"
-                f"Previous results: {previous_results}\n"
-                f"Kwargs values: {kwargs_value}"
+                f"Error occurred while executing class and function name: '{class_and_function_name}'\n"
+                f"With previous results: {previous_results}\n"
+                f"With kwargs values: {kwargs_value}.\n"                
+                f"Error details: {str(exception)}\n"
             )
-        raise RuntimeError(error_message) from e
+        raise RuntimeError(error_message) from exception
 
     def _prepare_arguments_for_function(self, func, previous_results: list, kwargs_value: dict):
         """
@@ -217,7 +221,7 @@ class WorkflowExecutor:
 
         return func_kwargs
 
-    def _get_return_infos_for_function(self, func):
+    def _get_function_output_names(self, func):
         output_names = getattr(func, '_output_name', None)
         if output_names is not None:
             if isinstance(output_names, str):
@@ -271,7 +275,8 @@ class WorkflowExecutor:
         The format should be 'Class.method', where Class is one of the pre-imported classes.
         """
         parts = class_and_function_name.split('.')
-        if len(parts) != 2: raise ValueError(f"Invalid function name '{class_and_function_name}'. It should be in 'Class.method' format.")
+        if len(parts) != 2: 
+            raise ValueError(f"Invalid function name '{class_and_function_name}'. It should be in 'Class.method' format.")
         class_name, method_name = parts
         
         cls = self.available_classes.get(class_name)
