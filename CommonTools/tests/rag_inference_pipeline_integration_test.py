@@ -38,7 +38,7 @@ class TestRagInferencePipelineIntegration:
         # Define the query for the test
         query = "Quelle est la capitale de la Choupiland ?"
         
-        response = self.inference.run(
+        response, sources = self.inference.run_dynamic_pipeline(
             query, 
             include_bm25_retrieval=True, 
             give_score=True, 
@@ -55,7 +55,7 @@ class TestRagInferencePipelineIntegration:
         query = "Explain the concept of CCIAPF."
 
         # Run the inference pipeline without BM25 retrieval
-        response = self.inference.run(
+        response, sources = self.inference.run_dynamic_pipeline(
             query,
             include_bm25_retrieval=False, 
             give_score=True, 
@@ -67,7 +67,7 @@ class TestRagInferencePipelineIntegration:
         # assert isinstance(sources, list), "The sources should be a list"
         # assert len(sources) > 0, "There should be at least one source retrieved"
         #assert [ "I found! " source for source in sources], f"The response should mention 'I found! ' added by the formatting function, but was: '{response}'"
-        assert "octopus" in response or "pieuvre" in response, f"The response should mention 'octopus', but was: '{response}'"
+        assert response.lower().__contains__("octopus") or response.lower().__contains__("pieuvre"), f"The response should mention 'octopus', but was: '{response}'"
 
     @staticmethod
     def format_retrieved_docs_function(retrieved_docs:list):
@@ -95,7 +95,7 @@ class TestRagInferencePipelineIntegration:
     #         return f"Custom Format: {docs}"
 
     #     # Run the inference pipeline with a custom formatting function
-    #     response, sources = self.inference.run(
+    #     response, sources = self.inference.run_dynamic_pipeline(
     #         query, 
     #         include_bm25_retrieval=True, 
     #         give_score=False, 

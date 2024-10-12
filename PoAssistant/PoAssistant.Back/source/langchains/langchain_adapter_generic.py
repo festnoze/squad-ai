@@ -6,10 +6,11 @@ import uuid
 
 from front_client import front_client
 # internal imports
-from models.conversation import Conversation, Message
+from common_tools.models.conversation import Conversation
+from common_tools.models.message import Message
 from models.stream_container import StreamContainer
 # common tools import
-from common_tools.langchains.langchain_adapter_type import LangChainAdapterType
+from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.helpers.misc import misc
 from common_tools.langchains.langchain_factory import LangChainFactory
 

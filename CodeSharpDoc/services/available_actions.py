@@ -4,8 +4,8 @@ from typing import List
 from common_tools.helpers.file_helper import file
 from common_tools.helpers.txt_helper import txt
 from common_tools.models.llm_info import LlmInfo
-from common_tools.RAG.rag_inference_pipeline import RagInferencePipeline
-from common_tools.RAG.rag_service import RAGService
+from common_tools.rag.rag_inference_pipeline import RagInferencePipeline
+from common_tools.rag.rag_service import RagService
 from common_tools.models.embedding_type import EmbeddingModel
 #
 from services.analysed_structures_handling import AnalysedStructuresHandling
@@ -19,7 +19,7 @@ class AvailableActions:
     # target_code_path = f"{project_path}/inputs/code_files_generated"
     struct_desc_folder_subpath = "outputs/structures_descriptions"
     struct_desc_folder_path = f"{local_path}/{struct_desc_folder_subpath}"
-    rag_service: RAGService = None
+    rag_service: RagService = None
 
     @staticmethod
     def display_menu() -> None:
@@ -29,13 +29,13 @@ class AvailableActions:
         print("1. Generate & replace summaries for all C# files in the project")
         print("2. Analyse code structures & summaries and save as json files")
         print("3. Build new vector database from analysed structures json files")
-        print("4. Query RAG service on vector database")
+        print("4. Query rag service on vector database")
         print("5. Help: Display this menu again")
         print("6. Exit")
 
-    def init_rag_service(llms_infos) -> RAGService:
+    def init_rag_service(llms_infos) -> RagService:
         if not AvailableActions.rag_service:
-            AvailableActions.rag_service = RAGService(llms_infos, EmbeddingModel.OpenAI_TextEmbedding3Large)
+            AvailableActions.rag_service = RagService(llms_infos, EmbeddingModel.OpenAI_TextEmbedding3Large)
         return AvailableActions.rag_service
 
     @staticmethod
@@ -67,9 +67,9 @@ class AvailableActions:
                 AvailableActions.rebuild_vectorstore(llms_infos)        
                 continue
 
-            # Query the RAG service on methods summaries vector database
+            # Query the rag service on methods summaries vector database
             elif choice == '4' or choice == 'q':            
-                AvailableActions.rag_querying_from_console(RagInferencePipeline(RAGService(llms_infos)))
+                AvailableActions.rag_querying_from_console(RagInferencePipeline(RagService(llms_infos)))
                 continue
             
             elif choice == '5' or choice == 'h':
@@ -102,9 +102,9 @@ class AvailableActions:
 
     @staticmethod
     def rag_querying_from_sl_chatbot(inference_pipeline, query: str, st, include_bm25_retrieval:bool = False):
-        txt.print_with_spinner("Querying RAG service.")
+        txt.print_with_spinner("Querying rag service.")
         answer, sources = inference_pipeline.run(query=query, include_bm25_retrieval= include_bm25_retrieval, give_score= True, format_retrieved_docs_function = AvailableActions.format_retrieved_docs_function)
-        txt.stop_spinner_replace_text("RAG retieval done")
+        txt.stop_spinner_replace_text("rag retieval done")
         answer = txt.remove_markdown(answer)
         st.session_state.messages.append({"role": "assistant", "content": answer})
         st.chat_message("assistant").write(answer)

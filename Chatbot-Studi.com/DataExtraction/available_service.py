@@ -14,6 +14,7 @@ from common_tools.rag.rag_service import RagService
 from common_tools.rag.rag_injection_pipeline.rag_injection_pipeline import RagInjectionPipeline
 from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
 from common_tools.models.embedding_type import EmbeddingModel
+from common_tools.models.conversation import Conversation
 
 class AvailableService:
     def init():
@@ -83,23 +84,23 @@ class AvailableService:
             query = input("Entrez votre question ('exit' pour quitter):\n")
             if query == "" or query == "exit":
                 return None
-            response = inference.run(query, include_bm25_retrieval= True, give_score=True)
+            response, sources = inference.run(query, include_bm25_retrieval= True, give_score=True)
             txt.print(response)
 
     def rag_query(query):
         inference = RagInferencePipeline(AvailableService.rag_service)
         if query.startswith('!'):
-            response = inference.run_static_pipeline(query[1:], include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
+            response, sources = inference.run_static_pipeline(query[1:], include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
         else:
-            response = inference.run(query, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
+            response, sources = inference.run_dynamic_pipeline(query, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
         return response
     
-    def rag_query_with_history(query_history:list[str]):
+    def rag_query_with_history(conversation_history:Conversation):
         inference = RagInferencePipeline(AvailableService.rag_service)
-        if len(query_history) % 2 == 0:
-            raise ValueError("Query history length must be odd.")
+        if conversation_history.last_message.role != 'user':
+            raise ValueError("Conversation history should end with a user message")
         
-        response = inference.run(query_history, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
+        response, sources = inference.run_dynamic_pipeline(conversation_history, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
         return response
 
     #todo: to delete or write to add metadata to context

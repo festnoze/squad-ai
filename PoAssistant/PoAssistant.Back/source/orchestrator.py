@@ -12,7 +12,8 @@ from common_tools.helpers.file_helper import file
 
 
 # internal import
-from models.conversation import Conversation, Message
+from common_tools.models.conversation import Conversation
+from common_tools.models.message import Message
 from langchains.langchain_adapter_generic import LangChainAdapter
 
 class Orchestrator:

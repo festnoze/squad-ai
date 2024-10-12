@@ -1,4 +1,6 @@
+from typing import Optional, Union
 from common_tools.helpers.execute_helper import Execute
+from common_tools.models.conversation import Conversation
 from common_tools.rag.rag_filtering_metadata_helper import RagFilteringMetadataHelper
 from common_tools.models.question_analysis import QuestionAnalysis
 from common_tools.rag.rag_service import RagService
@@ -20,19 +22,28 @@ class RAGHybridRetrieval:
         return retained_chunks
     
     @staticmethod    
-    def rag_retrieval(rag: RagService, analysed_query: QuestionAnalysis, metadata_filters:dict, give_score: bool = False, max_retrieved_count: int = 10, min_score: float = None, min_retrived_count: int = None):
-        retrieved_chunks = rag.retrieve(analysed_query.translated_question, None, metadata_filters, give_score, max_retrieved_count, min_score, min_retrived_count)
+    def rag_retrieval(rag: RagService, query:Optional[Union[str, Conversation]], analysed_query: QuestionAnalysis, metadata_filters:dict, give_score: bool = False, max_retrieved_count: int = 10, min_score: float = None, min_retrived_count: int = None):
+        conversation_history = None
+        if isinstance(query, Conversation):
+            conversation_history = '\n'.join([f"{msg.role}: {msg.content}" for msg in query.messages[:-1]])
+
+        retrieved_chunks = rag.retrieve(analysed_query.translated_question, conversation_history, metadata_filters, give_score, max_retrieved_count, min_score, min_retrived_count)
         return retrieved_chunks
     
     @staticmethod    
-    def bm25_retrieval(rag: RagService, analysed_query: QuestionAnalysis, filters: dict, give_score: bool, k = 3):
+    def bm25_retrieval(rag: RagService, query:Optional[Union[str, Conversation]], analysed_query: QuestionAnalysis, filters: dict, give_score: bool, k = 3):
         if filters and any(filters):
             filtered_docs = [doc for doc in rag.langchain_documents if RagFilteringMetadataHelper.filters_predicate(doc, filters)]
         else:
             filtered_docs = rag.langchain_documents
 
-        bm25_retriever = rag._build_bm25_retriever(filtered_docs, k)#, filters
-        bm25_retrieved_chunks = bm25_retriever.invoke(analysed_query.translated_question)
+        if isinstance(query, Conversation):
+            conversation_history = '\n'.join([f"{msg.role}: {msg.content}" for msg in query.messages[:-1]])
+            full_question = f"### Conversation history: ###\n{conversation_history}\n\n### User Question: ###\n {analysed_query.translated_question}" 
+        else:
+            full_question = analysed_query.translated_question
+        bm25_retriever = rag._build_bm25_retriever(filtered_docs, k) #, filters
+        bm25_retrieved_chunks = bm25_retriever.invoke(input=full_question)
        
         if give_score:
             score = 0.1 #todo: define the score

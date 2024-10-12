@@ -8,7 +8,7 @@ This tool is about documenting & rewritting your legacy C# code.
 
 ### Technicalities
 
-AI powered including: LLM, LangChain, Agents and RAG.
+AI powered including: LLM, LangChain, Agents and rag.
 
 Include: python, langchain, langgraph and C# code.
 

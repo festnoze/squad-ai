@@ -6,6 +6,7 @@ from common_tools.helpers.txt_helper import txt
 from common_tools.models.llm_info import LlmInfo
 from common_tools.rag.rag_service import RagService
 from common_tools.models.llm_info import LlmInfo
+from common_tools.models.conversation import Conversation
 
 # internal import
 from available_service import AvailableService
@@ -90,8 +91,9 @@ class ChatbotFront:
             st.chat_message("user").write(prompt)
 
             with st.spinner("Recherche de réponses en cours ..."):
-                rag_answer = AvailableService.rag_query(prompt)
-                #todo: finish it : rag_answer = AvailableService().rag_query_with_history([f"{msg['content']}" for msg in st.session_state.messages])
+                #rag_answer = AvailableService.rag_query(prompt)
+                conversation_history = Conversation([{ 'role': msg['role'], 'content': msg['content'] } for msg in st.session_state.messages])
+                rag_answer = AvailableService.rag_query_with_history(conversation_history)
 
             rag_answer = txt.remove_markdown(rag_answer)
             st.session_state.messages.append({"role": "assistant", "content": rag_answer})

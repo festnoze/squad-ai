@@ -7,7 +7,6 @@ from common_tools.helpers.groq_helper import GroqHelper
 from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.langchains.langchain_factory import LangChainFactory
 from common_tools.models.llm_info import LlmInfo
-from common_tools.RAG.rag_service import RAGService
 # internal import
 from services.summary_generation_service import SummaryGenerationService
 

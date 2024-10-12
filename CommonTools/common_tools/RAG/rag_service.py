@@ -53,7 +53,7 @@ class RagService:
     
     def _retrieve(self, vectorstore, question: str, additionnal_context: str = None, metadata_filters: dict = None, give_score: bool = False, max_retrived_count: int = 10, min_score: float = None, min_retrived_count: int = None) -> List[Document]:
         if additionnal_context:
-            full_question = f"### User Question:\n {question}\n\n### Context:\n{additionnal_context}" 
+            full_question = f"### Context: ###\n{additionnal_context}\n\n### User Question: ###\n {question}" 
         else:
             full_question = question
 

@@ -5,7 +5,7 @@ from requests.exceptions import HTTPError
 import json
 # internal import
 from common_tools.helpers.misc import misc
-from models.conversation import Message
+from common_tools.models.conversation import Message
 
 class front_client:
     host_uri = "http://localhost:5132"

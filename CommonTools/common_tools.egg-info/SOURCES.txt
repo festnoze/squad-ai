@@ -28,6 +28,7 @@ common_tools/langchains/langchain_factory.py
 common_tools/langchains/langsmith_client.py
 common_tools/models/__init__.py
 common_tools/models/base_desc.py
+common_tools/models/conversation.py
 common_tools/models/embedding_type.py
 common_tools/models/enum_desc.py
 common_tools/models/file_already_exists_policy.py
@@ -35,6 +36,7 @@ common_tools/models/langchain_adapter_type.py
 common_tools/models/langgraph_agent_state.py
 common_tools/models/llm_info.py
 common_tools/models/logical_operator.py
+common_tools/models/message.py
 common_tools/models/question_analysis.py
 common_tools/project/__init__.py
 common_tools/project/import_listing.py

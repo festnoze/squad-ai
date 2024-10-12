@@ -7,7 +7,7 @@ from langchains.langchain_adapter_generic import LangChainAdapter
 
 # internal import
 from orchestrator import Orchestrator
-from common_tools.langchains.langchain_adapter_type import LangChainAdapterType
+from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.models.llm_info import LlmInfo
 
 async def main():

@@ -3,13 +3,13 @@ from langchain.schema.messages import HumanMessage, AIMessage, SystemMessage
 from langchain.memory import ConversationBufferMemory
 from langchain_core.messages.base import BaseMessage, BaseMessageChunk
 
-class Message:
+class Message: #obsolete: moved to common _tools lib.
     def __init__(self, role: str, content: str, elapsed_seconds: int) -> None:
         self.role: str = role
         self.content: str = content
         self.elapsed_seconds: int = elapsed_seconds
 
-class Conversation:
+class Conversation: #obsolete: moved to common _tools lib.
     def __init__(self) -> None:
         self.messages: List[Message] = []
 
