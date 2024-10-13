@@ -9,41 +9,34 @@ from langchain_core.documents import Document
 
 class RAGHybridRetrieval:
     @staticmethod    
-    def rag_hybrid_retrieval(rag: RagService, analysed_query: QuestionAnalysis, metadata:dict, include_bm25_retrieval: bool = False, give_score: bool = True, max_retrived_count: int = 10):
+    def rag_hybrid_retrieval(rag: RagService, query:Optional[Union[str, Conversation]], metadata:dict, include_bm25_retrieval: bool = False, give_score: bool = True, max_retrived_count: int = 10):
         if not include_bm25_retrieval:
-            rag_retrieved_chunks = RAGHybridRetrieval.rag_retrieval(rag, analysed_query, metadata, give_score, max_retrived_count)
+            rag_retrieved_chunks = RAGHybridRetrieval.semantic_vector_retrieval(rag, query, metadata, give_score, max_retrived_count)
             return rag_retrieved_chunks
         
         rag_retrieved_chunks, bm25_retrieved_chunks = Execute.run_parallel(
-            (RAGHybridRetrieval.rag_retrieval, (rag, analysed_query, metadata, give_score, max_retrived_count)),
-            (RAGHybridRetrieval.bm25_retrieval, (rag, analysed_query, metadata, give_score, max_retrived_count)),
+            (RAGHybridRetrieval.semantic_vector_retrieval, (rag, query, metadata, give_score, max_retrived_count)),
+            (RAGHybridRetrieval.bm25_retrieval, (rag, query, metadata, give_score, max_retrived_count)),
         )
         retained_chunks = RAGHybridRetrieval.hybrid_chunks_selection(rag_retrieved_chunks, bm25_retrieved_chunks, give_score, max_retrived_count)
         return retained_chunks
     
     @staticmethod    
-    def rag_retrieval(rag: RagService, query:Optional[Union[str, Conversation]], analysed_query: QuestionAnalysis, metadata_filters:dict, give_score: bool = False, max_retrieved_count: int = 10, min_score: float = None, min_retrived_count: int = None):
-        conversation_history = None
-        if isinstance(query, Conversation):
-            conversation_history = '\n'.join([f"{msg.role}: {msg.content}" for msg in query.messages[:-1]])
-
-        retrieved_chunks = rag.retrieve(analysed_query.translated_question, conversation_history, metadata_filters, give_score, max_retrieved_count, min_score, min_retrived_count)
+    def semantic_vector_retrieval(rag: RagService, query:Optional[Union[str, Conversation]], metadata_filters:dict, give_score: bool = False, max_retrieved_count: int = 10, min_score: float = None, min_retrived_count: int = None):
+        question_w_history = Conversation.get_conv_history_as_str(query)
+        retrieved_chunks = rag.semantic_vector_retrieval(question_w_history, metadata_filters, give_score, max_retrieved_count, min_score, min_retrived_count)
         return retrieved_chunks
     
     @staticmethod    
-    def bm25_retrieval(rag: RagService, query:Optional[Union[str, Conversation]], analysed_query: QuestionAnalysis, filters: dict, give_score: bool, k = 3):
+    def bm25_retrieval(rag: RagService, query:Optional[Union[str, Conversation]], filters: dict, give_score: bool, k = 3):
         if filters and any(filters):
             filtered_docs = [doc for doc in rag.langchain_documents if RagFilteringMetadataHelper.filters_predicate(doc, filters)]
         else:
             filtered_docs = rag.langchain_documents
 
-        if isinstance(query, Conversation):
-            conversation_history = '\n'.join([f"{msg.role}: {msg.content}" for msg in query.messages[:-1]])
-            full_question = f"### Conversation history: ###\n{conversation_history}\n\n### User Question: ###\n {analysed_query.translated_question}" 
-        else:
-            full_question = analysed_query.translated_question
+        question_w_history = Conversation.get_conv_history_as_str(query)
         bm25_retriever = rag._build_bm25_retriever(filtered_docs, k) #, filters
-        bm25_retrieved_chunks = bm25_retriever.invoke(input=full_question)
+        bm25_retrieved_chunks = bm25_retriever.invoke(question_w_history)
        
         if give_score:
             score = 0.1 #todo: define the score

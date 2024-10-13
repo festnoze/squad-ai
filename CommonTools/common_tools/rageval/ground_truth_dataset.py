@@ -15,7 +15,7 @@ class GroundTruthDataset:
 )
 
     def generate(self, question: str, additionnal_context: str = None, metadata_filters: dict = None, give_score: bool = False, max_retrived_count: int = 10, min_score: float = None, min_retrived_count: int = None) -> list[Document]:
-        return self.rag_service.retrieve(question, additionnal_context, metadata_filters, give_score, max_retrived_count, min_score, min_retrived_count)
+        return self.rag_service.semantic_vector_retrieval(question, additionnal_context, metadata_filters, give_score, max_retrived_count, min_score, min_retrived_count)
 
     def generate_testset(self, question: str, additionnal_context: str = None, metadata_filters: dict = None, give_score: bool = False, max_retrived_count: int = 10, min_score: float = None, min_retrived_count: int = None, testset_size: int = 100, testset_type: str = "simple") -> list[Document]:
         if testset_type == "simple":

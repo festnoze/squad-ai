@@ -127,7 +127,7 @@ class RagInferencePipelineWithPrefect:
     # Data Retrieval sub-flow with parallel rag and BM25 retrieval
     @flow(name="rag hybrid retrieval", task_runner=ThreadPoolTaskRunner(max_workers=3))
     def rag_hybrid_retrieval(self, analysed_query: QuestionAnalysis, metadata, include_bm25_retrieval: bool = False, give_score: bool = True, max_retrived_count: int = 10):
-        rag_retrieved_chunks = self.rag_retrieval.submit(analysed_query, metadata, give_score, max_retrived_count)
+        rag_retrieved_chunks = self.semantic_vector_retrieval.submit(analysed_query, metadata, give_score, max_retrived_count)
         if include_bm25_retrieval:
             bm25_retrieved_chunks = self.bm25_retrieval.submit(analysed_query.translated_question, metadata, give_score, max_retrived_count)
 
@@ -151,8 +151,8 @@ class RagInferencePipelineWithPrefect:
         return rag_retrieved_chunks
     
     @task
-    def rag_retrieval(self, analysed_query: QuestionAnalysis, filters, give_score: bool = False, max_retrived_count: int = 10, min_score: float = None, min_retrived_count: int = None):
-        retrieved_chunks = self.rag.rag_retrieval(analysed_query.translated_question, None, filters, give_score, max_retrived_count, min_score, min_retrived_count)
+    def semantic_vector_retrieval(self, analysed_query: QuestionAnalysis, filters, give_score: bool = False, max_retrived_count: int = 10, min_score: float = None, min_retrived_count: int = None):
+        retrieved_chunks = self.rag.semantic_vector_retrieval(analysed_query.translated_question, None, filters, give_score, max_retrived_count, min_score, min_retrived_count)
         return retrieved_chunks
     
     @task

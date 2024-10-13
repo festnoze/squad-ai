@@ -79,16 +79,16 @@ class RagInferencePipeline:
         return final_response, None #todo: return the sources too
     
     
-    def run_static_inference_pipeline_but_guardrails(self, query: str, include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None) -> tuple:
+    def run_static_inference_pipeline_but_guardrails(self, query:Optional[Union[str, Conversation]], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None) -> tuple:
         """Run the full rag inference pipeline, but without guardrails"""
         # Pre-treatment
         analysed_query, metadata = RAGPreTreatment.rag_pre_treatment(self.rag, query, self.default_filters)
 
         # Data Retrieval
-        retrieved_chunks = RAGHybridRetrieval.rag_hybrid_retrieval(self.rag, analysed_query, metadata, include_bm25_retrieval, give_score)
+        retrieved_chunks = RAGHybridRetrieval.rag_hybrid_retrieval(self.rag, query, metadata, include_bm25_retrieval, give_score)
 
         # Augmented Answer Generation
-        response = RAGAugmentedGeneration.rag_augmented_answer_generation(self.rag, retrieved_chunks, analysed_query, give_score, format_retrieved_docs_function)
+        response = RAGAugmentedGeneration.rag_augmented_answer_generation(self.rag, retrieved_chunks, analysed_query, format_retrieved_docs_function)
 
         return response, analysed_query, retrieved_chunks
     

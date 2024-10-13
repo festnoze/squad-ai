@@ -72,7 +72,7 @@ class AvailableService:
 
     def single_docs_retrieval_query(query):        
         txt.print_with_spinner("Recherche en cours ...")
-        docs = AvailableService.rag_service.retrieve(query, give_score=True)
+        docs = AvailableService.rag_service.semantic_vector_retrieval(query, give_score=True)
         txt.stop_spinner_replace_text(f"{len(docs)} documents trouvés")
         for doc, score in docs:
             txt.print(f"[{score:.4f}] ({doc.metadata['type']}) {doc.metadata['name']} : {doc.page_content}".strip())

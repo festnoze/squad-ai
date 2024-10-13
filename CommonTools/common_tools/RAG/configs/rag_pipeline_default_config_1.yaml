@@ -21,7 +21,7 @@ pre_treatment:
 
 data_retrieval:
   - parallel_threads:
-      - RAGHybridRetrieval.rag_retrieval
+      - RAGHybridRetrieval.semantic_vector_retrieval
       - RAGHybridRetrieval.bm25_retrieval
   - RAGHybridRetrieval.hybrid_chunks_selection
 
