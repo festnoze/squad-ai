@@ -64,7 +64,7 @@ class RagInferencePipeline:
         return answer[0], None #todo: return the sources too
 
     # Main workflow using the static pipeline
-    def run_hardcoded_pipeline(self, query: Optional[Union[str, Conversation]], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None) -> tuple:
+    def run_static_inference_pipeline(self, query: Optional[Union[str, Conversation]], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None) -> tuple:
         """Run the full hardcoded rag inference pipeline """
         guardrails_result, run_inference_pipeline_results = Execute.run_parallel( 
             (RAGGuardrails.guardrails_query_analysis, (query)), # Guardrails check: query analysis
@@ -88,7 +88,7 @@ class RagInferencePipeline:
         retrieved_chunks = RAGHybridRetrieval.rag_hybrid_retrieval(self.rag, query, metadata, include_bm25_retrieval, give_score)
 
         # Augmented Answer Generation
-        response = RAGAugmentedGeneration.rag_augmented_answer_generation(self.rag, retrieved_chunks, analysed_query, format_retrieved_docs_function)
+        response = RAGAugmentedGeneration.rag_augmented_answer_generation(self.rag, query, retrieved_chunks, analysed_query, format_retrieved_docs_function)
 
         return response, analysed_query, retrieved_chunks
     

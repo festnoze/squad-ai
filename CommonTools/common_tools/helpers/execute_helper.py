@@ -15,11 +15,12 @@ class Execute:
 
         # Dynamically set max_workers based on the number of functions
         num_functions = len(functions_with_args)
-        if num_functions == 0: return ()
+        if num_functions == 0: 
+            return ()
         
-        results = [None] * len(functions_with_args) 
+        results = [None] * num_functions
         
-         # Use ThreadPoolExecutor to execute the functions in parallel
+        # Use ThreadPoolExecutor to execute the functions in parallel
         with ThreadPoolExecutor(max_workers=num_functions) as executor:
             futures = []
 
@@ -34,8 +35,12 @@ class Execute:
                     args = item[1] if len(item) > 1 else ()
                     kwargs = item[2] if len(item) > 2 else {}
 
-                    # Ensure args is a tuple, even if it's a single string
-                    if isinstance(args, str):
+                    # Ensure args is a tuple, even if it's a single non-iterable object (e.g., QuestionAnalysis)
+                    if not isinstance(args, tuple):
+                        args = (args,)
+
+                    # Check if args contain non-iterable objects and wrap them in a tuple
+                    if not isinstance(args, (tuple, list)):
                         args = (args,)
 
                     futures.append((executor.submit(func, *args, **kwargs), index))
@@ -48,3 +53,4 @@ class Execute:
                 results[index] = future.result()
 
         return tuple(results)
+
