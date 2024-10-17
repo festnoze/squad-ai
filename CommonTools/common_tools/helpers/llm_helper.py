@@ -1,8 +1,7 @@
-from langchain_core.language_models import BaseChatModel
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 from langchain_core.output_parsers import StrOutputParser, ListOutputParser, MarkdownListOutputParser, JsonOutputParser, BaseTransformOutputParser
-from langchain.schema.runnable import Runnable, RunnableParallel, RunnableSequence
+from langchain_core.runnables import Runnable, RunnableParallel, RunnableSequence
 from langchain.chains.base import Chain
 from langchain.agents import AgentExecutor, create_tool_calling_agent, create_json_chat_agent, tool
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -84,11 +83,11 @@ class Llm:
         return prompt, parser
 
     @staticmethod
-    def invoke_parallel_prompts(action_name: str, llms: Union[BaseChatModel, list[BaseChatModel]], *prompts: Union[str, ChatPromptTemplate]) -> list[str]:
+    def invoke_parallel_prompts(action_name: str, llms: Union[Runnable, list[Runnable]], *prompts: Union[str, ChatPromptTemplate]) -> list[str]:
         return Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(action_name, llms, None, None, *prompts)
     
     @staticmethod
-    def invoke_parallel_prompts_with_parser_batchs_fallbacks(action_name, llms_with_fallbacks: Union[BaseChatModel, list[BaseChatModel]], output_parser: BaseTransformOutputParser, batch_size: int = None, *prompts: Union[str, ChatPromptTemplate]) -> list[str]:
+    def invoke_parallel_prompts_with_parser_batchs_fallbacks(action_name, llms_with_fallbacks: Union[Runnable, list[Runnable]], output_parser: BaseTransformOutputParser, batch_size: int = None, *prompts: Union[str, ChatPromptTemplate]) -> list[str]:
         if len(prompts) == 0:
             return []        
         if not isinstance(llms_with_fallbacks, list):
@@ -151,7 +150,7 @@ class Llm:
         return answers
 
     @staticmethod
-    def invoke_llm_with_tools(llm: BaseChatModel, tools: list[any], input: str) -> str:
+    def invoke_llm_with_tools(llm_or_chain: Runnable, tools: list[any], input: str) -> str:
         #prompt = hub.pull("hwchase17/openai-tools-agent")
         prompt = ChatPromptTemplate.from_messages(
             [
@@ -160,13 +159,13 @@ class Llm:
                 MessagesPlaceholder("agent_scratchpad")
             ]
         )
-        agent = create_tool_calling_agent(llm, tools, prompt)
+        agent = create_tool_calling_agent(llm_or_chain, tools, prompt)
         agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
         res = agent_executor.invoke({"input": input})
         return res["output"]
 
     @staticmethod
-    def invoke_json_llm_with_tools(llm: BaseChatModel, tools: list[any], input: str) -> str:
+    def invoke_json_llm_with_tools(llm_or_chain: Runnable, tools: list[any], input: str) -> str:
         #prompt = hub.pull("hwchase17/openai-tools-agent")
         prompt = ChatPromptTemplate.from_messages(
             [
@@ -176,16 +175,16 @@ class Llm:
             ]
         )
         
-        agent = create_json_chat_agent(llm, tools, ChatPromptTemplate.from_messages([("human", "{input}")]))
+        agent = create_json_chat_agent(llm_or_chain, tools, ChatPromptTemplate.from_messages([("human", "{input}")]))
         agent_executor = AgentExecutor(agent=agent, tools=tools)
         res = agent_executor.invoke({"input": input})
         return res["output"]
     
     @staticmethod
-    async def invoke_llm_as_async_stream(llm: BaseChatModel, input, display_console: bool = False, content_chunks:list[str] = None):
+    async def invoke_as_async_stream(llm_or_chain: Runnable, input, display_console: bool = False, content_chunks:list[str] = None):
         new_line_for_stream = "\\/%*/\\" # use specific new line conversion over streaming, as new line is handled differently across platforms
         has_content_prop:bool = None
-        async for chunk in llm.astream(input):
+        async for chunk in llm_or_chain.astream(input):
             # Analyse specific stream structure upon first chunk: Handle both OpenAI & Ollama types
             if not has_content_prop:
                 if hasattr(chunk, 'content'): #LangChainAdapterType.OpenAI

@@ -1,9 +1,8 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import sys
 import inspect
-import threading
 from types import FunctionType
-
+import asyncio
 from common_tools.helpers.txt_helper import txt
 
 class Execute:
@@ -59,6 +58,79 @@ class Execute:
                 results[index] = future.result()
 
         return tuple(results)
+    
+    @staticmethod
+    async def run_parallel_async(*functions_with_args, functions_with_streaming_indexes=None):
+        """
+        Run synchronous and asynchronous functions in parallel, yielding results as they complete.
+        
+        :param functions_with_args: A mix of functions, both synchronous and asynchronous.
+        :param streaming: A list specifying the indices of functions that should be streamed.
+                          If a function's index is included in this list, it will be treated as a streaming async function.
+                          Example: [1] means the second function should be streamed.
+        :yield: Yields results as they are completed.
+        """
+        if functions_with_streaming_indexes is None:
+            functions_with_streaming_indexes = []
+
+        # Separate tasks into sync, async, and streaming async
+        async_tasks = []
+        sync_tasks = []
+        streaming_tasks = []
+
+        # Classify the tasks and prepare them for execution
+        for idx, item in enumerate(functions_with_args):
+            if callable(item):  # Function without arguments
+                if asyncio.iscoroutinefunction(item):
+                    if idx in functions_with_streaming_indexes:
+                        streaming_tasks.append((item, idx))
+                    else:
+                        async_tasks.append((item(), idx))
+                else:
+                    sync_tasks.append((item, (), {}, idx))
+            elif isinstance(item, tuple):
+                func = item[0]
+                args = item[1] if len(item) > 1 else ()
+                kwargs = item[2] if len(item) > 2 else {}
+
+                if asyncio.iscoroutinefunction(func):
+                    if idx in functions_with_streaming_indexes:
+                        streaming_tasks.append((func, args, kwargs, idx))
+                    else:
+                        async_tasks.append((func(*args, **kwargs), idx))
+                else:
+                    sync_tasks.append((func, args, kwargs, idx))
+            else:
+                raise ValueError(f"Invalid input: {item}")
+        
+        # Handle sync tasks with ThreadPoolExecutor
+        loop = asyncio.get_event_loop()
+        results = [None] * len(functions_with_args)
+        with ThreadPoolExecutor(max_workers=len(sync_tasks)) as executor:
+            # Submit synchronous tasks to the executor
+            sync_futures = {
+                loop.run_in_executor(executor, func, *args, **kwargs): idx
+                for func, args, kwargs, idx in sync_tasks
+            }
+
+            # Collect results as the synchronous tasks complete
+            for future in asyncio.as_completed(sync_futures):
+                idx = sync_futures[future]
+                results[idx] = await future
+                yield (idx, results[idx])
+
+        # Handle non-streaming async tasks
+        for coro, idx in async_tasks:
+            results[idx] = await coro
+            yield (idx, results[idx])
+
+        # Handle streaming async tasks
+        for func, args, kwargs, idx in streaming_tasks:
+            async for item in func(*args, **kwargs):
+                yield (idx, item)
+
+        # # Collect final results
+        # return tuple(results)
     
     @staticmethod
     def activate_global_function_parameters_types_verification():

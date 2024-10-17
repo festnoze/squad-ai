@@ -2,7 +2,7 @@ import datetime
 import random
 import string
 from langchain.tools import tool
-from langchain_core.language_models import BaseChatModel
+from langchain_core.runnables import Runnable
 #
 from common_tools.helpers.llm_helper import Llm
 
@@ -10,14 +10,14 @@ class ToolsHelper:
     pass    
     
 class WordsToolBox:
-    llm: BaseChatModel = None    
+    llm_or_chain: Runnable = None    
     @tool
     def number_to_french_words(nbr: int):
         """Convert an integer number to a string representation with words in french
         Args:
             nbr (int): The number to convert to words"""
         prompt = f"Convert the number {nbr} to words in french"
-        response = WordsToolBox.llm.invoke(prompt)
+        response = WordsToolBox.llm_or_chain.invoke(prompt)
         return Llm.get_llm_answer_content(response)
     
     @tool
@@ -26,7 +26,7 @@ class WordsToolBox:
         Args:
             text (str): The text to convert"""
         prompt = f"Convert the following text into spanish: '{text}'"
-        response = WordsToolBox.llm.invoke(prompt)
+        response = WordsToolBox.llm_or_chain.invoke(prompt)
         return Llm.get_llm_answer_content(response)
     
     @tool

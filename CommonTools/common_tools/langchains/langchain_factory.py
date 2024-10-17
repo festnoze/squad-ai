@@ -5,21 +5,21 @@ from langchain_groq import ChatGroq
 import uuid
 #import google.generative
 #from langchain_google_genai import GoogleGenerativeAI
-from langchain_core.language_models import BaseChatModel
+from langchain_core.runnables import Runnable
 from common_tools.helpers.txt_helper import txt
 from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.models.llm_info import LlmInfo
 
 class LangChainFactory():
     @staticmethod
-    def create_llms_from_infos(llms_infos: list[LlmInfo]) -> list[BaseChatModel]:
+    def create_llms_from_infos(llms_infos: list[LlmInfo]) -> list[Runnable]:
         txt.print_with_spinner(f"Loading LLM models ...")
         if isinstance(llms_infos, LlmInfo):
             llms_infos = [llms_infos]
         if len(llms_infos) == 0:
             raise ValueError("No LLMs infos provided.")
 
-        llms: list[BaseChatModel] = []
+        llms: list[Runnable] = []
         activate_print_status = txt.activate_print
         txt.activate_print = False
 
@@ -32,7 +32,7 @@ class LangChainFactory():
         return llms
     
     @staticmethod
-    def create_llm_from_info(llm_info: LlmInfo) -> BaseChatModel:
+    def create_llm_from_info(llm_info: LlmInfo) -> Runnable:
         txt.print_with_spinner(f"Loading LLM model ...")
         llm = LangChainFactory.create_llm(
             adapter_type= llm_info.type,
@@ -44,8 +44,8 @@ class LangChainFactory():
         return llm
     
     @staticmethod
-    def create_llm(adapter_type: LangChainAdapterType, llm_model_name: str, timeout_seconds: int = 50, temperature: float = 0.1, api_key: str = None) -> BaseChatModel:
-        llm: BaseChatModel = None
+    def create_llm(adapter_type: LangChainAdapterType, llm_model_name: str, timeout_seconds: int = 50, temperature: float = 0.1, api_key: str = None) -> Runnable:
+        llm: Runnable = None
         if adapter_type == LangChainAdapterType.OpenAI:
             if not api_key:
                 api_key = os.getenv("OPEN_API_KEY")

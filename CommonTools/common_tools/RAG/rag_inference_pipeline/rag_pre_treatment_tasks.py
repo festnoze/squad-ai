@@ -1,6 +1,5 @@
 from typing import Optional, Union
 from common_tools.helpers.execute_helper import Execute
-from common_tools.helpers.file_helper import file
 from common_tools.helpers.llm_helper import Llm
 from common_tools.helpers.ressource_helper import Ressource
 from common_tools.models.conversation import Conversation

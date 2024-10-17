@@ -17,7 +17,6 @@
 # from common_tools.rag.rag_filtering_metadata_helper import RagFilteringMetadataHelper
 # from common_tools.rag.rag_service import RagService
 # from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
-# from langchain_core.language_models import BaseChatModel
 # from langchain_core.documents import Document
 # from langchain_core.runnables import Runnable, RunnablePassthrough
 # from langchain_core.prompts import ChatPromptTemplate
@@ -231,7 +230,7 @@
 #                 return "I cannot answer your question, because its topic is explicitly forbidden."
     
 #     @staticmethod
-#     def generate_augmented_response_from_retrieved_chunks(self, llm: BaseChatModel, retrieved_docs: list[Document], questionAnalysis: QuestionAnalysis, format_retrieved_docs_function = None) -> str:
+#     def generate_augmented_response_from_retrieved_chunks(self, llm: Runnable, retrieved_docs: list[Document], questionAnalysis: QuestionAnalysis, format_retrieved_docs_function = None) -> str:
 #         retrieval_prompt = Ressource.get_rag_augmented_generation_query_prompt()
 #         retrieval_prompt = retrieval_prompt.replace("{question}", questionAnalysis.translated_question)
 #         additional_instructions = ''

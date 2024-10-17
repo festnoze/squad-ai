@@ -9,23 +9,27 @@ setup(
     url='https://github.com/festnoze/common_tools',
     packages=find_packages(),
     install_requires=[
+        'python-dotenv',
         'requests',
         'pydantic',
-        'langchain',
-        'langchain-experimental',
-        'langchain-openai',
-        'langchain-community',
-        'langchain-groq',
-        'langchain-chroma',
-        'langgraph',
-        'langsmith',
-        'openai',
+        'langchain>=0.3.3',
+        'langchain-core>=0.3.12',
+        'langchain-community>=0.3.2',
+        'langchain-experimental>=0.3.2',
+        'langchain-openai>=0.2.2',
+        'langchain-groq>=0.2.0',
+        'langchain-chroma>=0.1.4',
+        'langgraph>=0.2.38',
+        'langsmith>=0.1.136',
+        'openai>=1.52.0',
+        'ollama',
         'groq',
         'pyyaml',
-        'ragas',
-        'lark', # needed for langchain self-querying retriever
-        #'prefect',
-        #'sentence-transformers',
+        'ragas>=0.2.1',
+        'lark',  # needed for langchain self-querying retriever
+        # 'prefect',  # Uncomment if needed
+        # 'sentence-transformers>=3.2.0',  # Uncomment if needed
+        'rank-bm25'
     ],
     classifiers=[
         'Programming Language :: Python :: 3',

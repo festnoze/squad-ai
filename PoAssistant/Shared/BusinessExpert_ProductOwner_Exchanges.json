@@ -1,0 +1,42 @@
+﻿[
+    {
+        "source": "Métier",
+        "content": "Le besoin fonctionnel central et but à atteindre est : 'fais un test'."
+    },
+    {
+        "source": "PM",
+        "content": "1. Quel est l'objectif principal de ce test ? Est-ce pour évaluer les connaissances des apprenants, tester une nouvelle fonctionnalité, ou autre chose ?\n2. Qui sont les utilisateurs cibles de ce test ? Est-ce que ce sont les apprenants, les enseignants, ou un autre groupe ?\n3. Quel type de contenu ou de questions doit être inclus dans ce test ? Est-ce que ce sont des questions à choix multiples, des questions ouvertes, des exercices pratiques, etc. ?\n4. Y a-t-il des critères spécifiques de réussite ou d'évaluation pour ce test ?\n5. Comment les résultats du test doivent-ils être présentés ou utilisés par la suite ?"
+    },
+    {
+        "source": "Métier",
+        "content": "- L'objectif principal de ce test est d'évaluer les connaissances des apprenants. (Indice de confiance : 8)\n- Les utilisateurs cibles de ce test sont les apprenants. (Indice de confiance : 9)\n- Le test doit inclure des questions à choix multiples et des questions ouvertes pour évaluer à la fois la compréhension factuelle et la capacité d'analyse des apprenants. (Indice de confiance : 7)\n- Les critères spécifiques de réussite pour ce test incluent un score minimum de 70% pour être considéré comme réussi. (Indice de confiance : 6)\n- Les résultats du test doivent être présentés sous forme de rapport détaillé pour chaque apprenant, et utilisés pour identifier les domaines nécessitant une amélioration. (Indice de confiance : 8)"
+    },
+    {
+        "source": "PM",
+        "content": "6. Quelle est la durée prévue pour ce test ? Est-ce que les apprenants ont un temps limité pour le compléter ?\n7. Comment les questions à choix multiples et les questions ouvertes doivent-elles être réparties dans le test ? Y a-t-il un nombre spécifique de chaque type de question ?\n8. Y a-t-il des fonctionnalités spécifiques que vous souhaitez inclure pour aider les apprenants pendant le test, comme des indices ou la possibilité de revenir en arrière pour modifier leurs réponses ?\n9. Comment souhaitez-vous que les rapports détaillés soient accessibles aux apprenants et aux enseignants ? Via le LMS, par email, ou un autre moyen ?\n10. Y a-t-il des exigences particulières concernant la sécurité ou la confidentialité des données des apprenants lors de la passation du test et de la génération des rapports ?"
+    },
+    {
+        "source": "Métier",
+        "content": "- La durée prévue pour ce test est de 60 minutes, avec un temps limité pour le compléter. (Indice de confiance : 7)\n- Le test doit comporter 70% de questions à choix multiples et 30% de questions ouvertes, avec un total de 20 questions. (Indice de confiance : 6)\n- Il est souhaité d'inclure des fonctionnalités permettant aux apprenants de revenir en arrière pour modifier leurs réponses, mais pas d'indices. (Indice de confiance : 7)\n- Les rapports détaillés doivent être accessibles via le LMS pour garantir une centralisation et une facilité d'accès. (Indice de confiance : 8)\n- Il est crucial de respecter les normes de sécurité et de confidentialité des données, en assurant que les données des apprenants soient cryptées et accessibles uniquement aux personnes autorisées. (Indice de confiance : 9)"
+    },
+    {
+        "source": "PM",
+        "content": "11. Y a-t-il des prérequis ou des conditions spécifiques que les apprenants doivent remplir avant de pouvoir passer le test ?\n12. Souhaitez-vous que le test soit disponible en plusieurs langues ou uniquement dans une langue spécifique ?\n13. Comment souhaitez-vous gérer les cas où un apprenant ne termine pas le test dans le temps imparti ? Y aura-t-il une soumission automatique des réponses ?\n14. Y a-t-il des besoins spécifiques concernant l'interface utilisateur du test pour s'assurer qu'elle soit intuitive et facile à utiliser pour les apprenants ?\n15. Avez-vous besoin de fonctionnalités de suivi en temps réel pour les enseignants, afin qu'ils puissent voir la progression des apprenants pendant le test ?"
+    },
+    {
+        "source": "Métier",
+        "content": "- Les apprenants doivent avoir complété un module de formation préalable avant de pouvoir passer le test. (Indice de confiance : 8)\n- Le test doit être disponible en plusieurs langues pour s'adapter à un public diversifié. (Indice de confiance : 7)\n- En cas de non-achèvement du test dans le temps imparti, une soumission automatique des réponses doit être mise en place. (Indice de confiance : 8)\n- L'interface utilisateur du test doit être simple et intuitive, avec des instructions claires et une navigation facile entre les questions. (Indice de confiance : 9)\n- Il est souhaité d'avoir des fonctionnalités de suivi en temps réel pour les enseignants, afin qu'ils puissent voir la progression des apprenants pendant le test. (Indice de confiance : 7)"
+    },
+    {
+        "source": "PM",
+        "content": "16. Y a-t-il des langues spécifiques dans lesquelles le test doit être disponible, ou souhaitez-vous une flexibilité totale pour ajouter de nouvelles langues à l'avenir ?\n17. Comment souhaitez-vous que les apprenants soient informés de la soumission automatique de leurs réponses en cas de non-achèvement du test ?\n18. Souhaitez-vous inclure des éléments visuels ou multimédias dans le test pour enrichir l'expérience des apprenants ?\n19. Y a-t-il des fonctionnalités spécifiques que vous souhaitez inclure dans le suivi en temps réel pour les enseignants, comme des alertes ou des notifications ?\n20. Avez-vous des exigences particulières concernant l'accessibilité du test pour les apprenants ayant des besoins spécifiques ?"
+    },
+    {
+        "source": "Métier",
+        "content": "- Le test doit être disponible en anglais, français et espagnol, avec la flexibilité d'ajouter de nouvelles langues à l'avenir. (Indice de confiance : 8)\n- Les apprenants doivent être informés de la soumission automatique de leurs réponses par une notification à l'écran avant le début du test et un rappel 5 minutes avant la fin du temps imparti. (Indice de confiance : 7)\n- Il est souhaité d'inclure des éléments visuels et multimédias, tels que des images et des vidéos, pour enrichir l'expérience des apprenants. (Indice de confiance : 8)\n- Les fonctionnalités de suivi en temps réel pour les enseignants doivent inclure des alertes pour les apprenants en difficulté et des notifications sur le temps restant pour chaque apprenant. (Indice de confiance : 7)\n- Le test doit être accessible aux apprenants ayant des besoins spécifiques, avec des options telles que le texte agrandi, la compatibilité avec les lecteurs d'écran, et des contrastes de couleurs adaptés. (Indice de confiance : 9)"
+    },
+    {
+        "source": "PM",
+        "content": "Merci. Nous avons atteinds le nombre maximum d'échanges prévus. [FIN_PM_ASSIST]"
+    }
+]

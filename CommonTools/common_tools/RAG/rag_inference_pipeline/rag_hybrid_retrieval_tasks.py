@@ -6,7 +6,8 @@ from common_tools.models.question_analysis import QuestionAnalysis
 from common_tools.rag.rag_service import RagService
 #
 from langchain_core.documents import Document
-from langchain.retrievers import BM25Retriever, EnsembleRetriever
+from langchain.retrievers import EnsembleRetriever
+from langchain_community.retrievers import BM25Retriever
 
 class RAGHybridRetrieval:
     @staticmethod    

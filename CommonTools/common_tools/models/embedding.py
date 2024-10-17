@@ -1,6 +1,6 @@
 from enum import Enum
 import os
-from langchain.embeddings import OpenAIEmbeddings, OllamaEmbeddings
+from langchain_community.embeddings import OllamaEmbeddings
 from langchain_community.embeddings.sentence_transformer import SentenceTransformerEmbeddings
 
 class EmbeddingType(Enum):

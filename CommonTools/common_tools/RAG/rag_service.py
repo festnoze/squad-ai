@@ -1,38 +1,34 @@
 import os
 from typing import List, Optional, Union
 import json
+from collections import defaultdict
 
 # langchain related imports
-from langchain_core.language_models import BaseChatModel
+from langchain_core.runnables import Runnable
 from langchain_core.documents import Document
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.document_loaders import TextLoader
 #from langchain_community.vectorstores import FAISS
 from langchain_community.retrievers import BM25Retriever
+from langchain_community.query_constructors.chroma import ChromaTranslator
 #from rank_bm25 import BM25Okapi
+from langchain.retrievers.multi_query import MultiQueryRetriever
 from langchain.retrievers import EnsembleRetriever
 from langchain_chroma import Chroma
-from langchain.retrievers.multi_query import MultiQueryRetriever
 from langchain.chains.query_constructor.base import AttributeInfo
-from langchain_core.documents import Document
-from collections import defaultdict
 
 # common tools imports
-from common_tools.helpers.ressource_helper import Ressource
 from common_tools.helpers.txt_helper import txt
 from common_tools.models.file_already_exists_policy import FileAlreadyExistsPolicy
 from common_tools.models.llm_info import LlmInfo
-from common_tools.models.question_analysis import QuestionAnalysis
 from common_tools.helpers.file_helper import file
-from common_tools.helpers.llm_helper import Llm
 from common_tools.langchains.langchain_factory import LangChainFactory
 from common_tools.models.embedding import EmbeddingModel
 from langchain.retrievers.self_query.base import SelfQueryRetriever
 from langchain.chains.query_constructor.base import StructuredQueryOutputParser, get_query_constructor_prompt
-from langchain_community.query_constructors.chroma import ChromaTranslator
 
 class RagService:
-    def __init__(self, inference_llm_or_info: Optional[Union[LlmInfo, BaseChatModel]], embedding_model:EmbeddingModel=None, vector_db_and_docs_path = "./storage", documents_json_filename = "bm25_documents.json"):
+    def __init__(self, inference_llm_or_info: Optional[Union[LlmInfo, Runnable]], embedding_model:EmbeddingModel=None, vector_db_and_docs_path = "./storage", documents_json_filename = "bm25_documents.json"):
         self.init_embedding(embedding_model)
         self.init_inference_llm(inference_llm_or_info) #todo: add fallbacks with specifying multiple llms or llms infos
 
@@ -47,10 +43,10 @@ class RagService:
         self.embedding = embedding_model.create_instance()
         self.embedding_model_name = embedding_model.model_name
 
-    def init_inference_llm(self, llm_or_infos: Optional[Union[LlmInfo, BaseChatModel]]):
+    def init_inference_llm(self, llm_or_infos: Optional[Union[LlmInfo, Runnable]]):
         if isinstance(llm_or_infos, LlmInfo) or (isinstance(llm_or_infos, list) and any(llm_or_infos) and isinstance(llm_or_infos[0], LlmInfo)):            
             self.llm = LangChainFactory.create_llms_from_infos(llm_or_infos)[0]
-        elif isinstance(llm_or_infos, BaseChatModel):
+        elif isinstance(llm_or_infos, Runnable):
             self.llm = llm_or_infos
         else:
             raise ValueError("Invalid llm_or_infos parameter")

@@ -1,0 +1,28 @@
+﻿[
+    {
+        "us_desc": "En tant qu'apprenant\nPour les écoles : Toutes les écoles utilisant le LMS\nJe souhaiterais passer un test d'évaluation des connaissances\nAfin de mesurer ma compréhension et identifier les domaines nécessitant une amélioration.\n\nLe test d'évaluation des connaissances est conçu pour mesurer la compréhension factuelle et la capacité d'analyse des apprenants à travers des questions à choix multiples et des questions ouvertes.\n\nContexte : Ce test est destiné aux apprenants ayant complété un module de formation préalable. Il est disponible en plusieurs langues et doit être complété en 60 minutes.\n\nRègles métiers :\n- Le test doit inclure 70% de questions à choix multiples et 30% de questions ouvertes, avec un total de 20 questions.\n- Les apprenants doivent obtenir un score minimum de 70% pour réussir.\n- Les résultats doivent être présentés sous forme de rapport détaillé via le LMS.\n- Les données des apprenants doivent être cryptées et accessibles uniquement aux personnes autorisées.\n- Le test doit être accessible aux apprenants ayant des besoins spécifiques.\n\nUse cases :\n1. Passer le test d'évaluation\n2. Accéder aux résultats du test",
+        "use_cases": [
+            {
+                "uc_desc": "Passer le test d'évaluation",
+                "acceptance_criteria": [
+                    "L'apprenant peut accéder au test après avoir complété le module de formation préalable.",
+                    "Le test est disponible en anglais, français et espagnol.",
+                    "L'apprenant peut naviguer entre les questions et modifier ses réponses.",
+                    "Une notification informe l'apprenant de la soumission automatique des réponses 5 minutes avant la fin du temps imparti.",
+                    "Le test inclut des éléments visuels et multimédias pour enrichir l'expérience.",
+                    "L'interface utilisateur est simple et intuitive, avec des instructions claires."
+                ]
+            },
+            {
+                "uc_desc": "Accéder aux résultats du test",
+                "acceptance_criteria": [
+                    "Les résultats sont présentés sous forme de rapport détaillé pour chaque apprenant.",
+                    "Les rapports sont accessibles via le LMS.",
+                    "Les enseignants peuvent suivre la progression des apprenants en temps réel.",
+                    "Les données des apprenants sont cryptées et sécurisées.",
+                    "Les enseignants reçoivent des alertes pour les apprenants en difficulté."
+                ]
+            }
+        ]
+    }
+]

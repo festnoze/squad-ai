@@ -105,7 +105,7 @@ class AvailableService:
     #         response, sources = inference.run_pipeline_dynamic(query, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
     #     return response
     
-    def rag_query_with_history(conversation_history:Conversation):
+    async def rag_query_with_history_async(conversation_history:Conversation):
         txt.print_with_spinner("Chargement du pipeline d'inférence ...")
         inference = RagInferencePipeline(AvailableService.rag_service)
         if conversation_history.last_message.role != 'user':
@@ -123,9 +123,9 @@ class AvailableService:
         txt.stop_spinner_replace_text("Pipeline d'inférence chargé :")
         
         txt.print_with_spinner("Execution du pipeline d'inférence ...")
-        response = inference.run_pipeline_dynamic(conversation_history, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
+        async for chunk in inference.run_pipeline_static(conversation_history, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function):
+            yield chunk
         txt.stop_spinner_replace_text("Pipeline d'inférence exectué :")
-        return response
     
     def generate_ground_truth():
         RagasService.generate_ground_truth(AvailableService.llms_infos[0], AvailableService.rag_service.langchain_documents, 1)
@@ -147,7 +147,7 @@ class AvailableService:
         #     struct_type = doc.metadata.get('struct_type')
 
         #     context += f"• {summary}. In {functional_type.lower()} {struct_type.lower()}  '{struct_name}',{" method '" + method_name + "'," if method_name else ''} from namespace '{namespace}'.\n"
-        return context
+        # return context
 
     # def create_sqlLite_database(out_dir):
     #     db_instance = DB()

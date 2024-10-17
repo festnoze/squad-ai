@@ -65,22 +65,32 @@ class RagInferencePipeline:
         return answer[0]
     
     # Main workflow using the static pipeline
-    def run_pipeline_static(self, query: Optional[Union[str, Conversation]], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None) -> tuple:
+    async def run_pipeline_static(self, query: Optional[Union[str, Conversation]], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None):
         """Run the full hardcoded rag inference pipeline """
-        guardrails_result, run_inference_pipeline_results = Execute.run_parallel( 
-            (RAGGuardrails.guardrails_query_analysis, (query)), # Guardrails check: query analysis
-            (self.run_static_inference_pipeline_but_guardrails, (), {'query': query, 'include_bm25_retrieval': include_bm25_retrieval, 'give_score': give_score, 'format_retrieved_docs_function': format_retrieved_docs_function})
-        )
-
-        self.check_for_guardrails(guardrails_result)
-        response, analysed_query, retrieved_chunks = run_inference_pipeline_results
+        # Run both functions in parallel, where the second one is treated as streaming
+        async for idx, result in Execute.run_parallel_async(
+            (RAGGuardrails.guardrails_query_analysis, (query)),  # Guardrails check: query analysis
+            (self.run_static_inference_pipeline_but_guardrails_async, (), {
+                'query': query,
+                'include_bm25_retrieval': include_bm25_retrieval,
+                'give_score': give_score,
+                'format_retrieved_docs_function': format_retrieved_docs_function
+            }),
+            streaming=[1]  # Indicating that 'run_static_inference_pipeline_but_guardrails_async' is a streaming async function
+        ):
+            if idx == 1:
+                # Yield the streaming chunks of inference pipeline
+                yield result
+            elif idx == 0:
+                # Guardrails result, check it
+                self.check_for_guardrails(result)
         
-        # Post-treatment
-        final_response = RAGPostTreatment.rag_post_treatment(guardrails_result, response, analysed_query)
-        return final_response 
+        # # Post-treatment
+        # final_response = RAGPostTreatment.rag_post_treatment(guardrails_result, response, query)
+        # return final_response 
     
     
-    def run_static_inference_pipeline_but_guardrails(self, query:Optional[Union[str, Conversation]], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None) -> tuple:
+    async def run_static_inference_pipeline_but_guardrails_async(self, query:Optional[Union[str, Conversation]], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None):
         """Run the full rag inference pipeline, but without guardrails"""
         # Pre-treatment
         analysed_query, metadata = RAGPreTreatment.rag_static_pre_treatment(self.rag, query, self.default_filters)
@@ -89,9 +99,8 @@ class RagInferencePipeline:
         retrieved_chunks = RAGHybridRetrieval.rag_static_hybrid_retrieval(self.rag, query, metadata, include_bm25_retrieval, give_score)
 
         # Augmented Answer Generation
-        response = RAGAugmentedGeneration.rag_augmented_answer_generation(self.rag, query, retrieved_chunks, analysed_query, format_retrieved_docs_function)
-
-        return response, analysed_query, retrieved_chunks
+        async for chunk in RAGAugmentedGeneration.rag_augmented_answer_generation_async(self.rag, query, retrieved_chunks, analysed_query, format_retrieved_docs_function):
+            yield chunk
     
     def check_for_guardrails(self, guardrails_result:bool):
         """Raise an error if the query has been rejected by guardrails"""

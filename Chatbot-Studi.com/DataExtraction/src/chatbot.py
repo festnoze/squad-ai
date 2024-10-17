@@ -81,7 +81,7 @@ class ChatbotFront:
                 full_response = ""
 
                 # Simulate stream of response
-                for chunk in AvailableService.rag_query_with_history(prompt):
+                for chunk in AvailableService.rag_query_with_history_async(prompt):
                     full_response += chunk
                     message_placeholder.markdown(full_response + "▌")
 

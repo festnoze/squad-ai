@@ -8,7 +8,6 @@ from front_client import front_client
 # internal imports
 from common_tools.models.conversation import Conversation
 from common_tools.models.message import Message
-from models.stream_container import StreamContainer
 # common tools import
 from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.helpers.misc import misc
@@ -58,7 +57,7 @@ class LangChainAdapter():
         exchanges = conversation.to_langchain_messages(user_role, instructions)            
         start_time = time.time()
         content_chunks = []
-        content_stream = Llm.invoke_llm_as_async_stream(llm=self.llm, input= exchanges, display_console= True, content_chunks= content_chunks)
+        content_stream = Llm.invoke_as_async_stream(llm_or_chain=self.llm, input= exchanges, display_console= True, content_chunks= content_chunks)
         await front_client.post_new_metier_or_pm_answer_as_stream(content_stream)
         end_time = time.time()
         elapsed = misc.get_elapsed_time_seconds(start_time, end_time)
