@@ -1,3 +1,4 @@
+import os
 from typing import List, Optional, Union
 import json
 
@@ -12,6 +13,9 @@ from langchain_community.retrievers import BM25Retriever
 from langchain.retrievers import EnsembleRetriever
 from langchain_chroma import Chroma
 from langchain.retrievers.multi_query import MultiQueryRetriever
+from langchain.chains.query_constructor.base import AttributeInfo
+from langchain_core.documents import Document
+from collections import defaultdict
 
 # common tools imports
 from common_tools.helpers.ressource_helper import Ressource
@@ -22,8 +26,10 @@ from common_tools.models.question_analysis import QuestionAnalysis
 from common_tools.helpers.file_helper import file
 from common_tools.helpers.llm_helper import Llm
 from common_tools.langchains.langchain_factory import LangChainFactory
-from common_tools.models.embedding_type import EmbeddingModel
-from common_tools.rag.embedding_service import EmbeddingService
+from common_tools.models.embedding import EmbeddingModel
+from langchain.retrievers.self_query.base import SelfQueryRetriever
+from langchain.chains.query_constructor.base import StructuredQueryOutputParser, get_query_constructor_prompt
+from langchain_community.query_constructors.chroma import ChromaTranslator
 
 class RagService:
     def __init__(self, inference_llm_or_info: Optional[Union[LlmInfo, BaseChatModel]], embedding_model:EmbeddingModel=None, vector_db_and_docs_path = "./storage", documents_json_filename = "bm25_documents.json"):
@@ -33,18 +39,19 @@ class RagService:
         self.vector_db_path = vector_db_and_docs_path + '/' + self.embedding_model_name
         self.documents_json_filepath = vector_db_and_docs_path + '/' +  documents_json_filename
 
-        self._load_bm25_retriever()
-        self._load_vectorstore()
+        self.langchain_documents = self._load_langchain_documents(self.documents_json_filepath)
+        self.bm25_retriever = self._build_bm25_retriever(self.langchain_documents)
+        self.vectorstore = self._load_vectorstore()
 
-    def init_embedding(self, embedding_model:EmbeddingModel=None):
-        self.embedding = EmbeddingService.get_embedding(embedding_model)
+    def init_embedding(self, embedding_model:EmbeddingModel):
+        self.embedding = embedding_model.create_instance()
         self.embedding_model_name = embedding_model.model_name
 
-    def init_inference_llm(self, llm_or_infos):
+    def init_inference_llm(self, llm_or_infos: Optional[Union[LlmInfo, BaseChatModel]]):
         if isinstance(llm_or_infos, LlmInfo) or (isinstance(llm_or_infos, list) and any(llm_or_infos) and isinstance(llm_or_infos[0], LlmInfo)):            
-            self.inference_llm = LangChainFactory.create_llms_from_infos(llm_or_infos)[0]
+            self.llm = LangChainFactory.create_llms_from_infos(llm_or_infos)[0]
         elif isinstance(llm_or_infos, BaseChatModel):
-            self.inference_llm = llm_or_infos
+            self.llm = llm_or_infos
         else:
             raise ValueError("Invalid llm_or_infos parameter")
     
@@ -66,13 +73,8 @@ class RagService:
         else:
             results = vectorstore.similarity_search(question, k=max_retrived_count, filter=metadata_filters)
         return results
-            
-    def _load_bm25_retriever(self, bm25_results_count: int = 1) -> tuple:
-        self.langchain_documents = RagService.load_langchain_documents(self.documents_json_filepath)
-        self.bm25_retriever = self._build_bm25_retriever(self.langchain_documents, bm25_results_count) #todo: useful? as metadata are retieved while querying
-        return self.bm25_retriever, self.langchain_documents
     
-    def load_langchain_documents(filepath:str = None) -> List[Document]:
+    def _load_langchain_documents(self, filepath:str = None) -> List[Document]:
         if not file.file_exists(filepath):
             txt.print(">>> No file found with langchain documents. Please provide a valid file path.")
             return None
@@ -86,8 +88,9 @@ class RagService:
     
     def _load_vectorstore(self):
         if not self.embedding: raise ValueError("No embedding model specified")
-        self.vectorstore = Chroma(persist_directory= self.vector_db_path, embedding_function= self.embedding)
-        return self.vectorstore
+        abs_path = os.path.abspath(self.vector_db_path)
+        vectorstore = Chroma(persist_directory= abs_path, embedding_function= self.embedding)
+        return vectorstore
     
     def build_vectorstore_and_bm25_store(self, data: list, chunk_size:int = 0, delete_existing=True)-> int:
         if not data or len(data) == 0: return 0
@@ -141,13 +144,69 @@ class RagService:
         documents = txt_loader.load(folder_path)
         return self._build_vectorstore(documents, perform_chunking)
 
-    def _build_bm25_retriever(self, documents: List[Document], k: int = 20, metadata: dict = None) -> any:
+    def _build_bm25_retriever(self, documents: List[Document], k: int = 20, metadata: dict = None) -> BM25Retriever:
         if metadata:
             bm25_retriever = BM25Retriever.from_texts([doc.page_content for doc in documents], metadata)
         else:
             bm25_retriever = BM25Retriever.from_documents(documents)
         bm25_retriever.k = k
         return bm25_retriever
+    
+    def build_self_querying_retriever(self, metadata_description: list[AttributeInfo] = None, get_query_constructor:bool = True) -> tuple :
+        document_description = "Description of the document"
+        if not metadata_description:
+            metadata_description = RagService.generate_metadata_info_from_docs(self.langchain_documents)
+
+        if get_query_constructor:
+            query_constructor = self.build_query_with_extracted_metadata(metadata_description)
+            self_querying_retriever = SelfQueryRetriever(
+                query_constructor=query_constructor,
+                vectorstore=self.vectorstore,
+                structured_query_translator=ChromaTranslator(),
+            )
+            return self_querying_retriever, query_constructor
+        else:
+            self_querying_retriever = SelfQueryRetriever.from_llm(
+                self.llm,
+                self.vectorstore,
+                document_description,
+                metadata_description,
+            )
+            return self_querying_retriever, None
+
+    def build_query_with_extracted_metadata(self, metadata_description: list[AttributeInfo] = None):
+        document_description = "Description of the document"
+        prompt = get_query_constructor_prompt(
+            document_description,
+            metadata_description,
+        )
+        output_parser = StructuredQueryOutputParser.from_components()
+        query_constructor = prompt | self.llm | output_parser
+        return query_constructor
+        
+    @staticmethod
+    def generate_metadata_info_from_docs(documents: list[Document], max_values: int = 10, metadata_keys_description:dict = None) -> list[AttributeInfo]:
+        metadata_field_info = []
+        value_counts = defaultdict(list)
+
+        for doc in documents:
+            for key, value in doc.metadata.items():
+                if value not in value_counts[key]:
+                    value_counts[key].append(value)
+
+        for key, values in value_counts.items():
+            description = f"'{key}' metadata"
+            if metadata_keys_description and key in metadata_keys_description:
+                description += f" (indicate: {metadata_keys_description[key]})"
+            value_type = type(values[0]).__name__
+            if len(values) <= max_values:
+                values_str = ', '.join([f"'{value}'" for value in values])
+                description += f". One value in: [{values_str}]"
+            
+            metadata_field_info.append(AttributeInfo(name=key, description=description, type=value_type))
+
+        return metadata_field_info
+    
         
     def reset_vectorstore(self):
         if hasattr(self, 'vectorstore') and self.vectorstore:

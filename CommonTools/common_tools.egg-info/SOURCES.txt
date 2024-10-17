@@ -8,7 +8,6 @@ common_tools.egg-info/dependency_links.txt
 common_tools.egg-info/requires.txt
 common_tools.egg-info/top_level.txt
 common_tools/helpers/__init__.py
-common_tools/helpers/agents_workflows.py
 common_tools/helpers/display_helper.py
 common_tools/helpers/execute_helper.py
 common_tools/helpers/file_helper.py
@@ -29,7 +28,7 @@ common_tools/langchains/langsmith_client.py
 common_tools/models/__init__.py
 common_tools/models/base_desc.py
 common_tools/models/conversation.py
-common_tools/models/embedding_type.py
+common_tools/models/embedding.py
 common_tools/models/enum_desc.py
 common_tools/models/file_already_exists_policy.py
 common_tools/models/langchain_adapter_type.py
@@ -42,7 +41,6 @@ common_tools/project/__init__.py
 common_tools/project/import_listing.py
 common_tools/project/useless_code_analyser.py
 common_tools/rag/__init__.py
-common_tools/rag/embedding_service.py
 common_tools/rag/rag_filtering_metadata_helper.py
 common_tools/rag/rag_service.py
 common_tools/rag/rag_inference_pipeline/__init__.py

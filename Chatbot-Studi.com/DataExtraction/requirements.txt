@@ -4,4 +4,5 @@ pytest
 rank_bm25
 numpy
 streamlit
-git+https://github.com/explodinggradients/ragas.git
+nltk
+ragas

@@ -1,7 +1,7 @@
 from langchain.tools import tool
 from langchain_core.documents import Document
 import time
-
+from langchain.indexes import VectorstoreIndexCreator
 from langgraph.prebuilt.tool_executor import ToolExecutor
 from langchain.tools.render import format_tool_to_openai_function
 from langchain.agents import Tool
@@ -42,7 +42,7 @@ class RagInferencePipelineWithPrefect:
             
             additionnal_tools = [format_tool_to_openai_function(t) for t in tools] #TODO: check compatibility out of OpenAI
             all_tools.extend(additionnal_tools)
-            self.rag.inference_llm = self.rag.inference_llm.bind_functions(all_tools)
+            self.rag.llm = self.rag.llm.bind_functions(all_tools)
             self.tool_executor = ToolExecutor(all_tools)
 
 
@@ -108,7 +108,7 @@ class RagInferencePipelineWithPrefect:
         prefilter_prompt = Ressource.get_language_detection_prompt()
         prefilter_prompt = prefilter_prompt.replace("{question}", query)
         prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(prefilter_prompt, QuestionAnalysisPydantic, QuestionAnalysis)
-        response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks("rag prefiltering", [self.rag.inference_llm, self.rag.inference_llm], output_parser, 10, *[prompt_for_output_parser])
+        response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks("rag prefiltering", [self.rag.llm, self.rag.llm], output_parser, 10, *[prompt_for_output_parser])
         questionAnalysis = response[0]
         questionAnalysis['question'] = query
         if questionAnalysis['detected_language'].__contains__("english"):
@@ -213,7 +213,7 @@ class RagInferencePipelineWithPrefect:
     def rag_response_generation(self, retrieved_chunks: list, questionAnalysis: QuestionAnalysis):
         # Remove score from retrieved docs
         retrieved_chunks = [doc[0] if isinstance(doc, tuple) else doc for doc in retrieved_chunks]
-        return self.generate_augmented_response_from_retrieved_chunks(self.rag.inference_llm, retrieved_chunks, questionAnalysis)
+        return self.generate_augmented_response_from_retrieved_chunks(self.rag.llm, retrieved_chunks, questionAnalysis)
         
     # Post-treatment subflow
     @flow(name="rag post-treatment")

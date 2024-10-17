@@ -25,4 +25,4 @@ The provided tools range from:
 <u>*Tips:*</u>
 
 - Look into `setup.py` file, the required packages are listed in: `install_requires` section.
-- To install locally this package from another project, execture from the terminal: `pip install -e C:/Dev/squad-ai/CommonTools`
+- To install locally this package from another project, execute from the terminal: `pip install -e C:/Dev/squad-ai/CommonTools`

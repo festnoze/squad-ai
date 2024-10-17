@@ -1,4 +1,7 @@
 from enum import Enum
+import os
+from langchain.embeddings import OpenAIEmbeddings, OllamaEmbeddings
+from langchain_community.embeddings.sentence_transformer import SentenceTransformerEmbeddings
 
 class EmbeddingType(Enum):
     OpenAI = "OpenAI"
@@ -27,10 +30,14 @@ class EmbeddingModel(Enum):
     SentenceTransformer_AllMiniML12 = ("all-MiniLM-L12-v2", EmbeddingType.SentenceTransformer)
     SentenceTransformer_AllMiniML12_paraphrase = ("paraphrase-multilingual-MiniLM-L12-v2", EmbeddingType.SentenceTransformer)
 
-    def __init__(self, model_name: str, embedding_type: EmbeddingType):
-        self.model_name = model_name
-        self.embedding_type = embedding_type
+    @property
+    def model_name(self):
+        return self.value[0]
 
+    @property
+    def embedding_type(self):
+        return self.value[1]
+    
     def __str__(self):
         return f"{self.model_name} ({self.embedding_type.value})"
     
@@ -45,4 +52,20 @@ class EmbeddingModel(Enum):
     @property
     def is_sentence_transformer(self) -> bool:
         return self.embedding_type == EmbeddingType.SentenceTransformer
+    
+    def create_instance(self, api_key:str = None) -> any:
+        if self.is_openai:
+            if not api_key:
+                api_key= os.getenv("OPEN_API_KEY") 
+                if not api_key:
+                    raise ValueError("Required OpenAI API key isn't provided, nor being found in the env.")
+            return OpenAIEmbeddings(model=self.model_name, api_key=api_key)
+
+        if self.is_ollama:
+            return OllamaEmbeddings(model=self.model_name)
+        
+        if self.is_sentence_transformer:
+            return SentenceTransformerEmbeddings(model_name=f"sentence-transformers/{self.model_name}")
+
+        raise ValueError(f"Unhandled embedding type: '{self.embedding_type}'")
 

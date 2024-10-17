@@ -95,9 +95,19 @@ class ChatbotFront:
             if ChatbotFront.use_prefect:
                 ChatbotFront.inference_pipeline = RagInferencePipelineWithPrefect(ChatbotFront.rag, None)            
             else:
-                default_filters = RagFilteringMetadataHelper.get_CodeSharpDoc_default_filters()
+                default_filters = ChatbotFront.get_CodeSharpDoc_default_filters()
                 ChatbotFront.inference_pipeline = RagInferencePipeline(ChatbotFront.rag, default_filters, None)
 
+      
+    @staticmethod
+    def get_CodeSharpDoc_default_filters() -> dict:
+        return {
+                "$and": [
+                    {"functional_type": "Controller"},
+                    {"summary_kind": "method"}
+                ]
+            }
+    
     def clear_conversation():
         st.session_state.messages = []
         st.session_state.messages.append({"role": "assistant", "content": ChatbotFront.start_caption()})

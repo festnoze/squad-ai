@@ -1,4 +1,6 @@
+from typing import Optional, Union
 from common_tools.models.logical_operator import LogicalOperator
+from langchain.chains.query_constructor.base import AttributeInfo
 
 class RagFilteringMetadataHelper:
     
@@ -11,13 +13,13 @@ class RagFilteringMetadataHelper:
         filters = {}
         if query.__contains__("filters:"):
             filters_str = query.split("filters:")[1]
-            query = query.split("filters:")[0]
+            query_wo_metadata = query.split("filters:")[0]
         elif query.__contains__("filtres :"):
             filters_str = query.split("filtres :")[1]
-            query = query.split("filtres :")[0]
+            query_wo_metadata = query.split("filtres :")[0]
         filters_str = filters_str.strip()
         filters = RagFilteringMetadataHelper.get_filters_from_str(filters_str)
-        return filters, query
+        return filters, query_wo_metadata
     
     @staticmethod
     def get_filters_from_str(filters_str: str) -> dict:
@@ -45,7 +47,7 @@ class RagFilteringMetadataHelper:
             return {}  # Return an empty filter if no conditions found
         
     @staticmethod
-    def filters_predicate(doc, filters, operator=LogicalOperator.AND):
+    def filters_predicate(doc, filters:Union[dict, list], operator=LogicalOperator.AND):
         """Predicate to evaluate filter(s) (handle nested operators)"""
 
         # If filters is a dictionary (single filter or operator like $and/$or)
@@ -76,13 +78,28 @@ class RagFilteringMetadataHelper:
                 raise ValueError(f"Unhandled operator: {operator}")
 
         return False
-        
+    
+    from langchain_core.structured_query import Comparison
+
     @staticmethod
-    def get_CodeSharpDoc_default_filters() -> dict:
-        return {
-                "$and": [
-                    {"functional_type": "Controller"},
-                    {"summary_kind": "method"}
-                ]
-            }
+    def get_filters_from_comparison(comparison: Comparison, metadata_infos: list[AttributeInfo] = None) -> dict:
+        filters = []
+        valid_keys = set(attr_info.name for attr_info in metadata_infos) if metadata_infos else None
+        filter_dict = {}
+        if comparison is not None:
+            filter_dict = { comparison.attribute: comparison.value}
+
+        if not valid_keys:
+            filters.append(filter_dict)
+        else:
+            if comparison.attribute in valid_keys:
+                filters.append(filter_dict)            
+
+        if len(filters) > 1:
+            return {"$and": filters}
+        elif len(filters) == 1:
+            return filters[0]
+        else:
+            return {}
+
 

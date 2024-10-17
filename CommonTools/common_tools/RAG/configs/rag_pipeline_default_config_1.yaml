@@ -14,16 +14,18 @@ guardrails:
 
 pre_treatment:  
   - parallel_threads:
+    # - RAGPreTreatment.analyse_query_language
       - RAGPreTreatment.bypassed_analyse_query_language
       - RAGPreTreatment.analyse_query_for_metadata
       - RAGPreTreatment.extract_explicit_metadata
   - RAGPreTreatment.get_merged_metadata
 
 data_retrieval:
-  - parallel_threads:
-      - RAGHybridRetrieval.semantic_vector_retrieval
-      - RAGHybridRetrieval.bm25_retrieval
-  - RAGHybridRetrieval.hybrid_chunks_selection
+  # - parallel_threads:
+  #     - RAGHybridRetrieval.semantic_vector_retrieval
+  #     - RAGHybridRetrieval.bm25_retrieval
+  #- RAGHybridRetrieval.hybrid_chunks_selection
+  - RAGHybridRetrieval.rag_langchain_hybrid_retrieval
 
 augmented_generation:
   - RAGAugmentedGeneration.rag_augmented_answer_generation

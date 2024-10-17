@@ -19,7 +19,7 @@ class RAGAugmentedGeneration:
     def rag_response_generation(rag: RagService, query:Optional[Union[str, Conversation]], retrieved_chunks: list, questionAnalysis: QuestionAnalysis, format_retrieved_docs_function = None):
         if retrieved_chunks and any(retrieved_chunks) and isinstance(retrieved_chunks[0], tuple) : retrieved_chunks = [doc[0] for doc in retrieved_chunks] # Remove scores if present
 
-        return RAGAugmentedGeneration.generate_augmented_response_from_retrieved_chunks(rag.inference_llm, query, retrieved_chunks, questionAnalysis, format_retrieved_docs_function)
+        return RAGAugmentedGeneration.generate_augmented_response_from_retrieved_chunks(rag.llm, query, retrieved_chunks, questionAnalysis, format_retrieved_docs_function)
 
     @staticmethod
     def generate_augmented_response_from_retrieved_chunks(llm: BaseChatModel, query:Optional[Union[str, Conversation]], retrieved_docs: list[Document], analysed_query: QuestionAnalysis, format_retrieved_docs_function = None) -> str:

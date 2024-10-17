@@ -29,13 +29,13 @@ class Test_RAGInferencePipeline:
 
     def test_run_with_default_config(self):
         query = "What is the capital of France?"
-        results, sources = self.rag_pipeline.run_dynamic_pipeline(query, override_workflow_available_classes=self.override_workflow_available_classes)
+        results, sources = self.rag_pipeline.run_pipeline_dynamic(query, override_workflow_available_classes=self.override_workflow_available_classes)
 
         assert results == self.override_workflow_available_classes['RAGPostTreatment'].response_post_treatment()
 
     def test_run_with_bm25_retrieval_disabled(self):
         query = "Tell me about the Eiffel Tower."
-        results, sources = self.rag_pipeline.run_dynamic_pipeline(query, include_bm25_retrieval=False, override_workflow_available_classes=self.override_workflow_available_classes)
+        results, sources = self.rag_pipeline.run_pipeline_dynamic(query, include_bm25_retrieval=False, override_workflow_available_classes=self.override_workflow_available_classes)
 
         assert results == self.override_workflow_available_classes['RAGPostTreatment'].response_post_treatment()
     

@@ -1,29 +1,31 @@
+from common_tools.helpers.txt_helper import txt
+from common_tools.langchains.langchain_factory import LangChainFactory
+from common_tools.models.embedding import EmbeddingModel
+from common_tools.models.llm_info import LlmInfo
+from langchain_core.documents import Document
 from ragas.testset.synthesizers.generate import TestsetGenerator
-from ragas.testset.synthesizers.base_query import simple, reasoning, multi_context
-
-from common_tools.rag.rag_service import RagService
+from ragas.testset.synthesizers.abstract_query import AbstractQuerySynthesizer, ComparativeAbstractQuerySynthesizer
+from ragas.testset.synthesizers.specific_query import SpecificQuerySynthesizer
+from pandas import DataFrame
 
 class GroundTruthDataset:
-    def __init__(self, rag_service: RagService, testset_generator: TestsetGenerator):
-        self.rag_service = rag_service
-        KnowledgeGraph 
-        self.testset_generator = TestsetGenerator.from_langchain(self.rag_service.inference_llm,
-        generator = TestsetGenerator
-    generator_llm,
-    critic_llm,
-    embeddings
-)
+    def __init__(self, documents:list[Document], generator_llm_info: LlmInfo, critic_llm_info: LlmInfo, embedding_info: EmbeddingModel, distributions: dict = None, test_size: int = 10):
+        embedding = embedding_info.create_instance()
 
-    def generate(self, question: str, additionnal_context: str = None, metadata_filters: dict = None, give_score: bool = False, max_retrived_count: int = 10, min_score: float = None, min_retrived_count: int = None) -> list[Document]:
-        return self.rag_service.semantic_vector_retrieval(question, additionnal_context, metadata_filters, give_score, max_retrived_count, min_score, min_retrived_count)
+        self.generator = TestsetGenerator.from_langchain(
+            LangChainFactory.create_llm_from_info(generator_llm_info),
+            LangChainFactory.create_llm_from_info(critic_llm_info),
+            embedding
+        )
 
-    def generate_testset(self, question: str, additionnal_context: str = None, metadata_filters: dict = None, give_score: bool = False, max_retrived_count: int = 10, min_score: float = None, min_retrived_count: int = None, testset_size: int = 100, testset_type: str = "simple") -> list[Document]:
-        if testset_type == "simple":
-            testset = simple(question, testset_size)
-        elif testset_type == "reasoning":
-            testset = reasoning(question, testset_size)
-        elif testset_type == "multi_context":
-            testset = multi_context(question, testset_size)
-        else:
-            raise ValueError("Invalid testset_type parameter")
-        return self.testset_generator.generate(testset, additionnal_context, metadata_filters, give_score, max_retrived_count, min_score, min_retrived_count)
+        if not distributions:
+            distributions= [
+                (AbstractQuerySynthesizer(llm=generator_llm_info), 0.25),
+                (ComparativeAbstractQuerySynthesizer(llm=generator_llm_info), 0.25),
+                (SpecificQuerySynthesizer(llm=generator_llm_info), 0.5),
+            ]
+
+        testset = self.generator.generate_with_langchain_docs(documents, test_size, distributions)
+
+        test_df = testset.to_pandas() 
+        txt.print(test_df)

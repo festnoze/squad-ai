@@ -33,11 +33,11 @@ class RagInferencePipeline:
             all_tools = [repl_tool]            
             additionnal_tools = [format_tool_to_openai_function(t) for t in tools]
             all_tools.extend(additionnal_tools)
-            self.rag.inference_llm = self.rag.inference_llm.bind_functions(all_tools)
+            self.rag.llm = self.rag.llm.bind_functions(all_tools)
             self.tool_executor = ToolExecutor(all_tools)
 
     # Main workflow using the dynamic pipeline
-    def run_dynamic_pipeline(self, query: Optional[Union[str, Conversation]], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None, override_workflow_available_classes:dict = None) -> tuple:
+    def run_pipeline_dynamic(self, query: Optional[Union[str, Conversation]], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None, override_workflow_available_classes:dict = None) -> tuple:
         config = Ressource.get_rag_pipeline_default_config_1()
         if override_workflow_available_classes:
             workflow_available_classes = override_workflow_available_classes
@@ -64,7 +64,7 @@ class RagInferencePipeline:
         return answer[0], None #todo: return the sources too
 
     # Main workflow using the static pipeline
-    def run_static_inference_pipeline(self, query: Optional[Union[str, Conversation]], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None) -> tuple:
+    def run_pipeline_static(self, query: Optional[Union[str, Conversation]], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None) -> tuple:
         """Run the full hardcoded rag inference pipeline """
         guardrails_result, run_inference_pipeline_results = Execute.run_parallel( 
             (RAGGuardrails.guardrails_query_analysis, (query)), # Guardrails check: query analysis
@@ -82,10 +82,10 @@ class RagInferencePipeline:
     def run_static_inference_pipeline_but_guardrails(self, query:Optional[Union[str, Conversation]], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None) -> tuple:
         """Run the full rag inference pipeline, but without guardrails"""
         # Pre-treatment
-        analysed_query, metadata = RAGPreTreatment.rag_pre_treatment(self.rag, query, self.default_filters)
+        analysed_query, metadata = RAGPreTreatment.rag_static_pre_treatment(self.rag, query, self.default_filters)
 
         # Data Retrieval
-        retrieved_chunks = RAGHybridRetrieval.rag_hybrid_retrieval(self.rag, query, metadata, include_bm25_retrieval, give_score)
+        retrieved_chunks = RAGHybridRetrieval.rag_static_hybrid_retrieval(self.rag, query, metadata, include_bm25_retrieval, give_score)
 
         # Augmented Answer Generation
         response = RAGAugmentedGeneration.rag_augmented_answer_generation(self.rag, query, retrieved_chunks, analysed_query, format_retrieved_docs_function)

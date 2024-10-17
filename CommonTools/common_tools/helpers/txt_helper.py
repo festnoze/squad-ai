@@ -147,11 +147,14 @@ class txt:
 
     @staticmethod
     def stop_spinner_replace_text(text=None)-> int:
-        txt.stop_spinner()
         if not txt.activate_print:
             return None
         
+        txt.stop_spinner()
+        elapsed_str = None 
+        elapsed_sec = None
         empty = 120 * ' '
+
         if not text:
             text = empty
             sys.stdout.write(f'\r{empty}')
@@ -161,7 +164,7 @@ class txt:
                 elapsed_sec = txt.get_elapsed_seconds(txt.start_time, time.time())
                 elapsed_str = txt.get_elapsed_str(elapsed_sec)
                 if elapsed_str:
-                    elapsed_str = f" {elapsed_str}."
+                    elapsed_str = f" {elapsed_str if elapsed_str else ''}."
                 else:
                     elapsed_str = ''         
                 txt.start_time = None

@@ -1,3 +1,4 @@
+import pytest
 from unittest.mock import patch, MagicMock
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
@@ -5,7 +6,7 @@ from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagIn
 from common_tools.rag.rag_service import RagService
 from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.models.llm_info import LlmInfo
-from common_tools.models.embedding_type import EmbeddingModel
+from common_tools.models.embedding import EmbeddingModel
 
 class TestRagInferencePipelineIntegration:
 
@@ -38,7 +39,7 @@ class TestRagInferencePipelineIntegration:
         # Define the query for the test
         query = "Quelle est la capitale de la Choupiland ?"
         
-        response, sources = self.inference.run_dynamic_pipeline(
+        response, sources = self.inference.run_pipeline_dynamic(
             query, 
             include_bm25_retrieval=True, 
             give_score=True, 
@@ -55,7 +56,7 @@ class TestRagInferencePipelineIntegration:
         query = "Explain the concept of CCIAPF."
 
         # Run the inference pipeline without BM25 retrieval
-        response, sources = self.inference.run_dynamic_pipeline(
+        response, sources = self.inference.run_pipeline_dynamic(
             query,
             include_bm25_retrieval=False, 
             give_score=True, 
@@ -95,7 +96,7 @@ class TestRagInferencePipelineIntegration:
     #         return f"Custom Format: {docs}"
 
     #     # Run the inference pipeline with a custom formatting function
-    #     response, sources = self.inference.run_dynamic_pipeline(
+    #     response, sources = self.inference.run_pipeline_dynamic(
     #         query, 
     #         include_bm25_retrieval=True, 
     #         give_score=False, 

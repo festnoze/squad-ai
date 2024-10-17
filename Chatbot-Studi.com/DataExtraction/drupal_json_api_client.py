@@ -124,7 +124,7 @@ class DrupalJsonApiClient:
             return source_node[attribut_name]
         return None
 
-    def extract_long_string_values(self, item: any, min_length:int=80, auto_include_exceptions:list[str]=['title', 'name', 'description']) -> list[str]:
+    def extract_long_string_values(self, item: any, min_length:int=50, auto_include_exceptions:list[str]=['title', 'name', 'description']) -> list[str]:
         """
         Recursively extract string values from an item where the values are strings longer than the specified length.
 

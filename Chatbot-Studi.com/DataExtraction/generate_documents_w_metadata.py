@@ -9,7 +9,7 @@ class GenerateDocumentsWithMetadataFromFiles:
     def __init__(self):
         pass
        
-    def process_all_data(self, path: str) -> List[Document]:
+    def load_all_docs_as_json(self, path: str) -> List[Document]:
         all_docs = []
         txt.print_with_spinner(f"Build all Langchain documents ...")
 

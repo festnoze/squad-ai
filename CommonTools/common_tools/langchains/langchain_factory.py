@@ -8,29 +8,40 @@ import uuid
 from langchain_core.language_models import BaseChatModel
 from common_tools.helpers.txt_helper import txt
 from common_tools.models.langchain_adapter_type import LangChainAdapterType
-
 from common_tools.models.llm_info import LlmInfo
 
 class LangChainFactory():
     @staticmethod
     def create_llms_from_infos(llms_infos: list[LlmInfo]) -> list[BaseChatModel]:
-        txt.print_with_spinner(f"Loading LLM model ...")
+        txt.print_with_spinner(f"Loading LLM models ...")
         if isinstance(llms_infos, LlmInfo):
             llms_infos = [llms_infos]
         if len(llms_infos) == 0:
-            raise ValueError("No LLM info provided.")
+            raise ValueError("No LLMs infos provided.")
 
         llms: list[BaseChatModel] = []
+        activate_print_status = txt.activate_print
+        txt.activate_print = False
+
         for llm_info in llms_infos:
-            llm = LangChainFactory.create_llm(
-                adapter_type= llm_info.type,
-                llm_model_name= llm_info.model,
-                timeout_seconds= llm_info.timeout,
-                temperature= llm_info.temperature,
-                api_key= llm_info.api_key)
+            llm = LangChainFactory.create_llm_from_info(llm_info)
             llms.append(llm)
-        txt.stop_spinner_replace_text("LLM model loaded successfully.")
+            
+        txt.activate_print = activate_print_status
+        txt.stop_spinner_replace_text("LLMs models loaded successfully.")
         return llms
+    
+    @staticmethod
+    def create_llm_from_info(llm_info: LlmInfo) -> BaseChatModel:
+        txt.print_with_spinner(f"Loading LLM model ...")
+        llm = LangChainFactory.create_llm(
+            adapter_type= llm_info.type,
+            llm_model_name= llm_info.model,
+            timeout_seconds= llm_info.timeout,
+            temperature= llm_info.temperature,
+            api_key= llm_info.api_key)
+        txt.stop_spinner_replace_text("LLM model loaded successfully.")
+        return llm
     
     @staticmethod
     def create_llm(adapter_type: LangChainAdapterType, llm_model_name: str, timeout_seconds: int = 50, temperature: float = 0.1, api_key: str = None) -> BaseChatModel:
