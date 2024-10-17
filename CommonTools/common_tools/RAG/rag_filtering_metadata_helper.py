@@ -2,6 +2,8 @@ from typing import Optional, Union
 from common_tools.models.logical_operator import LogicalOperator
 from langchain.chains.query_constructor.base import AttributeInfo
 
+from langchain_core.structured_query import Comparison, Operation
+
 class RagFilteringMetadataHelper:
     
     @staticmethod
@@ -79,20 +81,27 @@ class RagFilteringMetadataHelper:
 
         return False
     
-    from langchain_core.structured_query import Comparison
-
     @staticmethod
-    def get_filters_from_comparison(comparison: Comparison, metadata_infos: list[AttributeInfo] = None) -> dict:
+    def get_filters_from_comparison(langchain_filters: Union[Comparison, Operation], metadata_infos: list[AttributeInfo] = None) -> dict:
         filters = []
         valid_keys = set(attr_info.name for attr_info in metadata_infos) if metadata_infos else None
         filter_dict = {}
-        if comparison is not None:
-            filter_dict = { comparison.attribute: comparison.value}
+        if langchain_filters is not None:
+            if isinstance(langchain_filters, Operation):
+                # Handle logical operators like $and/$or
+                if langchain_filters.operator.value == LogicalOperator.AND.value:
+                    filters = [RagFilteringMetadataHelper.get_filters_from_comparison(sub_filter, metadata_infos) for sub_filter in langchain_filters.filters]
+                elif langchain_filters.operator.value == LogicalOperator.OR.value:
+                    filters = [RagFilteringMetadataHelper.get_filters_from_comparison(sub_filter, metadata_infos) for sub_filter in langchain_filters.filters]
+            elif isinstance(langchain_filters, Comparison):
+                filter_dict = { langchain_filters.attribute: langchain_filters.value}
+            else:
+                raise ValueError(f"Unsupported filter type: {type(langchain_filters)}")
 
         if not valid_keys:
             filters.append(filter_dict)
         else:
-            if comparison.attribute in valid_keys:
+            if langchain_filters.attribute in valid_keys:
                 filters.append(filter_dict)            
 
         if len(filters) > 1:

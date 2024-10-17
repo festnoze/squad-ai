@@ -35,7 +35,8 @@ class RagInferencePipeline:
             all_tools.extend(additionnal_tools)
             self.rag.llm = self.rag.llm.bind_functions(all_tools)
             self.tool_executor = ToolExecutor(all_tools)
-
+    
+    #todo: return the sources via an extra parameter
     # Main workflow using the dynamic pipeline
     def run_pipeline_dynamic(self, query: Optional[Union[str, Conversation]], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None, override_workflow_available_classes:dict = None) -> tuple:
         config = Ressource.get_rag_pipeline_default_config_1()
@@ -61,8 +62,8 @@ class RagInferencePipeline:
 
         answer = workflow_executor.execute_workflow(kwargs_values=kwargs_values)
 
-        return answer[0], None #todo: return the sources too
-
+        return answer[0]
+    
     # Main workflow using the static pipeline
     def run_pipeline_static(self, query: Optional[Union[str, Conversation]], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None) -> tuple:
         """Run the full hardcoded rag inference pipeline """
@@ -76,7 +77,7 @@ class RagInferencePipeline:
         
         # Post-treatment
         final_response = RAGPostTreatment.rag_post_treatment(guardrails_result, response, analysed_query)
-        return final_response, None #todo: return the sources too
+        return final_response 
     
     
     def run_static_inference_pipeline_but_guardrails(self, query:Optional[Union[str, Conversation]], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None) -> tuple:

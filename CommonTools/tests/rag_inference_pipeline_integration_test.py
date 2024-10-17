@@ -35,11 +35,11 @@ class TestRagInferencePipelineIntegration:
             self.inference = RagInferencePipeline(self.rag_service)
 
 
-    def test_inference_pipeline_with_bm25_retrieval(self):
+    def test_inference_pipeline_run_dynamic_with_bm25_retrieval(self):
         # Define the query for the test
         query = "Quelle est la capitale de la Choupiland ?"
         
-        response, sources = self.inference.run_pipeline_dynamic(
+        response = self.inference.run_pipeline_dynamic(
             query, 
             include_bm25_retrieval=True, 
             give_score=True, 
@@ -51,12 +51,12 @@ class TestRagInferencePipelineIntegration:
         # assert len(sources) > 0, "There should be at least one source retrieved"
         assert "Choupicity" in response, f"The response should mention the fake capital of Choupiland from the data: 'Choupicity', but was: '{response}'"
 
-    def test_inference_pipeline_without_bm25_retrieval(self):
+    def test_inference_pipeline_run_dynamic_without_bm25_retrieval(self):
         # Define the query for the test
         query = "Explain the concept of CCIAPF."
 
         # Run the inference pipeline without BM25 retrieval
-        response, sources = self.inference.run_pipeline_dynamic(
+        response = self.inference.run_pipeline_dynamic(
             query,
             include_bm25_retrieval=False, 
             give_score=True, 
@@ -69,6 +69,23 @@ class TestRagInferencePipelineIntegration:
         # assert len(sources) > 0, "There should be at least one source retrieved"
         #assert [ "I found! " source for source in sources], f"The response should mention 'I found! ' added by the formatting function, but was: '{response}'"
         assert response.lower().__contains__("octopus") or response.lower().__contains__("pieuvre") or response.lower().__contains__("poulpe"), f"The response should mention 'octopus', but was: '{response}'"
+
+
+    def test_inference_pipeline_run_static_with_bm25_retrieval(self):
+        # Define the query for the test
+        query = "Quelle est la capitale de la Choupiland ?"
+        
+        response = self.inference.run_pipeline_static(
+            query, 
+            include_bm25_retrieval=True, 
+            give_score=True, 
+            format_retrieved_docs_function=None
+        )
+
+        assert isinstance(response, str), "The response should be a string"
+        # assert isinstance(sources, list), "The sources should be a list"
+        # assert len(sources) > 0, "There should be at least one source retrieved"
+        assert "Choupicity" in response, f"The response should mention the fake capital of Choupiland from the data: 'Choupicity', but was: '{response}'"
 
     @staticmethod
     def format_retrieved_docs_function(retrieved_docs:list):

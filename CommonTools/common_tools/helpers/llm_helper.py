@@ -8,11 +8,9 @@ from langchain.agents import AgentExecutor, create_tool_calling_agent, create_js
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_community.callbacks import get_openai_callback, OpenAICallbackHandler
 from langchain.schema.messages import HumanMessage, AIMessage, SystemMessage
-#
-#import yfinance as yf
-#
+from common_tools.models.langchain_adapter_type import LangChainAdapterType
 import inspect
-from typing import TypeVar, Generic, Any, Union
+from typing import TypeVar, Union
 
 class Llm:
     @staticmethod
@@ -68,18 +66,6 @@ class Llm:
         
         return content[start_index:end_index]
     
-    # @staticmethod
-    # def invoke_llm_with_retry(llm: BaseChatModel, input: str = "", max_retries: int = 3):
-    #     for i in range(max_retries):
-    #         try:
-    #             result = llm.invoke(input)
-    #             return Llm.get_content(result)
-    #         except Exception as e:
-    #             print(f"Error: {e}")
-    #             print(f"Retrying... {i+1}/{max_retries}")
-    #     raise Exception(f"LLM failed. Stopped after {max_retries} retries")
-
-
     TPydanticModel = TypeVar('TPydanticModel', bound=BaseModel)    
     TOutputModel = TypeVar('TOutputModel')
     output_parser_instructions_name: str = 'output_parser_instructions'
@@ -194,6 +180,28 @@ class Llm:
         agent_executor = AgentExecutor(agent=agent, tools=tools)
         res = agent_executor.invoke({"input": input})
         return res["output"]
+    
+    @staticmethod
+    async def invoke_llm_as_async_stream(llm: BaseChatModel, input, display_console: bool = False, content_chunks:list[str] = None):
+        new_line_for_stream = "\\/%*/\\" # use specific new line conversion over streaming, as new line is handled differently across platforms
+        has_content_prop:bool = None
+        async for chunk in llm.astream(input):
+            # Analyse specific stream structure upon first chunk: Handle both OpenAI & Ollama types
+            if not has_content_prop:
+                if hasattr(chunk, 'content'): #LangChainAdapterType.OpenAI
+                    has_content_prop = True
+                elif isinstance(chunk, str): #LangChainAdapterType.Ollama
+                    has_content_prop = False
+                else:
+                    raise ValueError(f"Unknown stream structure: neither OpenAI nor Ollama")
+            
+            content = chunk if not has_content_prop else chunk.content
+            
+            if display_console:
+                print(content, end= "", flush= True)
+            content_chunks.append(content)
+            content = content.replace('\r\n', '\n').replace('\n', new_line_for_stream)
+            yield content.encode('utf-8')
         
     def invoke_method_mesuring_openai_tokens_consumption(method_handler, *args, **kwargs):
         """
@@ -208,12 +216,6 @@ class Llm:
         with get_openai_callback() as openai_callback:
             method_handler(*args, **kwargs)
             Llm.display_tokens_consumption(openai_callback)
-
-    # def get_eur_usd_rate():
-    #     ticker = yf.Ticker("EURUSD=X")
-    #     data = ticker.history(period="1d")
-    #     rate = data["Close"].iloc[-1]
-    #     return rate
     
     def display_tokens_consumption(cb: OpenAICallbackHandler):
         max_len = len(Llm.format_number(cb.total_tokens)) + 2

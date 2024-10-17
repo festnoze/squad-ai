@@ -13,7 +13,7 @@ from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.rag.rag_service import RagService
 from common_tools.rag.rag_injection_pipeline.rag_injection_pipeline import RagInjectionPipeline
 from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
-from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline_with_prefect import RagInferencePipelineWithPrefect
+#from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline_with_prefect import RagInferencePipelineWithPrefect
 from common_tools.models.embedding import EmbeddingModel, EmbeddingType
 from common_tools.models.conversation import Conversation
 from ragas_service import RagasService
@@ -36,10 +36,10 @@ class AvailableService:
 
         if not hasattr(AvailableService, 'inference') or not AvailableService.inference:
             default_filters = {} #RagFilteringMetadataHelper.get_CodeSharpDoc_default_filters()
-            if use_prefect:
-                AvailableService.inference = RagInferencePipelineWithPrefect(AvailableService.rag_service, default_filters, None)            
-            else:
-                AvailableService.inference = RagInferencePipeline(AvailableService.rag_service, default_filters, None)
+            # if use_prefect:
+            #     AvailableService.inference = RagInferencePipelineWithPrefect(AvailableService.rag_service, default_filters, None)            
+            # else:
+            AvailableService.inference = RagInferencePipeline(AvailableService.rag_service, default_filters, None)
 
     def display_select_menu():
         while True:
@@ -97,15 +97,16 @@ class AvailableService:
             response, sources = AvailableService.inference.run(query, include_bm25_retrieval= True, give_score=True)
             txt.print(response)
 
-    def rag_query(query):
-        inference = RagInferencePipeline(AvailableService.rag_service)
-        if query.startswith('!'):
-            response, sources = inference.run_pipeline_static(query[1:], include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
-        else:
-            response, sources = inference.run_pipeline_dynamic(query, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
-        return response
+    # def rag_query_wo_history(query):
+    #     inference = RagInferencePipeline(AvailableService.rag_service)
+    #     if query.startswith('!'):
+    #         response, sources = inference.run_pipeline_static(query[1:], include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
+    #     else:
+    #         response, sources = inference.run_pipeline_dynamic(query, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
+    #     return response
     
     def rag_query_with_history(conversation_history:Conversation):
+        txt.print_with_spinner("Chargement du pipeline d'inférence ...")
         inference = RagInferencePipeline(AvailableService.rag_service)
         if conversation_history.last_message.role != 'user':
             raise ValueError("Conversation history should end with a user message")
@@ -113,12 +114,17 @@ class AvailableService:
         # Set static metadata infos to avoid extra calculation
         RAGPreTreatment.metadata_infos = [
             AttributeInfo(name='id', description="l'identifiant interne du document courant", type='str'),
-            AttributeInfo(name='type', description="le type de données contenu dans ce document. Il s'agit du valeur parmi : ['certifieur', 'certification', 'diplôme', 'domaine', 'financement', 'métier', 'formation']", type='str'),
+            AttributeInfo(name='type', description="le type de données contenu dans ce document. Il s'agit d'une valeur parmi les catégories suivantes: ['certifieur', 'certification', 'diplôme', 'domaine', 'financement', 'métier', 'formation']. Les plus fréquements concernées sont : métier et formation, ajout ce filtre dès que la question à trait à l'un de ces sujets", type='str'),
             AttributeInfo(name='name', description="le nom du sujet du document", type='str'),
             AttributeInfo(name='changed', description="'la date de dernier changement de la donnée", type='str'),
             AttributeInfo(name='rel_ids', description="les identifiants des documents connexes au présent document", type='str')
         ]
-        response, sources = inference.run_pipeline_dynamic(conversation_history, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
+        
+        txt.stop_spinner_replace_text("Pipeline d'inférence chargé :")
+        
+        txt.print_with_spinner("Execution du pipeline d'inférence ...")
+        response = inference.run_pipeline_dynamic(conversation_history, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
+        txt.stop_spinner_replace_text("Pipeline d'inférence exectué :")
         return response
     
     def generate_ground_truth():

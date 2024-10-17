@@ -80,8 +80,16 @@ class RAGPreTreatment:
         return response_with_filters.query, RagFilteringMetadataHelper.get_filters_from_comparison(response_with_filters.filter)
         
     @staticmethod
+    def bypassed_analyse_query_for_metadata(rag:RagService, query:Optional[Union[str, Conversation]], metadata_infos:list[AttributeInfo] = None) -> tuple[str, dict]:
+        return Conversation.get_user_query(query), {}
+        
+    @staticmethod
     def get_merged_metadata(question_analysis :QuestionAnalysis, query_wo_metadata_from_implicit:str, implicit_metadata:dict, query_wo_metadata_from_explicit:str, explicit_metadata:dict) -> dict:
-        question_analysis.translated_question = query_wo_metadata_from_implicit.strip()
+        #todo: replace the translated question isn't good
+        if query_wo_metadata_from_explicit and query_wo_metadata_from_explicit != question_analysis.question:
+            question_analysis.translated_question = query_wo_metadata_from_explicit.strip()
+        elif query_wo_metadata_from_implicit:
+            question_analysis.translated_question = query_wo_metadata_from_implicit.strip()
         merged = {}
         if explicit_metadata and any(explicit_metadata):
             merged = explicit_metadata.copy()

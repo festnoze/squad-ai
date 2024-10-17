@@ -13,6 +13,7 @@ from models.stream_container import StreamContainer
 from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.helpers.misc import misc
 from common_tools.langchains.langchain_factory import LangChainFactory
+from common_tools.helpers.llm_helper import Llm
 
 # from langchain.callbacks.manager import CallbackManager
 # from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
@@ -55,32 +56,13 @@ class LangChainAdapter():
     
     async def ask_llm_new_pm_business_message_streamed_to_front_async(self, user_role: str, conversation: Conversation, instructions: List[str]) -> Message:
         exchanges = conversation.to_langchain_messages(user_role, instructions)            
-        full_stream = StreamContainer()
         start_time = time.time()
-        content_stream = self.get_llm_answer_stream_not_await_async(input= exchanges, full_stream= full_stream, display_console= True)
+        content_chunks = []
+        content_stream = Llm.invoke_llm_as_async_stream(llm=self.llm, input= exchanges, display_console= True, content_chunks= content_chunks)
         await front_client.post_new_metier_or_pm_answer_as_stream(content_stream)
         end_time = time.time()
         elapsed = misc.get_elapsed_time_seconds(start_time, end_time)
-        answer_message = Message(user_role, full_stream.content, elapsed)
+        answer_message = Message(user_role, ''.join(content_chunks), elapsed)
         conversation.add_message(answer_message)
         front_client.post_update_last_metier_or_pm_answer(answer_message)
         return answer_message
-
-    async def get_llm_answer_stream_not_await_async(self, input, full_stream: StreamContainer, display_console: bool = True):
-        new_line_for_stream = "\\/%*/\\"
-        async for chunk in self.llm.astream(input):
-            
-            # Handle both OpenAI & Ollama streams struct:
-            # stream's chunks content are in a 'content' property on OpenAI LLM but are direct on Ollama LLMs
-            if self.adapter_type == LangChainAdapterType.OpenAI:
-                content = chunk.content
-            elif self.adapter_type == LangChainAdapterType.Ollama:
-                content = chunk
-            else:
-                raise ValueError(f"Unknown adapter type: {self.adapter_type}")
-            
-            if display_console:
-                print(content, end= "", flush= True)
-            full_stream.add_content(content)
-            content = content.replace('\r\n', '\n').replace('\n', new_line_for_stream)
-            yield content.encode('utf-8')

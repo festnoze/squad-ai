@@ -10,10 +10,10 @@
             "request": "launch",
             "program": "${workspaceFolder}/senv/Scripts/streamlit.exe",
             "args": [
-               "run", "chatbot.py"
+               "run", "src/chatbot.py"
             ],
             "env": {
-                "PYTHONPATH": "${workspaceFolder}"
+                "PYTHONPATH": "${workspaceFolder}/src"
             },
             "console": "integratedTerminal"
         }

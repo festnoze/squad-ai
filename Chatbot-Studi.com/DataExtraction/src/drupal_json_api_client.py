@@ -9,11 +9,13 @@ import numpy as np
 from common_tools.helpers import txt
 
 class DrupalJsonApiClient:
-    def __init__(self, base_url):
+    def __init__(self, base_url:str, user_name:str = None, user_password:str = None):
         if base_url:
             self.base_url = base_url
         else:
             raise ValueError("Base URL is required to initialize the DrupalJsonApiClient")
+        self.user_name = user_name
+        self.user_password = user_password
 
     def _perform_request(self, endpoint, remaining_retries=5, allowed_retries=5):
         """
@@ -28,7 +30,11 @@ class DrupalJsonApiClient:
             url = f"{self.base_url}{endpoint}"
         
         try:
-            response = requests.get(url)
+            if self.user_name and self.user_password:
+                response = requests.get(url, auth=(self.user_name, self.user_password))
+            else:
+                response = requests.get(url)
+                
             response.raise_for_status()  # Raise an error for bad responses (4xx or 5xx)
             return response.json()  # Return the JSON response if the request is successful
         except requests.RequestException as e:
