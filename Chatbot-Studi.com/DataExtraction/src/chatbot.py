@@ -76,18 +76,10 @@ class ChatbotFront:
             # rag_answer = txt.remove_markdown(rag_answer)
             # st.session_state.messages.append({"role": "assistant", "content": rag_answer})
             # st.chat_message("assistant").write(rag_answer)    
+
             with st.chat_message("assistant"):
-                message_placeholder = st.empty()
-                full_response = ""
-
-                # Simulate stream of response
-                for chunk in AvailableService.rag_query_with_history_async(prompt):
-                    full_response += chunk
-                    message_placeholder.markdown(full_response + "▌")
-
-                message_placeholder.markdown(full_response)  # Remove cursor when done
-
-                # Append assistant response
+                conversation_history = Conversation([{ 'role': msg['role'], 'content': msg['content'] } for msg in st.session_state.messages])
+                full_response = st.write_stream(AvailableService.rag_query_with_history(conversation_history))
                 st.session_state["messages"].append({"role": "assistant", "content": full_response})    
 
     def clear_conversation():

@@ -1,6 +1,8 @@
 from drupal_json_api_client import DrupalJsonApiClient
-from common_tools.helpers import txt, file, json
-from common_tools.models import FileAlreadyExistsPolicy
+from common_tools.helpers.txt_helper import txt
+from common_tools.helpers.file_helper import file
+from common_tools.helpers.json_helper import json
+from common_tools.models.file_already_exists_policy import FileAlreadyExistsPolicy
 from helpers.unicode_helper import UnicodeHelper
 from textwrap import dedent
 

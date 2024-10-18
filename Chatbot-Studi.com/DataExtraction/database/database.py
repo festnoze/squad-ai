@@ -5,7 +5,7 @@
 # from sqlalchemy import create_engine
 # from sqlalchemy.orm import sessionmaker
 # from database.models import Base, Job, Funding, Training, Domain, Diploma, Certification
-# from common_tools.helpers import JsonHelper
+# from common_tools.helpers.json import JsonHelper
 
 # class DB:
 #     def __init__(self):

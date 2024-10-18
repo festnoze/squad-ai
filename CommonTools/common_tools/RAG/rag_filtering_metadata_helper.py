@@ -90,9 +90,9 @@ class RagFilteringMetadataHelper:
             if isinstance(langchain_filters, Operation):
                 # Handle logical operators like $and/$or
                 if langchain_filters.operator.value == LogicalOperator.AND.value:
-                    filters = [RagFilteringMetadataHelper.get_filters_from_comparison(sub_filter, metadata_infos) for sub_filter in langchain_filters.filters]
+                    filters = [RagFilteringMetadataHelper.get_filters_from_comparison(sub_filter, metadata_infos) for sub_filter in langchain_filters.arguments]
                 elif langchain_filters.operator.value == LogicalOperator.OR.value:
-                    filters = [RagFilteringMetadataHelper.get_filters_from_comparison(sub_filter, metadata_infos) for sub_filter in langchain_filters.filters]
+                    filters = [RagFilteringMetadataHelper.get_filters_from_comparison(sub_filter, metadata_infos) for sub_filter in langchain_filters.arguments]
             elif isinstance(langchain_filters, Comparison):
                 filter_dict = { langchain_filters.attribute: langchain_filters.value}
             else:

@@ -1,8 +1,10 @@
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import sys
 import inspect
 from types import FunctionType
 import asyncio
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any, AsyncGenerator, Generator, Callable
+from functools import partial
 from common_tools.helpers.txt_helper import txt
 
 class Execute:
@@ -58,16 +60,16 @@ class Execute:
                 results[index] = future.result()
 
         return tuple(results)
-    
+
     @staticmethod
     async def run_parallel_async(*functions_with_args, functions_with_streaming_indexes=None):
         """
         Run synchronous and asynchronous functions in parallel, yielding results as they complete.
         
         :param functions_with_args: A mix of functions, both synchronous and asynchronous.
-        :param streaming: A list specifying the indices of functions that should be streamed.
-                          If a function's index is included in this list, it will be treated as a streaming async function.
-                          Example: [1] means the second function should be streamed.
+        :param functions_with_streaming_indexes: A list specifying the indices of functions that should be streamed.
+                            If a function's index is included in this list, it will be treated as a streaming async function.
+                            Example: [1] means the second function should be streamed.
         :yield: Yields results as they are completed.
         """
         if functions_with_streaming_indexes is None:
@@ -93,6 +95,10 @@ class Execute:
                 args = item[1] if len(item) > 1 else ()
                 kwargs = item[2] if len(item) > 2 else {}
 
+                # Ensure args is a tuple, even if it's a single non-iterable object
+                if not isinstance(args, tuple):
+                    args = (args,)
+
                 if asyncio.iscoroutinefunction(func):
                     if idx in functions_with_streaming_indexes:
                         streaming_tasks.append((func, args, kwargs, idx))
@@ -108,16 +114,17 @@ class Execute:
         results = [None] * len(functions_with_args)
         with ThreadPoolExecutor(max_workers=len(sync_tasks)) as executor:
             # Submit synchronous tasks to the executor
-            sync_futures = {
-                loop.run_in_executor(executor, func, *args, **kwargs): idx
+            sync_futures = [
+                (loop.run_in_executor(executor, partial(func, *args, **kwargs)), idx)
                 for func, args, kwargs, idx in sync_tasks
-            }
+            ]
 
             # Collect results as the synchronous tasks complete
-            for future in asyncio.as_completed(sync_futures):
-                idx = sync_futures[future]
-                results[idx] = await future
-                yield (idx, results[idx])
+            for future, idx in sync_futures:
+                # Wait for each future to complete
+                result = await future
+                results[idx] = result
+                yield (idx, result)
 
         # Handle non-streaming async tasks
         for coro, idx in async_tasks:
@@ -128,9 +135,6 @@ class Execute:
         for func, args, kwargs, idx in streaming_tasks:
             async for item in func(*args, **kwargs):
                 yield (idx, item)
-
-        # # Collect final results
-        # return tuple(results)
     
     @staticmethod
     def activate_global_function_parameters_types_verification():
@@ -187,4 +191,48 @@ class Execute:
             txt.print(e)
         except TypeError as e:
             txt.print(e)
+
+    @staticmethod
+    def get_as_sync_stream(function_to_call: Callable[..., AsyncGenerator], *args: Any, **kwargs: Any) -> Generator:
+        """
+        Convert an asynchronous streaming function to a synchronous streaming generator.
+        Explaination: Use asyncio.Queue() to bridge the asynchronous and synchronous contexts. 
+        The asynchronous task put result chunks into the queue, which are then consumed synchronously. 
+        This approach ensures that chunks are yielded incrementally, maintaining streaming behavior while going synchronous.
+        """
+        async def collect_results():
+            # Use an async generator to collect results and yield them one by one
+            async for chunk in function_to_call(*args, **kwargs):
+                yield chunk
+        
+        async def put_results_in_queue():
+            # Collect the results and put them in the queue for synchronous consumption
+            try:
+                async for chunk in collect_results():
+                    await queue.put(chunk)
+                # Indicate that all results have been put in the queue
+                await queue.put(None)
+            except Exception as e:
+                await queue.put(e)
+
+        # Create an event loop if there isn't one already
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_closed():
+                raise RuntimeError
+        except RuntimeError:
+            # If there is no event loop or it is closed, create a new one
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+                
+        # Create a queue to stream results from the async context to the sync context
+        queue = asyncio.Queue()
+        loop.create_task(put_results_in_queue())
+        while True:
+            item = loop.run_until_complete(queue.get())
+            if item is None:  # End of the stream
+                break
+            if isinstance(item, Exception):  # If there was an error
+                raise item
+            yield item
 

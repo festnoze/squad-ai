@@ -59,7 +59,7 @@ class RagService:
         #results = retriever_from_llm.invoke(input==question)
 
         if give_score:
-            results = vectorstore.similarity_search_with_score(question, k=max_retrived_count, filter=metadata_filters)
+            results = vectorstore.similarity_search_with_score(question, k=max_retrived_count, filter=metadata_filters if metadata_filters else None)
             if min_score and min_retrived_count and len(results) > min_retrived_count:
                 top_results = []
                 for result in results:

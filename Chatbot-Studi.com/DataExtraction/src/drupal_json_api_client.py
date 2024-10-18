@@ -6,7 +6,7 @@ from rank_bm25 import BM25Okapi
 from langchain.docstore.document import Document
 import numpy as np
 #
-from common_tools.helpers import txt
+from common_tools.helpers.txt_helper import txt
 
 class DrupalJsonApiClient:
     def __init__(self, base_url:str, user_name:str = None, user_password:str = None):
@@ -34,7 +34,7 @@ class DrupalJsonApiClient:
                 response = requests.get(url, auth=(self.user_name, self.user_password))
             else:
                 response = requests.get(url)
-                
+
             response.raise_for_status()  # Raise an error for bad responses (4xx or 5xx)
             return response.json()  # Return the JSON response if the request is successful
         except requests.RequestException as e:

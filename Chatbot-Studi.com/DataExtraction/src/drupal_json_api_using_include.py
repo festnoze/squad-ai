@@ -2,7 +2,7 @@ import time
 import requests
 from typing import List, Dict, Any
 
-from common_tools.helpers import txt
+from common_tools.helpers.txt_helper import txt
 
 #OBSOLETE - NOT USED
 class DrupalJsonApiClient:

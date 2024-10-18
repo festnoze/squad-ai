@@ -1,9 +1,9 @@
 
-from common_tools.helpers import JsonHelper
+from common_tools.helpers.json_helper import JsonHelper
 from langchain.schema import Document
 from typing import List, Dict
 #
-from common_tools.helpers import txt
+from common_tools.helpers.txt_helper import txt
 
 class GenerateDocumentsWithMetadataFromFiles:
     def __init__(self):

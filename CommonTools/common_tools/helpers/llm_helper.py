@@ -180,9 +180,11 @@ class Llm:
         res = agent_executor.invoke({"input": input})
         return res["output"]
     
+    new_line_for_stream = "\\/%*/\\" # use specific new line conversion over streaming, as new line is handled differently across platforms
     @staticmethod
     async def invoke_as_async_stream(llm_or_chain: Runnable, input, display_console: bool = False, content_chunks:list[str] = None):
-        new_line_for_stream = "\\/%*/\\" # use specific new line conversion over streaming, as new line is handled differently across platforms
+        if not content_chunks:
+            content_chunks = []
         has_content_prop:bool = None
         async for chunk in llm_or_chain.astream(input):
             # Analyse specific stream structure upon first chunk: Handle both OpenAI & Ollama types
@@ -198,9 +200,13 @@ class Llm:
             
             if display_console:
                 print(content, end= "", flush= True)
-            content_chunks.append(content)
-            content = content.replace('\r\n', '\n').replace('\n', new_line_for_stream)
-            yield content.encode('utf-8')
+            if content is not None and content != '':
+                content_chunks.append(content)
+                content = content.replace('\r\n', '\n').replace('\n', Llm.new_line_for_stream)
+                yield content.encode('utf-8')
+            else:
+                pass
+    
         
     def invoke_method_mesuring_openai_tokens_consumption(method_handler, *args, **kwargs):
         """

@@ -7,7 +7,7 @@ from common_tools.rag.rag_filtering_metadata_helper import RagFilteringMetadataH
 from common_tools.models.question_analysis import QuestionAnalysis, QuestionAnalysisPydantic
 from common_tools.rag.rag_service import RagService
 from common_tools.workflows.output_name_decorator import output_name
-from common_tools.helpers import txt
+from common_tools.helpers.txt_helper import txt
 from langchain.chains.query_constructor.base import AttributeInfo
 
 class RAGPreTreatment:

@@ -65,8 +65,8 @@ class RagInferencePipeline:
         return answer[0]
     
     # Main workflow using the static pipeline
-    async def run_pipeline_static(self, query: Optional[Union[str, Conversation]], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None):
-        """Run the full hardcoded rag inference pipeline """
+    async def run_pipeline_static_async(self, query: Optional[Union[str, Conversation]], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None):
+        """Run the full hardcoded rag inference pipeline but async and with streaming LLM augmented generation response"""
         # Run both functions in parallel, where the second one is treated as streaming
         async for idx, result in Execute.run_parallel_async(
             (RAGGuardrails.guardrails_query_analysis, (query)),  # Guardrails check: query analysis
@@ -76,11 +76,12 @@ class RagInferencePipeline:
                 'give_score': give_score,
                 'format_retrieved_docs_function': format_retrieved_docs_function
             }),
-            streaming=[1]  # Indicating that 'run_static_inference_pipeline_but_guardrails_async' is a streaming async function
+            functions_with_streaming_indexes=[1]  # Indicating that 'run_static_inference_pipeline_but_guardrails_async' is a streaming async function
         ):
             if idx == 1:
                 # Yield the streaming chunks of inference pipeline
-                yield result
+                async for chunk in result:
+                    yield chunk
             elif idx == 0:
                 # Guardrails result, check it
                 self.check_for_guardrails(result)

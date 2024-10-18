@@ -1,16 +1,19 @@
 from textwrap import dedent
 from dotenv import find_dotenv, load_dotenv
+import asyncio
 #
 from langchain.chains.query_constructor.schema import AttributeInfo
 #from database.database import DB
 from drupal_data_retireval import DrupalDataRetireval
 from generate_documents_w_metadata import GenerateDocumentsWithMetadataFromFiles
-from common_tools.rag.rag_inference_pipeline.rag_pre_treatment_tasks import RAGPreTreatment
 #
-from common_tools.helpers import txt
+from common_tools.helpers.txt_helper import txt
+from common_tools.helpers.llm_helper import Llm
+from common_tools.helpers.execute_helper import Execute
 from common_tools.models.llm_info import LlmInfo
 from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.rag.rag_service import RagService
+from common_tools.rag.rag_inference_pipeline.rag_pre_treatment_tasks import RAGPreTreatment
 from common_tools.rag.rag_injection_pipeline.rag_injection_pipeline import RagInjectionPipeline
 from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
 #from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline_with_prefect import RagInferencePipelineWithPrefect
@@ -105,27 +108,37 @@ class AvailableService:
     #         response, sources = inference.run_pipeline_dynamic(query, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
     #     return response
     
-    async def rag_query_with_history_async(conversation_history:Conversation):
+    def rag_query_with_history(conversation_history: Conversation):
         txt.print_with_spinner("Chargement du pipeline d'inférence ...")
         inference = RagInferencePipeline(AvailableService.rag_service)
+
         if conversation_history.last_message.role != 'user':
             raise ValueError("Conversation history should end with a user message")
-        
-        # Set static metadata infos to avoid extra calculation
+
+        # Set static metadata info to avoid extra calculation
         RAGPreTreatment.metadata_infos = [
             AttributeInfo(name='id', description="l'identifiant interne du document courant", type='str'),
-            AttributeInfo(name='type', description="le type de données contenu dans ce document. Il s'agit d'une valeur parmi les catégories suivantes: ['certifieur', 'certification', 'diplôme', 'domaine', 'financement', 'métier', 'formation']. Les plus fréquements concernées sont : métier et formation, ajout ce filtre dès que la question à trait à l'un de ces sujets", type='str'),
+            AttributeInfo(name='type', description="le type de données contenu dans ce document. Il s'agit d'une valeur parmi les catégories suivantes: ['certifieur', 'certification', 'diplôme', 'domaine', 'financement', 'métier', 'formation']. Les plus fréquemment concernées sont : métier et formation, ajoute ce filtre dès que la question traite l'un de ces sujets. attention, pour appliquer plusieurs filtres avec différentes valeurs de 'type', utiliser l'opérateur 'or' uniquement, et jamais 'and', car aucun document n'est de plusieurs types simultanément.", type='str'),
             AttributeInfo(name='name', description="le nom du sujet du document", type='str'),
-            AttributeInfo(name='changed', description="'la date de dernier changement de la donnée", type='str'),
+            AttributeInfo(name='changed', description="la date du dernier changement de la donnée", type='str'),
             AttributeInfo(name='rel_ids', description="les identifiants des documents connexes au présent document", type='str')
         ]
-        
+
         txt.stop_spinner_replace_text("Pipeline d'inférence chargé :")
-        
-        txt.print_with_spinner("Execution du pipeline d'inférence ...")
-        async for chunk in inference.run_pipeline_static(conversation_history, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function):
-            yield chunk
-        txt.stop_spinner_replace_text("Pipeline d'inférence exectué :")
+        txt.print_with_spinner("Exécution du pipeline d'inférence ...")
+
+        # Run the async generator directly using asyncio.run()
+        for chunk in Execute.get_as_sync_stream(
+            inference.run_pipeline_static_async,
+            conversation_history,
+            include_bm25_retrieval=True,
+            give_score=True,
+            format_retrieved_docs_function=AvailableService.format_retrieved_docs_function
+        ):
+            # remove the stream over Http behavior: replace special '\n' and convert byte->str (as it's consumed locally)
+            yield chunk.decode('utf-8').replace(Llm.new_line_for_stream, '\n')
+
+        txt.stop_spinner_replace_text("Pipeline d'inférence exécuté :")
     
     def generate_ground_truth():
         RagasService.generate_ground_truth(AvailableService.llms_infos[0], AvailableService.rag_service.langchain_documents, 1)
