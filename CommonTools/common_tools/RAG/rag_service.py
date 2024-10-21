@@ -57,9 +57,9 @@ class RagService:
     def _semantic_vector_retrieval(self, vectorstore, question: str, metadata_filters: dict = None, give_score: bool = False, max_retrived_count: int = 10, min_score: float = None, min_retrived_count: int = None) -> List[Document]:
         #retriever_from_llm = MultiQueryRetriever.from_llm(retriever=vectorstore.as_retriever(), llm=llm)
         #results = retriever_from_llm.invoke(input==question)
-
         if give_score:
-            results = vectorstore.similarity_search_with_score(question, k=max_retrived_count, filter=metadata_filters if metadata_filters else None)
+            metadata_filter = metadata_filters if metadata_filters else None
+            results = vectorstore.similarity_search_with_score(question, k=max_retrived_count, filter=metadata_filter)
             if min_score and min_retrived_count and len(results) > min_retrived_count:
                 top_results = []
                 for result in results:

@@ -35,10 +35,19 @@ class Conversation:
             raise ValueError("Unsupported query type")
         
     @staticmethod
-    def get_conv_history_as_str(query_or_conv: Optional[Union[str, 'Conversation']]) -> str:
+    def conversation_history_as_str(query_or_conv: Optional[Union[str, 'Conversation']]) -> str:
         if isinstance(query_or_conv, Conversation):
             conversation_history = '\n- '.join([f"{msg.role}: {msg.content}" for msg in query_or_conv.messages[:-1]])
-            full_question = f"### User conversation history: ###\n{conversation_history}\n\n### User current question: ###\n {query_or_conv.last_message.content}" 
+            full_question = f"### Conversation history: ###\n{conversation_history}\n\n### User current question: ###\n {query_or_conv.last_message.content}" 
+        else:
+            full_question = query_or_conv
+        return full_question
+    
+    @staticmethod
+    def user_queries_history_as_str(query_or_conv: Optional[Union[str, 'Conversation']]) -> str:
+        if isinstance(query_or_conv, Conversation):
+            conversation_history = '\n- '.join([f"- {msg.content}" for msg in [query for query in query_or_conv.messages[:-1] if query.role == 'user']])
+            full_question = f"### User queries history: ###\n{conversation_history}\n\n### User current question: ###\n {query_or_conv.last_message.content}" 
         else:
             full_question = query_or_conv
         return full_question

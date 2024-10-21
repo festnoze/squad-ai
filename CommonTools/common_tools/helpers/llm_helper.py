@@ -180,9 +180,9 @@ class Llm:
         res = agent_executor.invoke({"input": input})
         return res["output"]
     
-    new_line_for_stream = "\\/%*/\\" # use specific new line conversion over streaming, as new line is handled differently across platforms
+    new_line_for_stream_over_http = "\\/%*/\\" # use specific new line conversion over streaming, as new line is handled differently across platforms
     @staticmethod
-    async def invoke_as_async_stream(llm_or_chain: Runnable, input, display_console: bool = False, content_chunks:list[str] = None):
+    async def invoke_as_async_stream(llm_or_chain: Runnable, input, display_console: bool = False, content_chunks:list[str] = None, does_stream_across_http: bool = False):
         if not content_chunks:
             content_chunks = []
         has_content_prop:bool = None
@@ -202,7 +202,9 @@ class Llm:
                 print(content, end= "", flush= True)
             if content is not None and content != '':
                 content_chunks.append(content)
-                content = content.replace('\r\n', '\n').replace('\n', Llm.new_line_for_stream)
+                content = content.replace('\r\n', '\n')
+                if does_stream_across_http:
+                    content = content.replace('\n', Llm.new_line_for_stream_over_http)
                 yield content.encode('utf-8')
             else:
                 pass

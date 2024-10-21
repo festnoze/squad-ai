@@ -23,6 +23,7 @@ class RagFilteringMetadataHelper:
         filters = RagFilteringMetadataHelper.get_filters_from_str(filters_str)
         return filters, query_wo_metadata
     
+    #todo: make it generic from the metadat infos
     @staticmethod
     def get_filters_from_str(filters_str: str) -> dict:
         filters = []
@@ -84,26 +85,31 @@ class RagFilteringMetadataHelper:
     @staticmethod
     def get_filters_from_comparison(langchain_filters: Union[Comparison, Operation], metadata_infos: list[AttributeInfo] = None) -> dict:
         filters = []
-        valid_keys = set(attr_info.name for attr_info in metadata_infos) if metadata_infos else None
+        valid_keys = set(attr_info.name for attr_info in metadata_infos) if metadata_infos else set()
+
         filter_dict = {}
         if langchain_filters is not None:
             if isinstance(langchain_filters, Operation):
                 # Handle logical operators like $and/$or
                 if langchain_filters.operator.value == LogicalOperator.AND.value:
-                    filters = [RagFilteringMetadataHelper.get_filters_from_comparison(sub_filter, metadata_infos) for sub_filter in langchain_filters.arguments]
+                    filters = [
+                        RagFilteringMetadataHelper.get_filters_from_comparison(sub_filter, metadata_infos) 
+                        for sub_filter in langchain_filters.arguments
+                    ]
                 elif langchain_filters.operator.value == LogicalOperator.OR.value:
-                    filters = [RagFilteringMetadataHelper.get_filters_from_comparison(sub_filter, metadata_infos) for sub_filter in langchain_filters.arguments]
+                    filters = [
+                        RagFilteringMetadataHelper.get_filters_from_comparison(sub_filter, metadata_infos) 
+                        for sub_filter in langchain_filters.arguments
+                    ]
             elif isinstance(langchain_filters, Comparison):
-                filter_dict = { langchain_filters.attribute: langchain_filters.value}
+                # Add filter only if the attribute is in valid_keys or if no valid_keys are provided
+                if not valid_keys or langchain_filters.attribute in valid_keys:
+                    filter_dict = {langchain_filters.attribute: langchain_filters.value}
+                    filters.append(filter_dict)
             else:
                 raise ValueError(f"Unsupported filter type: {type(langchain_filters)}")
 
-        if not valid_keys:
-            filters.append(filter_dict)
-        else:
-            if langchain_filters.attribute in valid_keys:
-                filters.append(filter_dict)            
-
+        # Combine filters using logical operators if needed
         if len(filters) > 1:
             return {"$and": filters}
         elif len(filters) == 1:

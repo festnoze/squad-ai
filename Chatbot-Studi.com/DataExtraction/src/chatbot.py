@@ -13,10 +13,10 @@ class ChatbotFront:
         AvailableService.init()
 
         st.set_page_config(
-            page_title="Chatbot site public Studi.com",
-            page_icon="🔎",
-            layout="centered",
-            initial_sidebar_state="expanded" #"collapsed"
+            page_title= "Chatbot site public Studi.com",
+            page_icon= "🔎",
+            layout= "centered",
+            initial_sidebar_state= "collapsed" #"expanded"
         )
 
         # Custom CSS to hide the upper right hamburger menu and footer

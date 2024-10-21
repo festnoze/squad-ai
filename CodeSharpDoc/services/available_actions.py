@@ -1,13 +1,13 @@
 import json
 from typing import List
 #
-from CommonTools.common_tools.rag.rag_injection_pipeline.rag_injection_pipeline import RagInjectionPipeline
+from common_tools.rag.rag_injection_pipeline.rag_injection_pipeline import RagInjectionPipeline
 from common_tools.helpers.file_helper import file
 from common_tools.helpers.txt_helper import txt
 from common_tools.models.llm_info import LlmInfo
-from common_tools.rag.rag_inference_pipeline import RagInferencePipeline
+from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
 from common_tools.rag.rag_service import RagService
-from common_tools.models.embedding_type import EmbeddingModel
+from common_tools.models.embedding import EmbeddingModel
 #
 from services.analysed_structures_handling import AnalysedStructuresHandling
 from services.summary_generation_service import SummaryGenerationService
@@ -104,7 +104,8 @@ class AvailableActions:
     @staticmethod
     def rag_querying_from_sl_chatbot(inference_pipeline, query: str, st, include_bm25_retrieval:bool = False):
         txt.print_with_spinner("Querying rag service.")
-        answer, sources = inference_pipeline.run(query=query, include_bm25_retrieval= include_bm25_retrieval, give_score= True, format_retrieved_docs_function = AvailableActions.format_retrieved_docs_function)
+        
+        answer = inference_pipeline.run_pipeline_dynamic(query=query, include_bm25_retrieval= include_bm25_retrieval, give_score= True, format_retrieved_docs_function = AvailableActions.format_retrieved_docs_function)
         txt.stop_spinner_replace_text("rag retieval done")
         answer = txt.remove_markdown(answer)
         st.session_state.messages.append({"role": "assistant", "content": answer})

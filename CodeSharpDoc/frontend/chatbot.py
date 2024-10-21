@@ -5,7 +5,7 @@ import streamlit as st
 from common_tools.helpers.txt_helper import txt
 from common_tools.models.llm_info import LlmInfo
 from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
-from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline_with_prefect import RagInferencePipelineWithPrefect
+#from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline_with_prefect import RagInferencePipelineWithPrefect
 from common_tools.rag.rag_service import RagService
 from common_tools.rag.rag_filtering_metadata_helper import RagFilteringMetadataHelper
 
@@ -93,7 +93,7 @@ class ChatbotFront:
             ChatbotFront.rag = AvailableActions.init_rag_service(ChatbotFront.llms_infos)
         if not ChatbotFront.inference_pipeline:
             if ChatbotFront.use_prefect:
-                ChatbotFront.inference_pipeline = RagInferencePipelineWithPrefect(ChatbotFront.rag, None)            
+                pass#ChatbotFront.inference_pipeline = RagInferencePipelineWithPrefect(ChatbotFront.rag, None)            
             else:
                 default_filters = ChatbotFront.get_CodeSharpDoc_default_filters()
                 ChatbotFront.inference_pipeline = RagInferencePipeline(ChatbotFront.rag, default_filters, None)

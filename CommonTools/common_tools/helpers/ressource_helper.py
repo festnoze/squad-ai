@@ -35,16 +35,34 @@ class Ressource:
             if remove_comments:
                 content = txt.remove_commented_lines(content)
             return content
-
+        
     @staticmethod
-    def get_rag_augmented_generation_query_prompt(remove_comments=True) -> str:
+    def get_rag_augmented_generation_prompt_generic(remove_comments=True) -> str:
         """Loads and returns the content of rag_retriever_query.txt"""
-        with importlib.resources.open_text(Ressource.prompts_package_name, 'rag_augmented_generation_query.txt') as file_reader:
+        with importlib.resources.open_text(Ressource.prompts_package_name, 'rag_augmented_generation_query_generic.txt') as file_reader:
             content = file_reader.read()
             if remove_comments:
                 content = txt.remove_commented_lines(content)
             return content
 
+    @staticmethod
+    def get_rag_augmented_generation_prompt_on_studi(remove_comments=True) -> str:
+        """Loads and returns the content of rag_retriever_query.txt"""
+        with importlib.resources.open_text(Ressource.prompts_package_name, 'rag_augmented_generation_query_on_studi.txt') as file_reader:
+            content = file_reader.read()
+            if remove_comments:
+                content = txt.remove_commented_lines(content)
+            return content
+
+    @staticmethod
+    def get_rag_augmented_generation_prompt_on_code(remove_comments=True) -> str:
+        """Loads and returns the content of rag_retriever_query.txt"""
+        with importlib.resources.open_text(Ressource.prompts_package_name, 'rag_augmented_generation_query_on_code.txt') as file_reader:
+            content = file_reader.read()
+            if remove_comments:
+                content = txt.remove_commented_lines(content)
+            return content
+        
     @staticmethod
     def get_rag_pipeline_default_config_1(remove_comments=True) -> str:
         """Loads and returns the content of rag_pipeline_default_config_1.yaml"""

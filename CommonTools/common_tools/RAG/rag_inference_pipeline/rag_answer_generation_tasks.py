@@ -1,3 +1,4 @@
+import asyncio
 from typing import Optional, Union
 from common_tools.helpers.llm_helper import Llm
 from common_tools.helpers.ressource_helper import Ressource
@@ -9,11 +10,35 @@ from langchain_core.runnables import Runnable, RunnablePassthrough
 from langchain_core.prompts import ChatPromptTemplate
 
 class RAGAugmentedGeneration:
+    augmented_generation_prompt:str = None
 
     @staticmethod
     async def rag_augmented_answer_generation_async(rag: RagService, query:Optional[Union[str, Conversation]], retrieved_chunks: list, analysed_query: QuestionAnalysis, format_retrieved_docs_function = None):
         async for chunk in RAGAugmentedGeneration.rag_response_generation_async(rag, query, retrieved_chunks, analysed_query, format_retrieved_docs_function):
             yield chunk
+    
+    @staticmethod
+    def rag_augmented_answer_generation(rag: RagService, query: Optional[Union[str, Conversation]], retrieved_chunks: list, analysed_query: QuestionAnalysis, format_retrieved_docs_function=None):
+        async def run_async():
+            chunks = []
+            # Collect results from the async generator
+            async for chunk in RAGAugmentedGeneration.rag_augmented_answer_generation_async(
+                rag, query, retrieved_chunks, analysed_query, format_retrieved_docs_function
+            ):
+                chunks.append(chunk)
+            return ''.join(chunk.decode('utf-8') for chunk in chunks)
+
+        # Check if an event loop is already running
+        try:
+            return asyncio.run(run_async())
+        except RuntimeError as e:
+            if "asyncio.run() cannot be called from a running event loop" in str(e):
+                # If there is an existing event loop, use it to run the async function
+                loop = asyncio.get_event_loop()
+                return loop.run_until_complete(run_async())
+            else:
+                # Raise the original exception if it's a different issue
+                raise
 
     @staticmethod
     async def rag_response_generation_async(rag: RagService, query:Optional[Union[str, Conversation]], retrieved_chunks: list, questionAnalysis: QuestionAnalysis, format_retrieved_docs_function = None):
@@ -25,15 +50,18 @@ class RAGAugmentedGeneration:
 
     @staticmethod
     async def generate_augmented_response_from_retrieved_chunks_async(llm_or_chain: Runnable, query:Optional[Union[str, Conversation]], retrieved_docs: list[Document], analysed_query: QuestionAnalysis, format_retrieved_docs_function = None):
-        retrieval_prompt = Ressource.get_rag_augmented_generation_query_prompt()
+        if not RAGAugmentedGeneration.augmented_generation_prompt:
+            RAGAugmentedGeneration.augmented_generation_prompt = Ressource.get_rag_augmented_generation_prompt_generic()
+        augmented_generation_prompt = RAGAugmentedGeneration.augmented_generation_prompt
+
         question_w_history = Conversation.get_conv_history_as_str(query)
-        retrieval_prompt = retrieval_prompt.replace("{question}", question_w_history)
+        augmented_generation_prompt = augmented_generation_prompt.replace("{question}", question_w_history)
         additional_instructions = ''
         if not analysed_query.detected_language.__contains__("english"):
             additional_instructions = Ressource.get_prefiltering_translation_instructions_prompt()
             additional_instructions = additional_instructions.replace("{target_language}", analysed_query.detected_language)
-        retrieval_prompt = retrieval_prompt.replace("{additional_instructions}", additional_instructions)
-        rag_custom_prompt = ChatPromptTemplate.from_template(retrieval_prompt)
+        augmented_generation_prompt = augmented_generation_prompt.replace("{additional_instructions}", additional_instructions)
+        rag_custom_prompt = ChatPromptTemplate.from_template(augmented_generation_prompt)
 
         if format_retrieved_docs_function is None:
             context = retrieved_docs

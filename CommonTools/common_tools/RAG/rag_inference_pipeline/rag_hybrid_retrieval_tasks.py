@@ -11,7 +11,7 @@ from langchain_community.retrievers import BM25Retriever
 
 class RAGHybridRetrieval:
     @staticmethod    
-    def rag_static_hybrid_retrieval(rag: RagService, query:Optional[Union[str, Conversation]], metadata:dict, include_bm25_retrieval: bool = False, give_score: bool = True, max_retrived_count: int = 20):
+    def rag_hybrid_retrieval_custom(rag: RagService, query:Optional[Union[str, Conversation]], metadata:dict, include_bm25_retrieval: bool = False, give_score: bool = True, max_retrived_count: int = 20):
         if not include_bm25_retrieval:
             rag_retrieved_chunks = RAGHybridRetrieval.semantic_vector_retrieval(rag, query, metadata, give_score, max_retrived_count)
             return rag_retrieved_chunks
@@ -24,13 +24,35 @@ class RAGHybridRetrieval:
         return retained_chunks
     
     @staticmethod    
-    def rag_langchain_hybrid_retrieval(rag: RagService, query:Optional[Union[str, Conversation]], metadata:dict, include_bm25_retrieval: bool = True, give_score: bool = True, max_retrived_count: int = 20, bm25_ratio: float = 0.2):
-        vector_ratio = 1 - bm25_ratio
-        rag.bm25_retriever.k =  int(max_retrived_count * bm25_ratio)
-        ensemble_retriever = EnsembleRetriever(retrievers=[
-            rag.vectorstore.as_retriever(search_kwargs={"k": int(max_retrived_count * vector_ratio)}), 
-            rag.bm25_retriever],
-            weights=[1 - bm25_ratio, bm25_ratio])
+    def rag_hybrid_retrieval_langchain(rag: RagService, query:Optional[Union[str, Conversation]], metadata:dict, include_bm25_retrieval: bool = True, give_score: bool = True, max_retrived_count: int = 20, bm25_ratio: float = 0.2):
+        vector_ratio = 1 - bm25_ratio               
+        # Create bm25 retriever with metadata filter        
+        if metadata:
+            filtered_docs = [
+                doc for doc in rag.langchain_documents 
+                if RagFilteringMetadataHelper.filters_predicate(doc, metadata)
+            ]
+        else:
+            filtered_docs = rag.langchain_documents
+
+        # remove metadata filtering if no document are found
+        if not any(filtered_docs):
+            filtered_docs = rag.langchain_documents
+            metadata = None
+
+        bm25_retriever = rag._build_bm25_retriever(filtered_docs, k = int(max_retrived_count * bm25_ratio))
+        
+        # Create vectorstore retriever with metadata filter
+        vector_retriever = rag.vectorstore.as_retriever(
+            search_kwargs={
+                "k": int(max_retrived_count * vector_ratio),
+                "filter": metadata
+            }
+        ) 
+
+        retrievers = [vector_retriever, bm25_retriever]        
+        weights = [vector_ratio, bm25_ratio]
+        ensemble_retriever = EnsembleRetriever(retrievers=retrievers, weights=weights)
         question_w_history = Conversation.get_conv_history_as_str(query)
         retrieved_chunks = ensemble_retriever.invoke(question_w_history)
         return retrieved_chunks
@@ -49,7 +71,7 @@ class RAGHybridRetrieval:
             filtered_docs = rag.langchain_documents
 
         question_w_history = Conversation.get_conv_history_as_str(query)
-        bm25_retriever = rag._build_bm25_retriever(filtered_docs, k) #, filters
+        bm25_retriever = rag._build_bm25_retriever(filtered_docs, k) #, metadata_filters
         bm25_retrieved_chunks = bm25_retriever.invoke(question_w_history)
        
         if give_score:

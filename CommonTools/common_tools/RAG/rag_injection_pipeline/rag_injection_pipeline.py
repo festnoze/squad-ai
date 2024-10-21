@@ -134,14 +134,14 @@ class RagInjectionPipeline:
                 continue
             if isinstance(document, dict):
                 document = Document(page_content=document.get('page_content', ''), metadata=document.get('metadata', {}))
-            chunks_content = self._split_text_with_overlap(document.page_content, chunk_size, chunk_overlap)# txt_splitter.split_text(document.page_content)
+            chunks_content = txt_splitter.split_text(document.page_content)
             chunks = [Document(page_content=chunk, metadata=document.metadata) for chunk in chunks_content]
             all_chunks.extend(chunks)
 
         # Ensure chunks do not exceed the maximum allowed size
         valid_chunks = []
         for chunk in all_chunks:
-            if len(chunk.page_content) <= max_chunk_size:
+            if len(chunk.page_content) <= max_chunk_size*1.1:
                 valid_chunks.append(Document(page_content=chunk.page_content, metadata=chunk.metadata))
             else:
                 # Optionally, you can further split the chunk here if it exceeds the max size

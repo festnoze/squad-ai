@@ -1,5 +1,6 @@
 inputs/
 outputs/
+storage/
 outputs.save/
 outputs.old/
 chroma_db/

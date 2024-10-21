@@ -19,4 +19,5 @@ rank_bm25
 streamlit
 langgraph
 langchain-experimental
+lark
 -e C:/Dev/squad-ai/CommonTools # local package to internal tooling

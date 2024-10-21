@@ -15,19 +15,18 @@ class RAGPreTreatment:
     
     @staticmethod
     def rag_static_pre_treatment(rag:RagService, query:Optional[Union[str, Conversation]], default_filters:dict = {}) -> tuple[QuestionAnalysis, dict]:
-        RAGPreTreatment.default_filters = default_filters #todo: think to rather instanciate current class for setting specific filters by app.
         question_analysis, extracted_implicit_metadata, extracted_explicit_metadata = Execute.run_parallel(
-            (RAGPreTreatment.analyse_query_language, (rag, query)),
+            (RAGPreTreatment.bypassed_analyse_query_language, (rag, query)),
             (RAGPreTreatment.analyse_query_for_metadata, (rag, query)),
             (RAGPreTreatment.extract_explicit_metadata, (query)),
         )
         
         query_wo_metadata_implicit = extracted_implicit_metadata[0]
-        explicit_metadata_implicit = extracted_implicit_metadata[1]
+        metadata_implicit = extracted_implicit_metadata[1]
         query_wo_metadata_explicit = extracted_explicit_metadata[0]
-        explicit_metadata_explicit = extracted_explicit_metadata[1]
+        metadata_explicit = extracted_explicit_metadata[1]
 
-        merged_metadata = RAGPreTreatment.get_merged_metadata(question_analysis, query_wo_metadata_implicit, explicit_metadata_implicit, query_wo_metadata_explicit, explicit_metadata_explicit)
+        merged_metadata = RAGPreTreatment.get_merged_metadata(question_analysis, query_wo_metadata_implicit, metadata_implicit, query_wo_metadata_explicit, metadata_explicit)
         return question_analysis, merged_metadata
 
     @staticmethod    
@@ -72,9 +71,9 @@ class RAGPreTreatment:
         if not RAGPreTreatment.metadata_infos:
             RAGPreTreatment.metadata_infos = RagService.generate_metadata_info_from_docs(rag.langchain_documents, 30)
         self_querying_retriever, query_constructor = RagService.build_self_querying_retriever(rag, RAGPreTreatment.metadata_infos)
-        question = Conversation.get_user_query(query)
+        user_queries_history = Conversation.user_queries_history_as_str(query)
         
-        response_with_filters = query_constructor.invoke(question)
+        response_with_filters = query_constructor.invoke(user_queries_history)
         
         if response_with_filters.filter:
             txt.print(f"Filters extracted from the query: {response_with_filters.filter}")

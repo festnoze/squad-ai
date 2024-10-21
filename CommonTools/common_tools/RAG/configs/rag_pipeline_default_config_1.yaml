@@ -28,7 +28,7 @@ data_retrieval:
   #     - RAGHybridRetrieval.semantic_vector_retrieval
   #     - RAGHybridRetrieval.bm25_retrieval
   #- RAGHybridRetrieval.hybrid_chunks_selection
-  - RAGHybridRetrieval.rag_langchain_hybrid_retrieval
+  - RAGHybridRetrieval.rag_hybrid_retrieval_langchain
 
 augmented_generation:
   - RAGAugmentedGeneration.rag_augmented_answer_generation

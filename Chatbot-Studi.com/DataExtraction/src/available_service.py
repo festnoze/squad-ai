@@ -1,3 +1,4 @@
+import re
 from textwrap import dedent
 from dotenv import find_dotenv, load_dotenv
 import asyncio
@@ -16,6 +17,8 @@ from common_tools.rag.rag_service import RagService
 from common_tools.rag.rag_inference_pipeline.rag_pre_treatment_tasks import RAGPreTreatment
 from common_tools.rag.rag_injection_pipeline.rag_injection_pipeline import RagInjectionPipeline
 from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
+from common_tools.rag.rag_inference_pipeline.rag_answer_generation_tasks import RAGAugmentedGeneration
+from common_tools.helpers.ressource_helper import Ressource
 #from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline_with_prefect import RagInferencePipelineWithPrefect
 from common_tools.models.embedding import EmbeddingModel, EmbeddingType
 from common_tools.models.conversation import Conversation
@@ -43,6 +46,7 @@ class AvailableService:
             #     AvailableService.inference = RagInferencePipelineWithPrefect(AvailableService.rag_service, default_filters, None)            
             # else:
             AvailableService.inference = RagInferencePipeline(AvailableService.rag_service, default_filters, None)
+            RAGAugmentedGeneration.augmented_generation_prompt = Ressource.get_rag_augmented_generation_prompt_on_studi()
 
     def display_select_menu():
         while True:
@@ -142,7 +146,7 @@ class AvailableService:
                         'cards-diploma' (diplômes obtenus à l'issu de la formation), 
                         'methode' (description de la méthode de l'école, rarement utile), 
                         'modalites' (les conditions d'admission, de formation, de passage des examens et autres modalités), 
-                        'financement' (mode de financement de la formation), 
+                        'financement' (informations sur le coût, le prix, et le financement et les modes de financement de la formation), 
                         'simulation' (simulation de la date de début et de la durée de formation, en cas de démarrage à la prochaine session / promotion) 
                     ]
                     une metadata qui n'est présente que pour type='formation'"""), type='str'),
@@ -160,7 +164,7 @@ class AvailableService:
             format_retrieved_docs_function=AvailableService.format_retrieved_docs_function
         ):
             # remove the stream over Http behavior: replace special '\n' and convert byte->str (as it's consumed locally)
-            yield chunk.decode('utf-8').replace(Llm.new_line_for_stream, '\n')
+            yield chunk.decode('utf-8').replace(Llm.new_line_for_stream_over_http, '\n').replace("# ", "#### ").replace("## ", "##### ").replace("### ", "###### ")
 
         txt.stop_spinner_replace_text("Pipeline d'inférence exécuté :")
     
@@ -173,20 +177,20 @@ class AvailableService:
         if not any(retrieved_docs):
             return 'not a single information were found. Don\'t answer the question.'
         
-        total_size = sum([len(doc.page_content.split()) for doc in retrieved_docs])
-        return retrieved_docs
-        # context = ''
-        # for retrieved_doc in retrieved_docs:
-        #     doc = retrieved_doc[0] if isinstance(retrieved_doc, tuple) else retrieved_doc
-        #     summary = doc.page_content
-        #     functional_type = doc.metadata.get('functional_type')
-        #     method_name = doc.metadata.get('method_name')
-        #     namespace = doc.metadata.get('namespace')
-        #     struct_name = doc.metadata.get('struct_name')
-        #     struct_type = doc.metadata.get('struct_type')
-
-        #     context += f"• {summary}. In {functional_type.lower()} {struct_type.lower()}  '{struct_name}',{" method '" + method_name + "'," if method_name else ''} from namespace '{namespace}'.\n"
-        # return context
+        total_size = sum([len(re.split(r'[ .,;:!?]', doc.page_content)) for doc in retrieved_docs])
+        if total_size > 15000:
+            sub_list = []
+            current_size = 0            
+            for doc in retrieved_docs:
+                doc_size = len(re.split(r'[ .,;:!?]', doc.page_content))
+                if current_size + doc_size <= 15000:
+                    sub_list.append(doc)
+                    current_size += doc_size
+                else:
+                    break            
+            return sub_list
+        else:
+            return retrieved_docs
 
     # def create_sqlLite_database(out_dir):
     #     db_instance = DB()

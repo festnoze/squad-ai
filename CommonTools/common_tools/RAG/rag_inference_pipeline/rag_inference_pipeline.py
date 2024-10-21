@@ -12,8 +12,8 @@ from common_tools.rag.rag_inference_pipeline.rag_guardrails_tasks import RAGGuar
 from common_tools.rag.rag_inference_pipeline.rag_hybrid_retrieval_tasks import RAGHybridRetrieval
 from common_tools.rag.rag_inference_pipeline.rag_answer_generation_tasks import RAGAugmentedGeneration
 from common_tools.rag.rag_inference_pipeline.rag_post_treatment_tasks import RAGPostTreatment
-from common_tools.helpers.file_helper import file
 from common_tools.helpers.ressource_helper import Ressource
+from common_tools.helpers.file_helper import file
 from common_tools.workflows.workflow_executor import WorkflowExecutor
 from common_tools.models.conversation import Conversation
 
@@ -21,6 +21,7 @@ class RagInferencePipeline:
     def __init__(self, rag: RagService, default_filters: dict = {}, tools: list = None):
         self.rag: RagService = rag
         self.default_filters = default_filters
+        RAGPreTreatment.default_filters = default_filters #only useful for dynamic pipeline, to rethink #todo: think to rather instanciate current class for setting specific filters by app.
         self.tools: list = tools
 
         if tools and any(tools):
@@ -97,7 +98,7 @@ class RagInferencePipeline:
         analysed_query, metadata = RAGPreTreatment.rag_static_pre_treatment(self.rag, query, self.default_filters)
 
         # Data Retrieval
-        retrieved_chunks = RAGHybridRetrieval.rag_langchain_hybrid_retrieval(self.rag, query, metadata, include_bm25_retrieval, give_score)
+        retrieved_chunks = RAGHybridRetrieval.rag_hybrid_retrieval_langchain(self.rag, query, metadata, include_bm25_retrieval, give_score)
 
         # Augmented Answer Generation
         async for chunk in RAGAugmentedGeneration.rag_augmented_answer_generation_async(self.rag, query, retrieved_chunks, analysed_query, format_retrieved_docs_function):
