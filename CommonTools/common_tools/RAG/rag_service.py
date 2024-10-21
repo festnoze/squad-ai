@@ -141,6 +141,9 @@ class RagService:
         return self._build_vectorstore(documents, perform_chunking)
 
     def _build_bm25_retriever(self, documents: List[Document], k: int = 20, metadata: dict = None) -> BM25Retriever:
+        if not documents or len(documents) == 0: 
+            return None
+        
         if metadata:
             bm25_retriever = BM25Retriever.from_texts([doc.page_content for doc in documents], metadata)
         else:

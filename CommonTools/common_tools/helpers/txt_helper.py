@@ -143,7 +143,7 @@ class txt:
         if txt.waiting_spinner_thread:
             txt.stop_event.set()  # Signal the thread to stop
             txt.waiting_spinner_thread.join(timeout=1.0)  # Wait for the thread to stop
-            if txt.waiting_spinner_thread.is_alive():
+            if txt.waiting_spinner_thread and txt.waiting_spinner_thread.is_alive():
                 print("Warning: Spinner thread did not stop in time.")
             else:
                 txt.waiting_spinner_thread = None

@@ -1,9 +1,12 @@
 import streamlit as st
 from common_tools.helpers.txt_helper import txt
+from common_tools.helpers.file_helper import file
 from common_tools.models.conversation import Conversation
 
 # internal import
 from available_service import AvailableService
+from drupal_data_retireval import DrupalDataRetireval
+from scrape_service import ScrapeService
 
 class ChatbotFront:
     def main():
@@ -13,7 +16,7 @@ class ChatbotFront:
             page_title="Chatbot site public Studi.com",
             page_icon="🔎",
             layout="centered",
-            initial_sidebar_state="collapsed"
+            initial_sidebar_state="expanded" #"collapsed"
         )
 
         # Custom CSS to hide the upper right hamburger menu and footer
@@ -33,12 +36,13 @@ class ChatbotFront:
         with st.sidebar:
             st.button("Utilisez le chatbot pour Rechercher  ➺", disabled=True)
             st.button("🧽 Effacer la conversation du chatbot", on_click=ChatbotFront.clear_conversation)
-            st.sidebar.markdown("---")
+            st.divider()
             st.subheader("🚀 Autres actions :")
+            st.button("📊 Récupérer les données Drupal via json-api", on_click=ChatbotFront.get_drupal_data)
+            st.button("📚 Récupérer les pages web des formations", on_click=ChatbotFront.scrape_website_pages)
+            st.button("📦 Construit la BDD vectorielle", on_click=ChatbotFront.build_vectorstore)
+            st.divider()
             st.button("✨ Générer RAGAS Ground Truth", on_click=ChatbotFront.generate_ground_truth)
-            # st.button("📊 Analyser structures des fichiers C#", on_click=ChatbotFront.analyse_files_code_structures)
-            # st.button("📦 Ajouter fichiers analysés à la base", on_click= ChatbotFront.vectorize_summaries)
-            # st.button("📚 Créer documentation du code C#", on_click= ChatbotFront.generate_documentations, disabled=True)
             #ChatbotFront.folder_path = st.text_input("Dossier à traiter", value=ChatbotFront.folder_path)#, disabled=True)
 
         st.title("💬 Chatbot Studi.com")
@@ -85,6 +89,17 @@ class ChatbotFront:
     def clear_conversation():
         st.session_state.messages = []
         st.session_state.messages.append({"role": "assistant", "content": ChatbotFront.start_caption()})
+
+    def get_drupal_data():
+        drupal = DrupalDataRetireval(AvailableService.out_dir)
+        drupal.retrieve_all_data()
+
+    def build_vectorstore():
+        AvailableService.create_vector_db_from_generated_embeded_documents(AvailableService.out_dir)
+        
+    def scrape_website_pages():
+        scraper = ScrapeService()
+        scraper.scrape_all_trainings_links_and_contents()
 
     def generate_ground_truth():
         prompt = f"Génération du dataset RAGAS Ground Truth"

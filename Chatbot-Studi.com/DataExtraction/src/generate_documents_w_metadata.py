@@ -1,9 +1,11 @@
 
+import json
 from common_tools.helpers.json_helper import JsonHelper
 from langchain.schema import Document
 from typing import List, Dict
 #
 from common_tools.helpers.txt_helper import txt
+from common_tools.helpers.file_helper import file
 
 class GenerateDocumentsWithMetadataFromFiles:
     def __init__(self):
@@ -52,6 +54,25 @@ class GenerateDocumentsWithMetadataFromFiles:
         txt.print(f"---------------------")
         txt.print(f"Total documents created: {len(all_docs)}")
         return all_docs
+    
+    def load_trainings_details_as_json(self, path: str) -> dict:
+        files_str = file.get_files_paths_and_contents(path + 'scraped/')
+        contents = {}
+        for file_path, content_str in files_str.items():
+            filename = file_path.split('/')[-1].split('.')[0]
+            content = json.loads(content_str)
+            contents[content['title']] = content
+        return contents
+        # idx = 0
+        # for key, sections in contents.items():
+        #     idx+=1
+        #     if idx > 5: break
+        #     for section_name, section_content in sections.items():
+        #         txt.print(f"## {section_name} ##")
+        #         txt.print(section_content)#f"{section_content[:500]} ...")
+        #         txt.print(f" ")
+        #     txt.print(f"---------------------")
+
 
     def process_certifiers(self, data: List[Dict]) -> List[Document]:
         if not data:

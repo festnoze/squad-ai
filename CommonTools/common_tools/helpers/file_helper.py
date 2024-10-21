@@ -164,10 +164,10 @@ class file:
         shutil.copytree(source_folder, destination_folder, dirs_exist_ok=True)
     
     @staticmethod
-    def get_files_paths_and_contents(file_path: str, extension: str, file_kind: str = None):
+    def get_files_paths_and_contents(file_path: str, extension: str = None, file_kind: str = None):
         txt.print_with_spinner(f"Loading {file_kind if file_kind else extension} files ...")
         paths_and_contents = {}
-        files = file.get_all_folder_and_subfolders_files_path(file_path, '.' + extension)
+        files = file.get_all_folder_and_subfolders_files_path(file_path, ('.' + extension) if extension else None)
         for file_path in files:
             file_path = file_path.replace('\\', '/')
             paths_and_contents[file_path] = file.get_as_str(file_path)
@@ -185,9 +185,11 @@ class file:
     @staticmethod 
     def get_as_json(file_path:str):
         """Get the specified file content as a JSON object."""
-        with open(f"{file_path}", 'r') as file:
-            data = json.load(file)
-        return data
+        data = file.get_as_str(file_path)
+        if not data:
+            return None
+        json_ = json.loads(data)
+        return json_
     
     @staticmethod
     def get_as_yaml(file_path:str):

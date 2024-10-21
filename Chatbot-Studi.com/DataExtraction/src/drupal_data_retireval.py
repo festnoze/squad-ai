@@ -11,7 +11,6 @@ class DrupalDataRetireval:
         txt.activate_print = True
         self.out_dir = outdir
         self.studiClient = DrupalJsonApiClient("https://www.studi.com/jsonapi/", "etienne.millerioux@studi.fr", "khHD%!izshbv65A")
-        self.diplay_select_menu()
 
     def retrieve_all_data(self):
         """ Retrieve all data from studi.com """

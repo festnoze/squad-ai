@@ -5,3 +5,6 @@ numpy
 streamlit
 nltk
 ragas
+requests
+BeautifulSoup4
+selenium

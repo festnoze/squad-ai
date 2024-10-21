@@ -58,7 +58,8 @@ class AvailableService:
                 5 - Exit
             """))
             if choice == "1":
-                DrupalDataRetireval(AvailableService.out_dir)
+                drupal = DrupalDataRetireval(AvailableService.out_dir)
+                drupal.diplay_select_menu()
             elif choice == "2":
                 AvailableService.create_vector_db_from_generated_embeded_documents(AvailableService.out_dir)
             elif choice == "3":
@@ -71,8 +72,23 @@ class AvailableService:
                 #GenerateCleanedData()
 
     def create_vector_db_from_generated_embeded_documents(out_dir):
+        txt.activate_print = True
         all_docs = GenerateDocumentsWithMetadataFromFiles().load_all_docs_as_json(out_dir)
+        trainings_details_by_title = GenerateDocumentsWithMetadataFromFiles().load_trainings_details_as_json(out_dir)
+        for doc in all_docs:
+            if doc.metadata.get('type') != 'formation':
+                continue
+            name = doc.metadata.get('name', '')
+            training_details = trainings_details_by_title.get(name)
+            if training_details and any(training_details):
+                for section in training_details:
+                    doc.page_content += training_details[section] #todo now!!!
+            else:
+                txt.print(f"Training details not found for: {name}")
+                
+            # Process training_details as needed
         rag_injection = RagInjectionPipeline(AvailableService.rag_service)
+        return
         txt.print_with_spinner(f"Start embedding of {len(all_docs)} documents")
         injected = rag_injection.inject_documents(all_docs, perform_chunking= False, delete_existing= True)
         txt.stop_spinner_replace_text(f"Finished Embedding on: {injected} documents")
