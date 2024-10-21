@@ -82,9 +82,10 @@ class ChatbotFront:
             # st.chat_message("assistant").write(rag_answer)    
 
             with st.chat_message("assistant"):
-                conversation_history = Conversation([{ 'role': msg['role'], 'content': msg['content'] } for msg in st.session_state.messages])
-                full_response = st.write_stream(AvailableService.rag_query_with_history(conversation_history))
-                st.session_state["messages"].append({"role": "assistant", "content": full_response})    
+                with st.spinner("Je réfléchis à votre question ..."):
+                    conversation_history = Conversation([{ 'role': msg['role'], 'content': msg['content'] } for msg in st.session_state.messages])
+                    full_response = st.write_stream(AvailableService.rag_query_with_history(conversation_history))
+                    st.session_state["messages"].append({"role": "assistant", "content": full_response})    
 
     def clear_conversation():
         st.session_state.messages = []

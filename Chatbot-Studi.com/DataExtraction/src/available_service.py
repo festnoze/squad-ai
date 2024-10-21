@@ -125,8 +125,9 @@ class AvailableService:
             RAGPreTreatment.metadata_infos = [
                 AttributeInfo(name='id', description="L'identifiant interne du document courant", type='str'),
                 AttributeInfo(name='type', description= dedent("""\
-                    Le type de données contenu dans ce document. Prend une valeur parmi les suivantes : ['métier', 'formation', 'certifieur', 'certification', 'diplôme', 'domaine', 'financement']. 
-                    Les valeurs les plus fréquemment utilisées sont : 'formation' puis 'métier'. 
+                    Le type de données contenu dans ce document.
+                    Ajoute systématiquement un filtre sur le 'type'. Par défaut ce filtre aura la valeur : 'formation', sauf si la question parle explicitement d'un autre thème listé (comme 'métier' ou 'domaine'), 
+                    Prend une valeur parmi les suivantes : ['formation', 'métier', 'certifieur', 'certification', 'diplôme', 'domaine']. 
                     Il existe aussi des valeurs spéciales : 'liste_formations' qui contient la liste de toutes les formations, et 'liste_métiers' qui contient la liste de tous les métiers.
                     Ajoute un filtre sur 'type' dès que la question traite l'un de ces sujets. 
                     Attention, n'appliquer qu'un seul filtre sur 'type' maximum. 
@@ -135,21 +136,21 @@ class AvailableService:
                 AttributeInfo(name='changed', description="La date du dernier changement de la donnée", type='str'),
                 AttributeInfo(name='training_info_type', description=dedent("""\
                     Spécifie le type d'informations concernant une formation.
-                    Prend une valeur parmi les suivantes (description en parenthèses) : [
-                        'title' (titre de la formation),
-                        'summary' (filtre par défaut, a mettre pour avoir un résumé des informations générales de la formation),
+                    Attention : ce filtre n'est valable que si : type = 'formation'. Ne pas ajouter ce filtre si le type est différent de 'formation' ! 
+                    Prend une valeur parmi les suivantes (nom entre simple cotes, et description entre parenthèses) : [
+                        'url' (lien vers la page web de la formation),
+                        'summary' (filtre par défaut pour avoir un résumé des informations sur la formation),
                         'header-training' (informations générales sur la formation), 
                         'bref' (description en bref de la formation), 
                         'metiers' (métiers en liens avec la formation), 
-                        'academic_level' (niveau académique de la formation),
+                        'academic_level' (niveau académique ou niveau d'études de la formation),
                         'programme' (description du contenu détaillé de la formation), 
                         'cards-diploma' (diplômes obtenus à l'issu de la formation), 
                         'methode' (description de la méthode de l'école, rarement utile), 
                         'modalites' (les conditions d'admission, de formation, de passage des examens et autres modalités), 
-                        'financement' (informations sur le coût, le prix, et le financement et les modes de financement de la formation), 
+                        'financement' (informations sur le tarif, le prix, et le financement et les modes de financement de la formation), 
                         'simulation' (simulation de la date de début et de la durée de formation, en cas de démarrage à la prochaine session / promotion) 
-                    ]
-                    une metadata qui n'est présente que pour type='formation'"""), type='str'),
+                    ]"""), type='str'),
                 AttributeInfo(name='rel_ids', description="les identifiants des documents connexes au présent document", type='str')
             ]
         txt.stop_spinner_replace_text("Pipeline d'inférence chargé :")

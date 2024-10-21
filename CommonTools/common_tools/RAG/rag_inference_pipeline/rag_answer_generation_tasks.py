@@ -54,7 +54,7 @@ class RAGAugmentedGeneration:
             RAGAugmentedGeneration.augmented_generation_prompt = Ressource.get_rag_augmented_generation_prompt_generic()
         augmented_generation_prompt = RAGAugmentedGeneration.augmented_generation_prompt
 
-        question_w_history = Conversation.get_conv_history_as_str(query)
+        question_w_history = Conversation.conversation_history_as_str(query)
         augmented_generation_prompt = augmented_generation_prompt.replace("{question}", question_w_history)
         additional_instructions = ''
         if not analysed_query.detected_language.__contains__("english"):

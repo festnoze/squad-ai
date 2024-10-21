@@ -28,6 +28,8 @@ class RAGHybridRetrieval:
         vector_ratio = 1 - bm25_ratio               
         # Create bm25 retriever with metadata filter        
         if metadata:
+            if RagFilteringMetadataHelper.does_contain_filter(metadata, 'training_info_type','url'):
+                max_retrived_count = 100
             filtered_docs = [
                 doc for doc in rag.langchain_documents 
                 if RagFilteringMetadataHelper.filters_predicate(doc, metadata)
@@ -53,13 +55,13 @@ class RAGHybridRetrieval:
         retrievers = [vector_retriever, bm25_retriever]        
         weights = [vector_ratio, bm25_ratio]
         ensemble_retriever = EnsembleRetriever(retrievers=retrievers, weights=weights)
-        question_w_history = Conversation.get_conv_history_as_str(query)
+        question_w_history = Conversation.conversation_history_as_str(query)
         retrieved_chunks = ensemble_retriever.invoke(question_w_history)
         return retrieved_chunks
     
     @staticmethod    
     def semantic_vector_retrieval(rag: RagService, query:Optional[Union[str, Conversation]], metadata_filters:dict, give_score: bool = False, max_retrieved_count: int = 10, min_score: float = None, min_retrived_count: int = None):
-        question_w_history = Conversation.get_conv_history_as_str(query)
+        question_w_history = Conversation.conversation_history_as_str(query)
         retrieved_chunks = rag.semantic_vector_retrieval(question_w_history, metadata_filters, give_score, max_retrieved_count, min_score, min_retrived_count)
         return retrieved_chunks
     
@@ -70,7 +72,7 @@ class RAGHybridRetrieval:
         else:
             filtered_docs = rag.langchain_documents
 
-        question_w_history = Conversation.get_conv_history_as_str(query)
+        question_w_history = Conversation.conversation_history_as_str(query)
         bm25_retriever = rag._build_bm25_retriever(filtered_docs, k) #, metadata_filters
         bm25_retrieved_chunks = bm25_retriever.invoke(question_w_history)
        

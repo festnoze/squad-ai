@@ -38,6 +38,7 @@ class Conversation:
     def conversation_history_as_str(query_or_conv: Optional[Union[str, 'Conversation']]) -> str:
         if isinstance(query_or_conv, Conversation):
             conversation_history = '\n- '.join([f"{msg.role}: {msg.content}" for msg in query_or_conv.messages[:-1]])
+            if not conversation_history: conversation_history = "No history yet"
             full_question = f"### Conversation history: ###\n{conversation_history}\n\n### User current question: ###\n {query_or_conv.last_message.content}" 
         else:
             full_question = query_or_conv
@@ -47,6 +48,7 @@ class Conversation:
     def user_queries_history_as_str(query_or_conv: Optional[Union[str, 'Conversation']]) -> str:
         if isinstance(query_or_conv, Conversation):
             conversation_history = '\n- '.join([f"- {msg.content}" for msg in [query for query in query_or_conv.messages[:-1] if query.role == 'user']])
+            if not conversation_history: conversation_history = "No history yet"
             full_question = f"### User queries history: ###\n{conversation_history}\n\n### User current question: ###\n {query_or_conv.last_message.content}" 
         else:
             full_question = query_or_conv

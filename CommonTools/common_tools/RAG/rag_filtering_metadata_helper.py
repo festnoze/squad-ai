@@ -117,4 +117,28 @@ class RagFilteringMetadataHelper:
         else:
             return {}
 
+    @staticmethod
+    def does_contain_filter(metadata: Union[dict, list], key: str, value: str = None) -> bool:
+        """Check if a key-value pair exists in the metadata, including logical operators."""
+        if isinstance(metadata, dict):
+            # Handle logical operators like $and, $or, $not
+            if "$and" in metadata:
+                return any(RagFilteringMetadataHelper.does_contain_filter(sub_filter, key, value) for sub_filter in metadata["$and"])
+            elif "$or" in metadata:
+                return any(RagFilteringMetadataHelper.does_contain_filter(sub_filter, key, value) for sub_filter in metadata["$or"])
+            elif "$not" in metadata:
+                return not RagFilteringMetadataHelper.does_contain_filter(metadata["$not"], key, value)
+            
+            # Check if the current dictionary contains the key-value pair
+            if key in metadata and (value is None or metadata[key] == value):
+                return True
 
+            # Recursively check nested dictionaries
+            return any(RagFilteringMetadataHelper.does_contain_filter(v, key, value) for v in metadata.values())
+
+        elif isinstance(metadata, list):
+            # Check each item in the list
+            return any(RagFilteringMetadataHelper.does_contain_filter(item, key, value) for item in metadata)
+
+        # If it's not a dict or list, return False
+        return False
