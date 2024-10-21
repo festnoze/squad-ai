@@ -1,6 +1,7 @@
 import json
 from typing import List
 #
+from CommonTools.common_tools.rag.rag_injection_pipeline.rag_injection_pipeline import RagInjectionPipeline
 from common_tools.helpers.file_helper import file
 from common_tools.helpers.txt_helper import txt
 from common_tools.models.llm_info import LlmInfo
@@ -136,7 +137,8 @@ class AvailableActions:
         AvailableActions.init_rag_service(llms_infos)
         AvailableActions.rag_service.reset_vectorstore() # delete or empty DB first
         docs = AvailableActions.get_documents_to_vectorize_from_loaded_analysed_structures(AvailableActions.struct_desc_folder_path)
-        count = AvailableActions.rag_service.build_vectorstore_and_bm25_store(docs, chunk_size=0, delete_existing=True)
+        injection_pipeline = RagInjectionPipeline(AvailableActions.rag_service)
+        count = injection_pipeline.build_vectorstore_and_bm25_store(docs, chunk_size=0, children_chunk_size=0, delete_existing=True)
         print(f"Vector store built with {count} items")
 
     @staticmethod

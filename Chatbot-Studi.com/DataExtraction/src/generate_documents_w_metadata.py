@@ -40,8 +40,9 @@ class GenerateDocumentsWithMetadataFromFiles:
         all_docs.extend(self.process_jobs(jobs_data, domains_data))
 
         # Process trainings
+        trainings_details = self.load_trainings_details_as_json(path)
         trainings_data = JsonHelper.load_from_json(path + 'trainings.json')
-        all_docs.extend(self.process_trainings(trainings_data))
+        all_docs.extend(self.process_trainings(trainings_data, trainings_details))
 
         txt.stop_spinner_replace_text(f"All Langchain documents built successfully.")
         txt.print(f"Certifiers count: {len(certifiers_data)}")
@@ -160,11 +161,14 @@ class GenerateDocumentsWithMetadataFromFiles:
         if not data:
             return []
         docs = []
+        all_jobs_titles = []
         for item in data:
+            job_title = item.get("title")
+            all_jobs_titles.append(job_title)
             metadata = {
                 "id": item.get("id"),
                 "type": "métier",
-                "name": item.get("title"),
+                "name": job_title,
                 "changed": item.get("changed"),
                 "rel_ids": self.get_all_ids_as_str(item.get("related_ids", {}))
             }
@@ -177,20 +181,27 @@ class GenerateDocumentsWithMetadataFromFiles:
             content = f"Métier : '{metadata['name']}'. {('\r\nAppartient au domaine (ou filière) : ' + domain) if domain else ''}"
             doc = Document(page_content=content, metadata=metadata)
             docs.append(doc)
+
+        docs.append(Document(page_content= 'Liste complète de tous les métiers couvert par Studi :\n' + ', '.join(all_jobs_titles), metadata={"type": "liste_métiers",}))
         return docs
 
-    def process_trainings(self, data: List[Dict]) -> List[Document]:
+    def process_trainings(self, data: List[Dict], trainings_details: dict) -> List[Document]:
         if not data:
             return []
         docs = []
+        all_trainings_titles = []
         for item in data:
-            metadata = {
+            training_title = item.get("title")
+            all_trainings_titles.append(training_title)
+
+            metadata_common = {
                 "id": item.get("id"),
                 "type": "formation",
-                "name": item.get("title"),
+                "name": training_title,
                 "changed": item.get("changed"),
                 "rel_ids": self.get_all_ids_as_str(item.get("related_ids", {})),
             }
+
             # ext_ids = {
             #     "certification_id": related_ids.get("certification", ""),
             #     "diploma_ids": self.as_str(related_ids.get("diploma", [])),
@@ -199,10 +210,56 @@ class GenerateDocumentsWithMetadataFromFiles:
             #     "funding_ids": self.as_str(related_ids.get("funding", [])),
             #     "goal_ids": self.as_str(related_ids.get("goal", [])),
             # }
-            content = f"{item.get('title', '')}\r\n{item.get('field_metatag', '')}"
-            doc = Document(page_content=content, metadata=metadata)#{**metadata, **ext_ids})
-            docs.append(doc)
+
+            # Add training URL from details source
+            training_url = ''
+            training_url_str = ''
+            training_detail = trainings_details.get(training_title)
+            if training_detail and any(training_detail):
+                if 'url' in training_detail:
+                    training_url = training_detail['url']
+                    training_url_str = f"Lien vers la formation : {training_url}\n" 
+            else:                    
+                txt.print(f"/!\\ Training details not found for: {training_title}")
+            
+            # contents = [value for key, value in item.get('attributes', {}).items()]
+            # content = f"Formation : {item.get('title', '')}\n{training_url_str}{'\n'.join(contents)}"            
+            # metadata_summary = metadata_common.copy()
+            # metadata_summary['training_info_type'] = "summary"
+            # docs.append(Document(page_content=content, metadata=metadata_summary))
+            
+            # Add training details to docs
+            if training_detail and any(training_detail):
+                for section_name in training_detail:
+                    content = f"##{self.get_french_section(section_name)} de la formation : {item.get('title', '')}##\n"
+                    content += training_detail[section_name]
+                    metadata_detail = metadata_common.copy()
+                    metadata_detail['training_info_type'] = section_name
+                    docs.append(Document(page_content=content, metadata=metadata_detail))
+
+        docs.append(Document(page_content= 'Liste complète de toutes les formations proposées par Studi :\n' + ', '.join(all_trainings_titles), metadata={"type": "liste_formations",}))
         return docs
+    
+    def get_french_section(self, section: str) -> str:
+        if section == 'title':
+            return "Titre"
+        elif section == 'academic_level':
+            return "Niveau académique"
+        elif section == 'content':
+            return "Contenu"
+        elif section == 'certification':
+            return "Certification"
+        elif section == 'diploma':
+            return "Diplôme"
+        elif section == 'domain':
+            return "Domaine"
+        elif section == 'job':
+            return "Métiers"
+        elif section == 'funding':
+            return "Financements"
+        elif section == 'goal':
+            return "Objectifs"
+        return
     
     def as_str(self, lst: list):
         if not lst:

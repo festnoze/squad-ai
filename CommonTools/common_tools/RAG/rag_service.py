@@ -88,59 +88,7 @@ class RagService:
         vectorstore = Chroma(persist_directory= abs_path, embedding_function= self.embedding)
         return vectorstore
     
-    def build_vectorstore_and_bm25_store(self, data: list, chunk_size:int = 0, delete_existing=True)-> int:
-        if not data or len(data) == 0: return 0
-        self.vectorstore = self._build_vectorstore(data, chunk_size, delete_existing)
-        self._build_bm25_store(data)
-        return self.vectorstore._collection.count()
-
-    def _build_vectorstore(self, documents: list, chunk_size:int = 0, delete_existing=True) -> any:
-        if not documents or len(documents) == 0: raise ValueError("No documents provided")
-        if not self.embedding: raise ValueError("No embedding model specified")
-        if delete_existing:
-            self.reset_vectorstore()
-        if chunk_size > 0:
-            chunks = []
-            for document in documents:
-                    if isinstance(document, Document):
-                        chunks.extend(self._split_text_into_chunks(document.page_content, chunk_size))
-                    else:
-                        chunks.extend(self._split_text_into_chunks(document['page_content'], chunk_size))                
-            db = Chroma.from_texts(texts= chunks, embedding = self.embedding, persist_directory= self.vector_db_path)
-        else:
-            if not documents or not any(documents):
-                return None
-            if isinstance(documents[0], Document):
-                langchain_documents = documents
-            else:
-                langchain_documents = [
-                    Document(page_content=doc["page_content"], 
-                            metadata=doc["metadata"] if doc["metadata"] else '') 
-                    for doc in documents
-                ]
-            db = Chroma.from_documents(documents= langchain_documents, embedding = self.embedding, persist_directory= self.vector_db_path)
-        return db
-    
-    def _build_bm25_store(self, data):
-        documents_dict = []
-        for datum in data:
-            if isinstance(datum, Document):
-                documents_dict.append(self._build_document(datum.page_content, datum.metadata))
-            elif isinstance(datum, dict):
-                documents_dict.append(self._build_document(datum["page_content"], datum["metadata"]))
-            else:
-                raise ValueError("Invalid data type")
-        
-        json_data = json.dumps(documents_dict, ensure_ascii=False, indent=4)
-        file.write_file(json_data, self.documents_json_filepath, file_exists_policy= FileAlreadyExistsPolicy.Override)
-        
-    # not in use
-    def build_vectorstore_from_folder_files(self, folder_path: str, perform_chunking = True):
-        txt_loader = TextLoader()
-        documents = txt_loader.load(folder_path)
-        return self._build_vectorstore(documents, perform_chunking)
-
-    def _build_bm25_retriever(self, documents: List[Document], k: int = 20, metadata: dict = None) -> BM25Retriever:
+    def _build_bm25_retriever(self, documents: list[Document], k: int = 20, metadata: dict = None) -> BM25Retriever:
         if not documents or len(documents) == 0: 
             return None
         
@@ -150,7 +98,7 @@ class RagService:
             bm25_retriever = BM25Retriever.from_documents(documents)
         bm25_retriever.k = k
         return bm25_retriever
-    
+        
     def build_self_querying_retriever(self, metadata_description: list[AttributeInfo] = None, get_query_constructor:bool = True) -> tuple :
         document_description = "Description of the document"
         if not metadata_description:
@@ -205,25 +153,3 @@ class RagService:
             metadata_field_info.append(AttributeInfo(name=key, description=description, type=value_type))
 
         return metadata_field_info
-    
-        
-    def reset_vectorstore(self):
-        if hasattr(self, 'vectorstore') and self.vectorstore:
-            self.vectorstore.reset_collection()
-            #self._delete_vectorstore_files()
-
-    def _delete_vectorstore_files(self):
-        file.delete_folder(self.vector_db_path)
-    
-    def _build_document(self, content: str, metadata: dict):
-        return {'page_content': content, 'metadata': metadata}
-    
-    def _split_text_into_chunks(self, text: str, chunk_size:int = 4000, chunk_overlap= 150) -> List[str]:
-        txt_splitter = CharacterTextSplitter(
-            separator= "\n",
-            chunk_size= chunk_size,
-            chunk_overlap= chunk_overlap,
-            length_function= len
-        )
-        chunks = txt_splitter.split_text(text)
-        return chunks

@@ -73,10 +73,14 @@ class RAGPreTreatment:
             RAGPreTreatment.metadata_infos = RagService.generate_metadata_info_from_docs(rag.langchain_documents, 30)
         self_querying_retriever, query_constructor = RagService.build_self_querying_retriever(rag, RAGPreTreatment.metadata_infos)
         question = Conversation.get_user_query(query)
+        
         response_with_filters = query_constructor.invoke(question)
+        
         if response_with_filters.filter:
             txt.print(f"Filters extracted from the query: {response_with_filters.filter}")
-        return response_with_filters.query, RagFilteringMetadataHelper.get_filters_from_comparison(response_with_filters.filter)
+        
+        metadata_filters = RagFilteringMetadataHelper.get_filters_from_comparison(response_with_filters.filter)
+        return response_with_filters.query, metadata_filters
         
     @staticmethod
     def bypassed_analyse_query_for_metadata(rag:RagService, query:Optional[Union[str, Conversation]], metadata_infos:list[AttributeInfo] = None) -> tuple[str, dict]:

@@ -74,24 +74,9 @@ class AvailableService:
     def create_vector_db_from_generated_embeded_documents(out_dir):
         txt.activate_print = True
         all_docs = GenerateDocumentsWithMetadataFromFiles().load_all_docs_as_json(out_dir)
-        trainings_details_by_title = GenerateDocumentsWithMetadataFromFiles().load_trainings_details_as_json(out_dir)
-        for doc in all_docs:
-            if doc.metadata.get('type') != 'formation':
-                continue
-            name = doc.metadata.get('name', '')
-            training_details = trainings_details_by_title.get(name)
-            if training_details and any(training_details):
-                for section in training_details:
-                    doc.page_content += training_details[section] #todo now!!!
-            else:
-                txt.print(f"Training details not found for: {name}")
-                
-            # Process training_details as needed
-        rag_injection = RagInjectionPipeline(AvailableService.rag_service)
-        return
-        txt.print_with_spinner(f"Start embedding of {len(all_docs)} documents")
-        injected = rag_injection.inject_documents(all_docs, perform_chunking= False, delete_existing= True)
-        txt.stop_spinner_replace_text(f"Finished Embedding on: {injected} documents")
+        injection_pipeline = RagInjectionPipeline(AvailableService.rag_service)
+        injected = injection_pipeline.build_vectorstore_and_bm25_store(all_docs, chunk_size= 5000, children_chunk_size= 0, delete_existing= True)
+        return injected
 
     def docs_retrieval_query():
         while True:
@@ -131,15 +116,38 @@ class AvailableService:
         if conversation_history.last_message.role != 'user':
             raise ValueError("Conversation history should end with a user message")
 
-        # Set static metadata info to avoid extra calculation
-        RAGPreTreatment.metadata_infos = [
-            AttributeInfo(name='id', description="l'identifiant interne du document courant", type='str'),
-            AttributeInfo(name='type', description="le type de données contenu dans ce document. Il s'agit d'une valeur parmi les catégories suivantes: ['certifieur', 'certification', 'diplôme', 'domaine', 'financement', 'métier', 'formation']. Les plus fréquemment concernées sont : métier et formation, ajoute ce filtre dès que la question traite l'un de ces sujets. attention, pour appliquer plusieurs filtres avec différentes valeurs de 'type', utiliser l'opérateur 'or' uniquement, et jamais 'and', car aucun document n'est de plusieurs types simultanément.", type='str'),
-            AttributeInfo(name='name', description="le nom du sujet du document", type='str'),
-            AttributeInfo(name='changed', description="la date du dernier changement de la donnée", type='str'),
-            AttributeInfo(name='rel_ids', description="les identifiants des documents connexes au présent document", type='str')
-        ]
-
+        # Metadata infos
+        if not hasattr(RAGPreTreatment, 'metadata_infos') or not RAGPreTreatment.metadata_infos:
+            RAGPreTreatment.metadata_infos = [
+                AttributeInfo(name='id', description="L'identifiant interne du document courant", type='str'),
+                AttributeInfo(name='type', description= dedent("""\
+                    Le type de données contenu dans ce document. Prend une valeur parmi les suivantes : ['métier', 'formation', 'certifieur', 'certification', 'diplôme', 'domaine', 'financement']. 
+                    Les valeurs les plus fréquemment utilisées sont : 'formation' puis 'métier'. 
+                    Il existe aussi des valeurs spéciales : 'liste_formations' qui contient la liste de toutes les formations, et 'liste_métiers' qui contient la liste de tous les métiers.
+                    Ajoute un filtre sur 'type' dès que la question traite l'un de ces sujets. 
+                    Attention, n'appliquer qu'un seul filtre sur 'type' maximum. 
+                    Pour le filtre : type equals 'formation', on ajoute aussi fréquement un filtre sur 'training_info_type' si on recherche des informations spécifiques sur une formation"""), type='str'),
+                AttributeInfo(name='name', description="Le nom du document. Par exemple pour le filtre : type equals 'formation', il s'agit du nom de la formation", type='str'),
+                AttributeInfo(name='changed', description="La date du dernier changement de la donnée", type='str'),
+                AttributeInfo(name='training_info_type', description=dedent("""\
+                    Spécifie le type d'informations concernant une formation.
+                    Prend une valeur parmi les suivantes (description en parenthèses) : [
+                        'title' (titre de la formation),
+                        'summary' (filtre par défaut, a mettre pour avoir un résumé des informations générales de la formation),
+                        'header-training' (informations générales sur la formation), 
+                        'bref' (description en bref de la formation), 
+                        'metiers' (métiers en liens avec la formation), 
+                        'academic_level' (niveau académique de la formation),
+                        'programme' (description du contenu détaillé de la formation), 
+                        'cards-diploma' (diplômes obtenus à l'issu de la formation), 
+                        'methode' (description de la méthode de l'école, rarement utile), 
+                        'modalites' (les conditions d'admission, de formation, de passage des examens et autres modalités), 
+                        'financement' (mode de financement de la formation), 
+                        'simulation' (simulation de la date de début et de la durée de formation, en cas de démarrage à la prochaine session / promotion) 
+                    ]
+                    une metadata qui n'est présente que pour type='formation'"""), type='str'),
+                AttributeInfo(name='rel_ids', description="les identifiants des documents connexes au présent document", type='str')
+            ]
         txt.stop_spinner_replace_text("Pipeline d'inférence chargé :")
         txt.print_with_spinner("Exécution du pipeline d'inférence ...")
 
@@ -164,6 +172,8 @@ class AvailableService:
     def format_retrieved_docs_function(retrieved_docs):
         if not any(retrieved_docs):
             return 'not a single information were found. Don\'t answer the question.'
+        
+        total_size = sum([len(doc.page_content.split()) for doc in retrieved_docs])
         return retrieved_docs
         # context = ''
         # for retrieved_doc in retrieved_docs:

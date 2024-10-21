@@ -40,7 +40,7 @@ class ChatbotFront:
             st.subheader("🚀 Autres actions :")
             st.button("📊 Récupérer les données Drupal via json-api", on_click=ChatbotFront.get_drupal_data)
             st.button("📚 Récupérer les pages web des formations", on_click=ChatbotFront.scrape_website_pages)
-            st.button("📦 Construit la BDD vectorielle", on_click=ChatbotFront.build_vectorstore)
+            st.button("📦 Construit la base vectorielle", on_click=ChatbotFront.build_vectorstore)
             st.divider()
             st.button("✨ Générer RAGAS Ground Truth", on_click=ChatbotFront.generate_ground_truth)
             #ChatbotFront.folder_path = st.text_input("Dossier à traiter", value=ChatbotFront.folder_path)#, disabled=True)
