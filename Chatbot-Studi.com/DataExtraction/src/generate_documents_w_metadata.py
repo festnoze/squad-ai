@@ -182,7 +182,7 @@ class GenerateDocumentsWithMetadataFromFiles:
             doc = Document(page_content=content, metadata=metadata)
             docs.append(doc)
 
-        docs.append(Document(page_content= 'Liste complète de tous les métiers couvert par Studi :\n' + ', '.join(all_jobs_titles), metadata={"type": "liste_métiers",}))
+        #docs.append(Document(page_content= 'Liste complète de tous les métiers couvert par Studi :\n' + ', '.join(all_jobs_titles), metadata={"type": "liste_métiers",}))
         return docs
 
     def process_trainings(self, data: List[Dict], trainings_details: dict) -> List[Document]:
@@ -201,7 +201,6 @@ class GenerateDocumentsWithMetadataFromFiles:
                 "changed": item.get("changed"),
                 "rel_ids": self.get_all_ids_as_str(item.get("related_ids", {})),
             }
-
             # ext_ids = {
             #     "certification_id": related_ids.get("certification", ""),
             #     "diploma_ids": self.as_str(related_ids.get("diploma", [])),
@@ -211,33 +210,35 @@ class GenerateDocumentsWithMetadataFromFiles:
             #     "goal_ids": self.as_str(related_ids.get("goal", [])),
             # }
 
-            # Add training URL from details source
+            # Add training URL from details source to metadata
             training_url = ''
             training_url_str = ''
             training_detail = trainings_details.get(training_title)
             if training_detail and any(training_detail):
                 if 'url' in training_detail:
                     training_url = training_detail['url']
-                    training_url_str = f"Lien vers la formation : {training_url}\n" 
+                    metadata_common['url'] = training_url
             else:                    
                 txt.print(f"/!\\ Training details not found for: {training_title}")
-            
-            # contents = [value for key, value in item.get('attributes', {}).items()]
-            # content = f"Formation : {item.get('title', '')}\n{training_url_str}{'\n'.join(contents)}"            
-            # metadata_summary = metadata_common.copy()
-            # metadata_summary['training_info_type'] = "summary"
-            # docs.append(Document(page_content=content, metadata=metadata_summary))
+
+            # Add 'summary' document with infos from json-api source only
+            contents = [value for key, value in item.get('attributes', {}).items()]
+            content = f"Formation : {item.get('title', '')}\nLien vers la page : {training_url}\n{'\n'.join(contents)}"            
+            metadata_summary = metadata_common.copy()
+            metadata_summary['training_info_type'] = "summary"
+            docs.append(Document(page_content=content, metadata=metadata_summary))
             
             # Add training details to docs
             if training_detail and any(training_detail):
                 for section_name in training_detail:
-                    content = f"##{self.get_french_section(section_name)} de la formation : {item.get('title', '')}##\n"
-                    content += training_detail[section_name]
-                    metadata_detail = metadata_common.copy()
-                    metadata_detail['training_info_type'] = section_name
-                    docs.append(Document(page_content=content, metadata=metadata_detail))
+                    if section_name not in ['url', 'title']:
+                        content = f"##{self.get_french_section(section_name)} de la formation : {item.get('title', '')}##\n"
+                        content += training_detail[section_name]
+                        metadata_detail = metadata_common.copy()
+                        metadata_detail['training_info_type'] = section_name
+                        docs.append(Document(page_content=content, metadata=metadata_detail))
 
-        docs.append(Document(page_content= 'Liste complète de toutes les formations proposées par Studi :\n' + ', '.join(all_trainings_titles), metadata={"type": "liste_formations",}))
+        #docs.append(Document(page_content= 'Liste complète de toutes les formations proposées par Studi :\n' + ', '.join(all_trainings_titles), metadata={"type": "liste_formations",}))
         return docs
     
     def get_french_section(self, section: str) -> str:
@@ -253,13 +254,32 @@ class GenerateDocumentsWithMetadataFromFiles:
             return "Diplôme"
         elif section == 'domain':
             return "Domaine"
-        elif section == 'job':
+        elif section == 'job' or section == 'metiers':
             return "Métiers"
         elif section == 'funding':
             return "Financements"
         elif section == 'goal':
             return "Objectifs"
-        return
+        elif section == 'summary':
+            return "Résumé"
+        elif section == 'header-training':
+            return "Informations générales"
+        elif section == 'bref':
+            return "Description en bref"
+        elif section == 'cards-diploma':
+            return "Diplômes obtenus"
+        elif section == 'programme':
+            return "Programme"
+        elif section == 'financement':
+            return "Financements possibles"
+        elif section == 'methode':
+            return "Méthode d'apprentissage Studi"
+        elif section == 'modalites':
+            return "Modalités"
+        elif section == 'simulation':
+            return "Simulation de formation"
+        else:
+            raise ValueError(f"Unhandled section name: {section} in get_french_section")
     
     def as_str(self, lst: list):
         if not lst:

@@ -127,18 +127,16 @@ class AvailableService:
                 AttributeInfo(name='type', description= dedent("""\
                     Le type de données contenu dans ce document.
                     Ajoute systématiquement un filtre sur le 'type'. Par défaut ce filtre aura la valeur : 'formation', sauf si la question parle explicitement d'un autre thème listé (comme 'métier' ou 'domaine'), 
-                    Prend une valeur parmi les suivantes : ['formation', 'métier', 'certifieur', 'certification', 'diplôme', 'domaine']. 
-                    Il existe aussi des valeurs spéciales : 'liste_formations' qui contient la liste de toutes les formations, et 'liste_métiers' qui contient la liste de tous les métiers.
+                    Prend une valeur parmi les suivantes : ['formation', 'métier', 'certifieur', 'certification', 'diplôme', 'domaine'].
                     Ajoute un filtre sur 'type' dès que la question traite l'un de ces sujets. 
                     Attention, n'appliquer qu'un seul filtre sur 'type' maximum. 
                     Pour le filtre : type equals 'formation', on ajoute aussi fréquement un filtre sur 'training_info_type' si on recherche des informations spécifiques sur une formation"""), type='str'),
-                AttributeInfo(name='name', description="Le nom du document. Par exemple pour le filtre : type equals 'formation', il s'agit du nom de la formation", type='str'),
+                AttributeInfo(name='name', description="Le nom du document. Par exemple, en conjonction avec le filtre : type equals 'formation', il s'agira du nom de la formation. A utiliser que si le nom exact de l'objet recherché est connu.", type='str'),
                 AttributeInfo(name='changed', description="La date du dernier changement de la donnée", type='str'),
                 AttributeInfo(name='training_info_type', description=dedent("""\
                     Spécifie le type d'informations concernant une formation.
                     Attention : ce filtre n'est valable que si : type = 'formation'. Ne pas ajouter ce filtre si le type est différent de 'formation' ! 
                     Prend une valeur parmi les suivantes (nom entre simple cotes, et description entre parenthèses) : [
-                        'url' (lien vers la page web de la formation),
                         'summary' (filtre par défaut pour avoir un résumé des informations sur la formation),
                         'header-training' (informations générales sur la formation), 
                         'bref' (description en bref de la formation), 
@@ -151,7 +149,8 @@ class AvailableService:
                         'financement' (informations sur le tarif, le prix, et le financement et les modes de financement de la formation), 
                         'simulation' (simulation de la date de début et de la durée de formation, en cas de démarrage à la prochaine session / promotion) 
                     ]"""), type='str'),
-                AttributeInfo(name='rel_ids', description="les identifiants des documents connexes au présent document", type='str')
+                AttributeInfo(name='url', description="l'URL vers la page web de l'élément recherché. Ne s'applique que pour les types suivants : formation.", type='str'),
+                AttributeInfo(name='rel_ids', description="permet de rechercher les documents connexes à l'id du document fourni en valeur", type='str')
             ]
         txt.stop_spinner_replace_text("Pipeline d'inférence chargé :")
         txt.print_with_spinner("Exécution du pipeline d'inférence ...")
