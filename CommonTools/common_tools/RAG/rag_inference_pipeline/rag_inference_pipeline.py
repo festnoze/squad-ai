@@ -100,7 +100,7 @@ class RagInferencePipeline:
         analysed_query, metadata = RAGPreTreatment.rag_static_pre_treatment(self.rag, query, self.default_filters)
 
         # Data Retrieval
-        retrieved_chunks = RAGHybridRetrieval.rag_hybrid_retrieval_langchain(self.rag, query, metadata, include_bm25_retrieval, False, give_score)
+        retrieved_chunks = RAGHybridRetrieval.rag_hybrid_retrieval_langchain(self.rag, query, metadata, include_bm25_retrieval, True, give_score)
 
         # Augmented Answer Generation
         async for chunk in RAGAugmentedGeneration.rag_augmented_answer_generation_async(self.rag, query, retrieved_chunks, analysed_query, format_retrieved_docs_function):
