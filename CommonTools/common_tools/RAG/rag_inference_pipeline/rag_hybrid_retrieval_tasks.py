@@ -31,7 +31,7 @@ class RAGHybridRetrieval:
         return retained_chunks
     
     @staticmethod    
-    def rag_hybrid_retrieval_langchain(rag: RagService, query:Optional[Union[str, Conversation]], metadata:dict, include_bm25_retrieval: bool = True, give_score: bool = True, max_retrived_count: int = 20, bm25_ratio: float = 0.2):
+    def rag_hybrid_retrieval_langchain(rag: RagService, query:Optional[Union[str, Conversation]], metadata:dict, include_bm25_retrieval: bool = True, include_contextual_compression: bool = False, give_score: bool = True, max_retrived_count: int = 20, bm25_ratio: float = 0.2):
         vector_ratio = 1 - bm25_ratio
         # Create bm25 retriever with metadata filter
         if metadata:
@@ -63,12 +63,20 @@ class RAGHybridRetrieval:
         weights = [vector_ratio, bm25_ratio]
         ensemble_retriever = EnsembleRetriever(retrievers=retrievers, weights=weights)
 
-        filter_llm = LangChainFactory.create_llm(LangChainAdapterType.OpenAI, "gpt-4o-mini")
-        _filter = LLMChainFilter.from_llm(filter_llm)
-        compression_retriever = ContextualCompressionRetriever(base_compressor=_filter, base_retriever=ensemble_retriever)
+        if include_contextual_compression: # todo: rather put in a separate workflow step
+            filter_llm = LangChainFactory.create_llm(LangChainAdapterType.OpenAI, "gpt-4o-mini")
+            _filter = LLMChainFilter.from_llm(filter_llm)
+            final_retriever = ContextualCompressionRetriever(base_compressor=_filter, base_retriever=ensemble_retriever)
+        else:
+            final_retriever = ensemble_retriever
 
         question_w_history = Conversation.conversation_history_as_str(query)
-        retrieved_chunks = compression_retriever.invoke(question_w_history)
+        retrieved_chunks = final_retriever.invoke(question_w_history)
+
+        # Remove 'rel_ids' from metadata: useless for augmented generation and limit token usage
+        for doc in retrieved_chunks:
+            doc.metadata.pop("rel_ids", None)
+
         return retrieved_chunks
     
     @staticmethod    

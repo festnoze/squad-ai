@@ -72,20 +72,20 @@ class ChatbotFront:
             st.session_state.messages.append({"role": "user", "content": prompt})
             st.chat_message("user").write(prompt)
 
-            # with st.spinner("Recherche de réponses en cours ..."):
-            #     #rag_answer = AvailableService.rag_query(prompt)
-            #     conversation_history = Conversation([{ 'role': msg['role'], 'content': msg['content'] } for msg in st.session_state.messages])
-            #     rag_answer = AvailableService.rag_query_with_history(conversation_history)
+            # Without response streaming
+            with st.spinner("Recherche de réponses en cours ..."):
+                conversation_history = Conversation([{ 'role': msg['role'], 'content': msg['content'] } for msg in st.session_state.messages])
+                rag_answer = AvailableService.rag_query_with_history_wo_streaming(conversation_history)
+            rag_answer = txt.remove_markdown(rag_answer)
+            st.session_state.messages.append({"role": "assistant", "content": rag_answer})
+            st.chat_message("assistant").write(rag_answer)    
 
-            # rag_answer = txt.remove_markdown(rag_answer)
-            # st.session_state.messages.append({"role": "assistant", "content": rag_answer})
-            # st.chat_message("assistant").write(rag_answer)    
-
-            with st.chat_message("assistant"):
-                with st.spinner("Je réfléchis à votre question ..."):
-                    conversation_history = Conversation([{ 'role': msg['role'], 'content': msg['content'] } for msg in st.session_state.messages])
-                    full_response = st.write_stream(AvailableService.rag_query_with_history(conversation_history))
-                    st.session_state["messages"].append({"role": "assistant", "content": full_response})    
+            # With response streaming
+            # with st.chat_message("assistant"):
+            #     with st.spinner("Je réfléchis à votre question ..."):
+            #         conversation_history = Conversation([{ 'role': msg['role'], 'content': msg['content'] } for msg in st.session_state.messages])
+            #         full_response = st.write_stream(AvailableService.rag_query_with_history_streaming(conversation_history))
+            #         st.session_state["messages"].append({"role": "assistant", "content": full_response})    
 
     def clear_conversation():
         st.session_state.messages = []

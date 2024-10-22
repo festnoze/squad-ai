@@ -18,7 +18,13 @@ class RAGAugmentedGeneration:
             yield chunk
     
     @staticmethod
-    def rag_augmented_answer_generation(rag: RagService, query: Optional[Union[str, Conversation]], retrieved_chunks: list, analysed_query: QuestionAnalysis, format_retrieved_docs_function=None):
+    def rag_augmented_answer_generation(
+        rag: RagService, 
+        query: Optional[Union[str, Conversation]], 
+        retrieved_chunks: list, 
+        analysed_query: QuestionAnalysis, 
+        format_retrieved_docs_function=None
+    ):
         async def run_async():
             chunks = []
             # Collect results from the async generator
@@ -28,17 +34,22 @@ class RAGAugmentedGeneration:
                 chunks.append(chunk)
             return ''.join(chunk.decode('utf-8') for chunk in chunks)
 
-        # Check if an event loop is already running
+        # Ensure an event loop is available in the current thread
         try:
-            return asyncio.run(run_async())
-        except RuntimeError as e:
-            if "asyncio.run() cannot be called from a running event loop" in str(e):
-                # If there is an existing event loop, use it to run the async function
-                loop = asyncio.get_event_loop()
-                return loop.run_until_complete(run_async())
-            else:
-                # Raise the original exception if it's a different issue
-                raise
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            # If no event loop is present, create a new one
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        # Run the async function using the event loop
+        if loop.is_running():
+            # If the loop is already running, use it to run the coroutine
+            return loop.run_until_complete(run_async())
+        else:
+            # If the loop is not running, start it and run the coroutine
+            return loop.run_until_complete(run_async())
+
 
     @staticmethod
     async def rag_response_generation_async(rag: RagService, query:Optional[Union[str, Conversation]], retrieved_chunks: list, questionAnalysis: QuestionAnalysis, format_retrieved_docs_function = None):

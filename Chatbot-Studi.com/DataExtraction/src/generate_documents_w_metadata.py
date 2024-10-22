@@ -11,38 +11,54 @@ class GenerateDocumentsWithMetadataFromFiles:
     def __init__(self):
         pass
        
-    def load_all_docs_as_json(self, path: str) -> List[Document]:
+    def load_all_docs_as_json(self, path: str, write_all_lists = True) -> List[Document]:
         all_docs = []
         txt.print_with_spinner(f"Build all Langchain documents ...")
 
         # Process certifiers
         certifiers_data = JsonHelper.load_from_json(path + 'certifiers.json')
-        all_docs.extend(self.process_certifiers(certifiers_data))
+        certifiers_docs, all_certifiers_names = self.process_certifiers(certifiers_data)
+        all_docs.extend(certifiers_docs)
 
         # Process certifications
-        certifiers_data = JsonHelper.load_from_json(path + 'certifications.json')
-        all_docs.extend(self.process_certifications(certifiers_data))
+        certifications_data = JsonHelper.load_from_json(path + 'certifications.json')
+        certifications_docs, all_certifications_names = self.process_certifications(certifications_data)
+        all_docs.extend(certifications_docs)
 
         # Process diplomas
         diplomas_data = JsonHelper.load_from_json(path + 'diplomas.json')
-        all_docs.extend(self.process_diplomas(diplomas_data))
+        diplomas_docs, all_diplomas_names = self.process_diplomas(diplomas_data)
+        all_docs.extend(diplomas_docs)
 
         # Process domains
         domains_data = JsonHelper.load_from_json(path + 'domains.json')
-        all_docs.extend(self.process_domains(domains_data))
+        domains_docs, all_domains_names = self.process_domains(domains_data)
+        all_docs.extend(domains_docs)
 
         # Process fundings
         fundings_data = JsonHelper.load_from_json(path + 'fundings.json')
-        all_docs.extend(self.process_fundings(fundings_data))
+        fundings_docs, all_fundings_names = self.process_fundings(fundings_data)
+        all_docs.extend(fundings_docs)
 
         # Process jobs
         jobs_data = JsonHelper.load_from_json(path + 'jobs.json')
-        all_docs.extend(self.process_jobs(jobs_data, domains_data))
+        jobs_docs, all_jobs_names = self.process_jobs(jobs_data, domains_data)
+        all_docs.extend(jobs_docs)
 
         # Process trainings
-        trainings_details = self.load_trainings_details_as_json(path)
         trainings_data = JsonHelper.load_from_json(path + 'trainings.json')
-        all_docs.extend(self.process_trainings(trainings_data, trainings_details))
+        trainings_details = self.load_trainings_details_as_json(path)
+        trainings_docs, all_trainings_names = self.process_trainings(trainings_data, trainings_details, all_docs)
+        all_docs.extend(trainings_docs)
+
+        if write_all_lists:
+            file.write_file(all_certifiers_names, path + 'all/' + 'all_certifiers_names.json')
+            file.write_file(all_certifications_names, path + 'all/' + 'all_certifications_names.json')
+            file.write_file(all_diplomas_names, path + 'all/' + 'all_diplomas_names.json')
+            file.write_file(all_domains_names, path + 'all/' + 'all_domains_names.json')
+            file.write_file(all_fundings_names, path + 'all/' + 'all_fundings_names.json')
+            file.write_file(all_jobs_names, path + 'all/' + 'all_jobs_names.json')
+            file.write_file(all_trainings_names, path + 'all/' + 'all_trainings_names.json')
 
         txt.stop_spinner_replace_text(f"All Langchain documents built successfully.")
         txt.print(f"Certifiers count: {len(certifiers_data)}")
@@ -78,8 +94,10 @@ class GenerateDocumentsWithMetadataFromFiles:
     def process_certifiers(self, data: List[Dict]) -> List[Document]:
         if not data:
             return []
+        all_certifiers_names = []
         docs = []
         for item in data:
+            all_certifiers_names.append(item.get("name"))
             metadata = {
                 "id": item.get("id"),
                 "type": "certifieur",
@@ -89,13 +107,15 @@ class GenerateDocumentsWithMetadataFromFiles:
             content = f"{item.get('name', '')}"
             doc = Document(page_content=content, metadata=metadata)
             docs.append(doc)
-        return docs
+        return docs, all_certifiers_names
     
     def process_certifications(self, data: List[Dict]) -> List[Document]:
         if not data:
             return []
+        all_certifications_names = []
         docs = []
         for item in data:
+            all_certifications_names.append(item.get("name"))
             metadata = {
                 "id": item.get("id"),
                 "type": "certification",
@@ -105,13 +125,15 @@ class GenerateDocumentsWithMetadataFromFiles:
             content = f"{item.get('name', '')}"
             doc = Document(page_content=content, metadata=metadata)
             docs.append(doc)
-        return docs
+        return docs, all_certifications_names
 
     def process_diplomas(self, data: List[Dict]) -> List[Document]:
         if not data:
             return []
         docs = []
+        all_diplomas_names = []
         for item in data:
+            all_diplomas_names.append(item.get("title"))
             metadata = {
                 "id": item.get("id"),
                 "type": "diplôme",
@@ -122,13 +144,15 @@ class GenerateDocumentsWithMetadataFromFiles:
             content = f"{item.get('title', '')}\r\n{'\r\n'.join(related_paragraphs)}"
             doc = Document(page_content=content, metadata=metadata)
             docs.append(doc)
-        return docs
+        return docs, all_diplomas_names
 
     def process_domains(self, data: List[Dict]) -> List[Document]:
         if not data:
             return []
         docs = []
+        all_domains_names = []
         for item in data:
+            all_domains_names.append(item.get("name"))
             metadata = {
                 "id": item.get("id"),
                 "type": "domaine",
@@ -138,13 +162,15 @@ class GenerateDocumentsWithMetadataFromFiles:
             content = f"{item.get('name', '')}"
             doc = Document(page_content=content, metadata=metadata)
             docs.append(doc)
-        return docs
+        return docs, all_domains_names
 
     def process_fundings(self, data: List[Dict]) -> List[Document]:
         if not data:
             return []
         docs = []
+        all_fundings_names = []
         for item in data:
+            all_fundings_names.append(item.get("title"))
             metadata = {
                 "id": item.get("id"),
                 "type": "financement",
@@ -155,16 +181,16 @@ class GenerateDocumentsWithMetadataFromFiles:
             content = f"{item.get('title', '')}\r\n{'\r\n'.join(related_paragraphs)}"
             doc = Document(page_content=content, metadata=metadata)
             docs.append(doc)
-        return docs
+        return docs, all_fundings_names
 
     def process_jobs(self, data: List[Dict], domains) -> List[Document]:
         if not data:
             return []
         docs = []
-        all_jobs_titles = []
+        all_jobs_names = []
         for item in data:
             job_title = item.get("title")
-            all_jobs_titles.append(job_title)
+            all_jobs_names.append(job_title)
             metadata = {
                 "id": item.get("id"),
                 "type": "métier",
@@ -178,14 +204,14 @@ class GenerateDocumentsWithMetadataFromFiles:
                 domain = next((dom.get("name") for dom in domains if dom.get("id") == domain_id), "")
                 if not domain:
                     domain = ''
-            content = f"Métier : '{metadata['name']}'. {('\r\nAppartient au domaine (ou filière) : ' + domain) if domain else ''}"
+            content = f"Métier : '{metadata['name']}'. {('Domaine : ' + domain) if domain else ''}"
             doc = Document(page_content=content, metadata=metadata)
             docs.append(doc)
 
-        #docs.append(Document(page_content= 'Liste complète de tous les métiers couvert par Studi :\n' + ', '.join(all_jobs_titles), metadata={"type": "liste_métiers",}))
-        return docs
+        #docs.append(Document(page_content= 'Liste complète de tous les métiers couvert par Studi :\n' + ', '.join(all_jobs_names), metadata={"type": "liste_métiers",}))
+        return docs, all_jobs_names
 
-    def process_trainings(self, data: List[Dict], trainings_details: dict) -> List[Document]:
+    def process_trainings(self, data: List[Dict], trainings_details: dict, existing_docs:list = []) -> List[Document]:
         if not data:
             return []
         docs = []
@@ -193,26 +219,40 @@ class GenerateDocumentsWithMetadataFromFiles:
         for item in data:
             training_title = item.get("title")
             all_trainings_titles.append(training_title)
-
+            related_ids = item.get("related_ids", {})
             metadata_common = {
                 "id": item.get("id"),
                 "type": "formation",
                 "name": training_title,
                 "changed": item.get("changed"),
-                "rel_ids": self.get_all_ids_as_str(item.get("related_ids", {})),
+                "rel_ids": self.get_all_ids_as_str(related_ids),
             }
-            # ext_ids = {
-            #     "certification_id": related_ids.get("certification", ""),
-            #     "diploma_ids": self.as_str(related_ids.get("diploma", [])),
-            #     "domain_id": related_ids.get("domain", ""),
-            #     "job_ids": self.as_str(related_ids.get("job", [])),
-            #     "funding_ids": self.as_str(related_ids.get("funding", [])),
-            #     "goal_ids": self.as_str(related_ids.get("goal", [])),
-            # }
+
+            related_ids = {
+                "nom_domaine": related_ids.get("domain", ""),
+                "nom_certification": related_ids.get("certification", ""),
+                # "nom_diplomes": self.as_str(related_ids.get("diploma", [])),
+                # "nom_metiers": self.as_str(related_ids.get("job", [])),
+                # "nom_financements": self.as_str(related_ids.get("funding", [])),
+                # "nom_objectifs": self.as_str(related_ids.get("goal", [])),
+            }
+
+            for key, value in related_ids.items():
+                if value:
+                    is_list = key.endswith('s')
+                    if is_list:
+                        existing_docs_ids = [doc for doc in existing_docs if doc.metadata.get("id") in value]
+                        #assert len(existing_docs_ids) == len(value), f"At least one of the docs were not found by its id, on: {key} {value}"
+                        if any(existing_docs_ids):
+                            metadata_common[key] = self.as_str([doc.metadata.get("name") for doc in existing_docs_ids])
+                    else:
+                        existing_docs_ids = [doc for doc in existing_docs if doc.metadata.get("id") == value]
+                        #assert len(existing_docs_ids) == 1, f"Multiple or none docs found for: {key} {value}"
+                        if any(existing_docs_ids):
+                            metadata_common[key] = existing_docs_ids[0].metadata.get("name")
 
             # Add training URL from details source to metadata
             training_url = ''
-            training_url_str = ''
             training_detail = trainings_details.get(training_title)
             if training_detail and any(training_detail):
                 if 'url' in training_detail:
@@ -239,7 +279,7 @@ class GenerateDocumentsWithMetadataFromFiles:
                         docs.append(Document(page_content=content, metadata=metadata_detail))
 
         #docs.append(Document(page_content= 'Liste complète de toutes les formations proposées par Studi :\n' + ', '.join(all_trainings_titles), metadata={"type": "liste_formations",}))
-        return docs
+        return docs, all_trainings_titles
     
     def get_french_section(self, section: str) -> str:
         if section == 'title':
