@@ -4,10 +4,17 @@ from common_tools.models.conversation import Conversation
 from common_tools.rag.rag_filtering_metadata_helper import RagFilteringMetadataHelper
 from common_tools.models.question_analysis import QuestionAnalysis
 from common_tools.rag.rag_service import RagService
+from common_tools.helpers.llm_helper import Llm
+from common_tools.langchains.langchain_factory import LangChainFactory
+from common_tools.models.langchain_adapter_type import LangChainAdapterType
 #
 from langchain_core.documents import Document
 from langchain.retrievers import EnsembleRetriever
 from langchain_community.retrievers import BM25Retriever
+from langchain.retrievers import ContextualCompressionRetriever
+from langchain.retrievers.document_compressors import LLMChainExtractor
+from langchain.retrievers.document_compressors import LLMChainFilter
+
 
 class RAGHybridRetrieval:
     @staticmethod    
@@ -25,8 +32,8 @@ class RAGHybridRetrieval:
     
     @staticmethod    
     def rag_hybrid_retrieval_langchain(rag: RagService, query:Optional[Union[str, Conversation]], metadata:dict, include_bm25_retrieval: bool = True, give_score: bool = True, max_retrived_count: int = 20, bm25_ratio: float = 0.2):
-        vector_ratio = 1 - bm25_ratio               
-        # Create bm25 retriever with metadata filter        
+        vector_ratio = 1 - bm25_ratio
+        # Create bm25 retriever with metadata filter
         if metadata:
             if RagFilteringMetadataHelper.does_contain_filter(metadata, 'training_info_type','url'):
                 max_retrived_count = 100
@@ -55,8 +62,13 @@ class RAGHybridRetrieval:
         retrievers = [vector_retriever, bm25_retriever]        
         weights = [vector_ratio, bm25_ratio]
         ensemble_retriever = EnsembleRetriever(retrievers=retrievers, weights=weights)
+
+        filter_llm = LangChainFactory.create_llm(LangChainAdapterType.OpenAI, "gpt-4o-mini")
+        _filter = LLMChainFilter.from_llm(filter_llm)
+        compression_retriever = ContextualCompressionRetriever(base_compressor=_filter, base_retriever=ensemble_retriever)
+
         question_w_history = Conversation.conversation_history_as_str(query)
-        retrieved_chunks = ensemble_retriever.invoke(question_w_history)
+        retrieved_chunks = compression_retriever.invoke(question_w_history)
         return retrieved_chunks
     
     @staticmethod    
@@ -96,3 +108,6 @@ class RAGHybridRetrieval:
 
         return rag_retrieved_chunks
     
+    @staticmethod   
+    def chunks_reranking_and_selection(retrieved_chunks: list[tuple[Document, float]]):
+        pass    

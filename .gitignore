@@ -8,6 +8,9 @@ chroma_db/
 .env
 *.pyc
 *.exe
+*.bin
+*.sqlite3
+
 /Include
 /Lib
 Lib/

@@ -79,6 +79,7 @@ class RAGPreTreatment:
             txt.print(f"Filters extracted from the query: {response_with_filters.filter}")
         
         metadata_filters = RagFilteringMetadataHelper.get_filters_from_comparison(response_with_filters.filter)
+        print(f"Filters: '{metadata_filters}'")
         return response_with_filters.query, metadata_filters
         
     @staticmethod
@@ -87,7 +88,7 @@ class RAGPreTreatment:
         
     @staticmethod
     def get_merged_metadata(question_analysis :QuestionAnalysis, query_wo_metadata_from_implicit:str, implicit_metadata:dict, query_wo_metadata_from_explicit:str, explicit_metadata:dict) -> dict:
-        #todo: replace the translated question isn't good
+        #todo: to replace the translated question isn't a good way to do it
         if query_wo_metadata_from_explicit and query_wo_metadata_from_explicit != question_analysis.question:
             question_analysis.translated_question = query_wo_metadata_from_explicit.strip()
         elif query_wo_metadata_from_implicit:
