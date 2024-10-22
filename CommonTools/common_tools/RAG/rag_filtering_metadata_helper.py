@@ -96,16 +96,19 @@ class RagFilteringMetadataHelper:
                         RagFilteringMetadataHelper.get_filters_from_comparison(sub_filter, metadata_infos) 
                         for sub_filter in langchain_filters.arguments
                     ]
+                    filters = [f for f in filters if f and f != "NO_FILTER"]
                 elif langchain_filters.operator.value == LogicalOperator.OR.value:
                     filters = [
                         RagFilteringMetadataHelper.get_filters_from_comparison(sub_filter, metadata_infos) 
                         for sub_filter in langchain_filters.arguments
                     ]
+                    filters = [f for f in filters if f and f != "NO_FILTER"]
             elif isinstance(langchain_filters, Comparison):
                 # Add filter only if the attribute is in valid_keys or if no valid_keys are provided
                 if not valid_keys or langchain_filters.attribute in valid_keys:
-                    filter_dict = {langchain_filters.attribute: langchain_filters.value}
-                    filters.append(filter_dict)
+                    if langchain_filters.value != "NO_FILTER":
+                        filter_dict = {langchain_filters.attribute: langchain_filters.value}
+                        filters.append(filter_dict)
             else:
                 raise ValueError(f"Unsupported filter type: {type(langchain_filters)}")
 

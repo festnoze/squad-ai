@@ -15,10 +15,9 @@ class MetadataDescriptionHelper:
                 AttributeInfo(name='type', description= dedent(f"""\
                     Le type de données contenu dans ce document.
                     Ajoute systématiquement un filtre sur le 'type'. Par défaut ce filtre aura la valeur : 'formation', sauf si la question parle explicitement d'un autre thème listé (comme 'métier' ou 'domaine'), 
-                    {list_possible_values} : ['formation', 'métier', 'certifieur', 'certification', 'diplôme', 'domaine'].
-                    Ajoute un filtre sur 'type' dès que la question traite l'un de ces sujets. 
+                    {list_possible_values} : ['formation', 'métier', 'certifieur', 'certification', 'diplôme', 'domaine']. 
                     Attention, n'appliquer qu'un seul filtre sur 'type' maximum. 
-                    Pour le filtre : type equals 'formation', on ajoute aussi fréquement un filtre sur 'training_info_type' si on recherche des informations spécifiques sur une formation"""), type='str'),
+                    Si tu ajoutes : 'type' = 'formation', analyse la demande pour voir si tu ne peux pas aussi ajouter un filtre sur : 'training_info_type', 'name_domain' ou 'name_certification', si on recherche des informations spécifiques sur une formation, ou une formation précise"""), type='str'),
                 AttributeInfo(name='name', description="Le nom du document. Par exemple, en conjonction avec le filtre : type equals 'formation', il s'agira du nom de la formation. Attention : à n'utiliser que si le nom exact de l'objet recherché a été précédemment fourni par l'assistant (pas par l'utilisateur).", type='str'),
                 AttributeInfo(name='changed', description="La date du dernier changement de la donnée", type='str'),
                 AttributeInfo(name='training_info_type', description= dedent(f"""\
