@@ -70,7 +70,7 @@ class RAGPreTreatment:
     def analyse_query_for_metadata(rag:RagService, query:Optional[Union[str, Conversation]], metadata_infos:list[AttributeInfo] = None) -> tuple[str, dict]:
         if not RAGPreTreatment.metadata_infos:
             RAGPreTreatment.metadata_infos = RagService.generate_metadata_info_from_docs(rag.langchain_documents, 30)
-        self_querying_retriever, query_constructor = RagService.build_self_querying_retriever(rag, RAGPreTreatment.metadata_infos)
+        self_querying_retriever, query_constructor = RagService.build_self_querying_retriever_langchain(rag, RAGPreTreatment.metadata_infos)
         user_queries_history = Conversation.user_queries_history_as_str(query)
         
         response_with_filters = query_constructor.invoke(user_queries_history)

@@ -99,7 +99,8 @@ class RagService:
         bm25_retriever.k = k
         return bm25_retriever
         
-    def build_self_querying_retriever(self, metadata_description: list[AttributeInfo] = None, get_query_constructor:bool = True) -> tuple :
+    #todo: move to inference pipeline?
+    def build_self_querying_retriever_langchain(self, metadata_description: list[AttributeInfo] = None, get_query_constructor:bool = True) -> tuple :
         document_description = "Description of the document"
         if not metadata_description:
             metadata_description = RagService.generate_metadata_info_from_docs(self.langchain_documents)

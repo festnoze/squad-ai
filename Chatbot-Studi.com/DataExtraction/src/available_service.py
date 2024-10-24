@@ -146,7 +146,7 @@ class AvailableService:
         return response
 
     def generate_ground_truth():
-        RagasService.generate_ground_truth(AvailableService.llms_infos[0], AvailableService.rag_service.langchain_documents, 1)
+        asyncio.run(RagasService.generate_ground_truth_async(AvailableService.llms_infos[0], AvailableService.rag_service.langchain_documents, 1))
 
     #todo: to delete or write to add metadata to context
     @staticmethod

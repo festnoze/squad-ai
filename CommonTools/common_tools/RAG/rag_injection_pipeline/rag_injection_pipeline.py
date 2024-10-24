@@ -26,10 +26,10 @@ class RagInjectionPipeline:
     def __init__(self, rag: RagService):
         self.rag_service: RagService = rag
 
-    def build_vectorstore_and_bm25_store(self, data: list, chunk_size:int = 0, children_chunk_size:int = 0, delete_existing=True)-> int:
-        if not data or len(data) == 0: return 0
-        self.vectorstore = self._build_vectorstore(data, chunk_size, delete_existing)
-        self._build_bm25_store(data)
+    def build_vectorstore_and_bm25_store(self, documents: list, chunk_size:int = 0, children_chunk_size:int = 0, delete_existing=True)-> int:
+        if not documents or len(documents) == 0: return 0
+        self.vectorstore = self._build_vectorstore(documents, chunk_size, delete_existing)
+        self._build_bm25_store(documents)
         return self.vectorstore._collection.count()
 
     def _build_vectorstore(self, documents: list, chunk_size:int = 0, delete_existing=True) -> any:
@@ -73,13 +73,13 @@ class RagInjectionPipeline:
             )
         return db
 
-    def _build_bm25_store(self, data):
+    def _build_bm25_store(self, documents):
         documents_dict = []
-        for datum in data:
-            if isinstance(datum, Document):
-                documents_dict.append(self._build_document(datum.page_content, datum.metadata))
-            elif isinstance(datum, dict):
-                documents_dict.append(self._build_document(datum["page_content"], datum["metadata"]))
+        for document in documents:
+            if isinstance(document, Document):
+                documents_dict.append(self._build_document(document.page_content, document.metadata))
+            elif isinstance(document, dict):
+                documents_dict.append(self._build_document(document["page_content"], document["metadata"]))
             else:
                 raise ValueError("Invalid data type")
         

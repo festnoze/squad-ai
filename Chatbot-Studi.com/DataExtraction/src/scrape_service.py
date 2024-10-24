@@ -155,9 +155,28 @@ class ScrapeService:
         webpages_json = file.get_files_contents(pages_out_dir, 'json')
         for webpage_json_str in webpages_json:
             webpage_json = json.loads(webpage_json_str)
-            sections = self.extract_sections_from_content(webpage_json['title'], webpage_json['url'], webpage_json['content'])
-            out_filename = f"{sections_out_dir}{webpage_json_str['name']}.json"
+            sections = self.extract_sections_from_content(webpage_json['name'], webpage_json['url'], webpage_json['content'])
+            self.check_for_html_tags(sections)
+            continue
+            out_filename = f"{sections_out_dir}{webpage_json['name']}.json"
             file.write_file(sections, out_filename, FileAlreadyExistsPolicy.Override)
+
+    def check_for_html_tags(self, sections):
+        inline_html_tags = [
+            "a", "abbr", "b", "bdi", "bdo", "big", "br", "cite", "code", "dfn", "em", 
+            "i", "img", "input", "kbd", "label", "mark", "q", "s", "samp", "small", 
+            "span", "strong", "sub", "sup", "time", "u", "var", "wbr"
+        ]
+        # count then display the count of each tag in each section
+        for tag in inline_html_tags:
+            count = 0
+            for key, value in sections.items():
+                count += value.count(f"<{tag}>")
+                count += value.count(f"</{tag}>")
+            if count > 0:
+                txt.print(f"Found {count} '{tag}' tags in sections.")
+                
+
 
     def extract_sections_from_content(self, webpage_name: str, webpage_url: str, webpage_content: str, section_classes=['lame-header-training', 'lame-bref', 'lame-programme', 'lame-cards-diploma', 'lame-methode', 'lame-modalites', 'lame-financement', 'lame-simulation'], section_ids=['jobs']):
         sections = {}
@@ -201,8 +220,11 @@ class ScrapeService:
         return sections
 
     def process_section(self, section):
-        # Build a nested data structure
         content_list = []
+
+        # Replace <br> tags with newline characters
+        for br in section.find_all('br'):
+            br.replace_with("\n")         
 
         # Find all accordion items
         accordion_items = section.find_all('div', class_='accordion__item')
