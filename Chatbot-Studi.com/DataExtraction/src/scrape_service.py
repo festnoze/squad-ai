@@ -8,44 +8,43 @@ from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.file_helper import file
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from common_tools.models.file_already_exists_policy import FileAlreadyExistsPolicy
 
 class ScrapeService:
     def __init__(self):
         pass
 
-    def scrape_all_trainings_links_and_contents(self, max_pagination=17, batch_size=5):
+    def scrape_all_trainings(self, max_pagination=17, batch_size=5):
         txt.activate_print = True
         total_start_time = time.time()
         all_trainings_links_filename = "outputs/all_trainings_links.json"
         txt.print_with_spinner("Start scraping all trainings links:")
-        all_trainings_links = []
+        
+        # Load or retrieve all training links
+        all_trainings_urls = self.scrape_or_load_all_trainings_links(max_pagination, all_trainings_links_filename)
+        
+        pages_out_dir = "outputs/scraped-full/"
+        sections_out_dir = 'outputs/scraped/'
+
+        self.parallel_scrape_webpages_contents(all_trainings_urls, pages_out_dir, batch_size, only_not_yet_scraped= True)
+        self.extract_sections_from_scraped_pages(pages_out_dir, sections_out_dir)
+
+        elapsed = txt.get_elapsed_str(txt.get_elapsed_seconds(total_start_time, time.time()))
+        txt.print(f"Scraping all trainings contents completed and saved in {elapsed}") 
+
+    def scrape_or_load_all_trainings_links(self, max_pagination, all_trainings_links_filename):
+        all_trainings_urls = []
         if file.file_exists(all_trainings_links_filename):
             links_str = file.read_file(all_trainings_links_filename)
-            all_trainings_links = json.loads(links_str)
-            txt.stop_spinner_replace_text(f"Loaded {len(all_trainings_links)} trainings links.")
+            all_trainings_urls = json.loads(links_str)
+            txt.stop_spinner_replace_text(f"Loaded {len(all_trainings_urls)} trainings links.")
         else:
-            all_trainings_links = self.get_training_links_all_pages(max_pagination)
-            file.write_file(all_trainings_links, all_trainings_links_filename)
-            txt.stop_spinner_replace_text(f"Retrieved {len(all_trainings_links)} trainings links completed.")
-        
-        links_to_process = [
-            link for link in all_trainings_links
-            if not file.file_exists(f"outputs/scraped/{link.split('/')[-1]}.json")
-        ]
-        for i in range(0, len(links_to_process), batch_size):
-            batch = links_to_process[i:i + batch_size]
-            with ThreadPoolExecutor(max_workers=batch_size) as executor:
-                executor.map(self.scrape_and_save_webpage_content, batch)
+            all_trainings_urls = self.scrape_all_trainings_links(max_pagination)
+            file.write_file(all_trainings_urls, all_trainings_links_filename)
+            txt.stop_spinner_replace_text(f"Retrieved {len(all_trainings_urls)} trainings links completed.")
+        return all_trainings_urls
 
-        #not parallel version
-        # for i, link in enumerate(all_tainings_links):
-        #     if not file.file_exists(f"outputs/scraped/{link.split('/')[-1]}.json"):
-        #         contents = self.scrape_and_save_webpage_content(link)
-
-        elapsed = txt.get_elapsed_seconds(total_start_time, time.time())
-        txt.print(f"Scraping all trainings contents completed and saved in {elapsed}s.")        
-    
-    def get_training_links_all_pages(self, max_pagination=17, batch_size=5):
+    def scrape_all_trainings_links(self, max_pagination=17, batch_size=5):
         all_outputs = []
 
         for i in range(1, max_pagination + 1, batch_size):
@@ -76,7 +75,7 @@ class ScrapeService:
         url = base_url + str(page)
         driver.get(url)
         time.sleep(2)
-        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        soup = BeautifulSoup(all_page_content, 'html.parser')
         hits_list = soup.find('ol', class_='ais-Hits-list')
 
         if hits_list:
@@ -116,38 +115,64 @@ class ScrapeService:
         
         return training_links
     
+    def parallel_scrape_webpages_contents(self, pages_urls:list[str], out_dir:str, batch_size:int = 10, only_not_yet_scraped= True):        
+        # Remove already scraped webpages
+        if only_not_yet_scraped:
+            links_to_process = [
+                link for link in pages_urls
+                if not file.file_exists(f"{out_dir}{link.split('/')[-1]}.json")
+            ]
+        else:
+            links_to_process = pages_urls
+
+        # scrape pages in parallel batches
+        for i in range(0, len(links_to_process), batch_size):
+            batch = links_to_process[i:i + batch_size]
+            with ThreadPoolExecutor(max_workers=batch_size) as executor:
+                executor.map(self.scrape_and_save_webpage_content, batch)    
+
     def scrape_and_save_webpage_content(self, training_url):
         training_name = training_url.split("/")[-1]
         txt.print(f"Scraping training content of: '{training_name}'")
         start_time = time.time()
-        contents = self.scrape_webpage_content(training_url)
-        file.write_file(contents, f"outputs/scraped/{training_name}.json")
-        elapsed_str = txt.get_elapsed_str(txt.get_elapsed_seconds(start_time, time.time()))
-        txt.print(f"Scraped {len(contents)} sections completed and saved in {elapsed_str}")
+        page_content = self.retrieve_page_content(training_url)
+        file.write_file({ 'name': training_name, 'url': training_url, 'content': page_content }, f"outputs/scraped-full/{training_name}.json")
     
-    def scrape_webpage_content(self, url, section_classes= ['lame-header-training', 'lame-bref', 'lame-programme', 'lame-cards-diploma', 'lame-methode', 'lame-modalites', 'lame-financement', 'lame-simulation'], section_ids= ['jobs']):
-        sections = {}
-
-        # Setup Selenium WebDriver
+    def retrieve_page_content(self, url):
         driver = webdriver.Chrome()
         driver.get(url)
         time.sleep(2)
+
+        result = None
         if "Ce contenu n'existe pas ou plus." in driver.page_source:
             txt.print(f">>>>> Page not found: '{url}'")
-            driver.quit()
-            return None
-        soup = BeautifulSoup(driver.page_source, 'html.parser')
+        else:
+            result = driver.page_source
+        driver.quit()
+        return result
+    
+    def extract_sections_from_scraped_pages(self, pages_out_dir, sections_out_dir):
+        webpages_json = file.get_files_contents(pages_out_dir, 'json')
+        for webpage_json_str in webpages_json:
+            webpage_json = json.loads(webpage_json_str)
+            sections = self.extract_sections_from_content(webpage_json['title'], webpage_json['url'], webpage_json['content'])
+            out_filename = f"{sections_out_dir}{webpage_json_str['name']}.json"
+            file.write_file(sections, out_filename, FileAlreadyExistsPolicy.Override)
 
+    def extract_sections_from_content(self, webpage_name: str, webpage_url: str, webpage_content: str, section_classes=['lame-header-training', 'lame-bref', 'lame-programme', 'lame-cards-diploma', 'lame-methode', 'lame-modalites', 'lame-financement', 'lame-simulation'], section_ids=['jobs']):
+        sections = {}
+        soup = BeautifulSoup(webpage_content, 'html.parser')
         title_content_div = soup.find('div', class_='title-content')
         
-        if title_content_div:
-            # Extract the title from the h1 tag
+        # Extract the title from the h1 tag
+        if title_content_div:             
             h1 = title_content_div.find('h1')
             if h1:
                 title = h1.get_text(strip=True)
                 sections['title'] = title
             else:
-                txt.print(">>> Title not found in 'title-content' div.")
+                sections['title'] = webpage_name
+                txt.print(f"/!\\ Title not found in 'title-content' div. Use the one from url instead: '{webpage_name}'.")
 
             # Extract the academic level from 'tag-w' ul
             tag_w_ul = title_content_div.find('ul', class_='tag-w')
@@ -155,9 +180,7 @@ class ScrapeService:
                 # Find 'li' elements with class 'tag' inside 'tag-w' ul
                 li_tags = tag_w_ul.find_all('li', class_='tag')
                 if li_tags and any(li_tags):
-                    academic_levels = []
-                    for li_tag in li_tags:
-                        academic_levels.append(li_tag.get_text(strip=True))
+                    academic_levels = [li_tag.get_text(strip=True) for li_tag in li_tags]
                     sections['academic_level'] = ', '.join(academic_levels)
 
         # Extract content from the specified sections by their classes
@@ -165,17 +188,16 @@ class ScrapeService:
             section = soup.find('section', class_=section_class)
             if section:
                 key = section_class.replace('lame-', '')
-                sections[key] = self.render_nested_list_as_bullet_lists_str(self.process_section(section))
+                sections[key] = self._build_bullet_lists_str_from_nested_lists(self.process_section(section))
 
         # Extract content from the specified sections by their IDs
         for section_id in section_ids:
             section = soup.find('section', id=section_id)
             if section:
                 key = section_id.replace('jobs', 'metiers')
-                sections[key] = self.render_nested_list_as_bullet_lists_str(self.process_section(section))
+                sections[key] = self._build_bullet_lists_str_from_nested_lists(self.process_section(section))
 
-        driver.quit()
-        sections['url'] = url
+        sections['url'] = webpage_url
         return sections
 
     def process_section(self, section):
@@ -257,7 +279,7 @@ class ScrapeService:
 
         return content_list
     
-    def render_nested_list_as_bullet_lists_str(self, content, depth=0, indent_count=4)-> str:
+    def _build_bullet_lists_str_from_nested_lists(self, content, depth=0, indent_count=4)-> str:
         output = ''
         indent = ' ' * (indent_count * depth)
         bullets = ['•', '◦', '▪']
@@ -267,10 +289,10 @@ class ScrapeService:
             # Handle dictionary with 'title' and 'content'
             title = content.get('title', '')
             output += f"{indent}{bullet} {title}\n"
-            output += self.render_nested_list_as_bullet_lists_str(content.get('content', []), depth + 1, indent_count)
+            output += self._build_bullet_lists_str_from_nested_lists(content.get('content', []), depth + 1, indent_count)
         elif isinstance(content, list):
             for item in content:
-                output += self.render_nested_list_as_bullet_lists_str(item, depth, indent_count)
+                output += self._build_bullet_lists_str_from_nested_lists(item, depth, indent_count)
         elif isinstance(content, str):
             output += f"{indent}{bullet} {content}\n"
         else:

@@ -9,19 +9,24 @@ from ragas.testset.synthesizers.generate import TestsetGenerator
 from ragas.testset.synthesizers.abstract_query import AbstractQuerySynthesizer, ComparativeAbstractQuerySynthesizer
 from ragas.testset.synthesizers.specific_query import SpecificQuerySynthesizer
 from ragas.llms.base import LangchainLLMWrapper
-from pandas import DataFrame
+import pandas as panda
 from common_tools.helpers.execute_helper import Execute
+from common_tools.rag.rag_injection_pipeline.rag_injection_pipeline import RagInjectionPipeline
+from common_tools.models.llm_info import LlmInfo
+from common_tools.models.langchain_adapter_type import LangChainAdapterType
+from common_tools.rag.rag_service import RagService
+
+
+from langchain_community.document_loaders import TextLoader
+from langchain.indexes import VectorstoreIndexCreator
+from langchain.chains import RetrievalQA
+from langchain_openai import ChatOpenAI
+from langchain.text_splitter import CharacterTextSplitter, RecursiveCharacterTextSplitter
+import openai
 
 class RagasService:
     @staticmethod
-    def generate_ground_truth(llm_info: LlmInfo, langchain_documents: list[Document], test_size: int = 2):
-        
-        from langchain_community.document_loaders import TextLoader
-        from langchain.indexes import VectorstoreIndexCreator
-        from langchain.chains import RetrievalQA
-        from langchain_openai import ChatOpenAI
-        
-        nest_asyncio.apply()
+    def generate_ground_truth(llm_info: LlmInfo, langchain_documents: list[Document], test_size: int = 2):     
         # loader = TextLoader("./test.txt")
         # index = VectorstoreIndexCreator(embedding=EmbeddingModel.OpenAI_TextEmbedding3Small.create_instance()).from_loaders([loader])
 
@@ -36,22 +41,89 @@ class RagasService:
         # result = qa_chain({"query": question})
         # answer = result["result"]
         # print(answer)
+        from dotenv import load_dotenv
+        load_dotenv()
+        openai_api_key = os.getenv("OPEN_API_KEY")        
+        openai.api_key = openai_api_key
+        os.environ["OPENAI_API_KEY"] = openai_api_key
+
         loader = TextLoader("./test.txt")
-        docs = loader.load_and_split()
-        os.environ["OPENAI_API_KEY"] = os.getenv("OPEN_API_KEY") # needed by ragas which use GPT-4o-mini
-        
-        evaluator_llm = LangChainFactory.create_llm_from_info(llm_info) #AvailableService.rag_service.llm)
-        embedding = EmbeddingModel.OpenAI_TextEmbedding3Small.create_instance()
-        
-        generator = TestsetGenerator.from_langchain(
-            LangchainLLMWrapper(evaluator_llm),
-            #embedding
+        rag_service = RagService(llm_info, EmbeddingModel.OpenAI_TextEmbedding3Small) #EmbeddingModel.Ollama_AllMiniLM
+        injection_pipeline = RagInjectionPipeline(rag_service)
+        docs = loader.load_and_split(RecursiveCharacterTextSplitter(
+            separators=["\n"],
+            chunk_size=200,
+            chunk_overlap=20,
+            length_function=len
+        ))
+
+        retriever = rag_service.vectorstore.as_retriever()
+
+        from langchain.smith import RunEvalConfig
+        from ragas.integrations.langchain import EvaluatorChain
+        from ragas.metrics import (
+            answer_correctness,
+            answer_relevancy,
+            context_precision,
+            context_recall,
+            faithfulness,
         )
 
-        testset = generator.generate_with_langchain_docs(docs, test_size)
+        from common_tools.langchains.langsmith_client import Langsmith
+        langsmith = Langsmith()
+        client = langsmith.client
 
-        test_df = testset.to_pandas()
-        print(test_df)
+        dataset_url = "https://smith.langchain.com/o/c05186c1-666d-5eac-bbce-5c9c4785bfb1/datasets/e8113156-5c94-4d65-9ee7-f307114d1009?tab=2&paginationState=%7B%22pageIndex%22%3A0%2C%22pageSize%22%3A10%7D"
+        dataset_name = 'drupal_testset_02' #os.getenv("LANGCHAIN_PROJECT")
+        if not client.has_dataset(dataset_name=dataset_name):
+            client.create_dataset(dataset_name)
+
+
+        # Wrap the RAGAS metrics to use in LangChain
+        evaluators = [
+            EvaluatorChain(metric)
+            for metric in [
+                answer_correctness,
+                answer_relevancy,
+                context_precision,
+                context_recall,
+                faithfulness,
+            ]
+        ]
+
+        nest_asyncio.apply()
+        eval_config = RunEvalConfig(custom_evaluators=evaluators)
+
+        results = client.run_on_dataset(
+            dataset_name=dataset_name,
+            llm_or_chain_factory=rag_service.llm,
+            evaluation=eval_config,
+        )
+
+        df_results = panda.DataFrame.from_dict(results)
+        print(df_results)
+
+        # from langchain_community.document_loaders import DirectoryLoader
+        # path = "outputs/all/"
+        # loader = DirectoryLoader(path, glob="**/*.json")
+        # docs = loader.load()
+        
+        
+        # 
+        # os.environ["OPENAI_API_KEY"] = os.getenv("OPEN_API_KEY") # needed by ragas which use GPT-4o-mini
+        
+        # evaluator_llm = LangChainFactory.create_llm_from_info(llm_info) #AvailableService.rag_service.llm)
+        # embedding = EmbeddingModel.OpenAI_TextEmbedding3Small.create_instance()
+        
+        # generator = TestsetGenerator(
+        #     LangchainLLMWrapper(evaluator_llm),
+        #     #embedding
+        # )
+
+        # testset = generator.generate_with_langchain_docs(docs, testset_size=5)
+
+        # testset = testset.to_pandas()
+        # print(testset)
 
 
     @staticmethod

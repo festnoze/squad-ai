@@ -11,16 +11,14 @@ from scrape_service import ScrapeService
 class ChatbotFront:
     def main():
         AvailableService.init()
-
         st.set_page_config(
             page_title= "Chatbot site public Studi.com",
             page_icon= "🔎",
             layout= "centered",
-            initial_sidebar_state= "collapsed" #"expanded"
+            initial_sidebar_state= "expanded" #"collapsed" #
         )
 
-        # Custom CSS to hide the upper right hamburger menu and footer
-        hide_streamlit_style = """
+        custom_css = """
             <style>
             #MainMenu {visibility: hidden;}
             footer {visibility: hidden;}
@@ -29,20 +27,23 @@ class ChatbotFront:
                 padding-top: 1rem !important;
                 padding-bottom: 1rem !important;
             }
+            .stSidebar {
+                width: 360px !important;
+            }
             </style>
             """
-        st.markdown(hide_streamlit_style, unsafe_allow_html=True)
+        st.markdown(custom_css, unsafe_allow_html=True)
         
         with st.sidebar:
             st.button("Utilisez le chatbot pour Rechercher  ➺", disabled=True)
             st.button("🧽 Effacer la conversation du chatbot", on_click=ChatbotFront.clear_conversation)
             st.divider()
             st.subheader("🚀 Autres actions :")
-            st.button("📊 Récupérer les données Drupal via json-api", on_click=ChatbotFront.get_drupal_data)
-            st.button("📚 Récupérer les pages web des formations", on_click=ChatbotFront.scrape_website_pages)
-            st.button("📦 Construit la base vectorielle", on_click=ChatbotFront.build_vectorstore)
+            st.button("📊 Récupérer données Drupal par json-api", on_click=ChatbotFront.get_drupal_data)
+            st.button("📚 Scraping des pages web des formations", on_click=ChatbotFront.scrape_website_pages)
+            st.button("📦 Remplissage de la base vectorielle", on_click=ChatbotFront.build_vectorstore)
             st.divider()
-            st.button("✨ Générer RAGAS Ground Truth", on_click=ChatbotFront.generate_ground_truth)
+            st.button("✨ Générer RAGAS Ground Truth dataset", on_click=ChatbotFront.generate_ground_truth)
             #ChatbotFront.folder_path = st.text_input("Dossier à traiter", value=ChatbotFront.folder_path)#, disabled=True)
 
         st.title("💬 Chatbot Studi.com")
@@ -57,7 +58,7 @@ class ChatbotFront:
 
         for msg in st.session_state.messages:
             st.chat_message(msg["role"]).write(msg["content"])
-                    
+
         custom_css = """
             <style>
             .stSpinner {
@@ -101,13 +102,13 @@ class ChatbotFront:
         
     def scrape_website_pages():
         scraper = ScrapeService()
-        scraper.scrape_all_trainings_links_and_contents()
+        scraper.scrape_all_trainings()
 
     def generate_ground_truth():
         prompt = f"Génération du dataset RAGAS Ground Truth"
         with st.spinner("En cours ... " + prompt):
             AvailableService.generate_ground_truth()
-        st.session_state.messages.append({"role": "assistant", "content": txt.remove_markdown("Terminé avec succès : " + prompt)})
+            st.session_state.messages.append({"role": "assistant", "content": txt.remove_markdown("Terminé avec succès : " + prompt)})
 
     def start_caption():
         return "Bonjour, je suis Studia, votre agent virtuel. Comment puis-je vous aider ?"

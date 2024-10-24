@@ -38,7 +38,7 @@ class file:
             return None
             
     @staticmethod
-    def write_file(content: str, filepath: str, file_exists_policy: FileAlreadyExistsPolicy = FileAlreadyExistsPolicy.Override, encoding='utf-8-sig'):
+    def write_file(content: str, filepath: str, file_exists_policy: FileAlreadyExistsPolicy = FileAlreadyExistsPolicy.Override, encoding='utf-8'):
         """
         Writes content to a file specified by path and filename.
 

@@ -5,7 +5,7 @@ import json
 # langchain related imports
 from langchain_core.runnables import Runnable
 from langchain_core.documents import Document
-from langchain.text_splitter import CharacterTextSplitter
+from langchain.text_splitter import CharacterTextSplitter, RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import TextLoader
 #from langchain_community.vectorstores import FAISS
 from langchain_community.retrievers import BM25Retriever
@@ -123,12 +123,7 @@ class RagInjectionPipeline:
     
     def _split_text_into_chunks(self, documents: list, chunk_size: int = 2000, chunk_overlap: int = 100, max_chunk_size: int = 5461) -> list[Document]:
         all_chunks = []
-        txt_splitter = CharacterTextSplitter(
-            separator="\n",
-            chunk_size=chunk_size,
-            chunk_overlap=chunk_overlap,
-            length_function=len
-        )
+        txt_splitter = self._get_text_splitter(chunk_size, chunk_overlap)
         for document in documents:
             if not document:
                 continue
@@ -150,6 +145,16 @@ class RagInjectionPipeline:
                     if len(small_chunk) <= max_chunk_size:
                         valid_chunks.append(Document(page_content=small_chunk, metadata=chunk.metadata))
         return valid_chunks
+
+    def _get_text_splitter(self, chunk_size, chunk_overlap):
+        txt_splitter = CharacterTextSplitter(
+            separator="\n",
+            chunk_size=chunk_size,
+            chunk_overlap=chunk_overlap,
+            length_function=len
+        )
+        
+        return txt_splitter
     
     def _split_text_with_overlap(self, content: str, chunk_size: int, chunk_overlap: int) -> list[str]:
         """
