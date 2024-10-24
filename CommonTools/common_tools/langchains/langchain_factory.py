@@ -1,4 +1,3 @@
-import os
 from langchain_openai import ChatOpenAI
 from langchain_community.chat_models import ChatOllama, ChatAnthropic
 from langchain_groq import ChatGroq
@@ -10,7 +9,19 @@ from common_tools.helpers.txt_helper import txt
 from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.models.llm_info import LlmInfo
 
+import os
+from dotenv import load_dotenv
+import openai
+
 class LangChainFactory():
+    @staticmethod
+    def set_openai_apikey():
+        if not "OPEN_API_KEY" in os.environ:
+            load_dotenv()
+            openai_api_key = os.getenv("OPEN_API_KEY")        
+            openai.api_key = openai_api_key
+            os.environ["OPENAI_API_KEY"] = openai_api_key
+
     @staticmethod
     def create_llms_from_infos(llms_infos: list[LlmInfo]) -> list[Runnable]:
         txt.print_with_spinner(f"Loading LLM models ...")

@@ -13,6 +13,7 @@ from common_tools.models.llm_info import LlmInfo
 from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.rag.rag_service import RagService
 from common_tools.langchains.langsmith_client import Langsmith
+from common_tools.langchains.langchain_factory import LangChainFactory
 
 from langchain_community.document_loaders import DirectoryLoader
 from langchain_community.document_loaders import TextLoader
@@ -44,13 +45,11 @@ from ragas.metrics import (
 )
 
 class RagasService:    
+    #working version !!! (50% of the time only!)
     @staticmethod
-    async def generate_ground_truth_async(llm_info: LlmInfo, langchain_documents: list[Document], test_size: int = 2):  
-        load_dotenv()
-        openai_api_key = os.getenv("OPEN_API_KEY")        
-        openai.api_key = openai_api_key
-        os.environ["OPENAI_API_KEY"] = openai_api_key
-
+    #async def generate_ground_truth_async(llm_info: LlmInfo, langchain_documents: list[Document], test_size: int = 2):  
+    def generate_ground_truth(llm_info: LlmInfo, langchain_documents: list[Document], test_size: int = 2):
+        LangChainFactory.set_openai_apikey()
         # from datasets import load_dataset
         # ragas_data = load_dataset("aurelio-ai/ai-arxiv2-ragas-mixtral", split="train")
         # print(ragas_data[0])
@@ -59,24 +58,20 @@ class RagasService:
         evaluator_llm = rag_service.llm #LangchainLLMWrapper(rag_service.llm)
         evaluator_embedding = rag_service.embedding #LangchainEmbeddingsWrapper(rag_service.embedding)
 
-        docs = [doc for doc in rag_service.langchain_documents if doc.metadata.get("type") == "formation"][:10]
-        # text_splitter = RecursiveCharacterTextSplitter(
-        #     chunk_size = 1000,
-        #     chunk_overlap = 200
-        # )
-        # chunks = text_splitter.split_documents(docs)
-        
-        # # works with those docs: 
-        # from langchain.document_loaders import DirectoryLoader
-        # from common_tools.helpers.file_helper import file
-        # docs = []
-        # path = "C:/Dev/samples/Sample_Docs_Markdown"
-        # files_paths = file.get_files_paths_and_contents(path, 'md')
-        # for file_path in files_paths:
-        #     file_name = file_path.split('/')[-1].split('.')[0]
-        #     content = file.get_as_str(file_path)
-        #     doc = Document(page_content=content, metadata={"source": file_name})
-        #     docs.append(doc)
+        # # works once ? with own docs !
+        # docs = [doc for doc in rag_service.langchain_documents if doc.metadata.get("type") == "formation"][:10]
+
+        # works with those docs: 
+        from langchain.document_loaders import DirectoryLoader
+        from common_tools.helpers.file_helper import file
+        docs = []
+        path = "C:/Dev/samples/Sample_Docs_Markdown"
+        files_paths = file.get_files_paths_and_contents(path, 'md')
+        for file_path in files_paths:
+            file_name = file_path.split('/')[-1].split('.')[0]
+            content = file.get_as_str(file_path)
+            doc = Document(page_content=content, metadata={"source": file_name})
+            docs.append(doc)
 
         # try:
         #     embedding_extractor = EmbeddingExtractor(embedding_model=rag_service.embedding)
@@ -97,12 +92,69 @@ class RagasService:
             (SpecificQuerySynthesizer(llm=evaluator_llm), 0.25),
         ]
         generator = TestsetGenerator.from_langchain(llm=evaluator_llm)
-        dataset = generator.generate_with_langchain_docs(docs, testset_size=10, transforms_embedding_model=evaluator_embedding, query_distribution=distributions)
+        #docs = docs[:1]
+        dataset = generator.generate_with_langchain_docs(docs, testset_size=5, transforms_embedding_model=evaluator_embedding)#, query_distribution=distributions)
         #dataset = generator.generate_with_langchain_docs(chunks[:test_size], testset_size=test_size, transforms_embedding_model=evaluator_embedding)
         #dataset = generator.generate_with_langchain_docs(langchain_documents_final[:test_size], testset_size=test_size, transforms_llm=evaluator_llm, transforms_embedding_model=evaluator_embedding, query_distribution=distributions)
+        
         ds = dataset.to_pandas()
         print(ds)
 
+        testset_list = dataset.to_list()
+
+        # Get the first item
+        first_item = testset_list[0]
+
+        # Display each column (key-value pair) of the first item
+        for column, value in first_item.items():
+            print(f"{column}: {value}")
+        return
+    
+        langsmith = Langsmith()
+        client = langsmith.client
+        dataset_name = os.getenv("LANGCHAIN_PROJECT") + "_test2"
+        if not client.has_dataset(dataset_name=dataset_name):
+            client.create_dataset(dataset_name, docs)
+
+    
+
+    def generate_ground_truth_with_knowledge_graph(llm_info: LlmInfo, langchain_documents: list[Document], test_size: int = 2):
+        from ragas.testset.graph import KnowledgeGraph
+        from ragas.testset.graph import Node, NodeType
+        from ragas.testset.transforms import Transforms, apply_transforms, default_transforms
+        
+        load_dotenv()
+        openai_api_key = os.getenv("OPEN_API_KEY")        
+        openai.api_key = openai_api_key
+        os.environ["OPENAI_API_KEY"] = openai_api_key
+
+        rag_service = RagService(llm_info, EmbeddingModel.OpenAI_TextEmbedding3Small)
+        evaluator_llm = rag_service.llm
+        evaluator_embedding = rag_service.embedding
+
+        docs = [doc for doc in rag_service.langchain_documents if doc.metadata.get("type") == "formation"][:10]
+        
+        kg = KnowledgeGraph()
+        for doc in docs:
+            kg.nodes.append(
+                Node(
+                    type=NodeType.DOCUMENT,
+                    properties={"page_content": doc.page_content, "document_metadata": doc.metadata}
+                )
+            )
+        trans = default_transforms(llm=evaluator_llm, embedding_model=evaluator_embedding)
+        apply_transforms(kg, trans)
+        kg.save("knowledge_graph.json")
+        loaded_kg = KnowledgeGraph.load("knowledge_graph.json")
+        generator = TestsetGenerator(llm=evaluator_llm, knowledge_graph=loaded_kg)
+        distributions= [
+            (AbstractQuerySynthesizer(llm=evaluator_llm), 0.25),
+            (ComparativeAbstractQuerySynthesizer(llm=evaluator_llm), 0.25),
+            (SpecificQuerySynthesizer(llm=evaluator_llm), 0.5),
+        ]
+        dataset = generator.generate_with_langchain_docs(docs, testset_size=10, transforms_embedding_model=evaluator_embedding, query_distribution=distributions)
+        ds = dataset.to_pandas()
+        print(ds)
 
     @staticmethod
     def generate_ground_truth_from_ragas_site(llm_info: LlmInfo, langchain_documents: list[Document], test_size: int = 2): 

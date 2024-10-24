@@ -13,6 +13,7 @@ from common_tools.helpers.file_helper import file
 from common_tools.helpers.llm_helper import Llm
 from common_tools.helpers.execute_helper import Execute
 from common_tools.models.llm_info import LlmInfo
+from common_tools.langchains.langchain_factory import LangChainFactory
 from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.rag.rag_service import RagService
 from common_tools.rag.rag_inference_pipeline.rag_pre_treatment_tasks import RAGPreTreatment
@@ -28,6 +29,7 @@ from site_public__metadata_descriptions import MetadataDescriptionHelper
 
 class AvailableService:
     def init():
+        LangChainFactory.set_openai_apikey()
         use_prefect = False
         txt.activate_print = True
         AvailableService.out_dir = "C:/Dev/squad-ai/Chatbot-Studi.com/DataExtraction/outputs/"
@@ -146,7 +148,8 @@ class AvailableService:
         return response
 
     def generate_ground_truth():
-        asyncio.run(RagasService.generate_ground_truth_async(AvailableService.llms_infos[0], AvailableService.rag_service.langchain_documents, 1))
+        #asyncio.run(RagasService.generate_ground_truth_async(AvailableService.llms_infos[0], AvailableService.rag_service.langchain_documents, 1))
+        RagasService.generate_ground_truth(AvailableService.llms_infos[0], AvailableService.rag_service.langchain_documents, 1)
 
     #todo: to delete or write to add metadata to context
     @staticmethod
