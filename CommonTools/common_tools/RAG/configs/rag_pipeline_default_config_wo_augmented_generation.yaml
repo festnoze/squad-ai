@@ -1,0 +1,29 @@
+start:
+  - parallel_threads:
+      - guardrails
+      - inference_pipeline_but_generation
+
+inference_pipeline_but_generation:
+  - pre_treatment
+  - data_retrieval
+
+guardrails:
+  - RAGGuardrails.guardrails_query_analysis
+
+pre_treatment:  
+  - parallel_threads:
+    # - RAGPreTreatment.analyse_query_language
+      - RAGPreTreatment.bypassed_analyse_query_language
+
+    # - RAGPreTreatment.bypassed_analyse_query_for_metadata
+      - RAGPreTreatment.analyse_query_for_metadata
+      
+      - RAGPreTreatment.extract_explicit_metadata
+  - RAGPreTreatment.get_merged_metadata
+
+data_retrieval:
+  # - parallel_threads:
+  #     - RAGHybridRetrieval.semantic_vector_retrieval
+  #     - RAGHybridRetrieval.bm25_retrieval
+  #- RAGHybridRetrieval.hybrid_chunks_selection
+  - RAGHybridRetrieval.rag_hybrid_retrieval_langchain

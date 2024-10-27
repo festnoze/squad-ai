@@ -64,9 +64,18 @@ class Ressource:
             return content
         
     @staticmethod
-    def get_rag_pipeline_default_config_1(remove_comments=True) -> str:
-        """Loads and returns the content of rag_pipeline_default_config_1.yaml"""
-        with importlib.resources.open_text(Ressource.rag_configs_package_name, 'rag_pipeline_default_config_1.yaml') as file_reader:
+    def get_rag_pipeline_default_config_streaming(remove_comments=True) -> str:
+        """Loads and returns the content of rag_pipeline_default_config_streaming.yaml"""
+        with importlib.resources.open_text(Ressource.rag_configs_package_name, 'rag_pipeline_default_config_streaming.yaml') as file_reader:
+            content = file_reader.read()
+            if remove_comments:
+                content = txt.remove_commented_lines(content)
+            return yaml.safe_load(content)
+            
+    @staticmethod
+    def get_rag_pipeline_default_config_wo_augmented_generation(remove_comments=True) -> str:
+        """Loads and returns the content of rag_pipeline_default_config_wo_augmented_generation.yaml"""
+        with importlib.resources.open_text(Ressource.rag_configs_package_name, 'rag_pipeline_default_config_wo_augmented_generation.yaml') as file_reader:
             content = file_reader.read()
             if remove_comments:
                 content = txt.remove_commented_lines(content)

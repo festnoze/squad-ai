@@ -41,8 +41,8 @@ class RagInferencePipeline:
     
     #todo: return the sources via an extra parameter
     # Main workflow using the dynamic pipeline
-    def run_pipeline_dynamic(self, query: Optional[Union[str, Conversation]], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None, override_workflow_available_classes:dict = None) -> tuple:
-        config = Ressource.get_rag_pipeline_default_config_1()
+    async def run_pipeline_dynamic_async(self, query: Optional[Union[str, Conversation]], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None, override_workflow_available_classes:dict = None) -> tuple:
+        config = Ressource.get_rag_pipeline_default_config_wo_augmented_generation()
         if override_workflow_available_classes:
             workflow_available_classes = override_workflow_available_classes
         else:
@@ -63,9 +63,13 @@ class RagInferencePipeline:
             'format_retrieved_docs_function': format_retrieved_docs_function
         }
 
-        answer = workflow_executor.execute_workflow(kwargs_values=kwargs_values)
+        guardrails_result, retrieved_chunks = workflow_executor.execute_workflow(kwargs_values=kwargs_values)
+        self.check_for_guardrails(guardrails_result[0])
+        analysed_query = RAGPreTreatment.bypassed_analyse_query_language(self.rag, query)
 
-        return answer[0]
+        # Perform streaming augmented generation
+        async for chunk in RAGAugmentedGeneration.rag_augmented_answer_generation_async(self.rag, query, retrieved_chunks[0], analysed_query, format_retrieved_docs_function):
+            yield chunk
     
     # Main workflow using the static pipeline
     async def run_pipeline_static_async(self, query: Optional[Union[str, Conversation]], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None):

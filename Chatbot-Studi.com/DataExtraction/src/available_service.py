@@ -130,7 +130,8 @@ class AvailableService:
 
         # Run the async generator directly using asyncio.run()
         for chunk in Execute.get_as_sync_stream(
-            AvailableService.inference.run_pipeline_static_async,
+            AvailableService.inference.run_pipeline_dynamic_async,
+            #AvailableService.inference.run_pipeline_static_async,
             conversation_history,
             include_bm25_retrieval=True,
             give_score=True,
