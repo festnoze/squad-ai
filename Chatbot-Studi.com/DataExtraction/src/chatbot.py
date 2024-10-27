@@ -69,9 +69,9 @@ class ChatbotFront:
         st.markdown(custom_css, unsafe_allow_html=True)
 
         #tmp :
-        ChatbotFront.generate_ground_truth()
+        #ChatbotFront.generate_ground_truth()
 
-        
+
         if prompt := st.chat_input(placeholder='Ecrivez votre question ici ...'):
             prompt = txt.remove_markdown(prompt)
             st.session_state.messages.append({"role": "user", "content": prompt})

@@ -45,33 +45,76 @@ from ragas.metrics import (
 )
 
 class RagasService:    
+    @staticmethod
+    def evaluate_dataset(llm_info: LlmInfo, langchain_documents: list[Document], test_size: int = 2):
+        from ragas.llms import LangchainLLMWrapper
+        from ragas.embeddings import LangchainEmbeddingsWrapper
+
+        LangChainFactory.set_openai_apikey()
+        from datasets import load_dataset
+        from ragas import evaluate
+        ragas_data = load_dataset("aurelio-ai/ai-arxiv2-ragas-mixtral", split="train")
+        print(ragas_data[0])
+        
+        rag_service = RagService(llm_info, EmbeddingModel.OpenAI_TextEmbedding3Small)
+        evaluator_llm = rag_service.llm #LangchainLLMWrapper(rag_service.llm)
+        evaluator_embedding = rag_service.embedding #LangchainEmbeddingsWrapper(rag_service.embedding)
+        evaluator_llm = LangchainLLMWrapper(evaluator_llm)
+        evaluator_embedding = LangchainEmbeddingsWrapper(evaluator_embedding)
+        from ragas.metrics import AnswerCorrectness, AnswerRelevancy, ContextPrecision, ContextRecall, ContextEntityRecall, AnswerSimilarity, FactualCorrectness
+        
+        metric = FactualCorrectness(llm=evaluator_llm)
+        sample = ragas_data[0]
+        res = metric.single_turn_score(sample)
+
+        metrics = [
+            AnswerCorrectness(embeddings=evaluator_embedding, llm=evaluator_llm),
+        ]
+        results = evaluate(dataset=ragas_data, metrics=metrics)
+        print(results[0])
+
+    def evaluate_dataset2(llm_info: LlmInfo, langchain_documents: list[Document], test_size: int = 2):
+        LangChainFactory.set_openai_apikey()
+        from datasets import load_dataset
+        from ragas import evaluate
+        ragas_data = load_dataset("aurelio-ai/ai-arxiv2-ragas-mixtral", split="train")
+        print(ragas_data[0])
+        
+        rag_service = RagService(llm_info, EmbeddingModel.OpenAI_TextEmbedding3Small)
+        evaluator_llm = rag_service.llm #LangchainLLMWrapper(rag_service.llm)
+        evaluator_embedding = rag_service.embedding #LangchainEmbeddingsWrapper(rag_service.embedding)
+
+        metrics= [
+            (AbstractQuerySynthesizer(llm=evaluator_llm), 0.5),
+            (ComparativeAbstractQuerySynthesizer(llm=evaluator_llm), 0.25),
+            (SpecificQuerySynthesizer(llm=evaluator_llm), 0.25),
+        ]
+        results = evaluate(dataset=ragas_data[:10], metrics=metrics)
+        df = results.to_pandas()
+        df.head()
+
     #working version !!! (50% of the time only!)
     @staticmethod
     #async def generate_ground_truth_async(llm_info: LlmInfo, langchain_documents: list[Document], test_size: int = 2):  
     def generate_ground_truth(llm_info: LlmInfo, langchain_documents: list[Document], test_size: int = 2):
-        LangChainFactory.set_openai_apikey()
-        # from datasets import load_dataset
-        # ragas_data = load_dataset("aurelio-ai/ai-arxiv2-ragas-mixtral", split="train")
-        # print(ragas_data[0])
-
+        LangChainFactory.set_openai_apikey()               
         rag_service = RagService(llm_info, EmbeddingModel.OpenAI_TextEmbedding3Small)
         evaluator_llm = rag_service.llm #LangchainLLMWrapper(rag_service.llm)
         evaluator_embedding = rag_service.embedding #LangchainEmbeddingsWrapper(rag_service.embedding)
 
         # # works once ? with own docs !
-        # docs = [doc for doc in rag_service.langchain_documents if doc.metadata.get("type") == "formation"][:10]
-
+        docs = [Document(page_content= doc.page_content, metadata= {'id': doc.metadata["id"]}) for doc in rag_service.langchain_documents if doc.metadata.get("type") == "formation"][:10]
         # works with those docs: 
-        from langchain.document_loaders import DirectoryLoader
-        from common_tools.helpers.file_helper import file
-        docs = []
-        path = "C:/Dev/samples/Sample_Docs_Markdown"
-        files_paths = file.get_files_paths_and_contents(path, 'md')
-        for file_path in files_paths:
-            file_name = file_path.split('/')[-1].split('.')[0]
-            content = file.get_as_str(file_path)
-            doc = Document(page_content=content, metadata={"source": file_name})
-            docs.append(doc)
+        # from langchain.document_loaders import DirectoryLoader
+        # from common_tools.helpers.file_helper import file
+        # docs = []
+        # path = "C:/Dev/samples/Sample_Docs_Markdown"
+        # files_paths = file.get_files_paths_and_contents(path, 'md')
+        # for file_path in files_paths:
+        #     file_name = file_path.split('/')[-1].split('.')[0]
+        #     content = file.get_as_str(file_path)
+        #     doc = Document(page_content=content, metadata={"source": file_name})
+        #     docs.append(doc)
 
         # try:
         #     embedding_extractor = EmbeddingExtractor(embedding_model=rag_service.embedding)
@@ -114,9 +157,7 @@ class RagasService:
         client = langsmith.client
         dataset_name = os.getenv("LANGCHAIN_PROJECT") + "_test2"
         if not client.has_dataset(dataset_name=dataset_name):
-            client.create_dataset(dataset_name, docs)
-
-    
+            client.create_dataset(dataset_name, docs)    
 
     def generate_ground_truth_with_knowledge_graph(llm_info: LlmInfo, langchain_documents: list[Document], test_size: int = 2):
         from ragas.testset.graph import KnowledgeGraph
