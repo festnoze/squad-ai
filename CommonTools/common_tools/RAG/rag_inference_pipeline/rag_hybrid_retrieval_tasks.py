@@ -32,6 +32,10 @@ class RAGHybridRetrieval:
     
     @staticmethod    
     def rag_hybrid_retrieval_langchain(rag: RagService, query:Optional[Union[str, Conversation]], metadata:dict, include_bm25_retrieval: bool = True, include_contextual_compression: bool = False, give_score: bool = True, max_retrived_count: int = 20, bm25_ratio: float = 0.2):
+        if not include_bm25_retrieval:
+            rag_retrieved_chunks = RAGHybridRetrieval.semantic_vector_retrieval(rag, query, metadata, give_score, max_retrived_count)
+            return rag_retrieved_chunks
+        
         vector_ratio = 1 - bm25_ratio
         # Create bm25 retriever with metadata filter
         if metadata:

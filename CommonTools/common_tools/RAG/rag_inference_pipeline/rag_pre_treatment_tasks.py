@@ -16,7 +16,7 @@ class RAGPreTreatment:
     @staticmethod
     def rag_static_pre_treatment(rag:RagService, query:Optional[Union[str, Conversation]], default_filters:dict = {}) -> tuple[QuestionAnalysis, dict]:
         question_analysis, extracted_implicit_metadata, extracted_explicit_metadata = Execute.run_parallel(
-            (RAGPreTreatment.bypassed_analyse_query_language, (rag, query)),
+            (RAGPreTreatment.bypassed_query_classification, (rag, query)),
             (RAGPreTreatment.analyse_query_for_metadata, (rag, query)),
             (RAGPreTreatment.extract_explicit_metadata, (query)),
         )
@@ -31,7 +31,7 @@ class RAGPreTreatment:
 
     @staticmethod    
     @output_name('analysed_query')
-    def analyse_query_language(rag:RagService, query:Optional[Union[str, Conversation]]) -> QuestionAnalysis:
+    def query_classification(rag:RagService, query:Optional[Union[str, Conversation]]) -> QuestionAnalysis:
         user_query = Conversation.get_user_query(query)
         prefilter_prompt = Ressource.get_language_detection_prompt()
         prefilter_prompt = prefilter_prompt.replace("{question}", user_query)
@@ -49,7 +49,7 @@ class RAGPreTreatment:
 
     @staticmethod    
     @output_name('analysed_query') #todo: to replace with above
-    def bypassed_analyse_query_language(rag:RagService, query:Optional[Union[str, Conversation]]) -> QuestionAnalysis:
+    def bypassed_query_classification(rag:RagService, query:Optional[Union[str, Conversation]]) -> QuestionAnalysis:
         user_query = Conversation.get_user_query(query)
         question_analysis = QuestionAnalysis(query, query, "request", "french")
         return question_analysis
@@ -69,7 +69,7 @@ class RAGPreTreatment:
     @staticmethod
     def analyse_query_for_metadata(rag:RagService, query:Optional[Union[str, Conversation]], metadata_infos:list[AttributeInfo] = None) -> tuple[str, dict]:
         if not RAGPreTreatment.metadata_infos:
-            RAGPreTreatment.metadata_infos = RagService.generate_metadata_info_from_docs(rag.langchain_documents, 30)
+            RAGPreTreatment.metadata_infos = RagService.build_metadata_infos_from_docs(rag.langchain_documents, 30)
         self_querying_retriever, query_constructor = RagService.build_self_querying_retriever_langchain(rag, RAGPreTreatment.metadata_infos)
         user_queries_history = Conversation.user_queries_history_as_str(query)
         

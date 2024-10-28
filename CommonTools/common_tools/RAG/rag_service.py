@@ -50,6 +50,9 @@ class RagService:
             self.llm = llm_or_infos
         else:
             raise ValueError("Invalid llm_or_infos parameter")
+        
+    def embed_documents(self, text:str) -> List[float]:
+        return self.embedding.embed_documents(text)
     
     def semantic_vector_retrieval(self, question: str, metadata_filters: dict = None, give_score: bool = False, max_retrived_count: int = 10, min_score: float = None, min_retrived_count: int = None) -> list[Document]:
         return self._semantic_vector_retrieval(self.vectorstore, question, metadata_filters, give_score, max_retrived_count, min_score, min_retrived_count)
@@ -103,7 +106,7 @@ class RagService:
     def build_self_querying_retriever_langchain(self, metadata_description: list[AttributeInfo] = None, get_query_constructor:bool = True) -> tuple :
         document_description = "Description of the document"
         if not metadata_description:
-            metadata_description = RagService.generate_metadata_info_from_docs(self.langchain_documents)
+            metadata_description = RagService.build_metadata_infos_from_docs(self.langchain_documents)
 
         if get_query_constructor:
             query_constructor = self.build_query_with_extracted_metadata(metadata_description)
@@ -133,7 +136,7 @@ class RagService:
         return query_constructor
         
     @staticmethod
-    def generate_metadata_info_from_docs(documents: list[Document], max_values: int = 10, metadata_keys_description:dict = None) -> list[AttributeInfo]:
+    def build_metadata_infos_from_docs(documents: list[Document], max_values: int = 10, metadata_keys_description:dict = None) -> list[AttributeInfo]:
         metadata_field_info = []
         value_counts = defaultdict(list)
 

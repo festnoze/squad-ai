@@ -65,7 +65,7 @@ class RagInferencePipeline:
 
         guardrails_result, retrieved_chunks = workflow_executor.execute_workflow(kwargs_values=kwargs_values)
         self.check_for_guardrails(guardrails_result[0])
-        analysed_query = RAGPreTreatment.bypassed_analyse_query_language(self.rag, query)
+        analysed_query = RAGPreTreatment.bypassed_query_classification(self.rag, query)
 
         # Perform streaming augmented generation
         async for chunk in RAGAugmentedGeneration.rag_augmented_answer_generation_async(self.rag, query, retrieved_chunks[0], analysed_query, format_retrieved_docs_function):

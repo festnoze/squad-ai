@@ -14,8 +14,8 @@ guardrails:
 
 pre_treatment:  
   - parallel_threads:
-    # - RAGPreTreatment.analyse_query_language
-      - RAGPreTreatment.bypassed_analyse_query_language
+    # - RAGPreTreatment.query_classification
+      - RAGPreTreatment.bypassed_query_classification
 
     # - RAGPreTreatment.bypassed_analyse_query_for_metadata
       - RAGPreTreatment.analyse_query_for_metadata
