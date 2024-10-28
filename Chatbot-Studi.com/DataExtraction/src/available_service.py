@@ -129,7 +129,7 @@ class AvailableService:
         txt.print_with_spinner("Exécution du pipeline d'inférence ...")
 
         # Run the async generator directly using asyncio.run()
-        for chunk in Execute.get_as_sync_stream(
+        for chunk in Execute.get_async_stream_sync(
             AvailableService.inference.run_pipeline_dynamic_async,
             #AvailableService.inference.run_pipeline_static_async,
             conversation_history,

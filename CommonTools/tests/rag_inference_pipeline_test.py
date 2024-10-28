@@ -15,12 +15,17 @@ class Test_RAGInferencePipeline:
         # Define any methods of the ragService which are expected to be called
         self.mock_rag_service.retrieve.return_value = "rag Task Result"
 
+        self.augmented_answer_generation_method_name = 'rag_augmented_answer_generation_async'
+        async def get_encoded_generator_async(*args, **kwargs):
+            yield f"Mocked {self.augmented_answer_generation_method_name} called".encode('utf-8')
+
         # Create fake classes to override the actual workflow classes
         self.override_workflow_available_classes = {
             'RAGGuardrails': TestHelper.create_dynamic_fake_class_of(RAGGuardrails, 'RAGGuardrailsFake'),
             'RAGPreTreatment': TestHelper.create_dynamic_fake_class_of(RAGPreTreatment, 'RAGPreTreatmentFake'),
             'RAGHybridRetrieval': TestHelper.create_dynamic_fake_class_of(RAGHybridRetrieval, 'RAGHybridRetrievalFake'),
-            'RAGAugmentedGeneration': TestHelper.create_dynamic_fake_class_of(RAGAugmentedGeneration, 'RAGAugmentedGenerationFake'),
+            'RAGAugmentedGeneration': TestHelper.create_dynamic_fake_class_of(RAGAugmentedGeneration, 'RAGAugmentedGenerationFake', 
+                                    override_methods= { self.augmented_answer_generation_method_name: get_encoded_generator_async } ),
             'RAGPostTreatment': TestHelper.create_dynamic_fake_class_of(RAGPostTreatment, 'RAGPostTreatmentFake')
         }
 
@@ -28,16 +33,16 @@ class Test_RAGInferencePipeline:
         self.rag_pipeline = RagInferencePipeline(rag=self.mock_rag_service)
 
     def test_run_with_default_config(self):
-        query = "What is the capital of France?"
+        query = "What is blabla?"
         results = self.rag_pipeline.run_pipeline_dynamic(query, override_workflow_available_classes=self.override_workflow_available_classes)
 
-        assert results == self.override_workflow_available_classes['RAGPostTreatment'].response_post_treatment()
+        assert results == f"Mocked {self.augmented_answer_generation_method_name} called"
 
     def test_run_with_bm25_retrieval_disabled(self):
-        query = "Tell me about the Eiffel Tower."
+        query = "Tell me about blabla."
         results = self.rag_pipeline.run_pipeline_dynamic(query, include_bm25_retrieval=False, override_workflow_available_classes=self.override_workflow_available_classes)
 
-        assert results == self.override_workflow_available_classes['RAGPostTreatment'].response_post_treatment()
+        assert results == f"Mocked {self.augmented_answer_generation_method_name} called"
     
     # def test_run_with_custom_post_processing_function(self):
     #     query = "What is AI?"

@@ -193,7 +193,7 @@ class Execute:
             txt.print(e)
 
     @staticmethod
-    def get_as_sync_stream(function_to_call: Callable[..., AsyncGenerator], *args: Any, **kwargs: Any) -> Generator:
+    def get_sync_generator_from_async(function_to_call: Callable[..., AsyncGenerator], *args: Any, **kwargs: Any) -> Generator:
         """
         Convert an asynchronous streaming function to a synchronous streaming generator.
         Explaination: Use asyncio.Queue() to bridge the asynchronous and synchronous contexts. 

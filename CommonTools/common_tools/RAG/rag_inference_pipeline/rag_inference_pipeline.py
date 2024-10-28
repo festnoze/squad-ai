@@ -1,3 +1,4 @@
+import asyncio
 from typing import Optional, Union
 from langgraph.prebuilt.tool_executor import ToolExecutor
 from langchain.tools.render import format_tool_to_openai_function
@@ -41,7 +42,7 @@ class RagInferencePipeline:
     
     #todo: return the sources via an extra parameter
     # Main workflow using the dynamic pipeline
-    async def run_pipeline_dynamic_async(self, query: Optional[Union[str, Conversation]], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None, override_workflow_available_classes:dict = None) -> tuple:
+    async def run_pipeline_dynamic_async(self, query: Optional[Union[str, Conversation]], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None, override_workflow_available_classes:dict = None):
         config = Ressource.get_rag_pipeline_default_config_wo_augmented_generation()
         if override_workflow_available_classes:
             workflow_available_classes = override_workflow_available_classes
@@ -68,7 +69,7 @@ class RagInferencePipeline:
         analysed_query = RAGPreTreatment.bypassed_query_classification(self.rag, query)
 
         # Perform streaming augmented generation
-        async for chunk in RAGAugmentedGeneration.rag_augmented_answer_generation_async(self.rag, query, retrieved_chunks[0], analysed_query, format_retrieved_docs_function):
+        async for chunk in workflow_available_classes['RAGAugmentedGeneration'].rag_augmented_answer_generation_async(self.rag, query, retrieved_chunks[0], analysed_query, format_retrieved_docs_function):
             yield chunk
     
     # Main workflow using the static pipeline
@@ -114,3 +115,35 @@ class RagInferencePipeline:
         """Raise an error if the query has been rejected by guardrails"""
         if not guardrails_result:
             raise Exception("Query rejected by guardrails")
+        
+    def run_pipeline_dynamic(self,
+                            query: Optional[Union[str, Conversation]],
+                            include_bm25_retrieval: bool = False,
+                            give_score: bool = True,
+                            format_retrieved_docs_function=None,
+                            override_workflow_available_classes: dict[str, any] = None) -> tuple:
+
+        sync_generator = Execute.get_sync_generator_from_async(
+            self.run_pipeline_dynamic_async,
+            query,
+            include_bm25_retrieval,
+            give_score,
+            format_retrieved_docs_function,
+            override_workflow_available_classes
+        )
+        return ''.join(chunk.decode('utf-8') for chunk in sync_generator)
+    
+    def run_pipeline_static(self,
+                            query: Optional[Union[str, Conversation]],
+                            include_bm25_retrieval: bool = False,
+                            give_score: bool = True,
+                            format_retrieved_docs_function=None) -> tuple:
+        sync_generator = Execute.get_sync_generator_from_async(
+            self.run_pipeline_static_async,
+            query,
+            include_bm25_retrieval,
+            give_score,
+            format_retrieved_docs_function
+        )
+        return ''.join(chunk.decode('utf-8') for chunk in sync_generator)
+    
