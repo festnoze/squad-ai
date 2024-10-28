@@ -137,6 +137,50 @@ class Execute:
                 yield (idx, item)
     
     @staticmethod
+    def get_sync_generator_from_async(function_to_call: Callable[..., AsyncGenerator], *args: Any, **kwargs: Any) -> Generator:
+        """
+        Convert an asynchronous streaming function to a synchronous streaming generator.
+        Explaination: Use asyncio.Queue() to bridge the asynchronous and synchronous contexts. 
+        The asynchronous task put result chunks into the queue, which are then consumed synchronously. 
+        This approach ensures that chunks are yielded incrementally, maintaining streaming behavior while going synchronous.
+        """
+        async def collect_results():
+            # Use an async generator to collect results and yield them one by one
+            async for chunk in function_to_call(*args, **kwargs):
+                yield chunk
+        
+        async def put_results_in_queue():
+            # Collect the results and put them in the queue for synchronous consumption
+            try:
+                async for chunk in collect_results():
+                    await queue.put(chunk)
+                # Indicate that all results have been put in the queue
+                await queue.put(None)
+            except Exception as e:
+                await queue.put(e)
+
+        # Create an event loop if there isn't one already
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_closed():
+                raise RuntimeError
+        except RuntimeError:
+            # If there is no event loop or it is closed, create a new one
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+                
+        # Create a queue to stream results from the async context to the sync context
+        queue = asyncio.Queue()
+        loop.create_task(put_results_in_queue())
+        while True:
+            item = loop.run_until_complete(queue.get())
+            if item is None:  # End of the stream
+                break
+            if isinstance(item, Exception):  # If there was an error
+                raise item
+            yield item
+
+    @staticmethod
     def activate_global_function_parameters_types_verification():
         sys.setprofile(Execute._activate_strong_typed_functions_parameters)
         #threading.setprofile(Execute._activate_strong_typed_functions_parameters)
@@ -191,48 +235,3 @@ class Execute:
             txt.print(e)
         except TypeError as e:
             txt.print(e)
-
-    @staticmethod
-    def get_sync_generator_from_async(function_to_call: Callable[..., AsyncGenerator], *args: Any, **kwargs: Any) -> Generator:
-        """
-        Convert an asynchronous streaming function to a synchronous streaming generator.
-        Explaination: Use asyncio.Queue() to bridge the asynchronous and synchronous contexts. 
-        The asynchronous task put result chunks into the queue, which are then consumed synchronously. 
-        This approach ensures that chunks are yielded incrementally, maintaining streaming behavior while going synchronous.
-        """
-        async def collect_results():
-            # Use an async generator to collect results and yield them one by one
-            async for chunk in function_to_call(*args, **kwargs):
-                yield chunk
-        
-        async def put_results_in_queue():
-            # Collect the results and put them in the queue for synchronous consumption
-            try:
-                async for chunk in collect_results():
-                    await queue.put(chunk)
-                # Indicate that all results have been put in the queue
-                await queue.put(None)
-            except Exception as e:
-                await queue.put(e)
-
-        # Create an event loop if there isn't one already
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_closed():
-                raise RuntimeError
-        except RuntimeError:
-            # If there is no event loop or it is closed, create a new one
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-                
-        # Create a queue to stream results from the async context to the sync context
-        queue = asyncio.Queue()
-        loop.create_task(put_results_in_queue())
-        while True:
-            item = loop.run_until_complete(queue.get())
-            if item is None:  # End of the stream
-                break
-            if isinstance(item, Exception):  # If there was an error
-                raise item
-            yield item
-
