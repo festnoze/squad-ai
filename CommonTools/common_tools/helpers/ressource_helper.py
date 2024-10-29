@@ -19,6 +19,15 @@ class Ressource:
             return content
 
     @staticmethod
+    def get_query_completion_prompt(remove_comments=True) -> str:
+        """Loads and returns the content of query_completion_prompt.txt"""
+        with importlib.resources.open_text(Ressource.prompts_package_name, 'query_completion_prompt.txt') as file_reader:
+            content = file_reader.read()
+            if remove_comments:
+                content = txt.remove_commented_lines(content)
+            return content
+        
+    @staticmethod
     def get_prefiltering_translation_instructions_prompt(remove_comments=True) -> str:
         """Loads and returns the content of rag_prefiltering_ask_for_translation_instructions.txt"""
         with importlib.resources.open_text(Ressource.prompts_package_name, 'rag_prefiltering_ask_for_translation_instructions.txt') as file_reader:

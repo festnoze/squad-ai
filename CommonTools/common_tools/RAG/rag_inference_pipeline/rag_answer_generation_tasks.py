@@ -3,7 +3,7 @@ from typing import Optional, Union
 from common_tools.helpers.llm_helper import Llm
 from common_tools.helpers.ressource_helper import Ressource
 from common_tools.models.conversation import Conversation
-from common_tools.models.question_analysis import QuestionAnalysis
+from common_tools.models.question_analysis_base import QuestionAnalysisBase
 from common_tools.rag.rag_service import RagService
 from langchain_core.documents import Document
 from langchain_core.runnables import Runnable, RunnablePassthrough
@@ -13,7 +13,7 @@ class RAGAugmentedGeneration:
     augmented_generation_prompt:str = None
 
     @staticmethod
-    async def rag_augmented_answer_generation_async(rag: RagService, query:Optional[Union[str, Conversation]], retrieved_chunks: list, analysed_query: QuestionAnalysis, format_retrieved_docs_function = None):
+    async def rag_augmented_answer_generation_async(rag: RagService, query:Optional[Union[str, Conversation]], retrieved_chunks: list, analysed_query: QuestionAnalysisBase, format_retrieved_docs_function = None):
         async for chunk in RAGAugmentedGeneration.rag_response_generation_async(rag, query, retrieved_chunks, analysed_query, format_retrieved_docs_function):
             yield chunk
     
@@ -22,7 +22,7 @@ class RAGAugmentedGeneration:
         rag: RagService, 
         query: Optional[Union[str, Conversation]], 
         retrieved_chunks: list, 
-        analysed_query: QuestionAnalysis, 
+        analysed_query: QuestionAnalysisBase, 
         format_retrieved_docs_function=None
     ):
         async def run_async():
@@ -52,7 +52,7 @@ class RAGAugmentedGeneration:
 
 
     @staticmethod
-    async def rag_response_generation_async(rag: RagService, query:Optional[Union[str, Conversation]], retrieved_chunks: list, questionAnalysis: QuestionAnalysis, format_retrieved_docs_function = None):
+    async def rag_response_generation_async(rag: RagService, query:Optional[Union[str, Conversation]], retrieved_chunks: list, questionAnalysis: QuestionAnalysisBase, format_retrieved_docs_function = None):
         if retrieved_chunks and any(retrieved_chunks) and isinstance(retrieved_chunks[0], tuple): 
             retrieved_chunks = [doc[0] for doc in retrieved_chunks] # Remove scores if present
 
@@ -60,18 +60,21 @@ class RAGAugmentedGeneration:
             yield chunk
 
     @staticmethod
-    async def generate_augmented_response_from_retrieved_chunks_async(llm_or_chain: Runnable, query:Optional[Union[str, Conversation]], retrieved_docs: list[Document], analysed_query: QuestionAnalysis, format_retrieved_docs_function = None):
+    async def generate_augmented_response_from_retrieved_chunks_async(llm_or_chain: Runnable, query:Optional[Union[str, Conversation]], retrieved_docs: list[Document], analysed_query: QuestionAnalysisBase, format_retrieved_docs_function = None):
         if not RAGAugmentedGeneration.augmented_generation_prompt:
             RAGAugmentedGeneration.augmented_generation_prompt = Ressource.get_rag_augmented_generation_prompt_generic()
         augmented_generation_prompt = RAGAugmentedGeneration.augmented_generation_prompt
 
         question_w_history = Conversation.conversation_history_as_str(query)
         augmented_generation_prompt = augmented_generation_prompt.replace("{question}", question_w_history)
+        
+        # handle request for respond in a specific language
         additional_instructions = ''
-        if not analysed_query.detected_language.__contains__("english"):
+        if hasattr(analysed_query, 'detected_language') and not analysed_query.detected_language.__contains__("english"):
             additional_instructions = Ressource.get_prefiltering_translation_instructions_prompt()
             additional_instructions = additional_instructions.replace("{target_language}", analysed_query.detected_language)
         augmented_generation_prompt = augmented_generation_prompt.replace("{additional_instructions}", additional_instructions)
+        
         rag_custom_prompt = ChatPromptTemplate.from_template(augmented_generation_prompt)
 
         if format_retrieved_docs_function is None:

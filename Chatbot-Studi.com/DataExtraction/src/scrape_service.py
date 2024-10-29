@@ -73,19 +73,22 @@ class ScrapeService:
         options.add_argument("--log-level=3")  # Suppress logging
         driver = webdriver.Chrome(options=options)
         url = base_url + str(page)
-        driver.get(url)
+        response = driver.get(url)
         time.sleep(2)
-        soup = BeautifulSoup(all_page_content, 'html.parser')
-        hits_list = soup.find('ol', class_='ais-Hits-list')
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            hits_list = soup.find('ol', class_='ais-Hits-list')
 
-        if hits_list:
-                # Find all links in the hits list
-            for item in hits_list.find_all('a', href=True):
-                href = item['href']
-                if href.startswith("/fr/formation/"):
-                    training_links.append("https://www.studi.com" + href)
+            if hits_list:
+                    # Find all links in the hits list
+                for item in hits_list.find_all('a', href=True):
+                    href = item['href']
+                    if href.startswith("/fr/formation/"):
+                        training_links.append("https://www.studi.com" + href)
+            else:
+                print(f"No content found on page {page}")        
         else:
-            print(f"No content found on page {page}")
+            print(f"Failed to retrieve page {page}")
         
         driver.quit()
         return training_links
@@ -175,7 +178,7 @@ class ScrapeService:
                 count += value.count(f"</{tag}>")
             if count > 0:
                 txt.print(f"Found {count} '{tag}' tags in sections.")
-                
+
 
 
     def extract_sections_from_content(self, webpage_name: str, webpage_url: str, webpage_content: str, section_classes=['lame-header-training', 'lame-bref', 'lame-programme', 'lame-cards-diploma', 'lame-methode', 'lame-modalites', 'lame-financement', 'lame-simulation'], section_ids=['jobs']):

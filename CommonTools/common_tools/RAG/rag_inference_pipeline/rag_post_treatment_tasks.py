@@ -1,12 +1,12 @@
-from common_tools.models.question_analysis import QuestionAnalysis
+from common_tools.models.question_translation import QuestionTranslation
 
 class RAGPostTreatment:
     @staticmethod
-    def rag_post_treatment(guardrails_result: bool, rag_answer: str, analysed_query: QuestionAnalysis):
+    def rag_post_treatment(guardrails_result: bool, rag_answer: str, analysed_query: QuestionTranslation):
         return RAGPostTreatment.response_post_treatment(guardrails_result, rag_answer, analysed_query)
     
     @staticmethod
-    def response_post_treatment(guardrails_result: bool, rag_answer: list[str], analysed_query: QuestionAnalysis):
+    def response_post_treatment(guardrails_result: bool, rag_answer: list[str], analysed_query: QuestionTranslation):
         if guardrails_result == True:
             if isinstance(rag_answer, list):
                 return rag_answer[0]

@@ -11,11 +11,11 @@ guardrails:
   - RAGGuardrails.guardrails_query_analysis
 
 pre_treatment:  
+  - RAGPreTreatment.query_completion
   - parallel_threads:
-    - RAGPreTreatment.query_classification
     - RAGPreTreatment.analyse_query_for_metadata      
     - RAGPreTreatment.extract_explicit_metadata
-  - RAGPreTreatment.get_merged_metadata
+  - RAGPreTreatment.get_merged_metadata_and_question_analysis
 
 data_retrieval:
   - RAGHybridRetrieval.rag_hybrid_retrieval_langchain

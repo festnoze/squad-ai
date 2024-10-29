@@ -14,14 +14,14 @@ guardrails:
 
 pre_treatment:  
   - parallel_threads:
-  # - RAGPreTreatment.query_classification
-    - RAGPreTreatment.bypassed_query_classification
+  # - RAGPreTreatment.query_translation
+    - RAGPreTreatment.bypassed_query_translation
 
   # - RAGPreTreatment.bypassed_analyse_query_for_metadata
     - RAGPreTreatment.analyse_query_for_metadata
     
     - RAGPreTreatment.extract_explicit_metadata
-  - RAGPreTreatment.get_merged_metadata
+  - RAGPreTreatment.get_merged_metadata_and_question_analysis
 
 data_retrieval:
 # - parallel_threads:

@@ -30,16 +30,18 @@ class Conversation:
                 raise ValueError("Invalid query, no message found into the conversation")
             if not query_or_conv.last_message.role == "user":
                 raise ValueError("Invalid query, last message should be from user")
-            return query_or_conv.messages[-1].content
+            return query_or_conv.last_message.content
         else:
             raise ValueError("Unsupported query type")
         
     @staticmethod
-    def conversation_history_as_str(query_or_conv: Optional[Union[str, 'Conversation']]) -> str:
+    def conversation_history_as_str(query_or_conv: Optional[Union[str, 'Conversation']], include_current_user_query = True) -> str:
         if isinstance(query_or_conv, Conversation):
             conversation_history = '\n- '.join([f"{msg.role}: {msg.content}" for msg in query_or_conv.messages[:-1]])
             if not conversation_history: conversation_history = "No history yet"
-            full_question = f"### Conversation history: ###\n{conversation_history}\n\n### User current question: ###\n {query_or_conv.last_message.content}" 
+            full_question = f"### Conversation history: ###\n{conversation_history}\n"
+            if include_current_user_query:
+                full_question += f"\n###User current question: ###\n {query_or_conv.last_message.content}" 
         else:
             full_question = query_or_conv
         return full_question
@@ -53,7 +55,13 @@ class Conversation:
         else:
             full_question = query_or_conv
         return full_question
-        
+
+    @staticmethod
+    def user_queries_count(query_or_conv: Optional[Union[str, 'Conversation']]) -> int:
+        if isinstance(query_or_conv, Conversation):
+            return len([query for query in query_or_conv.messages if query.role == 'user'])
+        else:
+            return 1   
     def to_memory(self, user_role: str, instructions: list[str]) -> ConversationBufferMemory:
         memory = ConversationBufferMemory(self.to_langchain_messages(user_role, instructions))
         return memory

@@ -3,8 +3,10 @@ from common_tools.helpers.execute_helper import Execute
 from common_tools.helpers.llm_helper import Llm
 from common_tools.helpers.ressource_helper import Ressource
 from common_tools.models.conversation import Conversation
+from common_tools.models.question_analysis_base import QuestionAnalysisBase
+from common_tools.models.question_completion import QuestionCompletion, QuestionCompletionPydantic
 from common_tools.rag.rag_filtering_metadata_helper import RagFilteringMetadataHelper
-from common_tools.models.question_analysis import QuestionAnalysis, QuestionAnalysisPydantic
+from common_tools.models.question_translation import QuestionTranslation, QuestionTranslationPydantic
 from common_tools.rag.rag_service import RagService
 from common_tools.workflows.output_name_decorator import output_name
 from common_tools.helpers.txt_helper import txt
@@ -14,9 +16,9 @@ class RAGPreTreatment:
     default_filters = {}
     
     @staticmethod
-    def rag_static_pre_treatment(rag:RagService, query:Optional[Union[str, Conversation]], default_filters:dict = {}) -> tuple[QuestionAnalysis, dict]:
+    def rag_static_pre_treatment(rag:RagService, query:Optional[Union[str, Conversation]], default_filters:dict = {}) -> tuple[QuestionTranslation, dict]:
         question_analysis, extracted_implicit_metadata, extracted_explicit_metadata = Execute.run_parallel(
-            (RAGPreTreatment.bypassed_query_classification, (rag, query)),
+            (RAGPreTreatment.bypassed_query_translation, (rag, query)),
             (RAGPreTreatment.analyse_query_for_metadata, (rag, query)),
             (RAGPreTreatment.extract_explicit_metadata, (query)),
         )
@@ -26,38 +28,58 @@ class RAGPreTreatment:
         query_wo_metadata_explicit = extracted_explicit_metadata[0]
         metadata_explicit = extracted_explicit_metadata[1]
 
-        merged_metadata = RAGPreTreatment.get_merged_metadata(question_analysis, query_wo_metadata_implicit, metadata_implicit, query_wo_metadata_explicit, metadata_explicit)
+        merged_metadata = RAGPreTreatment.get_merged_metadata_and_question_analysis(question_analysis, query_wo_metadata_implicit, metadata_implicit, query_wo_metadata_explicit, metadata_explicit)
         return question_analysis, merged_metadata
 
+    @staticmethod
+    @output_name('analysed_query')
+    def query_completion(rag:RagService, query:Optional[Union[str, Conversation]]) -> str:
+        user_query = Conversation.get_user_query(query)
+        if Conversation.user_queries_count(query) < 2:
+            return QuestionCompletion(user_query)
+        
+        prefilter_prompt = Ressource.get_query_completion_prompt()
+        prefilter_prompt = prefilter_prompt.replace("{question}", user_query)
+        prefilter_prompt = prefilter_prompt.replace("{conv_history}", Conversation.conversation_history_as_str(query, include_current_user_query=False))
+        
+        prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(
+            prefilter_prompt, QuestionCompletionPydantic, QuestionCompletion
+        )
+        response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(
+            "query_completion", [rag.llm, rag.llm], output_parser, 10, *[prompt_for_output_parser]
+        )
+        question_completion = response[0]
+        return question_completion
+            
     @staticmethod    
     @output_name('analysed_query')
-    def query_classification(rag:RagService, query:Optional[Union[str, Conversation]]) -> QuestionAnalysis:
+    def query_translation(rag:RagService, query:Optional[Union[str, Conversation]]) -> QuestionTranslation:
         user_query = Conversation.get_user_query(query)
         prefilter_prompt = Ressource.get_language_detection_prompt()
         prefilter_prompt = prefilter_prompt.replace("{question}", user_query)
         prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(
-            prefilter_prompt, QuestionAnalysisPydantic, QuestionAnalysis
+            prefilter_prompt, QuestionTranslationPydantic, QuestionTranslation
         )
         response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(
-            "rag prefiltering", [rag.llm, rag.llm], output_parser, 10, *[prompt_for_output_parser]
+            "query_translation", [rag.llm, rag.llm], output_parser, 10, *[prompt_for_output_parser]
         )
         question_analysis = response[0]
         question_analysis['question'] = user_query
         if question_analysis['detected_language'].__contains__("english"):
             question_analysis['translated_question'] = user_query
-        return QuestionAnalysis(**question_analysis)
+        return QuestionTranslation(**question_analysis)
 
     @staticmethod    
     @output_name('analysed_query') #todo: to replace with above
-    def bypassed_query_classification(rag:RagService, query:Optional[Union[str, Conversation]]) -> QuestionAnalysis:
+    def bypassed_query_translation(rag:RagService, query:Optional[Union[str, Conversation]]) -> QuestionTranslation:
         user_query = Conversation.get_user_query(query)
-        question_analysis = QuestionAnalysis(query, query, "request", "french")
+        question_analysis = QuestionTranslation(query, query, "request", "french")
         return question_analysis
 
     @staticmethod   
-    def extract_explicit_metadata(query:Optional[Union[str, Conversation]]) -> tuple[str, dict]:
+    def extract_explicit_metadata(analysed_query:QuestionAnalysisBase) -> tuple[str, dict]:
         filters = {}
-        user_query = Conversation.get_user_query(query)
+        user_query = QuestionAnalysisBase.get_modified_question(analysed_query)
         if RagFilteringMetadataHelper.has_manual_filters(user_query):
             filters, query_wo_metadata = RagFilteringMetadataHelper.extract_manual_filters(user_query)
         else:
@@ -67,13 +89,14 @@ class RAGPreTreatment:
     
     metadata_infos = None
     @staticmethod
-    def analyse_query_for_metadata(rag:RagService, query:Optional[Union[str, Conversation]], metadata_infos:list[AttributeInfo] = None) -> tuple[str, dict]:
+    def analyse_query_for_metadata(rag:RagService, analysed_query:QuestionAnalysisBase, metadata_infos:list[AttributeInfo] = None) -> tuple[str, dict]:
         if not RAGPreTreatment.metadata_infos:
             RAGPreTreatment.metadata_infos = RagService.build_metadata_infos_from_docs(rag.langchain_documents, 30)
-        self_querying_retriever, query_constructor = RagService.build_self_querying_retriever_langchain(rag, RAGPreTreatment.metadata_infos)
-        user_queries_history = Conversation.user_queries_history_as_str(query)
+        query = QuestionAnalysisBase.get_modified_question(analysed_query)
         
-        response_with_filters = query_constructor.invoke(user_queries_history)
+        self_querying_retriever, query_constructor = RagService.build_self_querying_retriever_langchain(rag, RAGPreTreatment.metadata_infos)
+        
+        response_with_filters = query_constructor.invoke(query)
         
         if response_with_filters.filter:
             txt.print(f"Filters extracted from the query: {response_with_filters.filter}")
@@ -81,18 +104,18 @@ class RAGPreTreatment:
         metadata_filters = RagFilteringMetadataHelper.get_filters_from_comparison(response_with_filters.filter)
         print(f"Filters: '{metadata_filters}'")
         return response_with_filters.query, metadata_filters
-        
+            
     @staticmethod
-    def bypassed_analyse_query_for_metadata(rag:RagService, query:Optional[Union[str, Conversation]], metadata_infos:list[AttributeInfo] = None) -> tuple[str, dict]:
+    def bypassed_analyse_query_for_metadata(rag:RagService, analysed_query:QuestionAnalysisBase, metadata_infos:list[AttributeInfo] = None) -> tuple[str, dict]:
+        query = QuestionAnalysisBase.get_modified_question(analysed_query)
         return Conversation.get_user_query(query), {}
         
     @staticmethod
-    def get_merged_metadata(question_analysis :QuestionAnalysis, query_wo_metadata_from_implicit:str, implicit_metadata:dict, query_wo_metadata_from_explicit:str, explicit_metadata:dict) -> dict:
-        #todo: to replace the translated question isn't a good way to do it
-        if query_wo_metadata_from_explicit and query_wo_metadata_from_explicit != question_analysis.question:
-            question_analysis.translated_question = query_wo_metadata_from_explicit.strip()
-        elif query_wo_metadata_from_implicit:
-            question_analysis.translated_question = query_wo_metadata_from_implicit.strip()
+    def get_merged_metadata_and_question_analysis(analysed_query :QuestionAnalysisBase, query_wo_metadata_from_implicit:str, implicit_metadata:dict, query_wo_metadata_from_explicit:str, explicit_metadata:dict) -> dict:
+        if query_wo_metadata_from_explicit:
+            QuestionAnalysisBase.set_modified_question(analysed_query, query_wo_metadata_from_explicit.strip())
+        elif query_wo_metadata_from_implicit.strip():
+            QuestionAnalysisBase.set_modified_question(analysed_query, query_wo_metadata_from_implicit.strip())
         merged = {}
         if explicit_metadata and any(explicit_metadata):
             merged = explicit_metadata.copy()

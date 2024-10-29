@@ -213,7 +213,8 @@ class WorkflowExecutor:
                     if arg.default is not inspect.Parameter.empty:
                         continue
                     else:
-                        raise TypeError(f"Type mismatch for argument '{arg_name}': expected {arg.annotation}, got {type(arg_value)}")
+                        raise TypeError(f"Type mismatch while preparing args for function: '{func.__name__}'. Provided value for argument '{arg_name}' is: '{type(arg_value).__name__}', but expected to be: '{arg.annotation.__name__}'")
+
                 func_kwargs[arg_name] = arg_value
                 prev_results_index += 1
             else:

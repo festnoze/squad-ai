@@ -2,7 +2,7 @@ from typing import Optional, Union
 from common_tools.helpers.execute_helper import Execute
 from common_tools.models.conversation import Conversation
 from common_tools.rag.rag_filtering_metadata_helper import RagFilteringMetadataHelper
-from common_tools.models.question_analysis import QuestionAnalysis
+from common_tools.models.question_analysis_base import QuestionAnalysisBase
 from common_tools.rag.rag_service import RagService
 from common_tools.helpers.llm_helper import Llm
 from common_tools.langchains.langchain_factory import LangChainFactory
@@ -18,22 +18,22 @@ from langchain.retrievers.document_compressors import LLMChainFilter
 
 class RAGHybridRetrieval:
     @staticmethod    
-    def rag_hybrid_retrieval_custom(rag: RagService, query:Optional[Union[str, Conversation]], metadata:dict, include_bm25_retrieval: bool = False, give_score: bool = True, max_retrived_count: int = 20):
+    def rag_hybrid_retrieval_custom(rag: RagService, analysed_query :QuestionAnalysisBase, metadata:dict, include_bm25_retrieval: bool = False, give_score: bool = True, max_retrived_count: int = 20):
         if not include_bm25_retrieval:
-            rag_retrieved_chunks = RAGHybridRetrieval.semantic_vector_retrieval(rag, query, metadata, give_score, max_retrived_count)
+            rag_retrieved_chunks = RAGHybridRetrieval.semantic_vector_retrieval(rag,  QuestionAnalysisBase.get_modified_question(analysed_query), metadata, give_score, max_retrived_count)
             return rag_retrieved_chunks
         
         rag_retrieved_chunks, bm25_retrieved_chunks = Execute.run_parallel(
-            (RAGHybridRetrieval.semantic_vector_retrieval, (rag, query, metadata, give_score, max_retrived_count)),
-            (RAGHybridRetrieval.bm25_retrieval, (rag, query, metadata, give_score, max_retrived_count)),
+            (RAGHybridRetrieval.semantic_vector_retrieval, (rag, QuestionAnalysisBase.get_modified_question(analysed_query), metadata, give_score, max_retrived_count)),
+            (RAGHybridRetrieval.bm25_retrieval, (rag,  QuestionAnalysisBase.get_modified_question(analysed_query), metadata, give_score, max_retrived_count)),
         )
         retained_chunks = RAGHybridRetrieval.hybrid_chunks_selection(rag_retrieved_chunks, bm25_retrieved_chunks, give_score, max_retrived_count)
         return retained_chunks
     
     @staticmethod    
-    def rag_hybrid_retrieval_langchain(rag: RagService, query:Optional[Union[str, Conversation]], metadata:dict, include_bm25_retrieval: bool = True, include_contextual_compression: bool = False, give_score: bool = True, max_retrived_count: int = 20, bm25_ratio: float = 0.2):
+    def rag_hybrid_retrieval_langchain(rag: RagService, analysed_query :QuestionAnalysisBase, metadata:dict, include_bm25_retrieval: bool = True, include_contextual_compression: bool = False, give_score: bool = True, max_retrived_count: int = 20, bm25_ratio: float = 0.2):
         if not include_bm25_retrieval:
-            rag_retrieved_chunks = RAGHybridRetrieval.semantic_vector_retrieval(rag, query, metadata, give_score, max_retrived_count)
+            rag_retrieved_chunks = RAGHybridRetrieval.semantic_vector_retrieval(rag,  QuestionAnalysisBase.get_modified_question(analysed_query), metadata, give_score, max_retrived_count)
             return rag_retrieved_chunks
         
         vector_ratio = 1 - bm25_ratio
@@ -74,7 +74,7 @@ class RAGHybridRetrieval:
         else:
             final_retriever = ensemble_retriever
 
-        question_w_history = Conversation.conversation_history_as_str(query)
+        question_w_history = Conversation.conversation_history_as_str( QuestionAnalysisBase.get_modified_question(analysed_query))
         retrieved_chunks = final_retriever.invoke(question_w_history)
 
         # Remove 'rel_ids' from metadata: useless for augmented generation and limit token usage

@@ -1,0 +1,17 @@
+## Instructions ##
+Analyse the user question, and put the results in various variables as indicated :
+> add a string named 'question' with the provided user's query fully, and as this.
+
+- If there's any conversation history provided and you analyse that it contains any additionnal contextual informations useful for the current user query to be more explicit or precise about the topic, set 'has_contextual_info'. Take care that the user didn't change of topic.
+> add a boolean: 'has_contextual_info': It's value is true if the above is true, false otherwise.
+
+- If 'has_contextual_info' is true, rewrite the user query in the same langague including all needed information to make the question complete without the history.
+> add a string: 'modified_question' with as value the rewritten question from above request, if has_contextual_info, else give it an empty string as value.
+
+- Then classify the user's question. It can fall into one of those categories: greetings, conversation's ending, about studi studi (the school or company), about jobs, about trainings, about fundings, other (all which cannot be typed into one of the previous categories).
+> add a string 'question_type' with the corresponding value into ['greetings', 'ending', 'studi', 'job', 'training', 'funding', 'other'].
+
+## User Question ##
+{question}
+
+{conv_history}
