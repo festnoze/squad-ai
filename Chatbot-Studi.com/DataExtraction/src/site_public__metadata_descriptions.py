@@ -5,6 +5,8 @@ from common_tools.helpers.file_helper import file
 class MetadataDescriptionHelper:    
     @staticmethod
     def get_metadata_descriptions_for_studi_public_site(out_dir):
+        if not file.file_exists(out_dir + 'all/all_domains_names.json'):
+            return None
         domains_names = ', '.join(file.get_as_json(out_dir + 'all/all_domains_names.json'))
         certifications_names = ', '.join(file.get_as_json(out_dir + 'all/all_certifications_names.json'))
         warning_training_only = "Attention : cette meta-data existe uniquement pour les documents relatifs aux formations, c'est à dire ceux où : type = 'formation'. Ne pas ajouter ce filtre pour un type différent que 'formation'."

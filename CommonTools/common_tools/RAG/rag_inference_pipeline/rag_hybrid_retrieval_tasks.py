@@ -74,8 +74,7 @@ class RAGHybridRetrieval:
         else:
             final_retriever = ensemble_retriever
 
-        question_w_history = Conversation.conversation_history_as_str( QuestionAnalysisBase.get_modified_question(analysed_query))
-        retrieved_chunks = final_retriever.invoke(question_w_history)
+        retrieved_chunks = final_retriever.invoke(QuestionAnalysisBase.get_modified_question(analysed_query))
 
         # Remove 'rel_ids' from metadata: useless for augmented generation and limit token usage
         for doc in retrieved_chunks:

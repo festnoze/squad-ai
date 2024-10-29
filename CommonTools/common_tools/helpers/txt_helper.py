@@ -184,7 +184,7 @@ class txt:
     
     @staticmethod
     def remove_commented_lines(content):
-        content = '\n'.join([line for line in content.split('\n') if not line.strip().startswith('//') and not line.strip().startswith('#') ])
+        content = '\n'.join([line for line in content.split('\n') if not line.strip().startswith('//')])
         return content
     
     

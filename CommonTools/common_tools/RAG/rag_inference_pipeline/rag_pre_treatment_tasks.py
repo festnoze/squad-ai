@@ -1,5 +1,6 @@
 from typing import Optional, Union
 from common_tools.helpers.execute_helper import Execute
+from common_tools.helpers.file_helper import file
 from common_tools.helpers.llm_helper import Llm
 from common_tools.helpers.ressource_helper import Ressource
 from common_tools.models.conversation import Conversation
@@ -35,13 +36,17 @@ class RAGPreTreatment:
     @output_name('analysed_query')
     def query_completion(rag:RagService, query:Optional[Union[str, Conversation]]) -> str:
         user_query = Conversation.get_user_query(query)
-        if Conversation.user_queries_count(query) < 2:
-            return QuestionCompletion(user_query)
+        # if Conversation.user_queries_count(query) < 2:
+        #     return QuestionCompletion(user_query)
         
+        out_dir = "./outputs/" #todo: not generic enough
+        diploms_names = ', '.join(file.get_as_json(out_dir + 'all/all_diplomas_names.json'))
+        certifications_names = ', '.join(file.get_as_json(out_dir + 'all/all_certifications_names.json'))
         prefilter_prompt = Ressource.get_query_completion_prompt()
-        prefilter_prompt = prefilter_prompt.replace("{question}", user_query)
-        prefilter_prompt = prefilter_prompt.replace("{conv_history}", Conversation.conversation_history_as_str(query, include_current_user_query=False))
-        
+        prefilter_prompt = prefilter_prompt.replace("{user_query}", user_query)
+        prefilter_prompt = prefilter_prompt.replace("{conversation_history}", Conversation.conversation_history_as_str(query, include_current_user_query=False))
+        prefilter_prompt = prefilter_prompt.replace("{diplomes_list}", diploms_names)
+        prefilter_prompt = prefilter_prompt.replace("{certifications_list}", certifications_names)
         prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(
             prefilter_prompt, QuestionCompletionPydantic, QuestionCompletion
         )
@@ -49,7 +54,7 @@ class RAGPreTreatment:
             "query_completion", [rag.llm, rag.llm], output_parser, 10, *[prompt_for_output_parser]
         )
         question_completion = response[0]
-        return question_completion
+        return QuestionCompletion(**question_completion)
             
     @staticmethod    
     @output_name('analysed_query')
@@ -111,11 +116,13 @@ class RAGPreTreatment:
         return Conversation.get_user_query(query), {}
         
     @staticmethod
-    def get_merged_metadata_and_question_analysis(analysed_query :QuestionAnalysisBase, query_wo_metadata_from_implicit:str, implicit_metadata:dict, query_wo_metadata_from_explicit:str, explicit_metadata:dict) -> dict:
-        if query_wo_metadata_from_explicit:
-            QuestionAnalysisBase.set_modified_question(analysed_query, query_wo_metadata_from_explicit.strip())
-        elif query_wo_metadata_from_implicit.strip():
-            QuestionAnalysisBase.set_modified_question(analysed_query, query_wo_metadata_from_implicit.strip())
+    def get_merged_metadata_and_question_analysis(query:Optional[Union[str, Conversation]], analysed_query :QuestionAnalysisBase, query_wo_metadata_from_implicit:str, implicit_metadata:dict, query_wo_metadata_from_explicit:str, explicit_metadata:dict) -> dict:
+        if isinstance(query, Conversation):
+            query.last_message.content = analysed_query.modified_question
+        # if query_wo_metadata_from_explicit:
+        #     QuestionAnalysisBase.set_modified_question(analysed_query, query_wo_metadata_from_explicit.strip())
+        # elif query_wo_metadata_from_implicit.strip():
+        #     QuestionAnalysisBase.set_modified_question(analysed_query, query_wo_metadata_from_implicit.strip())
         merged = {}
         if explicit_metadata and any(explicit_metadata):
             merged = explicit_metadata.copy()

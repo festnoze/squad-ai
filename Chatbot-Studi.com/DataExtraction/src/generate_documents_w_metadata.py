@@ -1,5 +1,6 @@
 
 import json
+import re
 from common_tools.helpers.json_helper import JsonHelper
 from langchain.schema import Document
 from typing import List, Dict
@@ -133,7 +134,9 @@ class GenerateDocumentsWithMetadataFromFiles:
         docs = []
         all_diplomas_names = []
         for item in data:
-            all_diplomas_names.append(item.get("title"))
+            title = item.get("title", '')
+            title_summary = re.sub(r'\(.*?\)', '', title).replace("\n", " ").replace(" ?", "").replace("Nos formations en ligne ", "").replace(" en ligne", "").replace("niveau", "").replace("Qu’est-ce qu’un ", "").strip()
+            all_diplomas_names.append(title_summary)
             metadata = {
                 "id": item.get("id"),
                 "type": "diplôme",
@@ -141,7 +144,7 @@ class GenerateDocumentsWithMetadataFromFiles:
                 "changed": item.get("changed"),
             }
             related_paragraphs = item.get("related_infos", {}).get("paragraph", [])
-            content = f"{item.get('title', '')}\r\n{'\r\n'.join(related_paragraphs)}"
+            content = f"{title}\r\n{'\r\n'.join(related_paragraphs)}"
             doc = Document(page_content=content, metadata=metadata)
             docs.append(doc)
         return docs, all_diplomas_names

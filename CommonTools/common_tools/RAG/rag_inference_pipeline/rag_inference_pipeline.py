@@ -43,7 +43,7 @@ class RagInferencePipeline:
     #todo: return the sources via an extra parameter
     # Main workflow using the dynamic pipeline
     async def run_pipeline_dynamic_async(self, query: Optional[Union[str, Conversation]], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None, override_workflow_available_classes:dict = None):
-        config = Ressource.get_rag_pipeline_default_config_wo_augmented_generation()
+        config = Ressource.get_rag_pipeline_default_config_wo_AG_for_streaming()
         if override_workflow_available_classes:
             workflow_available_classes = override_workflow_available_classes
         else:

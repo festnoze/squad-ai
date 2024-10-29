@@ -137,7 +137,7 @@ class AvailableService:
             give_score=True,
             format_retrieved_docs_function=AvailableService.format_retrieved_docs_function
         ):
-            # remove the stream over Http behavior: replace special '\n' and convert byte->str (as it's consumed locally)
+            # remove the stream over Http behavior: replace special '\n' and convert byte->str (as it's consumed by a UI local to the project: streamlit)
             yield chunk.decode('utf-8').replace(Llm.new_line_for_stream_over_http, '\n').replace("# ", "#### ").replace("## ", "##### ").replace("### ", "###### ")
 
         txt.stop_spinner_replace_text("Pipeline d'inférence exécuté :")

@@ -1,17 +1,24 @@
 ## Instructions ##
-Analyse the user question, and put the results in various variables as indicated :
-> add a string named 'question' with the provided user's query fully, and as this.
+Analysez la requête de l'utilisateur et mettez les résultats dans différentes variables comme indiqué :
+> ajoutez une chaîne nommée `question` avec la requête de l'utilisateur fournie `telle quelle`.
 
-- If there's any conversation history provided and you analyse that it contains any additionnal contextual informations useful for the current user query to be more explicit or precise about the topic, set 'has_contextual_info'. Take care that the user didn't change of topic.
-> add a boolean: 'has_contextual_info': It's value is true if the above is true, false otherwise.
+- Si un historique de conversation est fourni : analysez s'il contient des informations contextuelles utiles pour rendre la requête en cours de l'utilisateur plus explicite ou plus précise concernant son sujet. Faites attention que l'utilisateur n'a pas changé de sujet.
+> ajoutez un booléen : `has_contextual_info` : La valeur est `true` si ce qui précède est vrai, sinon `false`.
 
-- If 'has_contextual_info' is true, rewrite the user query in the same langague including all needed information to make the question complete without the history.
-> add a string: 'modified_question' with as value the rewritten question from above request, if has_contextual_info, else give it an empty string as value.
+- Si `has_contextual_info` est `true`, réécrivez la requête de l'utilisateur dans la même langue en incluant toutes les informations nécessaires pour rendre la question complète sans besoin de l'historique pour la contextualiser.
+> ajoutez une chaîne : `question_with_context` avec comme valeur la question réécrite à partir de la demande ci-dessus, si `has_contextual_info`, sinon attribuez-lui une chaîne vide.
 
-- Then classify the user's question. It can fall into one of those categories: greetings, conversation's ending, about studi studi (the school or company), about jobs, about trainings, about fundings, other (all which cannot be typed into one of the previous categories).
-> add a string 'question_type' with the corresponding value into ['greetings', 'ending', 'studi', 'job', 'training', 'funding', 'other'].
+- analysez maintenant la valeur de `question_with_context`. 
+  - Si le sujet concerne l'un des éléments suivants : `[{diplomes_list}, {certifications_list}]`, et que la question ne concèrene pas explicitement le diplôme ou la certification ele-même, remplacez le terme identifié par : `une formation permettant d'accéder à un ` suivi du terme identifié.
+// - si le sujet n'est pas explicitement l'un des suivants : ['métier', 'certifieur', 'certification', 'diplôme', 'domaine']
+> ajoutez une chaîne : `modified_question` avec comme valeur la question réécrite à partir de la demande ci-dessus, sinon attribuez-lui la valeur de `question_with_context`.
 
-## User Question ##
-{question}
+//- Enfin, il va s'agir d'identifier la catégorie de la requête de l'utilisateur. Elle peut appartenir à l'une des catégories suivantes : `salutations`, `fin de conversation`, `à propos de studi (école ou entreprise)`, `à propos d'un emploi`, `à propos de formations`, `à propos de financements`, `autre` (tout ce qui ne peut être classé dans une des catégories précédentes).
+//> ajoutez une chaîne `question_type` avec la valeur correspondante parmi `[ 'formation', 'salutations', 'fin de conversation', 'école', 'emploi', 'financement', 'autre']`.
+- Enfin, il va s'agir d'identifier la catégorie de la requête de l'utilisateur. Elle peut appartenir à l'une des catégories suivantes : `salutations`, `fin de conversation`, `autre` (tout ce qui ne peut être classé dans une des catégories précédentes).
+> ajoutez une chaîne `question_type` avec la valeur correspondante parmi `[ 'salutations', 'fin', 'autre']`.
 
-{conv_history}
+## Requête de l'utilisateur  ##
+{user_query}
+
+{conversation_history}
