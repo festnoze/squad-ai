@@ -13,14 +13,14 @@ class RAGAugmentedGeneration:
     augmented_generation_prompt:str = None
 
     @staticmethod
-    async def rag_augmented_answer_generation_async(rag: RagService, query:Optional[Union[str, Conversation]], retrieved_chunks: list, analysed_query: QuestionAnalysisBase, format_retrieved_docs_function = None):
+    async def rag_augmented_answer_generation_async(rag: RagService, query:Union[str, Conversation], retrieved_chunks: list, analysed_query: QuestionAnalysisBase, format_retrieved_docs_function = None):
         async for chunk in RAGAugmentedGeneration.rag_response_generation_async(rag, query, retrieved_chunks, analysed_query, format_retrieved_docs_function):
             yield chunk
     
     @staticmethod
     def rag_augmented_answer_generation(
         rag: RagService, 
-        query: Optional[Union[str, Conversation]], 
+        query: Union[str, Conversation], 
         retrieved_chunks: list, 
         analysed_query: QuestionAnalysisBase, 
         format_retrieved_docs_function=None
@@ -52,7 +52,7 @@ class RAGAugmentedGeneration:
 
 
     @staticmethod
-    async def rag_response_generation_async(rag: RagService, query:Optional[Union[str, Conversation]], retrieved_chunks: list, questionAnalysis: QuestionAnalysisBase, format_retrieved_docs_function = None):
+    async def rag_response_generation_async(rag: RagService, query:Union[str, Conversation], retrieved_chunks: list, questionAnalysis: QuestionAnalysisBase, format_retrieved_docs_function = None):
         if retrieved_chunks and any(retrieved_chunks) and isinstance(retrieved_chunks[0], tuple): 
             retrieved_chunks = [doc[0] for doc in retrieved_chunks] # Remove scores if present
 
@@ -60,7 +60,7 @@ class RAGAugmentedGeneration:
             yield chunk
 
     @staticmethod
-    async def generate_augmented_response_from_retrieved_chunks_async(llm_or_chain: Runnable, query:Optional[Union[str, Conversation]], retrieved_docs: list[Document], analysed_query: QuestionAnalysisBase, format_retrieved_docs_function = None):
+    async def generate_augmented_response_from_retrieved_chunks_async(llm_or_chain: Runnable, query:Union[str, Conversation], retrieved_docs: list[Document], analysed_query: QuestionAnalysisBase, format_retrieved_docs_function = None):
         if not RAGAugmentedGeneration.augmented_generation_prompt:
             RAGAugmentedGeneration.augmented_generation_prompt = Ressource.get_rag_augmented_generation_prompt_generic()
         augmented_generation_prompt = RAGAugmentedGeneration.augmented_generation_prompt

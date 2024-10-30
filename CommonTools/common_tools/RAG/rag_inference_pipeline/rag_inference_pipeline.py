@@ -14,7 +14,6 @@ from common_tools.rag.rag_inference_pipeline.rag_hybrid_retrieval_tasks import R
 from common_tools.rag.rag_inference_pipeline.rag_answer_generation_tasks import RAGAugmentedGeneration
 from common_tools.rag.rag_inference_pipeline.rag_post_treatment_tasks import RAGPostTreatment
 from common_tools.helpers.ressource_helper import Ressource
-from common_tools.helpers.file_helper import file
 from common_tools.workflows.workflow_executor import WorkflowExecutor
 from common_tools.models.conversation import Conversation
 
@@ -42,7 +41,7 @@ class RagInferencePipeline:
     
     #todo: return the sources via an extra parameter
     # Main workflow using the dynamic pipeline
-    async def run_pipeline_dynamic_async(self, query: Optional[Union[str, Conversation]], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None, override_workflow_available_classes:dict = None):
+    async def run_pipeline_dynamic_async(self, query: Union[str, Conversation], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None, override_workflow_available_classes:dict = None, all_chunks_output = []):
         config = Ressource.get_rag_pipeline_default_config_wo_AG_for_streaming()
         if override_workflow_available_classes:
             workflow_available_classes = override_workflow_available_classes
@@ -69,11 +68,13 @@ class RagInferencePipeline:
         analysed_query = kwargs_values['analysed_query']
 
         # Perform streaming augmented generation
+        
         async for chunk in workflow_available_classes['RAGAugmentedGeneration'].rag_augmented_answer_generation_async(self.rag, query, retrieved_chunks[0], analysed_query, format_retrieved_docs_function):
+            all_chunks_output.append(chunk)
             yield chunk
     
     # Main workflow using the static pipeline
-    async def run_pipeline_static_async(self, query: Optional[Union[str, Conversation]], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None):
+    async def run_pipeline_static_async(self, query: Union[str, Conversation], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None):
         """Run the full hardcoded rag inference pipeline but async and with streaming LLM augmented generation response"""
         # Run both functions in parallel, where the second one is treated as streaming
         async for idx, result in Execute.run_parallel_async(
@@ -99,7 +100,7 @@ class RagInferencePipeline:
         # return final_response 
     
     
-    async def run_static_inference_pipeline_but_guardrails_async(self, query:Optional[Union[str, Conversation]], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None):
+    async def run_static_inference_pipeline_but_guardrails_async(self, query:Union[str, Conversation], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None):
         """Run the full rag inference pipeline, but without guardrails"""
         # Pre-treatment
         analysed_query, metadata = RAGPreTreatment.rag_static_pre_treatment(self.rag, query, self.default_filters)
@@ -117,7 +118,7 @@ class RagInferencePipeline:
             raise Exception("Query rejected by guardrails")
         
     def run_pipeline_dynamic(self,
-                            query: Optional[Union[str, Conversation]],
+                            query: Union[str, Conversation],
                             include_bm25_retrieval: bool = False,
                             give_score: bool = True,
                             format_retrieved_docs_function=None,
@@ -134,7 +135,7 @@ class RagInferencePipeline:
         return ''.join(chunk.decode('utf-8') for chunk in sync_generator)
     
     def run_pipeline_static(self,
-                            query: Optional[Union[str, Conversation]],
+                            query: Union[str, Conversation],
                             include_bm25_retrieval: bool = False,
                             give_score: bool = True,
                             format_retrieved_docs_function=None) -> tuple:

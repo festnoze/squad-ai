@@ -17,7 +17,7 @@ class RAGPreTreatment:
     default_filters = {}
     
     @staticmethod
-    def rag_static_pre_treatment(rag:RagService, query:Optional[Union[str, Conversation]], default_filters:dict = {}) -> tuple[QuestionTranslation, dict]:
+    def rag_static_pre_treatment(rag:RagService, query:Union[str, Conversation], default_filters:dict = {}) -> tuple[QuestionTranslation, dict]:
         question_analysis, extracted_implicit_metadata, extracted_explicit_metadata = Execute.run_parallel(
             (RAGPreTreatment.bypassed_query_translation, (rag, query)),
             (RAGPreTreatment.analyse_query_for_metadata, (rag, query)),
@@ -34,7 +34,7 @@ class RAGPreTreatment:
 
     @staticmethod
     @output_name('analysed_query')
-    def query_completion(rag:RagService, query:Optional[Union[str, Conversation]]) -> str:
+    def query_completion(rag:RagService, query:Union[str, Conversation]) -> str:
         user_query = Conversation.get_user_query(query)
         # if Conversation.user_queries_count(query) < 2:
         #     return QuestionCompletion(user_query)
@@ -42,11 +42,14 @@ class RAGPreTreatment:
         out_dir = "./outputs/" #todo: not generic enough
         diploms_names = ', '.join(file.get_as_json(out_dir + 'all/all_diplomas_names.json'))
         certifications_names = ', '.join(file.get_as_json(out_dir + 'all/all_certifications_names.json'))
+        domains_list = ', '.join(file.get_as_json(out_dir + 'all/all_domains_names.json'))
+
         prefilter_prompt = Ressource.get_query_completion_prompt()
         prefilter_prompt = prefilter_prompt.replace("{user_query}", user_query)
         prefilter_prompt = prefilter_prompt.replace("{conversation_history}", Conversation.conversation_history_as_str(query, include_current_user_query=False))
         prefilter_prompt = prefilter_prompt.replace("{diplomes_list}", diploms_names)
         prefilter_prompt = prefilter_prompt.replace("{certifications_list}", certifications_names)
+        prefilter_prompt = prefilter_prompt.replace("{domains_list}", domains_list)
         prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(
             prefilter_prompt, QuestionCompletionPydantic, QuestionCompletion
         )
@@ -58,7 +61,7 @@ class RAGPreTreatment:
             
     @staticmethod    
     @output_name('analysed_query')
-    def query_translation(rag:RagService, query:Optional[Union[str, Conversation]]) -> QuestionTranslation:
+    def query_translation(rag:RagService, query:Union[str, Conversation]) -> QuestionTranslation:
         user_query = Conversation.get_user_query(query)
         prefilter_prompt = Ressource.get_language_detection_prompt()
         prefilter_prompt = prefilter_prompt.replace("{question}", user_query)
@@ -76,7 +79,7 @@ class RAGPreTreatment:
 
     @staticmethod    
     @output_name('analysed_query') #todo: to replace with above
-    def bypassed_query_translation(rag:RagService, query:Optional[Union[str, Conversation]]) -> QuestionTranslation:
+    def bypassed_query_translation(rag:RagService, query:Union[str, Conversation]) -> QuestionTranslation:
         user_query = Conversation.get_user_query(query)
         question_analysis = QuestionTranslation(query, query, "request", "french")
         return question_analysis
@@ -116,7 +119,7 @@ class RAGPreTreatment:
         return Conversation.get_user_query(query), {}
         
     @staticmethod
-    def get_merged_metadata_and_question_analysis(query:Optional[Union[str, Conversation]], analysed_query :QuestionAnalysisBase, query_wo_metadata_from_implicit:str, implicit_metadata:dict, query_wo_metadata_from_explicit:str, explicit_metadata:dict) -> dict:
+    def get_merged_metadata_and_question_analysis(query:Union[str, Conversation], analysed_query :QuestionAnalysisBase, query_wo_metadata_from_implicit:str, implicit_metadata:dict, query_wo_metadata_from_explicit:str, explicit_metadata:dict) -> dict:
         if isinstance(query, Conversation):
             query.last_message.content = analysed_query.modified_question
         # if query_wo_metadata_from_explicit:

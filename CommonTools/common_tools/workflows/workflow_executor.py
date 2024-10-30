@@ -166,7 +166,7 @@ class WorkflowExecutor:
         error_message = (
                 f"Error: {str(exception)}\n"
                 f"Error occurred while executing class and function name: '{class_and_function_name}'\n"
-                f"With previous results: {previous_results_str}\n"
+                f"With previous results: {previous_results_str if previous_results else '<empty>'}\n"
                 f"With kwargs values: {kwargs_value}.\n"
             )
         raise RuntimeError(error_message) from exception

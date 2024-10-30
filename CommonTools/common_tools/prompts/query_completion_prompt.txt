@@ -1,22 +1,30 @@
 ## Instructions ##
-Analysez la requête de l'utilisateur et mettez les résultats dans différentes variables comme indiqué :
-> ajoutez une chaîne nommée `question` avec la requête de l'utilisateur fournie `telle quelle`.
+Analyse la requête de l'utilisateur et met les résultats dans les variables nommées indiquées :
 
-- Si un historique de conversation est fourni : analysez s'il contient des informations contextuelles utiles pour rendre la requête en cours de l'utilisateur plus explicite ou plus précise concernant son sujet. Faites attention que l'utilisateur n'a pas changé de sujet.
-> ajoutez un booléen : `has_contextual_info` : La valeur est `true` si ce qui précède est vrai, sinon `false`.
+> ajoute une chaîne nommée `question` avec la requête de l'utilisateur fournie `telle quelle`.
 
-- Si `has_contextual_info` est `true`, réécrivez la requête de l'utilisateur dans la même langue en incluant toutes les informations nécessaires pour rendre la question complète sans besoin de l'historique pour la contextualiser.
-> ajoutez une chaîne : `question_with_context` avec comme valeur la question réécrite à partir de la demande ci-dessus, si `has_contextual_info`, sinon attribuez-lui une chaîne vide.
+- Si un historique de conversation est fourni : analyse s'il contient des informations contextuelles utiles pour rendre la requête en cours de l'utilisateur plus explicite ou plus précise concernant son sujet. Fait attention à ne pas intégrer de contexte si l'utilisateur a changé de sujet.
+> ajoute un booléen : `has_contextual_info` : La valeur est `true` si ce qui précède est vrai, sinon `false`.
 
-- analysez maintenant la valeur de `question_with_context`. 
-  - Si le sujet concerne l'un des éléments suivants : `[{diplomes_list}, {certifications_list}]`, et que la question ne concèrene pas explicitement le diplôme ou la certification ele-même, remplacez le terme identifié par : `une formation permettant d'accéder à un ` suivi du terme identifié.
+- Réécrive la requête de l'utilisateur, dans la même langue, en supprimant tous les éléments de langague inutiles à la compréhension de la requête, et en intégrant, si `has_contextual_info` est `true`, toutes les informations nécessaires depuis l'historique de la conversation pour contextualiser la requête, et rendre la question autonome. Veille à ce que la requête réécrite reste centrée sur la requête courante de l'utilisateur.
+> ajoute une chaîne : `question_with_context` avec comme valeur la question réécrite à partir de la demande ci-dessus, si `has_contextual_info`, sinon attribue-lui une chaîne vide.
+Exemple: avec en requête: 'bof, et en compta?' et en historique: 'user: quels sont les formations RNCP en RH',  `question_with_context` vaudra : 'quelles sont les formations RNCP en comptabilité'
+- Analyse maintenant la valeur de `question_with_context`. 
+Si l'un des éléments précisé dans une ou plusieurs des listes entre crochets ci-après apparait dans la `question_with_context`, alors, remplacer le terme trouvé par la phrase précisée après le signe égal. Le reste de la requête reste identique. Ne pas appliquer si la question concerne explicitement l'objet lui-même, sans lien avec une ou des formations.
+  - [{diplomes_list}] = `une formation permettant d'accéder à un diplôme de niveau `, suivi du terme identifié corrigé.
+  - [{certifications_list}]` = `une formation permettant d'accéder à une certification de type `, suivi du terme identifié corrigé. Le reste de requête reste identique.
+  - [{domains_list}] = `dans le domaine `, suivi du terme identifié corrigé.
+> ajoute une chaîne : `modified_question` avec comme valeur la question réécrite à partir des deux demandes ci-dessus, sinon attribue-lui la valeur initiale de `question_with_context`.
+Exemple : si la requête est : 'quels sont les BAC+3 en compta', 'modified_question' vaudra : 'quelles sont les formations permettant d'accéder à un diplôme de niveau BAC + 3 dans le domaine de la comptabilité'
+
+
 // - si le sujet n'est pas explicitement l'un des suivants : ['métier', 'certifieur', 'certification', 'diplôme', 'domaine']
-> ajoutez une chaîne : `modified_question` avec comme valeur la question réécrite à partir de la demande ci-dessus, sinon attribuez-lui la valeur de `question_with_context`.
 
 //- Enfin, il va s'agir d'identifier la catégorie de la requête de l'utilisateur. Elle peut appartenir à l'une des catégories suivantes : `salutations`, `fin de conversation`, `à propos de studi (école ou entreprise)`, `à propos d'un emploi`, `à propos de formations`, `à propos de financements`, `autre` (tout ce qui ne peut être classé dans une des catégories précédentes).
-//> ajoutez une chaîne `question_type` avec la valeur correspondante parmi `[ 'formation', 'salutations', 'fin de conversation', 'école', 'emploi', 'financement', 'autre']`.
-- Enfin, il va s'agir d'identifier la catégorie de la requête de l'utilisateur. Elle peut appartenir à l'une des catégories suivantes : `salutations`, `fin de conversation`, `autre` (tout ce qui ne peut être classé dans une des catégories précédentes).
-> ajoutez une chaîne `question_type` avec la valeur correspondante parmi `[ 'salutations', 'fin', 'autre']`.
+//> ajoute une chaîne `question_type` avec la valeur correspondante parmi `[ 'formation', 'salutations', 'fin de conversation', 'école', 'emploi', 'financement', 'autre']`.
+- Enfin, identifier la catégorie de la requête 'modified_question'. 
+Elle peut appartenir à l'une des catégories suivantes : `salutations`, `fin de conversation`, `autre`
+> ajoute une chaîne `question_type` avec la valeur correspondante parmi `[ 'salutations', 'fin', 'autre']`.
 
 ## Requête de l'utilisateur  ##
 {user_query}

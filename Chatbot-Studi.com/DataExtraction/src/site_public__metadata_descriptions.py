@@ -38,7 +38,7 @@ class MetadataDescriptionHelper:
                         'simulation' (simulation de la date de début et de la durée de formation, en cas de démarrage à la prochaine session / promotion) 
                     ]"""), type='str'),
                 AttributeInfo(name='name_domain', description= dedent(f"""\
-                    Le nom du domaine (ou filière) à laquelle appartient la formation.
+                    Le nom du domaine (ou de filière) à laquelle appartient la formation. N'utiliser que des opérateurs 'or' pour combiner plusieurs domaines. jamais d'opérateur 'and'.
                     {list_possible_values} : [{domains_names}].
                     {warning_training_only}"""), type='str'),
                 AttributeInfo(name='name_certification', description= dedent(f"""\

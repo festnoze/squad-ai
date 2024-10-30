@@ -4,15 +4,16 @@ from dotenv import find_dotenv, load_dotenv
 import asyncio
 #
 from langchain.chains.query_constructor.schema import AttributeInfo
+from langchain_core.runnables import Runnable, RunnablePassthrough
+from langchain_core.prompts import ChatPromptTemplate
 #from database.database import DB
 from drupal_data_retireval import DrupalDataRetireval
 from generate_documents_w_metadata import GenerateDocumentsWithMetadataFromFiles
 #
 from common_tools.helpers.txt_helper import txt
-from common_tools.helpers.file_helper import file
-from common_tools.helpers.llm_helper import Llm
 from common_tools.helpers.execute_helper import Execute
 from common_tools.models.llm_info import LlmInfo
+from common_tools.helpers.llm_helper import Llm
 from common_tools.langchains.langchain_factory import LangChainFactory
 from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.rag.rag_service import RagService
@@ -28,6 +29,9 @@ from ragas_service import RagasService
 from site_public__metadata_descriptions import MetadataDescriptionHelper
 
 class AvailableService:
+    inference: RagInferencePipeline = None
+    rag_service: RagService = None
+
     def init():
         LangChainFactory.set_openai_apikey()
         use_prefect = False
@@ -41,10 +45,10 @@ class AvailableService:
             AvailableService.llms_infos.append(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4o-mini", timeout=50, temperature=0))
             #AvailableService.llms_infos.append(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4o", timeout=80, temperature=0))
         
-        if not hasattr(AvailableService, 'rag_service') or not AvailableService.rag_service:
+        if not AvailableService.rag_service:
             AvailableService.rag_service = RagService(AvailableService.llms_infos, EmbeddingModel.OpenAI_TextEmbedding3Small) #EmbeddingModel.Ollama_AllMiniLM
 
-        if not hasattr(AvailableService, 'inference') or not AvailableService.inference:
+        if not AvailableService.inference:
             default_filters = {} #RagFilteringMetadataHelper.get_CodeSharpDoc_default_filters()
             # if use_prefect:
             #     AvailableService.inference = RagInferencePipelineWithPrefect(AvailableService.rag_service, default_filters, None)            
@@ -89,7 +93,7 @@ class AvailableService:
         txt.activate_print = True
         all_docs = GenerateDocumentsWithMetadataFromFiles().load_all_docs_as_json(out_dir)
         injection_pipeline = RagInjectionPipeline(AvailableService.rag_service)
-        injected = injection_pipeline.build_vectorstore_and_bm25_store(all_docs, chunk_size= 5000, children_chunk_size= 0, delete_existing= True)
+        injected = injection_pipeline.build_vectorstore_and_bm25_store(all_docs, chunk_size= 2000, children_chunk_size= 0, delete_existing= True)
         AvailableService.reinit() # reload rag_service with the new vectorstore and langchain documents
         return injected
 
@@ -123,10 +127,11 @@ class AvailableService:
     #         response, sources = AvailableService.inference.run_pipeline_dynamic(query, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
     #     return response
     
-    def rag_query_with_history_streaming(conversation_history: Conversation):
+    def rag_query_with_history_streaming(conversation_history: Conversation, all_chunks_output = []):
         if conversation_history.last_message.role != 'user':
             raise ValueError("Conversation history should end with a user message")
         txt.print_with_spinner("Exécution du pipeline d'inférence ...")
+        
 
         # Run the async generator directly using asyncio.run()
         for chunk in Execute.get_sync_generator_from_async(
@@ -135,10 +140,12 @@ class AvailableService:
             conversation_history,
             include_bm25_retrieval=True,
             give_score=True,
-            format_retrieved_docs_function=AvailableService.format_retrieved_docs_function
+            format_retrieved_docs_function=AvailableService.format_retrieved_docs_function,
+            all_chunks_output=all_chunks_output
         ):
             # remove the stream over Http behavior: replace special '\n' and convert byte->str (as it's consumed by a UI local to the project: streamlit)
-            yield chunk.decode('utf-8').replace(Llm.new_line_for_stream_over_http, '\n').replace("# ", "#### ").replace("## ", "##### ").replace("### ", "###### ")
+            stream_chunk = chunk.decode('utf-8').replace(Llm.new_line_for_stream_over_http, '\n')#.replace("# ", "#### ").replace("## ", "##### ").replace("### ", "###### ")
+            yield stream_chunk
 
         txt.stop_spinner_replace_text("Pipeline d'inférence exécuté :")
 
@@ -147,6 +154,18 @@ class AvailableService:
         response = AvailableService.inference.run_pipeline_dynamic(conversation_history, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
         txt.stop_spinner_replace_text("Pipeline d'inférence exectué :")
         return response
+    
+    def summarize(text):
+        promptlate = ChatPromptTemplate.from_template(dedent("""\
+        # Contexte : Il s'agit de créer un résumé pour constituer la mémoire contextuelle d'un chatbot RAG.
+        # Contexte métier : Il s'agit d'une réponse apportée à une demande dans le domaine de la formation en ligne sur le site Studi.com
+        # Objectif : Ecrit un résumé extremement synthétique (moins de 100 mots) de la réponse suivante. 
+        # Formalisme : Il s'agit de juste garder les mots clés importants du ou des éléments de réponses, ne garder que le premier niveau de réponse en cas de liste avec des sous-éléments. ne pas garder d'url. Ne pas garder les éléments de structuration. Ne pas préciser qu'il s'agit d'un résumé.
+        # Texte à traiter : 
+        {input}"""))
+        chain = promptlate | AvailableService.rag_service.llm | RunnablePassthrough()
+        result = chain.invoke(input=text)
+        return Llm.get_content(result)
 
     def generate_ground_truth():
         #asyncio.run(RagasService.generate_ground_truth_async(AvailableService.llms_infos[0], AvailableService.rag_service.langchain_documents, 1))

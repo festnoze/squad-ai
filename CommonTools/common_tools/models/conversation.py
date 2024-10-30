@@ -14,7 +14,7 @@ class Conversation:
     def add_message(self, message: Message) -> None:
         self.messages.append(message)
     
-    def add_new_message(self, role: str, content: str, elapsed_seconds: int) -> None:
+    def add_new_message(self, role: str, content: str, elapsed_seconds: int=0) -> None:
         self.messages.append(Message(role, content, elapsed_seconds))
 
     @property
@@ -22,7 +22,7 @@ class Conversation:
         return self.messages[-1]
     
     @staticmethod
-    def get_user_query(query_or_conv: Optional[Union[str, 'Conversation']]) -> str:
+    def get_user_query(query_or_conv: Union[str, 'Conversation']) -> str:
         if isinstance(query_or_conv, str):
             return query_or_conv
         elif isinstance(query_or_conv, Conversation):
@@ -32,10 +32,10 @@ class Conversation:
                 raise ValueError("Invalid query, last message should be from user")
             return query_or_conv.last_message.content
         else:
-            raise ValueError("Unsupported query type")
+            raise ValueError("get_user_query don't handle query type")
         
     @staticmethod
-    def conversation_history_as_str(query_or_conv: Optional[Union[str, 'Conversation']], include_current_user_query = True) -> str:
+    def conversation_history_as_str(query_or_conv: Union[str, 'Conversation'], include_current_user_query = True) -> str:
         if isinstance(query_or_conv, Conversation):
             conversation_history = '\n- '.join([f"{msg.role}: {msg.content}" for msg in query_or_conv.messages[:-1]])
             if not conversation_history: conversation_history = "No history yet"
@@ -47,7 +47,7 @@ class Conversation:
         return full_question
     
     @staticmethod
-    def user_queries_history_as_str(query_or_conv: Optional[Union[str, 'Conversation']]) -> str:
+    def user_queries_history_as_str(query_or_conv: Union[str, 'Conversation']) -> str:
         if isinstance(query_or_conv, Conversation):
             conversation_history = '\n- '.join([f"- {msg.content}" for msg in [query for query in query_or_conv.messages[:-1] if query.role == 'user']])
             if not conversation_history: conversation_history = "No history yet"
@@ -57,7 +57,7 @@ class Conversation:
         return full_question
 
     @staticmethod
-    def user_queries_count(query_or_conv: Optional[Union[str, 'Conversation']]) -> int:
+    def user_queries_count(query_or_conv: Union[str, 'Conversation']) -> int:
         if isinstance(query_or_conv, Conversation):
             return len([query for query in query_or_conv.messages if query.role == 'user'])
         else:

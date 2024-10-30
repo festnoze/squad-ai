@@ -1,4 +1,5 @@
-from typing import Optional, Union
+from typing import Union
+from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.execute_helper import Execute
 from common_tools.models.conversation import Conversation
 from common_tools.rag.rag_filtering_metadata_helper import RagFilteringMetadataHelper
@@ -39,12 +40,13 @@ class RAGHybridRetrieval:
         vector_ratio = 1 - bm25_ratio
         # Create bm25 retriever with metadata filter
         if metadata:
-            if RagFilteringMetadataHelper.does_contain_filter(metadata, 'training_info_type','url'):
+            if RagFilteringMetadataHelper.does_contain_filter(metadata, 'domaine','url'):
                 max_retrived_count = 100
             filtered_docs = [
                 doc for doc in rag.langchain_documents 
                 if RagFilteringMetadataHelper.filters_predicate(doc, metadata)
             ]
+            txt.print(f"docs corresponding to metadata: {len(filtered_docs)}/{len(rag.langchain_documents)}")
         else:
             filtered_docs = rag.langchain_documents
 
@@ -83,13 +85,13 @@ class RAGHybridRetrieval:
         return retrieved_chunks
     
     @staticmethod    
-    def semantic_vector_retrieval(rag: RagService, query:Optional[Union[str, Conversation]], metadata_filters:dict, give_score: bool = False, max_retrieved_count: int = 10, min_score: float = None, min_retrived_count: int = None):
+    def semantic_vector_retrieval(rag: RagService, query:Union[str, Conversation], metadata_filters:dict, give_score: bool = False, max_retrieved_count: int = 10, min_score: float = None, min_retrived_count: int = None):
         question_w_history = Conversation.conversation_history_as_str(query)
         retrieved_chunks = rag.semantic_vector_retrieval(question_w_history, metadata_filters, give_score, max_retrieved_count, min_score, min_retrived_count)
         return retrieved_chunks
     
     @staticmethod    
-    def bm25_retrieval(rag: RagService, query:Optional[Union[str, Conversation]], metadata_filters: dict, give_score: bool, k = 3):
+    def bm25_retrieval(rag: RagService, query:Union[str, Conversation], metadata_filters: dict, give_score: bool, k = 3):
         if metadata_filters and any(metadata_filters):
             filtered_docs = [doc for doc in rag.langchain_documents if RagFilteringMetadataHelper.filters_predicate(doc, metadata_filters)]
         else:

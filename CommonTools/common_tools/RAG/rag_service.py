@@ -86,10 +86,14 @@ class RagService:
         return docs
     
     def _load_vectorstore(self):
-        if not self.embedding: raise ValueError("No embedding model specified")
-        abs_path = os.path.abspath(self.vector_db_path)
-        vectorstore = Chroma(persist_directory= abs_path, embedding_function= self.embedding)
-        return vectorstore
+        try:
+            if not self.embedding: raise ValueError("No embedding model specified")
+            abs_path = os.path.abspath(self.vector_db_path)
+            vectorstore = Chroma(persist_directory= abs_path, embedding_function= self.embedding)
+            return vectorstore
+        except Exception as e:
+            txt.print(f"Error loading vectorstore: {e}")
+            return None
     
     def _build_bm25_retriever(self, documents: list[Document], k: int = 20, metadata: dict = None) -> BM25Retriever:
         if not documents or len(documents) == 0: 

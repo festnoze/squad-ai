@@ -95,10 +95,10 @@ class GenerateDocumentsWithMetadataFromFiles:
     def process_certifiers(self, data: List[Dict]) -> List[Document]:
         if not data:
             return []
-        all_certifiers_names = []
+        all_certifiers_names = set()
         docs = []
         for item in data:
-            all_certifiers_names.append(item.get("name"))
+            all_certifiers_names.add(item.get("name"))
             metadata = {
                 "id": item.get("id"),
                 "type": "certifieur",
@@ -108,15 +108,15 @@ class GenerateDocumentsWithMetadataFromFiles:
             content = f"{item.get('name', '')}"
             doc = Document(page_content=content, metadata=metadata)
             docs.append(doc)
-        return docs, all_certifiers_names
+        return docs, list(all_certifiers_names)
     
     def process_certifications(self, data: List[Dict]) -> List[Document]:
         if not data:
             return []
-        all_certifications_names = []
+        all_certifications_names = set()
         docs = []
         for item in data:
-            all_certifications_names.append(item.get("name"))
+            all_certifications_names.add(item.get("name"))
             metadata = {
                 "id": item.get("id"),
                 "type": "certification",
@@ -126,17 +126,17 @@ class GenerateDocumentsWithMetadataFromFiles:
             content = f"{item.get('name', '')}"
             doc = Document(page_content=content, metadata=metadata)
             docs.append(doc)
-        return docs, all_certifications_names
+        return docs, list(all_certifications_names)
 
     def process_diplomas(self, data: List[Dict]) -> List[Document]:
         if not data:
             return []
         docs = []
-        all_diplomas_names = []
+        all_diplomas_names = set()
         for item in data:
             title = item.get("title", '')
             title_summary = re.sub(r'\(.*?\)', '', title).replace("\n", " ").replace(" ?", "").replace("Nos formations en ligne ", "").replace(" en ligne", "").replace("niveau", "").replace("Qu’est-ce qu’un ", "").strip()
-            all_diplomas_names.append(title_summary)
+            all_diplomas_names.add(title_summary)
             metadata = {
                 "id": item.get("id"),
                 "type": "diplôme",
@@ -147,15 +147,15 @@ class GenerateDocumentsWithMetadataFromFiles:
             content = f"{title}\r\n{'\r\n'.join(related_paragraphs)}"
             doc = Document(page_content=content, metadata=metadata)
             docs.append(doc)
-        return docs, all_diplomas_names
+        return docs, list(all_diplomas_names)
 
     def process_domains(self, data: List[Dict]) -> List[Document]:
         if not data:
             return []
         docs = []
-        all_domains_names = []
+        all_domains_names = set()
         for item in data:
-            all_domains_names.append(item.get("name"))
+            all_domains_names.add(item.get("name"))
             metadata = {
                 "id": item.get("id"),
                 "type": "domaine",
@@ -165,15 +165,15 @@ class GenerateDocumentsWithMetadataFromFiles:
             content = f"{item.get('name', '')}"
             doc = Document(page_content=content, metadata=metadata)
             docs.append(doc)
-        return docs, all_domains_names
+        return docs, list(all_domains_names)
 
     def process_fundings(self, data: List[Dict]) -> List[Document]:
         if not data:
             return []
         docs = []
-        all_fundings_names = []
+        all_fundings_names = set()
         for item in data:
-            all_fundings_names.append(item.get("title"))
+            all_fundings_names.add(item.get("title"))
             metadata = {
                 "id": item.get("id"),
                 "type": "financement",
@@ -184,16 +184,16 @@ class GenerateDocumentsWithMetadataFromFiles:
             content = f"{item.get('title', '')}\r\n{'\r\n'.join(related_paragraphs)}"
             doc = Document(page_content=content, metadata=metadata)
             docs.append(doc)
-        return docs, all_fundings_names
+        return docs, list(all_fundings_names)
 
     def process_jobs(self, data: List[Dict], domains) -> List[Document]:
         if not data:
             return []
         docs = []
-        all_jobs_names = []
+        all_jobs_names = set()
         for item in data:
             job_title = item.get("title")
-            all_jobs_names.append(job_title)
+            all_jobs_names.add(job_title)
             metadata = {
                 "id": item.get("id"),
                 "type": "métier",
@@ -212,16 +212,16 @@ class GenerateDocumentsWithMetadataFromFiles:
             docs.append(doc)
 
         #docs.append(Document(page_content= 'Liste complète de tous les métiers couvert par Studi :\n' + ', '.join(all_jobs_names), metadata={"type": "liste_métiers",}))
-        return docs, all_jobs_names
+        return docs, list(all_jobs_names)
 
     def process_trainings(self, data: List[Dict], trainings_details: dict, existing_docs:list = []) -> List[Document]:
         if not data:
             return []
         docs = []
-        all_trainings_titles = []
+        all_trainings_titles = set()
         for item in data:
             training_title = item.get("title")
-            all_trainings_titles.append(training_title)
+            all_trainings_titles.add(training_title)
             related_ids = item.get("related_ids", {})
             metadata_common = {
                 "id": item.get("id"),
@@ -282,7 +282,7 @@ class GenerateDocumentsWithMetadataFromFiles:
                         docs.append(Document(page_content=content, metadata=metadata_detail))
 
         #docs.append(Document(page_content= 'Liste complète de toutes les formations proposées par Studi :\n' + ', '.join(all_trainings_titles), metadata={"type": "liste_formations",}))
-        return docs, all_trainings_titles
+        return docs, list(all_trainings_titles)
     
     def get_french_section(self, section: str) -> str:
         if section == 'title':
