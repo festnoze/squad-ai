@@ -136,4 +136,28 @@ class RAGPreTreatment:
             for key, value in implicit_metadata.items():
                 if key not in merged:
                     merged[key] = value
+
+        # Transform academic_level metadata for some cases
+        merged = RAGPreTreatment.transform_academic_level_metadata(merged)
         return merged
+    
+    def transform_academic_level_metadata(metadata):
+        if isinstance(metadata, list):
+            return [RAGPreTreatment.transform_academic_level_metadata(item) for item in metadata]
+        
+        academic_level_metadata = metadata.get('academic_level', None)
+        if academic_level_metadata:
+            if academic_level_metadata == 'pre-graduate' or academic_level_metadata == 'pré-graduate':
+                metadata['academic_level'] = 'Bac'
+            elif academic_level_metadata == 'BTS':
+                metadata['academic_level'] = 'Bac+2'
+            elif academic_level_metadata == 'graduate':
+                metadata['academic_level'] = 'Bac+3'
+        
+        if metadata.get('$and'):
+            metadata['$and'] = RAGPreTreatment.transform_academic_level_metadata(metadata['$and'])
+        if metadata.get('$or'):
+            metadata['$or'] = RAGPreTreatment.transform_academic_level_metadata(metadata['$or'])
+        if metadata.get('$not'):
+            metadata['$not'] = RAGPreTreatment.transform_academic_level_metadata(metadata['$not'])
+        return metadata

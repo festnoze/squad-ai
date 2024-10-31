@@ -54,7 +54,7 @@ class GenerateDocumentsWithMetadataFromFiles:
         # Process trainings
         trainings_data = JsonHelper.load_from_json(path + 'trainings.json')
         trainings_details = self.load_trainings_details_as_json(path)
-        trainings_docs, all_trainings_names = self.process_trainings(trainings_data, trainings_details, all_docs, sub_domains_data)
+        trainings_docs, all_trainings_names = self.process_trainings(trainings_data, trainings_details, all_docs, domains_data, sub_domains_data)
         all_docs.extend(trainings_docs)
 
         if write_all_lists:
@@ -240,7 +240,7 @@ class GenerateDocumentsWithMetadataFromFiles:
         #docs.append(Document(page_content= 'Liste complète de tous les métiers couvert par Studi :\n' + ', '.join(all_jobs_names), metadata={"type": "liste_métiers",}))
         return docs, list(all_jobs_names)
 
-    def process_trainings(self, data: List[Dict], trainings_details: dict, existing_docs:list = [], sub_domains_data = None) -> List[Document]:
+    def process_trainings(self, data: List[Dict], trainings_details: dict, existing_docs:list = [], domains_data = None, sub_domains_data = None) -> List[Document]:
         if not data:
             return []
         docs = []
@@ -256,12 +256,16 @@ class GenerateDocumentsWithMetadataFromFiles:
                 "changed": item.get("changed"),
                 "rel_ids": self.get_all_ids_as_str(related_ids),
             }            
-            sub_domain_id = related_ids.get("domain", "")
-            doms = [sub_domain for sub_domain in sub_domains_data if sub_domain['id'] == sub_domain_id]
-            if not doms:
-                domain_id = sub_domain_id
+            sub_domain_id = related_ids.get("domain", "not found")
+            subdoms = [sub_domain for sub_domain in sub_domains_data if sub_domain['id'] == sub_domain_id]
+            if sub_domain_id == 'not found' or not subdoms or not any(subdoms) or 'parent' not in subdoms[0]['related_ids'] or not subdoms[0]['related_ids']['parent']:
+                doms = [domain for domain in domains_data if domain['id'] == sub_domain_id] # check if the sub_domain_id is if fact a domain_id
+                if not doms or not any(doms):
+                    domain_id = 'not found'
+                else:
+                    domain_id = doms[0]['id']
             else:
-                domain_id = doms[0]['id']
+                domain_id = subdoms[0]['related_ids']['parent'][0]
 
             ids_by_metadata_names = {
                 "sub_domain_name": sub_domain_id,
