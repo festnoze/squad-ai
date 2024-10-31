@@ -68,7 +68,6 @@ class RagInferencePipeline:
         analysed_query = kwargs_values['analysed_query']
 
         # Perform streaming augmented generation
-        
         async for chunk in workflow_available_classes['RAGAugmentedGeneration'].rag_augmented_answer_generation_async(self.rag, query, retrieved_chunks[0], analysed_query, format_retrieved_docs_function):
             all_chunks_output.append(chunk)
             yield chunk

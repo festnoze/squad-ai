@@ -19,7 +19,7 @@ class RAGPreTreatment:
     @staticmethod
     def rag_static_pre_treatment(rag:RagService, query:Union[str, Conversation], default_filters:dict = {}) -> tuple[QuestionTranslation, dict]:
         question_analysis, extracted_implicit_metadata, extracted_explicit_metadata = Execute.run_parallel(
-            (RAGPreTreatment.bypassed_query_translation, (rag, query)),
+            (RAGPreTreatment.query_completion, (rag, query)),
             (RAGPreTreatment.analyse_query_for_metadata, (rag, query)),
             (RAGPreTreatment.extract_explicit_metadata, (query)),
         )
@@ -53,11 +53,13 @@ class RAGPreTreatment:
         prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(
             prefilter_prompt, QuestionCompletionPydantic, QuestionCompletion
         )
+
         response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(
             "query_completion", [rag.llm, rag.llm], output_parser, 10, *[prompt_for_output_parser]
         )
-        question_completion = response[0]
-        return QuestionCompletion(**question_completion)
+        question_completion = QuestionCompletion(**response[0])
+        print(f'>> La question réécrite : "{question_completion.modified_question}"')
+        return question_completion
             
     @staticmethod    
     @output_name('analysed_query')

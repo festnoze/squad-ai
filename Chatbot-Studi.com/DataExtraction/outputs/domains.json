@@ -1,24 +1,4 @@
-﻿[
-    {
-        "id": "2808323a-919f-4e67-860b-e67361f4aa16",
-        "type": "taxonomy_term--domain",
-        "name": "Animation - 3D - VFX",
-        "changed": "2023-03-29T06:42:35+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/2808323a-919f-4e67-860b-e67361f4aa16/field_school?resourceVersion=id%3A930"
-        },
-        "related_ids": {}
-    },
-    {
-        "id": "98b69e75-2b13-41d1-a37d-222cde277631",
-        "type": "taxonomy_term--domain",
-        "name": "Assurance",
-        "changed": "2022-10-19T02:01:43+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/98b69e75-2b13-41d1-a37d-222cde277631/field_school?resourceVersion=id%3A933"
-        },
-        "related_ids": {}
-    },
+[
     {
         "id": "6b4682d4-6b61-47e8-b15c-8e96a2fba0e4",
         "type": "taxonomy_term--domain",
@@ -27,17 +7,15 @@
         "related_url": {
             "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/6b4682d4-6b61-47e8-b15c-8e96a2fba0e4/field_school?resourceVersion=id%3A190"
         },
-        "related_ids": {}
-    },
-    {
-        "id": "1a3e5ef9-d44f-42dc-a6b7-107de2ff10c7",
-        "type": "taxonomy_term--domain",
-        "name": "Banque - Gestion de patrimoine",
-        "changed": "2022-10-19T02:01:43+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/1a3e5ef9-d44f-42dc-a6b7-107de2ff10c7/field_school?resourceVersion=id%3A934"
+        "related_ids": {
+            "parent": [
+                "virtual"
+            ]
         },
-        "related_ids": {}
+        "subdomains_names": [
+            "Assurance",
+            "Banque - Gestion de patrimoine"
+        ]
     },
     {
         "id": "d02f193e-d88e-48b2-acc4-955a250e9915",
@@ -47,27 +25,15 @@
         "related_url": {
             "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/d02f193e-d88e-48b2-acc4-955a250e9915/field_school?resourceVersion=id%3A96"
         },
-        "related_ids": {}
-    },
-    {
-        "id": "6be5122d-fe40-46e9-949d-75a25889358d",
-        "type": "taxonomy_term--domain",
-        "name": "Boulangerie",
-        "changed": "2023-10-17T10:53:07+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/6be5122d-fe40-46e9-949d-75a25889358d/field_school?resourceVersion=id%3A1279"
+        "related_ids": {
+            "parent": [
+                "virtual"
+            ]
         },
-        "related_ids": {}
-    },
-    {
-        "id": "845db3d8-ed58-4c53-be28-ca20a3ee2dac",
-        "type": "taxonomy_term--domain",
-        "name": "Business gaming",
-        "changed": "2022-10-19T02:01:43+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/845db3d8-ed58-4c53-be28-ca20a3ee2dac/field_school?resourceVersion=id%3A1241"
-        },
-        "related_ids": {}
+        "subdomains_names": [
+            "Coiffure",
+            "Esth\u00e9tique"
+        ]
     },
     {
         "id": "57dc40eb-a37e-462f-8894-0fff9ec360bf",
@@ -77,17 +43,16 @@
         "related_url": {
             "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/57dc40eb-a37e-462f-8894-0fff9ec360bf/field_school?resourceVersion=id%3A143"
         },
-        "related_ids": {}
-    },
-    {
-        "id": "85d692da-f42f-4d84-9fc7-0b39acf4fbfa",
-        "type": "taxonomy_term--domain",
-        "name": "Coiffure",
-        "changed": "2023-03-29T06:43:48+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/85d692da-f42f-4d84-9fc7-0b39acf4fbfa/field_school?resourceVersion=id%3A911"
+        "related_ids": {
+            "parent": [
+                "virtual"
+            ]
         },
-        "related_ids": {}
+        "subdomains_names": [
+            "Data - IA",
+            "D\u00e9veloppement",
+            "Infra - S\u00e9curit\u00e9"
+        ]
     },
     {
         "id": "710a3fec-0ed9-400a-b353-66e99c7b9d8c",
@@ -97,57 +62,16 @@
         "related_url": {
             "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/710a3fec-0ed9-400a-b353-66e99c7b9d8c/field_school?resourceVersion=id%3A149"
         },
-        "related_ids": {}
-    },
-    {
-        "id": "b89a8d01-335d-4be9-8b82-d4922abe8778",
-        "type": "taxonomy_term--domain",
-        "name": "Commerce international",
-        "changed": "2024-01-19T12:55:29+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/b89a8d01-335d-4be9-8b82-d4922abe8778/field_school?resourceVersion=id%3A932"
+        "related_ids": {
+            "parent": [
+                "virtual"
+            ]
         },
-        "related_ids": {}
-    },
-    {
-        "id": "93d08171-df89-45b5-bce8-eaf1d5b6a2ca",
-        "type": "taxonomy_term--domain",
-        "name": "Commercial - Relation client",
-        "changed": "2023-03-29T06:39:59+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/93d08171-df89-45b5-bce8-eaf1d5b6a2ca/field_school?resourceVersion=id%3A923"
-        },
-        "related_ids": {}
-    },
-    {
-        "id": "9af4b276-c8a6-493d-8b0a-2ce21e0b19c5",
-        "type": "taxonomy_term--domain",
-        "name": "Communication",
-        "changed": "2023-03-29T06:39:33+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/9af4b276-c8a6-493d-8b0a-2ce21e0b19c5/field_school?resourceVersion=id%3A931"
-        },
-        "related_ids": {}
-    },
-    {
-        "id": "09d7c4fb-7ce4-44f4-b94f-016ac37f3dae",
-        "type": "taxonomy_term--domain",
-        "name": "Comptabilit\u00e9",
-        "changed": "2023-03-29T06:41:04+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/09d7c4fb-7ce4-44f4-b94f-016ac37f3dae/field_school?resourceVersion=id%3A918"
-        },
-        "related_ids": {}
-    },
-    {
-        "id": "3816be02-0452-46f3-9499-52c7a39b0adc",
-        "type": "taxonomy_term--domain",
-        "name": "Data - IA",
-        "changed": "2022-10-19T02:01:43+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/3816be02-0452-46f3-9499-52c7a39b0adc/field_school?resourceVersion=id%3A936"
-        },
-        "related_ids": {}
+        "subdomains_names": [
+            "Commerce international",
+            "Commercial - Relation client",
+            "Retail - Point de vente"
+        ]
     },
     {
         "id": "9f697e27-9f0a-47ab-8b5d-84ec4449ce44",
@@ -157,27 +81,15 @@
         "related_url": {
             "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/9f697e27-9f0a-47ab-8b5d-84ec4449ce44/field_school?resourceVersion=id%3A93"
         },
-        "related_ids": {}
-    },
-    {
-        "id": "1b9f49c8-9f71-40bf-89f7-16b3bfe7bf05",
-        "type": "taxonomy_term--domain",
-        "name": "Design graphique et digital",
-        "changed": "2023-03-29T06:42:44+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/1b9f49c8-9f71-40bf-89f7-16b3bfe7bf05/field_school?resourceVersion=id%3A908"
+        "related_ids": {
+            "parent": [
+                "virtual"
+            ]
         },
-        "related_ids": {}
-    },
-    {
-        "id": "abbbd8ce-b39c-47da-a8f7-28f25339e8f1",
-        "type": "taxonomy_term--domain",
-        "name": "D\u00e9veloppement",
-        "changed": "2023-03-29T06:42:11+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/abbbd8ce-b39c-47da-a8f7-28f25339e8f1/field_school?resourceVersion=id%3A928"
-        },
-        "related_ids": {}
+        "subdomains_names": [
+            "Animation - 3D - VFX",
+            "Design graphique et digital"
+        ]
     },
     {
         "id": "88e4fa48-7213-4f5e-bd6a-6115eaf7be1a",
@@ -187,17 +99,12 @@
         "related_url": {
             "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/88e4fa48-7213-4f5e-bd6a-6115eaf7be1a/field_school?resourceVersion=id%3A1371"
         },
-        "related_ids": {}
-    },
-    {
-        "id": "b1e56438-c3ca-4c99-af56-c139912e0264",
-        "type": "taxonomy_term--domain",
-        "name": "Esth\u00e9tique",
-        "changed": "2023-03-29T06:43:40+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/b1e56438-c3ca-4c99-af56-c139912e0264/field_school?resourceVersion=id%3A910"
+        "related_ids": {
+            "parent": [
+                "virtual"
+            ]
         },
-        "related_ids": {}
+        "subdomains_names": []
     },
     {
         "id": "78e1becf-ce77-49cd-b685-4b624187a7d9",
@@ -207,17 +114,15 @@
         "related_url": {
             "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/78e1becf-ce77-49cd-b685-4b624187a7d9/field_school?resourceVersion=id%3A119"
         },
-        "related_ids": {}
-    },
-    {
-        "id": "fee5282f-d46a-484d-ba5a-5a734ac4ef0c",
-        "type": "taxonomy_term--domain",
-        "name": "Finance - Contr\u00f4le de gestion",
-        "changed": "2023-03-29T06:41:12+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/fee5282f-d46a-484d-ba5a-5a734ac4ef0c/field_school?resourceVersion=id%3A917"
+        "related_ids": {
+            "parent": [
+                "virtual"
+            ]
         },
-        "related_ids": {}
+        "subdomains_names": [
+            "Comptabilit\u00e9",
+            "Finance - Contr\u00f4le de gestion"
+        ]
     },
     {
         "id": "c5d0552a-7bf7-4ba4-b6da-fd253a6f964a",
@@ -227,27 +132,15 @@
         "related_url": {
             "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/c5d0552a-7bf7-4ba4-b6da-fd253a6f964a/field_school?resourceVersion=id%3A1239"
         },
-        "related_ids": {}
-    },
-    {
-        "id": "e23ccfa6-5550-47a5-ba94-36436dba57c2",
-        "type": "taxonomy_term--domain",
-        "name": "Gestion de projet",
-        "changed": "2023-03-29T06:43:25+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/e23ccfa6-5550-47a5-ba94-36436dba57c2/field_school?resourceVersion=id%3A913"
+        "related_ids": {
+            "parent": [
+                "virtual"
+            ]
         },
-        "related_ids": {}
-    },
-    {
-        "id": "97bd0e81-e54e-4ab1-bcb5-7c4794d41fee",
-        "type": "taxonomy_term--domain",
-        "name": "H\u00e9bergement - Management",
-        "changed": "2022-10-19T02:01:43+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/97bd0e81-e54e-4ab1-bcb5-7c4794d41fee/field_school?resourceVersion=id%3A929"
-        },
-        "related_ids": {}
+        "subdomains_names": [
+            "Business gaming",
+            "Programmation gaming"
+        ]
     },
     {
         "id": "482ca55c-c59e-4176-8f2d-a62ac19da578",
@@ -257,37 +150,14 @@
         "related_url": {
             "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/482ca55c-c59e-4176-8f2d-a62ac19da578/field_school?resourceVersion=id%3A121"
         },
-        "related_ids": {}
-    },
-    {
-        "id": "33ed4453-1b45-4074-a954-dc7b9c24c65c",
-        "type": "taxonomy_term--domain",
-        "name": "Immobilier",
-        "changed": "2023-05-03T02:02:15+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/33ed4453-1b45-4074-a954-dc7b9c24c65c/field_school?resourceVersion=id%3A919"
+        "related_ids": {
+            "parent": [
+                "virtual"
+            ]
         },
-        "related_ids": {}
-    },
-    {
-        "id": "50782672-b5d3-43c6-8c1a-1763cabd3767",
-        "type": "taxonomy_term--domain",
-        "name": "Immobilier",
-        "changed": "2023-01-23T22:22:11+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/50782672-b5d3-43c6-8c1a-1763cabd3767/field_school?resourceVersion=id%3A1142"
-        },
-        "related_ids": {}
-    },
-    {
-        "id": "dff08290-c225-4ff6-ae06-f234fed727a8",
-        "type": "taxonomy_term--domain",
-        "name": "Infra - S\u00e9curit\u00e9",
-        "changed": "2023-03-29T06:41:56+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/dff08290-c225-4ff6-ae06-f234fed727a8/field_school?resourceVersion=id%3A925"
-        },
-        "related_ids": {}
+        "subdomains_names": [
+            "Immobilier"
+        ]
     },
     {
         "id": "7de523d8-bc31-4437-b8a4-685b1c081419",
@@ -297,17 +167,14 @@
         "related_url": {
             "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/7de523d8-bc31-4437-b8a4-685b1c081419/field_school?resourceVersion=id%3A122"
         },
-        "related_ids": {}
-    },
-    {
-        "id": "c9de6492-665d-4f99-ba65-312aba3f6156",
-        "type": "taxonomy_term--domain",
-        "name": "Juridique",
-        "changed": "2024-08-30T12:27:00+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/c9de6492-665d-4f99-ba65-312aba3f6156/field_school?resourceVersion=id%3A921"
+        "related_ids": {
+            "parent": [
+                "virtual"
+            ]
         },
-        "related_ids": {}
+        "subdomains_names": [
+            "Juridique"
+        ]
     },
     {
         "id": "8eccfc92-5710-4be0-afa3-75ab6aa47b56",
@@ -317,27 +184,16 @@
         "related_url": {
             "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/8eccfc92-5710-4be0-afa3-75ab6aa47b56/field_school?resourceVersion=id%3A83"
         },
-        "related_ids": {}
-    },
-    {
-        "id": "47d0fafe-a5cf-4333-9160-8dcdfd3c74c2",
-        "type": "taxonomy_term--domain",
-        "name": "Management - Strat\u00e9gie d'entreprise",
-        "changed": "2023-03-29T06:43:13+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/47d0fafe-a5cf-4333-9160-8dcdfd3c74c2/field_school?resourceVersion=id%3A912"
+        "related_ids": {
+            "parent": [
+                "virtual"
+            ]
         },
-        "related_ids": {}
-    },
-    {
-        "id": "9579cef1-7c90-4108-b67a-9b7fd8c59e6d",
-        "type": "taxonomy_term--domain",
-        "name": "Marketing",
-        "changed": "2023-03-29T06:39:24+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/9579cef1-7c90-4108-b67a-9b7fd8c59e6d/field_school?resourceVersion=id%3A909"
-        },
-        "related_ids": {}
+        "subdomains_names": [
+            "Gestion de projet",
+            "Management - Strat\u00e9gie d'entreprise",
+            "Office management - Secr\u00e9tariat"
+        ]
     },
     {
         "id": "99ba78ae-038c-4ff4-865d-fb67f5c5f1a9",
@@ -347,67 +203,15 @@
         "related_url": {
             "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/99ba78ae-038c-4ff4-865d-fb67f5c5f1a9/field_school?resourceVersion=id%3A94"
         },
-        "related_ids": {}
-    },
-    {
-        "id": "e4efd81f-75fc-4cc5-bb1c-10f596b77f57",
-        "type": "taxonomy_term--domain",
-        "name": "Office management - Secr\u00e9tariat",
-        "changed": "2023-03-29T06:43:03+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/e4efd81f-75fc-4cc5-bb1c-10f596b77f57/field_school?resourceVersion=id%3A907"
+        "related_ids": {
+            "parent": [
+                "virtual"
+            ]
         },
-        "related_ids": {}
-    },
-    {
-        "id": "5815a6ce-c1c6-4a5d-8ebe-55c9e343f082",
-        "type": "taxonomy_term--domain",
-        "name": "Petite enfance",
-        "changed": "2022-10-19T02:01:43+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/5815a6ce-c1c6-4a5d-8ebe-55c9e343f082/field_school?resourceVersion=id%3A914"
-        },
-        "related_ids": {}
-    },
-    {
-        "id": "4c87e8e7-92bc-4f84-b11b-f358aaae8c36",
-        "type": "taxonomy_term--domain",
-        "name": "Petite enfance",
-        "changed": "2022-10-19T02:01:43+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/4c87e8e7-92bc-4f84-b11b-f358aaae8c36/field_school?resourceVersion=id%3A1139"
-        },
-        "related_ids": {}
-    },
-    {
-        "id": "1109e86e-4887-4175-9757-38c8bc1b58f3",
-        "type": "taxonomy_term--domain",
-        "name": "Politique RH - Recrutement",
-        "changed": "2023-03-29T06:40:40+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/1109e86e-4887-4175-9757-38c8bc1b58f3/field_school?resourceVersion=id%3A927"
-        },
-        "related_ids": {}
-    },
-    {
-        "id": "9e936526-e193-469e-a3a5-7b3e30fc7a67",
-        "type": "taxonomy_term--domain",
-        "name": "Programmation gaming",
-        "changed": "2022-10-19T02:01:43+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/9e936526-e193-469e-a3a5-7b3e30fc7a67/field_school?resourceVersion=id%3A1240"
-        },
-        "related_ids": {}
-    },
-    {
-        "id": "442a5b66-f805-40c2-98b4-3bfd4f6ddcf3",
-        "type": "taxonomy_term--domain",
-        "name": "Relation client",
-        "changed": "2022-10-19T02:01:43+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/442a5b66-f805-40c2-98b4-3bfd4f6ddcf3/field_school?resourceVersion=id%3A924"
-        },
-        "related_ids": {}
+        "subdomains_names": [
+            "Communication",
+            "Marketing"
+        ]
     },
     {
         "id": "f5631970-d4e8-417d-93da-11edd4ad658d",
@@ -417,17 +221,15 @@
         "related_url": {
             "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/f5631970-d4e8-417d-93da-11edd4ad658d/field_school?resourceVersion=id%3A140"
         },
-        "related_ids": {}
-    },
-    {
-        "id": "69c68231-0489-4803-bc0c-77075525ff5e",
-        "type": "taxonomy_term--domain",
-        "name": "Retail - Point de vente",
-        "changed": "2023-03-29T06:40:11+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/69c68231-0489-4803-bc0c-77075525ff5e/field_school?resourceVersion=id%3A922"
+        "related_ids": {
+            "parent": [
+                "virtual"
+            ]
         },
-        "related_ids": {}
+        "subdomains_names": [
+            "Politique RH - Recrutement",
+            "Social - Paie"
+        ]
     },
     {
         "id": "41343eaa-ef21-4d4d-8262-c5fe47f400b9",
@@ -437,37 +239,15 @@
         "related_url": {
             "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/41343eaa-ef21-4d4d-8262-c5fe47f400b9/field_school?resourceVersion=id%3A108"
         },
-        "related_ids": {}
-    },
-    {
-        "id": "ea876232-7cde-407c-86e7-6d986fe9c475",
-        "type": "taxonomy_term--domain",
-        "name": "Services \u00e0 la personne",
-        "changed": "2022-10-19T02:01:43+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/ea876232-7cde-407c-86e7-6d986fe9c475/field_school?resourceVersion=id%3A915"
+        "related_ids": {
+            "parent": [
+                "virtual"
+            ]
         },
-        "related_ids": {}
-    },
-    {
-        "id": "7beff872-5279-4d5d-9f61-66ff7471e762",
-        "type": "taxonomy_term--domain",
-        "name": "Services \u00e0 la personne",
-        "changed": "2023-02-07T08:20:57+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/7beff872-5279-4d5d-9f61-66ff7471e762/field_school?resourceVersion=id%3A1140"
-        },
-        "related_ids": {}
-    },
-    {
-        "id": "b2b3e0ba-2e5c-43cd-9472-6b89fa360b54",
-        "type": "taxonomy_term--domain",
-        "name": "Social - Paie",
-        "changed": "2023-03-29T06:40:48+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/b2b3e0ba-2e5c-43cd-9472-6b89fa360b54/field_school?resourceVersion=id%3A926"
-        },
-        "related_ids": {}
+        "subdomains_names": [
+            "Petite enfance",
+            "Services \u00e0 la personne"
+        ]
     },
     {
         "id": "96e632af-17d2-4f67-82c2-addf69de4981",
@@ -477,17 +257,14 @@
         "related_url": {
             "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/96e632af-17d2-4f67-82c2-addf69de4981/field_school?resourceVersion=id%3A624"
         },
-        "related_ids": {}
-    },
-    {
-        "id": "c569ccb9-77e0-4997-8dc7-0d90803f8a33",
-        "type": "taxonomy_term--domain",
-        "name": "Sport business",
-        "changed": "2023-06-19T09:18:07+00:00",
-        "related_url": {
-            "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/c569ccb9-77e0-4997-8dc7-0d90803f8a33/field_school?resourceVersion=id%3A935"
+        "related_ids": {
+            "parent": [
+                "virtual"
+            ]
         },
-        "related_ids": {}
+        "subdomains_names": [
+            "Sport business"
+        ]
     },
     {
         "id": "faa4a8ca-605b-4f72-908c-10f0d749b3e6",
@@ -497,6 +274,14 @@
         "related_url": {
             "school": "https://www.studi.com/fr/jsonapi/taxonomy_term/domain/faa4a8ca-605b-4f72-908c-10f0d749b3e6/field_school?resourceVersion=id%3A131"
         },
-        "related_ids": {}
+        "related_ids": {
+            "parent": [
+                "virtual"
+            ]
+        },
+        "subdomains_names": [
+            "H\u00e9bergement - Management",
+            "Relation client"
+        ]
     }
 ]

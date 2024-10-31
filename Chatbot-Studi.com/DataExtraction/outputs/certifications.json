@@ -1,4 +1,4 @@
-﻿[
+[
     {
         "id": "f3ca5a7d-d507-49ec-9d45-1104cc252a61",
         "type": "taxonomy_term--certification",
@@ -39,6 +39,9 @@
         "type": "taxonomy_term--certification",
         "name": "Certification compl\u00e9mentaire (R\u00e9pertoire Sp\u00e9cifique)",
         "changed": "2022-12-01T08:07:46+00:00",
+        "attributes": {
+            "name": "Certification compl\u00e9mentaire (R\u00e9pertoire Sp\u00e9cifique)"
+        },
         "related_url": {}
     },
     {

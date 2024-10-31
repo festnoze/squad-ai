@@ -46,7 +46,7 @@ class RAGHybridRetrieval:
                 doc for doc in rag.langchain_documents 
                 if RagFilteringMetadataHelper.filters_predicate(doc, metadata)
             ]
-            txt.print(f"docs corresponding to metadata: {len(filtered_docs)}/{len(rag.langchain_documents)}")
+            print(f">> docs count corresponding to metadata: {len(filtered_docs)}/{len(rag.langchain_documents)}")
         else:
             filtered_docs = rag.langchain_documents
 

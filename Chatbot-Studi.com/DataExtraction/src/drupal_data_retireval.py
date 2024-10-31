@@ -17,7 +17,7 @@ class DrupalDataRetireval:
         self.retrieve_jobs()
         self.retrieve_fundings()
         self.retrieve_trainings()
-        self.retrieve_domains()
+        self.retrieve_domains_and_subdomains()
         self.retrieve_diplomas()
         self.retrieve_certifications()
         self.retrieve_certifiers()
@@ -25,8 +25,11 @@ class DrupalDataRetireval:
 
     def retrieve_jobs(self):
         """ Retrieve all jobs from studi.com """
-        full_data = self.studiClient.get_drupal_data_recursively('node/jobs')
-        self.save_json_file("full/jobs", full_data)
+        if file.file_exists(f"{self.out_dir}{"full/jobs"}.json"):
+            full_data = file.get_as_json(f"{self.out_dir}{"full/jobs"}.json")
+        else:
+            full_data = self.studiClient.get_drupal_data_recursively('node/jobs')
+            self.save_json_file("full/jobs", full_data)
 
         jobs = self.studiClient.extract_common_data_from_nodes(full_data, ['field_paragraph'], ['field_domain'])
         jobs = self.studiClient.parallel_get_items_related_infos(jobs)
@@ -35,8 +38,11 @@ class DrupalDataRetireval:
 
     def retrieve_fundings(self):
         """ Retrieve all fundings from studi.com """
-        full_data = self.studiClient.get_drupal_data_recursively('node/funding')
-        self.save_json_file("full/fundings", full_data)
+        if file.file_exists(f"{self.out_dir}{"full/fundings"}.json"):
+            full_data = file.get_as_json(f"{self.out_dir}{"full/fundings"}.json")
+        else:
+            full_data = self.studiClient.get_drupal_data_recursively('node/funding')
+            self.save_json_file("full/fundings", full_data)
         
         fundings = self.studiClient.extract_common_data_from_nodes(full_data, ['field_paragraph'], [])      
         fundings = self.studiClient.parallel_get_items_related_infos(fundings)
@@ -45,8 +51,11 @@ class DrupalDataRetireval:
 
     def retrieve_trainings(self):
         """ Retrieve all trainings from studi.com """
-        full_data = self.studiClient.get_drupal_data_recursively('node/training')
-        self.save_json_file("full/trainings", full_data) 
+        if file.file_exists(f"{self.out_dir}{"full/trainings"}.json"):
+            full_data = file.get_as_json(f"{self.out_dir}{"full/trainings"}.json")
+        else:
+            full_data = self.studiClient.get_drupal_data_recursively('node/training')
+            self.save_json_file("full/trainings", full_data) 
         
         trainings = self.studiClient.extract_common_data_from_nodes(
             full_data,
@@ -57,8 +66,12 @@ class DrupalDataRetireval:
 
     def retrieve_diplomas(self):
         """ Retrieve all diplomas from studi.com """
-        full_data = self.studiClient.get_drupal_data_recursively('node/diploma')
-        self.save_json_file("full/diplomas", full_data)
+        if file.file_exists(f"{self.out_dir}{"full/diplomas"}.json"):
+            full_data = file.get_as_json(f"{self.out_dir}{"full/diplomas"}.json")
+        else:
+            full_data = self.studiClient.get_drupal_data_recursively('node/diploma')
+            self.save_json_file("full/diplomas", full_data)
+
         diplomas = self.studiClient.extract_common_data_from_nodes(full_data, ['field_paragraph'], ['field_content_bloc','field_certification', 'field_diploma', 'field_domain', 'field_job', 'field_funding', 'field_goal', 'field_job'])
         diplomas = self.studiClient.parallel_get_items_related_infos(diplomas)
         self.save_json_file("diplomas", diplomas)
@@ -66,26 +79,46 @@ class DrupalDataRetireval:
 
     def retrieve_certifications(self):
         """ Retrieve all certifications from studi.com """
-        full_data = self.studiClient.get_drupal_data_recursively('taxonomy_term/certification')
-        self.save_json_file("full/certifications", full_data)
+        if file.file_exists(f"{self.out_dir}{"full/certifications"}.json"):
+            full_data = file.get_as_json(f"{self.out_dir}{"full/certifications"}.json")
+        else:
+            full_data = self.studiClient.get_drupal_data_recursively('taxonomy_term/certification')
+            self.save_json_file("full/certifications", full_data)
 
         certifications = self.studiClient.extract_common_data_from_nodes(full_data, ['field_paragraph'])
         self.save_json_file("certifications", certifications)
         txt.print(">>> Finished certifications drupal data retireval ...")
 
-    def retrieve_domains(self):
+    def retrieve_domains_and_subdomains(self):
         """ Retrieve all domains from studi.com """
-        full_data = self.studiClient.get_drupal_data_recursively('taxonomy_term/domain')
-        self.save_json_file("full/domains", full_data)
+        if file.file_exists(f"{self.out_dir}{"full/domains"}.json"):
+            full_data = file.get_as_json(f"{self.out_dir}{"full/domains"}.json")
+        else:
+            full_data = self.studiClient.get_drupal_data_recursively('taxonomy_term/domain')
+            self.save_json_file("full/domains", full_data)
 
-        domains = self.studiClient.extract_common_data_from_nodes(full_data, ['field_paragraph', 'field_school'], ['field_jobs'])  
+        domains_and_subdomains = self.studiClient.extract_common_data_from_nodes(full_data, ['field_paragraph', 'field_school'], ['field_jobs', 'parent'])  
+        
+        domains = [domain for domain in domains_and_subdomains if domain['related_ids']['parent'][0] == 'virtual']
+        subdomains = [domain for domain in domains_and_subdomains if domain['related_ids']['parent'][0] != 'virtual']
+        for domain in domains:
+            domain['subdomains_names'] = []
+            for subdomain in subdomains:
+                if subdomain['related_ids']['parent'][0] == domain['id']:
+                    subdomain['domain_name'] = domain['name']
+                    domain['subdomains_names'].append(subdomain['name'])
+
+        self.save_json_file("subdomains", subdomains)
         self.save_json_file("domains", domains)
-        txt.print(">>> Finished domains drupal data retireval ...")
+        txt.print(">>> Finished domains/sub-domains drupal data retireval ...")
 
     def retrieve_certifiers(self):
         """ Retrieve all certifications from studi.com """
-        full_data = self.studiClient.get_drupal_data_recursively('taxonomy_term/certifier')
-        self.save_json_file("full/certifiers", full_data)
+        if file.file_exists(f"{self.out_dir}{"full/certifiers"}.json"):
+            full_data = file.get_as_json(f"{self.out_dir}{"full/certifiers"}.json")
+        else:
+            full_data = self.studiClient.get_drupal_data_recursively('taxonomy_term/certifier')
+            self.save_json_file("full/certifiers", full_data)
 
         certifiers = self.studiClient.extract_common_data_from_nodes(full_data)
         self.save_json_file("certifiers", certifiers)
@@ -124,7 +157,7 @@ class DrupalDataRetireval:
             elif choice == "4":
                 self.retrieve_trainings()
             elif choice == "5":
-                self.retrieve_domains()
+                self.retrieve_domains_and_subdomains()
             elif choice == "6":
                 self.retrieve_diplomas()
             elif choice == "7":

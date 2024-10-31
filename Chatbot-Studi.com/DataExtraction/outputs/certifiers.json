@@ -1,4 +1,4 @@
-﻿[
+[
     {
         "id": "d26b4a08-ed5e-4664-bb4e-7fd2d3b37629",
         "type": "taxonomy_term--certifier",
@@ -159,7 +159,10 @@
         "id": "a568fb82-f6a4-42a1-91f5-34efc6fa1f23",
         "type": "taxonomy_term--certifier",
         "name": "Leader Films Conservatoire libre du cin\u00e9ma fran\u00e7ais (CLCF)",
-        "changed": "2022-10-19T02:01:43+00:00"
+        "changed": "2022-10-19T02:01:43+00:00",
+        "attributes": {
+            "name": "Leader Films Conservatoire libre du cin\u00e9ma fran\u00e7ais (CLCF)"
+        }
     },
     {
         "id": "014a643e-3565-4261-bf72-e441a284af31",
@@ -189,7 +192,10 @@
         "id": "2783f9af-016b-4a1d-8ca2-8dacdbc48d0c",
         "type": "taxonomy_term--certifier",
         "name": "Minist\u00e8re de l\u2019Enseignement sup\u00e9rieur, de la Recherche et de l\u2019Innovation",
-        "changed": "2024-07-18T12:46:20+00:00"
+        "changed": "2024-07-18T12:46:20+00:00",
+        "attributes": {
+            "name": "Minist\u00e8re de l\u2019Enseignement sup\u00e9rieur, de la Recherche et de l\u2019Innovation"
+        }
     },
     {
         "id": "f6bcb99e-9190-4d1f-ad90-dc5683fad9c8",

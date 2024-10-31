@@ -1,4 +1,4 @@
-﻿[
+[
     {
         "id": "f3782c5b-e5b7-4c25-802a-668601cb0a9c",
         "type": "node--jobs",
@@ -1390,6 +1390,7 @@
         "title": "Directeur administratif et financier / Directrice administrative et financi\u00e8re",
         "changed": "2024-06-14T15:01:09+00:00",
         "attributes": {
+            "title": "Directeur administratif et financier / Directrice administrative et financi\u00e8re",
             "metatag": "Le directeur administratif et financier met en place la strat\u00e9gie financi\u00e8re et administrative de l'entreprise. Comment devenir DAF ?\r\nDirecteur administratif et financier : m\u00e9tier, formation - Studi",
             "short_description": "Il/Elle met en \u0153uvre et supervise la gestion administrative et financi\u00e8re d'une entreprise (affaires juridiques, comptabilit\u00e9, contr\u00f4le de gestion, etc.)"
         },
@@ -4582,6 +4583,7 @@
         "title": "Chauffeur accompagnateur / Chauffeuse accompagnatrice",
         "changed": "2024-08-01T08:15:18+00:00",
         "attributes": {
+            "title": "Chauffeur accompagnateur / Chauffeuse accompagnatrice",
             "metatag": "Le chauffeur accompagnateur est de permettre l\u2019acc\u00e8s aux transports \u00e0 un public d\u2019usagers non autonomes. Comment devenir chauffeur accompagnateur ? - Studi\r\nChauffeur accompagnateur : m\u00e9tier, salaire, formation - Studi"
         },
         "related_url": {
@@ -4633,6 +4635,7 @@
         "title": "Administrateur / Administratrice r\u00e9seaux et s\u00e9curit\u00e9",
         "changed": "2024-06-25T09:48:55+00:00",
         "attributes": {
+            "title": "Administrateur / Administratrice r\u00e9seaux et s\u00e9curit\u00e9",
             "metatag": "L\u2019administrateur r\u00e9seaux et s\u00e9curit\u00e9 g\u00e8re la s\u00e9curit\u00e9 du syst\u00e8me informatique d\u2019une entreprise. Comment devenir administrateur r\u00e9seaux et s\u00e9curit\u00e9 ? - Studi\r\nAdministrateur r\u00e9seaux et s\u00e9curit\u00e9 : m\u00e9tier, salaire - Studi"
         },
         "related_url": {
@@ -4754,6 +4757,7 @@
         "title": "Coordonnateur / Coordinatrice de services \u00e0 la personne",
         "changed": "2024-02-22T15:23:46+00:00",
         "attributes": {
+            "title": "Coordonnateur / Coordinatrice de services \u00e0 la personne",
             "metatag": "Le coordonnateur des services \u00e0 la personne organise l\u2019aide d\u00e9di\u00e9e aux personnes en perte d'autonomie. Comment devenir coordonnateur d\u2019aide \u00e0 la personne ?\r\nCoordonnateur d\u2019aide \u00e0 domicile : m\u00e9tier, salaire - Studi"
         },
         "related_url": {
@@ -5225,6 +5229,7 @@
         "title": "Organisateur / Organisatrice d\u2019\u00e9v\u00e9nements professionnels",
         "changed": "2024-06-07T09:28:31+00:00",
         "attributes": {
+            "title": "Organisateur / Organisatrice d\u2019\u00e9v\u00e9nements professionnels",
             "metatag": "L\u2019organisateur d\u2019\u00e9v\u00e9nements professionnels g\u00e8re et coordonne des \u00e9v\u00e9nements d\u2019entreprise. Comment devenir organisateur d\u2019\u00e9v\u00e9nements ? - Studi\r\nOrganisateur d\u2019\u00e9v\u00e9nements : m\u00e9tier, salaire, formation - Studi",
             "short_description": "L\u2019organisateur d\u2019\u00e9v\u00e9nements professionnels g\u00e8re et coordonne des \u00e9v\u00e9nements d\u2019entreprise tels que des r\u00e9ceptions, des s\u00e9minaires, des inaugurations, des lancements de produits, etc."
         },
@@ -5478,7 +5483,9 @@
         "title": "Superviseur / Superviseuse infrastructure et r\u00e9seaux",
         "changed": "2024-06-18T07:47:10+00:00",
         "attributes": {
-            "metatag": "Le superviseur infrastructure et r\u00e9seaux surveille un r\u00e9seau, ses infrastructures et machines. Comment devenir superviseur infrastructure et r\u00e9seaux ? - Studi\r\nSuperviseur infrastructure et r\u00e9seaux : m\u00e9tier, salaire - Studi"
+            "title": "Superviseur / Superviseuse infrastructure et r\u00e9seaux",
+            "metatag": "Le superviseur infrastructure et r\u00e9seaux surveille un r\u00e9seau, ses infrastructures et machines. Comment devenir superviseur infrastructure et r\u00e9seaux ? - Studi\r\nSuperviseur infrastructure et r\u00e9seaux : m\u00e9tier, salaire - Studi",
+            "short_description": "Il/Elle surveille l\u2019\u00e9tat du r\u00e9seau, des infrastructures et des machines."
         },
         "related_url": {
             "paragraph": "https://www.studi.com/fr/jsonapi/node/jobs/a893e1c5-a91d-46e0-a0ae-2c516af7e279/field_paragraph?resourceVersion=id%3A111402"
@@ -6034,6 +6041,7 @@
         "title": "Collaborateur / Collaboratrice comptable et financier",
         "changed": "2022-11-25T16:28:40+00:00",
         "attributes": {
+            "title": "Collaborateur / Collaboratrice comptable et financier",
             "metatag": "Collaborateur comptable et financier : m\u00e9tier, salaire - Studi\r\nLe collaborateur comptable et financier est charg\u00e9 des op\u00e9rations de comptabilit\u00e9 d\u2019une entreprise. Comment devenir collaborateur comptable et financier ? - Studi"
         },
         "related_url": {
@@ -6584,6 +6592,9 @@
         "type": "node--jobs",
         "title": "Contr\u00f4leur de Gestion Sociale / Contr\u00f4leuse de Gestion Sociale",
         "changed": "2023-03-20T09:55:08+00:00",
+        "attributes": {
+            "title": "Contr\u00f4leur de Gestion Sociale / Contr\u00f4leuse de Gestion Sociale"
+        },
         "related_url": {
             "paragraph": "https://www.studi.com/fr/jsonapi/node/jobs/b3bacba8-b89b-4b1d-b548-1a4f0af5f472/field_paragraph?resourceVersion=id%3A68703"
         },
@@ -7842,6 +7853,7 @@
         "title": "Conseiller vendeur / Conseill\u00e8re vendeuse en voyages",
         "changed": "2022-07-04T09:46:01+00:00",
         "attributes": {
+            "title": "Conseiller vendeur / Conseill\u00e8re vendeuse en voyages",
             "metatag": "Conseiller vendeur voyages : m\u00e9tier, salaire, formation - Studi\r\nLe conseiller vendeur voyages \u00e9tablit des devis de prestation pour sa client\u00e8le : nuit\u00e9e, transport, excursions\u2026 Comment devenir conseiller vendeur voyages ? - Studi"
         },
         "related_url": {
@@ -8292,6 +8304,7 @@
         "title": "Charg\u00e9 / Charg\u00e9e de relations commerciales et internationales",
         "changed": "2022-11-25T16:39:29+00:00",
         "attributes": {
+            "title": "Charg\u00e9 / Charg\u00e9e de relations commerciales et internationales",
             "metatag": "Charg\u00e9 de relations commerciales et internationales - Studi\r\nLe charg\u00e9 de relations commerciales et internationales n\u00e9gocie \u00e0 l\u2019international. Comment devenir responsable d\u2019affaires internationales ? - Studi"
         },
         "related_url": {
@@ -8441,7 +8454,8 @@
         "title": "Responsable comptable",
         "changed": "2024-06-14T14:35:21+00:00",
         "attributes": {
-            "metatag": "Le responsable comptable coordonne les proc\u00e9dures et veille au respect des objectifs financiers de l\u2019entreprise. Comment devenir responsable comptable ? - Studi\r\nResponsable comptable : m\u00e9tier, salaire, formation - Studi"
+            "metatag": "Le responsable comptable coordonne les proc\u00e9dures et veille au respect des objectifs financiers de l\u2019entreprise. Comment devenir responsable comptable ? - Studi\r\nResponsable comptable : m\u00e9tier, salaire, formation - Studi",
+            "short_description": "Il/Elle est le garant de la bonne sant\u00e9 comptable et fiscale d\u2019une structure."
         },
         "related_url": {
             "paragraph": "https://www.studi.com/fr/jsonapi/node/jobs/847c8ea7-f6d6-4c30-b5cd-899dcee2cd56/field_paragraph?resourceVersion=id%3A111182"
@@ -8489,6 +8503,7 @@
         "title": "Concepteur / Conceptrice d\u2019applications informatiques",
         "changed": "2024-07-30T15:32:17+00:00",
         "attributes": {
+            "title": "Concepteur / Conceptrice d\u2019applications informatiques",
             "metatag": "Le concepteur d\u2019applications informatiques cr\u00e9e des applications ou des sites web selon le cahier des charges fourni. Comment devenir concepteur d\u2019applications ? - Studi\r\nConcepteur d\u2019applications : m\u00e9tier, salaire, formation - Studi"
         },
         "related_url": {
@@ -8513,7 +8528,8 @@
         "title": "D\u00e9veloppeur / D\u00e9veloppeuse d\u2019applications",
         "changed": "2024-06-14T08:47:10+00:00",
         "attributes": {
-            "metatag": "Le d\u00e9veloppeur d\u2019applications r\u00e9alise le d\u00e9veloppement d\u2019applications pour mobiles, smartphones et autres tablettes. Comment devenir d\u00e9veloppeur d\u2019applications ? - Studi\r\nD\u00e9veloppeur d\u2019applications : m\u00e9tier, salaire, formation - Studi"
+            "metatag": "Le d\u00e9veloppeur d\u2019applications r\u00e9alise le d\u00e9veloppement d\u2019applications pour mobiles, smartphones et autres tablettes. Comment devenir d\u00e9veloppeur d\u2019applications ? - Studi\r\nD\u00e9veloppeur d\u2019applications : m\u00e9tier, salaire, formation - Studi",
+            "short_description": "Il/Elle con\u00e7oit des logiciels pour mobiles, smartphones et autres tablettes."
         },
         "related_url": {
             "paragraph": "https://www.studi.com/fr/jsonapi/node/jobs/643c6901-b045-468c-ba5f-fb132655f4ca/field_paragraph?resourceVersion=id%3A111127"
@@ -8736,6 +8752,7 @@
         "title": "Responsable de la commercialisation de produits sportifs",
         "changed": "2023-03-31T21:53:58+00:00",
         "attributes": {
+            "title": "Responsable de la commercialisation de produits sportifs",
             "metatag": "Le responsable commercial sportif est un expert de la vente et strat\u00e9gie de vente d\u2019articles de sport. Comment devenir responsable commercial sportif ? - Studi\r\nResponsable commercial sportif : m\u00e9tier, salaire - Studi"
         },
         "related_url": {
@@ -8832,6 +8849,7 @@
         "title": "Technicien / Technicienne de vente en articles de sport",
         "changed": "2022-10-04T17:32:39+00:00",
         "attributes": {
+            "title": "Technicien / Technicienne de vente en articles de sport",
             "metatag": "Technicien de vente article de sport : m\u00e9tier, salaire - Studi\r\nLe technicien de vente en articles de sport est sp\u00e9cialiste de la vente d\u2019articles sportifs. Comment devenir technicien de vente en articles de sport ? - Studi"
         },
         "related_url": {
@@ -8906,6 +8924,7 @@
         "title": "Conseiller / Conseill\u00e8re en gestion de patrimoine immobilier",
         "changed": "2023-05-22T09:25:33+00:00",
         "attributes": {
+            "title": "Conseiller / Conseill\u00e8re en gestion de patrimoine immobilier",
             "metatag": "Le conseiller en gestion de patrimoine immobilier g\u00e8re les biens de sa client\u00e8le. Comment devenir conseiller en gestion de patrimoine ? - Studi\r\nConseiller en gestion de patrimoine immobilier - Studi"
         },
         "related_url": {
@@ -8932,6 +8951,7 @@
         "title": "Conseiller / Conseill\u00e8re en ing\u00e9nierie patrimoniale",
         "changed": "2022-09-29T15:54:25+00:00",
         "attributes": {
+            "title": "Conseiller / Conseill\u00e8re en ing\u00e9nierie patrimoniale",
             "metatag": "Conseiller en ing\u00e9nierie patrimoniale : m\u00e9tier, salaire - Studi\r\nLe conseiller en ing\u00e9nierie patrimoniale g\u00e8re les placements immobiliers de ses clients. Comment devenir conseiller en ing\u00e9nierie patrimoniale ? - Studi"
         },
         "related_url": {
@@ -8957,6 +8977,7 @@
         "title": "Conseiller / Conseill\u00e8re en investissement immobilier et financier",
         "changed": "2023-05-22T09:24:44+00:00",
         "attributes": {
+            "title": "Conseiller / Conseill\u00e8re en investissement immobilier et financier",
             "metatag": "Le conseiller en investissement financier et immobilier accompagne les clients qui ont un projet d\u2019investissement. Comment devenir conseiller en investissement ? - Studi\r\nConseiller en investissement financier et immobilier - Studi"
         },
         "related_url": {
@@ -9404,6 +9425,7 @@
         "title": "Chef / Cheffe de d\u00e9partement en grande distribution",
         "changed": "2022-09-27T15:15:47+00:00",
         "attributes": {
+            "title": "Chef / Cheffe de d\u00e9partement en grande distribution",
             "metatag": "Chef de d\u00e9partement en grande distribution : m\u00e9tier - Studi\r\nLe chef de d\u00e9partement est charg\u00e9 du fonctionnement d\u2019un ensemble de rayons d\u2019une grande surface. Comment devenir chef de d\u00e9partement en grande distribution ? - Studi"
         },
         "related_url": {

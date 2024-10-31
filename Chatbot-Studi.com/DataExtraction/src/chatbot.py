@@ -5,7 +5,6 @@ from common_tools.models.conversation import Conversation
 
 # internal import
 from available_service import AvailableService
-from drupal_data_retireval import DrupalDataRetireval
 from scrape_service import ScrapeService
 
 class ChatbotFront:
@@ -15,7 +14,7 @@ class ChatbotFront:
             page_title= "Chatbot site public Studi.com",
             page_icon= "🔎",
             layout= "centered",
-            initial_sidebar_state= "expanded" #"collapsed" #
+            initial_sidebar_state= "collapsed" #"expanded" #
         )
 
         custom_css = """
@@ -41,7 +40,7 @@ class ChatbotFront:
             st.subheader('🚀 Autres actions :')
             st.button('📊 Récupérer données Drupal par json-api', on_click=ChatbotFront.get_drupal_data)
             st.button('📚 Scraping des pages web des formations', on_click=ChatbotFront.scrape_website_pages)
-            st.button('📦 Remplissage de la base vectorielle', on_click=ChatbotFront.build_vectorstore)
+            st.button('📦 Construction de la base vectorielle', on_click=ChatbotFront.build_vectorstore)
             st.divider()
             st.button('✨ Générer RAGAS Ground Truth dataset', on_click=ChatbotFront.generate_ground_truth)
             #ChatbotFront.folder_path = st.text_input('Dossier à traiter', value=ChatbotFront.folder_path)#, disabled=True)
@@ -91,25 +90,34 @@ class ChatbotFront:
                     st.session_state.conversation.add_new_message('assistant', full_response)
                     st.session_state.messages.append({'role': 'assistant', 'content': full_response})
             
-            # Replace AI response by a summary
-            st.session_state.conversation.last_message.content = AvailableService.summarize(st.session_state.conversation.last_message.content)
-            a=0
+                    # Replace AI response by a summary
+                    st.session_state.conversation.last_message.content = AvailableService.summarize(st.session_state.conversation.last_message.content)
+                    b=3
+
 
     def clear_conversation():
         st.session_state.messages = []
         st.session_state.messages.append({'role': 'assistant', 'content': ChatbotFront._start_caption()})
 
     def get_drupal_data():
-        drupal = DrupalDataRetireval(AvailableService.out_dir)
-        drupal.retrieve_all_data()
+        prompt = f'Récupération des données Drupal par json-api'
+        with st.spinner('En cours ... ' + prompt):
+            AvailableService.retrieve_all_data()
+            st.session_state.messages.append({'role': 'assistant', 'content': txt.remove_markdown("Terminé avec succès : " + prompt)})
 
-    def build_vectorstore():
-        AvailableService.create_vector_db_from_generated_embeded_documents(AvailableService.out_dir)
-        
     def scrape_website_pages():
-        scraper = ScrapeService()
-        scraper.scrape_all_trainings()
+        prompt = f'Scraping des pages web des formations'
+        with st.spinner('En cours ... ' + prompt):
+            scraper = ScrapeService()
+            scraper.scrape_all_trainings()            
+            st.session_state.messages.append({'role': 'assistant', 'content': txt.remove_markdown("Terminé avec succès : " + prompt)})
 
+    def build_vectorstore():        
+        prompt = f'Construction de la base de données vectorielle'
+        with st.spinner('En cours ... ' + prompt):
+            AvailableService.create_vector_db_from_generated_embeded_documents(AvailableService.out_dir)
+            st.session_state.messages.append({'role': 'assistant', 'content': txt.remove_markdown("Terminé avec succès : " + prompt)})
+        
     def generate_ground_truth():
         prompt = f'Génération du dataset RAGAS Ground Truth'
         with st.spinner('En cours ... ' + prompt):
@@ -120,4 +128,4 @@ class ChatbotFront:
         return "Bonjour, je suis Studia, votre agent virtuel. Comment puis-je vous aider ?"
 
 if __name__ == "__main__":
-    ChatbotFront.main()
+    ChatbotFront.main() # startup with launching the chatbot

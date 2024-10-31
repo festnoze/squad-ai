@@ -171,7 +171,7 @@ class file:
         for file_path in files:
             file_path = file_path.replace('\\', '/')
             paths_and_contents[file_path] = file.get_as_str(file_path)
-        txt.stop_spinner_replace_text(f"{len(paths_and_contents)} {file_kind if file_kind else extension} files loaded successfully.")
+        txt.stop_spinner_replace_text(f"{len(paths_and_contents)} {file_kind if file_kind else extension if extension else ''} files loaded successfully.")
         return paths_and_contents
     
     @staticmethod

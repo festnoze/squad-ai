@@ -1,4 +1,4 @@
-﻿[
+[
     {
         "id": "51091b69-2cd6-4c98-98c5-fe96ee9bed3b",
         "type": "node--diploma",
@@ -51,6 +51,7 @@
         "title": "Qu\u2019est-ce qu\u2019un BTS ( brevet de technicien sup\u00e9rieur) ?",
         "changed": "2024-07-03T08:15:17+00:00",
         "attributes": {
+            "title": "Qu\u2019est-ce qu\u2019un BTS ( brevet de technicien sup\u00e9rieur) ?",
             "metatag": "D\u00e9couvrez sans plus attendre nos BTS ! Ces derniers offrent des formations certifiantes de niveau bac +2\u00a0 100% en ligne !"
         },
         "related_url": {
@@ -95,6 +96,7 @@
         "title": "Qu\u2019est-ce qu\u2019un CAP (certificat d\u2019aptitude professionnelle) ?",
         "changed": "2024-04-30T20:23:13+00:00",
         "attributes": {
+            "title": "Qu\u2019est-ce qu\u2019un CAP (certificat d\u2019aptitude professionnelle) ?",
             "metatag": "D\u00e9couvrez sans plus attendre nos CAP ! Ces derniers offrent des formations certifiantes de niveau 3\u00a0 100% en ligne !"
         },
         "related_url": {
@@ -117,6 +119,7 @@
         "title": "Qu\u2019est-ce qu\u2019un MBA (Master of Business Administration) ?",
         "changed": "2024-07-03T08:09:34+00:00",
         "attributes": {
+            "title": "Qu\u2019est-ce qu\u2019un MBA (Master of Business Administration) ?",
             "metatag": "D\u00e9couvrez le MBA chez Studi : une formation de qualit\u00e9, adapt\u00e9e aux r\u00e9alit\u00e9s du march\u00e9, offerte \u00e0 des tarifs avantageux avec des options d'alternance pour une carri\u00e8re prometteuse."
         },
         "related_url": {

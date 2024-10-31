@@ -26,7 +26,7 @@ from common_tools.helpers.ressource_helper import Ressource
 from common_tools.models.embedding import EmbeddingModel, EmbeddingType
 from common_tools.models.conversation import Conversation
 from ragas_service import RagasService
-from site_public__metadata_descriptions import MetadataDescriptionHelper
+from site_public_metadata_descriptions import MetadataDescriptionHelper
 
 class AvailableService:
     inference: RagInferencePipeline = None
@@ -40,6 +40,11 @@ class AvailableService:
         if not hasattr(AvailableService, 'llms_infos') or not AvailableService.llms_infos:
             AvailableService.llms_infos = []
             #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "phi3", timeout= 80, temperature = 0.5))
+
+            #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-haiku-20240307",  timeout= 60, temperature = 0.5, api_key= anthropic_api_key))
+            #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-sonnet-20240229",  timeout= 60, temperature = 0.5, api_key= anthropic_api_key))
+            #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-opus-20240229",  timeout= 60, temperature = 0.5, api_key= anthropic_api_key))
+
             #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0125",  timeout= 60, temperature = 0.5))
             #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-instruct",  timeout= 60, temperature = 0.5))
             AvailableService.llms_infos.append(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4o-mini", timeout=50, temperature=0))
@@ -57,7 +62,7 @@ class AvailableService:
             AvailableService.inference = RagInferencePipeline(AvailableService.rag_service, default_filters, metadata_descriptions_for_studi_public_site, None)
             RAGAugmentedGeneration.augmented_generation_prompt = Ressource.get_rag_augmented_generation_prompt_on_studi()
 
-    def reinit():
+    def re_init():
         AvailableService.rag_service = None
         AvailableService.inference = None
         AvailableService.init()
@@ -89,12 +94,16 @@ class AvailableService:
                 exit()
                 #GenerateCleanedData()
 
+    def retrieve_all_data():
+        drupal = DrupalDataRetireval(AvailableService.out_dir)
+        drupal.retrieve_all_data()
+
     def create_vector_db_from_generated_embeded_documents(out_dir):
         txt.activate_print = True
         all_docs = GenerateDocumentsWithMetadataFromFiles().load_all_docs_as_json(out_dir)
         injection_pipeline = RagInjectionPipeline(AvailableService.rag_service)
-        injected = injection_pipeline.build_vectorstore_and_bm25_store(all_docs, chunk_size= 2000, children_chunk_size= 0, delete_existing= True)
-        AvailableService.reinit() # reload rag_service with the new vectorstore and langchain documents
+        injected = injection_pipeline.build_vectorstore_and_bm25_store(all_docs, chunk_size= 2500, children_chunk_size= 0, delete_existing= True)
+        AvailableService.re_init() # reload rag_service with the new vectorstore and langchain documents
         return injected
 
     def docs_retrieval_query():
@@ -131,9 +140,7 @@ class AvailableService:
         if conversation_history.last_message.role != 'user':
             raise ValueError("Conversation history should end with a user message")
         txt.print_with_spinner("Exécution du pipeline d'inférence ...")
-        
 
-        # Run the async generator directly using asyncio.run()
         for chunk in Execute.get_sync_generator_from_async(
             AvailableService.inference.run_pipeline_dynamic_async,
             #AvailableService.inference.run_pipeline_static_async,

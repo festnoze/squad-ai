@@ -1,4 +1,4 @@
-﻿[
+[
     {
         "id": "56688577-548a-4666-84b5-72e3f9fb060c",
         "type": "node--funding",
@@ -192,6 +192,7 @@
         "title": "Pr\u00e9paration Op\u00e9rationnelle \u00e0 l\u2019Emploi  individuelle",
         "changed": "2024-09-20T13:39:25+00:00",
         "attributes": {
+            "title": "Pr\u00e9paration Op\u00e9rationnelle \u00e0 l\u2019Emploi  individuelle",
             "body": "La Pr\u00e9paration Op\u00e9rationnelle \u00e0 l'Emploi individuelle (POEI) permet de former un futur collaborateur avant son embauche par l\u2019interm\u00e9diaire de France Travail.\r\nLa Pr\u00e9paration Op\u00e9rationnelle \u00e0 l'Emploi individuelle (POEI) permet de former un futur collaborateur avant son embauche par l\u2019interm\u00e9diaire de France Travail."
         },
         "related_url": {
@@ -243,6 +244,7 @@
         "title": "Action de Formation Conventionn\u00e9e par France Travail (AFC)",
         "changed": "2024-09-20T13:35:09+00:00",
         "attributes": {
+            "title": "Action de Formation Conventionn\u00e9e par France Travail (AFC)",
             "body": "L'Action de Formation Conventionn\u00e9e par France Travail (AFC) vise \u00e0 faciliter le retour rapide \u00e0 l'emploi. Sa mise en \u0153uvre permet de combler un \u00e9cart entre les comp\u00e9tences d\u00e9tenues par le demandeur d'emploi et les exigences du march\u00e9 du travail.\r\nL'Action de Formation Conventionn\u00e9e par France Travail (AFC) vise \u00e0 faciliter le retour rapide \u00e0 l'emploi. Sa mise en \u0153uvre permet de combler un \u00e9cart entre les comp\u00e9tences d\u00e9tenues par le demandeur d'emploi et les exigences du march\u00e9 du travail."
         },
         "related_url": {
@@ -353,6 +355,14 @@
         "related_url": {
             "paragraph": "https://www.studi.com/fr/jsonapi/node/funding/fbd2ce8f-4f6a-48c1-a358-f0a5b799939f/field_paragraph?resourceVersion=id%3A116891"
         },
-        "related_infos": {}
+        "related_infos": {
+            "paragraph": [
+                "Studi et France Travail s'associent pour vous aider \u00e0 acc\u00e9l\u00e9rer votre retour \u00e0 l\u2019emploi en vous formant aux m\u00e9tiers les plus recherch\u00e9s par les recruteurs.\r\n\r\nFormez-vous \u00e0 un m\u00e9tier d'avenir dans des secteurs qui recrutent !\r\n\r\nAttention, les places sont limit\u00e9es !",
+                "Nos formations 100% financ\u00e9es par France Travail\r\n\r\n4 secteurs qui recrutent : Comptabilit\u00e9 et Gestion, Education et P\u00e9dagogie, Syst\u00e8mes et R\u00e9seaux, Vente et Commerce",
+                "Notre objectif : vous offrir la meilleure exp\u00e9rience p\u00e9dagogique pour faire de votre formation un succ\u00e8s et de votre future carri\u00e8re une r\u00e9ussite\r\n\r\n1. Des contenus disponibles \u00e0 tout moment\r\n\r\nSuivez et \u00e9tudiez vos cours \u00e0 votre rythme et \u00e0 tout moment de la journ\u00e9e, accessibles 24h/24 et 7j/7 via web ou application mobile.\r\n\r\n\r\n2. Des contenus en direct\r\n\r\nParticipez \u00e0 des classes virtuelles en direct avec formateurs, \u00e9quipe p\u00e9dagogique et votre groupe d\u2019apprenants pour interagir en direct",
+                "3. Un accompagnement personnalis\u00e9\r\n\r\n\r\n\t\r\n\tVotre charg\u00e9 de suivi apprenant s\u2019assure que votre formation se d\u00e9roule conform\u00e9ment \u00e0 vos objectifs, disponible \u00e0 la demande il est \u00e0 votre \u00e9coute tout au long de votre parcours.\r\n\t\r\n\t\r\n\tVotre responsable p\u00e9dagogique est votre contact privil\u00e9gi\u00e9 sur tous les aspects p\u00e9dagogiques de votre parcours de votre entr\u00e9e en formation jusqu\u2019au passage de vos examens.\r\n\t\r\n\t\r\n\tVotre formateur r\u00e9f\u00e9rent est expert du domaine de votre formation, il r\u00e9pondra \u00e0 toutes vos questions sp\u00e9cifiques aux notions de votre parcours.\r\n\t \r\n\t\r\n\r\n\r\nJe suis int\u00e9ress\u00e9(e)",
+                "*Sous condition d'\u00eatre indemnis\u00e9 au titre de l'ARE (Allocation d'aide au retour \u00e0 l'emploi) pendant toute la dur\u00e9e de la formation."
+            ]
+        }
     }
 ]

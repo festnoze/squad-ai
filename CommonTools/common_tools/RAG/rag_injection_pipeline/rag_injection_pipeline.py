@@ -26,7 +26,7 @@ class RagInjectionPipeline:
     def __init__(self, rag: RagService):
         self.rag_service: RagService = rag
 
-    def build_vectorstore_and_bm25_store(self, documents: list, chunk_size:int = 0, children_chunk_size:int = 0, delete_existing=True)-> int:
+    def build_vectorstore_and_bm25_store(self, documents: list, chunk_size:int = 2000, children_chunk_size:int = 0, delete_existing=True)-> int:
         if not documents or len(documents) == 0: return 0
         self.vectorstore = self._build_vectorstore(documents, chunk_size, delete_existing)
         self._build_bm25_store(documents)

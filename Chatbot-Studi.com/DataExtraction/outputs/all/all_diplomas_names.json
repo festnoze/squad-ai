@@ -1,12 +1,12 @@
 [
     "CAP",
-    "graduate by Studi",
-    "pré-graduate by Studi",
-    "Bac",
-    "Nos bac pro",
     "BTS",
+    "Bac+3",
+    "bac pro",
+    "Bac+5",
     "MBA",
-    "Bac +5",
-    "Bac +2",
-    "Bac +3"
+    "Bac+2",
+    "Bac",
+    "pré-graduate",
+    "graduate"
 ]

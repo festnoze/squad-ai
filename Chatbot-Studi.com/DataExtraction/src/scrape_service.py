@@ -160,7 +160,6 @@ class ScrapeService:
             webpage_json = json.loads(webpage_json_str)
             sections = self.extract_sections_from_content(webpage_json['name'], webpage_json['url'], webpage_json['content'])
             self.check_for_html_tags(sections)
-            continue
             out_filename = f"{sections_out_dir}{webpage_json['name']}.json"
             file.write_file(sections, out_filename, FileAlreadyExistsPolicy.Override)
 
