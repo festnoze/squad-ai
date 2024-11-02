@@ -39,16 +39,16 @@ class AvailableService:
         AvailableService.out_dir = "C:/Dev/squad-ai/Chatbot-Studi.com/DataExtraction/outputs/"
         if not hasattr(AvailableService, 'llms_infos') or not AvailableService.llms_infos:
             AvailableService.llms_infos = []
-            #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "phi3", timeout= 80, temperature = 0.5))
+            #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "phi3", timeout= 80, temperature = 0))
 
-            #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-haiku-20240307",  timeout= 60, temperature = 0.5, api_key= anthropic_api_key))
-            #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-sonnet-20240229",  timeout= 60, temperature = 0.5, api_key= anthropic_api_key))
-            #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-opus-20240229",  timeout= 60, temperature = 0.5, api_key= anthropic_api_key))
+            #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-haiku-20240307",  timeout= 60, temperature = 0))
+            #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-sonnet-20240229",  timeout= 60, temperature = 0))
+            #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-opus-20240229",  timeout= 60, temperature = 0))
 
-            #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0125",  timeout= 60, temperature = 0.5))
-            #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-instruct",  timeout= 60, temperature = 0.5))
+            #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0125",  timeout= 60, temperature = 0))
+            #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-instruct",  timeout= 60, temperature = 0))
             #AvailableService.llms_infos.append(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4o-mini", timeout=50, temperature=0))
-            AvailableService.llms_infos.append(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4o", timeout=80, temperature=0))
+            AvailableService.llms_infos.append(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4o", timeout=60, temperature=0))
         
         if not AvailableService.rag_service:
             AvailableService.rag_service = RagService(AvailableService.llms_infos, EmbeddingModel.OpenAI_TextEmbedding3Small) #EmbeddingModel.Ollama_AllMiniLM
@@ -170,7 +170,7 @@ class AvailableService:
         # Formalisme : Il s'agit de juste garder les mots clés importants du ou des éléments de réponses, ne garder que le premier niveau de réponse en cas de liste avec des sous-éléments. ne pas garder d'url. Ne pas garder les éléments de structuration. Ne pas préciser qu'il s'agit d'un résumé.
         # Texte à traiter : 
         {input}"""))
-        chain = promptlate | AvailableService.rag_service.llm | RunnablePassthrough()
+        chain = promptlate | AvailableService.rag_service.llm_1 | RunnablePassthrough()
         result = chain.invoke(input=text)
         return Llm.get_content(result)
 

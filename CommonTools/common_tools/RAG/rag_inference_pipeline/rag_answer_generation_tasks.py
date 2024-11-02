@@ -56,7 +56,7 @@ class RAGAugmentedGeneration:
         if retrieved_chunks and any(retrieved_chunks) and isinstance(retrieved_chunks[0], tuple): 
             retrieved_chunks = [doc[0] for doc in retrieved_chunks] # Remove scores if present
 
-        async for chunk in RAGAugmentedGeneration.generate_augmented_response_from_retrieved_chunks_async(rag.llm, query, retrieved_chunks, questionAnalysis, format_retrieved_docs_function):
+        async for chunk in RAGAugmentedGeneration.generate_augmented_response_from_retrieved_chunks_async(rag.llm_1, query, retrieved_chunks, questionAnalysis, format_retrieved_docs_function):
             yield chunk
 
     @staticmethod

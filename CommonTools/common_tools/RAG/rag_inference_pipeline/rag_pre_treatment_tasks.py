@@ -55,7 +55,7 @@ class RAGPreTreatment:
         )
 
         response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(
-            "query_completion", [rag.llm, rag.llm], output_parser, 10, *[prompt_for_output_parser]
+            "query_completion", [rag.llm_1, rag.llm_2, rag.llm_3], output_parser, 10, *[prompt_for_output_parser]
         )
         question_completion = QuestionCompletion(**response[0])
         print(f'>> La question réécrite : "{question_completion.modified_question}"')
@@ -71,7 +71,7 @@ class RAGPreTreatment:
             prefilter_prompt, QuestionTranslationPydantic, QuestionTranslation
         )
         response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(
-            "query_translation", [rag.llm, rag.llm], output_parser, 10, *[prompt_for_output_parser]
+            "query_translation", [rag.llm_1, rag.llm_2, rag.llm_3], output_parser, 10, *[prompt_for_output_parser]
         )
         question_analysis = response[0]
         question_analysis['question'] = user_query
@@ -112,7 +112,6 @@ class RAGPreTreatment:
             txt.print(f"Filters extracted from the query: {response_with_filters.filter}")
         
         metadata_filters = RagFilteringMetadataHelper.get_filters_from_comparison(response_with_filters.filter)
-        print(f"Filters: '{metadata_filters}'")
         return response_with_filters.query, metadata_filters
             
     @staticmethod
@@ -128,18 +127,19 @@ class RAGPreTreatment:
         #     QuestionAnalysisBase.set_modified_question(analysed_query, query_wo_metadata_from_explicit.strip())
         # elif query_wo_metadata_from_implicit.strip():
         #     QuestionAnalysisBase.set_modified_question(analysed_query, query_wo_metadata_from_implicit.strip())
-        merged = {}
+        merged_metadata_filters = {}
         if explicit_metadata and any(explicit_metadata):
-            merged = explicit_metadata.copy()
+            merged_metadata_filters = explicit_metadata.copy()
         
         if implicit_metadata and any(implicit_metadata):
             for key, value in implicit_metadata.items():
-                if key not in merged:
-                    merged[key] = value
+                if key not in merged_metadata_filters:
+                    merged_metadata_filters[key] = value
 
         # Transform academic_level metadata for some cases
-        merged = RAGPreTreatment.transform_academic_level_metadata(merged)
-        return merged
+        merged_metadata_filters = RAGPreTreatment.transform_academic_level_metadata(merged_metadata_filters)
+        print(f"Filters: '{merged_metadata_filters}'")
+        return merged_metadata_filters
     
     def transform_academic_level_metadata(metadata):
         if isinstance(metadata, list):

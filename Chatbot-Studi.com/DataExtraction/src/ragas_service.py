@@ -57,7 +57,7 @@ class RagasService:
         print(ragas_data[0])
         
         rag_service = RagService(llm_info, EmbeddingModel.OpenAI_TextEmbedding3Small)
-        evaluator_llm = rag_service.llm #LangchainLLMWrapper(rag_service.llm)
+        evaluator_llm = rag_service.llm_1 #LangchainLLMWrapper(rag_service.llm_1)
         evaluator_embedding = rag_service.embedding #LangchainEmbeddingsWrapper(rag_service.embedding)
         evaluator_llm = LangchainLLMWrapper(evaluator_llm)
         evaluator_embedding = LangchainEmbeddingsWrapper(evaluator_embedding)
@@ -81,7 +81,7 @@ class RagasService:
         print(ragas_data[0])
         
         rag_service = RagService(llm_info, EmbeddingModel.OpenAI_TextEmbedding3Small)
-        evaluator_llm = rag_service.llm #LangchainLLMWrapper(rag_service.llm)
+        evaluator_llm = rag_service.llm_1 #LangchainLLMWrapper(rag_service.llm_1)
         evaluator_embedding = rag_service.embedding #LangchainEmbeddingsWrapper(rag_service.embedding)
 
         metrics= [
@@ -99,7 +99,7 @@ class RagasService:
     def generate_ground_truth(llm_info: LlmInfo, langchain_documents: list[Document], test_size: int = 2):
         LangChainFactory.set_openai_apikey()               
         rag_service = RagService(llm_info, EmbeddingModel.OpenAI_TextEmbedding3Small)
-        evaluator_llm = rag_service.llm #LangchainLLMWrapper(rag_service.llm)
+        evaluator_llm = rag_service.llm_1 #LangchainLLMWrapper(rag_service.llm_1)
         evaluator_embedding = rag_service.embedding #LangchainEmbeddingsWrapper(rag_service.embedding)
 
         # # works once ? with own docs !
@@ -120,10 +120,10 @@ class RagasService:
         #     embedding_extractor = EmbeddingExtractor(embedding_model=rag_service.embedding)
         #     langchain_documents_with_embeddings = await embedding_extractor.transform(chunks[:test_size])
 
-        #     keyphrases_extractor = KeyphrasesExtractor(llm=rag_service.llm)
+        #     keyphrases_extractor = KeyphrasesExtractor(llm=rag_service.llm_1)
         #     langchain_documents_with_keyphrases = await keyphrases_extractor.transform(langchain_documents_with_embeddings)
 
-        #     title_extractor = TitleExtractor(llm=rag_service.llm)
+        #     title_extractor = TitleExtractor(llm=rag_service.llm_1)
         #     langchain_documents_final = await title_extractor.transform(langchain_documents_with_keyphrases)
 
         # except Exception as e:
@@ -170,7 +170,7 @@ class RagasService:
         os.environ["OPENAI_API_KEY"] = openai_api_key
 
         rag_service = RagService(llm_info, EmbeddingModel.OpenAI_TextEmbedding3Small)
-        evaluator_llm = rag_service.llm
+        evaluator_llm = rag_service.llm_1
         evaluator_embedding = rag_service.embedding
 
         docs = [doc for doc in rag_service.langchain_documents if doc.metadata.get("type") == "formation"][:10]
@@ -207,7 +207,7 @@ class RagasService:
         os.environ["OPENAI_API_KEY"] = openai_api_key
 
         rag_service = RagService(llm_info, EmbeddingModel.OpenAI_TextEmbedding3Small)
-        generator_llm = LangchainLLMWrapper(rag_service.llm)
+        generator_llm = LangchainLLMWrapper(rag_service.llm_1)
         generator_embeddings = rag_service.embedding
         generator = TestsetGenerator(llm=generator_llm)
         dataset = generator.generate_with_langchain_docs(langchain_documents[:5], testset_size=test_size)
@@ -254,7 +254,7 @@ class RagasService:
 
         results = client.run_on_dataset(
             dataset_name=dataset_name,
-            llm_or_chain_factory=rag_service.llm,
+            llm_or_chain_factory=rag_service.llm_1,
             evaluation=eval_config,
         )
 
@@ -271,7 +271,7 @@ class RagasService:
         # 
         # os.environ["OPENAI_API_KEY"] = os.getenv("OPEN_API_KEY") # needed by ragas which use GPT-4o-mini
         
-        # evaluator_llm = LangChainFactory.create_llm_from_info(llm_info) #AvailableService.rag_service.llm)
+        # evaluator_llm = LangChainFactory.create_llm_from_info(llm_info) #AvailableService.rag_service.llm_1)
         # embedding = EmbeddingModel.OpenAI_TextEmbedding3Small.create_instance()
         
         # generator = TestsetGenerator(
@@ -291,7 +291,7 @@ class RagasService:
         #Execute.activate_global_function_parameters_types_verification()
         os.environ["OPENAI_API_KEY"] = os.getenv("OPEN_API_KEY") # needed by ragas which use GPT-4o-mini
         
-        evaluator_llm = LangChainFactory.create_llm_from_info(llm_info) #AvailableService.rag_service.llm)
+        evaluator_llm = LangChainFactory.create_llm_from_info(llm_info) #AvailableService.rag_service.llm_1)
         embedding = EmbeddingModel.OpenAI_TextEmbedding3Small.create_instance()
         
         generator = TestsetGenerator.from_langchain(

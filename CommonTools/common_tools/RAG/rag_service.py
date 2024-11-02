@@ -28,9 +28,12 @@ from langchain.retrievers.self_query.base import SelfQueryRetriever
 from langchain.chains.query_constructor.base import StructuredQueryOutputParser, get_query_constructor_prompt
 
 class RagService:
-    def __init__(self, inference_llm_or_info: Optional[Union[LlmInfo, Runnable]], embedding_model:EmbeddingModel=None, vector_db_and_docs_path = "./storage", documents_json_filename = "bm25_documents.json"):
+    def __init__(self, llms_or_info: Optional[Union[LlmInfo, Runnable, list]], embedding_model:EmbeddingModel=None, vector_db_and_docs_path = "./storage", documents_json_filename = "bm25_documents.json"):
+        self.llm_1=None
+        self.llm_2=None
+        self.llm_3=None
         self.init_embedding(embedding_model)
-        self.init_inference_llm(inference_llm_or_info) #todo: add fallbacks with specifying multiple llms or llms infos
+        self.init_llms(llms_or_info) #todo: add fallbacks with specifying multiple llms or llms infos
 
         self.vector_db_path = vector_db_and_docs_path + '/' + self.embedding_model_name
         self.documents_json_filepath = vector_db_and_docs_path + '/' +  documents_json_filename
@@ -43,13 +46,33 @@ class RagService:
         self.embedding = embedding_model.create_instance()
         self.embedding_model_name = embedding_model.model_name
 
-    def init_inference_llm(self, llm_or_infos: Optional[Union[LlmInfo, Runnable]]):
-        if isinstance(llm_or_infos, LlmInfo) or (isinstance(llm_or_infos, list) and any(llm_or_infos) and isinstance(llm_or_infos[0], LlmInfo)):            
-            self.llm = LangChainFactory.create_llms_from_infos(llm_or_infos)[0]
-        elif isinstance(llm_or_infos, Runnable):
-            self.llm = llm_or_infos
+    def _init_llm(self, llm_or_info: Optional[Union[LlmInfo, Runnable]]):
+        if isinstance(llm_or_info, LlmInfo) or (isinstance(llm_or_info, list) and any(llm_or_info) and isinstance(llm_or_info[0], LlmInfo)):            
+            return LangChainFactory.create_llms_from_infos(llm_or_info)[0]
+        elif isinstance(llm_or_info, Runnable):
+            return llm_or_info
         else:
             raise ValueError("Invalid llm_or_infos parameter")
+        
+    def init_llms(self, llm_or_infos: Optional[Union[LlmInfo, Runnable, list]]):        
+        if isinstance(llm_or_infos, list):
+            index = 1
+            for llm_or_info in llm_or_infos:
+                if index == 1:
+                    self.llm_1 = self._init_llm(llm_or_info)
+                elif index == 2:
+                    self.llm_2 = self._init_llm(llm_or_info)
+                elif index == 3:
+                    self.llm_3 = self._init_llm(llm_or_info)
+                else:
+                    raise ValueError("Only 4 llms are supported")
+                index += 1
+        else:
+            self.llm_1 = self._init_llm(llm_or_infos)
+        
+        #set default llms if undefined
+        if not self.llm_2: self.llm_2 = self.llm_1
+        if not self.llm_3: self.llm_3 = self.llm_2
         
     def embed_documents(self, text:str) -> List[float]:
         return self.embedding.embed_documents(text)
@@ -58,7 +81,7 @@ class RagService:
         return self._semantic_vector_retrieval(self.vectorstore, question, metadata_filters, give_score, max_retrived_count, min_score, min_retrived_count)
     
     def _semantic_vector_retrieval(self, vectorstore, question: str, metadata_filters: dict = None, give_score: bool = False, max_retrived_count: int = 10, min_score: float = None, min_retrived_count: int = None) -> List[Document]:
-        #retriever_from_llm = MultiQueryRetriever.from_llm(retriever=vectorstore.as_retriever(), llm=llm)
+        #retriever_from_llm = MultiQueryRetriever.from_llm(retriever=vectorstore.as_retriever(), llm=llm_1)
         #results = retriever_from_llm.invoke(input==question)
         if give_score:
             metadata_filter = metadata_filters if metadata_filters else None
@@ -122,7 +145,7 @@ class RagService:
             return self_querying_retriever, query_constructor
         else:
             self_querying_retriever = SelfQueryRetriever.from_llm(
-                self.llm,
+                self.llm_3, #choose the best llm for the job
                 self.vectorstore,
                 document_description,
                 metadata_description,
@@ -136,7 +159,7 @@ class RagService:
             metadata_description,
         )
         output_parser = StructuredQueryOutputParser.from_components()
-        query_constructor = prompt | self.llm | output_parser
+        query_constructor = prompt | self.llm_1 | output_parser
         return query_constructor
         
     @staticmethod

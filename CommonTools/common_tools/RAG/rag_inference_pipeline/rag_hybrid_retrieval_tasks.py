@@ -46,9 +46,6 @@ class RAGHybridRetrieval:
                 doc for doc in rag.langchain_documents 
                 if RagFilteringMetadataHelper.filters_predicate(doc, metadata)
             ]
-            abc = [doc for doc in rag.langchain_documents if doc.metadata.get('type') == 'formation']
-            abc = [doc for doc in abc if doc.metadata.get('domain_name') == 'Ressources humaines - Paie']
-            abc = [doc for doc in abc if doc.metadata.get('academic_level') == 'Bac+2']
             print(f">> docs count corresponding to metadata: {len(filtered_docs)}/{len(rag.langchain_documents)}")
         else:
             filtered_docs = rag.langchain_documents
