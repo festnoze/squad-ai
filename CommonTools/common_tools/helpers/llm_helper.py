@@ -229,7 +229,7 @@ class Llm:
         cost_eur = cb.total_cost / Llm.get_eur_usd_rate()
         print("Token consumption:")
         print(f"Input prompt: {Llm.format_number(cb.prompt_tokens)}")
-        print(f"Completion: + {Llm.format_number(cb.completion_tokens)}")    
+        print(f"rewritting: + {Llm.format_number(cb.rewritting_tokens)}")    
         print(f"            " + "-" * max_len)
         print(f"Total tokens: {Llm.format_number(cb.total_tokens)}")
         print(f"Total cost:   {cost_eur:.3f}€ ({cb.total_cost:.3f}$)")

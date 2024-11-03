@@ -19,9 +19,18 @@ class Ressource:
             return content
 
     @staticmethod
-    def get_query_completion_prompt(remove_comments=True) -> str:
-        """Loads and returns the content of query_completion_prompt.txt"""
-        with importlib.resources.open_text(Ressource.prompts_package_name, 'query_completion_prompt.txt') as file_reader:
+    def get_query_rewritting_prompt(remove_comments=True) -> str:
+        """Loads and returns the content of query_rewritting_prompt.txt"""
+        with importlib.resources.open_text(Ressource.prompts_package_name, 'query_rewritting_prompt.txt') as file_reader:
+            content = file_reader.read()
+            if remove_comments:
+                content = txt.remove_commented_lines(content)
+            return content
+        
+    @staticmethod
+    def get_query_standalone_from_history_prompt(remove_comments=True) -> str:
+        """Loads and returns the content of query_standalone_from_history_prompt.txt"""
+        with importlib.resources.open_text(Ressource.prompts_package_name, 'query_standalone_from_history_prompt.txt') as file_reader:
             content = file_reader.read()
             if remove_comments:
                 content = txt.remove_commented_lines(content)

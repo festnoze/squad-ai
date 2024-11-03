@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 from common_tools.models.question_analysis_base import QuestionAnalysisBase, QuestionAnalysisBasePydantic
 
-class QuestionCompletion(QuestionAnalysisBase):
+class QuestionRewritting(QuestionAnalysisBase):
     def __init__(self, question, has_contextual_info=False, question_with_context=None, modified_question=None, question_type=None, **kwargs):
         # If a dictionary is provided, unpack its values
         if kwargs:
@@ -17,7 +17,7 @@ class QuestionCompletion(QuestionAnalysisBase):
             self.question_type = question_type.lower() if question_type else 'other'
 
      
-class QuestionCompletionPydantic(QuestionAnalysisBasePydantic):
+class QuestionRewrittingPydantic(QuestionAnalysisBasePydantic):
     has_contextual_info: bool = Field(description="Whether the conversation's history has needed contextual information to complete the user''s query")
     question_with_context: str = Field(description="The user''s query completed with the context information from the conversation history")
     question_type: str = Field(description="The type of the question as a string. One value in: ['salutations', 'fin', 'autre']")#. One value in: ['greetings', 'ending', 'studi', 'job', 'training', 'funding', 'other'].")
