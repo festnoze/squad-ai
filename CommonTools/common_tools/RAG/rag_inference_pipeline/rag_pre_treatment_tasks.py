@@ -7,9 +7,9 @@ from common_tools.helpers.ressource_helper import Ressource
 from common_tools.models.conversation import Conversation
 from common_tools.models.question_analysis_base import QuestionAnalysisBase
 from common_tools.models.question_rewritting import QuestionRewritting, QuestionRewrittingPydantic
-from common_tools.rag.rag_filtering_metadata_helper import RagFilteringMetadataHelper
 from common_tools.models.question_translation import QuestionTranslation, QuestionTranslationPydantic
 from common_tools.rag.rag_service import RagService
+from common_tools.rag.rag_filtering_metadata_helper import RagFilteringMetadataHelper
 from common_tools.workflows.output_name_decorator import output_name
 from common_tools.helpers.txt_helper import txt
 from langchain.chains.query_constructor.base import AttributeInfo

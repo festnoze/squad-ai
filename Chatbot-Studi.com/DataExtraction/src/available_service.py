@@ -6,6 +6,7 @@ import asyncio
 from langchain.chains.query_constructor.schema import AttributeInfo
 from langchain_core.runnables import Runnable, RunnablePassthrough
 from langchain_core.prompts import ChatPromptTemplate
+from langchain.docstore.document import Document
 #from database.database import DB
 from drupal_data_retireval import DrupalDataRetireval
 from generate_documents_w_metadata import GenerateDocumentsWithMetadataFromFiles
@@ -18,6 +19,7 @@ from common_tools.langchains.langchain_factory import LangChainFactory
 from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.rag.rag_service import RagService
 from common_tools.rag.rag_inference_pipeline.rag_pre_treatment_tasks import RAGPreTreatment
+from common_tools.models.question_rewritting import QuestionRewritting, QuestionRewrittingPydantic
 from common_tools.rag.rag_injection_pipeline.rag_injection_pipeline import RagInjectionPipeline
 from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
 from common_tools.rag.rag_inference_pipeline.rag_answer_generation_tasks import RAGAugmentedGeneration
@@ -136,6 +138,18 @@ class AvailableService:
     #         response, sources = AvailableService.inference.run_pipeline_dynamic(query, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
     #     return response
     
+    def rag_query_retrieval_but_augmented_generation(conversation_history: Conversation):
+        return AvailableService.inference.run_pipeline_dynamic_but_augmented_generation(conversation_history, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
+
+    def rag_query_augmented_generation_async(analysed_query: QuestionRewritting, retrieved_chunks: list[Document], decoded_stream = False, all_chunks_output: list[str] = []):
+         for chunk in Execute.get_sync_generator_from_async(RAGAugmentedGeneration.rag_augmented_answer_generation_async, AvailableService.rag_service, analysed_query.modified_question, retrieved_chunks, analysed_query, AvailableService.format_retrieved_docs_function):  
+            if decoded_stream:
+                chunk_str = chunk.decode('utf-8').replace(Llm.new_line_for_stream_over_http, '\n')
+                all_chunks_output.append(chunk_str)
+                yield chunk_str
+            else:
+                yield chunk
+
     def rag_query_with_history_streaming(conversation_history: Conversation, all_chunks_output = []):
         if conversation_history.last_message.role != 'user':
             raise ValueError("Conversation history should end with a user message")

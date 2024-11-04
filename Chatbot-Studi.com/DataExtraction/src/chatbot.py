@@ -82,17 +82,18 @@ class ChatbotFront:
             # st.chat_message('assistant').write(rag_answer)    
 
             # With response streaming
+            all_chunks_output = []
             with st.chat_message('assistant'):
                 with st.spinner('Je réfléchis à votre question ...'):
-                    all_chunks_output = []
-                    st.write_stream(AvailableService.rag_query_with_history_streaming(st.session_state.conversation, all_chunks_output))
-                    full_response = ''.join([chunk.decode('utf-8').replace(Llm.new_line_for_stream_over_http, '\n') for chunk in all_chunks_output])
-                    st.session_state.conversation.add_new_message('assistant', full_response)
-                    st.session_state.messages.append({'role': 'assistant', 'content': full_response})
-            
-                    # Replace AI response by a summary
-                    st.session_state.conversation.last_message.content = AvailableService.summarize(st.session_state.conversation.last_message.content)
-                    b=3
+                    analysed_query, retrieved_chunks = AvailableService.rag_query_retrieval_but_augmented_generation(st.session_state.conversation)
+                st.write_stream(AvailableService.rag_query_augmented_generation_async(analysed_query, retrieved_chunks[0], True, all_chunks_output))
+                full_response = ''.join(all_chunks_output)
+                st.session_state.conversation.add_new_message('assistant', full_response)
+                st.session_state.messages.append({'role': 'assistant', 'content': full_response})
+        
+                # Replace AI response by its summary in streamlit cached conversation
+                st.session_state.conversation.last_message.content = AvailableService.summarize(st.session_state.conversation.last_message.content)
+                b=3
 
 
     def clear_conversation():
