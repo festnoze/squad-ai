@@ -2,6 +2,7 @@ import streamlit as st
 from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.llm_helper import Llm
 from common_tools.models.conversation import Conversation
+from common_tools.rag.rag_inference_pipeline.end_pipeline_exception import EndPipelineException
 
 # internal import
 from available_service import AvailableService
@@ -81,20 +82,41 @@ class ChatbotFront:
             # st.session_state.messages.append({'role': 'assistant', 'content': rag_answer})
             # st.chat_message('assistant').write(rag_answer)    
 
+            for key, value in st.session_state.items():
+                st.write(f"{key}: {value}")
+
             # With response streaming
             all_chunks_output = []
             with st.chat_message('assistant'):
                 with st.spinner('Je réfléchis à votre question ...'):
-                    analysed_query, retrieved_chunks = AvailableService.rag_query_retrieval_but_augmented_generation(st.session_state.conversation)
-                st.write_stream(AvailableService.rag_query_augmented_generation_async(analysed_query, retrieved_chunks[0], True, all_chunks_output))
-                full_response = ''.join(all_chunks_output)
+                    try:
+                        analysed_query, retrieved_chunks = AvailableService.rag_query_retrieval_but_augmented_generation(st.session_state.conversation)             
+                        pipeline_succeeded = True
+                    except EndPipelineException as ex:
+                        full_response = ex.message
+                        st.write(full_response)
+                        pipeline_succeeded = False
+                        pipeline_ends_reason = ex.name
+
+                if pipeline_succeeded:
+                    st.write_stream(AvailableService.rag_query_augmented_generation_streaming_async(analysed_query, retrieved_chunks[0], True, all_chunks_output))
+                    full_response = ''.join(all_chunks_output)
+
                 st.session_state.conversation.add_new_message('assistant', full_response)
                 st.session_state.messages.append({'role': 'assistant', 'content': full_response})
-        
+
+                # Demande de notation
+                if not pipeline_succeeded and pipeline_ends_reason == '_fin_echange_':
+                    feedback_value = st.feedback('stars', on_change=ChatbotFront.handle_feedback_change)
+                    st.session_state['feedback_value'] = feedback_value
                 # Replace AI response by its summary in streamlit cached conversation
                 st.session_state.conversation.last_message.content = AvailableService.summarize(st.session_state.conversation.last_message.content)
                 b=3
 
+    def handle_feedback_change():
+        feedback_value = st.session_state.get('feedback_value')
+        #st.session_state.chat_history.append(f"Feedback received: {feedback_value}")
+        st.write(f"Feedback recorded as: {feedback_value}")
 
     def clear_conversation():
         st.session_state.messages = []

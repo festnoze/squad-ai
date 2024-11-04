@@ -8,6 +8,8 @@ from common_tools.models.conversation import Conversation
 from common_tools.models.question_analysis_base import QuestionAnalysisBase
 from common_tools.models.question_rewritting import QuestionRewritting, QuestionRewrittingPydantic
 from common_tools.models.question_translation import QuestionTranslation, QuestionTranslationPydantic
+from common_tools.rag.rag_inference_pipeline.end_message_ends_pipeline_exception import EndMessageEndsPipelineException
+from common_tools.rag.rag_inference_pipeline.greetings_ends_pipeline_exception import GreetingsEndsPipelineException
 from common_tools.rag.rag_service import RagService
 from common_tools.rag.rag_filtering_metadata_helper import RagFilteringMetadataHelper
 from common_tools.workflows.output_name_decorator import output_name
@@ -36,38 +38,47 @@ class RAGPreTreatment:
     @staticmethod
     @output_name('analysed_query')
     def query_standalone_from_history(rag:RagService, query:Union[str, Conversation]) -> QuestionRewritting:
+        query_standalone_prompt = Ressource.get_query_standalone_from_history_prompt()
+        user_query = Conversation.get_user_query(query)
+        query_standalone_prompt = query_standalone_prompt.replace("{user_query}", user_query)
+        query_standalone_prompt = query_standalone_prompt.replace("{conversation_history}", Conversation.conversation_history_as_str(query, include_current_user_query=False))
+
+        prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(
+            query_standalone_prompt, QuestionRewrittingPydantic, QuestionRewritting
+        )
+
+        response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(
+            "Standalone query from history", [rag.llm_2, rag.llm_3], output_parser, 10, *[prompt_for_output_parser]
+        )
+        question_rewritting = QuestionRewritting(**response[0])
+        print(f'> Standalone query: "{question_rewritting.question_with_context}"')
+
+        # interupt pipeline if no RAG is needed
+        if question_rewritting.question_type == 'salutations':
+            print(f'> Salutations detected, ending pipeline')
+            raise GreetingsEndsPipelineException()
+        elif question_rewritting.question_type == 'fin_echange':
+            print(f"> Fin d'échange detected, ending pipeline")
+            raise EndMessageEndsPipelineException()
+        return question_rewritting
+
+    @staticmethod
+    @output_name('analysed_query')
+    def query_rewritting(rag:RagService, analysed_query:QuestionRewritting) -> str:        
         out_dir = "./outputs/" #todo: not generic enough
         diploms_names = ', '.join(file.get_as_json(out_dir + 'all/all_diplomas_names.json'))
         certifications_names = ', '.join(file.get_as_json(out_dir + 'all/all_certifications_names.json'))
         domains_list = ', '.join(file.get_as_json(out_dir + 'all/all_domains_names.json'))
         sub_domains_list = ', '.join(file.get_as_json(out_dir + 'all/all_sub_domains_names.json'))
 
-        query_rewritting_prompt = Ressource.get_query_standalone_from_history_prompt()
-        user_query = Conversation.get_user_query(query)
-        query_rewritting_prompt = query_rewritting_prompt.replace("{user_query}", user_query)
-        query_rewritting_prompt = query_rewritting_prompt.replace("{conversation_history}", Conversation.conversation_history_as_str(query, include_current_user_query=False))
+        query_rewritting_prompt = Ressource.get_query_rewritting_prompt()
+        query_rewritting_prompt = query_rewritting_prompt.replace("{user_query}", analysed_query.question_with_context)
         query_rewritting_prompt = query_rewritting_prompt.replace("{diplomes_list}", diploms_names)
         query_rewritting_prompt = query_rewritting_prompt.replace("{certifications_list}", certifications_names)
         query_rewritting_prompt = query_rewritting_prompt.replace("{domains_list}", domains_list)
         query_rewritting_prompt = query_rewritting_prompt.replace("{sub_domains_list}", sub_domains_list)
-        prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(
-            query_rewritting_prompt, QuestionRewrittingPydantic, QuestionRewritting
-        )
 
-        response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(
-            "query_rewritting", [rag.llm_2, rag.llm_3], output_parser, 10, *[prompt_for_output_parser]
-        )
-        question_rewritting = QuestionRewritting(**response[0])
-        print(f'>> La question réécrite : "{question_rewritting.modified_question}"')
-        return question_rewritting
-
-    @staticmethod
-    @output_name('analysed_query')
-    def query_rewritting(rag:RagService, analysed_query:QuestionRewritting) -> str:
-        query_rewritting_prompt = Ressource.get_query_rewritting_prompt()
-        query_rewritting_prompt = query_rewritting_prompt.replace("{user_query}", analysed_query.question_with_context)
-
-        response = rag.llm_2.invoke(query_rewritting_prompt)
+        response = Llm.invoke_chain('Query rewritting', rag.llm_1, query_rewritting_prompt)
 
         content =  json.loads(Llm.extract_json_from_llm_response(Llm.get_content(response)))
         analysed_query.modified_question = content['modified_question']
@@ -118,10 +129,7 @@ class RAGPreTreatment:
         
         self_querying_retriever, query_constructor = RagService.build_self_querying_retriever_langchain(rag, RAGPreTreatment.metadata_infos)
         
-        response_with_filters = query_constructor.invoke(query)
-        
-        if response_with_filters.filter:
-            txt.print(f"Filters extracted from the query: {response_with_filters.filter}")
+        response_with_filters = Llm.invoke_chain('Analyse metadata', query_constructor, query)
         
         metadata_filters = RagFilteringMetadataHelper.get_filters_from_comparison(response_with_filters.filter)
         return response_with_filters.query, metadata_filters
@@ -150,7 +158,7 @@ class RAGPreTreatment:
 
         # Transform academic_level metadata for some cases
         merged_metadata_filters = RAGPreTreatment.transform_academic_level_metadata(merged_metadata_filters)
-        print(f"Filters: '{merged_metadata_filters}'")
+        print(f"Metadata filters: '{merged_metadata_filters}'")
         return merged_metadata_filters
     
     def transform_academic_level_metadata(metadata):

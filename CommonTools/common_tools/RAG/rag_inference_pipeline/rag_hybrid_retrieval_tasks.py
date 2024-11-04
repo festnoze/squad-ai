@@ -98,7 +98,7 @@ class RAGHybridRetrieval:
             filtered_docs = rag.langchain_documents
 
         question_w_history = Conversation.conversation_history_as_str(query)
-        bm25_retriever = rag._build_bm25_retriever(filtered_docs, k) #, metadata_filters
+        bm25_retriever = rag._build_bm25_retriever(filtered_docs, k)
         bm25_retrieved_chunks = bm25_retriever.invoke(question_w_history)
        
         if give_score:

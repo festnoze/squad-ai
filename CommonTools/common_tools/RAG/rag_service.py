@@ -78,14 +78,9 @@ class RagService:
         return self.embedding.embed_documents(text)
     
     def semantic_vector_retrieval(self, question: str, metadata_filters: dict = None, give_score: bool = False, max_retrived_count: int = 10, min_score: float = None, min_retrived_count: int = None) -> list[Document]:
-        return self._semantic_vector_retrieval(self.vectorstore, question, metadata_filters, give_score, max_retrived_count, min_score, min_retrived_count)
-    
-    def _semantic_vector_retrieval(self, vectorstore, question: str, metadata_filters: dict = None, give_score: bool = False, max_retrived_count: int = 10, min_score: float = None, min_retrived_count: int = None) -> List[Document]:
-        #retriever_from_llm = MultiQueryRetriever.from_llm(retriever=vectorstore.as_retriever(), llm=llm_1)
-        #results = retriever_from_llm.invoke(input==question)
         if give_score:
             metadata_filter = metadata_filters if metadata_filters else None
-            results = vectorstore.similarity_search_with_score(question, k=max_retrived_count, filter=metadata_filter)
+            results = self.vectorstore.similarity_search_with_score(question, k=max_retrived_count, filter=metadata_filter)
             if min_score and min_retrived_count and len(results) > min_retrived_count:
                 top_results = []
                 for result in results:
@@ -93,7 +88,7 @@ class RagService:
                         top_results.append(result)
                 results = top_results
         else:
-            results = vectorstore.similarity_search(question, k=max_retrived_count, filter=metadata_filters)
+            results = self.vectorstore.similarity_search(question, k=max_retrived_count, filter=metadata_filters)
         return results
     
     def _load_langchain_documents(self, filepath:str = None) -> List[Document]:
@@ -118,7 +113,7 @@ class RagService:
             txt.print(f"Error loading vectorstore: {e}")
             return None
     
-    def _build_bm25_retriever(self, documents: list[Document], k: int = 20, metadata: dict = None) -> BM25Retriever:
+    def _build_bm25_retriever(self, documents: list[Document], k: int = 20, metadata: dict = None, action_name = 'RAG BM25 retrieval') -> BM25Retriever:
         if not documents or len(documents) == 0: 
             return None
         
@@ -127,7 +122,7 @@ class RagService:
         else:
             bm25_retriever = BM25Retriever.from_documents(documents)
         bm25_retriever.k = k
-        return bm25_retriever
+        return bm25_retriever.with_config({"run_name": f"{action_name}"})
         
     #todo: move to inference pipeline?
     def build_self_querying_retriever_langchain(self, metadata_description: list[AttributeInfo] = None, get_query_constructor:bool = True) -> tuple :

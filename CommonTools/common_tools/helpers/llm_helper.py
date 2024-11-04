@@ -122,6 +122,7 @@ class Llm:
         if isinstance(prompt, ChatPromptTemplate):
             return prompt
         return ChatPromptTemplate.from_messages([HumanMessage(prompt)])
+    
     @staticmethod
     def _invoke_parallel_chains(action_name: str = "", inputs: dict = None, batch_size: int = None, *chains: Chain) -> list[str]:
         if len(chains) == 0:
@@ -140,7 +141,7 @@ class Llm:
             # combined = RunnableParallel(**{f"invoke_{i}": chain for i, chain in enumerate(chains_batch)}).with_config({"run_name": action_name})
             # responses = combined.invoke(inputs)
             combined = RunnableParallel(**{f"invoke_{i}": chain for i, chain in enumerate(chains_batch)})
-            parallel_chains = combined.with_config({"run_name": f"{action_name}{f"- batch x{str(batch_size)}" if batch_size else ""}"})
+            parallel_chains = combined.with_config({"run_name": f"{action_name}{f"- batch x{str(batch_size)}" if (batch_size and len(chains_batches)>1) else ""}"})
             responses = parallel_chains.invoke(inputs) 
 
             responses_list = [responses[key] for key in responses.keys()]
@@ -148,6 +149,12 @@ class Llm:
             answers.extend(batch_answers)
 
         return answers
+    
+    @staticmethod
+    def invoke_chain(action_name: str = "", chain: Chain = None, input: dict = None) -> list[str]:       
+        if not input: input = {"input": ""}
+        chain_w_config = chain.with_config({"run_name": f"{action_name}"})
+        return chain_w_config.invoke(input) 
 
     @staticmethod
     def invoke_llm_with_tools(llm_or_chain: Runnable, tools: list[any], input: str) -> str:
@@ -180,13 +187,16 @@ class Llm:
         res = agent_executor.invoke({"input": input})
         return res["output"]
     
+
     new_line_for_stream_over_http = "\\/%*/\\" # use specific new line conversion over streaming, as new line is handled differently across platforms
     @staticmethod
-    async def invoke_as_async_stream(llm_or_chain: Runnable, input, display_console: bool = False, content_chunks:list[str] = None, does_stream_across_http: bool = False):
-        if not content_chunks:
-            content_chunks = []
+    async def invoke_as_async_stream(action_name:str, llm_or_chain: Runnable, input, display_console: bool = False, content_chunks:list[str] = None, does_stream_across_http: bool = False):
+        if not content_chunks: content_chunks = []
         has_content_prop:bool = None
-        async for chunk in llm_or_chain.astream(input):
+        
+        llm_or_chain_w_config = llm_or_chain.with_config({"run_name": f"{action_name}"})
+
+        async for chunk in llm_or_chain_w_config.astream(input):
             # Analyse specific stream structure upon first chunk: Handle both OpenAI & Ollama types
             if not has_content_prop:
                 if hasattr(chunk, 'content'): #LangChainAdapterType.OpenAI

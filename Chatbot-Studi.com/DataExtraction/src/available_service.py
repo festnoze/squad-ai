@@ -49,7 +49,7 @@ class AvailableService:
 
             #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0125",  timeout= 60, temperature = 0))
             #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-instruct",  timeout= 60, temperature = 0))
-            #AvailableService.llms_infos.append(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4o-mini", timeout=50, temperature=0))
+            AvailableService.llms_infos.append(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4o-mini", timeout=50, temperature=0))
             AvailableService.llms_infos.append(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4o", timeout=60, temperature=0))
         
         if not AvailableService.rag_service:
@@ -131,17 +131,10 @@ class AvailableService:
             response, sources = AvailableService.inference.run(query, include_bm25_retrieval= True, give_score=True)
             txt.print(response)
 
-    # def rag_query_wo_history(query):
-    #     if query.startswith('!'):
-    #         response, sources = AvailableService.inference.run_pipeline_static(query[1:], include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
-    #     else:
-    #         response, sources = AvailableService.inference.run_pipeline_dynamic(query, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
-    #     return response
-    
     def rag_query_retrieval_but_augmented_generation(conversation_history: Conversation):
         return AvailableService.inference.run_pipeline_dynamic_but_augmented_generation(conversation_history, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
 
-    def rag_query_augmented_generation_async(analysed_query: QuestionRewritting, retrieved_chunks: list[Document], decoded_stream = False, all_chunks_output: list[str] = []):
+    def rag_query_augmented_generation_streaming_async(analysed_query: QuestionRewritting, retrieved_chunks: list[Document], decoded_stream = False, all_chunks_output: list[str] = []):
          for chunk in Execute.get_sync_generator_from_async(RAGAugmentedGeneration.rag_augmented_answer_generation_async, AvailableService.rag_service, analysed_query.modified_question, retrieved_chunks, analysed_query, AvailableService.format_retrieved_docs_function):  
             if decoded_stream:
                 chunk_str = chunk.decode('utf-8').replace(Llm.new_line_for_stream_over_http, '\n')
@@ -150,7 +143,7 @@ class AvailableService:
             else:
                 yield chunk
 
-    def rag_query_with_history_streaming(conversation_history: Conversation, all_chunks_output = []):
+    def rag_query_full_pipeline_streaming(conversation_history: Conversation, all_chunks_output = []):
         if conversation_history.last_message.role != 'user':
             raise ValueError("Conversation history should end with a user message")
         txt.print_with_spinner("Exécution du pipeline d'inférence ...")
@@ -170,7 +163,7 @@ class AvailableService:
 
         txt.stop_spinner_replace_text("Pipeline d'inférence exécuté :")
 
-    def rag_query_with_history_wo_streaming(conversation_history:Conversation):        
+    def rag_query_full_pipeline_no_streaming(conversation_history:Conversation):        
         txt.print_with_spinner("Execution du pipeline d'inférence ...")
         response = AvailableService.inference.run_pipeline_dynamic(conversation_history, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
         txt.stop_spinner_replace_text("Pipeline d'inférence exectué :")

@@ -10,6 +10,15 @@ class Ressource:
     rag_configs_package_name = 'common_tools.rag.configs'
 
     @staticmethod
+    def get_ressource_file_content(file_name:str, remove_comments=True) -> str:
+        """Loads and returns the content of query_rewritting_prompt.txt"""
+        with importlib.resources.open_text(Ressource.prompts_package_name, file_name) as file_reader:
+            content = file_reader.read()
+            if remove_comments:
+                content = txt.remove_commented_lines(content)
+            return content
+
+    @staticmethod
     def get_language_detection_prompt(remove_comments=True) -> str:
         """Loads and returns the content of rag_language_detection_query.txt"""
         with importlib.resources.open_text(Ressource.prompts_package_name, 'rag_language_detection_query.txt') as file_reader:

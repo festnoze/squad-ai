@@ -20,4 +20,4 @@ class QuestionRewritting(QuestionAnalysisBase):
 class QuestionRewrittingPydantic(QuestionAnalysisBasePydantic):
     has_contextual_info: bool = Field(description="Whether the conversation's history has needed contextual information to complete the user''s query")
     question_with_context: str = Field(description="The user''s query completed with the context information from the conversation history")
-    question_type: str = Field(description="The type of the question as a string. One value in: ['salutations', 'fin', 'autre']")#. One value in: ['greetings', 'ending', 'studi', 'job', 'training', 'funding', 'other'].")
+    question_type: str = Field(description="The type of the question as a string. One value in: ['salutations', 'fin_echange', 'autre']")#. One value in: ['greetings', 'ending', 'studi', 'job', 'training', 'funding', 'other'].")

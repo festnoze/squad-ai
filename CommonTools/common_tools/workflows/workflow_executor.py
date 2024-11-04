@@ -6,6 +6,7 @@ import typing
 from collections.abc import Iterable
 #
 from common_tools.helpers.file_helper import file
+from common_tools.rag.rag_inference_pipeline.end_pipeline_exception import EndPipelineException
 
 class WorkflowExecutor:
     def __init__(self, config_or_config_file_path=None, available_classes:dict={}):
@@ -124,6 +125,8 @@ class WorkflowExecutor:
         
         try:
             result = func(**func_kwargs)
+        except EndPipelineException as epe:
+            raise epe
         except Exception as e:
             self._raise_fail_func_execution(class_and_function_name, previous_results, kwargs_values, e)
 

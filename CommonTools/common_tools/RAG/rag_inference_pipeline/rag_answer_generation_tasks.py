@@ -84,7 +84,7 @@ class RAGAugmentedGeneration:
         
         rag_chain = rag_custom_prompt | llm_or_chain | RunnablePassthrough()
 
-        async for chunk in Llm.invoke_as_async_stream(rag_chain, context):
+        async for chunk in Llm.invoke_as_async_stream('RAG augmented generation', rag_chain, context):
             yield chunk        
         # answer = rag_chain.invoke(input= context)
         # return Llm.get_content(answer)   

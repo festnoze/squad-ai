@@ -16,6 +16,7 @@ from common_tools.rag.rag_inference_pipeline.rag_post_treatment_tasks import RAG
 from common_tools.helpers.ressource_helper import Ressource
 from common_tools.workflows.workflow_executor import WorkflowExecutor
 from common_tools.models.conversation import Conversation
+from common_tools.rag.rag_inference_pipeline.end_pipeline_exception import EndPipelineException
 
 class RagInferencePipeline:
     def __init__(self, rag: RagService, default_filters: dict = {}, metadata_descriptions = None, tools: list = None):
@@ -42,8 +43,12 @@ class RagInferencePipeline:
     #todo: return the sources via an extra parameter
     # Main workflow using the dynamic pipeline
     async def run_pipeline_dynamic_async(self, query: Union[str, Conversation], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None, override_workflow_available_classes:dict = None, all_chunks_output = []):
-        analysed_query, retrieved_chunks = self.run_pipeline_dynamic_but_augmented_generation(query, include_bm25_retrieval, give_score, format_retrieved_docs_function, override_workflow_available_classes, all_chunks_output)
-                
+        try:
+            analysed_query, retrieved_chunks = self.run_pipeline_dynamic_but_augmented_generation(query, include_bm25_retrieval, give_score, format_retrieved_docs_function, override_workflow_available_classes, all_chunks_output)
+        except EndPipelineException as ex:
+            yield ex.message
+            return
+        
         async for chunk in self.get_available_classes(override_workflow_available_classes)['RAGAugmentedGeneration'].rag_augmented_answer_generation_async(self.rag, query, retrieved_chunks[0], analysed_query, format_retrieved_docs_function):
             all_chunks_output.append(chunk)
             yield chunk
@@ -61,8 +66,11 @@ class RagInferencePipeline:
             'give_score': give_score,
             'format_retrieved_docs_function': format_retrieved_docs_function
         }
+        try:
+            guardrails_result, retrieved_chunks = workflow_executor.execute_workflow(kwargs_values=kwargs_values)
+        except EndPipelineException as ex:
+            raise ex
 
-        guardrails_result, retrieved_chunks = workflow_executor.execute_workflow(kwargs_values=kwargs_values)
         self.check_for_guardrails(guardrails_result[0])
         analysed_query = kwargs_values['analysed_query']
         return analysed_query, retrieved_chunks
