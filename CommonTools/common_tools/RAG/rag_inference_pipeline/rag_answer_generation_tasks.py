@@ -11,12 +11,6 @@ from langchain_core.prompts import ChatPromptTemplate
 
 class RAGAugmentedGeneration:
     augmented_generation_prompt:str = None
-
-    @staticmethod
-    async def rag_augmented_answer_generation_async(rag: RagService, query:Union[str, Conversation], retrieved_chunks: list, analysed_query: QuestionAnalysisBase, format_retrieved_docs_function = None):
-        async for chunk in RAGAugmentedGeneration.rag_response_generation_async(rag, query, retrieved_chunks, analysed_query, format_retrieved_docs_function):
-            yield chunk
-    
     @staticmethod
     def rag_augmented_answer_generation(
         rag: RagService, 
@@ -50,17 +44,12 @@ class RAGAugmentedGeneration:
             # If the loop is not running, start it and run the coroutine
             return loop.run_until_complete(run_async())
 
-
     @staticmethod
-    async def rag_response_generation_async(rag: RagService, query:Union[str, Conversation], retrieved_chunks: list, questionAnalysis: QuestionAnalysisBase, format_retrieved_docs_function = None):
+    async def rag_augmented_answer_generation_async(rag: RagService, query:Union[str, Conversation], retrieved_chunks: list, analysed_query: QuestionAnalysisBase, format_retrieved_docs_function = None):
         if retrieved_chunks and any(retrieved_chunks) and isinstance(retrieved_chunks[0], tuple): 
             retrieved_chunks = [doc[0] for doc in retrieved_chunks] # Remove scores if present
 
-        async for chunk in RAGAugmentedGeneration.generate_augmented_response_from_retrieved_chunks_async(rag.llm_1, query, retrieved_chunks, questionAnalysis, format_retrieved_docs_function):
-            yield chunk
-
-    @staticmethod
-    async def generate_augmented_response_from_retrieved_chunks_async(llm_or_chain: Runnable, query:Union[str, Conversation], retrieved_docs: list[Document], analysed_query: QuestionAnalysisBase, format_retrieved_docs_function = None):
+        llm_or_chain = rag.llm_1 # Select the smallest llm for the augmented generation task, as it takes lots of tokens
         if not RAGAugmentedGeneration.augmented_generation_prompt:
             RAGAugmentedGeneration.augmented_generation_prompt = Ressource.get_rag_augmented_generation_prompt_generic()
         augmented_generation_prompt = RAGAugmentedGeneration.augmented_generation_prompt
@@ -78,13 +67,11 @@ class RAGAugmentedGeneration:
         rag_custom_prompt = ChatPromptTemplate.from_template(augmented_generation_prompt)
 
         if format_retrieved_docs_function is None:
-            context = retrieved_docs
+            context = retrieved_chunks
         else:
-            context = format_retrieved_docs_function(retrieved_docs)
+            context = format_retrieved_docs_function(retrieved_chunks)
         
         rag_chain = rag_custom_prompt | llm_or_chain | RunnablePassthrough()
 
         async for chunk in Llm.invoke_as_async_stream('RAG augmented generation', rag_chain, context):
-            yield chunk        
-        # answer = rag_chain.invoke(input= context)
-        # return Llm.get_content(answer)   
+            yield chunk  

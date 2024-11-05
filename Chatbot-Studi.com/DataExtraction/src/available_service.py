@@ -29,16 +29,18 @@ from common_tools.models.embedding import EmbeddingModel, EmbeddingType
 from common_tools.models.conversation import Conversation
 from ragas_service import RagasService
 from site_public_metadata_descriptions import MetadataDescriptionHelper
+import os
 
 class AvailableService:
     inference: RagInferencePipeline = None
     rag_service: RagService = None
 
-    def init():
+    def init(activate_print = True):
         LangChainFactory.set_openai_apikey()
         use_prefect = False
         txt.activate_print = True
-        AvailableService.out_dir = "C:/Dev/squad-ai/Chatbot-Studi.com/DataExtraction/outputs/"
+        AvailableService.current_dir = os.getcwd()
+        AvailableService.out_dir = os.path.join(AvailableService.current_dir, 'outputs')
         if not hasattr(AvailableService, 'llms_infos') or not AvailableService.llms_infos:
             AvailableService.llms_infos = []
             #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "phi3", timeout= 80, temperature = 0))
@@ -134,32 +136,38 @@ class AvailableService:
     def rag_query_retrieval_but_augmented_generation(conversation_history: Conversation):
         return AvailableService.inference.run_pipeline_dynamic_but_augmented_generation(conversation_history, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
 
-    def rag_query_augmented_generation_streaming_async(analysed_query: QuestionRewritting, retrieved_chunks: list[Document], decoded_stream = False, all_chunks_output: list[str] = []):
+    def rag_query_augmented_generation_streaming(analysed_query: QuestionRewritting, retrieved_chunks: list[Document], decoded_stream = False, all_chunks_output: list[str] = []):
          for chunk in Execute.get_sync_generator_from_async(RAGAugmentedGeneration.rag_augmented_answer_generation_async, AvailableService.rag_service, analysed_query.modified_question, retrieved_chunks, analysed_query, AvailableService.format_retrieved_docs_function):  
             if decoded_stream:
-                chunk_str = chunk.decode('utf-8').replace(Llm.new_line_for_stream_over_http, '\n')
+                chunk_str = chunk.decode('utf-8').replace(Llm.new_line_for_stream_over_http, '\n').replace("# ", "#### ").replace("## ", "##### ").replace("### ", "###### ")
                 all_chunks_output.append(chunk_str)
                 yield chunk_str
             else:
                 yield chunk
 
-    def rag_query_full_pipeline_streaming(conversation_history: Conversation, all_chunks_output = []):
+    def rag_query_full_pipeline_streaming(conversation_history: Conversation, all_chunks_output = [], use_dynamic_pipeline = True, special_streaming_chars = True):
         if conversation_history.last_message.role != 'user':
             raise ValueError("Conversation history should end with a user message")
         txt.print_with_spinner("Exécution du pipeline d'inférence ...")
+        
+        pipeline_method = None
+        if use_dynamic_pipeline:
+            pipeline_method = AvailableService.inference.run_pipeline_dynamic_async
+        else:
+            pipeline_method = AvailableService.inference.run_pipeline_static_async
 
-        for chunk in Execute.get_sync_generator_from_async(
-            AvailableService.inference.run_pipeline_dynamic_async,
-            #AvailableService.inference.run_pipeline_static_async,
+        for stream_chunk in Execute.get_sync_generator_from_async(
+            pipeline_method,
             conversation_history,
             include_bm25_retrieval=True,
             give_score=True,
             format_retrieved_docs_function=AvailableService.format_retrieved_docs_function,
             all_chunks_output=all_chunks_output
         ):
-            # remove the stream over Http behavior: replace special '\n' and convert byte->str (as it's consumed by a UI local to the project: streamlit)
-            stream_chunk = chunk.decode('utf-8').replace(Llm.new_line_for_stream_over_http, '\n')#.replace("# ", "#### ").replace("## ", "##### ").replace("### ", "###### ")
-            yield stream_chunk
+            if not special_streaming_chars:
+                yield stream_chunk.decode('utf-8').replace(Llm.new_line_for_stream_over_http, '\n')
+            else:
+                yield stream_chunk
 
         txt.stop_spinner_replace_text("Pipeline d'inférence exécuté :")
 
@@ -169,7 +177,7 @@ class AvailableService:
         txt.stop_spinner_replace_text("Pipeline d'inférence exectué :")
         return response
     
-    def summarize(text):
+    def _summarize(text):
         promptlate = ChatPromptTemplate.from_template(dedent("""\
         # Contexte : Il s'agit de créer un résumé pour constituer la mémoire contextuelle d'un chatbot RAG.
         # Contexte métier : Il s'agit d'une réponse apportée à une demande dans le domaine de la formation en ligne sur le site Studi.com

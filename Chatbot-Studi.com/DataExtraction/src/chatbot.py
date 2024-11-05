@@ -82,9 +82,6 @@ class ChatbotFront:
             # st.session_state.messages.append({'role': 'assistant', 'content': rag_answer})
             # st.chat_message('assistant').write(rag_answer)    
 
-            for key, value in st.session_state.items():
-                st.write(f"{key}: {value}")
-
             # With response streaming
             all_chunks_output = []
             with st.chat_message('assistant'):
@@ -99,7 +96,7 @@ class ChatbotFront:
                         pipeline_ends_reason = ex.name
 
                 if pipeline_succeeded:
-                    st.write_stream(AvailableService.rag_query_augmented_generation_streaming_async(analysed_query, retrieved_chunks[0], True, all_chunks_output))
+                    st.write_stream(AvailableService.rag_query_augmented_generation_streaming(analysed_query, retrieved_chunks[0], True, all_chunks_output))
                     full_response = ''.join(all_chunks_output)
 
                 st.session_state.conversation.add_new_message('assistant', full_response)
@@ -110,7 +107,7 @@ class ChatbotFront:
                     feedback_value = st.feedback('stars', on_change=ChatbotFront.handle_feedback_change)
                     st.session_state['feedback_value'] = feedback_value
                 # Replace AI response by its summary in streamlit cached conversation
-                st.session_state.conversation.last_message.content = AvailableService.summarize(st.session_state.conversation.last_message.content)
+                st.session_state.conversation.last_message.content = AvailableService._summarize(st.session_state.conversation.last_message.content)
                 b=3
 
     def handle_feedback_change():
