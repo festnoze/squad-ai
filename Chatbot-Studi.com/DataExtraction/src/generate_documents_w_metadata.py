@@ -1,5 +1,6 @@
 
 import json
+import os
 import re
 from common_tools.helpers.json_helper import JsonHelper
 from langchain.schema import Document
@@ -17,55 +18,56 @@ class GenerateDocumentsWithMetadataFromFiles:
         txt.print_with_spinner(f"Build all Langchain documents ...")
 
         # Process certifiers
-        certifiers_data = JsonHelper.load_from_json(path + 'certifiers.json')
+        certifiers_data = JsonHelper.load_from_json(os.path.join(path, 'certifiers.json'))
         certifiers_docs, all_certifiers_names = self.process_certifiers(certifiers_data)
         all_docs.extend(certifiers_docs)
 
         # Process certifications
-        certifications_data = JsonHelper.load_from_json(path + 'certifications.json')
+        certifications_data = JsonHelper.load_from_json(os.path.join(path, 'certifications.json'))
         certifications_docs, all_certifications_names = self.process_certifications(certifications_data)
         all_docs.extend(certifications_docs)
 
         # Process diplomas
-        diplomas_data = JsonHelper.load_from_json(path + 'diplomas.json')
+        diplomas_data = JsonHelper.load_from_json(os.path.join(path, 'diplomas.json'))
         diplomas_docs, all_diplomas_names = self.process_diplomas(diplomas_data)
         all_docs.extend(diplomas_docs)
 
         # Process domains
-        domains_data = JsonHelper.load_from_json(path + 'domains.json')
+        domains_data = JsonHelper.load_from_json(os.path.join(path, 'domains.json'))
         domains_docs, all_domains_names = self.process_domains(domains_data)
         all_docs.extend(domains_docs)
 
         # Process sub-domains
-        sub_domains_data = JsonHelper.load_from_json(path + 'subdomains.json')
+        sub_domains_data = JsonHelper.load_from_json(os.path.join(path, 'subdomains.json'))
         sub_domains_docs, all_sub_domains_names = self.process_sub_domains(sub_domains_data)
         all_docs.extend(sub_domains_docs)
 
         # Process fundings
-        fundings_data = JsonHelper.load_from_json(path + 'fundings.json')
+        fundings_data = JsonHelper.load_from_json(os.path.join(path, 'fundings.json'))
         fundings_docs, all_fundings_names = self.process_fundings(fundings_data)
         all_docs.extend(fundings_docs)
 
         # Process jobs
-        jobs_data = JsonHelper.load_from_json(path + 'jobs.json')
+        jobs_data = JsonHelper.load_from_json(os.path.join(path, 'jobs.json'))
         jobs_docs, all_jobs_names = self.process_jobs(jobs_data, domains_data)
         all_docs.extend(jobs_docs)
 
         # Process trainings
-        trainings_data = JsonHelper.load_from_json(path + 'trainings.json')
+        trainings_data = JsonHelper.load_from_json(os.path.join(path, 'trainings.json'))
         trainings_details = self.load_trainings_details_as_json(path)
         trainings_docs, all_trainings_names = self.process_trainings(trainings_data, trainings_details, all_docs, domains_data, sub_domains_data)
         all_docs.extend(trainings_docs)
 
         if write_all_lists:
-            file.write_file(all_certifiers_names, path + 'all/' + 'all_certifiers_names.json')
-            file.write_file(all_certifications_names, path + 'all/' + 'all_certifications_names.json')
-            file.write_file(all_diplomas_names, path + 'all/' + 'all_diplomas_names.json')
-            file.write_file(all_domains_names, path + 'all/' + 'all_domains_names.json')
-            file.write_file(all_sub_domains_names, path + 'all/' + 'all_sub_domains_names.json')
-            file.write_file(all_fundings_names, path + 'all/' + 'all_fundings_names.json')
-            file.write_file(all_jobs_names, path + 'all/' + 'all_jobs_names.json')
-            file.write_file(all_trainings_names, path + 'all/' + 'all_trainings_names.json')
+            path_all = os.path.join(path, 'all')
+            file.write_file(all_certifiers_names, os.path.join(path_all, 'all_certifiers_names.json'))
+            file.write_file(all_certifications_names, os.path.join(path_all, 'all_certifications_names.json'))
+            file.write_file(all_diplomas_names, os.path.join(path_all, 'all_diplomas_names.json'))
+            file.write_file(all_domains_names, os.path.join(path_all, 'all_domains_names.json'))
+            file.write_file(all_sub_domains_names, os.path.join(path_all, 'all_sub_domains_names.json'))
+            file.write_file(all_fundings_names, os.path.join(path_all, 'all_fundings_names.json'))
+            file.write_file(all_jobs_names, os.path.join(path_all, 'all_jobs_names.json'))
+            file.write_file(all_trainings_names, os.path.join(path_all, 'all_trainings_names.json'))
 
         txt.stop_spinner_replace_text(f"All Langchain documents built successfully.")
         txt.print(f"Certifiers count: {len(certifiers_data)}")
@@ -80,7 +82,7 @@ class GenerateDocumentsWithMetadataFromFiles:
         return all_docs
     
     def load_trainings_details_as_json(self, path: str) -> dict:
-        files_str = file.get_files_paths_and_contents(path + 'scraped/')
+        files_str = file.get_files_paths_and_contents(os.path.join(path, 'scraped/'))
         contents = {}
         for file_path, content_str in files_str.items():
             filename = file_path.split('/')[-1].split('.')[0]

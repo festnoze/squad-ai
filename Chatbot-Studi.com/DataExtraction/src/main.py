@@ -21,7 +21,7 @@ async def create_vector_db():
 
 @app.post("/rag/query/stream")
 async def rag_query_stream(conversation_history: Conversation):
-    def generate_chunks():
-        for chunk in AvailableService.rag_query_full_pipeline_streaming(conversation_history):
+    def generate_chunks_full_pipeline_streaming():
+        for chunk in AvailableService.rag_query_full_pipeline_streaming_no_async(conversation_history):
             yield chunk
-    return StreamingResponse(generate_chunks(), media_type="text/event-stream")
+    return StreamingResponse(generate_chunks_full_pipeline_streaming(), media_type="text/event-stream")

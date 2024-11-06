@@ -1,0 +1,89 @@
+﻿@page "/po"
+
+@using PoAssistant.Front.Data
+@using PoAssistant.Front.Services
+@inject UserStoryService userStoryService
+
+<PageTitle>Product Owner : Rédaction de la User Story</PageTitle>
+
+<h4>Product Owner : Rédaction de la User Story</h4>
+
+<head>
+</head>
+
+@if (userStory == null)
+{
+    <div class="message-source-sender">en cours de rédaction</div>
+    <div class="message-bubble message-sender">
+        <div class="loader">
+            <div class="circle"></div>
+            <div class="circle"></div>
+            <div class="circle"></div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="chat-wrapper">
+        <div class="chat-container">
+
+            <div class="message-source-sender">Description de la User Story</div>
+            <div class="message-bubble message-sender">@userStory.Description</div>
+            @foreach (var useCase in userStory.UseCases)
+            {
+                <div class="message-source-sender">Use case</div>
+                <div class="message-bubble message-sender">@useCase.Description</div>
+
+                <div class="message-source-receiver">Critères d'acceptance</div>
+                <div class="message-bubble message-receiver" style="">
+                    <ul style="margin: 0px; padding-right: 15px;">
+                        @foreach (var acceptanceCriterion in useCase.AcceptanceCriteria)
+                        {
+                            <li>@acceptanceCriterion</li>
+                        }
+                    </ul>
+                </div>
+            }
+
+        </div>
+        @*<div c lass="input-area">
+            @if (userStory.Any() && userStory.Last().IsLastThreadMessage)
+            {
+                <textarea class="input-text" @bind="userStory.Last().Content"></textarea>
+            }
+            else
+            {
+                <textarea class="input-text" placeholder="Attendre le prochain message Métier à corriger" readonly></textarea>
+            }
+            <button class="send-button" disabled="@(userStory.Any() && userStory.Last().IsLastThreadMessage ? false : true)">Send</button>
+        </div> *@
+
+    </div>
+}
+<body>
+</body>
+
+
+@code {
+    private UserStoryModel? userStory;
+
+    protected override async Task OnInitializedAsync()
+    {
+        userStory = userStoryService.GetPoUserStory();
+        userStoryService.OnUserStoryChanged += ReloadUserStory;
+    }
+
+    private void ReloadUserStory()
+    {
+        userStory = userStoryService.GetPoUserStory();
+
+        // Notify the component to re-render
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        userStoryService.OnUserStoryChanged -= ReloadUserStory;
+    }
+
+}

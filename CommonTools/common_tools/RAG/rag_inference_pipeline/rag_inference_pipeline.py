@@ -40,16 +40,16 @@ class RagInferencePipeline:
             self.rag.llm = self.rag.llm.bind_functions(all_tools)
             self.tool_executor = ToolExecutor(all_tools)
     
-    #todo: return the sources via an extra parameter
-    # Main workflow using the dynamic pipeline
+    #todo: return the retireved chunks via an extra parameter
     async def run_pipeline_dynamic_async(self, query: Union[str, Conversation], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None, override_workflow_available_classes:dict = None, all_chunks_output = []):
+        """Run the full rag inference pipeline: use dynamic pipeline until augmented generation which is streamed async"""
         try:
-            analysed_query, retrieved_chunks = self.run_pipeline_dynamic_but_augmented_generation(query, include_bm25_retrieval, give_score, format_retrieved_docs_function, override_workflow_available_classes, all_chunks_output)
+            analysed_query, retrieved_chunks = self.run_pipeline_dynamic_but_augmented_generation(query, include_bm25_retrieval, give_score, format_retrieved_docs_function, override_workflow_available_classes)
         except EndPipelineException as ex:
             yield ex.message
             return
-        
-        async for chunk in self.get_available_classes(override_workflow_available_classes)['RAGAugmentedGeneration'].rag_augmented_answer_generation_async(self.rag, query, retrieved_chunks[0], analysed_query, format_retrieved_docs_function):
+        augmented_generation_class = self.get_available_classes(override_workflow_available_classes)['RAGAugmentedGeneration']
+        async for chunk in augmented_generation_class.rag_augmented_answer_generation_streaming_async(self.rag, query, retrieved_chunks[0], analysed_query, format_retrieved_docs_function):
             all_chunks_output.append(chunk)
             yield chunk
             
@@ -124,7 +124,7 @@ class RagInferencePipeline:
         retrieved_chunks = RAGHybridRetrieval.rag_hybrid_retrieval_langchain(self.rag, query, metadata, include_bm25_retrieval, True, give_score)
 
         # Augmented Answer Generation
-        async for chunk in RAGAugmentedGeneration.rag_augmented_answer_generation_async(self.rag, query, retrieved_chunks, analysed_query, format_retrieved_docs_function):
+        async for chunk in RAGAugmentedGeneration.rag_augmented_answer_generation_streaming_async(self.rag, query, retrieved_chunks, analysed_query, format_retrieved_docs_function):
             yield chunk
     
     def check_for_guardrails(self, guardrails_result:bool):

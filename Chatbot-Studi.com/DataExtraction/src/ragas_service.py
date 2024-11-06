@@ -221,7 +221,7 @@ class RagasService:
         openai.api_key = openai_api_key
         os.environ["OPENAI_API_KEY"] = openai_api_key
 
-        loader = TextLoader("./test.txt")
+        loader = TextLoader("./tests/test.txt")
         rag_service = RagService(llm_info, EmbeddingModel.OpenAI_TextEmbedding3Small) #EmbeddingModel.Ollama_AllMiniLM
         injection_pipeline = RagInjectionPipeline(rag_service)
         docs = loader.load_and_split(RecursiveCharacterTextSplitter(

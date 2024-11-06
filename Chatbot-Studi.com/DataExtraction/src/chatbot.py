@@ -1,3 +1,5 @@
+import time
+from typing import Generator
 import streamlit as st
 from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.llm_helper import Llm
@@ -68,19 +70,20 @@ class ChatbotFront:
             </style>
         """
         st.markdown(custom_css, unsafe_allow_html=True)
-        if prompt := st.chat_input(placeholder= 'Ecrivez votre question ici ...'):
-            prompt = txt.remove_markdown(prompt)
-            st.session_state.messages.append({'role': 'user', 'content': prompt})
-            st.session_state.conversation.add_new_message('user',prompt)
-            st.chat_message('user').write(prompt)
+        if user_query := st.chat_input(placeholder= 'Ecrivez votre question ici ...'):
+            user_query = txt.remove_markdown(user_query)
+            st.session_state.messages.append({'role': 'user', 'content': user_query})
+            st.session_state.conversation.add_new_message('user', user_query)
+            st.chat_message('user').write_stream(ChatbotFront._write_stream(user_query))
 
             # # Without response streaming
             # with st.spinner('Recherche de réponses en cours ...'):
             #     conversation_history = Conversation([{ 'role': msg['role'], 'content': msg['content'] } for msg in st.session_state.messages])
-            #     rag_answer = AvailableService.rag_query_with_history_wo_streaming(conversation_history)
+            #     rag_answer = AvailableService.rag_query_full_pipeline_no_streaming_no_async(conversation_history, use_dynamic_pipeline=True)
             # rag_answer = txt.remove_markdown(rag_answer)
             # st.session_state.messages.append({'role': 'assistant', 'content': rag_answer})
-            # st.chat_message('assistant').write(rag_answer)    
+            # with st.chat_message('assistant'):
+            #     st.write(rag_answer)    
 
             # With response streaming
             all_chunks_output = []
@@ -89,31 +92,28 @@ class ChatbotFront:
                     try:
                         analysed_query, retrieved_chunks = AvailableService.rag_query_retrieval_but_augmented_generation(st.session_state.conversation)             
                         pipeline_succeeded = True
-                    except EndPipelineException as ex:
-                        full_response = ex.message
-                        st.write(full_response)
+                    except EndPipelineException as ex:                        
                         pipeline_succeeded = False
                         pipeline_ends_reason = ex.name
+                        pipeline_ended_response = ex.message
 
                 if pipeline_succeeded:
                     st.write_stream(AvailableService.rag_query_augmented_generation_streaming(analysed_query, retrieved_chunks[0], True, all_chunks_output))
                     full_response = ''.join(all_chunks_output)
+                else:
+                    st.write_stream(ChatbotFront._write_stream(pipeline_ended_response))
+                    full_response = pipeline_ended_response
 
                 st.session_state.conversation.add_new_message('assistant', full_response)
                 st.session_state.messages.append({'role': 'assistant', 'content': full_response})
 
-                # Demande de notation
-                if not pipeline_succeeded and pipeline_ends_reason == '_fin_echange_':
-                    feedback_value = st.feedback('stars', on_change=ChatbotFront.handle_feedback_change)
+                # Ask for rating in case of conversation's ending
+                if not pipeline_succeeded and  pipeline_ends_reason == '_fin_echange_':
+                    feedback_value = st.feedback('stars', on_change=ChatbotFront._handle_feedback_change)
                     st.session_state['feedback_value'] = feedback_value
-                # Replace AI response by its summary in streamlit cached conversation
-                st.session_state.conversation.last_message.content = AvailableService._summarize(st.session_state.conversation.last_message.content)
-                b=3
 
-    def handle_feedback_change():
-        feedback_value = st.session_state.get('feedback_value')
-        #st.session_state.chat_history.append(f"Feedback received: {feedback_value}")
-        st.write(f"Feedback recorded as: {feedback_value}")
+                # Replace RAG response by a generated summary used in streamlit cached conversation
+                st.session_state.conversation.last_message.content = AvailableService.get_summarized_answer(st.session_state.conversation.last_message.content)
 
     def clear_conversation():
         st.session_state.messages = []
@@ -146,6 +146,17 @@ class ChatbotFront:
 
     def _start_caption():
         return "Bonjour, je suis Studia, votre agent virtuel. Comment puis-je vous aider ?"
+        
+    def _handle_feedback_change():
+        feedback_value = st.session_state.get('feedback_value')
+        #st.session_state.chat_history.append(f"Feedback received: {feedback_value}")
+        st.write(f"Feedback recorded as: {feedback_value}")
+
+    def _write_stream(text: str, interval_btw_words:float = 0.02) -> Generator[str, None, None]:
+        words = text.split(" ")
+        for word in words:
+            yield word + " "
+            time.sleep(interval_btw_words)
 
 if __name__ == "__main__":
     ChatbotFront.main() # startup with launching the chatbot

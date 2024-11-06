@@ -7,7 +7,10 @@ langchain-community>=0.3.2
 langchain-experimental>=0.3.2
 langchain-openai>=0.2.2
 langchain-groq>=0.2.0
+protobuf==4.25.1
 langchain-chroma>=0.1.4
+langchain-ollama>=0.1.0
+langchain-anthropic>=0.2.4
 langgraph>=0.2.38
 langsmith>=0.1.136
 openai>=1.52.0
@@ -17,3 +20,5 @@ pyyaml
 ragas>=0.2.1
 lark
 rank-bm25
+langchain-qdrant>=0.1.0
+qdrant-client

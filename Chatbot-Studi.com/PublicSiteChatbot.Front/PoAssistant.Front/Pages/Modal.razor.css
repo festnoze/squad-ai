@@ -1,0 +1,30 @@
+﻿.modal {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: rgba(100, 100, 100, 0.5); /* Semi-transparent background */
+}
+
+.modal-wrapper {
+    width: 320px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    overflow-y: auto;
+    box-shadow: 0 8px 60px 0 #747474;
+}
+
+.modal-content {
+    padding: 20px;
+    margin: auto; /* This will take as much space as needed, centered */
+    overflow: auto; /* In case the content overflows */
+}
+
+.modal-close {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    cursor: pointer;
+    padding-right: 5px;
+}

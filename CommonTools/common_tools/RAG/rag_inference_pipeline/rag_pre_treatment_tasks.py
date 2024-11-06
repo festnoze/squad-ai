@@ -78,10 +78,11 @@ class RAGPreTreatment:
         query_rewritting_prompt = query_rewritting_prompt.replace("{domains_list}", domains_list)
         query_rewritting_prompt = query_rewritting_prompt.replace("{sub_domains_list}", sub_domains_list)
 
-        response = Llm.invoke_chain('Query rewritting', rag.llm_1, query_rewritting_prompt)
+        response = Llm.invoke_chain('Query rewritting', rag.llm_2, query_rewritting_prompt)
 
         content =  json.loads(Llm.extract_json_from_llm_response(Llm.get_content(response)))
         analysed_query.modified_question = content['modified_question']
+        print(f'> Rewritten query: "{analysed_query.modified_question}"')
         return analysed_query
                
     @staticmethod    
@@ -122,12 +123,12 @@ class RAGPreTreatment:
     
     metadata_infos = None
     @staticmethod
-    def analyse_query_for_metadata(rag:RagService, analysed_query:QuestionAnalysisBase, metadata_infos:list[AttributeInfo] = None) -> tuple[str, dict]:
+    def analyse_query_for_metadata(rag:RagService, analysed_query:QuestionAnalysisBase) -> tuple[str, dict]:
         if not RAGPreTreatment.metadata_infos:
             RAGPreTreatment.metadata_infos = RagService.build_metadata_infos_from_docs(rag.langchain_documents, 30)
         query = QuestionAnalysisBase.get_modified_question(analysed_query)
         
-        self_querying_retriever, query_constructor = RagService.build_self_querying_retriever_langchain(rag, RAGPreTreatment.metadata_infos)
+        self_querying_retriever, query_constructor = rag.build_self_querying_retriever_langchain(rag.llm_2, RAGPreTreatment.metadata_infos)
         
         response_with_filters = Llm.invoke_chain('Analyse metadata', query_constructor, query)
         
@@ -135,7 +136,7 @@ class RAGPreTreatment:
         return response_with_filters.query, metadata_filters
             
     @staticmethod
-    def bypassed_analyse_query_for_metadata(rag:RagService, analysed_query:QuestionAnalysisBase, metadata_infos:list[AttributeInfo] = None) -> tuple[str, dict]:
+    def bypassed_analyse_query_for_metadata(rag:RagService, analysed_query:QuestionAnalysisBase) -> tuple[str, dict]:
         query = QuestionAnalysisBase.get_modified_question(analysed_query)
         return Conversation.get_user_query(query), {}
         

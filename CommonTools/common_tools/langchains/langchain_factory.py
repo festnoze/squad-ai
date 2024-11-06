@@ -1,13 +1,14 @@
 from langchain_openai import ChatOpenAI
-from langchain_community.chat_models import ChatOllama, ChatAnthropic
+from langchain_ollama import ChatOllama
+from langchain_anthropic import ChatAnthropic
 from langchain_groq import ChatGroq
-import uuid
 #import google.generative
 #from langchain_google_genai import GoogleGenerativeAI
 from langchain_core.runnables import Runnable
 from common_tools.helpers.txt_helper import txt
 from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.models.llm_info import LlmInfo
+import uuid
 
 import os
 from dotenv import load_dotenv

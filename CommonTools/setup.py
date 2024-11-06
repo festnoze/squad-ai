@@ -1,8 +1,11 @@
 from setuptools import setup, find_packages
 
+## To install/update the below listed dependencies globally, run the following command as admin in a python terminal:
+# senv\Scripts\activate
+# pip install -e . --upgrade
 setup(
     name='common_tools',
-    version='0.1',
+    version='0.3.1',
     description='Common tools for AI and generic needs on file, console, json, ...',
     author='Etienne Millerioux',
     author_email='eemillerioux@gmail.com',  # Replace with your email
@@ -18,7 +21,10 @@ setup(
         'langchain-experimental>=0.3.2',
         'langchain-openai>=0.2.2',
         'langchain-groq>=0.2.0',
+        'protobuf==4.25.1',
         'langchain-chroma>=0.1.4',
+        'langchain-ollama>=0.1.0',
+        'langchain-anthropic>=0.2.4',
         'langgraph>=0.2.38',
         'langsmith>=0.1.136',
         'openai>=1.52.0',
@@ -27,9 +33,11 @@ setup(
         'pyyaml',
         'ragas>=0.2.1',
         'lark',  # needed for langchain self-querying retriever
-        # 'prefect',  # Uncomment if needed
-        # 'sentence-transformers>=3.2.0',  # Uncomment if needed
-        'rank-bm25'
+        # 'prefect',  # Uncomment if needed prefect
+        # 'sentence-transformers>=3.2.0',  # Uncomment if add as new LLM models' provider
+        'rank-bm25',
+        'langchain-qdrant>=0.1.0',
+        'qdrant-client',
     ],
     classifiers=[
         'Programming Language :: Python :: 3',

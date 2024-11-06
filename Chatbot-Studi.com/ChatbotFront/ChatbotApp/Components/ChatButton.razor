@@ -1,9 +1,0 @@
-<button class="open-chat-button" @onclick="ToggleChat">
-    <i class="fa-light fa-comments"></i>
-    <span>Chattez avec un conseiller</span>
-</button>
-
-@code {
-    [Parameter] public EventCallback OnToggle { get; set; }
-    private void ToggleChat() => OnToggle.InvokeAsync();
-}

@@ -1,0 +1,23 @@
+﻿@if (IsVisible)
+{
+    <div class="modal">
+        <div class="modal-wrapper">
+            @* <span class="modal-close" @onclick="Close">&times;</span> *@
+            <div class="modal-content">
+                @ChildContent
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public RenderFragment ChildContent { get; set; }
+    [Parameter] public bool IsVisible { get; set; }
+    [Parameter] public EventCallback<bool> IsVisibleChanged { get; set; }
+
+    // private void Close()
+    // {
+    //     IsVisible = false;
+    //     IsVisibleChanged.InvokeAsync(IsVisible);
+    // }
+}

@@ -35,27 +35,26 @@ class AvailableService:
     inference: RagInferencePipeline = None
     rag_service: RagService = None
 
-    def init(activate_print = True):
-        LangChainFactory.set_openai_apikey()
-        use_prefect = False
-        txt.activate_print = True
+    def init(activate_print = True, use_prefect = False):
+        LangChainFactory.set_openai_apikey()        
+        txt.activate_print = activate_print
         AvailableService.current_dir = os.getcwd()
         AvailableService.out_dir = os.path.join(AvailableService.current_dir, 'outputs')
         if not hasattr(AvailableService, 'llms_infos') or not AvailableService.llms_infos:
             AvailableService.llms_infos = []
             #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "phi3", timeout= 80, temperature = 0))
 
-            #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-haiku-20240307",  timeout= 60, temperature = 0))
-            #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-sonnet-20240229",  timeout= 60, temperature = 0))
-            #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-opus-20240229",  timeout= 60, temperature = 0))
+            AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-5-haiku-20241022",  timeout= 60, temperature = 0))
+            AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-5-sonnet-20241022",  timeout= 60, temperature = 0))
+            ##AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-opus-latest",  timeout= 60, temperature = 0))
 
             #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0125",  timeout= 60, temperature = 0))
             #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-instruct",  timeout= 60, temperature = 0))
-            AvailableService.llms_infos.append(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4o-mini", timeout=50, temperature=0))
-            AvailableService.llms_infos.append(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4o", timeout=60, temperature=0))
+            #AvailableService.llms_infos.append(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4o-mini", timeout=50, temperature=0))
+            #AvailableService.llms_infos.append(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4o", timeout=60, temperature=0))
         
         if not AvailableService.rag_service:
-            AvailableService.rag_service = RagService(AvailableService.llms_infos, EmbeddingModel.OpenAI_TextEmbedding3Small) #EmbeddingModel.Ollama_AllMiniLM
+            AvailableService.rag_service = RagService(AvailableService.llms_infos, EmbeddingModel.OpenAI_TextEmbedding3Small, vector_db_type='qdrant') #EmbeddingModel.Ollama_AllMiniLM
 
         if not AvailableService.inference:
             default_filters = {} #RagFilteringMetadataHelper.get_CodeSharpDoc_default_filters()
@@ -69,7 +68,7 @@ class AvailableService:
     def re_init():
         AvailableService.rag_service = None
         AvailableService.inference = None
-        AvailableService.init()
+        AvailableService.init(txt.activate_print)
 
     def display_select_menu():
         while True:
@@ -103,12 +102,11 @@ class AvailableService:
         drupal.retrieve_all_data()
 
     def create_vector_db_from_generated_embeded_documents(out_dir):
-        txt.activate_print = True
+        vector_db_type = 'qdrant' # 'chroma' # 'qdrant'
         all_docs = GenerateDocumentsWithMetadataFromFiles().load_all_docs_as_json(out_dir)
         injection_pipeline = RagInjectionPipeline(AvailableService.rag_service)
-        injected = injection_pipeline.build_vectorstore_and_bm25_store(all_docs, chunk_size= 2500, children_chunk_size= 0, delete_existing= True)
+        injection_pipeline.build_vectorstore_and_bm25_store(all_docs, chunk_size= 2500, children_chunk_size= 0, delete_existing= True, vector_db_type=vector_db_type)
         AvailableService.re_init() # reload rag_service with the new vectorstore and langchain documents
-        return injected
 
     def docs_retrieval_query():
         while True:
@@ -137,15 +135,36 @@ class AvailableService:
         return AvailableService.inference.run_pipeline_dynamic_but_augmented_generation(conversation_history, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
 
     def rag_query_augmented_generation_streaming(analysed_query: QuestionRewritting, retrieved_chunks: list[Document], decoded_stream = False, all_chunks_output: list[str] = []):
-         for chunk in Execute.get_sync_generator_from_async(RAGAugmentedGeneration.rag_augmented_answer_generation_async, AvailableService.rag_service, analysed_query.modified_question, retrieved_chunks, analysed_query, AvailableService.format_retrieved_docs_function):  
+         for chunk in Execute.get_sync_generator_from_async(RAGAugmentedGeneration.rag_augmented_answer_generation_streaming_async, AvailableService.rag_service, analysed_query.modified_question, retrieved_chunks, analysed_query, AvailableService.format_retrieved_docs_function):  
             if decoded_stream:
-                chunk_str = chunk.decode('utf-8').replace(Llm.new_line_for_stream_over_http, '\n').replace("# ", "#### ").replace("## ", "##### ").replace("### ", "###### ")
-                all_chunks_output.append(chunk_str)
-                yield chunk_str
+                chunk_final = chunk.decode('utf-8').replace(Llm.new_line_for_stream_over_http, '\n')
+                #if remove_markdown: chunk_final = txt.remove_markdown(chunk_final)
             else:
-                yield chunk
+                chunk_final = chunk
 
-    def rag_query_full_pipeline_streaming(conversation_history: Conversation, all_chunks_output = [], use_dynamic_pipeline = True, special_streaming_chars = True):
+            all_chunks_output.append(chunk_final)
+            yield chunk_final
+
+    async def rag_query_dynamic_pipeline_streaming_async(conversation_history: Conversation, all_chunks_output = [], use_dynamic_pipeline = True, special_streaming_chars = True):
+        if conversation_history.last_message.role != 'user':
+            raise ValueError("Conversation history should end with a user message")
+        txt.print_with_spinner("Exécution du pipeline d'inférence ...")
+        
+        for stream_chunk in AvailableService.inference.run_pipeline_dynamic_async(
+            conversation_history,
+            include_bm25_retrieval=True,
+            give_score=True,
+            format_retrieved_docs_function=AvailableService.format_retrieved_docs_function,
+            all_chunks_output=all_chunks_output
+        ):
+            if not special_streaming_chars:
+                yield stream_chunk.decode('utf-8').replace(Llm.new_line_for_stream_over_http, '\n')
+            else:
+                yield stream_chunk
+
+        txt.stop_spinner_replace_text("Pipeline d'inférence exécuté :")
+
+    def rag_query_full_pipeline_streaming_no_async(conversation_history: Conversation, all_chunks_output = [], use_dynamic_pipeline = True, special_streaming_chars = True):
         if conversation_history.last_message.role != 'user':
             raise ValueError("Conversation history should end with a user message")
         txt.print_with_spinner("Exécution du pipeline d'inférence ...")
@@ -171,22 +190,30 @@ class AvailableService:
 
         txt.stop_spinner_replace_text("Pipeline d'inférence exécuté :")
 
-    def rag_query_full_pipeline_no_streaming(conversation_history:Conversation):        
+    def rag_query_full_pipeline_no_streaming_no_async(conversation_history:Conversation, use_dynamic_pipeline = True):        
         txt.print_with_spinner("Execution du pipeline d'inférence ...")
-        response = AvailableService.inference.run_pipeline_dynamic(conversation_history, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
+        if use_dynamic_pipeline:
+            pipeline_method = AvailableService.inference.run_pipeline_dynamic_async
+        else:
+            pipeline_method = AvailableService.inference.run_pipeline_static_async
+
+        sync_generator = Execute.get_sync_generator_from_async(
+            pipeline_method,
+            conversation_history,
+            True, #include_bm25_retrieval
+            True, #give_score
+            AvailableService.format_retrieved_docs_function, #format_retrieved_docs_function,
+            None, #override_workflow_available_classes
+        )
+        response = ''.join(chunk.decode('utf-8') for chunk in sync_generator)
         txt.stop_spinner_replace_text("Pipeline d'inférence exectué :")
         return response
     
-    def _summarize(text):
-        promptlate = ChatPromptTemplate.from_template(dedent("""\
-        # Contexte : Il s'agit de créer un résumé pour constituer la mémoire contextuelle d'un chatbot RAG.
-        # Contexte métier : Il s'agit d'une réponse apportée à une demande dans le domaine de la formation en ligne sur le site Studi.com
-        # Objectif : Ecrit un résumé extremement synthétique (moins de 100 mots) de la réponse suivante. 
-        # Formalisme : Il s'agit de juste garder les mots clés importants du ou des éléments de réponses, ne garder que le premier niveau de réponse en cas de liste avec des sous-éléments. ne pas garder d'url. Ne pas garder les éléments de structuration. Ne pas préciser qu'il s'agit d'un résumé.
-        # Texte à traiter : 
-        {input}"""))
+    def get_summarized_answer(text):
+        synthesize_rag_answer_prompt = Ressource.get_ressource_file_content('synthesize_rag_answer_french_prompt.txt')
+        promptlate = ChatPromptTemplate.from_template(synthesize_rag_answer_prompt)
         chain = promptlate | AvailableService.rag_service.llm_1 | RunnablePassthrough()
-        result = chain.invoke(input=text)
+        result = Llm.invoke_chain('Answer summarization', chain, text)
         return Llm.get_content(result)
 
     def generate_ground_truth():

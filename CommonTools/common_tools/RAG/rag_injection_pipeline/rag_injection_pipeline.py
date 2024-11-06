@@ -1,4 +1,7 @@
 import re
+
+from langchain_qdrant import Qdrant
+from qdrant_client import QdrantClient
 from common_tools.rag.rag_service import RagService
 import json
 
@@ -9,12 +12,13 @@ from langchain.text_splitter import CharacterTextSplitter, RecursiveCharacterTex
 from langchain_community.document_loaders import TextLoader
 #from langchain_community.vectorstores import FAISS
 from langchain_community.retrievers import BM25Retriever
-from langchain_community.query_constructors.chroma import ChromaTranslator
 #from rank_bm25 import BM25Okapi
 from langchain.retrievers.multi_query import MultiQueryRetriever
 from langchain.retrievers import EnsembleRetriever
 from langchain_chroma import Chroma
-from langchain.chains.query_constructor.base import AttributeInfo
+from langchain_community.query_constructors.chroma import ChromaTranslator
+from langchain.vectorstores import Qdrant
+from qdrant_client.http.models import Distance, VectorParams
 
 # common tools imports
 from common_tools.helpers.txt_helper import txt
@@ -26,17 +30,15 @@ class RagInjectionPipeline:
     def __init__(self, rag: RagService):
         self.rag_service: RagService = rag
 
-    def build_vectorstore_and_bm25_store(self, documents: list, chunk_size:int = 2000, children_chunk_size:int = 0, delete_existing=True)-> int:
-        if not documents or len(documents) == 0: return 0
-        self.vectorstore = self._build_vectorstore(documents, chunk_size, delete_existing)
+    def build_vectorstore_and_bm25_store(self, documents: list, chunk_size:int = 2000, children_chunk_size:int = 0, vector_db_type='qdrant', delete_existing=True)-> int:
+        self.vectorstore = self._build_vectorstore(documents, chunk_size, delete_existing, vector_db_type)
         self._build_bm25_store(documents)
-        return self.vectorstore._collection.count()
 
-    def _build_vectorstore(self, documents: list, chunk_size:int = 0, delete_existing=True) -> any:
+    def _build_vectorstore(self, documents: list, chunk_size:int = 0, delete_existing=True, vector_db_type='qdrant') -> any:
         if not documents or len(documents) == 0: raise ValueError("No documents provided")
         if not hasattr(self.rag_service, 'embedding') or not self.rag_service.embedding: raise ValueError("Embedding model must be specified to build vector store")
         if delete_existing:
-            self.reset_vectorstore()
+            self.reset_vectorstore(vector_db_type)
         
         langchain_documents = []
         if chunk_size > 0:
@@ -56,7 +58,12 @@ class RagInjectionPipeline:
                     for doc in documents
                 ]
         txt.print_with_spinner(f"Start embedding of {len(langchain_documents)} documents or chunks")
-        db = self._add_documents_to_chroma(documents= langchain_documents, embedding = self.rag_service.embedding, vector_db_path= self.rag_service.vector_db_path)
+        if vector_db_type == 'qdrant':
+            db = self._add_documents_to_qdrant(documents= langchain_documents, embedding = self.rag_service.embedding, vector_db_path= self.rag_service.vector_db_path)
+        elif vector_db_type == 'chroma':
+            db = self._add_documents_to_chroma(documents= langchain_documents, embedding = self.rag_service.embedding, vector_db_path= self.rag_service.vector_db_path)
+        else:
+            raise ValueError("Invalid vector db type: " + vector_db_type)
         txt.stop_spinner_replace_text(f"Finished Embedding on: {len(langchain_documents)} documents")
         return db
     
@@ -71,6 +78,21 @@ class RagInjectionPipeline:
                 embedding=embedding,
                 persist_directory=vector_db_path
             )
+        return db
+    
+    def _add_documents_to_qdrant(self, documents: list[Document], embedding, collection_name: str = 'collection1', vector_db_path: str = '') -> Qdrant:
+        vector_size = len(embedding.embed_query("test"))  # Determine the vector size
+        qdrant_client = QdrantClient(path=vector_db_path)
+        qdrant_client.recreate_collection(
+            collection_name=collection_name,
+            vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE)
+        )
+        db = Qdrant(
+            client= qdrant_client,
+            collection_name= collection_name,
+            embeddings= embedding
+        )
+        db.add_documents(documents)
         return db
 
     def _build_bm25_store(self, documents):
@@ -104,7 +126,7 @@ class RagInjectionPipeline:
     #     bm25_retriever.k = k
     #     return bm25_retriever
 
-    def reset_vectorstore(self):
+    def reset_vectorstore(self, vector_db_type):
         if hasattr(self, 'vectorstore') and self.vectorstore:
             self.vectorstore.reset_collection()
             #self._delete_vectorstore_files()

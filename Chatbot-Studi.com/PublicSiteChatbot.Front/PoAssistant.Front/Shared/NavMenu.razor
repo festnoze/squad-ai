@@ -1,0 +1,127 @@
+﻿@using PoAssistant.Front.Data
+@using PoAssistant.Front.Infrastructure
+@using PoAssistant.Front.Services
+@using Microsoft.AspNetCore.Components.Authorization
+
+@inject IJSRuntime JSRuntime
+@inject ThreadMetierCdPService threadService
+@inject IExchangesRepository exchangesRepository
+
+<div class="sidebar @(isMenuReduced ? "menu-reduced" : "")">
+    <div class="top-row ps-3 navbar navbar-dark">
+        <div style="padding-top: 5px;">
+            <span class="oi oi-double-quote-serif-right" style="color: #1e8a56; font-size: 1.9rem; top: -5px; padding-left: 9px;" />
+            <span class="oi oi-double-quote-serif-left" style="color: #aaaaaa; font-size: 2.9rem; top: -15px; opacity: 0.1; @(isMenuReduced ? "top: -15px; left: -40px" : "top: -15px; left: -20px;")" />
+            <a class="navbar-brand">@(!isMenuReduced ? "Assistant cadrage" : "")</a>
+            <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+        </div>
+    </div>
+
+    <div @onclick="ToggleNavMenu">
+        <div class="toggle-menu" @onclick="ToggleMenuSize"></div>
+        <nav class="flex-column">
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                    <span class="oi oi-people nav-icon" aria-hidden="true"></span>@(!isMenuReduced ? "Métier/CdP : Cadrage du brief" : "")
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="po">
+                    <span class="oi oi-file nav-icon" aria-hidden="true"></span> @(!isMenuReduced ? "PO : Rédaction User Story" : "")
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="qa">
+                    <span class="oi oi-check nav-icon" aria-hidden="true"></span> @(!isMenuReduced ? "QA : Tests d'acceptance" : "")
+                </NavLink>
+            </div>
+            @if (exchangesNames != null && exchangesNames.Count > 0)
+            {
+                <div class="nav-item px-3" @onclick="ToggleExchangesListVisibility">
+                    <NavLink class="nav-link" href="">
+                        <span class="oi oi-list nav-icon" aria-hidden="true"></span> @(!isMenuReduced ? "Historique des échanges" : "")
+                    </NavLink>
+                </div>
+                <ul class="nav flex-column" style="@(isExchangeListHidden ? "display: none;" : "")">
+                    <li class="nav-item px-3 nav-link sub-menu-item" @onclick="NewExchange">
+                        <span class="oi oi-plus nav-icon" style="font-size: 1.5rem" aria-hidden="true"></span>
+                        <span style="color: white;">Nouveau</span>
+                    </li>
+                    @foreach (var exchangeName in exchangesNames)
+                    {                        
+                        <li class="nav-item px-3 nav-link sub-menu-item" @onclick="() => LoadExchangeList(exchangeName)">
+                            <span class="oi oi-chat nav-icon" style="font-size: 1.6rem" aria-hidden="true"></span>
+                            <span style="color: white;">@TruncateExchangeName(exchangeName)</span>
+                        </li>
+                    }
+                </ul>
+
+            }
+        </nav>
+    </div>
+</div>
+
+<script>
+    window.blazorExtensions = {
+        ReadStorage: function (key) {
+            return window.localStorage.getItem(key);
+        }
+    };
+</script>
+
+@code {
+    private bool collapseNavMenu = true;
+    private bool isMenuReduced = false;
+    private List<string> exchangesNames = new List<string>();
+    private string? username;
+    private bool isExchangeListHidden = true;
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        username = await JSRuntime.InvokeAsync<string>("blazorExtensions.ReadStorage", "userName");
+        if (!threadService.IsExchangesLoaded() && username != null)
+        {
+            threadService.ExchangesIsLoaded();
+            exchangesNames = exchangesRepository.GetAllUserExchangesNames(username);
+            await InvokeAsync(StateHasChanged);
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+
+    private void ToggleMenuSize()
+    {
+        isMenuReduced = !isMenuReduced;
+    }
+
+    private void ToggleExchangesListVisibility()
+    {
+        isExchangeListHidden = !isExchangeListHidden;
+    }
+
+    private string TruncateExchangeName(string exchangeName)
+    {
+        if (exchangeName.Length > 65)
+            return exchangeName.Substring(0, 62) + "...";
+        else
+            return exchangeName;
+    }
+
+    private void LoadExchangeList(string exchangeNameTruncated)
+    {
+        threadService.LoadThreadByName(exchangeNameTruncated, true);
+    }
+
+    private void NewExchange()
+    {
+        threadService.DeleteMetierPoThread();
+    }
+}

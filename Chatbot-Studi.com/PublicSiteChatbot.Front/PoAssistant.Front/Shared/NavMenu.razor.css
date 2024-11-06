@@ -1,0 +1,117 @@
+.navbar-toggler {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.top-row {
+    height: 3.5rem;
+    background-color: rgba(0,0,0,0.4);
+}
+
+.navbar-brand {
+    justify-content: start
+}
+
+.sidebar {
+    background-image: linear-gradient(150deg, rgb(140, 164, 187) 25%, rgb(208, 240, 255) 100%);
+}
+
+@media (min-width: 641px) {
+
+    .sidebar {
+        width: 330px;
+        height: 100vh;
+        position: sticky;
+        top: 0;
+    }
+}
+
+    .oi {
+        width: 2rem;
+        font-size: 1.1rem;
+        vertical-align: text-top;
+        top: -2px;
+    }
+    .nav-icon {
+        font-size: 1.5rem;
+    }
+
+    .nav-item {
+        font-size: 0.9rem;
+        padding-bottom: 0.5rem;
+        padding-top: 0.5rem;
+    }
+
+        .nav-item ::deep a {
+            color: #d7d7d7;
+            border-radius: 4px;
+            height: 3rem;
+            display: flex;
+            align-items: center;
+            line-height: 3rem;
+        }
+
+            .nav-item ::deep a.active {
+                background-color: rgba(255,255,255,0.25);
+                color: white;
+            }
+
+            .nav-item ::deep a:hover {
+                background-color: rgba(255,255,255,0.1);
+                color: white;
+            }
+
+    @media (min-width: 251px) {
+        .navbar-toggler {
+            display: none;
+        }
+
+        .collapse {
+            /* Never collapse the sidebar for wide screens */
+            display: block;
+        }
+    }
+
+    /* Style pour la barre de réduction/extension */
+.toggle-menu {
+    position: absolute;
+    top: 0;
+    right: 0px; /* Keep your positioning as is */
+    height: 100%;
+    width: 6px;
+    background-color: slategray; /* Existing background color */
+    background-image: linear-gradient(90deg, rgba(255, 255, 255, 0.25) 50%, transparent 50%);
+    background-size: 3px 5px; /* New adjusted size for a closer grip effect */
+    cursor: pointer;
+}
+
+    /* Styles additionnels pour le menu réduit */
+    .menu-reduced {
+        width: 95px; /* Largeur réduite pour n'afficher que les icônes */
+    }
+
+        .menu-reduced .nav-link {
+            justify-content: center; /* Centrer les icônes */
+        }
+
+.sub-menu-item {
+    cursor: pointer;
+    margin-left: 25px;
+    font-size: 0.7rem;
+    font-weight: 100;
+    color: rgb(140, 164, 187);
+    padding: 5px 0px; /* Adjust padding as needed */
+    border: 1px solid transparent; /* Transparent border to maintain the layout */
+    border-radius: 6px; /* Rounded corners, adjust as needed */
+    transition: all 0.9s ease; /* Smooth transition for hover effects */
+}
+
+    .sub-menu-item:hover {
+        margin-left: 3px;
+        margin-right: 8px;
+        font-size: 0.9rem;
+        font-weight: 400;
+        color: rgb(84, 178, 178);
+        background-color: rgba(255, 255, 255, 0.15); /* Whitish background with low opacity */
+        border-color: rgba(255, 255, 255, 0.3); /* Whitish border with some opacity */
+        box-shadow: 0 0 8px rgba(255, 255, 255, 0.5); /* Optional: Adds glow effect */
+    }

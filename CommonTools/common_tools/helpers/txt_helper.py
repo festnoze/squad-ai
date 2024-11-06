@@ -179,14 +179,13 @@ class txt:
     
     @staticmethod    
     def remove_markdown(text):
-        remove_chars = r"[*_#=|{}!]" # Miss markdown tags: +, -, ., (, ), [, ], <, >, ", ', `, ~, :, ;, ?, @, &, %, $, /, \
+        remove_chars = r"[*_#={}!]" # Miss markdown tags: |, +, -, ., (, ), [, ], <, >, ", ', `, ~, :, ;, ?, @, &, %, $, /, \
         return re.sub(remove_chars, "", text)
     
     @staticmethod
     def remove_commented_lines(content):
         content = '\n'.join([line for line in content.split('\n') if not line.strip().startswith('//')])
-        return content
-    
+        return content    
     
     @staticmethod
     def apply_to_all_str(input: Optional[Union[str, dict, list]], delegate) -> Optional[Union[str, dict, list]]:

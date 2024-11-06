@@ -3,6 +3,7 @@ import os
 from langchain_community.embeddings import OllamaEmbeddings
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.embeddings.sentence_transformer import SentenceTransformerEmbeddings
+from langchain_core.embeddings import Embeddings
 
 class EmbeddingType(Enum):
     OpenAI = "OpenAI"
@@ -54,7 +55,7 @@ class EmbeddingModel(Enum):
     def is_sentence_transformer(self) -> bool:
         return self.embedding_type == EmbeddingType.SentenceTransformer
     
-    def create_instance(self, api_key:str = None) -> any:
+    def create_instance(self, api_key:str = None) -> Embeddings:
         if self.is_openai:
             if not api_key:
                 api_key= os.getenv("OPEN_API_KEY") 

@@ -5,6 +5,7 @@ from common_tools.helpers.ressource_helper import Ressource
 from common_tools.models.conversation import Conversation
 from common_tools.models.question_analysis_base import QuestionAnalysisBase
 from common_tools.rag.rag_service import RagService
+from common_tools.helpers.execute_helper import Execute
 from langchain_core.documents import Document
 from langchain_core.runnables import Runnable, RunnablePassthrough
 from langchain_core.prompts import ChatPromptTemplate
@@ -22,11 +23,13 @@ class RAGAugmentedGeneration:
         async def run_async():
             chunks = []
             # Collect results from the async generator
-            async for chunk in RAGAugmentedGeneration.rag_augmented_answer_generation_async(
+            async for chunk in RAGAugmentedGeneration.rag_augmented_answer_generation_streaming_async(
                 rag, query, retrieved_chunks, analysed_query, format_retrieved_docs_function
             ):
                 chunks.append(chunk)
             return ''.join(chunk.decode('utf-8') for chunk in chunks)
+
+        #todo: to replace with: Execute.get_sync_generator_from_async
 
         # Ensure an event loop is available in the current thread
         try:
@@ -45,7 +48,7 @@ class RAGAugmentedGeneration:
             return loop.run_until_complete(run_async())
 
     @staticmethod
-    async def rag_augmented_answer_generation_async(rag: RagService, query:Union[str, Conversation], retrieved_chunks: list, analysed_query: QuestionAnalysisBase, format_retrieved_docs_function = None):
+    async def rag_augmented_answer_generation_streaming_async(rag: RagService, query:Union[str, Conversation], retrieved_chunks: list, analysed_query: QuestionAnalysisBase, format_retrieved_docs_function = None):
         if retrieved_chunks and any(retrieved_chunks) and isinstance(retrieved_chunks[0], tuple): 
             retrieved_chunks = [doc[0] for doc in retrieved_chunks] # Remove scores if present
 

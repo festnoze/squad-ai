@@ -1,0 +1,84 @@
+﻿@page "/login"
+@using PoAssistant.Front.Services
+
+@inject IJSRuntime JSRuntime
+@inject IAuthenticationService AuthenticationService
+@inject NavigationManager NavigationManager
+
+<div>
+    <div class="top-row ps-3 navbar navbar-dark" style="border-radius: .25rem;">
+        <div style="padding-top: 5px; padding-bottom: 50px; display: flex; justify-content: flex-end;">
+            <a class="connection-header">Connexion</a>
+            <div style="display: flex; justify-content: flex-end;">
+                <span class="oi oi-double-quote-serif-right" style="color: #1e8a56; font-size: 1.9rem; top: -5px; padding-left: 9px; left: 70px;" />
+                <span class="oi oi-double-quote-serif-left" style="color: #333; font-size: 2.9rem; top: -15px; opacity: 0.1; top: -15px; left: 50px;" />
+            </div>
+        </div>
+    </div>
+
+    <div style="padding-top: 5px; padding-bottom: 30px;">
+    </div>
+
+    @if (showErrorMessage)
+    {
+        <div class="alert alert-danger" style="white-space: pre-line; font-size: 0.7rem;">
+            <i>Les informations de connexion ne sont pas valides</i>
+        </div>
+    }
+
+    <form @onsubmit="DoLogin">
+        <div>
+            <label class="label" for="username"><i>Pseudonyme</i></label>
+            <input @bind="username" class="form-control" />
+        </div>
+        <div>
+            <label class="label" for="password">Mot de passe</label>
+            <input type="password" @bind="password" class="form-control" />
+        </div>
+        <div class="connection-button-area">
+            <button type="submit" class="connection-button">Connexion</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    window.blazorExtensions = {
+        WriteStorage: function (key, value) {
+            window.localStorage.setItem(key, value);
+        },
+        ReadStorage: function (key) {
+            return window.localStorage.getItem(key);
+        }
+    };
+</script>
+
+@code {
+    [Parameter] public EventCallback<bool> IsVisibleChanged { get; set; }
+    private string? username;
+    private string? password;
+    private bool showErrorMessage;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            showErrorMessage = false;
+        }
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    private async Task DoLogin()
+    {
+        showErrorMessage = false;
+        if (await AuthenticationService.LoginAsync(username ?? "", password ?? ""))
+        {
+            await JSRuntime.InvokeVoidAsync("blazorExtensions.WriteStorage", "userName", username);
+            await IsVisibleChanged.InvokeAsync(false);
+        }
+        else
+        {
+            showErrorMessage = true;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+}
