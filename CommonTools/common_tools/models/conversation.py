@@ -31,6 +31,8 @@ class Conversation:
             if not query_or_conv.last_message.role == "user":
                 raise ValueError("Invalid query, last message should be from user")
             return query_or_conv.last_message.content
+        elif 'messages' in query_or_conv:
+            return query_or_conv['messages'][-1]['content']
         else:
             raise ValueError("get_user_query don't handle query type")
         

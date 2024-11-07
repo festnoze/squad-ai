@@ -32,6 +32,13 @@ class ChatbotFront:
             .stSidebar {
                 width: 360px !important;
             }
+            .rounded-frame {
+                border: 2px solid #3498db;
+                border-radius: 15px;
+                padding: 20px;
+                margin-bottom: 20px;
+                background-color: #f9f9f9;
+            }
             </style>
             """
         st.markdown(custom_css, unsafe_allow_html=True)
@@ -48,10 +55,11 @@ class ChatbotFront:
             st.button('✨ Générer RAGAS Ground Truth dataset', on_click=ChatbotFront.generate_ground_truth)
             #ChatbotFront.folder_path = st.text_input('Dossier à traiter', value=ChatbotFront.folder_path)#, disabled=True)
 
-        st.title('💬 Chatbot Studi.com')
+        #st.title('💬 Chatbot Studi.com')
         # st.markdown('<h4 style='text-align: right;'><strong>🛰️ trouvez votre future formation</strong></h4>', unsafe_allow_html=True)
-        st.caption(" Interroger notre base de connaissance sur : les métiers, nos formations, les financements, l'alternance, ...")
-                
+        #st.caption(" Interroger notre base de connaissance sur : les métiers, nos formations, les financements, l'alternance, ...")
+        
+        #st.markdown('<div class="rounded-frame">', unsafe_allow_html=True)    
         if 'messages' not in st.session_state:
             st.session_state['messages'] = []
             st.session_state.messages.append({'role': 'assistant', 'content': ChatbotFront._start_caption()})
@@ -61,20 +69,12 @@ class ChatbotFront:
 
         for msg in st.session_state.messages:
             st.chat_message(msg['role']).write(msg['content'])
-
-        custom_css = """
-            <style>
-            .stSpinner {
-                margin-left: 20px;
-            }
-            </style>
-        """
-        st.markdown(custom_css, unsafe_allow_html=True)
+        #st.markdown('</div>', unsafe_allow_html=True)
+        
         if user_query := st.chat_input(placeholder= 'Ecrivez votre question ici ...'):
-            user_query = txt.remove_markdown(user_query)
+            st.chat_message('user').write_stream(ChatbotFront._write_stream(user_query))
             st.session_state.messages.append({'role': 'user', 'content': user_query})
             st.session_state.conversation.add_new_message('user', user_query)
-            st.chat_message('user').write_stream(ChatbotFront._write_stream(user_query))
 
             # # Without response streaming
             # with st.spinner('Recherche de réponses en cours ...'):
@@ -111,20 +111,27 @@ class ChatbotFront:
                 if not pipeline_succeeded and  pipeline_ends_reason == '_fin_echange_':
                     feedback_value = st.feedback('stars', on_change=ChatbotFront._handle_feedback_change)
                     st.session_state['feedback_value'] = feedback_value
+                if pipeline_succeeded:                   
+                    thumb_value = st.feedback('thumbs')#, on_change=ChatbotFront._handle_feedback_change) 
 
                 # Replace RAG response by a generated summary used in streamlit cached conversation
                 st.session_state.conversation.last_message.content = AvailableService.get_summarized_answer(st.session_state.conversation.last_message.content)
 
+    ### Helpers methods ###
+
+    @staticmethod
     def clear_conversation():
         st.session_state.messages = []
         st.session_state.messages.append({'role': 'assistant', 'content': ChatbotFront._start_caption()})
 
+    @staticmethod
     def get_drupal_data():
         prompt = f'Récupération des données Drupal par json-api'
         with st.spinner('En cours ... ' + prompt):
             AvailableService.retrieve_all_data()
             st.session_state.messages.append({'role': 'assistant', 'content': txt.remove_markdown("Terminé avec succès : " + prompt)})
 
+    @staticmethod
     def scrape_website_pages():
         prompt = f'Scraping des pages web des formations'
         with st.spinner('En cours ... ' + prompt):
@@ -132,26 +139,33 @@ class ChatbotFront:
             scraper.scrape_all_trainings()            
             st.session_state.messages.append({'role': 'assistant', 'content': txt.remove_markdown("Terminé avec succès : " + prompt)})
 
+    @staticmethod
     def build_vectorstore():        
         prompt = f'Construction de la base de données vectorielle'
         with st.spinner('En cours ... ' + prompt):
             AvailableService.create_vector_db_from_generated_embeded_documents(AvailableService.out_dir)
             st.session_state.messages.append({'role': 'assistant', 'content': txt.remove_markdown("Terminé avec succès : " + prompt)})
         
+    @staticmethod
     def generate_ground_truth():
         prompt = f'Génération du dataset RAGAS Ground Truth'
         with st.spinner('En cours ... ' + prompt):
             AvailableService.generate_ground_truth()
             st.session_state.messages.append({'role': 'assistant', 'content': txt.remove_markdown("Terminé avec succès : " + prompt)})
-
+    
+    @staticmethod
     def _start_caption():
         return "Bonjour, je suis Studia, votre agent virtuel. Comment puis-je vous aider ?"
-        
-    def _handle_feedback_change():
-        feedback_value = st.session_state.get('feedback_value')
-        #st.session_state.chat_history.append(f"Feedback received: {feedback_value}")
-        st.write(f"Feedback recorded as: {feedback_value}")
 
+    @staticmethod  
+    def _handle_feedback_change():
+        feedback_value = st.session_state.get('feedback_value', 5)
+        #st.session_state.chat_history.append(f"Feedback received: {feedback_value}")
+        feedback_msg = f"Merci pour votre retour. Nous avons bien enregistré votre note. A bientôt sur le chatbot Studi.com."# de {feedback_value if feedback_value else '-'} étoiles."
+        st.session_state.messages[-1]['content'] = feedback_msg
+        st.write(feedback_msg)
+
+    @staticmethod
     def _write_stream(text: str, interval_btw_words:float = 0.02) -> Generator[str, None, None]:
         words = text.split(" ")
         for word in words:

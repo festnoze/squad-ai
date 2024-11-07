@@ -132,7 +132,7 @@ class RAGPreTreatment:
         
         response_with_filters = Llm.invoke_chain('Analyse metadata', query_constructor, query)
         
-        metadata_filters = RagFilteringMetadataHelper.get_filters_from_comparison(response_with_filters.filter)
+        metadata_filters = RagFilteringMetadataHelper.get_filters_from_comparison(response_with_filters.filter, RAGPreTreatment.metadata_infos)
         return response_with_filters.query, metadata_filters
             
     @staticmethod

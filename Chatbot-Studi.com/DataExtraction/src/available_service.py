@@ -36,22 +36,23 @@ class AvailableService:
     rag_service: RagService = None
 
     def init(activate_print = True, use_prefect = False):
-        LangChainFactory.set_openai_apikey()        
+        AvailableService.vector_db_type = 'chroma' # 'qdrant'       
         txt.activate_print = activate_print
+        LangChainFactory.set_openai_apikey() 
         AvailableService.current_dir = os.getcwd()
         AvailableService.out_dir = os.path.join(AvailableService.current_dir, 'outputs')
         if not hasattr(AvailableService, 'llms_infos') or not AvailableService.llms_infos:
             AvailableService.llms_infos = []
             #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "phi3", timeout= 80, temperature = 0))
 
-            AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-5-haiku-20241022",  timeout= 60, temperature = 0))
-            AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-5-sonnet-20241022",  timeout= 60, temperature = 0))
+            # AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-5-haiku-20241022",  timeout= 60, temperature = 0))
+            # AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-5-sonnet-20241022",  timeout= 60, temperature = 0))
             ##AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-opus-latest",  timeout= 60, temperature = 0))
 
             #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0125",  timeout= 60, temperature = 0))
             #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-instruct",  timeout= 60, temperature = 0))
-            #AvailableService.llms_infos.append(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4o-mini", timeout=50, temperature=0))
-            #AvailableService.llms_infos.append(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4o", timeout=60, temperature=0))
+            AvailableService.llms_infos.append(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4o-mini", timeout=50, temperature=0))
+            AvailableService.llms_infos.append(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4o", timeout=60, temperature=0))
         
         if not AvailableService.rag_service:
             AvailableService.rag_service = RagService(AvailableService.llms_infos, EmbeddingModel.OpenAI_TextEmbedding3Small, vector_db_type='qdrant') #EmbeddingModel.Ollama_AllMiniLM
@@ -102,10 +103,9 @@ class AvailableService:
         drupal.retrieve_all_data()
 
     def create_vector_db_from_generated_embeded_documents(out_dir):
-        vector_db_type = 'qdrant' # 'chroma' # 'qdrant'
         all_docs = GenerateDocumentsWithMetadataFromFiles().load_all_docs_as_json(out_dir)
         injection_pipeline = RagInjectionPipeline(AvailableService.rag_service)
-        injection_pipeline.build_vectorstore_and_bm25_store(all_docs, chunk_size= 2500, children_chunk_size= 0, delete_existing= True, vector_db_type=vector_db_type)
+        injection_pipeline.build_vectorstore_and_bm25_store(all_docs, chunk_size= 2500, children_chunk_size= 0, delete_existing= True, vector_db_type=AvailableService.vector_db_type)
         AvailableService.re_init() # reload rag_service with the new vectorstore and langchain documents
 
     def docs_retrieval_query():

@@ -17,7 +17,7 @@ from langchain.retrievers.multi_query import MultiQueryRetriever
 from langchain.retrievers import EnsembleRetriever
 from langchain_chroma import Chroma
 from langchain_community.query_constructors.chroma import ChromaTranslator
-from langchain.vectorstores import Qdrant
+from langchain_community.vectorstores import Qdrant
 from qdrant_client.http.models import Distance, VectorParams
 
 # common tools imports

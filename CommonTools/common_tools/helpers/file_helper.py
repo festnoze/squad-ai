@@ -181,11 +181,12 @@ class file:
         for file_path in files:
             contents.append(file.get_as_str(file_path))
         return contents
-    
+        
     @staticmethod 
-    def get_as_json(file_path:str):
-        """Get the specified file content as a JSON object."""
-        data = file.get_as_str(file_path)
+    def get_as_json(full_file_path:str):
+        if not file.file_exists(full_file_path):
+            raise FileNotFoundError(f"File '{full_file_path}' does not exist.")
+        data = file.get_as_str(full_file_path)
         if not data:
             return None
         json_ = json.loads(data)

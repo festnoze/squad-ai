@@ -39,7 +39,7 @@ class RAGHybridRetrieval:
         
         vector_ratio = 1 - bm25_ratio
         # Create bm25 retriever with metadata filter
-        if metadata:
+        if metadata and any(metadata):
             if RagFilteringMetadataHelper.does_contain_filter(metadata, 'domaine','url'):
                 max_retrived_count = 100
             filtered_docs = [
@@ -49,6 +49,7 @@ class RAGHybridRetrieval:
             print(f">> docs count corresponding to metadata: {len(filtered_docs)}/{len(rag.langchain_documents)}")
         else:
             filtered_docs = rag.langchain_documents
+            metadata = None
 
         # remove metadata filtering if no document are found
         if not any(filtered_docs):
@@ -76,8 +77,10 @@ class RAGHybridRetrieval:
         else:
             final_retriever = ensemble_retriever
 
-        retrieved_chunks = final_retriever.invoke(QuestionAnalysisBase.get_modified_question(analysed_query))
-
+        try:
+            retrieved_chunks = final_retriever.invoke(QuestionAnalysisBase.get_modified_question(analysed_query))
+        except Exception as e:
+            raise e
         # Remove 'rel_ids' from metadata: useless for augmented generation and limit token usage
         for doc in retrieved_chunks:
             doc.metadata.pop("rel_ids", None)

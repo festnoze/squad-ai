@@ -6,16 +6,14 @@ from common_tools.helpers.file_helper import file
 class MetadataDescriptionHelper:    
     @staticmethod
     def get_metadata_descriptions_for_studi_public_site(out_dir):
-        all_dir = os.path.join(out_dir, 'outputs') + '/'
-        if not file.file_exists(all_dir + 'all_domains_names.json'):
-            return None
-        domains_names = ', '.join(file.get_as_json(all_dir + 'all_domains_names.json'))
-        sub_domains_names = ', '.join(file.get_as_json(all_dir + 'all_sub_domains_names.json'))
-        certifications_names = ', '.join(file.get_as_json(all_dir + 'all_certifications_names.json'))
-        diplomes_names = ', '.join(file.get_as_json(all_dir + 'all_diplomas_names.json'))
+        all_dir = os.path.join(out_dir, 'all')
+        domains_names = ', '.join(file.get_as_json(os.path.join(all_dir, 'all_domains_names.json')))
+        sub_domains_names = ', '.join(file.get_as_json(os.path.join(all_dir, 'all_sub_domains_names.json')))
+        certifications_names = ', '.join(file.get_as_json(os.path.join(all_dir, 'all_certifications_names.json')))
+        diplomes_names = ', '.join(file.get_as_json(os.path.join(all_dir, 'all_diplomas_names.json')))
         warning_exactitude = "Attention, le texte de la valeur doit correspondre exactement au texte de l'une des valeurs possibles."
         warning_training_only = "Attention : cette meta-data n'existe que pour les documents relatifs aux formations (type = 'formation'). Ne pas ajouter ce filtre pour un type différent que 'formation'."
-        and_operator_not_allowed = "Attention : Seul l'opérateur 'or' est utilisable pour combiner plusieurs éléments avec cette même clé, ne jamais appliquer d'opérateur 'and' entre plusieurs éléments avec cette même clé."
+        and_operator_not_allowed = "Attention : Ne jamais appliquer d'opérateur 'and' entre plusieurs éléments avec cette même clé. (Utilisez plutôt l'opérateur 'or' pour combiner plusieurs éléments avec cette même clé)"
         list_possible_values = "Peut prendre une valeur parmi la liste suivante. Chaque élément est sous le format : 'valeur' (description -optionnelle)"
 
         return [
