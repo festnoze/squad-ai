@@ -39,10 +39,10 @@ class RagService:
         self.init_embedding(embedding_model)
         self.init_llms(llms_or_info) #todo: add fallbacks with specifying multiple llms or llms infos
 
-        self.vector_db_path = os.path.abspath(os.path.join(os.path.join(vector_db_and_docs_path, self.embedding_model_name), vector_db_type))
-        self.documents_json_filepath = os.path.abspath(os.path.join(vector_db_and_docs_path, documents_json_filename))
+        self.vector_db_path = os.path.join(os.path.join(os.path.abspath(vector_db_and_docs_path), self.embedding_model_name), vector_db_type)
+        self.all_documents_json_file_path = os.path.abspath(os.path.join(vector_db_and_docs_path, documents_json_filename))
 
-        self.langchain_documents = self._load_langchain_documents(self.documents_json_filepath)
+        self.langchain_documents = self._load_langchain_documents(self.all_documents_json_file_path)
         self.bm25_retriever = self._build_bm25_retriever(self.langchain_documents)
         self.vectorstore = self._load_vectorstore()
 

@@ -15,6 +15,7 @@ from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.execute_helper import Execute
 from common_tools.models.llm_info import LlmInfo
 from common_tools.helpers.llm_helper import Llm
+from common_tools.helpers.config_helper import ConfigHelper
 from common_tools.langchains.langchain_factory import LangChainFactory
 from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.rag.rag_service import RagService
@@ -24,7 +25,6 @@ from common_tools.rag.rag_injection_pipeline.rag_injection_pipeline import RagIn
 from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
 from common_tools.rag.rag_inference_pipeline.rag_answer_generation_tasks import RAGAugmentedGeneration
 from common_tools.helpers.ressource_helper import Ressource
-#from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline_with_prefect import RagInferencePipelineWithPrefect
 from common_tools.models.embedding import EmbeddingModel, EmbeddingType
 from common_tools.models.conversation import Conversation
 from ragas_service import RagasService
@@ -34,37 +34,35 @@ import os
 class AvailableService:
     inference: RagInferencePipeline = None
     rag_service: RagService = None
+    vector_db_type: str = None
+    embedding_model: EmbeddingModel = None
+    llms_infos: list[LlmInfo] = None
 
-    def init(activate_print = True, use_prefect = False):
-        AvailableService.vector_db_type = 'qdrant' #  'chroma' #  
+
+    def init(activate_print = True):
+        load_dotenv()
         txt.activate_print = activate_print
-        LangChainFactory.set_openai_apikey() 
         AvailableService.current_dir = os.getcwd()
         AvailableService.out_dir = os.path.join(AvailableService.current_dir, 'outputs')
-        if not hasattr(AvailableService, 'llms_infos') or not AvailableService.llms_infos:
-            AvailableService.llms_infos = []
-            #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "phi3", timeout= 80, temperature = 0))
-            #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "llama3.2:1b", timeout= 80, temperature = 0))
-            # AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "llama3.2", timeout= 80, temperature = 0))
-            # AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "qwen2.5-coder", timeout= 80, temperature = 0))
-
-            # AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-5-haiku-20241022",  timeout= 60, temperature = 0))
-            # AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-5-sonnet-20241022",  timeout= 60, temperature = 0))
-            ##AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-opus-latest",  timeout= 60, temperature = 0))
-
-            #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0125",  timeout= 60, temperature = 0))
-            #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-instruct",  timeout= 60, temperature = 0))
-            AvailableService.llms_infos.append(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4o-mini", timeout=50, temperature=0))
-            AvailableService.llms_infos.append(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4o", timeout=60, temperature=0))
         
+        if not AvailableService.vector_db_type:
+            AvailableService.vector_db_type = ConfigHelper.get_vector_db_type_from_env()
+        if not AvailableService.llms_infos:
+            LangChainFactory.set_openai_apikey() 
+            AvailableService.llms_infos = ConfigHelper.get_llms_from_env()
         if not AvailableService.rag_service:
-            AvailableService.rag_service = RagService(AvailableService.llms_infos, EmbeddingModel.OpenAI_TextEmbedding3Small, vector_db_type='qdrant') #EmbeddingModel.Ollama_AllMiniLM
-        #TEST = AvailableService.rag_service.llm_1.invoke("quelle est la capitale de l'europe ?")
+            if not AvailableService.embedding_model:
+                AvailableService.embedding_model = ConfigHelper.get_embedding_model_from_env()
+            AvailableService.rag_service = RagService(
+                                            llms_or_info=AvailableService.llms_infos, 
+                                            embedding_model=AvailableService.embedding_model, 
+                                            vector_db_type=AvailableService.vector_db_type,
+                                        )
+            
+        #TEST_LLM = AvailableService.rag_service.llm_1.invoke("quelle est la capitale de l'europe ?")
+
         if not AvailableService.inference:
-            default_filters = {} #RagFilteringMetadataHelper.get_CodeSharpDoc_default_filters()
-            # if use_prefect:
-            #     AvailableService.inference = RagInferencePipelineWithPrefect(AvailableService.rag_service, default_filters, None)            
-            # else:
+            default_filters = {}
             metadata_descriptions_for_studi_public_site = MetadataDescriptionHelper.get_metadata_descriptions_for_studi_public_site(AvailableService.out_dir)
             AvailableService.inference = RagInferencePipeline(AvailableService.rag_service, default_filters, metadata_descriptions_for_studi_public_site, None)
             RAGAugmentedGeneration.augmented_generation_prompt = Ressource.get_rag_augmented_generation_prompt_on_studi()
