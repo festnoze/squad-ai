@@ -88,6 +88,7 @@ class ChatbotFront:
             # With response streaming
             all_chunks_output = []
             with st.chat_message('assistant'):
+                start = time.time()
                 with st.spinner('Je réfléchis à votre question ...'):
                     try:
                         analysed_query, retrieved_chunks = AvailableService.rag_query_retrieval_but_augmented_generation(st.session_state.conversation)             
@@ -107,6 +108,9 @@ class ChatbotFront:
                 st.session_state.conversation.add_new_message('assistant', full_response)
                 st.session_state.messages.append({'role': 'assistant', 'content': full_response})
 
+                elapsed_time = time.time() - start
+                txt.print(f"RAG full pipeline duration {txt.get_elapsed_str(elapsed_time)}")
+                
                 # Ask for rating in case of conversation's ending
                 if not pipeline_succeeded and  pipeline_ends_reason == '_fin_echange_':
                     feedback_value = st.feedback('stars', on_change=ChatbotFront._handle_feedback_change)

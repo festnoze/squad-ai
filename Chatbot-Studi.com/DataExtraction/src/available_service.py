@@ -36,7 +36,7 @@ class AvailableService:
     rag_service: RagService = None
 
     def init(activate_print = True, use_prefect = False):
-        AvailableService.vector_db_type = 'chroma' # 'qdrant'       
+        AvailableService.vector_db_type = 'qdrant' #  'chroma' #  
         txt.activate_print = activate_print
         LangChainFactory.set_openai_apikey() 
         AvailableService.current_dir = os.getcwd()
@@ -44,6 +44,9 @@ class AvailableService:
         if not hasattr(AvailableService, 'llms_infos') or not AvailableService.llms_infos:
             AvailableService.llms_infos = []
             #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "phi3", timeout= 80, temperature = 0))
+            #AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "llama3.2:1b", timeout= 80, temperature = 0))
+            # AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "llama3.2", timeout= 80, temperature = 0))
+            # AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "qwen2.5-coder", timeout= 80, temperature = 0))
 
             # AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-5-haiku-20241022",  timeout= 60, temperature = 0))
             # AvailableService.llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-5-sonnet-20241022",  timeout= 60, temperature = 0))
@@ -56,7 +59,7 @@ class AvailableService:
         
         if not AvailableService.rag_service:
             AvailableService.rag_service = RagService(AvailableService.llms_infos, EmbeddingModel.OpenAI_TextEmbedding3Small, vector_db_type='qdrant') #EmbeddingModel.Ollama_AllMiniLM
-
+        #TEST = AvailableService.rag_service.llm_1.invoke("quelle est la capitale de l'europe ?")
         if not AvailableService.inference:
             default_filters = {} #RagFilteringMetadataHelper.get_CodeSharpDoc_default_filters()
             # if use_prefect:
