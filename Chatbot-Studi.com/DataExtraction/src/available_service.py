@@ -111,6 +111,13 @@ class AvailableService:
         injection_pipeline.build_vectorstore_and_bm25_store(all_docs, chunk_size= 2500, children_chunk_size= 0, delete_existing= True, vector_db_type=AvailableService.vector_db_type)
         AvailableService.re_init() # reload rag_service with the new vectorstore and langchain documents
 
+    def create_summary_vector_db_from_generated_embeded_documents(out_dir):
+        all_docs = GenerateDocumentsWithMetadataFromFiles().load_all_docs_as_json(out_dir)
+        injection_pipeline = RagInjectionPipeline(AvailableService.rag_service)
+        injection_pipeline.build_vectorstore_and_bm25_store(all_docs, chunk_size= 2500, children_chunk_size= 0, delete_existing= True, vector_db_type=AvailableService.vector_db_type)
+        AvailableService.re_init() # reload rag_service with the new vectorstore and langchain documents
+        
+
     def docs_retrieval_query():
         while True:
             query = input("Entrez votre question ('exit' pour quitter):\n")

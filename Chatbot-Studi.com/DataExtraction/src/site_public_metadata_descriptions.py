@@ -5,12 +5,20 @@ from common_tools.helpers.file_helper import file
 
 class MetadataDescriptionHelper:    
     @staticmethod
+    def get_all_json(path, file_name):
+        file_name = file_name + '.json'
+        file_path = os.path.join(path, file_name)
+        if not file.file_exists(file_path): raise ValueError(f"File '{file_path}' does not exist")
+        content = file.get_as_json(file_path)
+        return ", ".join(f"'{item}'" for item in content)
+    
+    @staticmethod
     def get_metadata_descriptions_for_studi_public_site(out_dir):
         all_dir = os.path.join(out_dir, 'all')
-        domains_names = ', '.join(file.get_as_json(os.path.join(all_dir, 'all_domains_names.json')))
-        sub_domains_names = ', '.join(file.get_as_json(os.path.join(all_dir, 'all_sub_domains_names.json')))
-        certifications_names = ', '.join(file.get_as_json(os.path.join(all_dir, 'all_certifications_names.json')))
-        diplomes_names = ', '.join(file.get_as_json(os.path.join(all_dir, 'all_diplomas_names.json')))
+        domains_names = MetadataDescriptionHelper.get_all_json(all_dir, 'all_domains_names')
+        sub_domains_names = MetadataDescriptionHelper.get_all_json(all_dir, 'all_sub_domains_names')
+        certifications_names = MetadataDescriptionHelper.get_all_json(all_dir, 'all_certifications_names')
+        diplomes_names = MetadataDescriptionHelper.get_all_json(all_dir, 'all_diplomas_names')
         warning_exactitude = "Attention, le texte de la valeur doit correspondre exactement au texte de l'une des valeurs possibles."
         warning_training_only = "Attention : cette meta-data n'existe que pour les documents relatifs aux formations (type = 'formation'). Ne pas ajouter ce filtre pour un type différent que 'formation'."
         and_operator_not_allowed = "Attention : Ne jamais appliquer d'opérateur 'and' entre plusieurs éléments avec cette même clé. (Utilisez plutôt l'opérateur 'or' pour combiner plusieurs éléments avec cette même clé)"

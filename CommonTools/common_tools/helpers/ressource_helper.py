@@ -1,8 +1,6 @@
 import importlib.resources
-
 import yaml
-
-from common_tools.helpers.txt_helper import txt
+from common_tools.helpers.txt_helper import txt  # Assuming txt.remove_commented_lines is defined here
 
 class Ressource:
     
@@ -10,100 +8,53 @@ class Ressource:
     rag_configs_package_name = 'common_tools.rag.configs'
 
     @staticmethod
-    def get_ressource_file_content(file_name:str, remove_comments=True) -> str:
-        """Loads and returns the content of query_rewritting_prompt.txt"""
-        with importlib.resources.open_text(Ressource.prompts_package_name, file_name) as file_reader:
+    def get_ressource_file_content(file_name: str, package_name: str = None, remove_comments=True) -> str:
+        """The generic method to get the content of a file in prompts package"""
+        if not package_name: package_name = Ressource.prompts_package_name
+        with importlib.resources.open_text(package_name, file_name) as file_reader:
             content = file_reader.read()
             if remove_comments:
                 content = txt.remove_commented_lines(content)
             return content
 
     @staticmethod
-    def get_language_detection_prompt(remove_comments=True) -> str:
-        """Loads and returns the content of rag_language_detection_query.txt"""
-        with importlib.resources.open_text(Ressource.prompts_package_name, 'rag_language_detection_query.txt') as file_reader:
-            content = file_reader.read()
-            if remove_comments:
-                content = txt.remove_commented_lines(content)
-            return content
+    def get_language_detection_prompt() -> str:
+        return Ressource.get_ressource_file_content('rag_language_detection_query.txt')
 
     @staticmethod
-    def get_query_rewritting_prompt(remove_comments=True) -> str:
-        """Loads and returns the content of query_rewritting_prompt.txt"""
-        with importlib.resources.open_text(Ressource.prompts_package_name, 'query_rewritting_prompt.txt') as file_reader:
-            content = file_reader.read()
-            if remove_comments:
-                content = txt.remove_commented_lines(content)
-            return content
+    def get_query_rewritting_prompt() -> str:
+        return Ressource.get_ressource_file_content('query_rewritting_prompt.txt')
         
     @staticmethod
-    def get_query_standalone_from_history_prompt(remove_comments=True) -> str:
-        """Loads and returns the content of query_standalone_from_history_prompt.txt"""
-        with importlib.resources.open_text(Ressource.prompts_package_name, 'query_standalone_from_history_prompt.txt') as file_reader:
-            content = file_reader.read()
-            if remove_comments:
-                content = txt.remove_commented_lines(content)
-            return content
+    def get_create_standalone_query_from_history_prompt() -> str:
+        return Ressource.get_ressource_file_content('create_standalone_query_from_history_prompt.txt')
         
     @staticmethod
-    def get_prefiltering_translation_instructions_prompt(remove_comments=True) -> str:
-        """Loads and returns the content of rag_prefiltering_ask_for_translation_instructions.txt"""
-        with importlib.resources.open_text(Ressource.prompts_package_name, 'rag_prefiltering_ask_for_translation_instructions.txt') as file_reader:
-            content = file_reader.read()
-            if remove_comments:
-                content = txt.remove_commented_lines(content)
-            return content
+    def get_prefiltering_translation_instructions_prompt() -> str:
+        return Ressource.get_ressource_file_content('rag_prefiltering_ask_for_translation_instructions.txt')
 
     @staticmethod
-    def get_query_code_additional_instructions_prompt(remove_comments=True) -> str:
-        """Loads and returns the content of rag_query_code_additionnal_instructions.txt"""
-        with importlib.resources.open_text(Ressource.prompts_package_name, 'rag_query_code_additionnal_instructions.txt') as file_reader:
-            content = file_reader.read()
-            if remove_comments:
-                content = txt.remove_commented_lines(content)
-            return content
+    def get_query_code_additional_instructions_prompt() -> str:
+        return Ressource.get_ressource_file_content('rag_query_code_additionnal_instructions.txt')
         
     @staticmethod
-    def get_rag_augmented_generation_prompt_generic(remove_comments=True) -> str:
-        """Loads and returns the content of rag_retriever_query.txt"""
-        with importlib.resources.open_text(Ressource.prompts_package_name, 'rag_augmented_generation_query_generic.txt') as file_reader:
-            content = file_reader.read()
-            if remove_comments:
-                content = txt.remove_commented_lines(content)
-            return content
+    def get_rag_augmented_generation_prompt_generic() -> str:
+        return Ressource.get_ressource_file_content('rag_augmented_generation_query_generic.txt')
 
     @staticmethod
-    def get_rag_augmented_generation_prompt_on_studi(remove_comments=True) -> str:
-        """Loads and returns the content of rag_retriever_query.txt"""
-        with importlib.resources.open_text(Ressource.prompts_package_name, 'rag_augmented_generation_query_on_studi.txt') as file_reader:
-            content = file_reader.read()
-            if remove_comments:
-                content = txt.remove_commented_lines(content)
-            return content
+    def get_rag_augmented_generation_prompt_on_studi() -> str:
+        return Ressource.get_ressource_file_content('rag_augmented_generation_query_on_studi.txt')
 
     @staticmethod
-    def get_rag_augmented_generation_prompt_on_code(remove_comments=True) -> str:
-        """Loads and returns the content of rag_retriever_query.txt"""
-        with importlib.resources.open_text(Ressource.prompts_package_name, 'rag_augmented_generation_query_on_code.txt') as file_reader:
-            content = file_reader.read()
-            if remove_comments:
-                content = txt.remove_commented_lines(content)
-            return content
+    def get_rag_augmented_generation_prompt_on_code() -> str:
+        return Ressource.get_ressource_file_content('rag_augmented_generation_query_on_code.txt')
         
     @staticmethod
-    def get_rag_pipeline_default_config_full_no_streaming(remove_comments=True) -> str:
-        """Loads and returns the content of rag_pipeline_default_config_full_no_streaming.yaml"""
-        with importlib.resources.open_text(Ressource.rag_configs_package_name, 'rag_pipeline_default_config_full_no_streaming.yaml') as file_reader:
-            content = file_reader.read()
-            if remove_comments:
-                content = txt.remove_commented_lines(content)
-            return yaml.safe_load(content)
+    def get_rag_pipeline_default_config_full_no_streaming() -> dict:
+        content = Ressource.get_ressource_file_content('rag_pipeline_default_config_full_no_streaming.yaml', Ressource.rag_configs_package_name)
+        return yaml.safe_load(content)
             
     @staticmethod
-    def get_rag_pipeline_default_config_wo_AG_for_streaming(remove_comments=True) -> str:
-        """Loads and returns the content of rag_pipeline_default_config_wo_AG_for_streaming.yaml"""
-        with importlib.resources.open_text(Ressource.rag_configs_package_name, 'rag_pipeline_default_config_wo_AG_for_streaming.yaml') as file_reader:
-            content = file_reader.read()
-            if remove_comments:
-                content = txt.remove_commented_lines(content)
-            return yaml.safe_load(content)
+    def get_rag_pipeline_default_config_wo_AG_for_streaming() -> dict:
+        content = Ressource.get_ressource_file_content('rag_pipeline_default_config_wo_AG_for_streaming.yaml', Ressource.rag_configs_package_name)
+        return yaml.safe_load(content)

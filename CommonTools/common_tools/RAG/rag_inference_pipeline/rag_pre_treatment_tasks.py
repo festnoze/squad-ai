@@ -37,18 +37,50 @@ class RAGPreTreatment:
     
     @staticmethod
     @output_name('analysed_query')
+    def query_standalone_rewritten_from_history(rag:RagService, query:Union[str, Conversation]) -> QuestionRewritting:
+        query_standalone_rewritten_prompt = Ressource.get_ressource_file_content('create_standalone_and_rewritten_query_from_history_prompt.txt')
+        
+        query_standalone_rewritten_prompt = RAGPreTreatment._replace_all_categories_in_prompt(query_standalone_rewritten_prompt)
+        query_standalone_rewritten_prompt = RAGPreTreatment._replace_query_and_history_in_prompt(query, query_standalone_rewritten_prompt)  
+                
+        prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(
+                        query_standalone_rewritten_prompt, QuestionRewrittingPydantic, QuestionRewritting)
+
+        response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(
+                'Make standalone and rewritten query', [rag.llm_2, rag.llm_3], output_parser, 10, *[prompt_for_output_parser])
+        
+        question_rewritting = QuestionRewritting(**response[0])
+        print(f'> Standalone query: "{question_rewritting.question_with_context}" and rewritten query: "{question_rewritting.modified_question}"')
+
+        # interupt pipeline if no RAG is needed
+        if question_rewritting.question_type == 'salutations':
+            print(f'> Salutations detected, ending pipeline')
+            raise GreetingsEndsPipelineException()
+        elif question_rewritting.question_type == 'fin_echange':
+            print(f"> Fin d'échange detected, ending pipeline")
+            raise EndMessageEndsPipelineException()
+        return question_rewritting
+
+    @staticmethod
+    def _replace_query_and_history_in_prompt(query, prompt):
+        prompt = prompt.replace('{user_query}', Conversation.get_user_query(query))
+        prompt = prompt.replace('{conversation_history}', Conversation.conversation_history_as_str(query, include_current_user_query=False))
+        return prompt
+    
+    @staticmethod
+    @output_name('analysed_query')
     def query_standalone_from_history(rag:RagService, query:Union[str, Conversation]) -> QuestionRewritting:
-        query_standalone_prompt = Ressource.get_query_standalone_from_history_prompt()
+        query_standalone_prompt = Ressource.get_create_standalone_query_from_history_prompt()
         user_query = Conversation.get_user_query(query)
-        query_standalone_prompt = query_standalone_prompt.replace("{user_query}", user_query)
-        query_standalone_prompt = query_standalone_prompt.replace("{conversation_history}", Conversation.conversation_history_as_str(query, include_current_user_query=False))
+        query_standalone_prompt = query_standalone_prompt.replace('{user_query}', user_query)
+        query_standalone_prompt = query_standalone_prompt.replace('{conversation_history}', Conversation.conversation_history_as_str(query, include_current_user_query=False))
 
         prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(
             query_standalone_prompt, QuestionRewrittingPydantic, QuestionRewritting
         )
 
         response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(
-            "Standalone query from history", [rag.llm_2, rag.llm_3], output_parser, 10, *[prompt_for_output_parser]
+            'Standalone query from history', [rag.llm_2, rag.llm_3], output_parser, 10, *[prompt_for_output_parser]
         )
         question_rewritting = QuestionRewritting(**response[0])
         print(f'> Standalone query: "{question_rewritting.question_with_context}"')
@@ -65,18 +97,7 @@ class RAGPreTreatment:
     @staticmethod
     @output_name('analysed_query')
     def query_rewritting(rag:RagService, analysed_query:QuestionRewritting) -> str:        
-        out_dir = "./outputs/" #todo: not generic enough
-        diploms_names = ', '.join(file.get_as_json(out_dir + 'all/all_diplomas_names.json'))
-        certifications_names = ', '.join(file.get_as_json(out_dir + 'all/all_certifications_names.json'))
-        domains_list = ', '.join(file.get_as_json(out_dir + 'all/all_domains_names.json'))
-        sub_domains_list = ', '.join(file.get_as_json(out_dir + 'all/all_sub_domains_names.json'))
-
-        query_rewritting_prompt = Ressource.get_query_rewritting_prompt()
-        query_rewritting_prompt = query_rewritting_prompt.replace("{user_query}", analysed_query.question_with_context)
-        query_rewritting_prompt = query_rewritting_prompt.replace("{diplomes_list}", diploms_names)
-        query_rewritting_prompt = query_rewritting_prompt.replace("{certifications_list}", certifications_names)
-        query_rewritting_prompt = query_rewritting_prompt.replace("{domains_list}", domains_list)
-        query_rewritting_prompt = query_rewritting_prompt.replace("{sub_domains_list}", sub_domains_list)
+        query_rewritting_prompt = RAGPreTreatment._replace_all_categories_in_prompt(analysed_query.question_with_context)
 
         response = Llm.invoke_chain('Query rewritting', rag.llm_2, query_rewritting_prompt)
 
@@ -84,6 +105,22 @@ class RAGPreTreatment:
         analysed_query.modified_question = content['modified_question']
         print(f'> Rewritten query: "{analysed_query.modified_question}"')
         return analysed_query
+
+    @staticmethod
+    def _replace_all_categories_in_prompt(prompt):
+        out_dir = "./outputs/" #todo: not generic enough
+        diploms_names = ', '.join(file.get_as_json(out_dir + 'all/all_diplomas_names.json'))
+        certifications_names = ', '.join(file.get_as_json(out_dir + 'all/all_certifications_names.json'))
+        domains_list = ', '.join(file.get_as_json(out_dir + 'all/all_domains_names.json'))
+        sub_domains_list = ', '.join(file.get_as_json(out_dir + 'all/all_sub_domains_names.json'))
+
+        query_rewritting_prompt = Ressource.get_query_rewritting_prompt()
+        query_rewritting_prompt = query_rewritting_prompt.replace("{user_query}", prompt)
+        query_rewritting_prompt = query_rewritting_prompt.replace("{diplomes_list}", diploms_names)
+        query_rewritting_prompt = query_rewritting_prompt.replace("{certifications_list}", certifications_names)
+        query_rewritting_prompt = query_rewritting_prompt.replace("{domains_list}", domains_list)
+        query_rewritting_prompt = query_rewritting_prompt.replace("{sub_domains_list}", sub_domains_list)
+        return query_rewritting_prompt
                
     @staticmethod    
     @output_name('analysed_query')
@@ -95,11 +132,11 @@ class RAGPreTreatment:
             prefilter_prompt, QuestionTranslationPydantic, QuestionTranslation
         )
         response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(
-            "query_translation", [rag.llm_1, rag.llm_2, rag.llm_3], output_parser, 10, *[prompt_for_output_parser]
+            'query_translation', [rag.llm_1, rag.llm_2, rag.llm_3], output_parser, 10, *[prompt_for_output_parser]
         )
         question_analysis = response[0]
         question_analysis['question'] = user_query
-        if question_analysis['detected_language'].__contains__("english"):
+        if question_analysis['detected_language'].__contains__('english'):
             question_analysis['translated_question'] = user_query
         return QuestionTranslation(**question_analysis)
 
@@ -107,7 +144,7 @@ class RAGPreTreatment:
     @output_name('analysed_query') #todo: to replace with above
     def bypassed_query_translation(rag:RagService, query:Union[str, Conversation]) -> QuestionTranslation:
         user_query = Conversation.get_user_query(query)
-        question_analysis = QuestionTranslation(query, query, "request", "french")
+        question_analysis = QuestionTranslation(query, query, 'request', 'french')
         return question_analysis
 
     @staticmethod   

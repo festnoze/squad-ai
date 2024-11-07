@@ -17,7 +17,7 @@ Exemple: avec en requête: 'compare les' et comme historique: 'user: quels forma
 
 //- Enfin, il va s'agir d'identifier la catégorie de la requête de l'utilisateur. Elle peut appartenir à l'une des catégories suivantes : `salutations`, `fin de conversation`, `à propos de studi (école ou entreprise)`, `à propos d'un emploi`, `à propos de formations`, `à propos de financements`, `autre` (tout ce qui ne peut être classé dans une des catégories précédentes).
 //> ajoute une chaîne `question_type` avec la valeur correspondante parmi `[ 'formation', 'salutations', 'fin de conversation', 'école', 'emploi', 'financement', 'autre']`.
-- Enfin, identifie la catégorie de la requête 'modified_question'. Elle peut appartenir à l'une des catégories suivantes : 
+- Enfin, identifie la catégorie de la requête 'question_with_context'. Elle peut appartenir à l'une des catégories suivantes : 
   - `salutations` : en cas de salutations en début de conversation. Attention : Uniquement si l'utilisateur ne fait aucune autre demande en sus des saluations.  
   - `fin_echange` : en cas de formule (sans autre question) mettant fin à la conversation (tel que : 'merci', 'parfait', ou 'au revoir'). Attention : Uniquement si l'utilisateur ne fait auncune autre demande en sus de signifier la fin de la conversation.
   - `autre` : dans tous les autres cas.
@@ -27,3 +27,4 @@ Exemple: avec en requête: 'compare les' et comme historique: 'user: quels forma
 {user_query}
 
 {conversation_history}
+

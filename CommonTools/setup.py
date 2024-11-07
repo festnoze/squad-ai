@@ -46,6 +46,9 @@ setup(
     ],
     python_requires='>=3.6',
     include_package_data=True,
-    package_data={
-    },
+    package_data={        
+        # If any folder contains ressources files (which are not python files, like *.txt files), reference those folders here to include them into the 'common_tools' package:
+        'common_tools.prompts': ['**/*'],
+        'common_tools.rag.configs': ['**/*']
+    }
 )

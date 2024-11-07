@@ -51,6 +51,7 @@ class ChatbotFront:
             st.button('📊 Récupérer données Drupal par json-api', on_click=ChatbotFront.get_drupal_data)
             st.button('📚 Scraping des pages web des formations', on_click=ChatbotFront.scrape_website_pages)
             st.button('📦 Construction de la base vectorielle', on_click=ChatbotFront.build_vectorstore)
+            st.button('📦 Construction de la base résumée', on_click=ChatbotFront.build_summary_vectorstore)
             st.divider()
             st.button('✨ Générer RAGAS Ground Truth dataset', on_click=ChatbotFront.generate_ground_truth)
             #ChatbotFront.folder_path = st.text_input('Dossier à traiter', value=ChatbotFront.folder_path)#, disabled=True)
@@ -126,7 +127,9 @@ class ChatbotFront:
     @staticmethod
     def clear_conversation():
         st.session_state.messages = []
+        st.session_state.conversation = Conversation()
         st.session_state.messages.append({'role': 'assistant', 'content': ChatbotFront._start_caption()})
+        st.session_state.conversation.add_new_message('assistant', ChatbotFront._start_caption())
 
     @staticmethod
     def get_drupal_data():
@@ -149,7 +152,14 @@ class ChatbotFront:
         with st.spinner('En cours ... ' + prompt):
             AvailableService.create_vector_db_from_generated_embeded_documents(AvailableService.out_dir)
             st.session_state.messages.append({'role': 'assistant', 'content': txt.remove_markdown("Terminé avec succès : " + prompt)})
-        
+
+    @staticmethod
+    def build_summary_vectorstore():
+        prompt = f'Construction de la base de données vectorielle résumée'
+        with st.spinner('En cours ... ' + prompt):
+            AvailableService.create_summary_vector_db_from_generated_embeded_documents(AvailableService.out_dir)
+            st.session_state.messages.append({'role': 'assistant', 'content': txt.remove_markdown("Terminé avec succès : " + prompt)})
+
     @staticmethod
     def generate_ground_truth():
         prompt = f'Génération du dataset RAGAS Ground Truth'

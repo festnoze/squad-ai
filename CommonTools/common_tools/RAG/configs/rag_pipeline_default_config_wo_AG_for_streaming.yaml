@@ -11,8 +11,9 @@ guardrails:
   - RAGGuardrails.guardrails_query_analysis
 
 pre_treatment:  
-  - RAGPreTreatment.query_standalone_from_history
-  - RAGPreTreatment.query_rewritting
+  # - RAGPreTreatment.query_standalone_from_history
+  # - RAGPreTreatment.query_rewritting
+  - RAGPreTreatment.query_standalone_rewritten_from_history
   - parallel_threads:
     - RAGPreTreatment.analyse_query_for_metadata      
     - RAGPreTreatment.extract_explicit_metadata
