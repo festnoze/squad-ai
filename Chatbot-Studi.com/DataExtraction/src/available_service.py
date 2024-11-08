@@ -123,8 +123,11 @@ class AvailableService:
         summarize_doc_prompt = summarize_doc_prompt.replace('context', context)
 
         summarize_doc_prompt = summarize_doc_prompt.replace('content', test_training.page_content)
-        response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks('Summarize document', [AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2], summarize_doc_prompt)
-        answer = Llm.get_content(response)
+        #response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks('Summarize document', [AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2], summarize_doc_prompt)
+        response_1 = Llm.invoke_chain('Summarize document', AvailableService.rag_service.llm_1, summarize_doc_prompt)
+        response_2 = Llm.invoke_chain('Summarize document', AvailableService.rag_service.llm_2, summarize_doc_prompt)
+        
+        answer = Llm.get_content(response_1)
         txt.print(answer)
 
         injection_pipeline = RagInjectionPipeline(AvailableService.rag_service)

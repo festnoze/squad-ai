@@ -1,25 +1,43 @@
 #Instructions#
-Effectue les actions suivantes:
-- Analyse completement le contenu du document ci-après, puis écris un résumé synthétique mais complet et structuré, reprenant l'intégralité des informations utiles que contient le document.
-- Met le résumé ainsi créé dans une variable texte nommée : 'doc_summary'.
 
-- Crée toutes les questions unitaires auquel le résumé du document précédent (la valeur de 'doc_summary') permet de répondre. Les questions doivent exhaustivement recouvrir les infos du résumé du document, être toutes être exprimées de façon à être complètes et être unitaires.
-    Exemple 1 : 
-    Pour un résumé du contenu du document étant : 
-    "Formation X ... la durée est de 540 heures (1 an) en continue et 800 heures (18 mois) en alternance".
-    Les questions, afin d'être exhaustives, complètes et atomiques, devraient être : 
+**Objectif** : Analyser le contenu d'un document pour générer un résumé structuré et les questions unitaires correspondantes.
+
+**Étapes** :
+
+1. **Résumé du document** :
+   - Analyse le contenu du document, et crée un résumé structuré et complet, nommé `doc_summary`, avec toutes les informations utiles.
+   - **Format attendu :**
+     ```json
+     "doc_summary": "Résumé complet du document ici."
+     ```
+
+2. **Génération de questions unitaires** :
+   - Crée exhaustivement toutes les questions en lien avec les informations du résumé. Chaque question doit être complète et atomique.
+
+   **Exemple** :
+   - Si le résumé comprend le texte: "Formation X, durée de 540 heures en continue et 800 heures en alternance."
+   - Les questions, afin d'être exhaustives, complètes et atomiques, pour ce texte devraient être : 
     "Quelle est la durée en heures de la formation X en formation continue ?", "Quelle est la durée en mois/années de la formation X en formation continue ?", 
     "Quelle est la durée en heures de la formation X en alternance ?", "Quelle est la durée en mois/années de la formation X en alternance ?".
-- Crée ensuite un dictionnaire appelé 'questions' où la clé est un identifiant (int), et où la valeur est le texte d'une question, où tu mettra en valeurs chacune des questions créées, avec en clé un nombre auto-incrémenté commencant par 1.
 
-- Découpe ensuite le résumé du document précédent (la valeur de 'doc_summary'), afin que chacune des parties permettant de répondre une ou plusieurs des questions précédentes. Certaines phrases ou information peuvent être dupliquées dans plusieurs parties si elles sont utiles à la réponse des questions correspondantes.
-- Crée ensuite un dictionnaire appelé 'doc_chunks' où la clé est un identifiant (int), et où la valeur est le texte de l'une des parties du document synthétique découpé (str). Tu y mettra en valeurs chacune des parties du découpage du document résumé, avec en clé un nombre auto-incrémenté commencant par 1.
+3. **Découpage du résumé** :
+   - Découpe `doc_summary` en parties (ou chunks) autonomes. Chaque chunk doit permettre de répondre à une ou plusieurs questions unitaires.
+   - **Note** : Les informations peuvent être dupliquées dans plusieurs chunks si nécessaire.
 
-- Analyse ensuite les liens entre 'questions' et 'doc_chunks', c'est-à-dire entre les questions et les parties de documents y répondant.
-- Crée ensuite dict (int, list[int]) qui prend en clé un identifiant d'un élément de 'doc_chunks' (une partie du document découpé), et en valeur un tableau de tous les identifiants de questions répondus par cette partie de document. 
+4. **Structure de données finale** :
+   - Organise les informations sous forme d'un dictionnaire nommé `doc_chunks_to_questions`, où chaque clé est un chunk de résumé et chaque valeur est une liste des questions associées.
+   
+   **Format attendu :**
+   ```json
+   {
+       "Texte chunk 1": ["Question 1", "Question 2"],
+       "Texte chunk 2": ["Question 3", "Question 4"]
+   }
+   ```
 
-#Contexte#
+
+#Contexte# 
 {context}
 
-#Contenu du document#
+#Contenu du document# 
 {doc_content}
