@@ -9,7 +9,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain.docstore.document import Document
 #from database.database import DB
 from drupal_data_retireval import DrupalDataRetireval
-from generate_documents_w_metadata import GenerateDocumentsWithMetadataFromFiles
+from generate_documents_and_metadata import GenerateDocumentsAndMetadata
 #
 from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.execute_helper import Execute
@@ -27,6 +27,7 @@ from common_tools.rag.rag_inference_pipeline.rag_answer_generation_tasks import 
 from common_tools.helpers.ressource_helper import Ressource
 from common_tools.models.embedding import EmbeddingModel, EmbeddingType
 from common_tools.models.conversation import Conversation
+from generate_documents_summaries_and_metadata import GenerateDocumentsSummariesAndMetadata
 from ragas_service import RagasService
 from site_public_metadata_descriptions import MetadataDescriptionHelper
 import os
@@ -41,6 +42,7 @@ class AvailableService:
 
     def init(activate_print = True):
         load_dotenv()
+        load_dotenv(dotenv_path=".rag_config.env")
         txt.activate_print = activate_print
         AvailableService.current_dir = os.getcwd()
         AvailableService.out_dir = os.path.join(AvailableService.current_dir, 'outputs')
@@ -104,15 +106,29 @@ class AvailableService:
         drupal.retrieve_all_data()
 
     def create_vector_db_from_generated_embeded_documents(out_dir):
-        all_docs = GenerateDocumentsWithMetadataFromFiles().load_all_docs_as_json(out_dir)
+        all_docs = GenerateDocumentsAndMetadata().load_all_docs_as_json(out_dir)
         injection_pipeline = RagInjectionPipeline(AvailableService.rag_service)
         injection_pipeline.build_vectorstore_and_bm25_store(all_docs, chunk_size= 2500, children_chunk_size= 0, delete_existing= True, vector_db_type=AvailableService.vector_db_type)
         AvailableService.re_init() # reload rag_service with the new vectorstore and langchain documents
 
     def create_summary_vector_db_from_generated_embeded_documents(out_dir):
-        all_docs = GenerateDocumentsWithMetadataFromFiles().load_all_docs_as_json(out_dir)
+        trainings_docs = GenerateDocumentsSummariesAndMetadata().load_and_process_trainings(out_dir)
+        
+        test_training = trainings_docs[0]
+        summarize_doc_prompt = Ressource.get_ressource_file_content('summarize_document.french.txt')
+        
+        prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(
+                        summarize_doc_prompt, QuestionRewrittingPydantic, QuestionRewritting)
+        context = f"Il s'agit d'une formation de l'entreprise STUDI.\n"
+        summarize_doc_prompt = summarize_doc_prompt.replace('context', context)
+
+        summarize_doc_prompt = summarize_doc_prompt.replace('content', test_training.page_content)
+        response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks('Summarize document', [AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2], summarize_doc_prompt)
+        answer = Llm.get_content(response)
+        txt.print(answer)
+
         injection_pipeline = RagInjectionPipeline(AvailableService.rag_service)
-        injection_pipeline.build_vectorstore_and_bm25_store(all_docs, chunk_size= 2500, children_chunk_size= 0, delete_existing= True, vector_db_type=AvailableService.vector_db_type)
+        #injection_pipeline.build_vectorstore_and_bm25_store(all_docs, chunk_size= 2500, children_chunk_size= 0, delete_existing= True, vector_db_type=AvailableService.vector_db_type)
         AvailableService.re_init() # reload rag_service with the new vectorstore and langchain documents
         
 
@@ -218,8 +234,8 @@ class AvailableService:
         return response
     
     def get_summarized_answer(text):
-        synthesize_rag_answer_prompt = Ressource.get_ressource_file_content('synthesize_rag_answer_french_prompt.txt')
-        promptlate = ChatPromptTemplate.from_template(synthesize_rag_answer_prompt)
+        summarize_rag_answer_prompt = Ressource.get_ressource_file_content('summarize_rag_answer_prompt.french.txt')
+        promptlate = ChatPromptTemplate.from_template(summarize_rag_answer_prompt)
         chain = promptlate | AvailableService.rag_service.llm_1 | RunnablePassthrough()
         result = Llm.invoke_chain('Answer summarization', chain, text)
         return Llm.get_content(result)

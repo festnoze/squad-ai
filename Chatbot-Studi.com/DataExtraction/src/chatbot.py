@@ -17,7 +17,7 @@ class ChatbotFront:
             page_title= "Chatbot site public Studi.com",
             page_icon= "🔎",
             layout= "centered",
-            initial_sidebar_state= "collapsed" #"expanded" #
+            initial_sidebar_state= "expanded" # "collapsed" #
         )
 
         custom_css = """

@@ -9,7 +9,7 @@ from typing import List, Dict
 from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.file_helper import file
 
-class GenerateDocumentsWithMetadataFromFiles:
+class GenerateDocumentsAndMetadata:
     def __init__(self):
         pass
        
@@ -242,12 +242,12 @@ class GenerateDocumentsWithMetadataFromFiles:
         #docs.append(Document(page_content= 'Liste complète de tous les métiers couvert par Studi :\n' + ', '.join(all_jobs_names), metadata={"type": "liste_métiers",}))
         return docs, list(all_jobs_names)
 
-    def process_trainings(self, data: List[Dict], trainings_details: dict, existing_docs:list = [], domains_data = None, sub_domains_data = None) -> List[Document]:
-        if not data:
+    def process_trainings(self, trainings_data: List[Dict], trainings_details: dict, existing_docs:list = [], domains_data = None, sub_domains_data = None) -> List[Document]:
+        if not trainings_data:
             return []
         docs = []
         all_trainings_titles = set()
-        for item in data:
+        for item in trainings_data:
             training_title = item.get("title")
             all_trainings_titles.add(training_title)
             related_ids = item.get("related_ids", {})

@@ -32,8 +32,6 @@ class MetadataDescriptionHelper:
                     {list_possible_values} : ['formation', 'métier', 'certifieur', 'certification', 'diplôme', 'domaine', 'sous-domaine']. 
                     Attention, n'appliquer qu'un seul filtre sur 'type' maximum. Ne jamais utiliser d'opérateurs 'or' ou 'and' pour combiner plusieurs types. Dans ce cas, ne pas mettre de filtre sur 'type'.
                     Si 'type' = 'formation', vérifie si la demande est à un sujet précis concerant la formation, auquel cas, regarde pour aussi ajouter des filtres spécifiques aux formations parmi : ['training_info_type', 'domain_name', 'sub_domain_name', 'certification_name', 'academic_level'], si on recherche des informations spécifiques sur une formation, ou une formation précise"""), type='str'),
-                #AttributeInfo(name='name', description="Le nom du document. Par exemple, en conjonction avec le filtre : type = 'formation', il s'agira du nom de la formation. Attention : à n'utiliser que si le nom exact de l'objet recherché a été précédemment fourni par l'assistant (pas par l'utilisateur).", type='str'),
-                #AttributeInfo(name='changed', description="La date du dernier changement de la donnée", type='str'),
                 AttributeInfo(name='training_info_type', description= dedent(f"""\
                     Le type d'informations spécifique concernant une formation.
                     {list_possible_values} : [
@@ -68,7 +66,9 @@ class MetadataDescriptionHelper:
                     {list_possible_values} : [{diplomes_names}].
                     {warning_training_only}
                     {and_operator_not_allowed}"""), type='str'),
-                AttributeInfo(name='url', description="l'URL vers la page web de l'élément recherché. Ne s'applique que pour les types suivants : formation.", type='str'),
+                # AttributeInfo(name='name', description="Le nom du document. Par exemple, en conjonction avec le filtre : type = 'formation', il s'agira du nom de la formation. Attention : à n'utiliser que si le nom exact de l'objet recherché a été précédemment fourni par l'assistant (pas par l'utilisateur).", type='str'),
+                # AttributeInfo(name='changed', description="La date du document", type='str'),
+                # AttributeInfo(name='url', description="l'URL vers la page web de l'élément recherché. Ne s'applique que pour les types suivants : formation.", type='str'),
                 #AttributeInfo(name='rel_ids', description="permet de rechercher les documents connexes à l'id du document fourni en valeur", type='str')
             ]
     

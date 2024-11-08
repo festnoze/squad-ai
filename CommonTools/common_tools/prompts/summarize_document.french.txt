@@ -1,0 +1,25 @@
+#Instructions#
+Effectue les actions suivantes:
+- Analyse completement le contenu du document ci-après, puis écris un résumé synthétique mais complet et structuré, reprenant l'intégralité des informations utiles que contient le document.
+- Met le résumé ainsi créé dans une variable texte nommée : 'doc_summary'.
+
+- Crée toutes les questions unitaires auquel le résumé du document précédent (la valeur de 'doc_summary') permet de répondre. Les questions doivent exhaustivement recouvrir les infos du résumé du document, être toutes être exprimées de façon à être complètes et être unitaires.
+    Exemple 1 : 
+    Pour un résumé du contenu du document étant : 
+    "Formation X ... la durée est de 540 heures (1 an) en continue et 800 heures (18 mois) en alternance".
+    Les questions, afin d'être exhaustives, complètes et atomiques, devraient être : 
+    "Quelle est la durée en heures de la formation X en formation continue ?", "Quelle est la durée en mois/années de la formation X en formation continue ?", 
+    "Quelle est la durée en heures de la formation X en alternance ?", "Quelle est la durée en mois/années de la formation X en alternance ?".
+- Crée ensuite un dictionnaire appelé 'questions' où la clé est un identifiant (int), et où la valeur est le texte d'une question, où tu mettra en valeurs chacune des questions créées, avec en clé un nombre auto-incrémenté commencant par 1.
+
+- Découpe ensuite le résumé du document précédent (la valeur de 'doc_summary'), afin que chacune des parties permettant de répondre une ou plusieurs des questions précédentes. Certaines phrases ou information peuvent être dupliquées dans plusieurs parties si elles sont utiles à la réponse des questions correspondantes.
+- Crée ensuite un dictionnaire appelé 'doc_chunks' où la clé est un identifiant (int), et où la valeur est le texte de l'une des parties du document synthétique découpé (str). Tu y mettra en valeurs chacune des parties du découpage du document résumé, avec en clé un nombre auto-incrémenté commencant par 1.
+
+- Analyse ensuite les liens entre 'questions' et 'doc_chunks', c'est-à-dire entre les questions et les parties de documents y répondant.
+- Crée ensuite dict (int, list[int]) qui prend en clé un identifiant d'un élément de 'doc_chunks' (une partie du document découpé), et en valeur un tableau de tous les identifiants de questions répondus par cette partie de document. 
+
+#Contexte#
+{context}
+
+#Contenu du document#
+{doc_content}
