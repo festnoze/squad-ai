@@ -1,12 +1,17 @@
 import importlib.resources
+import re
 import yaml
 from common_tools.helpers.txt_helper import txt  # Assuming txt.remove_commented_lines is defined here
 
-class Ressource:
-    
+class Ressource:    
     prompts_package_name = 'common_tools.prompts'
     rag_configs_package_name = 'common_tools.rag.configs'
 
+    @staticmethod
+    def load_and_replace_variables(file_name: str, variables_values: dict) -> str:
+        ressource_content = Ressource.get_ressource_file_content(file_name)
+        return Ressource.replace_variables(ressource_content, variables_values)
+    
     @staticmethod
     def get_ressource_file_content(file_name: str, package_name: str = None, remove_comments=True) -> str:
         """The generic method to get the content of a file in prompts package"""
@@ -16,6 +21,19 @@ class Ressource:
             if remove_comments:
                 content = txt.remove_commented_lines(content)
             return content
+        
+    @staticmethod
+    def replace_variables(prompt: str, variables: dict) -> str:
+        pattern = re.compile(r'\{([^}]+)\}')
+        def replacer(match):
+            key = match.group(1)
+            return variables.get(key, '')
+        # Replace each {*} in variables' values first with the variables' values themselves or empty string
+        for variable_key, variable_value in variables.items():
+            variables[variable_key] = pattern.sub(replacer, variable_value)
+        # Replace variables in the prompt
+        return pattern.sub(replacer, prompt)
+
 
     @staticmethod
     def get_language_detection_prompt() -> str:

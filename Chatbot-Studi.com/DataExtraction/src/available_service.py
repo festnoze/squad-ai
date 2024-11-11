@@ -1,3 +1,4 @@
+import json
 import re
 from textwrap import dedent
 from dotenv import find_dotenv, load_dotenv
@@ -21,6 +22,7 @@ from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.rag.rag_service import RagService
 from common_tools.rag.rag_inference_pipeline.rag_pre_treatment_tasks import RAGPreTreatment
 from common_tools.models.question_rewritting import QuestionRewritting, QuestionRewrittingPydantic
+from common_tools.models.doc_summary import DocSummary, DocSummaryPydantic
 from common_tools.rag.rag_injection_pipeline.rag_injection_pipeline import RagInjectionPipeline
 from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
 from common_tools.rag.rag_inference_pipeline.rag_answer_generation_tasks import RAGAugmentedGeneration
@@ -115,20 +117,32 @@ class AvailableService:
         trainings_docs = GenerateDocumentsSummariesAndMetadata().load_and_process_trainings(out_dir)
         
         test_training = trainings_docs[0]
-        summarize_doc_prompt = Ressource.get_ressource_file_content('summarize_document.french.txt')
+        subject = test_training.metadata['type']
+        name = test_training.metadata['name']
+        doc_title = f'{subject} : "{name}".\n'
+        prompt_summarize_doc = Ressource.load_and_replace_variables(
+                    file_name= 'summarize_document.french.txt',
+                    variables_values= {
+                        'doc_title': doc_title, 
+                        'doc_content': test_training.page_content
+                    }
+            )
         
         prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(
-                        summarize_doc_prompt, QuestionRewrittingPydantic, QuestionRewritting)
-        context = f"Il s'agit d'une formation de l'entreprise STUDI.\n"
-        summarize_doc_prompt = summarize_doc_prompt.replace('context', context)
-
-        summarize_doc_prompt = summarize_doc_prompt.replace('content', test_training.page_content)
-        #response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks('Summarize document', [AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2], summarize_doc_prompt)
-        response_1 = Llm.invoke_chain('Summarize document', AvailableService.rag_service.llm_1, summarize_doc_prompt)
-        response_2 = Llm.invoke_chain('Summarize document', AvailableService.rag_service.llm_2, summarize_doc_prompt)
-        
-        answer = Llm.get_content(response_1)
-        txt.print(answer)
+                prompt_summarize_doc, DocSummaryPydantic, DocSummary)
+        response_1 = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(
+                        'Summarize documents by batches', 
+                        [AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2], 
+                        output_parser, 10, *[prompt_for_output_parser])
+        #response_1 = Llm.invoke_chain('Summarize document', AvailableService.rag_service.llm_1, prompt_summarize_doc)
+        doc_summary1 = DocSummary(doc_content= test_training.page_content, **response_1[0])
+        for chunk, questions in doc_summary1.doc_chunks_to_questions:
+            txt.print('### Chunks ###\n' + chunk.text)
+            i = 1
+            for question in questions:
+                txt.print('* Question n°' + str(i) + ': ' + question.text)
+                i += 1
+        txt.print(doc_summary1)
 
         injection_pipeline = RagInjectionPipeline(AvailableService.rag_service)
         #injection_pipeline.build_vectorstore_and_bm25_store(all_docs, chunk_size= 2500, children_chunk_size= 0, delete_existing= True, vector_db_type=AvailableService.vector_db_type)

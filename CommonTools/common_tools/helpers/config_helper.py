@@ -31,20 +31,23 @@ class ConfigHelper:
         if not llms_list_json:
             raise ValueError("LLMS_JSON is not set in the environment")
         try:
-            # Remove surrounding single quotes if present
-            llms_list_json = llms_list_json.strip('\'"')
+            temperature = float(os.getenv('LLMS_TEMPERATURE'))
+        except ValueError:            
+            raise ValueError("LLMS_TEMPERATURE is not set in the environment")
+
+        try:
+            llms_list_json = llms_list_json.strip('\'"') # Remove surrounding single quotes
             llms_list = json.loads(llms_list_json)
             llms = []
             for llm_dict in llms_list:
                 llm_type_str = llm_dict['type']
                 model = llm_dict['model']
                 timeout = llm_dict['timeout']
-                temperature = llm_dict['temperature']
-                # Map the type string to LangChainAdapterType enum
                 llm_type_enum = LangChainAdapterType[llm_type_str]
                 llm_info = LlmInfo(type=llm_type_enum, model=model, timeout=timeout, temperature=temperature)
                 llms.append(llm_info)
             return llms
+        
         except json.JSONDecodeError as e:
             raise ValueError(f"Error parsing LLMS_JSON: {e}")
         except KeyError as e:
