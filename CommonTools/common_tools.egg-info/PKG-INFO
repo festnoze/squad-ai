@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: common_tools
-Version: 0.3.1
+Version: 0.4.0
 Summary: Common tools for AI and generic needs on file, console, json, ...
 Home-page: https://github.com/festnoze/common_tools
 Author: Etienne Millerioux
@@ -12,6 +12,8 @@ Requires-Python: >=3.6
 License-File: LICENSE
 Requires-Dist: python-dotenv
 Requires-Dist: requests
+Requires-Dist: pandas
+Requires-Dist: ace-tools
 Requires-Dist: pydantic
 Requires-Dist: langchain>=0.3.3
 Requires-Dist: langchain-core>=0.3.12
@@ -29,7 +31,7 @@ Requires-Dist: openai>=1.52.0
 Requires-Dist: ollama
 Requires-Dist: groq
 Requires-Dist: pyyaml
-Requires-Dist: ragas>=0.2.1
+Requires-Dist: ragas>=0.2.3
 Requires-Dist: lark
 Requires-Dist: rank-bm25
 Requires-Dist: langchain-qdrant>=0.1.0

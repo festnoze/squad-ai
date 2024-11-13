@@ -1,19 +1,120 @@
-
 import json
 import os
 import re
-from common_tools.helpers.json_helper import JsonHelper
-from langchain.schema import Document
-from typing import List, Dict
 #
+from langchain.schema import Document
 from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.file_helper import file
+from common_tools.helpers.json_helper import JsonHelper
+from common_tools.helpers.llm_helper import Llm
+from common_tools.models.doc_summary import Question, DocChunk, DocSummary, DocSummaryPydantic, DocQuestionsByChunkPydantic
+from common_tools.helpers.ressource_helper import Ressource
 
 class GenerateDocumentsSummariesAndMetadata:
     def __init__(self):
         pass
-       
-    def load_all_docs_summaries_as_json(self, path: str) -> List[Document]:
+
+    def create_summary_and_questions_from_docs_single_step(self, llm_and_fallback:list, trainings_docs:list[Document]):
+        test_training = trainings_docs[0]
+        subject = test_training.metadata['type']
+        name = test_training.metadata['name']
+        doc_title = f'{subject} : "{name}".'
+        prompt_summarize_doc = Ressource.load_and_replace_variables(
+                    file_name= 'document_summarize_create_chunks_and_corresponding_questions.french.txt',
+                    variables_values= {
+                        'doc_title': doc_title, 
+                        'doc_content': test_training.page_content
+                    }
+            )
+        prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(
+                prompt_summarize_doc, DocSummaryPydantic, DocSummary)
+        response_1 = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(
+                        'Summarize documents by batches', 
+                        llm_and_fallback, 
+                        output_parser, 10, *[prompt_for_output_parser])
+        doc_summary1 = DocSummary(doc_content= test_training.page_content, **response_1[0])
+        doc_summary1.display_to_terminal()
+
+    def create_summary_and_questions_from_docs_in_two_steps(self, llm_and_fallback:list, trainings_docs):
+        test_training = trainings_docs[0]
+        subject = test_training.metadata['type']
+        name = test_training.metadata['name']
+        doc_title = f'{subject} : "{name}".'
+        doc_content = test_training.page_content
+        variables_values= {
+                        'doc_title': doc_title, 
+                        'doc_content': doc_content
+                    }
+        
+        # Step 1: Summarize document
+        prompt_summarize_doc = Ressource.load_and_replace_variables(
+                    file_name= 'document_summarize.french.txt',
+                    variables_values= variables_values)
+                
+        resp = Llm.invoke_chain_with_input('Summarize document', llm_and_fallback[0], prompt_summarize_doc)
+        doc_summary = Llm.get_content(resp)
+        txt.print(doc_summary[:500])
+
+        # Step 2: Split document in chunks with associated questions
+        prompt_doc_chunks_and_questions = Ressource.load_and_replace_variables(
+                        file_name= 'document_create_chunks_and_corresponding_questions.french.txt',
+                        variables_values= variables_values)
+        
+        prompt_doc_chunks_and_questions_for_output_parser, chunks_and_questions_output_parser = Llm.get_prompt_and_json_output_parser(
+                prompt_doc_chunks_and_questions, DocQuestionsByChunkPydantic, DocSummary)
+        
+        doc_chunks_and_questions_response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(
+                        'Chunks & questions from documents by batches', 
+                        llm_and_fallback, 
+                        chunks_and_questions_output_parser, 
+                        10,
+                        *[prompt_doc_chunks_and_questions_for_output_parser])
+        
+        doc_chunks = doc_chunks_and_questions_response[0]['doc_chunks']        
+        doc_summary1 = DocSummary(doc_content= doc_content, doc_summary=doc_summary, doc_chunks=doc_chunks)
+        doc_summary1.display_to_terminal()
+
+    def create_summary_and_questions_from_docs_in_three_steps(self, llm_and_fallback:list, trainings_docs):
+        test_training = trainings_docs[0]
+        subject = test_training.metadata['type']
+        name = test_training.metadata['name']
+        doc_title = f'{subject} : "{name}".'
+        doc_content = test_training.page_content
+        variables_values= {
+                        'doc_title': doc_title, 
+                        'doc_content': doc_content
+                    }
+        
+        # Step 1: Summarize document
+        prompt_summarize_doc = Ressource.load_and_replace_variables('document_summarize.french.txt', variables_values)       
+        resp = Llm.invoke_chain_with_input('Summarize document', llm_and_fallback[0], prompt_summarize_doc)
+        doc_summary = Llm.get_content(resp)
+
+        # Step 2: Split document in chunks
+        prompt_doc_chunks = Ressource.load_and_replace_variables('document_extract_chunks.french.txt', variables_values)
+        resp = Llm.invoke_chain_with_input('Chunks from document', llm_and_fallback[0], prompt_doc_chunks)
+        doc_chunks = Llm.extract_json_from_llm_response(resp)
+        chunks_texts = [chunk['chunk_content'] for chunk in doc_chunks]
+
+        # Step 3: Create questions for each chunk
+        prompts_chunks_questions = []
+        prompt_create_questions_for_chunk = Ressource.get_ressource_file_content('document_create_questions_for_a_chunk.french.txt')
+        for doc_chunk in chunks_texts:
+            variables = {'doc_title': doc_title, 'doc_content': doc_chunk}
+            prompt_chunk_questions = Ressource.replace_variables(prompt_create_questions_for_chunk, variables)
+            prompts_chunks_questions.append(prompt_chunk_questions)
+
+        doc_chunks_questions_response = Llm.invoke_parallel_prompts_with_fallback('Generate chunk questions', llm_and_fallback, *prompts_chunks_questions)
+
+        # Build the doc_chunks list with their questions   
+        doc_chunks = []
+        for i, chunk_text in enumerate(chunks_texts):
+            chunk_questions = Llm.extract_json_from_llm_response(doc_chunks_questions_response[i])
+            doc_chunks.append(DocChunk(chunk_text, [Question(chunk_question['question']) for chunk_question in chunk_questions]))   
+        doc_summary1 = DocSummary(doc_content= doc_content, doc_summary=doc_summary, doc_chunks=doc_chunks)
+        doc_summary1.display_to_terminal()
+
+    def load_all_docs_summaries_as_json(self, path: str) -> list[Document]:
         all_docs = []
         txt.print_with_spinner(f"Build all Langchain documents summaries ...")
 
@@ -29,14 +130,14 @@ class GenerateDocumentsSummariesAndMetadata:
         # jobs_docs, all_jobs_names = self.process_jobs(jobs_data, domains_data)
         # all_docs.extend(jobs_docs)
 
-    def load_and_process_trainings(self, path: str) -> List[Document]:
+    def load_and_process_trainings(self, path: str) -> list[Document]:
         all_docs = []
         # Load all needed infos from files
         domains_data = JsonHelper.load_from_json(os.path.join(path, 'domains.json'))
         sub_domains_data = JsonHelper.load_from_json(os.path.join(path, 'subdomains.json'))
         trainings_data = JsonHelper.load_from_json(os.path.join(path, 'trainings.json'))
         trainings_details = self.load_trainings_details_as_json(path)
-        
+
         trainings_docs, all_trainings_names = self.process_trainings(trainings_data, trainings_details, all_docs, domains_data, sub_domains_data)
         all_docs.extend(trainings_docs)
 
@@ -61,7 +162,7 @@ class GenerateDocumentsSummariesAndMetadata:
         #     txt.print(f"---------------------")
 
 
-    def process_certifiers(self, data: List[Dict]) -> List[Document]:
+    def process_certifiers(self, data: list[dict]) -> list[Document]:
         if not data:
             return []
         all_certifiers_names = set()
@@ -79,7 +180,7 @@ class GenerateDocumentsSummariesAndMetadata:
             docs.append(doc)
         return docs, list(all_certifiers_names)
     
-    def process_certifications(self, data: List[Dict]) -> List[Document]:
+    def process_certifications(self, data: list[dict]) -> list[Document]:
         if not data:
             return []
         all_certifications_names = set()
@@ -97,7 +198,7 @@ class GenerateDocumentsSummariesAndMetadata:
             docs.append(doc)
         return docs, list(all_certifications_names)
 
-    def process_diplomas(self, data: List[Dict]) -> List[Document]:
+    def process_diplomas(self, data: list[dict]) -> list[Document]:
         if not data:
             return []
         docs = []
@@ -118,7 +219,7 @@ class GenerateDocumentsSummariesAndMetadata:
             docs.append(doc)
         return docs, list(all_diplomas_names)
 
-    def process_domains(self, data: List[Dict]) -> List[Document]:
+    def process_domains(self, data: list[dict]) -> list[Document]:
         if not data:
             return []
         docs = []
@@ -136,7 +237,7 @@ class GenerateDocumentsSummariesAndMetadata:
             docs.append(doc)
         return docs, list(all_domains_names)
     
-    def process_sub_domains(self, data: List[Dict]) -> List[Document]:
+    def process_sub_domains(self, data: list[dict]) -> list[Document]:
         if not data:
             return []
         docs = []
@@ -156,7 +257,7 @@ class GenerateDocumentsSummariesAndMetadata:
             docs.append(doc)
         return docs, list(all_subdomains_names)
 
-    def process_fundings(self, data: List[Dict]) -> List[Document]:
+    def process_fundings(self, data: list[dict]) -> list[Document]:
         if not data:
             return []
         docs = []
@@ -175,7 +276,7 @@ class GenerateDocumentsSummariesAndMetadata:
             docs.append(doc)
         return docs, list(all_fundings_names)
 
-    def process_jobs(self, data: List[Dict], domains) -> List[Document]:
+    def process_jobs(self, data: list[dict], domains) -> list[Document]:
         if not data:
             return []
         docs = []
@@ -203,7 +304,7 @@ class GenerateDocumentsSummariesAndMetadata:
         #docs.append(Document(page_content= 'Liste complète de tous les métiers couvert par Studi :\n' + ', '.join(all_jobs_names), metadata={"type": "liste_métiers",}))
         return docs, list(all_jobs_names)
 
-    def process_trainings(self, trainings_data: List[Dict], trainings_details: dict, existing_docs:list = [], domains_data = None, sub_domains_data = None) -> List[Document]:
+    def process_trainings(self, trainings_data: list[dict], trainings_details: dict, existing_docs:list = [], domains_data = None, sub_domains_data = None) -> list[Document]:
         if not trainings_data:
             return []
         docs = []
@@ -287,7 +388,9 @@ class GenerateDocumentsSummariesAndMetadata:
 
         #docs.append(Document(page_content= 'Liste complète de toutes les formations proposées par Studi :\n' + ', '.join(all_trainings_titles), metadata={"type": "liste_formations",}))
         return docs, list(all_trainings_titles)
-    section_to_french:dict = None
+    
+    
+    section_to_french:dict = None # Singleton containing the static mapping of section names to their french equivalent.
     def get_french_section(self, section_name: str) -> str:
         if not GenerateDocumentsSummariesAndMetadata.section_to_french:
             GenerateDocumentsSummariesAndMetadata.section_to_french = {
@@ -353,7 +456,6 @@ class GenerateDocumentsSummariesAndMetadata:
     
     def get_all_ids_as_str(self, related_ids):
         all_ids = []
-
         # Iterate over all keys and values in related_ids
         for key, value in related_ids.items():
             if isinstance(value, list):

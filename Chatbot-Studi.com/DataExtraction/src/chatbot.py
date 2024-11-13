@@ -17,7 +17,7 @@ class ChatbotFront:
             page_title= "Chatbot site public Studi.com",
             page_icon= "🔎",
             layout= "centered",
-            initial_sidebar_state= "expanded" # "collapsed" #
+            initial_sidebar_state= "collapsed" # "expanded" # 
         )
 
         custom_css = """
@@ -70,7 +70,8 @@ class ChatbotFront:
 
         for msg in st.session_state.messages:
             st.chat_message(msg['role']).write(msg['content'])
-        #st.markdown('</div>', unsafe_allow_html=True)
+        
+        ChatbotFront.build_summary_vectorstore() #TODO: TMP, to remove when summarization is done and working
         
         if user_query := st.chat_input(placeholder= 'Ecrivez votre question ici ...'):
             st.chat_message('user').write_stream(ChatbotFront._write_stream(user_query))

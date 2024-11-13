@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 # pip install -e . --upgrade
 setup(
     name='common_tools',
-    version='0.3.1',
+    version='0.4.0',
     description='Common tools for AI and generic needs on file, console, json, ...',
     author='Etienne Millerioux',
     author_email='eemillerioux@gmail.com',  # Replace with your email
@@ -14,6 +14,7 @@ setup(
     install_requires=[
         'python-dotenv',
         'requests',
+        'pandas',
         'pydantic',
         'langchain>=0.3.3',
         'langchain-core>=0.3.12',
@@ -25,19 +26,19 @@ setup(
         'langchain-chroma>=0.1.4',
         'langchain-ollama>=0.1.0',
         'langchain-anthropic>=0.2.4',
+        'langchain-qdrant>=0.1.0',
+        'qdrant-client',
         'langgraph>=0.2.38',
         'langsmith>=0.1.136',
+        'ragas>=0.2.5',
         'openai>=1.52.0',
         'ollama',
         'groq',
         'pyyaml',
-        'ragas>=0.2.1',
         'lark',  # needed for langchain self-querying retriever
         # 'prefect',  # Uncomment if needed prefect
         # 'sentence-transformers>=3.2.0',  # Uncomment if add as new LLM models' provider
         'rank-bm25',
-        'langchain-qdrant>=0.1.0',
-        'qdrant-client',
     ],
     classifiers=[
         'Programming Language :: Python :: 3',

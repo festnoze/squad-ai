@@ -1,3 +1,4 @@
+import json
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
 from langchain_core.output_parsers import StrOutputParser, ListOutputParser, MarkdownListOutputParser, JsonOutputParser, BaseTransformOutputParser
@@ -39,55 +40,31 @@ class Llm:
     @staticmethod
     def embed_into_code_block(code_block_type: str, text: str) -> str:
         return  f"```{code_block_type} \n{text}\n```\n"
-        
-    @staticmethod
-    def extract_json_from_llm_response(response: any) -> str:
-        content = Llm.get_content(response)
-        content = Llm.get_code_block("json", content)
-        start_index = -1 
-        first_index_open_curly_brace = content.find('{')
-        first_index_open_square_brace = content.find('[')
-        last_index_close_curly_brace = content.rfind('}')
-        last_index_close_square_brace = content.rfind(']')
-        
-        if first_index_open_curly_brace != -1:
-            start_index = first_index_open_curly_brace
-        if first_index_open_square_brace != -1 and (start_index == -1 or first_index_open_square_brace < start_index):
-            start_index = first_index_open_square_brace
-
-        if last_index_close_curly_brace != -1:
-            end_index = last_index_close_curly_brace + 1
-        if last_index_close_square_brace != -1 and (end_index == -1 or last_index_close_square_brace > end_index):
-            end_index = last_index_close_square_brace + 1
-
-        if start_index == -1 or end_index == -1:
-            raise Exception("No JSON content found in response")
-        
-        return content[start_index:end_index]
-    
-    TPydanticModel = TypeVar('TPydanticModel', bound=BaseModel)    
-    TOutputModel = TypeVar('TOutputModel')
-    output_parser_instructions_name: str = 'output_parser_instructions'
 
     @staticmethod
-    def get_prompt_and_json_output_parser(prompt_str: str, json_type: TPydanticModel, output_type: TOutputModel):
-        assert issubclass(json_type, BaseModel), "provided pydantic type must inherit from BaseModel"
-        assert inspect.isclass(output_type), "output_type must be a class"
-        prompt = ChatPromptTemplate.from_messages(
-            [
-                ("system", "Process the following input, then create a JSON object respecting those formating instructions: {" + Llm.output_parser_instructions_name + "}"),
-                ("human", prompt_str),
-            ]
-        )    
-        parser = JsonOutputParser(pydantic_object=json_type)
-        return prompt, parser
-
-    @staticmethod
-    def invoke_parallel_prompts(action_name: str, llms: Union[Runnable, list[Runnable]], *prompts: Union[str, ChatPromptTemplate]) -> list[str]:
-        return Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(action_name, llms, None, None, *prompts)
+    def invoke_prompt_with_fallback(action_name: str, llms_with_fallbacks: Union[Runnable, list[Runnable]], prompt: Union[str, ChatPromptTemplate]) -> list[str]:
+        """Invoke single LLM w/o output parser, nor batching, nor parallel multiple prompts (fallbacks possible)"""
+        answers = Llm.invoke_parallel_prompts_with_fallback(action_name, llms_with_fallbacks, *[prompt])
+        return answers[0]
     
     @staticmethod
-    def invoke_parallel_prompts_with_parser_batchs_fallbacks(action_name, llms_with_fallbacks: Union[Runnable, list[Runnable]], output_parser: BaseTransformOutputParser, batch_size: int = None, *prompts: Union[str, ChatPromptTemplate]) -> list[str]:
+    def invoke_chain_with_input(action_name: str = "", chain: Chain = None, input: dict = None) -> list[str]:       
+        if not input: input = {"input": ""}
+        chain_w_config = chain.with_config({"run_name": f"{action_name}"})
+        return chain_w_config.invoke(input)     
+     
+    @staticmethod
+    def invoke_prompt_with_output_parser_and_fallbacks(action_name: str, llms_with_fallbacks: Union[Runnable, list[Runnable]], prompt: Union[str, ChatPromptTemplate], output_parser: BaseTransformOutputParser = None, batch_size:int = None) -> list[str]:
+        """Invoke a single LLM prompt (fallbacks, output parser, batching possible in option, no parallel multiple prompts)"""
+        return Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(action_name, llms_with_fallbacks, output_parser, batch_size, *[prompt])
+    
+    @staticmethod
+    def invoke_parallel_prompts_with_fallback(action_name: str, llms_with_fallbacks: Union[Runnable, list[Runnable]], *prompts: Union[str, ChatPromptTemplate]) -> list[str]:
+        """Invoke LLM in parallel, w/o output parser, nor batching (fallbacks possible)"""
+        return Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(action_name, llms_with_fallbacks, None, None, *prompts)
+   
+    @staticmethod
+    def invoke_parallel_prompts_with_parser_batchs_fallbacks(action_name: str, llms_with_fallbacks: Union[Runnable, list[Runnable]], output_parser: BaseTransformOutputParser, batch_size: int = None, *prompts: Union[str, ChatPromptTemplate]) -> list[str]:
         if len(prompts) == 0:
             return []        
         if not isinstance(llms_with_fallbacks, list):
@@ -116,13 +93,7 @@ class Llm:
         
         answers = Llm._invoke_parallel_chains(action_name, inputs, batch_size, *chains)
         return answers
-    
-    @staticmethod
-    def prompt_as_chat_prompt_template(prompt: str) -> ChatPromptTemplate:
-        if isinstance(prompt, ChatPromptTemplate):
-            return prompt
-        return ChatPromptTemplate.from_messages([HumanMessage(prompt)])
-    
+        
     @staticmethod
     def _invoke_parallel_chains(action_name: str = "", inputs: dict = None, batch_size: int = None, *chains: Chain) -> list[str]:
         if len(chains) == 0:
@@ -138,8 +109,6 @@ class Llm:
 
         answers = []
         for chains_batch in chains_batches:
-            # combined = RunnableParallel(**{f"invoke_{i}": chain for i, chain in enumerate(chains_batch)}).with_config({"run_name": action_name})
-            # responses = combined.invoke(inputs)
             combined = RunnableParallel(**{f"invoke_{i}": chain for i, chain in enumerate(chains_batch)})
             parallel_chains = combined.with_config({"run_name": f"{action_name}{f"- batch x{str(batch_size)}" if (batch_size and len(chains_batches)>1) else ""}"})
             responses = parallel_chains.invoke(inputs) 
@@ -147,15 +116,8 @@ class Llm:
             responses_list = [responses[key] for key in responses.keys()]
             batch_answers = [Llm.get_content(response) for response in responses_list]
             answers.extend(batch_answers)
-
-        return answers
+        return answers    
     
-    @staticmethod
-    def invoke_chain(action_name: str = "", chain: Chain = None, input: dict = None) -> list[str]:       
-        if not input: input = {"input": ""}
-        chain_w_config = chain.with_config({"run_name": f"{action_name}"})
-        return chain_w_config.invoke(input) 
-
     @staticmethod
     def invoke_llm_with_tools(llm_or_chain: Runnable, tools: list[any], input: str) -> str:
         #prompt = hub.pull("hwchase17/openai-tools-agent")
@@ -187,7 +149,6 @@ class Llm:
         res = agent_executor.invoke({"input": input})
         return res["output"]
     
-
     new_line_for_stream_over_http = "\\/%*/\\" # use specific new line conversion over streaming, as new line is handled differently across platforms
     @staticmethod
     async def invoke_as_async_stream(action_name:str, llm_or_chain: Runnable, input, display_console: bool = False, content_chunks:list[str] = None, does_stream_across_http: bool = False):
@@ -218,9 +179,57 @@ class Llm:
                 yield content.encode('utf-8')
             else:
                 pass
+
+    @staticmethod
+    def prompt_as_chat_prompt_template(prompt: Union[str, ChatPromptTemplate]) -> ChatPromptTemplate:
+        if isinstance(prompt, ChatPromptTemplate):
+            return prompt
+        return ChatPromptTemplate.from_messages([HumanMessage(prompt)])
     
+    @staticmethod
+    def extract_json_from_llm_response(response: any) -> str:
+        content = Llm.get_content(response)
+        content = Llm.get_code_block("json", content)
+        start_index = -1 
+        first_index_open_curly_brace = content.find('{')
+        first_index_open_square_brace = content.find('[')
+        last_index_close_curly_brace = content.rfind('}')
+        last_index_close_square_brace = content.rfind(']')
         
-    def invoke_method_mesuring_openai_tokens_consumption(method_handler, *args, **kwargs):
+        if first_index_open_curly_brace != -1:
+            start_index = first_index_open_curly_brace
+        if first_index_open_square_brace != -1 and (start_index == -1 or first_index_open_square_brace < start_index):
+            start_index = first_index_open_square_brace
+
+        if last_index_close_curly_brace != -1:
+            end_index = last_index_close_curly_brace + 1
+        if last_index_close_square_brace != -1 and (end_index == -1 or last_index_close_square_brace > end_index):
+            end_index = last_index_close_square_brace + 1
+
+        if start_index == -1 or end_index == -1:
+            raise Exception("No JSON content found in response")
+        
+        content = content[start_index:end_index]
+        return json.loads(content)
+    
+    TPydanticModel = TypeVar('TPydanticModel', bound=BaseModel)    
+    TOutputModel = TypeVar('TOutputModel')
+    output_parser_instructions_name: str = 'output_parser_instructions'
+
+    @staticmethod
+    def get_prompt_and_json_output_parser(prompt_str: str, json_type: TPydanticModel, output_type: TOutputModel):
+        assert issubclass(json_type, BaseModel), "provided pydantic type must inherit from BaseModel"
+        assert inspect.isclass(output_type), "output_type must be a class"
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", "Process the following input, then create a JSON object respecting those formating instructions: {" + Llm.output_parser_instructions_name + "}"),
+                ("human", prompt_str),
+            ]
+        )    
+        parser = JsonOutputParser(pydantic_object=json_type)
+        return prompt, parser
+        
+    def call_method_mesuring_openai_tokens_consumption(method_handler, *args, **kwargs):
         """
         Invokes the provided method handler within an OpenAI callback context 
         and displays the token consumption.

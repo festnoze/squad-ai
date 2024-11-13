@@ -99,7 +99,7 @@ class RAGPreTreatment:
     def query_rewritting(rag:RagService, analysed_query:QuestionRewritting) -> str:        
         query_rewritting_prompt = RAGPreTreatment._replace_all_categories_in_prompt(analysed_query.question_with_context)
 
-        response = Llm.invoke_chain('Query rewritting', rag.llm_2, query_rewritting_prompt)
+        response = Llm.invoke_chain_with_input('Query rewritting', rag.llm_2, query_rewritting_prompt)
 
         content =  json.loads(Llm.extract_json_from_llm_response(Llm.get_content(response)))
         analysed_query.modified_question = content['modified_question']
@@ -167,7 +167,7 @@ class RAGPreTreatment:
         
         self_querying_retriever, query_constructor = rag.build_self_querying_retriever_langchain(rag.llm_2, RAGPreTreatment.metadata_infos)
         
-        response_with_filters = Llm.invoke_chain('Analyse metadata', query_constructor, query)
+        response_with_filters = Llm.invoke_chain_with_input('Analyse metadata', query_constructor, query)
         
         metadata_filters = RagFilteringMetadataHelper.get_filters_from_comparison(response_with_filters.filter, RAGPreTreatment.metadata_infos)
         return response_with_filters.query, metadata_filters

@@ -26,23 +26,13 @@ import openai
 
 from langchain.smith import RunEvalConfig
 from ragas.testset.synthesizers.generate import TestsetGenerator
-from ragas.testset.synthesizers.abstract_query import AbstractQuerySynthesizer, ComparativeAbstractQuerySynthesizer
-from ragas.testset.synthesizers.specific_query import SpecificQuerySynthesizer
 from ragas.llms.base import LangchainLLMWrapper
 from ragas.embeddings.base import LangchainEmbeddingsWrapper
 from ragas.testset import Testset
 from ragas.testset.transforms import EmbeddingExtractor, KeyphrasesExtractor, TitleExtractor
 from ragas.integrations.langchain import EvaluatorChain
-from ragas.metrics import (
-    answer_correctness,
-    answer_relevancy,
-    context_precision,
-    context_recall,
-    faithfulness,
-    # context_entity_recall,
-    # answer_similarity,
-    #ALL_METRICS
-)
+from ragas.metrics import LLMContextRecall, Faithfulness, FactualCorrectness, SemanticSimilarity
+from ragas import evaluate
 
 class RagasService:    
     @staticmethod
@@ -85,9 +75,10 @@ class RagasService:
         evaluator_embedding = rag_service.embedding #LangchainEmbeddingsWrapper(rag_service.embedding)
 
         metrics= [
-            (AbstractQuerySynthesizer(llm=evaluator_llm), 0.5),
-            (ComparativeAbstractQuerySynthesizer(llm=evaluator_llm), 0.25),
-            (SpecificQuerySynthesizer(llm=evaluator_llm), 0.25),
+            (LLMContextRecall(llm=evaluator_llm), 0.25),
+            (SemanticSimilarity(embeddings=evaluator_embedding), 0.25),
+            (Faithfulness(llm=evaluator_llm), 0.25),
+            (FactualCorrectness(llm=evaluator_llm), 0.25),
         ]
         results = evaluate(dataset=ragas_data[:10], metrics=metrics)
         df = results.to_pandas()

@@ -1,6 +1,7 @@
 import json
 import re
 from textwrap import dedent
+import time
 from dotenv import find_dotenv, load_dotenv
 import asyncio
 #
@@ -22,7 +23,6 @@ from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.rag.rag_service import RagService
 from common_tools.rag.rag_inference_pipeline.rag_pre_treatment_tasks import RAGPreTreatment
 from common_tools.models.question_rewritting import QuestionRewritting, QuestionRewrittingPydantic
-from common_tools.models.doc_summary import DocSummary, DocSummaryPydantic
 from common_tools.rag.rag_injection_pipeline.rag_injection_pipeline import RagInjectionPipeline
 from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
 from common_tools.rag.rag_inference_pipeline.rag_answer_generation_tasks import RAGAugmentedGeneration
@@ -114,40 +114,28 @@ class AvailableService:
         AvailableService.re_init() # reload rag_service with the new vectorstore and langchain documents
 
     def create_summary_vector_db_from_generated_embeded_documents(out_dir):
-        trainings_docs = GenerateDocumentsSummariesAndMetadata().load_and_process_trainings(out_dir)
-        
-        test_training = trainings_docs[0]
-        subject = test_training.metadata['type']
-        name = test_training.metadata['name']
-        doc_title = f'{subject} : "{name}".\n'
-        prompt_summarize_doc = Ressource.load_and_replace_variables(
-                    file_name= 'summarize_document.french.txt',
-                    variables_values= {
-                        'doc_title': doc_title, 
-                        'doc_content': test_training.page_content
-                    }
-            )
-        
-        prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(
-                prompt_summarize_doc, DocSummaryPydantic, DocSummary)
-        response_1 = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(
-                        'Summarize documents by batches', 
-                        [AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2], 
-                        output_parser, 10, *[prompt_for_output_parser])
-        #response_1 = Llm.invoke_chain('Summarize document', AvailableService.rag_service.llm_1, prompt_summarize_doc)
-        doc_summary1 = DocSummary(doc_content= test_training.page_content, **response_1[0])
-        for chunk, questions in doc_summary1.doc_chunks_to_questions:
-            txt.print('### Chunks ###\n' + chunk.text)
-            i = 1
-            for question in questions:
-                txt.print('* Question n°' + str(i) + ': ' + question.text)
-                i += 1
-        txt.print(doc_summary1)
+        summary_builder = GenerateDocumentsSummariesAndMetadata()
+        trainings_docs = summary_builder.load_and_process_trainings(out_dir)
+
+        txt.print("-"*70)
+        start = time.time()
+        summary_builder.create_summary_and_questions_from_docs_single_step([AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2], trainings_docs)
+        txt.print(f"Single step summary generation took {txt.get_elapsed_str(time.time() - start)}")
+        txt.print("-"*70)
+
+        start = time.time()
+        summary_builder.create_summary_and_questions_from_docs_in_two_steps([AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2], trainings_docs)
+        txt.print(f"Two steps summary generation took {txt.get_elapsed_str(time.time() - start)}")
+        txt.print("-"*70)
+
+        start = time.time()
+        summary_builder.create_summary_and_questions_from_docs_in_three_steps([AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2], trainings_docs)
+        txt.print(f"Three steps summary generation took {txt.get_elapsed_str(time.time() - start)}")
+        txt.print("-"*70)
 
         injection_pipeline = RagInjectionPipeline(AvailableService.rag_service)
         #injection_pipeline.build_vectorstore_and_bm25_store(all_docs, chunk_size= 2500, children_chunk_size= 0, delete_existing= True, vector_db_type=AvailableService.vector_db_type)
         AvailableService.re_init() # reload rag_service with the new vectorstore and langchain documents
-        
 
     def docs_retrieval_query():
         while True:
@@ -254,7 +242,7 @@ class AvailableService:
         summarize_rag_answer_prompt = Ressource.get_ressource_file_content('summarize_rag_answer_prompt.french.txt')
         promptlate = ChatPromptTemplate.from_template(summarize_rag_answer_prompt)
         chain = promptlate | AvailableService.rag_service.llm_1 | RunnablePassthrough()
-        result = Llm.invoke_chain('Answer summarization', chain, text)
+        result = Llm.invoke_chain_with_input('Answer summarization', chain, text)
         return Llm.get_content(result)
 
     def generate_ground_truth():
