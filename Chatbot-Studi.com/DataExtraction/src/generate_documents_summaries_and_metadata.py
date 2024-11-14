@@ -14,12 +14,12 @@ class GenerateDocumentsSummariesAndMetadata:
     def __init__(self):
         pass
 
-    def create_summary_and_questions_from_docs_single_step(self, llm_and_fallback:list, trainings_docs:list[Document]):
+    async def create_summary_and_questions_from_docs_single_step_async(self, llm_and_fallback:list, trainings_docs:list[Document]):
         test_training = trainings_docs[0]
         subject = test_training.metadata['type']
         name = test_training.metadata['name']
         doc_title = f'{subject} : "{name}".'
-        prompt_summarize_doc = Ressource.load_and_replace_variables(
+        prompt_summarize_doc = Ressource.load_with_replaced_variables(
                     file_name= 'document_summarize_create_chunks_and_corresponding_questions.french.txt',
                     variables_values= {
                         'doc_title': doc_title, 
@@ -28,14 +28,15 @@ class GenerateDocumentsSummariesAndMetadata:
             )
         prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(
                 prompt_summarize_doc, DocSummaryPydantic, DocSummary)
-        response_1 = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(
+        
+        response_1 = await Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks_async(
                         'Summarize documents by batches', 
                         llm_and_fallback, 
                         output_parser, 10, *[prompt_for_output_parser])
         doc_summary1 = DocSummary(doc_content= test_training.page_content, **response_1[0])
-        doc_summary1.display_to_terminal()
+        return doc_summary1
 
-    def create_summary_and_questions_from_docs_in_two_steps(self, llm_and_fallback:list, trainings_docs):
+    async def create_summary_and_questions_from_docs_in_two_steps_async(self, llm_and_fallback:list, trainings_docs):
         test_training = trainings_docs[0]
         subject = test_training.metadata['type']
         name = test_training.metadata['name']
@@ -47,23 +48,23 @@ class GenerateDocumentsSummariesAndMetadata:
                     }
         
         # Step 1: Summarize document
-        prompt_summarize_doc = Ressource.load_and_replace_variables(
+        prompt_summarize_doc = Ressource.load_with_replaced_variables(
                     file_name= 'document_summarize.french.txt',
                     variables_values= variables_values)
                 
-        resp = Llm.invoke_chain_with_input('Summarize document', llm_and_fallback[0], prompt_summarize_doc)
+        resp = await Llm.invoke_chain_with_input_async('Summarize document', llm_and_fallback[0], prompt_summarize_doc)
         doc_summary = Llm.get_content(resp)
         txt.print(doc_summary[:500])
 
         # Step 2: Split document in chunks with associated questions
-        prompt_doc_chunks_and_questions = Ressource.load_and_replace_variables(
+        prompt_doc_chunks_and_questions = Ressource.load_with_replaced_variables(
                         file_name= 'document_create_chunks_and_corresponding_questions.french.txt',
                         variables_values= variables_values)
         
         prompt_doc_chunks_and_questions_for_output_parser, chunks_and_questions_output_parser = Llm.get_prompt_and_json_output_parser(
                 prompt_doc_chunks_and_questions, DocQuestionsByChunkPydantic, DocSummary)
         
-        doc_chunks_and_questions_response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(
+        doc_chunks_and_questions_response = await Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks_async(
                         'Chunks & questions from documents by batches', 
                         llm_and_fallback, 
                         chunks_and_questions_output_parser, 
@@ -72,48 +73,61 @@ class GenerateDocumentsSummariesAndMetadata:
         
         doc_chunks = doc_chunks_and_questions_response[0]['doc_chunks']        
         doc_summary1 = DocSummary(doc_content= doc_content, doc_summary=doc_summary, doc_chunks=doc_chunks)
-        doc_summary1.display_to_terminal()
+        return doc_summary1
 
-    def create_summary_and_questions_from_docs_in_three_steps(self, llm_and_fallback:list, trainings_docs):
-        test_training = trainings_docs[0]
-        subject = test_training.metadata['type']
-        name = test_training.metadata['name']
-        doc_title = f'{subject} : "{name}".'
-        doc_content = test_training.page_content
-        variables_values= {
-                        'doc_title': doc_title, 
-                        'doc_content': doc_content
-                    }
-        
+    async def create_summary_and_questions_from_docs_in_three_steps_async(self, llm_and_fallback:list, trainings_docs):      
         # Step 1: Summarize document
-        prompt_summarize_doc = Ressource.load_and_replace_variables('document_summarize.french.txt', variables_values)       
-        resp = Llm.invoke_chain_with_input('Summarize document', llm_and_fallback[0], prompt_summarize_doc)
-        doc_summary = Llm.get_content(resp)
+        prompts_summarize_doc = []
+        for training_doc in trainings_docs:
+            doc_title = f'{training_doc.metadata['type']} : "{training_doc.metadata['name']}".'
+            doc_content = training_doc.page_content            
+            prompt_summarize_doc = Ressource.load_with_replaced_variables(
+                                    file_name= 'document_summarize.french.txt',
+                                    variables_values= {'doc_title': doc_title, 'doc_content': doc_content})       
+            prompts_summarize_doc.append(prompt_summarize_doc)
 
-        # Step 2: Split document in chunks
-        prompt_doc_chunks = Ressource.load_and_replace_variables('document_extract_chunks.french.txt', variables_values)
-        resp = Llm.invoke_chain_with_input('Chunks from document', llm_and_fallback[0], prompt_doc_chunks)
-        doc_chunks = Llm.extract_json_from_llm_response(resp)
-        chunks_texts = [chunk['chunk_content'] for chunk in doc_chunks]
+        summarized_docs_response = await Llm.invoke_parallel_prompts_async(f'Summarize {len(trainings_docs)} documents', llm_and_fallback, *prompts_summarize_doc)
+        
+        docs_summaries = [Llm.get_content(summarized_doc) for summarized_doc in summarized_docs_response]
+        for i in range(len(trainings_docs)):
+            txt.print(f"Summary length vs. original for doc n°{i+1}: {len(docs_summaries[i])}/{len(trainings_docs[i].page_content)} chars. ({len(docs_summaries[i])/len(trainings_docs[i].page_content)*100:.0f}%)")
+        
+        # Step 2: Split document's summary in chunks
+        prompts_docs_chunks = []
+        for i in range(len(trainings_docs)):
+            prompt_doc_chunks = Ressource.load_with_replaced_variables(
+                                    file_name= 'document_extract_chunks.french.txt', 
+                                    variables_values= {'doc_title': trainings_docs[i].metadata['name'], 'doc_content': docs_summaries[i]})
+            prompts_docs_chunks.append(prompt_doc_chunks)
 
-        # Step 3: Create questions for each chunk
+        chunking_docs_response = await Llm.invoke_parallel_prompts_async(f'Chunking {len(trainings_docs)} documents', llm_and_fallback, prompt_doc_chunks)
+        
+        docs_chunks_json = [Llm.extract_json_from_llm_response(chunking_doc) for chunking_doc in chunking_docs_response]
+        chunks_by_docs = [[chunk['chunk_content'] for chunk in doc_chunks] for doc_chunks in docs_chunks_json] 
+
+        # Step 3: Create questions for each chunk of each document
         prompts_chunks_questions = []
-        prompt_create_questions_for_chunk = Ressource.get_ressource_file_content('document_create_questions_for_a_chunk.french.txt')
-        for doc_chunk in chunks_texts:
-            variables = {'doc_title': doc_title, 'doc_content': doc_chunk}
-            prompt_chunk_questions = Ressource.replace_variables(prompt_create_questions_for_chunk, variables)
-            prompts_chunks_questions.append(prompt_chunk_questions)
+        prompt_create_questions_for_chunk = Ressource.load_ressource_file('document_create_questions_for_a_chunk.french.txt')
+        for i in range(len(trainings_docs)):
+            for doc_chunk in chunks_by_docs[i]:
+                prompt_chunk_questions = Ressource.replace_variables(prompt_create_questions_for_chunk, {'doc_title': trainings_docs[i].metadata['name'], 'doc_chunk': doc_chunk})
+                prompts_chunks_questions.append(prompt_chunk_questions)
 
-        doc_chunks_questions_response = Llm.invoke_parallel_prompts_with_fallback('Generate chunk questions', llm_and_fallback, *prompts_chunks_questions)
-
-        # Build the doc_chunks list with their questions   
-        doc_chunks = []
-        for i, chunk_text in enumerate(chunks_texts):
-            chunk_questions = Llm.extract_json_from_llm_response(doc_chunks_questions_response[i])
-            doc_chunks.append(DocChunk(chunk_text, [Question(chunk_question['question']) for chunk_question in chunk_questions]))   
-        doc_summary1 = DocSummary(doc_content= doc_content, doc_summary=doc_summary, doc_chunks=doc_chunks)
-        doc_summary1.display_to_terminal()
-
+        doc_chunks_questions_response = await Llm.invoke_parallel_prompts_async(f'Generate questions for {sum([len(chunks) for chunks in chunks_by_docs])} chunks', llm_and_fallback, *prompts_chunks_questions)   
+        
+        idx = 0
+        docs = []
+        for i in range(len(trainings_docs)):
+            doc_chunks = []
+            for j in range(len(chunks_by_docs[i])):
+                chunk_questions = Llm.extract_json_from_llm_response(doc_chunks_questions_response[idx])                
+                chunk_text = chunks_by_docs[i][j]
+                chunk_questions = [Question(chunk_question['question']) for chunk_question in chunk_questions]
+                doc_chunks.append(DocChunk(chunk_text, chunk_questions))
+                idx += 1
+            docs.append(DocSummary(doc_content= trainings_docs[i].page_content, doc_summary=docs_summaries[i], doc_chunks=doc_chunks))
+        return docs
+    
     def load_all_docs_summaries_as_json(self, path: str) -> list[Document]:
         all_docs = []
         txt.print_with_spinner(f"Build all Langchain documents summaries ...")

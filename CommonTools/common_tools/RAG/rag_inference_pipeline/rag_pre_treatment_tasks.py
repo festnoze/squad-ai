@@ -21,7 +21,7 @@ class RAGPreTreatment:
     
     @staticmethod
     def rag_static_pre_treatment(rag:RagService, query:Union[str, Conversation], default_filters:dict = {}) -> tuple[QuestionTranslation, dict]:
-        question_analysis, extracted_implicit_metadata, extracted_explicit_metadata = Execute.run_parallel(
+        question_analysis, extracted_implicit_metadata, extracted_explicit_metadata = Execute.run_sync_functions_in_parallel_threads(
             (RAGPreTreatment.query_rewritting, (rag, query)),
             (RAGPreTreatment.analyse_query_for_metadata, (rag, query)),
             (RAGPreTreatment.extract_explicit_metadata, (query)),
@@ -99,8 +99,8 @@ class RAGPreTreatment:
     def query_rewritting(rag:RagService, analysed_query:QuestionRewritting) -> str:        
         query_rewritting_prompt = RAGPreTreatment._replace_all_categories_in_prompt(analysed_query.question_with_context)
 
-        response = Llm.invoke_chain_with_input('Query rewritting', rag.llm_2, query_rewritting_prompt)
-
+        response = Execute.get_sync_from_async(Llm.invoke_chain_with_input_async, 'Query rewritting', rag.llm_2, query_rewritting_prompt)
+        
         content =  json.loads(Llm.extract_json_from_llm_response(Llm.get_content(response)))
         analysed_query.modified_question = content['modified_question']
         print(f'> Rewritten query: "{analysed_query.modified_question}"')

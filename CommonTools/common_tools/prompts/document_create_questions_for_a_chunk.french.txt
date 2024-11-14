@@ -33,6 +33,6 @@
 {doc_title}
 </Titre du document>
 
-<Contenu du document> 
-{doc_content}
-</Contenu du document>
+<Contenu du chunk> 
+{doc_chunk}
+</Contenu du chunk>

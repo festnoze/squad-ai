@@ -24,7 +24,7 @@ class RAGHybridRetrieval:
             rag_retrieved_chunks = RAGHybridRetrieval.semantic_vector_retrieval(rag,  QuestionAnalysisBase.get_modified_question(analysed_query), metadata, give_score, max_retrived_count)
             return rag_retrieved_chunks
         
-        rag_retrieved_chunks, bm25_retrieved_chunks = Execute.run_parallel(
+        rag_retrieved_chunks, bm25_retrieved_chunks = Execute.run_sync_functions_in_parallel_threads(
             (RAGHybridRetrieval.semantic_vector_retrieval, (rag, QuestionAnalysisBase.get_modified_question(analysed_query), metadata, give_score, max_retrived_count)),
             (RAGHybridRetrieval.bm25_retrieval, (rag,  QuestionAnalysisBase.get_modified_question(analysed_query), metadata, give_score, max_retrived_count)),
         )

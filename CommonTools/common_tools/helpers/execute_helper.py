@@ -9,9 +9,9 @@ from common_tools.helpers.txt_helper import txt
 
 class Execute:
     @staticmethod
-    def run_parallel(*functions_with_args):
+    def run_sync_functions_in_parallel_threads(*functions_with_args):
         """
-        Run the provided functions in parallel and return their results as a tuple.
+        Run the provided sync functions in parallel and return their results as a tuple.
         Supports function calls in multiple formats:
         - `task_a` : A function with no arguments
         - `(task_b, ("John",))` : Function with positional arguments
@@ -62,9 +62,9 @@ class Execute:
         return tuple(results)
 
     @staticmethod
-    async def run_parallel_async(*functions_with_args, functions_with_streaming_indexes=None):
+    async def run_sync_async_stream_functions_as_concurrent_async_tasks(*functions_with_args, functions_with_streaming_indexes=None):
         """
-        Run synchronous and asynchronous functions in parallel, yielding results as they complete.
+        Run synchronous and asynchronous functions (even with streaming) in parallel, as concurrent async tasks.
         
         :param functions_with_args: A mix of functions, both synchronous and asynchronous.
         :param functions_with_streaming_indexes: A list specifying the indices of functions that should be streamed.
@@ -135,6 +135,27 @@ class Execute:
         for func, args, kwargs, idx in streaming_tasks:
             async for item in func(*args, **kwargs):
                 yield (idx, item)
+    
+    @staticmethod
+    def get_sync_from_async(function_to_call: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+        """
+        Encapsulate an asynchronous function into a synchronous function.
+        Explanation: This method runs the async function in the current event loop or a new one if necessary.
+        The async function completes its execution and returns the final result synchronously.
+        """
+
+        # Create an event loop if there isn't one already
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_closed():
+                raise RuntimeError
+        except RuntimeError:
+            # If there is no event loop or it is closed, create a new one
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        # Run the async function and return its result synchronously
+        return loop.run_until_complete(function_to_call(*args, **kwargs))
     
     @staticmethod
     def get_sync_generator_from_async(function_to_call: Callable[..., AsyncGenerator], *args: Any, **kwargs: Any) -> Generator:

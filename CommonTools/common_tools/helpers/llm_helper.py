@@ -9,6 +9,7 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_community.callbacks import get_openai_callback, OpenAICallbackHandler
 from langchain.schema.messages import HumanMessage, AIMessage, SystemMessage
 from common_tools.models.langchain_adapter_type import LangChainAdapterType
+from common_tools.helpers.execute_helper import Execute
 import inspect
 from typing import TypeVar, Union
 
@@ -42,16 +43,16 @@ class Llm:
         return  f"```{code_block_type} \n{text}\n```\n"
 
     @staticmethod
-    def invoke_prompt_with_fallback(action_name: str, llms_with_fallbacks: Union[Runnable, list[Runnable]], prompt: Union[str, ChatPromptTemplate]) -> list[str]:
+    async def invoke_prompt_with_fallback_async(action_name: str, llms_with_fallbacks: Union[Runnable, list[Runnable]], prompt: Union[str, ChatPromptTemplate]) -> list[str]:
         """Invoke single LLM w/o output parser, nor batching, nor parallel multiple prompts (fallbacks possible)"""
-        answers = Llm.invoke_parallel_prompts_with_fallback(action_name, llms_with_fallbacks, *[prompt])
+        answers = await Llm.invoke_parallel_prompts_async(action_name, llms_with_fallbacks, *[prompt])
         return answers[0]
     
     @staticmethod
-    def invoke_chain_with_input(action_name: str = "", chain: Chain = None, input: dict = None) -> list[str]:       
+    async def invoke_chain_with_input_async(action_name: str = "", chain: Chain = None, input: dict = None) -> list[str]:       
         if not input: input = {"input": ""}
         chain_w_config = chain.with_config({"run_name": f"{action_name}"})
-        return chain_w_config.invoke(input)     
+        return await chain_w_config.ainvoke(input)     
      
     @staticmethod
     def invoke_prompt_with_output_parser_and_fallbacks(action_name: str, llms_with_fallbacks: Union[Runnable, list[Runnable]], prompt: Union[str, ChatPromptTemplate], output_parser: BaseTransformOutputParser = None, batch_size:int = None) -> list[str]:
@@ -59,12 +60,16 @@ class Llm:
         return Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(action_name, llms_with_fallbacks, output_parser, batch_size, *[prompt])
     
     @staticmethod
-    def invoke_parallel_prompts_with_fallback(action_name: str, llms_with_fallbacks: Union[Runnable, list[Runnable]], *prompts: Union[str, ChatPromptTemplate]) -> list[str]:
+    async def invoke_parallel_prompts_async(action_name: str, llms_with_fallbacks: Union[Runnable, list[Runnable]], *prompts: Union[str, ChatPromptTemplate]) -> list[str]:
         """Invoke LLM in parallel, w/o output parser, nor batching (fallbacks possible)"""
-        return Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(action_name, llms_with_fallbacks, None, None, *prompts)
+        return await Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks_async(action_name, llms_with_fallbacks, None, None, *prompts)
    
     @staticmethod
     def invoke_parallel_prompts_with_parser_batchs_fallbacks(action_name: str, llms_with_fallbacks: Union[Runnable, list[Runnable]], output_parser: BaseTransformOutputParser, batch_size: int = None, *prompts: Union[str, ChatPromptTemplate]) -> list[str]:
+        return Execute.get_sync_from_async(Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks_async, action_name, llms_with_fallbacks, output_parser, batch_size, *prompts)
+    
+    @staticmethod
+    async def invoke_parallel_prompts_with_parser_batchs_fallbacks_async(action_name: str, llms_with_fallbacks: Union[Runnable, list[Runnable]], output_parser: BaseTransformOutputParser, batch_size: int = None, *prompts: Union[str, ChatPromptTemplate]) -> list[str]:
         if len(prompts) == 0:
             return []        
         if not isinstance(llms_with_fallbacks, list):
@@ -91,11 +96,15 @@ class Llm:
         if output_parser and isinstance(output_parser, JsonOutputParser):
             inputs = {Llm.output_parser_instructions_name: output_parser.get_format_instructions()}
         
-        answers = Llm._invoke_parallel_chains(action_name, inputs, batch_size, *chains)
+        answers = await Llm._invoke_parallel_chains_async(action_name, inputs, batch_size, *chains)
         return answers
         
     @staticmethod
     def _invoke_parallel_chains(action_name: str = "", inputs: dict = None, batch_size: int = None, *chains: Chain) -> list[str]:
+        Execute.get_sync_from_async(Llm._invoke_parallel_chains_async, action_name, inputs, batch_size, *chains)
+    
+    @staticmethod
+    async def _invoke_parallel_chains_async(action_name: str = "", inputs: dict = None, batch_size: int = None, *chains: Chain) -> list[str]:
         if len(chains) == 0:
             return []
         if not batch_size:
@@ -111,7 +120,7 @@ class Llm:
         for chains_batch in chains_batches:
             combined = RunnableParallel(**{f"invoke_{i}": chain for i, chain in enumerate(chains_batch)})
             parallel_chains = combined.with_config({"run_name": f"{action_name}{f"- batch x{str(batch_size)}" if (batch_size and len(chains_batches)>1) else ""}"})
-            responses = parallel_chains.invoke(inputs) 
+            responses = await parallel_chains.ainvoke(inputs) 
 
             responses_list = [responses[key] for key in responses.keys()]
             batch_answers = [Llm.get_content(response) for response in responses_list]

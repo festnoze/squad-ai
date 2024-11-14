@@ -117,25 +117,49 @@ class AvailableService:
         summary_builder = GenerateDocumentsSummariesAndMetadata()
         trainings_docs = summary_builder.load_and_process_trainings(out_dir)
 
-        txt.print("-"*70)
         start = time.time()
-        summary_builder.create_summary_and_questions_from_docs_single_step([AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2], trainings_docs)
-        txt.print(f"Single step summary generation took {txt.get_elapsed_str(time.time() - start)}")
-        txt.print("-"*70)
+        docs_with_summary_chunks_and_questions = Execute.get_sync_from_async(summary_builder.create_summary_and_questions_from_docs_in_three_steps_async, [AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2], trainings_docs[:2])
+        summary_chunks_and_questions_elapsed_str = txt.get_elapsed_str(time.time() - start)
+        txt.print(f"Three steps summary, chunking and questions generation took: {summary_chunks_and_questions_elapsed_str}")
 
-        start = time.time()
-        summary_builder.create_summary_and_questions_from_docs_in_two_steps([AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2], trainings_docs)
-        txt.print(f"Two steps summary generation took {txt.get_elapsed_str(time.time() - start)}")
         txt.print("-"*70)
-
-        start = time.time()
-        summary_builder.create_summary_and_questions_from_docs_in_three_steps([AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2], trainings_docs)
-        txt.print(f"Three steps summary generation took {txt.get_elapsed_str(time.time() - start)}")
+        docs_with_summary_chunks_and_questions[0].display_to_terminal(True)
         txt.print("-"*70)
 
         injection_pipeline = RagInjectionPipeline(AvailableService.rag_service)
         #injection_pipeline.build_vectorstore_and_bm25_store(all_docs, chunk_size= 2500, children_chunk_size= 0, delete_existing= True, vector_db_type=AvailableService.vector_db_type)
         AvailableService.re_init() # reload rag_service with the new vectorstore and langchain documents
+
+    async def test_different_splitting_of_summarize_chunks_and_questions_creation_async(out_dir):
+        summary_builder = GenerateDocumentsSummariesAndMetadata()
+        trainings_docs = summary_builder.load_and_process_trainings(out_dir)
+
+        txt.print("-"*70)
+        start = time.time()
+        summary_1_step = await summary_builder.create_summary_and_questions_from_docs_single_step_async([AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2], trainings_docs)
+        summary_1_step_elapsed_str = txt.get_elapsed_str(time.time() - start)
+        
+        start = time.time()
+        summary_2_steps = await summary_builder.create_summary_and_questions_from_docs_in_two_steps_async([AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2], trainings_docs)
+        summary_2_steps_elapsed_str = txt.get_elapsed_str(time.time() - start)
+
+        start = time.time()
+        summary_3_steps = await summary_builder.create_summary_and_questions_from_docs_in_three_steps_async([AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2], trainings_docs)
+        summary_3_steps_elapsed_str = txt.get_elapsed_str(time.time() - start)
+
+        
+        txt.print("-"*70)
+        summary_1_step.display_to_terminal()
+        txt.print(f"Single step summary generation took {summary_1_step_elapsed_str}")
+        txt.print("-"*70)
+
+        summary_2_steps.display_to_terminal()
+        txt.print(f"Two steps summary generation took {summary_2_steps_elapsed_str}")
+        txt.print("-"*70)
+
+        summary_3_steps.display_to_terminal()
+        txt.print(f"Three steps summary generation took {summary_3_steps_elapsed_str}")
+        txt.print("-"*70)
 
     def docs_retrieval_query():
         while True:
