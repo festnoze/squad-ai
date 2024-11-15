@@ -385,21 +385,20 @@ class GenerateDocumentsSummariesChunksQuestionsAndMetadata:
                 txt.print(f"/!\\ Training details not found for: {training_title}")
 
             # Add 'summary' document with infos from json-api source only
-            contents = [f"\n##{self.get_french_section(key)}##\n{Ressource.remove_curly_brackets(value)}" for key, value in training_data.get('attributes', {}).items()]
+            contents = [f"\n###{self.get_french_section(key)}###\n{Ressource.remove_curly_brackets(value)}" for key, value in training_data.get('attributes', {}).items()]
             content = f"Formation : {training_data.get('title', '')}\nLien vers la page : {training_url}\n{'\n'.join(contents)}"            
             metadata_summary = metadata_common.copy()
             metadata_summary['training_info_type'] = "summary"
-            #docs.append(Document(page_content=content, metadata=metadata_summary))
             
-            # Add training details to docs
+            # Add training details to doc
             if training_detail and any(training_detail):
                 for section_name in training_detail:
                     if section_name not in ['url', 'title']:
-                        content_detail = f"##{self.get_french_section(section_name)} de la formation : {training_data.get('title', '')}##\n"
+                        content_detail = f"###{self.get_french_section(section_name)} de la formation : {training_data.get('title', '')}###\n"
                         content_detail += training_detail[section_name]
                         content += f"\n\n{content_detail}"
-                        metadata_detail = metadata_common.copy()
-                        metadata_detail['training_info_type'] = section_name
+                        # metadata_detail = metadata_common.copy()
+                        # metadata_detail['training_info_type'] = section_name
                         #docs.append(Document(page_content=content_detail, metadata=metadata_detail))
             docs.append(Document(page_content=content, metadata=metadata_summary))
 
