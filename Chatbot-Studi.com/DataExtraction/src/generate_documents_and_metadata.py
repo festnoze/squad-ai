@@ -2,12 +2,13 @@
 import json
 import os
 import re
-from common_tools.helpers.json_helper import JsonHelper
-from langchain.schema import Document
 from typing import List, Dict
+from langchain.schema import Document
 #
 from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.file_helper import file
+from common_tools.helpers.json_helper import JsonHelper
+from common_tools.helpers.ressource_helper import Ressource
 
 class GenerateDocumentsAndMetadata:
     def __init__(self):
@@ -247,15 +248,15 @@ class GenerateDocumentsAndMetadata:
             return []
         docs = []
         all_trainings_titles = set()
-        for item in trainings_data:
-            training_title = item.get("title")
+        for training_data in trainings_data:
+            training_title = training_data.get("title")
             all_trainings_titles.add(training_title)
-            related_ids = item.get("related_ids", {})
+            related_ids = training_data.get("related_ids", {})
             metadata_common = {
-                "id": item.get("id"),
+                "id": training_data.get("id"),
                 "type": "formation",
                 "name": training_title,
-                "changed": item.get("changed"),
+                "changed": training_data.get("changed"),
                 "rel_ids": self.get_all_ids_as_str(related_ids),
             }            
             sub_domain_id = related_ids.get("domain", "not found")
@@ -306,8 +307,9 @@ class GenerateDocumentsAndMetadata:
                 txt.print(f"/!\\ Training details not found for: {training_title}")
 
             # Add 'summary' document with infos from json-api source only
-            contents = [value for key, value in item.get('attributes', {}).items()]
-            content = f"Formation : {item.get('title', '')}\nLien vers la page : {training_url}\n{'\n'.join(contents)}"            
+            contents = [f"\n##{self.get_french_section(key)}##\n{Ressource.remove_curly_brackets(value)}" for key, value in training_data.get('attributes', {}).items()]
+            
+            content = f"Formation : {training_data.get('title', '')}\nLien vers la page : {training_url}\n{'\n'.join(contents)}"            
             metadata_summary = metadata_common.copy()
             metadata_summary['training_info_type'] = "summary"
             docs.append(Document(page_content=content, metadata=metadata_summary))
@@ -316,7 +318,7 @@ class GenerateDocumentsAndMetadata:
             if training_detail and any(training_detail):
                 for section_name in training_detail:
                     if section_name not in ['url', 'title']:
-                        content = f"##{self.get_french_section(section_name)} de la formation : {item.get('title', '')}##\n"
+                        content = f"##{self.get_french_section(section_name)} de la formation : {training_data.get('title', '')}##\n"
                         content += training_detail[section_name]
                         metadata_detail = metadata_common.copy()
                         metadata_detail['training_info_type'] = section_name

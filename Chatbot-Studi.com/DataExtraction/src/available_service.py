@@ -1,22 +1,16 @@
-import json
+import os
 import re
 from textwrap import dedent
 import time
 from dotenv import find_dotenv, load_dotenv
-import asyncio
-#
-from langchain.chains.query_constructor.schema import AttributeInfo
-from langchain_core.runnables import Runnable, RunnablePassthrough
-from langchain_core.prompts import ChatPromptTemplate
-from langchain.docstore.document import Document
-#from database.database import DB
-from drupal_data_retireval import DrupalDataRetireval
-from generate_documents_and_metadata import GenerateDocumentsAndMetadata
+from generate_summaries_chunks_questions_and_metadata import GenerateDocumentsSummariesChunksQuestionsAndMetadata
+from ragas_service import RagasService
 #
 from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.execute_helper import Execute
 from common_tools.models.llm_info import LlmInfo
 from common_tools.helpers.llm_helper import Llm
+from common_tools.helpers.file_helper import file
 from common_tools.helpers.config_helper import ConfigHelper
 from common_tools.langchains.langchain_factory import LangChainFactory
 from common_tools.models.langchain_adapter_type import LangChainAdapterType
@@ -29,10 +23,16 @@ from common_tools.rag.rag_inference_pipeline.rag_answer_generation_tasks import 
 from common_tools.helpers.ressource_helper import Ressource
 from common_tools.models.embedding import EmbeddingModel, EmbeddingType
 from common_tools.models.conversation import Conversation
-from generate_documents_summaries_and_metadata import GenerateDocumentsSummariesAndMetadata
-from ragas_service import RagasService
+from common_tools.models.doc_w_summary_chunks_questions import DocWithSummaryChunksAndQuestions
+#
+from langchain.chains.query_constructor.schema import AttributeInfo
+from langchain_core.runnables import Runnable, RunnablePassthrough
+from langchain_core.prompts import ChatPromptTemplate
+from langchain.docstore.document import Document
+#from database.database import DB
+from drupal_data_retireval import DrupalDataRetireval
+from generate_documents_and_metadata import GenerateDocumentsAndMetadata
 from site_public_metadata_descriptions import MetadataDescriptionHelper
-import os
 
 class AvailableService:
     inference: RagInferencePipeline = None
@@ -40,7 +40,6 @@ class AvailableService:
     vector_db_type: str = None
     embedding_model: EmbeddingModel = None
     llms_infos: list[LlmInfo] = None
-
 
     def init(activate_print = True):
         load_dotenv()
@@ -60,8 +59,7 @@ class AvailableService:
             AvailableService.rag_service = RagService(
                                             llms_or_info=AvailableService.llms_infos, 
                                             embedding_model=AvailableService.embedding_model, 
-                                            vector_db_type=AvailableService.vector_db_type,
-                                        )
+                                            vector_db_type=AvailableService.vector_db_type)
             
         #TEST_LLM = AvailableService.rag_service.llm_1.invoke("quelle est la capitale de l'europe ?")
 
@@ -76,33 +74,6 @@ class AvailableService:
         AvailableService.inference = None
         AvailableService.init(txt.activate_print)
 
-    def display_select_menu():
-        while True:
-            choice = input(dedent("""
-                ┌──────────────────────────────┐
-                │ DATA EXTRACTION - MAIN MENU  │
-                └──────────────────────────────┘
-                Tap the number of the selected action:  ① ② ③ ④
-                1 - Retrieve data from Drupal json-api & Save as json files
-                2 - Create a vector database after having generated and embedded documents
-                3 - R Query: Retrieve similar documents (rag w/o Augmented Generation by LLM)
-                4 - rag query: Respond with LLM augmented by similar retrieved documents
-                5 - Exit
-            """))
-            if choice == "1":
-                drupal = DrupalDataRetireval(AvailableService.out_dir)
-                drupal.diplay_select_menu()
-            elif choice == "2":
-                AvailableService.create_vector_db_from_generated_embeded_documents(AvailableService.out_dir)
-            elif choice == "3":
-                AvailableService.docs_retrieval_query()
-            elif choice == "4":
-                AvailableService.rag_query_console()
-            elif choice == "5" or choice.lower() == "e":
-                print("Exiting ...")
-                exit()
-                #GenerateCleanedData()
-
     def retrieve_all_data():
         drupal = DrupalDataRetireval(AvailableService.out_dir)
         drupal.retrieve_all_data()
@@ -114,24 +85,36 @@ class AvailableService:
         AvailableService.re_init() # reload rag_service with the new vectorstore and langchain documents
 
     def create_summary_vector_db_from_generated_embeded_documents(out_dir):
-        summary_builder = GenerateDocumentsSummariesAndMetadata()
-        trainings_docs = summary_builder.load_and_process_trainings(out_dir)
-
-        start = time.time()
-        docs_with_summary_chunks_and_questions = Execute.get_sync_from_async(summary_builder.create_summary_and_questions_from_docs_in_three_steps_async, [AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2], trainings_docs[:2])
-        summary_chunks_and_questions_elapsed_str = txt.get_elapsed_str(time.time() - start)
-        txt.print(f"Three steps summary, chunking and questions generation took: {summary_chunks_and_questions_elapsed_str}")
-
-        txt.print("-"*70)
-        docs_with_summary_chunks_and_questions[0].display_to_terminal(True)
-        txt.print("-"*70)
+        docs_with_summary_chunks_and_questions_file_path = os.path.join(out_dir, 'all_docs_summaries_chunks_and_questions.json')
+        if file.file_exists(docs_with_summary_chunks_and_questions_file_path):
+            docs_with_summary_chunks_and_questions_json = file.get_as_json(docs_with_summary_chunks_and_questions_file_path)
+            docs_with_summary_chunks_and_questions = [DocWithSummaryChunksAndQuestions(**doc) for doc in docs_with_summary_chunks_and_questions_json]
+            txt.print(f">>> Loaded existing {len(docs_with_summary_chunks_and_questions)} docs with summary, chunks and questions from file at: {docs_with_summary_chunks_and_questions_file_path}")
+        else:
+            start = time.time()
+            summary_builder = GenerateDocumentsSummariesChunksQuestionsAndMetadata()
+            trainings_docs = summary_builder.load_and_process_trainings(out_dir)
+            
+            docs_with_summary_chunks_and_questions = Execute.get_sync_from_async(
+                            summary_builder.create_summary_and_questions_from_docs_in_three_steps_async, 
+                            [AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2, AvailableService.rag_service.llm_3], 
+                            trainings_docs, 50)
+            
+            docs_json = [doc.to_dict(False) for doc in docs_with_summary_chunks_and_questions]
+            file.write_file(docs_json, docs_with_summary_chunks_and_questions_file_path)
+            summary_chunks_and_questions_elapsed_str = txt.get_elapsed_str(time.time() - start)
+            txt.print(f"Generation of summaries, chunking and questions in three steps for {len(docs_with_summary_chunks_and_questions)} documents took: {summary_chunks_and_questions_elapsed_str}")
+            txt.print("-"*70)
+            txt.print(">>> Displaying the first document summary, chunks and questions:")
+            docs_with_summary_chunks_and_questions[0].display_to_terminal(False)
+            txt.print("-"*70)
 
         injection_pipeline = RagInjectionPipeline(AvailableService.rag_service)
         #injection_pipeline.build_vectorstore_and_bm25_store(all_docs, chunk_size= 2500, children_chunk_size= 0, delete_existing= True, vector_db_type=AvailableService.vector_db_type)
         AvailableService.re_init() # reload rag_service with the new vectorstore and langchain documents
 
     async def test_different_splitting_of_summarize_chunks_and_questions_creation_async(out_dir):
-        summary_builder = GenerateDocumentsSummariesAndMetadata()
+        summary_builder = GenerateDocumentsSummariesChunksQuestionsAndMetadata()
         trainings_docs = summary_builder.load_and_process_trainings(out_dir)
 
         txt.print("-"*70)
@@ -263,7 +246,7 @@ class AvailableService:
         return response
     
     def get_summarized_answer(text):
-        summarize_rag_answer_prompt = Ressource.get_ressource_file_content('summarize_rag_answer_prompt.french.txt')
+        summarize_rag_answer_prompt = Ressource.load_ressource_file('summarize_rag_answer_prompt.french.txt')
         promptlate = ChatPromptTemplate.from_template(summarize_rag_answer_prompt)
         chain = promptlate | AvailableService.rag_service.llm_1 | RunnablePassthrough()
         result = Llm.invoke_chain_with_input('Answer summarization', chain, text)
@@ -272,6 +255,33 @@ class AvailableService:
     def generate_ground_truth():
         #asyncio.run(RagasService.generate_ground_truth_async(AvailableService.llms_infos[0], AvailableService.rag_service.langchain_documents, 1))
         RagasService.generate_ground_truth(AvailableService.llms_infos[0], AvailableService.rag_service.langchain_documents, 1)
+ 
+    def display_select_menu():
+        while True:
+            choice = input(dedent("""
+                ┌──────────────────────────────┐
+                │ DATA EXTRACTION - MAIN MENU  │
+                └──────────────────────────────┘
+                Tap the number of the selected action:  ① ② ③ ④
+                1 - Retrieve data from Drupal json-api & Save as json files
+                2 - Create a vector database after having generated and embedded documents
+                3 - R Query: Retrieve similar documents (rag w/o Augmented Generation by LLM)
+                4 - rag query: Respond with LLM augmented by similar retrieved documents
+                5 - Exit
+            """))
+            if choice == "1":
+                drupal = DrupalDataRetireval(AvailableService.out_dir)
+                drupal.diplay_select_menu()
+            elif choice == "2":
+                AvailableService.create_vector_db_from_generated_embeded_documents(AvailableService.out_dir)
+            elif choice == "3":
+                AvailableService.docs_retrieval_query()
+            elif choice == "4":
+                AvailableService.rag_query_console()
+            elif choice == "5" or choice.lower() == "e":
+                print("Exiting ...")
+                exit()
+                #GenerateCleanedData()
 
     #todo: to delete or write to add metadata to context
     @staticmethod

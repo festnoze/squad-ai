@@ -9,6 +9,7 @@ from common_tools.helpers.file_helper import file
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from common_tools.models.file_already_exists_policy import FileAlreadyExistsPolicy
+from common_tools.helpers.ressource_helper import Ressource
 
 class ScrapeService:
     def __init__(self):
@@ -178,8 +179,6 @@ class ScrapeService:
             if count > 0:
                 txt.print(f"Found {count} '{tag}' tags in sections.")
 
-
-
     def extract_sections_from_content(self, webpage_name: str, webpage_url: str, webpage_content: str, section_classes=['lame-header-training', 'lame-bref', 'lame-programme', 'lame-cards-diploma', 'lame-methode', 'lame-modalites', 'lame-financement', 'lame-simulation'], section_ids=['jobs']):
         sections = {}
         soup = BeautifulSoup(webpage_content, 'html.parser')
@@ -190,9 +189,9 @@ class ScrapeService:
             h1 = title_content_div.find('h1')
             if h1:
                 title = h1.get_text(strip=True)
-                sections['title'] = title
+                sections['title'] = Ressource.remove_curly_brackets(title)
             else:
-                sections['title'] = webpage_name
+                sections['title'] = Ressource.remove_curly_brackets(webpage_name)
                 txt.print(f"/!\\ Title not found in 'title-content' div. Use the one from url instead: '{webpage_name}'.")
 
             # Extract the academic level from 'tag-w' ul
@@ -202,21 +201,23 @@ class ScrapeService:
                 li_tags = tag_w_ul.find_all('li', class_='tag')
                 if li_tags and any(li_tags):
                     academic_levels = [li_tag.get_text(strip=True) for li_tag in li_tags]
-                    sections['academic_level'] = ', '.join(academic_levels)
+                    sections['academic_level'] = self._build_bullet_lists_str_from_nested_lists(academic_levels)
 
         # Extract content from the specified sections by their classes
         for section_class in section_classes:
             section = soup.find('section', class_=section_class)
             if section:
                 key = section_class.replace('lame-', '')
-                sections[key] = self._build_bullet_lists_str_from_nested_lists(self.process_section(section))
+                processed_section = self.process_section(section)
+                sections[key] = self._build_bullet_lists_str_from_nested_lists(processed_section)
 
         # Extract content from the specified sections by their IDs
         for section_id in section_ids:
             section = soup.find('section', id=section_id)
             if section:
                 key = section_id.replace('jobs', 'metiers')
-                sections[key] = self._build_bullet_lists_str_from_nested_lists(self.process_section(section))
+                processed_section = self.process_section(section)
+                sections[key] = self._build_bullet_lists_str_from_nested_lists(processed_section)
 
         sections['url'] = webpage_url
         return sections
@@ -236,7 +237,7 @@ class ScrapeService:
                 accordion_head = item.find('div', class_='accordion-head')
                 if accordion_head:
                     title_span = accordion_head.find('span', class_='title')
-                    title = title_span.get_text(strip=True) if title_span else ''
+                    title = Ressource.remove_curly_brackets(title_span.get_text(strip=True)) if title_span else ''
                 else:
                     title = ''
 
@@ -254,7 +255,7 @@ class ScrapeService:
                     for span in spans:
                         bp_text = span.get_text(strip=True)
                         if bp_text:
-                            sub_content.append(bp_text)
+                            sub_content.append(Ressource.remove_curly_brackets(bp_text))
 
                     # Extract bullet points from divs with class 'tag-w' and spans with class 'tag'
                     tag_w_divs = accordion_content.find_all('div', class_='tag-w')
@@ -262,7 +263,7 @@ class ScrapeService:
                         # Get the label before the tags
                         label = tag_w.get_text(separator=' ', strip=True).split(':')[0]
                         tags = tag_w.find_all('span', class_='tag')
-                        tags_text = ', '.join([tag.get_text(strip=True) for tag in tags])
+                        tags_text = self._build_bullet_lists_str_from_nested_lists([tag.get_text(strip=True) for tag in tags])
                         if label and tags_text:
                             sub_content.append(f"{label}: {tags_text}")
 
@@ -272,7 +273,7 @@ class ScrapeService:
                         li_items = ul.find_all('li')
                         li_sublist = []
                         for li in li_items:
-                            li_text = li.get_text(strip=True)
+                            li_text = Ressource.remove_curly_brackets(li.get_text(strip=True))
                             if li_text:
                                 li_sublist.append(li_text)
                         if li_sublist:
@@ -281,7 +282,7 @@ class ScrapeService:
                     # Extract any remaining text paragraphs
                     paragraphs = accordion_content.find_all('p')
                     for p in paragraphs:
-                        p_text = p.get_text(strip=True)
+                        p_text = Ressource.remove_curly_brackets(p.get_text(strip=True))
                         if p_text and p_text not in sub_content:
                             sub_content.append(p_text)
 
@@ -289,17 +290,20 @@ class ScrapeService:
                     item_content['content'] = sub_content
 
                 else:
-                    # Fallback to extracting all text from item
-                    item_text = item.get_text(separator=' ', strip=True)
-                    item_content['content'].append(item_text)
+                    raise Exception(f"Accordion item '{title}' has no content.")
 
                 # Append this item to the content list
                 content_list.append(item_content)
         else:
-            # No accordion items, process the section differently
-            # Extract text content
-            content_text = section.get_text(separator=' ', strip=True)
-            content_list.append(content_text)
+            # No accordion items, process the section differently (using section's 'strings' or 'text' property)
+            if section.strings:
+                section_strs = list(section.strings)
+                cleaned_section_strs = [Ressource.remove_curly_brackets(section_str.strip()) for section_str in section_strs if section_str.strip()]
+                if any(cleaned_section_strs):
+                    content_list = cleaned_section_strs
+                else: # Extract text content                
+                    content_text = Ressource.remove_curly_brackets(section.get_text(separator=' ', strip=True))
+                    content_list.append(content_text)
 
         return content_list
     
@@ -312,13 +316,13 @@ class ScrapeService:
         if isinstance(content, dict):
             # Handle dictionary with 'title' and 'content'
             title = content.get('title', '')
-            output += f"{indent}{bullet} {title}\n"
+            output += Ressource.remove_curly_brackets(f"{indent}{bullet} {title}\n")
             output += self._build_bullet_lists_str_from_nested_lists(content.get('content', []), depth + 1, indent_count)
         elif isinstance(content, list):
             for item in content:
                 output += self._build_bullet_lists_str_from_nested_lists(item, depth, indent_count)
         elif isinstance(content, str):
-            output += f"{indent}{bullet} {content}\n"
+            output += Ressource.remove_curly_brackets(f"{indent}{bullet} {content}\n")
         else:
             # Handle other types if necessary
             pass

@@ -3,13 +3,15 @@ from pydantic import BaseModel, Field
 import pandas as pd
 from common_tools.helpers.txt_helper import txt
 
-
 class Question:
     def __init__(self, text: str = ''):
         self.text = text
 
     def __repr__(self) -> str:
         return f"Question: {self.text})"
+    
+    def to_dict(self) -> dict:
+        return {"text": self.text}
 
 class DocChunk:
     def __init__(self, text: str = '', questions:list[Question] = []):
@@ -19,16 +21,29 @@ class DocChunk:
     def __repr__(self) -> str:
         return f"DocChunk: {self.text})"
     
-class DocSummary:
+    def to_dict(self) -> dict:
+        return {"text": self.text, "questions": [question.to_dict() for question in self.questions]}
+    
+class DocWithSummaryChunksAndQuestions:
     def __init__(self, doc_content: str = None, doc_summary: str = None, doc_chunks_with_questions: Union[dict, list[DocChunk]] = None, **kwargs):
-        if kwargs:
-            self.doc_content:str = kwargs.get('doc_content', doc_content)
-            self.doc_summary:str = kwargs.get('doc_summary', doc_summary)
-            self.doc_chunks:list[DocChunk] = self.get_typed_chunks_with_their_questions(kwargs.get('doc_chunks', doc_chunks_with_questions))
-        else:
-            self.doc_content:str = doc_content
-            self.doc_summary:str = doc_summary
-            self.doc_chunks:list[DocChunk] = self.get_typed_chunks_with_their_questions(doc_chunks_with_questions)
+        self.doc_content: str = doc_content if doc_content else kwargs.get('doc_content')
+        self.doc_summary: str = doc_summary if doc_summary else kwargs.get('doc_summary')
+        self.doc_chunks: list[DocChunk] = self.get_typed_chunks_with_their_questions(
+                    doc_chunks_with_questions if doc_chunks_with_questions else kwargs.get('doc_chunks')
+        )
+
+    def __repr__(self) -> str:
+        return f"Summary: '{self.doc_summary[:30].replace('\n', '')}...' with: {len(self.doc_chunks)} chunks, and {sum([len(chunk.questions) for chunk in self.doc_chunks])} questions)"
+    
+    def to_dict(self, include_full_doc=True) -> dict:
+        doc_dict = {
+            "doc_content": "",
+            "doc_summary": self.doc_summary,
+            "doc_chunks": [chunk.to_dict() for chunk in self.doc_chunks]
+        }
+        if include_full_doc:
+            doc_dict["doc_content"] = self.doc_content
+        return doc_dict
     
     def get_typed_chunks_with_their_questions(self, chunks_and_questions_dict: Union[dict, list[DocChunk]]) -> list[DocChunk]:
         chunks_with_questions_typed = [] 
@@ -70,12 +85,12 @@ class DocSummary:
             if len(chunk.questions) > max_questions: 
                 max_questions = len(chunk.questions)
             i += 1
-            if display_questions:
-                j = 1
-                for question in chunk.questions:
+            j = 1
+            for question in chunk.questions:
+                if display_questions:
                     txt.print(f'>> Question n°{str(j)}: {question.text}')
-                    total_questions += 1
-                    j += 1
+                total_questions += 1
+                j += 1
         txt.print(f'Total: {total_chunks} chunks')
         txt.print(f'Total: {total_questions} questions')
         txt.print(f'Max.: {max_questions} questions')
@@ -92,7 +107,7 @@ class DocChunkPydantic(BaseModel):
     text: str = Field(description="Texte d'une partie (chunk) du document.")
     questions: list[QuestionPydantic] = Field(description="Liste des questions correspondant à ce chunk.")
     
-class DocSummaryPydantic(BaseModel):
+class DocWithSummaryChunksAndQuestionsPydantic(BaseModel):
     doc_summary: str = Field(description="Résumé complet et structuré du contenu du document")
     doc_chunks: list[DocChunkPydantic] = Field(description="Liste des chunks du document.")
 

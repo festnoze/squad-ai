@@ -7,14 +7,15 @@ from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.file_helper import file
 from common_tools.helpers.json_helper import JsonHelper
 from common_tools.helpers.llm_helper import Llm
-from common_tools.models.doc_summary import Question, DocChunk, DocSummary, DocSummaryPydantic, DocQuestionsByChunkPydantic
+from common_tools.models.doc_w_summary_chunks_questions import Question, DocChunk, DocWithSummaryChunksAndQuestions, DocWithSummaryChunksAndQuestionsPydantic, DocQuestionsByChunkPydantic
 from common_tools.helpers.ressource_helper import Ressource
 
-class GenerateDocumentsSummariesAndMetadata:
+class GenerateDocumentsSummariesChunksQuestionsAndMetadata:
     def __init__(self):
         pass
 
     async def create_summary_and_questions_from_docs_single_step_async(self, llm_and_fallback:list, trainings_docs:list[Document]):
+        txt.print('Warning: Only process the 1st document for now.')
         test_training = trainings_docs[0]
         subject = test_training.metadata['type']
         name = test_training.metadata['name']
@@ -27,16 +28,17 @@ class GenerateDocumentsSummariesAndMetadata:
                     }
             )
         prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(
-                prompt_summarize_doc, DocSummaryPydantic, DocSummary)
+                prompt_summarize_doc, DocWithSummaryChunksAndQuestionsPydantic, DocWithSummaryChunksAndQuestions)
         
         response_1 = await Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks_async(
                         'Summarize documents by batches', 
                         llm_and_fallback, 
                         output_parser, 10, *[prompt_for_output_parser])
-        doc_summary1 = DocSummary(doc_content= test_training.page_content, **response_1[0])
+        doc_summary1 = DocWithSummaryChunksAndQuestions(doc_content= test_training.page_content, **response_1[0])
         return doc_summary1
 
     async def create_summary_and_questions_from_docs_in_two_steps_async(self, llm_and_fallback:list, trainings_docs):
+        txt.print('Warning: Only process the 1st document for now.')
         test_training = trainings_docs[0]
         subject = test_training.metadata['type']
         name = test_training.metadata['name']
@@ -62,7 +64,7 @@ class GenerateDocumentsSummariesAndMetadata:
                         variables_values= variables_values)
         
         prompt_doc_chunks_and_questions_for_output_parser, chunks_and_questions_output_parser = Llm.get_prompt_and_json_output_parser(
-                prompt_doc_chunks_and_questions, DocQuestionsByChunkPydantic, DocSummary)
+                prompt_doc_chunks_and_questions, DocQuestionsByChunkPydantic, DocWithSummaryChunksAndQuestions)
         
         doc_chunks_and_questions_response = await Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks_async(
                         'Chunks & questions from documents by batches', 
@@ -72,10 +74,10 @@ class GenerateDocumentsSummariesAndMetadata:
                         *[prompt_doc_chunks_and_questions_for_output_parser])
         
         doc_chunks = doc_chunks_and_questions_response[0]['doc_chunks']        
-        doc_summary1 = DocSummary(doc_content= doc_content, doc_summary=doc_summary, doc_chunks=doc_chunks)
+        doc_summary1 = DocWithSummaryChunksAndQuestions(doc_content= doc_content, doc_summary=doc_summary, doc_chunks=doc_chunks)
         return doc_summary1
 
-    async def create_summary_and_questions_from_docs_in_three_steps_async(self, llm_and_fallback:list, trainings_docs):      
+    async def create_summary_and_questions_from_docs_in_three_steps_async(self, llm_and_fallback:list, trainings_docs, batch_size:int = 50):      
         # Step 1: Summarize document
         prompts_summarize_doc = []
         for training_doc in trainings_docs:
@@ -86,11 +88,9 @@ class GenerateDocumentsSummariesAndMetadata:
                                     variables_values= {'doc_title': doc_title, 'doc_content': doc_content})       
             prompts_summarize_doc.append(prompt_summarize_doc)
 
-        summarized_docs_response = await Llm.invoke_parallel_prompts_async(f'Summarize {len(trainings_docs)} documents', llm_and_fallback, *prompts_summarize_doc)
+        summarized_docs_response = await Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks_async(f'Summarize {len(trainings_docs)} documents', llm_and_fallback, None, batch_size, *prompts_summarize_doc)
         
         docs_summaries = [Llm.get_content(summarized_doc) for summarized_doc in summarized_docs_response]
-        for i in range(len(trainings_docs)):
-            txt.print(f"Summary length vs. original for doc n°{i+1}: {len(docs_summaries[i])}/{len(trainings_docs[i].page_content)} chars. ({len(docs_summaries[i])/len(trainings_docs[i].page_content)*100:.0f}%)")
         
         # Step 2: Split document's summary in chunks
         prompts_docs_chunks = []
@@ -100,7 +100,7 @@ class GenerateDocumentsSummariesAndMetadata:
                                     variables_values= {'doc_title': trainings_docs[i].metadata['name'], 'doc_content': docs_summaries[i]})
             prompts_docs_chunks.append(prompt_doc_chunks)
 
-        chunking_docs_response = await Llm.invoke_parallel_prompts_async(f'Chunking {len(trainings_docs)} documents', llm_and_fallback, prompt_doc_chunks)
+        chunking_docs_response = await Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks_async(f'Chunking {len(trainings_docs)} documents', llm_and_fallback, None, batch_size, *prompts_docs_chunks)
         
         docs_chunks_json = [Llm.extract_json_from_llm_response(chunking_doc) for chunking_doc in chunking_docs_response]
         chunks_by_docs = [[chunk['chunk_content'] for chunk in doc_chunks] for doc_chunks in docs_chunks_json] 
@@ -113,19 +113,23 @@ class GenerateDocumentsSummariesAndMetadata:
                 prompt_chunk_questions = Ressource.replace_variables(prompt_create_questions_for_chunk, {'doc_title': trainings_docs[i].metadata['name'], 'doc_chunk': doc_chunk})
                 prompts_chunks_questions.append(prompt_chunk_questions)
 
-        doc_chunks_questions_response = await Llm.invoke_parallel_prompts_async(f'Generate questions for {sum([len(chunks) for chunks in chunks_by_docs])} chunks', llm_and_fallback, *prompts_chunks_questions)   
+        doc_chunks_questions_response = await Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks_async(f'Generate questions for {sum([len(chunks) for chunks in chunks_by_docs])} chunks', llm_and_fallback, None, batch_size, *prompts_chunks_questions)   
         
         idx = 0
         docs = []
         for i in range(len(trainings_docs)):
             doc_chunks = []
             for j in range(len(chunks_by_docs[i])):
-                chunk_questions = Llm.extract_json_from_llm_response(doc_chunks_questions_response[idx])                
+                try:
+                    chunk_questions = Llm.extract_json_from_llm_response(doc_chunks_questions_response[idx])
+                except Exception as e:
+                    txt.print(f"<<<<< Error on doc {i} chunk {j} with error: {e}>>>>>>")
+                    chunk_questions = []             
                 chunk_text = chunks_by_docs[i][j]
                 chunk_questions = [Question(chunk_question['question']) for chunk_question in chunk_questions]
                 doc_chunks.append(DocChunk(chunk_text, chunk_questions))
                 idx += 1
-            docs.append(DocSummary(doc_content= trainings_docs[i].page_content, doc_summary=docs_summaries[i], doc_chunks=doc_chunks))
+            docs.append(DocWithSummaryChunksAndQuestions(doc_content= trainings_docs[i].page_content, doc_summary=docs_summaries[i], doc_chunks=doc_chunks))
         return docs
     
     def load_all_docs_summaries_as_json(self, path: str) -> list[Document]:
@@ -174,7 +178,6 @@ class GenerateDocumentsSummariesAndMetadata:
         #         txt.print(section_content)#f"{section_content[:500]} ...")
         #         txt.print(f" ")
         #     txt.print(f"---------------------")
-
 
     def process_certifiers(self, data: list[dict]) -> list[Document]:
         if not data:
@@ -382,7 +385,7 @@ class GenerateDocumentsSummariesAndMetadata:
                 txt.print(f"/!\\ Training details not found for: {training_title}")
 
             # Add 'summary' document with infos from json-api source only
-            contents = [f"\n##{self.get_french_section(key)}##\n{value}" for key, value in training_data.get('attributes', {}).items()]
+            contents = [f"\n##{self.get_french_section(key)}##\n{Ressource.remove_curly_brackets(value)}" for key, value in training_data.get('attributes', {}).items()]
             content = f"Formation : {training_data.get('title', '')}\nLien vers la page : {training_url}\n{'\n'.join(contents)}"            
             metadata_summary = metadata_common.copy()
             metadata_summary['training_info_type'] = "summary"
@@ -406,8 +409,8 @@ class GenerateDocumentsSummariesAndMetadata:
     
     section_to_french:dict = None # Singleton containing the static mapping of section names to their french equivalent.
     def get_french_section(self, section_name: str) -> str:
-        if not GenerateDocumentsSummariesAndMetadata.section_to_french:
-            GenerateDocumentsSummariesAndMetadata.section_to_french = {
+        if not GenerateDocumentsSummariesChunksQuestionsAndMetadata.section_to_french:
+            GenerateDocumentsSummariesChunksQuestionsAndMetadata.section_to_french = {
                 'title': "Titre",
                 'academic_level': "Niveau académique",
                 'content': "Contenu",
@@ -458,8 +461,8 @@ class GenerateDocumentsSummariesAndMetadata:
                 'code_rncp': "Code RNCP"
             }
 
-        if section_name in GenerateDocumentsSummariesAndMetadata.section_to_french:
-            return GenerateDocumentsSummariesAndMetadata.section_to_french[section_name]
+        if section_name in GenerateDocumentsSummariesChunksQuestionsAndMetadata.section_to_french:
+            return GenerateDocumentsSummariesChunksQuestionsAndMetadata.section_to_french[section_name]
         else:
             raise ValueError(f"Unhandled section name: {section_name} in get_french_section")
     

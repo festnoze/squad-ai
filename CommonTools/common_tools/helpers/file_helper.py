@@ -3,7 +3,7 @@ import os
 import shutil
 import glob
 import csv
-from typing import Any
+from typing import Any, Union
 import yaml
 
 from common_tools.models.file_already_exists_policy import FileAlreadyExistsPolicy
@@ -38,48 +38,45 @@ class file:
             return None
             
     @staticmethod
-    def write_file(content: str, filepath: str, file_exists_policy: FileAlreadyExistsPolicy = FileAlreadyExistsPolicy.Override, encoding='utf-8'):
+    def write_file(content: Union[str, dict, list], filepath: str, file_exists_policy: FileAlreadyExistsPolicy = FileAlreadyExistsPolicy.Override, encoding='utf-8'):
         """
-        Writes content to a file specified by path and filename.
+        Writes the content (of type: string, dict or list of dict) to a file specified by path and filename.
 
         Args:
-            content (str): The content to write to the file.
-            path (str): The directory path where the file should be created.
-            filename (str): The name of the file, including its extension.
+            content (str | dict | list): The content to write to the file.
+            filepath (str): The full path where the file should be created.
+            file_exists_policy (FileAlreadyExistsPolicy): Policy for handling existing files.
+            encoding (str): The file encoding to use.
         """
         # Ensure the directory exists
         dirpath = os.path.dirname(filepath)
-        if not os.path.exists(dirpath) or not os.path.isfile(dirpath):
+        if not os.path.exists(dirpath):
             os.makedirs(dirpath, exist_ok=True)
-        
+
         # Apply policy in case the file already exists
         if os.path.exists(filepath):
             if file_exists_policy == FileAlreadyExistsPolicy.Override:
-                pass # continue overwrites the file
+                pass  # continue to overwrite the file
             elif file_exists_policy == FileAlreadyExistsPolicy.Skip:
-                txt.print(f"File '{filepath}' already exists. Skipping writing as per policy.")
-                return # skip writing the file
+                print(f"Info from '{file.write_file.__name__}': File '{filepath}' already exists. Skipping writing as per policy.")
+                return  # skip writing the file
             elif file_exists_policy == FileAlreadyExistsPolicy.AutoRename:
                 filepath = file._get_unique_filename(filepath)
-                txt.print(f"File '{filepath}' exists. Renaming to '{filepath}' as per policy.")
+                print(f"Info from '{file.write_file.__name__}': File '{filepath}' exists. Renaming to '{filepath}' as per policy.")
             elif file_exists_policy == FileAlreadyExistsPolicy.Fail:
-                raise FileExistsError(f"File '{filepath}' already exists. Failing as per policy.")            
-        
-        # Transform dict into its json string representation
-        if isinstance(content, dict):
-            content = json.dumps(content, indent=4)            
+                raise FileExistsError(f"Error in '{file.write_file.__name__}': File '{filepath}' already exists. Failing as per policy.")
 
         # Write the content to the file
         with open(filepath, 'w', encoding=encoding) as file_handler:
-            if isinstance(content, str):
+            if isinstance(content, dict) or isinstance(content, list):
+                if isinstance(content, list) and any(content) and not isinstance(content[0], dict):
+                    raise ValueError(f"Error in '{file.write_file.__name__}': Invalid content of type list. Items are of type: {type(content[0]).__name__}. Only 'dict' allowed in list.")
+                json.dump(content, file_handler, ensure_ascii=False, indent=4)
+            elif isinstance(content, str):
                 file_handler.write(content)
             else:
-                json.dump(content, file_handler, ensure_ascii=False, indent=4)
-            # if isinstance(content, list):
-            #     for line in content:
-            #         file_handler.write(f"{line}\n")
+                raise ValueError(f"Error in '{file.write_file.__name__}': Invalid content type: {type(content).__name__}. Only 'str', 'dict', or 'list of dicts' allowed.")
     
-
     @staticmethod
     def _get_unique_filename(filepath: str) -> str:
         """

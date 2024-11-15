@@ -38,8 +38,7 @@ class RAGPreTreatment:
     @staticmethod
     @output_name('analysed_query')
     def query_standalone_rewritten_from_history(rag:RagService, query:Union[str, Conversation]) -> QuestionRewritting:
-        query_standalone_rewritten_prompt = Ressource.get_ressource_file_content('create_standalone_and_rewritten_query_from_history_prompt.txt')
-        
+        query_standalone_rewritten_prompt = Ressource.load_ressource_file('create_standalone_and_rewritten_query_from_history_prompt.txt')
         query_standalone_rewritten_prompt = RAGPreTreatment._replace_all_categories_in_prompt(query_standalone_rewritten_prompt)
         query_standalone_rewritten_prompt = RAGPreTreatment._replace_query_and_history_in_prompt(query, query_standalone_rewritten_prompt)  
                 

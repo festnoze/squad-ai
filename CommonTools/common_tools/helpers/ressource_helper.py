@@ -36,6 +36,9 @@ class Ressource:
         result = pattern.sub(replacer, prompt)
         return result.replace('**(*(**', '{').replace('**)*)**', '}')  # Replace: '**((**' and '**))**' to '{' and '}'
 
+    @staticmethod
+    def remove_curly_brackets(text:str):
+        return Ressource.replace_variables(text, {})
 
     @staticmethod
     def get_language_detection_prompt() -> str:

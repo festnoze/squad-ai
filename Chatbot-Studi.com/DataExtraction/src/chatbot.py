@@ -30,7 +30,7 @@ class ChatbotFront:
                 padding-bottom: 1rem !important;
             }
             .stSidebar {
-                width: 360px !important;
+                width: 365px !important;
             }
             .rounded-frame {
                 border: 2px solid #3498db;
