@@ -3,5 +3,5 @@ from common_tools.rag.rag_inference_pipeline.end_pipeline_exception import EndPi
 
 class GreetingsEndsPipelineException(EndPipelineException):
     def __init__(self):
-        message = Ressource.get_ressource_file_content('greetings_default_message.txt')
+        message = Ressource.load_ressource_file('greetings_default_message.txt')
         super().__init__("_salutations_", message)

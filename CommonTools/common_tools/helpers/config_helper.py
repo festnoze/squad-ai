@@ -26,6 +26,13 @@ class ConfigHelper:
         return vector_db_type
     
     @staticmethod
+    def get_vector_db_name_from_env():
+        vector_db_type = os.getenv('VECTOR_DB_NAME')
+        if not vector_db_type:
+            raise ValueError("VECTOR_DB_NAME is not set in the environment")
+        return vector_db_type
+    
+    @staticmethod
     def get_llms_from_env():
         llms_list_json = os.getenv('LLMS_JSON')
         if not llms_list_json:

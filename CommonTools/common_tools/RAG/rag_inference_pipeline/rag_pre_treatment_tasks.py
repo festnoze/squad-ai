@@ -10,11 +10,10 @@ from common_tools.models.question_rewritting import QuestionRewritting, Question
 from common_tools.models.question_translation import QuestionTranslation, QuestionTranslationPydantic
 from common_tools.rag.rag_inference_pipeline.end_message_ends_pipeline_exception import EndMessageEndsPipelineException
 from common_tools.rag.rag_inference_pipeline.greetings_ends_pipeline_exception import GreetingsEndsPipelineException
+from common_tools.rag.rag_inference_pipeline.rag_pre_treat_metadata_filters_analysis import RagPreTreatMetadataFiltersAnalysis
 from common_tools.rag.rag_service import RagService
 from common_tools.rag.rag_filtering_metadata_helper import RagFilteringMetadataHelper
 from common_tools.workflows.output_name_decorator import output_name
-from common_tools.helpers.txt_helper import txt
-from langchain.chains.query_constructor.base import AttributeInfo
 
 class RAGPreTreatment:
     default_filters = {}
@@ -100,7 +99,7 @@ class RAGPreTreatment:
 
         response = Execute.get_sync_from_async(Llm.invoke_chain_with_input_async, 'Query rewritting', rag.llm_2, query_rewritting_prompt)
         
-        content =  json.loads(Llm.extract_json_from_llm_response(Llm.get_content(response)))
+        content =  Llm.extract_json_from_llm_response(Llm.get_content(response))
         analysed_query.modified_question = content['modified_question']
         print(f'> Rewritten query: "{analysed_query.modified_question}"')
         return analysed_query
@@ -157,6 +156,7 @@ class RAGPreTreatment:
             query_wo_metadata = user_query
         return query_wo_metadata, filters
     
+
     metadata_infos = None
     @staticmethod
     def analyse_query_for_metadata(rag:RagService, analysed_query:QuestionAnalysisBase) -> tuple[str, dict]:
@@ -164,10 +164,15 @@ class RAGPreTreatment:
             RAGPreTreatment.metadata_infos = RagService.build_metadata_infos_from_docs(rag.langchain_documents, 30)
         query = QuestionAnalysisBase.get_modified_question(analysed_query)
         
-        self_querying_retriever, query_constructor = rag.build_self_querying_retriever_langchain(rag.llm_2, RAGPreTreatment.metadata_infos)
+        query_constructor = RagPreTreatMetadataFiltersAnalysis.get_query_constructor_langchain(rag.llm_2, RAGPreTreatment.metadata_infos)
         
-        response_with_filters = Llm.invoke_chain_with_input('Analyse metadata', query_constructor, query)
-        
+        ## WARNING: This is a fix as langchain query contructor (or our async to sync) seems to fails while async with error: Connection error.
+        # try:
+        #     response_with_filters = Execute.get_sync_from_async(Llm.invoke_chain_with_input_async, 'Analyse metadata', query_constructor, query)
+        # except Exception as e:
+        #     print(f'+++ Error on "analyse_query_for_metadata": {e}')
+        response_with_filters = query_constructor.invoke(query)
+
         metadata_filters = RagFilteringMetadataHelper.get_filters_from_comparison(response_with_filters.filter, RAGPreTreatment.metadata_infos)
         return response_with_filters.query, metadata_filters
             

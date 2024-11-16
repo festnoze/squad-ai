@@ -1,11 +1,9 @@
 from typing import Optional, Union
 from common_tools.models.logical_operator import LogicalOperator
-from langchain.chains.query_constructor.base import AttributeInfo
-
 from langchain_core.structured_query import Comparison, Operation
+from common_tools.models.metadata_description import MetadataDescription
 
 class RagFilteringMetadataHelper:
-    
     @staticmethod
     def has_manual_filters(question: str) -> bool:
         return  question.__contains__("filters:") or question.__contains__("filtres :")
@@ -23,7 +21,7 @@ class RagFilteringMetadataHelper:
         filters = RagFilteringMetadataHelper.get_filters_from_str(filters_str)
         return filters, query_wo_metadata
     
-    #todo: make it generic from the metadat infos
+    #TODO: make it generic from the metadata infos
     @staticmethod
     def get_filters_from_str(filters_str: str) -> dict:
         filters = []
@@ -83,7 +81,7 @@ class RagFilteringMetadataHelper:
         return False
     
     @staticmethod
-    def get_filters_from_comparison(langchain_filters: Union[Comparison, Operation], metadata_infos: list[AttributeInfo] = None) -> dict:
+    def get_filters_from_comparison(langchain_filters: Union[Comparison, Operation], metadata_infos: list[MetadataDescription] = None) -> dict:
         filters = []
         valid_keys = set(attr_info.name for attr_info in metadata_infos) if metadata_infos else set()
         operator = None

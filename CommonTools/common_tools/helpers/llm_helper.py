@@ -52,7 +52,7 @@ class Llm:
     async def invoke_chain_with_input_async(action_name: str = "", chain: Chain = None, input: dict = None) -> list[str]:       
         if not input: input = {"input": ""}
         chain_w_config = chain.with_config({"run_name": f"{action_name}"})
-        return await chain_w_config.ainvoke(input)     
+        return await chain_w_config.ainvoke(input)  
      
     @staticmethod
     def invoke_prompt_with_output_parser_and_fallbacks(action_name: str, llms_with_fallbacks: Union[Runnable, list[Runnable]], prompt: Union[str, ChatPromptTemplate], output_parser: BaseTransformOutputParser = None, batch_size:int = None) -> list[str]:

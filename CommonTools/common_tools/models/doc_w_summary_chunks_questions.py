@@ -69,6 +69,7 @@ class DocWithSummaryChunksAndQuestions:
                 for question in chunk.questions:
                     chunk_content += question.text + '\n'
             if include_chunk_text:
+                if include_questions: chunk_content += '### Réponses ###\n'
                 chunk_content += chunk.text + '\n'
             docs.append(Document(page_content=chunk_content, metadata=self.metadata))
         return docs

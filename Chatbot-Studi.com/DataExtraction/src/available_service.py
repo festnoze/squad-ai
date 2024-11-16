@@ -51,7 +51,7 @@ class AvailableService:
         if not AvailableService.vector_db_type:
             AvailableService.vector_db_type = ConfigHelper.get_vector_db_type_from_env()
         if not AvailableService.llms_infos:
-            LangChainFactory.set_openai_apikey() 
+            LangChainFactory.set_openai_apikey()
             AvailableService.llms_infos = ConfigHelper.get_llms_from_env()
         if not AvailableService.rag_service:
             if not AvailableService.embedding_model:
@@ -59,7 +59,8 @@ class AvailableService:
             AvailableService.rag_service = RagService(
                                             llms_or_info=AvailableService.llms_infos, 
                                             embedding_model=AvailableService.embedding_model, 
-                                            vector_db_type=AvailableService.vector_db_type)
+                                            vector_db_type=AvailableService.vector_db_type,
+                                            vector_db_name=ConfigHelper.get_vector_db_name_from_env())
             
         #TEST_LLM = AvailableService.rag_service.llm_1.invoke("quelle est la capitale de l'europe ?")
 
@@ -81,11 +82,11 @@ class AvailableService:
     def create_vector_db_from_generated_embeded_documents(out_dir):
         all_docs = GenerateDocumentsAndMetadata().load_all_docs_as_json(out_dir)
         injection_pipeline = RagInjectionPipeline(AvailableService.rag_service)
-        injection_pipeline.build_vectorstore_and_bm25_store(all_docs, chunk_size= 2500, children_chunk_size= 0, vector_db_type=AvailableService.vector_db_type, collection_name= 'studi-full', delete_existing= True)
+        injection_pipeline.build_vectorstore_and_bm25_store(all_docs, chunk_size= 2500, children_chunk_size= 0, vector_db_type=AvailableService.vector_db_type, collection_name= 'studi-public-full', delete_existing= True)
         AvailableService.re_init() # reload rag_service with the new vectorstore and langchain documents
 
     def create_summary_vector_db_from_generated_embeded_documents(out_dir):
-        trainings_documents, trainings_objects = out_dir._load_or_generate_summary_chunks_and_questions_for_docs()
+        trainings_documents, trainings_objects = AvailableService._load_or_generate_summary_chunks_and_questions_for_docs(out_dir)
 
         # Add full text and metadata to trainings' DocWithSummaryChunksAndQuestions objects
         for training_obj, training_doc in zip(trainings_objects, trainings_documents):           
@@ -100,11 +101,11 @@ class AvailableService:
             training_obj.doc_content = training_doc.page_content
             training_obj.metadata = training_doc.metadata
 
-        all_docs = []
+        all_chunks_with_questions = []
         for training_object in trainings_objects:
-            all_docs.extend(training_object.chunks_to_langchain_documents())
+            all_chunks_with_questions.extend(training_object.chunks_to_langchain_documents(include_chunk_text=True, include_questions=True))
         injection_pipeline = RagInjectionPipeline(AvailableService.rag_service)
-        injection_pipeline.build_vectorstore_and_bm25_store(all_docs, chunk_size= 2500, children_chunk_size= 0, vector_db_type=AvailableService.vector_db_type, collection_name= 'studi-summarized-questions', delete_existing= True)
+        injection_pipeline.build_vectorstore_and_bm25_store(all_chunks_with_questions, chunk_size= 2500, children_chunk_size= 0, vector_db_type=AvailableService.vector_db_type, collection_name='studi-public-summarized-chunks-w-questions', delete_existing= True) #, collection_name= 'studi-summarized-questions'
         AvailableService.re_init() # reload rag_service with the new vectorstore and langchain documents
 
     def _load_or_generate_summary_chunks_and_questions_for_docs(out_dir):
@@ -267,7 +268,7 @@ class AvailableService:
         summarize_rag_answer_prompt = Ressource.load_ressource_file('summarize_rag_answer_prompt.french.txt')
         promptlate = ChatPromptTemplate.from_template(summarize_rag_answer_prompt)
         chain = promptlate | AvailableService.rag_service.llm_1 | RunnablePassthrough()
-        result = Llm.invoke_chain_with_input('Answer summarization', chain, text)
+        result = Execute.get_sync_from_async(Llm.invoke_chain_with_input_async, 'Answer summarization', chain, text)
         return Llm.get_content(result)
 
     def generate_ground_truth():

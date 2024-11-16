@@ -71,7 +71,7 @@ class ChatbotFront:
         for msg in st.session_state.messages:
             st.chat_message(msg['role']).write(msg['content'])
         
-        ChatbotFront.build_summary_vectorstore() #TODO: TMP, to remove when summarization is done and working
+        #ChatbotFront.build_summary_vectorstore() #TODO: TMP, to remove when summarization is done and working
         
         if user_query := st.chat_input(placeholder= 'Ecrivez votre question ici ...'):
             st.chat_message('user').write_stream(ChatbotFront._write_stream(user_query))

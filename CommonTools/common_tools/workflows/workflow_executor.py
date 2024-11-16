@@ -163,14 +163,14 @@ class WorkflowExecutor:
                     kwargs_values[name] = value 
     
     def _raise_fail_func_execution(self, class_and_function_name, previous_results:list, kwargs_value, exception):
-        previous_results_str = ', '.join(str(result) for result in previous_results)
+        previous_results_str = ', '.join(f'({type(result).__name__}) {str(result)[:25]}...' for result in previous_results)
         previous_results_str = previous_results_str[:100] + '... + size: ' + str(len(previous_results_str)) if len(previous_results_str) > 100 else previous_results_str
         
         error_message = (
                 f"Error: {str(exception)}\n"
                 f"Error occurred while executing class and function name: '{class_and_function_name}'\n"
                 f"With previous results: {previous_results_str if previous_results else '<empty>'}\n"
-                f"With kwargs values: {kwargs_value}.\n"
+                f"With kwargs values: {', '.join(list(kwargs_value.keys()))}.\n"
             )
         raise RuntimeError(error_message) from exception
 

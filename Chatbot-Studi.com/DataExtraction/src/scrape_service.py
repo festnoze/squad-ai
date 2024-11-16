@@ -27,8 +27,8 @@ class ScrapeService:
         pages_out_dir = "outputs/scraped-full/"
         sections_out_dir = 'outputs/scraped/'
 
-        self.parallel_scrape_webpages_contents(all_trainings_urls, pages_out_dir, batch_size, only_not_yet_scraped= True)
-        self.extract_sections_from_scraped_pages(pages_out_dir, sections_out_dir)
+        self.parallel_scrape_content_missing_webpages(all_trainings_urls, pages_out_dir, batch_size, only_missing_webpages_to_scrape= True)
+        self.save_sections_from_scraped_pages(pages_out_dir, sections_out_dir)
 
         elapsed = txt.get_elapsed_str(txt.get_elapsed_seconds(total_start_time, time.time()))
         txt.print(f"Scraping all trainings contents completed and saved in {elapsed}") 
@@ -119,9 +119,9 @@ class ScrapeService:
         
         return training_links
     
-    def parallel_scrape_webpages_contents(self, pages_urls:list[str], out_dir:str, batch_size:int = 10, only_not_yet_scraped= True):        
+    def parallel_scrape_content_missing_webpages(self, pages_urls:list[str], out_dir:str, batch_size:int = 10, only_missing_webpages_to_scrape= True):        
         # Remove already scraped webpages
-        if only_not_yet_scraped:
+        if only_missing_webpages_to_scrape:
             links_to_process = [
                 link for link in pages_urls
                 if not file.file_exists(f"{out_dir}{link.split('/')[-1]}.json")
@@ -155,7 +155,7 @@ class ScrapeService:
         driver.quit()
         return result
     
-    def extract_sections_from_scraped_pages(self, pages_out_dir, sections_out_dir):
+    def save_sections_from_scraped_pages(self, pages_out_dir, sections_out_dir):
         webpages_json = file.get_files_contents(pages_out_dir, 'json')
         for webpage_json_str in webpages_json:
             webpage_json = json.loads(webpage_json_str)
@@ -201,7 +201,9 @@ class ScrapeService:
                 li_tags = tag_w_ul.find_all('li', class_='tag')
                 if li_tags and any(li_tags):
                     academic_levels = [li_tag.get_text(strip=True) for li_tag in li_tags]
-                    sections['academic_level'] = self._build_bullet_lists_str_from_nested_lists(academic_levels)
+                    if len(academic_levels) != 1:
+                        txt.print(f"Found {len(academic_levels)} academic levels for '{webpage_name}'.")
+                    sections['academic_level'] = academic_levels[0]
 
         # Extract content from the specified sections by their classes
         for section_class in section_classes:
@@ -307,25 +309,30 @@ class ScrapeService:
 
         return content_list
     
-    def _build_bullet_lists_str_from_nested_lists(self, content, depth=0, indent_count=4)-> str:
+    def _build_bullet_lists_str_from_nested_lists(self, content, depth=0, indent_with_tabs = False, indent_count=4)-> str:
         output = ''
-        indent = ' ' * (indent_count * depth)
         bullets = ['•', '◦', '▪']
         bullet = bullets[depth % len(bullets)]
+        
+        if indent_with_tabs: indent = '\t' * depth
+        else: indent = ' ' * indent_count * depth
 
         if isinstance(content, dict):
-            # Handle dictionary with 'title' and 'content'
+            # Handle dictionaries with 'title' and 'content'
             title = content.get('title', '')
-            output += Ressource.remove_curly_brackets(f"{indent}{bullet} {title}\n")
-            output += self._build_bullet_lists_str_from_nested_lists(content.get('content', []), depth + 1, indent_count)
+            if title:
+                output += Ressource.remove_curly_brackets(f"##{title}##\n")
+            if 'content' in content:
+                output += self._build_bullet_lists_str_from_nested_lists(content.get('content', []), depth, indent_with_tabs, indent_count)
+            else: # Handle other dictionaries
+                output += self._build_bullet_lists_str_from_nested_lists(list(content.items()), depth, indent_with_tabs, indent_count)
         elif isinstance(content, list):
-            for item in content:
-                output += self._build_bullet_lists_str_from_nested_lists(item, depth, indent_count)
+            for i, content_item in enumerate(content):
+                list_depth = depth if i == 0 else depth + 1 # Increase depth for nested lists with previous item (as a sub-list needs a prior title to justify extra-indentation)
+                output += self._build_bullet_lists_str_from_nested_lists(content_item, list_depth, indent_with_tabs, indent_count)
         elif isinstance(content, str):
             output += Ressource.remove_curly_brackets(f"{indent}{bullet} {content}\n")
-        else:
-            # Handle other types if necessary
-            pass
-
+        else:            
+            pass # Handle other types here if needed
         return output
 

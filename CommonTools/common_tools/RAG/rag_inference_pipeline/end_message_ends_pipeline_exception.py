@@ -3,5 +3,5 @@ from common_tools.rag.rag_inference_pipeline.end_pipeline_exception import EndPi
 
 class EndMessageEndsPipelineException(EndPipelineException):
     def __init__(self):        
-        message = Ressource.get_ressource_file_content('end_conversation_default_message.txt')
+        message = Ressource.load_ressource_file('end_conversation_default_message.txt')
         super().__init__("_fin_echange_", message)
