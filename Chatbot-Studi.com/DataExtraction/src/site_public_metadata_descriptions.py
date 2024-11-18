@@ -11,6 +11,8 @@ class MetadataDescriptionHelper:
         sub_domains_names = MetadataDescriptionHelper.get_all_json(all_dir, 'all_sub_domains_names')
         certifications_names = MetadataDescriptionHelper.get_all_json(all_dir, 'all_certifications_names')
         diplomes_names = MetadataDescriptionHelper.get_all_json(all_dir, 'all_diplomas_names')
+        trainings_names = MetadataDescriptionHelper.get_all_json(all_dir, 'all_trainings_names')
+
         warning_exactitude = "Attention, le texte de la valeur doit correspondre exactement au texte de l'une des valeurs possibles."
         warning_training_only = "Attention : cette meta-data n'existe que pour les documents relatifs aux formations (type = 'formation'). Ne pas ajouter ce filtre pour un type différent que 'formation'."
         and_operator_not_allowed = "Attention : Ne jamais appliquer d'opérateur 'and' entre plusieurs éléments avec cette même clé. (Utilisez plutôt l'opérateur 'or' pour combiner plusieurs éléments avec cette même clé)."
@@ -66,7 +68,16 @@ class MetadataDescriptionHelper:
                         {and_operator_not_allowed}"""),
                     possible_values= diplomes_names, 
                     type='str'),
-                # MetadataDescription(name='name', description="Le nom du document. Par exemple, en conjonction avec le filtre : type = 'formation', il s'agira du nom de la formation. Attention : à n'utiliser que si le nom exact de l'objet recherché a été précédemment fourni par l'assistant (pas par l'utilisateur).", type='str'),
+                MetadataDescription(
+                    name='name', 
+                    description=f"""\
+                        Le nom du document. 
+                        Par exemple, en conjonction avec le filtre : type = 'formation', il s'agira du nom de la formation.
+                        Ce filtre est à utiliser lorsque l'on cherche un élément nommé explicitement (s'applique pour 'type' = ['formation', 'métier']).
+                        Ce filtre est utilisable avec n'importe quelle valeur, même partielle ou approximative (car l'élément sémantiquement le plus proche sera alors recherché).""",
+                        possible_values=  trainings_names,
+                        type='str'),
+
                 # MetadataDescription(name='changed', description="La date du document", type='str'),
                 # MetadataDescription(name='url', description="l'URL vers la page web de l'élément recherché. Ne s'applique que pour les types suivants : formation.", type='str'),
                 #MetadataDescription(name='rel_ids', description="permet de rechercher les documents connexes à l'id du document fourni en valeur", type='str')

@@ -2,7 +2,7 @@ from typing import Union
 from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.execute_helper import Execute
 from common_tools.models.conversation import Conversation
-from common_tools.rag.rag_filtering_metadata_helper import RagFilteringMetadataHelper
+from common_tools.helpers.rag_filtering_metadata_helper import RagFilteringMetadataHelper
 from common_tools.models.question_analysis_base import QuestionAnalysisBase
 from common_tools.rag.rag_service import RagService
 from common_tools.helpers.llm_helper import Llm

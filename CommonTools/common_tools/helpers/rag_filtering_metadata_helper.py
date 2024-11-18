@@ -111,29 +111,133 @@ class RagFilteringMetadataHelper:
             return filters[0]
         else:
             return {}
+        
+    @staticmethod
+    def find_filter_value(metadata: Union[dict, list], key: str, value: str = None) -> any:
+        """
+        Search for a key-value pair in the metadata and return the associated value if found.
+        Mimics `does_contain_filter` but returns the value or `None` if not found.
+        """
+        if isinstance(metadata, dict):
+            # Handle logical operators like $and, $or, $not
+            if "$and" in metadata:
+                for sub_filter in metadata["$and"]:
+                    result = RagFilteringMetadataHelper.find_filter_value(sub_filter, key, value)
+                    if result is not None:
+                        return result
+            elif "$or" in metadata:
+                for sub_filter in metadata["$or"]:
+                    result = RagFilteringMetadataHelper.find_filter_value(sub_filter, key, value)
+                    if result is not None:
+                        return result
+            elif "$not" in metadata:
+                result = RagFilteringMetadataHelper.find_filter_value(metadata["$not"], key, value)
+                return None if result is not None else None
+
+            # Check if the current dictionary contains the key-value pair
+            if key in metadata and (value is None or metadata[key] == value):
+                return metadata[key]
+
+            # Recursively check nested dictionaries
+            for v in metadata.values():
+                result = RagFilteringMetadataHelper.find_filter_value(v, key, value)
+                if result is not None:
+                    return result
+
+        elif isinstance(metadata, list):
+            # Check each item in the list
+            for item in metadata:
+                result = RagFilteringMetadataHelper.find_filter_value(item, key, value)
+                if result is not None:
+                    return result      
+                 
+        return None # If it's not a dict or list, return None
 
     @staticmethod
     def does_contain_filter(metadata: Union[dict, list], key: str, value: str = None) -> bool:
         """Check if a key-value pair exists in the metadata, including logical operators."""
-        if isinstance(metadata, dict):
-            # Handle logical operators like $and, $or, $not
-            if "$and" in metadata:
-                return any(RagFilteringMetadataHelper.does_contain_filter(sub_filter, key, value) for sub_filter in metadata["$and"])
-            elif "$or" in metadata:
-                return any(RagFilteringMetadataHelper.does_contain_filter(sub_filter, key, value) for sub_filter in metadata["$or"])
-            elif "$not" in metadata:
-                return not RagFilteringMetadataHelper.does_contain_filter(metadata["$not"], key, value)
-            
-            # Check if the current dictionary contains the key-value pair
-            if key in metadata and (value is None or metadata[key] == value):
-                return True
+        return RagFilteringMetadataHelper.find_filter_value(metadata, key, value) is not None
+    
+    @staticmethod
+    def remove_filter_key(metadata: Union[dict, list], key: str) -> Union[dict, list, None]:
+        """
+        Recursively removes all occurrences of the specified key from the filter metadata.
+        If a parent container (dict or list) becomes empty as a result, it is also removed.
+        
+        Parameters:
+        - metadata: The filter structure (dict or list).
+        - key: The key to be removed.
 
-            # Recursively check nested dictionaries
-            return any(RagFilteringMetadataHelper.does_contain_filter(v, key, value) for v in metadata.values())
+        Returns:
+        - The modified metadata with the key removed.
+        - None if the container becomes empty.
+        """
+        if isinstance(metadata, dict):
+            # Remove the key if it exists in the current dictionary
+            if key in metadata:
+                del metadata[key]
+            
+            # Recursively process each value in the dictionary
+            keys_to_delete = []
+            for k, v in metadata.items():
+                new_value = RagFilteringMetadataHelper.remove_filter_key(v, key)
+                if new_value is None:  # Mark empty containers for deletion
+                    keys_to_delete.append(k)
+                else:
+                    metadata[k] = new_value
+            
+            # Delete empty containers
+            for k in keys_to_delete:
+                del metadata[k]
+
+            # Return None if the dictionary is now empty
+            return metadata if metadata else None
 
         elif isinstance(metadata, list):
-            # Check each item in the list
-            return any(RagFilteringMetadataHelper.does_contain_filter(item, key, value) for item in metadata)
+            # Recursively process each item in the list
+            new_list = []
+            for item in metadata:
+                updated_item = RagFilteringMetadataHelper.remove_filter_key(item, key)
+                if updated_item is not None:  # Keep non-empty items
+                    new_list.append(updated_item)
 
-        # If it's not a dict or list, return False
-        return False
+            # Return the modified list, or None if it is empty
+            return new_list if new_list else None
+
+        # Return the metadata itself if it's not a dict or list
+        return metadata
+
+    @staticmethod
+    def update_filter_value(metadata: Union[dict, list], key: str, new_value: any) -> Union[dict, list, None]:
+        """
+        Recursively updates all occurrences of the specified key with the provided value
+        in the filter metadata.
+
+        Parameters:
+        - metadata: The filter structure (dict or list).
+        - key: The key whose value needs to be updated.
+        - new_value: The new value to assign to the key.
+
+        Returns:
+        - The modified metadata with the updated values.
+        """
+        if isinstance(metadata, dict):
+            # Update the key if it exists in the current dictionary
+            if key in metadata:
+                metadata[key] = new_value
+            
+            # Recursively process each value in the dictionary
+            for k, v in metadata.items():
+                metadata[k] = RagFilteringMetadataHelper.update_filter_value(v, key, new_value)
+
+            return metadata
+
+        elif isinstance(metadata, list):
+            # Recursively process each item in the list
+            return [
+                RagFilteringMetadataHelper.update_filter_value(item, key, new_value)
+                for item in metadata
+            ]
+
+        # Return the metadata itself if it's not a dict or list
+        return metadata

@@ -181,6 +181,8 @@ class file:
         
     @staticmethod 
     def get_as_json(full_file_path:str):
+        if not full_file_path.endswith('.json'):
+            full_file_path += '.json'
         if not file.file_exists(full_file_path):
             raise FileNotFoundError(f"File '{full_file_path}' does not exist.")
         data = file.get_as_str(full_file_path)

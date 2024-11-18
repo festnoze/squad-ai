@@ -34,7 +34,7 @@ class RagInjectionPipeline:
         self.vectorstore = self._build_vectorstore(documents, chunk_size, vector_db_type, collection_name, delete_existing)
         self._build_bm25_store(documents)
 
-    def _build_vectorstore(self, documents: list, chunk_size:int = 0, vector_db_type='qdrant', collection_name:str = 'main', delete_existing=True) -> any:
+    def _build_vectorstore(self, documents: list, chunk_size:int = 1000, vector_db_type='qdrant', collection_name:str = 'main', delete_existing=True) -> any:
         if not documents or len(documents) == 0: raise ValueError("No documents provided")
         if not hasattr(self.rag_service, 'embedding') or not self.rag_service.embedding: raise ValueError("Embedding model must be specified to build vector store")
         if delete_existing:
@@ -42,10 +42,10 @@ class RagInjectionPipeline:
         
         langchain_documents = []
         if chunk_size > 0:
-            langchain_documents = self._split_text_into_chunks(documents, chunk_size)  
-            txt.print("The size of the smallest chunk is: " + str(self.get_min_size(langchain_documents)) + " words long.")
-            txt.print("The size of the biggest chunk is: " + str(self.get_max_size(langchain_documents)) + " words long.")
-            txt.print("The total number of chunks is: " + str(len(langchain_documents)) + " chunks.")      
+            langchain_documents = self._split_text_into_chunks(documents, chunk_size, chunk_size/10 if chunk_size != 0 else 0)  
+            txt.print("Size of the smallest chunk is: " + str(self.get_min_size(langchain_documents)) + " words long.")
+            txt.print("Size of the biggest chunk is: " + str(self.get_max_size(langchain_documents)) + " words long.")
+            txt.print("Total count: " + str(len(langchain_documents)) + " chunks.")      
         else:
             if not documents or not any(documents):
                 return None
@@ -57,14 +57,14 @@ class RagInjectionPipeline:
                             metadata=doc["metadata"] if doc["metadata"] else '') 
                     for doc in documents
                 ]
-        txt.print_with_spinner(f"Start embedding of {len(langchain_documents)} documents or chunks")
+        txt.print_with_spinner(f"Start embedding of {len(langchain_documents)} chunks of documents...")
         if vector_db_type == 'qdrant':
             db = self._add_documents_to_qdrant(documents= langchain_documents, embedding = self.rag_service.embedding, vector_db_path= self.rag_service.vector_db_path, collection_name=collection_name)
         elif vector_db_type == 'chroma':
             db = self._add_documents_to_chroma(documents= langchain_documents, embedding = self.rag_service.embedding, vector_db_path= self.rag_service.vector_db_path, collection_name=collection_name)
         else:
             raise ValueError("Invalid vector db type: " + vector_db_type)
-        txt.stop_spinner_replace_text(f"Finished Embedding on: {len(langchain_documents)} documents")
+        txt.stop_spinner_replace_text(f"Done. {len(langchain_documents)} documents' chunks embedded sucessfully!")
         return db
     
     def _batch_list(self, documents, batch_size):
@@ -158,7 +158,7 @@ class RagInjectionPipeline:
         # Ensure chunks do not exceed the maximum allowed size
         valid_chunks = []
         for chunk in all_chunks:
-            if len(chunk.page_content) <= max_chunk_size*1.1:
+            if len(chunk.page_content.split(' ')) <= max_chunk_size*1.15:
                 valid_chunks.append(Document(page_content=chunk.page_content, metadata=chunk.metadata))
             else:
                 # Optionally, you can further split the chunk here if it exceeds the max size
@@ -169,7 +169,7 @@ class RagInjectionPipeline:
         return valid_chunks
 
     def _get_text_splitter(self, chunk_size, chunk_overlap):
-        txt_splitter = CharacterTextSplitter(
+        txt_splitter = RecursiveCharacterTextSplitter(
             separator="\n",
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,

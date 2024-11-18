@@ -86,55 +86,20 @@ class AvailableService:
         AvailableService.re_init() # reload rag_service with the new vectorstore and langchain documents
 
     def create_summary_vector_db_from_generated_embeded_documents(out_dir):
-        trainings_documents, trainings_objects = AvailableService._load_or_generate_summary_chunks_and_questions_for_docs(out_dir)
-
-        # Add full text and metadata to trainings' DocWithSummaryChunksAndQuestions objects
-        for training_obj, training_doc in zip(trainings_objects, trainings_documents):           
-            match = re.search(r'formation : "(.*?)"', training_obj.doc_summary)
-            if not match: raise ValueError(f"Could not find the training name in the summary: {training_obj.doc_summary[:100]}...")
-            doc_training_title = match.group(1).replace('  ', ' ')
-            obj_training_title = training_doc.metadata['name'].replace('  ', ' ')
-            obj_title_first_quote_index = obj_training_title.find('"')
-            if obj_title_first_quote_index != -1: obj_training_title = obj_training_title[:obj_title_first_quote_index]
-            if obj_training_title != doc_training_title: raise ValueError(f"Training name mismatch: {training_doc.metadata['name']} != {doc_training_title}")
-            #
-            training_obj.doc_content = training_doc.page_content
-            training_obj.metadata = training_doc.metadata
-
-        all_chunks_with_questions = []
-        for training_object in trainings_objects:
-            all_chunks_with_questions.extend(training_object.chunks_to_langchain_documents(include_chunk_text=True, include_questions=True))
+        all_chunks = AvailableService._load_or_generate_summary_chunks_and_questions_for_docs(out_dir)
         injection_pipeline = RagInjectionPipeline(AvailableService.rag_service)
-        injection_pipeline.build_vectorstore_and_bm25_store(all_chunks_with_questions, chunk_size= 2500, children_chunk_size= 0, vector_db_type=AvailableService.vector_db_type, collection_name='studi-public-summarized-chunks-w-questions', delete_existing= True) #, collection_name= 'studi-summarized-questions'
+        injection_pipeline.build_vectorstore_and_bm25_store(all_chunks, chunk_size= 2500, children_chunk_size= 0, vector_db_type=AvailableService.vector_db_type, collection_name='studi-public-summarized-chunks-w-questions', delete_existing= True) #, collection_name= 'studi-summarized-questions'
         AvailableService.re_init() # reload rag_service with the new vectorstore and langchain documents
 
     def _load_or_generate_summary_chunks_and_questions_for_docs(out_dir):
-        docs_with_summary_chunks_and_questions_file_path = os.path.join(out_dir, 'all_docs_summaries_chunks_and_questions.json')
-        if file.file_exists(docs_with_summary_chunks_and_questions_file_path):
-            summary_builder = GenerateDocumentsSummariesChunksQuestionsAndMetadata()
-            trainings_docs = summary_builder.load_and_process_trainings(out_dir)
-            docs_with_summary_chunks_and_questions_json = file.get_as_json(docs_with_summary_chunks_and_questions_file_path)
-            docs_with_summary_chunks_and_questions = [DocWithSummaryChunksAndQuestions(**doc) for doc in docs_with_summary_chunks_and_questions_json]
-            txt.print(f">>> Loaded existing {len(docs_with_summary_chunks_and_questions)} docs with summary, chunks and questions from file at: {docs_with_summary_chunks_and_questions_file_path}")
-        else:
-            start = time.time()
-            summary_builder = GenerateDocumentsSummariesChunksQuestionsAndMetadata()
-            trainings_docs = summary_builder.load_and_process_trainings(out_dir)
-            txt.print_with_spinner(f"Generating summaries, chunking and questions in 3 steps for each {len(trainings_docs)} documents")
-            docs_with_summary_chunks_and_questions = Execute.get_sync_from_async(
-                            summary_builder.create_summary_and_questions_from_docs_in_three_steps_async, 
-                            [AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2, AvailableService.rag_service.llm_3], 
-                            trainings_docs, 50)
-            
-            docs_json = [doc.to_dict(False) for doc in docs_with_summary_chunks_and_questions]
-            file.write_file(docs_json, docs_with_summary_chunks_and_questions_file_path)
-            summary_chunks_and_questions_elapsed_str = txt.get_elapsed_str(time.time() - start)
-            txt.stop_spinner_replace_text(f"Finish generating summaries, chunking and questions in 3 steps for all {len(docs_with_summary_chunks_and_questions)} documents. Done in: {summary_chunks_and_questions_elapsed_str}")
-        return trainings_docs,docs_with_summary_chunks_and_questions# reload rag_service with the new vectorstore and langchain documents
+        llm_and_fallback = [AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2, AvailableService.rag_service.llm_3]
+        summary_builder = GenerateDocumentsSummariesChunksQuestionsAndMetadata()
+        all_docs = summary_builder.load_or_generate_all_docs_from_summaries(out_dir, llm_and_fallback)
+        return all_docs
 
     async def test_different_splitting_of_summarize_chunks_and_questions_creation_async(out_dir):
         summary_builder = GenerateDocumentsSummariesChunksQuestionsAndMetadata()
-        trainings_docs = summary_builder.load_and_process_trainings(out_dir)
+        trainings_docs = summary_builder._load_and_process_trainings(out_dir)
 
         txt.print("-"*70)
         start = time.time()

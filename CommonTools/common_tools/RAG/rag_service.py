@@ -109,14 +109,14 @@ class RagService:
             elif vectorstore_type == "qdrant":
                 db_dir = self.vector_db_path
             if not file.file_exists(db_dir):
-                txt.print(f'>> Vectorstore not loaded, as path: "{db_dir[-40:]}" is not found')
+                txt.print(f'>> Vectorstore not loaded, as path: "... {db_dir[-40:]}" is not found')
                 return None
             
             if vectorstore_type == "chroma":
                 return Chroma(persist_directory= db_dir, embedding_function= self.embedding)
             elif vectorstore_type == "qdrant":
                 qdrant_client = QdrantClient(path=db_dir)
-                return QdrantVectorStore(client=qdrant_client, collection_name=collection_name, embeddings=self.embedding)
+                return QdrantVectorStore(client=qdrant_client, collection_name=collection_name, embedding=self.embedding)
         
         except Exception as e:
             txt.print(f"Error loading vectorstore: {e}")

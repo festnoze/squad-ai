@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import time
 #
 from langchain.schema import Document
 from common_tools.helpers.txt_helper import txt
@@ -9,6 +10,7 @@ from common_tools.helpers.json_helper import JsonHelper
 from common_tools.helpers.llm_helper import Llm
 from common_tools.models.doc_w_summary_chunks_questions import Question, DocChunk, DocWithSummaryChunksAndQuestions, DocWithSummaryChunksAndQuestionsPydantic, DocQuestionsByChunkPydantic
 from common_tools.helpers.ressource_helper import Ressource
+from common_tools.helpers.execute_helper import Execute
 
 class GenerateDocumentsSummariesChunksQuestionsAndMetadata:
     def __init__(self):
@@ -132,34 +134,119 @@ class GenerateDocumentsSummariesChunksQuestionsAndMetadata:
             docs.append(DocWithSummaryChunksAndQuestions(doc_content= trainings_docs[i].page_content, doc_summary=docs_summaries[i], doc_chunks=doc_chunks))
         return docs
     
-    def load_all_docs_summaries_as_json(self, path: str) -> list[Document]:
+    def load_or_generate_all_docs_from_summaries(
+                                        self, 
+                                        path: str, 
+                                        llm_and_fallback, 
+                                        separate_chunks_and_questions=False) -> list[Document]:
         all_docs = []
+        add_trainings_full_details = False
+        add_trainings_full_doc = True # Needed to be load to get the metadata of each trainings
         txt.print_with_spinner(f"Build all Langchain documents summaries ...")
 
         # Process certifiers
         certifiers_data = JsonHelper.load_from_json(os.path.join(path, 'certifiers.json'))
+        certifiers_docs, all_certifiers_names = self.process_certifiers(certifiers_data)
+        all_docs.extend(certifiers_docs)
+
+        # Process certifications
         certifications_data = JsonHelper.load_from_json(os.path.join(path, 'certifications.json'))
+        certifications_docs, all_certifications_names = self.process_certifications(certifications_data)
+        all_docs.extend(certifications_docs)
+
+        # Process diplomas
         diplomas_data = JsonHelper.load_from_json(os.path.join(path, 'diplomas.json'))
+        diplomas_docs, all_diplomas_names = self.process_diplomas(diplomas_data)
+        all_docs.extend(diplomas_docs)
+
+        # Process domains
         domains_data = JsonHelper.load_from_json(os.path.join(path, 'domains.json'))
+        domains_docs, all_domains_names = self.process_domains(domains_data)
+        all_docs.extend(domains_docs)
+
+        # Process sub-domains
         sub_domains_data = JsonHelper.load_from_json(os.path.join(path, 'subdomains.json'))
+        sub_domains_docs, all_sub_domains_names = self.process_sub_domains(sub_domains_data)
+        all_docs.extend(sub_domains_docs)
 
-        # # Process jobs
-        # jobs_data = JsonHelper.load_from_json(os.path.join(path, 'jobs.json'))
-        # jobs_docs, all_jobs_names = self.process_jobs(jobs_data, domains_data)
-        # all_docs.extend(jobs_docs)
+        # Process fundings
+        fundings_data = JsonHelper.load_from_json(os.path.join(path, 'fundings.json'))
+        fundings_docs, all_fundings_names = self.process_fundings(fundings_data)
+        all_docs.extend(fundings_docs)
 
-    def load_and_process_trainings(self, path: str) -> list[Document]:
-        all_docs = []
+        # Process jobs
+        jobs_data = JsonHelper.load_from_json(os.path.join(path, 'jobs.json'))
+        jobs_docs, all_jobs_names = self.process_jobs(jobs_data, domains_data)
+        all_docs.extend(jobs_docs)
+
+        # Process trainings (generate summaries, chunks and questions if needed)
+        trainings_objects = self.load_or_generate_trainings_to_process(path, all_docs, llm_and_fallback, add_trainings_full_details, add_trainings_full_doc)
+        
+        # Create all chunks (docs chunks with questions)
+        docs_chunks_and_questions = []
+        for training_object in trainings_objects:
+            if separate_chunks_and_questions:
+                #TODO: to rework, so questions chunk can ref. the doc chunk id, change both bool to a single: 'separate_chunks_and_questions'
+                docs_chunks_and_questions.extend(training_object.to_langchain_documents_chunked_summary_and_questions(include_chunk_text=True, include_questions=False))
+                docs_chunks_and_questions.extend(training_object.to_langchain_documents_chunked_summary_and_questions(include_chunk_text=False, include_questions=True))
+            else:
+                docs_chunks_and_questions.extend(training_object.to_langchain_documents_chunked_summary_and_questions(include_chunk_text=True, include_questions=True))
+        all_docs.extend(docs_chunks_and_questions)
+    
+        return all_docs
+
+    def load_or_generate_trainings_to_process(self, out_dir: str, all_docs:list, llm_and_fallback, add_full_details = False, add_full_doc = True) -> list[Document]:       
+        trainings_docs = self._load_and_process_trainings(out_dir, all_docs, add_full_details, add_full_doc)
+        docs_with_summary_chunks_and_questions_file_path = os.path.join(out_dir, 'trainings_summaries_chunks_and_questions_objects.json')
+
+        if file.file_exists(docs_with_summary_chunks_and_questions_file_path):
+            docs_with_summary_chunks_and_questions_json = file.get_as_json(docs_with_summary_chunks_and_questions_file_path)
+            trainings_objects = [DocWithSummaryChunksAndQuestions(**doc) for doc in docs_with_summary_chunks_and_questions_json]
+            txt.print(f">>> Loaded existing {len(trainings_objects)} docs with summary, chunks and questions from file at: {docs_with_summary_chunks_and_questions_file_path}")
+        else:
+            trainings_objects = self.generate_trainings_summaries_chunks_and_questions(llm_and_fallback, trainings_docs, docs_with_summary_chunks_and_questions_file_path)
+        
+        return self.enrich_trainings_objects_from_trainings_docs(trainings_docs, trainings_objects)
+
+    def generate_trainings_summaries_chunks_and_questions(self, llm_and_fallback, trainings_docs, docs_with_summary_chunks_and_questions_file_path):
+        start = time.time()
+        txt.print_with_spinner(f"Generating summaries, chunking and questions in 3 steps for each {len(trainings_docs)} documents")
+        docs_with_summary_chunks_and_questions = Execute.get_sync_from_async(
+                            self.create_summary_and_questions_from_docs_in_three_steps_async, 
+                            llm_and_fallback, 
+                            trainings_docs, 50)
+            
+        docs_json = [doc.to_dict(False) for doc in docs_with_summary_chunks_and_questions]
+        file.write_file(docs_json, docs_with_summary_chunks_and_questions_file_path)
+        summary_chunks_and_questions_elapsed_str = txt.get_elapsed_str(time.time() - start)
+        txt.stop_spinner_replace_text(f"Finish generating summaries, chunking and questions in 3 steps for all {len(docs_with_summary_chunks_and_questions)} documents. Done in: {summary_chunks_and_questions_elapsed_str}")
+
+    def enrich_trainings_objects_from_trainings_docs(self, trainings_docs, trainings_objects):                
+        # Add full text and metadata to trainings' DocWithSummaryChunksAndQuestions objects
+        for training_obj, training_doc in zip(trainings_objects, trainings_docs):           
+            self.check_for_training_name(training_obj, training_doc)
+            training_obj.doc_content = training_doc.page_content
+            training_obj.metadata = training_doc.metadata
+        return trainings_objects
+
+    def check_for_training_name(self, training_obj, training_doc):
+        match = re.search(r'formation : "(.*?)"', training_obj.doc_summary)
+        if not match: raise ValueError(f"Could not find the training name in the summary: {training_obj.doc_summary[:100]}...")
+        doc_training_title = match.group(1).replace('  ', ' ')
+        obj_training_title = training_doc.metadata['name'].replace('  ', ' ')
+        obj_title_first_quote_index = obj_training_title.find('"')
+        if obj_title_first_quote_index != -1: obj_training_title = obj_training_title[:obj_title_first_quote_index]
+        if obj_training_title != doc_training_title: raise ValueError(f"Training name mismatch: {training_doc.metadata['name']} != {doc_training_title}")
+    
+    def _load_and_process_trainings(self, path: str, all_docs:list, add_full_details = False, add_full_doc = True) -> list[Document]:
         # Load all needed infos from files
         domains_data = JsonHelper.load_from_json(os.path.join(path, 'domains.json'))
         sub_domains_data = JsonHelper.load_from_json(os.path.join(path, 'subdomains.json'))
         trainings_data = JsonHelper.load_from_json(os.path.join(path, 'trainings.json'))
         trainings_details = self.load_trainings_details_as_json(path)
-
-        trainings_docs, all_trainings_names = self.process_trainings(trainings_data, trainings_details, all_docs, domains_data, sub_domains_data)
+        trainings_docs, all_trainings_names = self.process_trainings(trainings_data, trainings_details, all_docs, domains_data, sub_domains_data, add_full_details, add_full_doc)
         all_docs.extend(trainings_docs)
-
-        return all_docs
+        return trainings_docs
     
     def load_trainings_details_as_json(self, path: str) -> dict:
         files_str = file.get_files_paths_and_contents(os.path.join(path, 'scraped/'))
@@ -321,10 +408,10 @@ class GenerateDocumentsSummariesChunksQuestionsAndMetadata:
         #docs.append(Document(page_content= 'Liste complète de tous les métiers couvert par Studi :\n' + ', '.join(all_jobs_names), metadata={"type": "liste_métiers",}))
         return docs, list(all_jobs_names)
 
-    def process_trainings(self, trainings_data: list[dict], trainings_details: dict, existing_docs:list = [], domains_data = None, sub_domains_data = None) -> list[Document]:
+    def process_trainings(self, trainings_data: list[dict], trainings_details: dict, existing_docs:list = [], domains_data = None, sub_domains_data = None, add_full_details = False, add_full_doc = True) -> list[Document]:
         if not trainings_data:
             return []
-        docs = []
+        all_trainings_docs = []
         all_trainings_titles = set()
         for training_data in trainings_data:
             training_title = training_data.get("title")
@@ -388,7 +475,7 @@ class GenerateDocumentsSummariesChunksQuestionsAndMetadata:
             contents = [f"\n###{self.get_french_section(key)}###\n{Ressource.remove_curly_brackets(value)}" for key, value in training_data.get('attributes', {}).items()]
             content = f"Formation : {training_data.get('title', '')}\nLien vers la page : {training_url}\n{'\n'.join(contents)}"            
             metadata_summary = metadata_common.copy()
-            metadata_summary['training_info_type'] = "summary"
+            metadata_summary['training_info_type'] = "full"
             
             # Add training details to doc
             if training_detail and any(training_detail):
@@ -397,13 +484,16 @@ class GenerateDocumentsSummariesChunksQuestionsAndMetadata:
                         content_detail = f"###{self.get_french_section(section_name)} de la formation : {training_data.get('title', '')}###\n"
                         content_detail += training_detail[section_name]
                         content += f"\n\n{content_detail}"
-                        # metadata_detail = metadata_common.copy()
-                        # metadata_detail['training_info_type'] = section_name
-                        #docs.append(Document(page_content=content_detail, metadata=metadata_detail))
-            docs.append(Document(page_content=content, metadata=metadata_summary))
+                        metadata_detail = metadata_common.copy()
+                        metadata_detail['training_info_type'] = section_name
+                        if add_full_details:
+                            all_trainings_docs.append(Document(page_content=content_detail, metadata=metadata_detail))
+            if add_full_doc:
+                all_trainings_docs.append(Document(page_content=content, metadata=metadata_summary))
 
         #docs.append(Document(page_content= 'Liste complète de toutes les formations proposées par Studi :\n' + ', '.join(all_trainings_titles), metadata={"type": "liste_formations",}))
-        return docs, list(all_trainings_titles)
+        existing_docs.extend(all_trainings_docs)
+        return all_trainings_docs, list(all_trainings_titles)
     
     
     section_to_french:dict = None # Singleton containing the static mapping of section names to their french equivalent.

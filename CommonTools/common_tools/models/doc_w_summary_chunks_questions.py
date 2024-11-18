@@ -61,7 +61,7 @@ class DocWithSummaryChunksAndQuestions:
             page_content += self.doc_content + '\n'
         return Document(page_content=page_content, metadata=self.metadata)
     
-    def chunks_to_langchain_documents(self, include_chunk_text=True, include_questions=True) -> Document:
+    def to_langchain_documents_chunked_summary_and_questions(self, include_chunk_text=True, include_questions=True) -> Document:
         docs = []
         for chunk in self.doc_chunks:
             chunk_content = ''

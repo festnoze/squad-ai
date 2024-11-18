@@ -1,9 +1,12 @@
 import json
+import os
 from typing import Optional, Union
 from common_tools.helpers.execute_helper import Execute
 from common_tools.helpers.file_helper import file
 from common_tools.helpers.llm_helper import Llm
+from common_tools.helpers.rag_bm25_retriever_helper import BM25RetrieverHelper
 from common_tools.helpers.ressource_helper import Ressource
+from common_tools.helpers.rag_filtering_metadata_helper import RagFilteringMetadataHelper
 from common_tools.models.conversation import Conversation
 from common_tools.models.question_analysis_base import QuestionAnalysisBase
 from common_tools.models.question_rewritting import QuestionRewritting, QuestionRewrittingPydantic
@@ -12,7 +15,6 @@ from common_tools.rag.rag_inference_pipeline.end_message_ends_pipeline_exception
 from common_tools.rag.rag_inference_pipeline.greetings_ends_pipeline_exception import GreetingsEndsPipelineException
 from common_tools.rag.rag_inference_pipeline.rag_pre_treat_metadata_filters_analysis import RagPreTreatMetadataFiltersAnalysis
 from common_tools.rag.rag_service import RagService
-from common_tools.rag.rag_filtering_metadata_helper import RagFilteringMetadataHelper
 from common_tools.workflows.output_name_decorator import output_name
 
 class RAGPreTreatment:
@@ -200,6 +202,32 @@ class RAGPreTreatment:
 
         # Transform academic_level metadata for some cases
         merged_metadata_filters = RAGPreTreatment.transform_academic_level_metadata(merged_metadata_filters)
+        
+        # Update metadata filters values  for 'name' key if not found in all_trainings_names or all_jobs_names
+        filter_by_name_value = RagFilteringMetadataHelper.find_filter_value(merged_metadata_filters, 'name')
+        if filter_by_name_value:
+            all_dir = "./outputs/all/"
+            filter_by_type_value = RagFilteringMetadataHelper.find_filter_value(merged_metadata_filters, 'type')
+            if filter_by_type_value and filter_by_type_value == 'formation':
+                all_trainings_names = file.get_as_json(all_dir + 'all_trainings_names')
+                if filter_by_name_value not in all_trainings_names:
+                    retrieved_value, retrieval_score = BM25RetrieverHelper.find_best_match_bm25(all_trainings_names, filter_by_name_value)                    
+                    if retrieval_score > 0.5:
+                        RagFilteringMetadataHelper.update_filter_value(merged_metadata_filters, 'name', retrieved_value)
+                    else:
+                        RagFilteringMetadataHelper.remove_filter_key(merged_metadata_filters, 'name')
+                        print(f"No match found for metadata value: '{filter_by_name_value}'in all trainings names. Nearest match: '{retrieved_value}' has a score of: {retrieval_score}")
+            
+            elif filter_by_type_value and filter_by_type_value == 'metier':
+                all_trainings_names = file.get_as_json(all_dir + 'all_jobs_names')
+                if filter_by_name_value not in all_trainings_names:
+                    retrieved_value, retrieval_score = BM25RetrieverHelper.find_best_match_bm25(all_trainings_names, filter_by_name_value)                    
+                    if retrieval_score > 0.5:
+                        RagFilteringMetadataHelper.update_filter_value(merged_metadata_filters, 'name', retrieved_value)
+                    else:
+                        RagFilteringMetadataHelper.remove_filter_key(merged_metadata_filters, 'name')
+                        print(f"No match found for metadata value: '{filter_by_name_value}'in all trainings names. Nearest match: '{retrieved_value}' has a score of: {retrieval_score}")             
+
         print(f"Metadata filters: '{merged_metadata_filters}'")
         return merged_metadata_filters
     
