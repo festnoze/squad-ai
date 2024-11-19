@@ -21,7 +21,7 @@ class RAGHybridRetrieval:
     @staticmethod    
     def rag_hybrid_retrieval_custom(rag: RagService, analysed_query :QuestionAnalysisBase, metadata:dict, include_bm25_retrieval: bool = False, give_score: bool = True, max_retrived_count: int = 20):
         if not include_bm25_retrieval:
-            rag_retrieved_chunks = RAGHybridRetrieval.semantic_vector_retrieval(rag,  QuestionAnalysisBase.get_modified_question(analysed_query), metadata, give_score, max_retrived_count)
+            rag_retrieved_chunks = RAGHybridRetrieval.semantic_vector_retrieval(rag, QuestionAnalysisBase.get_modified_question(analysed_query), metadata, give_score, max_retrived_count)
             return rag_retrieved_chunks
         
         rag_retrieved_chunks, bm25_retrieved_chunks = Execute.run_sync_functions_in_parallel_threads(
@@ -32,12 +32,11 @@ class RAGHybridRetrieval:
         return retained_chunks
     
     @staticmethod    
-    def rag_hybrid_retrieval_langchain(rag: RagService, analysed_query :QuestionAnalysisBase, metadata:dict, include_bm25_retrieval: bool = True, include_contextual_compression: bool = False, give_score: bool = True, max_retrived_count: int = 20, bm25_ratio: float = 0.2):
-        if not include_bm25_retrieval:
-            rag_retrieved_chunks = RAGHybridRetrieval.semantic_vector_retrieval(rag,  QuestionAnalysisBase.get_modified_question(analysed_query), metadata, give_score, max_retrived_count)
-            return rag_retrieved_chunks
-        
-        vector_ratio = 1 - bm25_ratio
+    def rag_hybrid_retrieval_langchain(rag: RagService, analysed_query :QuestionAnalysisBase, metadata:dict, include_bm25_retrieval: bool = False, include_contextual_compression: bool = False, include_semantic_retrieval: bool = True, give_score: bool = True, max_retrived_count: int = 20, bm25_ratio: float = 0.2):
+        semantic_k_ratio = 1 - bm25_ratio if include_bm25_retrieval and include_semantic_retrieval else 1
+        # rag_retrieved_chunks = RAGHybridRetrieval.semantic_vector_retrieval(rag,  QuestionAnalysisBase.get_modified_question(analysed_query), metadata, give_score, max_retrived_count)
+        # return rag_retrieved_chunks
+
         # Create bm25 retriever with metadata filter
         if metadata and any(metadata):
             if RagFilteringMetadataHelper.does_contain_filter(metadata, 'domaine','url'):
@@ -59,21 +58,22 @@ class RAGHybridRetrieval:
         bm25_retriever = rag._build_bm25_retriever(filtered_docs, k = int(max_retrived_count * bm25_ratio))
         
         # Create vectorstore retriever with metadata filter
-        vector_retriever = rag.vectorstore.as_retriever(
-            search_kwargs={
-                "k": int(max_retrived_count * vector_ratio),
-                "filter": metadata
-            }
-        ) 
+        vector_retriever = rag.vectorstore.as_retriever(search_kwargs=
+                                    {'k': int(max_retrived_count * semantic_k_ratio), 'filter': metadata}) 
+        retrievers = []
+        if include_semantic_retrieval: retrievers.append(vector_retriever)
+        if include_bm25_retrieval: retrievers.append(bm25_retriever)
+        if not any(retrievers): raise ValueError(f"No retriever has been defined in the hybrid retrieval")
 
-        retrievers = [vector_retriever, bm25_retriever]        
-        weights = [vector_ratio, bm25_ratio]
+        weights = [semantic_k_ratio, bm25_ratio]
         ensemble_retriever = EnsembleRetriever(retrievers=retrievers, weights=weights)
 
         if include_contextual_compression: # todo: rather put in a separate workflow step
-            filter_llm = LangChainFactory.create_llm(LangChainAdapterType.OpenAI, "gpt-4o-mini")
-            _filter = LLMChainFilter.from_llm(filter_llm)
-            final_retriever = ContextualCompressionRetriever(base_compressor=_filter, base_retriever=ensemble_retriever)
+            _filter = LLMChainFilter.from_llm(rag.llm_1)
+            final_retriever = ContextualCompressionRetriever(
+                                    name= 'contextual compression retriever', 
+                                    base_compressor=_filter, 
+                                    base_retriever=ensemble_retriever)
         else:
             final_retriever = ensemble_retriever
 

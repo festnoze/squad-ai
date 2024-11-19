@@ -19,7 +19,6 @@ from common_tools.workflows.output_name_decorator import output_name
 
 class RAGPreTreatment:
     default_filters = {}
-    
     @staticmethod
     def rag_static_pre_treatment(rag:RagService, query:Union[str, Conversation], default_filters:dict = {}) -> tuple[QuestionTranslation, dict]:
         question_analysis, extracted_implicit_metadata, extracted_explicit_metadata = Execute.run_sync_functions_in_parallel_threads(
@@ -40,7 +39,7 @@ class RAGPreTreatment:
     @output_name('analysed_query')
     def query_standalone_rewritten_from_history(rag:RagService, query:Union[str, Conversation]) -> QuestionRewritting:
         query_standalone_rewritten_prompt = Ressource.load_ressource_file('create_standalone_and_rewritten_query_from_history_prompt.txt')
-        query_standalone_rewritten_prompt = RAGPreTreatment._replace_all_categories_in_prompt(query_standalone_rewritten_prompt)
+        query_standalone_rewritten_prompt = RAGPreTreatment._query_rewritting_prompt_replace_all_categories(query_standalone_rewritten_prompt)
         query_standalone_rewritten_prompt = RAGPreTreatment._replace_query_and_history_in_prompt(query, query_standalone_rewritten_prompt)  
                 
         prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(
@@ -94,12 +93,13 @@ class RAGPreTreatment:
             raise EndMessageEndsPipelineException()
         return question_rewritting
 
+    #TODO: /!\ WARNING /!\ the query rewritting is domain specific and its prompt too (for studi.com). Thus, it shouldn't be in common_tools
     @staticmethod
     @output_name('analysed_query')
     def query_rewritting(rag:RagService, analysed_query:QuestionRewritting) -> str:        
-        query_rewritting_prompt = RAGPreTreatment._replace_all_categories_in_prompt(analysed_query.question_with_context)
+        query_rewritting_prompt = RAGPreTreatment._query_rewritting_prompt_replace_all_categories(analysed_query.question_with_context)
 
-        response = Execute.get_sync_from_async(Llm.invoke_chain_with_input_async, 'Query rewritting', rag.llm_2, query_rewritting_prompt)
+        response = Execute.get_sync_from_async(Llm.invoke_chain_with_input_async, 'Query rewritting', rag.llm_1, query_rewritting_prompt)
         
         content =  Llm.extract_json_from_llm_response(Llm.get_content(response))
         analysed_query.modified_question = content['modified_question']
@@ -107,12 +107,12 @@ class RAGPreTreatment:
         return analysed_query
 
     @staticmethod
-    def _replace_all_categories_in_prompt(prompt):
+    def _query_rewritting_prompt_replace_all_categories(prompt):
         out_dir = "./outputs/" #todo: not generic enough
-        diploms_names = ', '.join(file.get_as_json(out_dir + 'all/all_diplomas_names.json'))
-        certifications_names = ', '.join(file.get_as_json(out_dir + 'all/all_certifications_names.json'))
-        domains_list = ', '.join(file.get_as_json(out_dir + 'all/all_domains_names.json'))
-        sub_domains_list = ', '.join(file.get_as_json(out_dir + 'all/all_sub_domains_names.json'))
+        diploms_names = ', '.join([f"'{value}'" for value in file.get_as_json(out_dir + 'all/all_diplomas_names.json')])
+        certifications_names = ', '.join([f"'{value}'" for value in file.get_as_json(out_dir + 'all/all_certifications_names.json')])
+        domains_list = ', '.join([f"'{value}'" for value in file.get_as_json(out_dir + 'all/all_domains_names.json')])
+        sub_domains_list = ', '.join([f"'{value}'" for value in file.get_as_json(out_dir + 'all/all_sub_domains_names.json')])
 
         query_rewritting_prompt = Ressource.get_query_rewritting_prompt()
         query_rewritting_prompt = query_rewritting_prompt.replace("{user_query}", prompt)
@@ -163,12 +163,15 @@ class RAGPreTreatment:
     @staticmethod
     def analyse_query_for_metadata(rag:RagService, analysed_query:QuestionAnalysisBase) -> tuple[str, dict]:
         if not RAGPreTreatment.metadata_infos:
-            RAGPreTreatment.metadata_infos = RagService.build_metadata_infos_from_docs(rag.langchain_documents, 30)
+            RAGPreTreatment.metadata_infos = RagFilteringMetadataHelper.auto_generate_metadata_descriptions_from_docs_metadata(rag.langchain_documents, 30)
+        
         query = QuestionAnalysisBase.get_modified_question(analysed_query)
         
-        query_constructor = RagPreTreatMetadataFiltersAnalysis.get_query_constructor_langchain(rag.llm_2, RAGPreTreatment.metadata_infos)
-        
-        ## WARNING: This is a fix as langchain query contructor (or our async to sync) seems to fails while async with error: Connection error.
+        #query_constructor = RagPreTreatMetadataFiltersAnalysis.get_query_constructor_langchain(rag.llm_2, RAGPreTreatment.metadata_infos)
+        self_querying_retriever = RagPreTreatMetadataFiltersAnalysis.build_self_querying_retriever_langchain(rag.vectorstore, rag.vector_db_type, rag.llm_2, RAGPreTreatment.metadata_infos, True)
+        query_constructor = self_querying_retriever.query_constructor
+
+        ## WARNING: Not work as async. This is a fix as langchain query contructor (or our async to sync) seems to fails while async with error: Connection error.
         # try:
         #     response_with_filters = Execute.get_sync_from_async(Llm.invoke_chain_with_input_async, 'Analyse metadata', query_constructor, query)
         # except Exception as e:
@@ -200,54 +203,79 @@ class RAGPreTreatment:
                 if key not in merged_metadata_filters:
                     merged_metadata_filters[key] = value
 
-        # Transform academic_level metadata for some cases
-        merged_metadata_filters = RAGPreTreatment.transform_academic_level_metadata(merged_metadata_filters)
+        print(f"Extracted metadata filters: '{merged_metadata_filters}'")
+        return merged_metadata_filters
+    
+    @staticmethod
+    def metadata_filters_validation_and_correction(metadata_filters_to_validate):
+        """Validate or fix values of metadata filters, like : academic_level, name, domain_name, sub_domain_name, certification_name"""
         
-        # Update metadata filters values  for 'name' key if not found in all_trainings_names or all_jobs_names
-        filter_by_name_value = RagFilteringMetadataHelper.find_filter_value(merged_metadata_filters, 'name')
+        ### Check for validity of names of metadata filters
+        existing_metadata_names = [metadata.name for metadata in RAGPreTreatment.metadata_infos]
+        metadata_filters_names = RagFilteringMetadataHelper.get_all_filters_keys(metadata_filters_to_validate)
+        for metadata_filter_name in metadata_filters_names:
+            if metadata_filter_name not in existing_metadata_names:
+                RagFilteringMetadataHelper.remove_filter_by_name(metadata_filters_to_validate, metadata_filter_name)
+                print(f"/!\\ Filter on invalid metadata name: '{metadata_filter_name}'. It has been removed from metadata filters.")
+        
+        ### Check for validity of values of metadata filters
+ 
+        #TODO: the following checks are not generic and shouldn't be in common_tools
+        metadata_filters_to_validate = RAGPreTreatment.domain_specific_extra_metadata_filters_validation_and_correction(metadata_filters_to_validate)
+        
+        # Generic check for metadata filters values against possible values defined in the MetadataDescription        
+        metadata_filters = RagFilteringMetadataHelper.get_flatten_filters_list(metadata_filters_to_validate)
+        for metadata_filter_name, metadata_filter_value in metadata_filters.items():
+            corresponding_metadata_info = RAGPreTreatment.metadata_infos[existing_metadata_names.index(metadata_filter_name)]
+            if corresponding_metadata_info.possible_values:
+                if metadata_filter_value not in corresponding_metadata_info.possible_values:
+                    retrieved_value, retrieval_score = BM25RetrieverHelper.find_best_match_bm25(corresponding_metadata_info.possible_values, metadata_filter_value)                    
+                    if retrieval_score > 0.5:
+                        RagFilteringMetadataHelper.update_filter_value(metadata_filters_to_validate, metadata_filter_name, retrieved_value)
+                        print(f"/!\\ Filter on metadata '{metadata_filter_name}' with invalid value: '{metadata_filter_value}' was replaced by the nearest match: '{retrieved_value}' with score: [{retrieval_score}].")
+                    else:
+                        RagFilteringMetadataHelper.remove_filter_by_name(metadata_filters_to_validate, metadata_filter_name)
+                        print(f"/!\\ Filter on metadata '{metadata_filter_name}' with invalid value: '{metadata_filter_value}'. It has been removed from metadata filters.")
+
+        print(f"Corrected metadata filters: '{metadata_filters_to_validate}'")
+        return metadata_filters_to_validate
+
+    #TODO: the following checks are not generic and shouldn't be in common_tools
+    def domain_specific_extra_metadata_filters_validation_and_correction(metadata_filters_to_validate):
+        # Update value of 'academic_level' metadata filter in some cases (like: pre-graduate, BTS, graduate)
+        filter_by_academic_level_value = RagFilteringMetadataHelper.find_filter_value(metadata_filters_to_validate, 'academic_level')
+        if filter_by_academic_level_value:
+            if filter_by_academic_level_value == 'pre-graduate' or filter_by_academic_level_value == 'pré-graduate':
+                RagFilteringMetadataHelper.update_filter_value(metadata_filters_to_validate, 'academic_level', 'Bac')
+            elif filter_by_academic_level_value == 'BTS':
+                RagFilteringMetadataHelper.update_filter_value(metadata_filters_to_validate, 'academic_level', 'Bac+2')
+            elif filter_by_academic_level_value == 'graduate':
+                RagFilteringMetadataHelper.update_filter_value(metadata_filters_to_validate, 'academic_level', 'Bac+3')
+
+        # Update value of 'name' metadata filter if its value has no perfect match (in all_trainings_names or all_jobs_names)
+        filter_by_name_value = RagFilteringMetadataHelper.find_filter_value(metadata_filters_to_validate, 'name')
         if filter_by_name_value:
             all_dir = "./outputs/all/"
-            filter_by_type_value = RagFilteringMetadataHelper.find_filter_value(merged_metadata_filters, 'type')
+            filter_by_type_value = RagFilteringMetadataHelper.find_filter_value(metadata_filters_to_validate, 'type')
             if filter_by_type_value and filter_by_type_value == 'formation':
-                all_trainings_names = file.get_as_json(all_dir + 'all_trainings_names')
+                all_trainings_names = file.get_as_json(all_dir + 'all_trainings_names') #TODO: single loading
                 if filter_by_name_value not in all_trainings_names:
                     retrieved_value, retrieval_score = BM25RetrieverHelper.find_best_match_bm25(all_trainings_names, filter_by_name_value)                    
                     if retrieval_score > 0.5:
-                        RagFilteringMetadataHelper.update_filter_value(merged_metadata_filters, 'name', retrieved_value)
+                        RagFilteringMetadataHelper.update_filter_value(metadata_filters_to_validate, 'name', retrieved_value)
+                        print(f"No match found for metadata value: '{filter_by_name_value}'in all trainings names. Replcaed by the nearest match: '{retrieved_value}' with score of: [{retrieval_score}].")
                     else:
-                        RagFilteringMetadataHelper.remove_filter_key(merged_metadata_filters, 'name')
-                        print(f"No match found for metadata value: '{filter_by_name_value}'in all trainings names. Nearest match: '{retrieved_value}' has a score of: {retrieval_score}")
+                        RagFilteringMetadataHelper.remove_filter_by_name(metadata_filters_to_validate, 'name')
+                        print(f"No match found for metadata value: '{filter_by_name_value}'in all trainings names. Nearest match: '{retrieved_value}' has a low score of: [{retrieval_score}].")
             
             elif filter_by_type_value and filter_by_type_value == 'metier':
                 all_trainings_names = file.get_as_json(all_dir + 'all_jobs_names')
                 if filter_by_name_value not in all_trainings_names:
                     retrieved_value, retrieval_score = BM25RetrieverHelper.find_best_match_bm25(all_trainings_names, filter_by_name_value)                    
                     if retrieval_score > 0.5:
-                        RagFilteringMetadataHelper.update_filter_value(merged_metadata_filters, 'name', retrieved_value)
+                        RagFilteringMetadataHelper.update_filter_value(metadata_filters_to_validate, 'name', retrieved_value)
                     else:
-                        RagFilteringMetadataHelper.remove_filter_key(merged_metadata_filters, 'name')
+                        RagFilteringMetadataHelper.remove_filter_by_name(metadata_filters_to_validate, 'name')
                         print(f"No match found for metadata value: '{filter_by_name_value}'in all trainings names. Nearest match: '{retrieved_value}' has a score of: {retrieval_score}")             
 
-        print(f"Metadata filters: '{merged_metadata_filters}'")
-        return merged_metadata_filters
-    
-    def transform_academic_level_metadata(metadata):
-        if isinstance(metadata, list):
-            return [RAGPreTreatment.transform_academic_level_metadata(item) for item in metadata]
-        
-        academic_level_metadata = metadata.get('academic_level', None)
-        if academic_level_metadata:
-            if academic_level_metadata == 'pre-graduate' or academic_level_metadata == 'pré-graduate':
-                metadata['academic_level'] = 'Bac'
-            elif academic_level_metadata == 'BTS':
-                metadata['academic_level'] = 'Bac+2'
-            elif academic_level_metadata == 'graduate':
-                metadata['academic_level'] = 'Bac+3'
-        
-        if metadata.get('$and'):
-            metadata['$and'] = RAGPreTreatment.transform_academic_level_metadata(metadata['$and'])
-        if metadata.get('$or'):
-            metadata['$or'] = RAGPreTreatment.transform_academic_level_metadata(metadata['$or'])
-        if metadata.get('$not'):
-            metadata['$not'] = RAGPreTreatment.transform_academic_level_metadata(metadata['$not'])
-        return metadata
+        return metadata_filters_to_validate

@@ -1,9 +1,7 @@
-from collections import defaultdict
 from typing import Optional, Union
 from common_tools.models.logical_operator import LogicalOperator
 from langchain_core.structured_query import Comparison, Operation
 from common_tools.models.metadata_description import MetadataDescription
-from langchain.schema import Document
 
 class RagFilteringMetadataHelper:
     @staticmethod
@@ -118,7 +116,7 @@ class RagFilteringMetadataHelper:
     def find_filter_value(metadata: Union[dict, list], key: str, value: str = None) -> any:
         """
         Search for a key-value pair in the metadata and return the associated value if found.
-        Mimics `does_contain_filter` but returns the value or `None` if not found.
+        Returns the value or `None` if not found.
         """
         if isinstance(metadata, dict):
             # Handle logical operators like $and, $or, $not
@@ -161,7 +159,7 @@ class RagFilteringMetadataHelper:
         return RagFilteringMetadataHelper.find_filter_value(metadata, key, value) is not None
     
     @staticmethod
-    def remove_filter_by_name(metadata: Union[dict, list], key: str) -> Union[dict, list, None]:
+    def remove_filter_key(metadata: Union[dict, list], key: str) -> Union[dict, list, None]:
         """
         Recursively removes all occurrences of the specified key from the filter metadata.
         If a parent container (dict or list) becomes empty as a result, it is also removed.
@@ -182,7 +180,7 @@ class RagFilteringMetadataHelper:
             # Recursively process each value in the dictionary
             keys_to_delete = []
             for k, v in metadata.items():
-                new_value = RagFilteringMetadataHelper.remove_filter_by_name(v, key)
+                new_value = RagFilteringMetadataHelper.remove_filter_key(v, key)
                 if new_value is None:  # Mark empty containers for deletion
                     keys_to_delete.append(k)
                 else:
@@ -199,7 +197,7 @@ class RagFilteringMetadataHelper:
             # Recursively process each item in the list
             new_list = []
             for item in metadata:
-                updated_item = RagFilteringMetadataHelper.remove_filter_by_name(item, key)
+                updated_item = RagFilteringMetadataHelper.remove_filter_key(item, key)
                 if updated_item is not None:  # Keep non-empty items
                     new_list.append(updated_item)
 
@@ -243,86 +241,3 @@ class RagFilteringMetadataHelper:
 
         # Return the metadata itself if it's not a dict or list
         return metadata
-    
-    @staticmethod
-    def get_all_filters_keys(metadata: Union[dict, list]) -> list:
-        """
-        Parse all provided filters and return a list of all distinct filter keys,
-        excluding logical operators like $and, $or, and $not.
-
-        :param metadata: The metadata containing filters (can be a dict or list).
-        :return: A list of distinct filter keys.
-        """
-        keys = set()
-
-        def extract_keys(item):
-            if isinstance(item, dict):
-                for key, value in item.items():
-                    if key not in {"$and", "$or", "$not"}:  # Exclude logical operators
-                        keys.add(key)
-                    if isinstance(value, (dict, list)):
-                        extract_keys(value)
-
-            elif isinstance(item, list):
-                for sub_item in item:
-                    extract_keys(sub_item)
-
-        extract_keys(metadata)
-        return list(keys)
-    
-    @staticmethod
-    def get_flatten_filters_list(metadata: Union[dict, list]) -> dict:
-        """
-        Flatten filters into a key-value JSON object, removing '$and', '$or', and '$not' logical operators.
-
-        :param metadata: The metadata containing filters (can be a dict or list).
-        :return: A flattened JSON object with key-value pairs.
-        """
-        flattened_filters = {}
-
-        def extract_kv(item):
-            if isinstance(item, dict):
-                for key, value in item.items():
-                    if key in {"$and", "$or", "$not"}:
-                        # Skip logical operators but process their contents
-                        if isinstance(value, list):
-                            for sub_item in value:
-                                extract_kv(sub_item)
-                        elif isinstance(value, dict):
-                            extract_kv(value)
-                    else:
-                        # Add key-value pairs directly or process nested structures
-                        if isinstance(value, (dict, list)):
-                            extract_kv(value)
-                        else:
-                            flattened_filters[key] = value
-            elif isinstance(item, list):
-                for sub_item in item:
-                    extract_kv(sub_item)
-
-        extract_kv(metadata)
-        return flattened_filters
-    
-         
-    @staticmethod
-    def auto_generate_metadata_descriptions_from_docs_metadata(documents: list[Document], max_values: int = 10, metadata_keys_description:dict = None) -> list[MetadataDescription]:
-        metadata_field_info = []
-        value_counts = defaultdict(list)
-
-        for doc in documents:
-            for key, value in doc.metadata.items():
-                if value not in value_counts[key]:
-                    value_counts[key].append(value)
-
-        for key, possible_values in value_counts.items():
-            description = f"'{key}' metadata"
-            if metadata_keys_description and key in metadata_keys_description:
-                description += f" (indicate: {metadata_keys_description[key]})"
-            value_type = type(possible_values[0]).__name__
-            if len(possible_values) <= max_values:
-                values_str = ', '.join([f"'{value}'" for value in possible_values])
-                description += f". One value in: [{values_str}]"
-            
-            metadata_field_info.append(MetadataDescription(name=key, description=description, type=value_type, possible_values=possible_values))
-
-        return metadata_field_info

@@ -13,35 +13,30 @@ from langchain_core.runnables import RunnablePassthrough
 from common_tools.models.metadata_description import MetadataDescription
 
 class RagPreTreatMetadataFiltersAnalysis:
-    #todo: move to inference pipeline?
-    def build_self_querying_retriever_langchain(self, llm, metadata_description: list[MetadataDescription] = None, get_query_constructor:bool = True) -> tuple :
+    def build_self_querying_retriever_langchain(vectorstore, vector_db_type:str, llm, metadata_description: list[MetadataDescription] = None, create_custom_query_constructor:bool = False) -> SelfQueryRetriever :
         document_description = "Description of the document"
-        if not metadata_description:
-            metadata_description = RagPreTreatMetadataFiltersAnalysis._auto_generate_metadata_infos_from_docs_metadata(self.langchain_documents)
 
-        if get_query_constructor:
+        if create_custom_query_constructor:
             # Get query translator adapted to the vectorstore type
-            if self.vector_db_type == "qdrant":
+            if vector_db_type == "qdrant":
                 translator = QdrantTranslator('')
-            elif self.vector_db_type == "chroma":
+            elif vector_db_type == "chroma":
                 translator = ChromaTranslator()
             else:
-                raise ValueError(f"Unsupported vectorstore type: {self.vector_db_type}")
+                raise ValueError(f"Unsupported vectorstore type: {vector_db_type}")
             
-            query_constructor = self.get_query_constructor_langchain(llm, metadata_description)
+            query_constructor = RagPreTreatMetadataFiltersAnalysis.get_query_constructor_langchain(llm, metadata_description)
             self_querying_retriever = SelfQueryRetriever(
                                             query_constructor=query_constructor,
-                                            vectorstore=self.vectorstore,
+                                            vectorstore=vectorstore,
                                             structured_query_translator=translator)
-            
-            return self_querying_retriever, query_constructor
         else:
             self_querying_retriever = SelfQueryRetriever.from_llm(
                                             llm, #choose the best llm for the job
-                                            self.vectorstore,
+                                            vectorstore,
                                             document_description,
                                             metadata_description)
-            return self_querying_retriever, None
+        return self_querying_retriever
 
     def get_query_constructor_langchain(llm, metadata_descriptions: list[MetadataDescription] = None):
         document_description = "Description of the document"
@@ -62,29 +57,6 @@ class RagPreTreatMetadataFiltersAnalysis:
         promptlate = ChatPromptTemplate.from_template(prompt)
         query_constructor = prompt | llm | output_parser | RunnablePassthrough()
         return query_constructor    
-        
-    @staticmethod
-    def _auto_generate_metadata_infos_from_docs_metadata(documents: list[Document], max_values: int = 10, metadata_keys_description:dict = None) -> list[MetadataDescription]:
-        metadata_field_info = []
-        value_counts = defaultdict(list)
-
-        for doc in documents:
-            for key, value in doc.metadata.items():
-                if value not in value_counts[key]:
-                    value_counts[key].append(value)
-
-        for key, possible_values in value_counts.items():
-            description = f"'{key}' metadata"
-            if metadata_keys_description and key in metadata_keys_description:
-                description += f" (indicate: {metadata_keys_description[key]})"
-            value_type = type(possible_values[0]).__name__
-            if len(possible_values) <= max_values:
-                values_str = ', '.join([f"'{value}'" for value in possible_values])
-                description += f". One value in: [{values_str}]"
-            
-            metadata_field_info.append(MetadataDescription(name=key, description=description, type=value_type, possible_values=possible_values))
-
-        return metadata_field_info
     
     def get_query_constructor_prompt_custom(
             document_description: str,
