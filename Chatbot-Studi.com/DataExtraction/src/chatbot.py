@@ -1,8 +1,10 @@
 import time
 from typing import Generator
+#
 import streamlit as st
+import streamlit.components.v1 as components
+#
 from common_tools.helpers.txt_helper import txt
-from common_tools.helpers.llm_helper import Llm
 from common_tools.models.conversation import Conversation
 from common_tools.rag.rag_inference_pipeline.end_pipeline_exception import EndPipelineException
 
@@ -20,7 +22,7 @@ class ChatbotFront:
             initial_sidebar_state= "collapsed" # "expanded" # 
         )
 
-        custom_css = """
+        custom_css = """\
             <style>
             #MainMenu {visibility: hidden;}
             footer {visibility: hidden;}
@@ -42,6 +44,21 @@ class ChatbotFront:
             </style>
             """
         st.markdown(custom_css, unsafe_allow_html=True)
+
+        focus_script = """\
+            <script>
+                // Wait for the page to load
+                window.onload = function() {
+                    // Select the textarea element using its data-testid attribute
+                    var textArea = window.parent.document.querySelector('textarea[data-testid="stChatInputTextArea"]');
+                    if (textArea) {
+                        // Set focus to the textarea element
+                        textArea.focus();
+                    }
+                }
+            </script>
+            """
+        components.html(focus_script, height=0)
         
         with st.sidebar:
             st.button('Utilisez le chatbot pour Rechercher  ➺', disabled=True)
@@ -74,6 +91,9 @@ class ChatbotFront:
         #ChatbotFront.build_summary_vectorstore() #TODO: TMP, to remove when summarization is done and working
         
         if user_query := st.chat_input(placeholder= 'Ecrivez votre question ici ...'):
+            #TODO: tmp to remove
+            if not user_query.strip():
+                user_query = 'quels bts en rh ?'
             st.chat_message('user').write_stream(ChatbotFront._write_stream(user_query))
             st.session_state.messages.append({'role': 'user', 'content': user_query})
             st.session_state.conversation.add_new_message('user', user_query)

@@ -15,11 +15,20 @@ from langchain_community.retrievers import BM25Retriever
 from langchain.retrievers import ContextualCompressionRetriever
 from langchain.retrievers.document_compressors import LLMChainExtractor
 from langchain.retrievers.document_compressors import LLMChainFilter
-
+from langchain_core.structured_query import (
+        Comparator,
+        Comparison,
+        Operation,
+        Operator,
+        StructuredQuery,
+        Visitor,
+)
 
 class RAGHybridRetrieval:
+    metadata_descriptions = None
+
     @staticmethod    
-    def rag_hybrid_retrieval_custom(rag: RagService, analysed_query :QuestionAnalysisBase, metadata:dict, include_bm25_retrieval: bool = False, give_score: bool = True, max_retrived_count: int = 20):
+    def rag_hybrid_retrieval_custom(rag: RagService, analysed_query: QuestionAnalysisBase, metadata: dict, include_bm25_retrieval: bool = False, give_score: bool = True, max_retrived_count: int = 20):
         if not include_bm25_retrieval:
             rag_retrieved_chunks = RAGHybridRetrieval.semantic_vector_retrieval(rag, QuestionAnalysisBase.get_modified_question(analysed_query), metadata, give_score, max_retrived_count)
             return rag_retrieved_chunks
@@ -32,38 +41,43 @@ class RAGHybridRetrieval:
         return retained_chunks
     
     @staticmethod    
-    def rag_hybrid_retrieval_langchain(rag: RagService, analysed_query :QuestionAnalysisBase, metadata:dict, include_bm25_retrieval: bool = False, include_contextual_compression: bool = False, include_semantic_retrieval: bool = True, give_score: bool = True, max_retrived_count: int = 20, bm25_ratio: float = 0.2):
-        semantic_k_ratio = 1 - bm25_ratio if include_bm25_retrieval and include_semantic_retrieval else 1
-        # rag_retrieved_chunks = RAGHybridRetrieval.semantic_vector_retrieval(rag,  QuestionAnalysisBase.get_modified_question(analysed_query), metadata, give_score, max_retrived_count)
-        # return rag_retrieved_chunks
-
-        # Create bm25 retriever with metadata filter
-        if metadata and any(metadata):
-            if RagFilteringMetadataHelper.does_contain_filter(metadata, 'domaine','url'):
-                max_retrived_count = 100
-            filtered_docs = [
-                doc for doc in rag.langchain_documents 
-                if RagFilteringMetadataHelper.filters_predicate(doc, metadata)
-            ]
-            print(f">> docs count corresponding to metadata: {len(filtered_docs)}/{len(rag.langchain_documents)}")
-        else:
-            filtered_docs = rag.langchain_documents
-            metadata = None
-
-        # remove metadata filtering if no document are found
-        if not any(filtered_docs):
-            filtered_docs = rag.langchain_documents
-            metadata = None
-
-        bm25_retriever = rag._build_bm25_retriever(filtered_docs, k = int(max_retrived_count * bm25_ratio))
+    def rag_hybrid_retrieval_langchain(rag: RagService, analysed_query: QuestionAnalysisBase, metadata_filters:Operation, include_bm25_retrieval: bool = True, include_contextual_compression: bool = False, include_semantic_retrieval: bool = True, give_score: bool = True, max_retrived_count: int = 20, bm25_ratio: float = 0.2):
+        if metadata_filters and not any(metadata_filters):
+            metadata_filters = None
         
-        # Create vectorstore retriever with metadata filter
-        vector_retriever = rag.vectorstore.as_retriever(search_kwargs=
-                                    {'k': int(max_retrived_count * semantic_k_ratio), 'filter': metadata}) 
+        if include_bm25_retrieval and include_semantic_retrieval:
+            semantic_k_ratio = round(1 - bm25_ratio, 2)
+            bm25_ratio = round(1 - semantic_k_ratio, 2)
+        else:
+            semantic_k_ratio = 1 if include_semantic_retrieval else 0
+            bm25_ratio = 1 if include_bm25_retrieval else 0
+
         retrievers = []
-        if include_semantic_retrieval: retrievers.append(vector_retriever)
-        if include_bm25_retrieval: retrievers.append(bm25_retriever)
-        if not any(retrievers): raise ValueError(f"No retriever has been defined in the hybrid retrieval")
+        if include_semantic_retrieval:
+            metadata_filters_in_specific_db_type_format = RagFilteringMetadataHelper.translate_langchain_metadata_filters_into_specified_db_type_format(metadata_filters, RAGHybridRetrieval.metadata_descriptions, rag.vector_db_type)
+            vector_retriever = rag.vectorstore.as_retriever(search_kwargs={'k': int(max_retrived_count * semantic_k_ratio), 'filter': metadata_filters_in_specific_db_type_format}) 
+            retrievers.append(vector_retriever)
+        
+        if include_bm25_retrieval: 
+            # Select documents matching metadata filters
+            if metadata_filters:
+                if RagFilteringMetadataHelper.does_contain_filter(metadata_filters, 'domaine','url'):
+                    max_retrived_count = 100
+                metadata_filters_chroma = RagFilteringMetadataHelper.translate_langchain_metadata_filters_into_chroma_db_format(metadata_filters)
+                filtered_docs = [
+                    doc for doc in rag.langchain_documents 
+                    if RagFilteringMetadataHelper.metadata_filtering_predicate_ChromaDb(doc, metadata_filters_chroma)
+                ]
+                print(f">> docs count corresponding to metadata: {len(filtered_docs)}/{len(rag.langchain_documents)}")
+            else:
+                filtered_docs = rag.langchain_documents
+
+            # Build BM25 retriever from filtered documents
+            bm25_retriever = rag._build_bm25_retriever(filtered_docs, k = int(max_retrived_count * bm25_ratio))
+            retrievers.append(bm25_retriever)
+
+        if not any(retrievers): 
+            raise ValueError(f"No retriever has been defined in the hybrid retrieval")
 
         weights = [semantic_k_ratio, bm25_ratio]
         ensemble_retriever = EnsembleRetriever(retrievers=retrievers, weights=weights)
@@ -81,10 +95,15 @@ class RAGHybridRetrieval:
             retrieved_chunks = final_retriever.invoke(QuestionAnalysisBase.get_modified_question(analysed_query))
         except Exception as e:
             raise e
+        
+        # In case no docs are retrieved, re-launch the hybrid retrieval, but without metadata filters
+        if metadata_filters and (not retrieved_chunks or not any(retrieved_chunks)):
+            print(f">> Hybid retrieval returns no documents. Retrying without any metadata filters.")
+            return RAGHybridRetrieval.rag_hybrid_retrieval_langchain(rag, analysed_query, None, include_bm25_retrieval, include_contextual_compression, include_semantic_retrieval, give_score, max_retrived_count, bm25_ratio)
+
         # Remove 'rel_ids' from metadata: useless for augmented generation and limit token usage
         for doc in retrieved_chunks:
             doc.metadata.pop("rel_ids", None)
-
         return retrieved_chunks
     
     @staticmethod    
@@ -96,7 +115,7 @@ class RAGHybridRetrieval:
     @staticmethod    
     def bm25_retrieval(rag: RagService, query:Union[str, Conversation], metadata_filters: dict, give_score: bool, k = 3):
         if metadata_filters and any(metadata_filters):
-            filtered_docs = [doc for doc in rag.langchain_documents if RagFilteringMetadataHelper.filters_predicate(doc, metadata_filters)]
+            filtered_docs = [doc for doc in rag.langchain_documents if RagFilteringMetadataHelper.metadata_filtering_predicate_ChromaDb(doc, metadata_filters)]
         else:
             filtered_docs = rag.langchain_documents
 

@@ -1,9 +1,20 @@
 from collections import defaultdict
 from typing import Optional, Union
 from common_tools.models.logical_operator import LogicalOperator
-from langchain_core.structured_query import Comparison, Operation
 from common_tools.models.metadata_description import MetadataDescription
+#
 from langchain.schema import Document
+from langchain_community.query_constructors.chroma import ChromaTranslator
+from langchain_community.query_constructors.qdrant import QdrantTranslator
+from langchain_community.query_constructors.pinecone import PineconeTranslator
+from langchain_core.structured_query import (
+    Comparator,
+    Comparison,
+    Operation,
+    Operator,
+    StructuredQuery,
+    Visitor,
+)
 
 class RagFilteringMetadataHelper:
     @staticmethod
@@ -50,17 +61,19 @@ class RagFilteringMetadataHelper:
             return {}  # Return an empty filter if no conditions found
         
     @staticmethod
-    def filters_predicate(doc, filters:Union[dict, list], operator=LogicalOperator.AND):
+    def metadata_filtering_predicate_ChromaDb(doc, filters:Union[dict, list], operator=LogicalOperator.AND):
         """Predicate to evaluate filter(s) (handle nested operators)"""
-
+        if filters is None:
+            return True
+        
         # If filters is a dictionary (single filter or operator like $and/$or)
         if isinstance(filters, dict):
             if "$and" in filters:
                 # Recursively handle $and with multiple conditions
-                return RagFilteringMetadataHelper.filters_predicate(doc, filters["$and"], LogicalOperator.AND)
+                return RagFilteringMetadataHelper.metadata_filtering_predicate_ChromaDb(doc, filters["$and"], LogicalOperator.AND)
             elif "$or" in filters:
                 # Recursively handle $or with multiple conditions
-                return RagFilteringMetadataHelper.filters_predicate(doc, filters["$or"], LogicalOperator.OR)
+                return RagFilteringMetadataHelper.metadata_filtering_predicate_ChromaDb(doc, filters["$or"], LogicalOperator.OR)
             else:
                 # Handle single key-value filter (field-value pair)
                 return all(doc.metadata.get(key) == value for key, value in filters.items())
@@ -69,12 +82,12 @@ class RagFilteringMetadataHelper:
         elif isinstance(filters, list):
             if operator == LogicalOperator.AND:
                 return all(
-                    RagFilteringMetadataHelper.filters_predicate(doc, sub_filter, LogicalOperator.AND)
+                    RagFilteringMetadataHelper.metadata_filtering_predicate_ChromaDb(doc, sub_filter, LogicalOperator.AND)
                     for sub_filter in filters
                 )
             elif operator == LogicalOperator.OR:
                 return any(
-                    RagFilteringMetadataHelper.filters_predicate(doc, sub_filter, LogicalOperator.OR)
+                    RagFilteringMetadataHelper.metadata_filtering_predicate_ChromaDb(doc, sub_filter, LogicalOperator.OR)
                     for sub_filter in filters
                 )
             else:
@@ -83,7 +96,73 @@ class RagFilteringMetadataHelper:
         return False
     
     @staticmethod
-    def get_filters_from_comparison(langchain_filters: Union[Comparison, Operation], metadata_infos: list[MetadataDescription] = None) -> dict:
+    def translate_langchain_metadata_filters_into_specified_db_type_format(
+            langchain_filters: Union[Comparison, Operation],
+            metadata_descriptions: list[MetadataDescription] = None,
+            vector_db_type: str = "chroma",
+            metadata_key: str = "metadata"
+        ) -> dict:
+        """
+        Translate LangChain-style filters into vector database-specific filter formats.
+
+        :param langchain_filters: The LangChain-style filter object (Comparison or Operation).
+        :param metadata_descriptions: Optional list of metadata descriptions to validate filter attributes.
+        :param vector_db_type: The target database translator type (e.g., "chroma", "qdrant", "pinecone").
+        :param metadata_key: The key under which metadata is stored (used by QdrantTranslator).
+        :return: A dictionary representing the translated filter for the specified database.
+        """
+        if langchain_filters is None:
+            return None
+        
+        # Initialize the appropriate translator based on the specified type
+        translator:Visitor = None
+        if vector_db_type == "chroma":
+            translator = ChromaTranslator()
+        elif vector_db_type == "qdrant":
+            translator = QdrantTranslator(metadata_key=metadata_key)
+        elif vector_db_type == "pinecone":
+            translator = PineconeTranslator()
+        else:
+            raise ValueError(f"Unsupported translator type: {vector_db_type}")
+
+        # Validate the filter attributes against provided metadata descriptions
+        valid_metadata_keys = set(metadata_description.name if hasattr(metadata_description, 'name') else metadata_description['name'] for metadata_description in metadata_descriptions) if metadata_descriptions else set()
+
+        def validate_and_translate(filter_obj):
+            if isinstance(filter_obj, Operation):
+                # Recursively process operations
+                translated_args = [
+                    validate_and_translate(arg) for arg in filter_obj.arguments
+                ]
+                # Filter out None values resulting from invalid attributes
+                translated_args = [arg for arg in translated_args if arg is not None]
+                if not translated_args:
+                    return None
+                return Operation(operator=filter_obj.operator, arguments=translated_args)
+            elif isinstance(filter_obj, Comparison):
+                # Check if the attribute is valid
+                if not valid_metadata_keys or filter_obj.attribute in valid_metadata_keys:
+                    return filter_obj
+                else:
+                    print(f"Warning: Attribute '{filter_obj.attribute}' is not recognized.")
+                    return None
+            else:
+                raise ValueError(f"Unsupported filter type: {type(filter_obj)}")
+
+        # Validate and translate the filters
+        validated_filters = validate_and_translate(langchain_filters)
+        if validated_filters is None:
+            return {}
+
+        # Use the translator to convert the validated filters into the target format
+        translated_filter = translator.visit_operation(validated_filters)
+        return translated_filter
+    
+    @staticmethod
+    def translate_langchain_metadata_filters_into_chroma_db_format(langchain_filters: Union[Comparison, Operation], metadata_infos: list[MetadataDescription] = None) -> dict:
+        if langchain_filters is None:
+            return None
+        
         filters = []
         valid_keys = set(attr_info.name for attr_info in metadata_infos) if metadata_infos else set()
         operator = None
@@ -92,7 +171,7 @@ class RagFilteringMetadataHelper:
         if langchain_filters is not None:            
             if isinstance(langchain_filters, Operation):
                 filters = [
-                    RagFilteringMetadataHelper.get_filters_from_comparison(sub_filter, metadata_infos) 
+                    RagFilteringMetadataHelper.translate_langchain_metadata_filters_into_chroma_db_format(sub_filter, metadata_infos) 
                     for sub_filter in langchain_filters.arguments
                 ]
                 filters = [f for f in filters if f and f != "NO_FILTER"]
@@ -113,7 +192,48 @@ class RagFilteringMetadataHelper:
             return filters[0]
         else:
             return {}
+
+    @staticmethod
+    def translate_chroma_db_metadata_filters_to_langchain_format(chroma_filters: dict) -> Operation: #Union[Operation, Comparison, None]:
+        """
+        Translate ChromaDB filter format back into LangChain-style Operations or Comparisons.
+
+        :param chroma_filters: The filter dictionary in ChromaDB format.
+        :return: A LangChain Operation or Comparison object.
+        """
+        def parse_filter(filters):
+            if not isinstance(filters, dict):
+                return None
+
+            # Logical operators mapping
+            for operator_key in ["$and", "$or", "$not"]:
+                if operator_key in filters:
+                    operator = operator_key.strip("$")
+                    sub_filters = filters[operator_key]
+
+                    # Recursively parse the sub-filters
+                    parsed_arguments = [parse_filter(sub_filter) for sub_filter in sub_filters]
+                    parsed_arguments = [arg for arg in parsed_arguments if arg is not None]
+
+                    # Handle 'not' as a special case (1 argument only)
+                    if operator == "not" and len(parsed_arguments) == 1:
+                        return Operation(operator=operator, arguments=parsed_arguments)
+
+                    # For 'and' and 'or'
+                    return Operation(operator=operator, arguments=parsed_arguments)
+
+            # Base case: A single attribute-value pair (Comparison)
+            for key, value in filters.items():
+                if not key.startswith("$"):  # Skip reserved keys like "$and", "$or", "$not"
+                    return Comparison(attribute=key, comparator="eq", value=value)
+
+            return None
         
+        if chroma_filters is None:
+            return None
+        else:
+            return parse_filter(chroma_filters)
+   
     @staticmethod
     def find_filter_value(metadata: Union[dict, list], key: str, value: str = None) -> any:
         """
@@ -248,7 +368,7 @@ class RagFilteringMetadataHelper:
     def get_all_filters_keys(metadata: Union[dict, list]) -> list:
         """
         Parse all provided filters and return a list of all distinct filter keys,
-        excluding logical operators like $and, $or, and $not.
+        excluding logical operators ($and, $or, $not) and comparison operators ($eq, $ne, $lt, $gt, etc.).
 
         :param metadata: The metadata containing filters (can be a dict or list).
         :return: A list of distinct filter keys.
@@ -258,7 +378,8 @@ class RagFilteringMetadataHelper:
         def extract_keys(item):
             if isinstance(item, dict):
                 for key, value in item.items():
-                    if key not in {"$and", "$or", "$not"}:  # Exclude logical operators
+                    # Exclude logical and comparison operators
+                    if key not in {"$and", "$or", "$not", "$eq", "$ne", "$lt", "$lte", "$gt", "$gte", "$in", "$nin"}:
                         keys.add(key)
                     if isinstance(value, (dict, list)):
                         extract_keys(value)
@@ -269,6 +390,7 @@ class RagFilteringMetadataHelper:
 
         extract_keys(metadata)
         return list(keys)
+
     
     @staticmethod
     def get_flatten_filters_list(metadata: Union[dict, list]) -> dict:

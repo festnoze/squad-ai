@@ -356,7 +356,7 @@ class WorkflowExecutor:
         """
         flat_list = []
         for item in items:
-            if isinstance(item, Iterable) and not isinstance(item, (str, bytes, dict, list)):
+            if isinstance(item, tuple):
                 flat_list.extend(self.flatten_tuples(item))  # Recursively flatten if it's a nested iterable (tuple/set)
             else:
                 flat_list.append(item)

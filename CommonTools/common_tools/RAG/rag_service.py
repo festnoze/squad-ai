@@ -14,6 +14,7 @@ from langchain.retrievers.multi_query import MultiQueryRetriever
 from langchain.retrievers import EnsembleRetriever
 from langchain_chroma import Chroma
 from langchain_qdrant import QdrantVectorStore
+from langchain_core.vectorstores import VectorStore
 from qdrant_client import QdrantClient
 
 # common tools imports
@@ -31,13 +32,14 @@ class RagService:
         self.llm_3=None
         self.init_embedding(embedding_model)
         self.init_llms(llms_or_info) #todo: add fallbacks with specifying multiple llms or llms infos
-        self.vector_db_type = vector_db_type
-        self.vector_db_path = os.path.join(os.path.join(os.path.abspath(vector_db_and_docs_path), self.embedding_model_name), vector_db_type)
+        self.vector_db_name:str = vector_db_name
+        self.vector_db_type:str = vector_db_type
+        self.vector_db_path:str = os.path.join(os.path.join(os.path.abspath(vector_db_and_docs_path), self.embedding_model_name), vector_db_type)
         self.all_documents_json_file_path = os.path.abspath(os.path.join(vector_db_and_docs_path, documents_json_filename))
 
-        self.langchain_documents = self._load_langchain_documents(self.all_documents_json_file_path)
+        self.langchain_documents:list[Document] = self._load_langchain_documents(self.all_documents_json_file_path)
         self.bm25_retriever = self._build_bm25_retriever(self.langchain_documents)
-        self.vectorstore = self._load_vectorstore(vector_db_type, vector_db_name)
+        self.vectorstore:VectorStore = RagService._load_vectorstore(self.vector_db_path, self.embedding, self.vector_db_type, self.vector_db_name)
 
     def init_embedding(self, embedding_model:EmbeddingModel):
         self.embedding = embedding_model.create_instance()
@@ -100,26 +102,28 @@ class RagService:
             for doc in json_data ]
         return docs
     
-    def _load_vectorstore(self, vectorstore_type: str = 'chroma', collection_name:str = 'main') -> Optional[Union[Chroma, QdrantVectorStore]]:
+
+    def _load_vectorstore(vector_db_path:str = None, embedding = None, vectorstore_type: str = 'chroma', collection_name:str = 'main') -> VectorStore:
         try:
-            if not self.embedding: raise ValueError("As no embedding model is specified")            
-            db_dir = ''
-            if vectorstore_type == "chroma":
-                db_dir = os.path.join(self.vector_db_path, collection_name)
-            elif vectorstore_type == "qdrant":
-                db_dir = self.vector_db_path
-            if not file.file_exists(db_dir):
-                txt.print(f'>> Vectorstore not loaded, as path: "... {db_dir[-40:]}" is not found')
-                return None
+            vectorstore:VectorStore = None
             
             if vectorstore_type == "chroma":
-                return Chroma(persist_directory= db_dir, embedding_function= self.embedding)
+                chroma_vector_db_path = os.path.join(vector_db_path, collection_name)
+                if not file.file_exists(chroma_vector_db_path):
+                    txt.print(f'>> Vectorstore not loaded, as path: "... {vector_db_path[-110:]}" is not found')
+                else:
+                    vectorstore = Chroma(persist_directory= chroma_vector_db_path, embedding_function= embedding)
+            
             elif vectorstore_type == "qdrant":
-                qdrant_client = QdrantClient(path=db_dir)
-                return QdrantVectorStore(client=qdrant_client, collection_name=collection_name, embedding=self.embedding)
+                if not file.file_exists(vector_db_path):
+                    txt.print(f'>> Vectorstore not loaded, as path: "... {vector_db_path[-110:]}" is not found')
+                else:
+                    qdrant_client = QdrantClient(path=vector_db_path)
+                    vectorstore = QdrantVectorStore(client=qdrant_client, collection_name=collection_name, embedding=embedding)
+            return vectorstore
         
         except Exception as e:
-            txt.print(f"Error loading vectorstore: {e}")
+            txt.print(f"Loading vectorstore fails: {e}")
             return None
             
     def _build_bm25_retriever(self, documents: list[Document], k: int = 20, metadata: dict = None, action_name = 'RAG BM25 retrieval') -> BM25Retriever:

@@ -3,21 +3,18 @@ start:
       - guardrails
       - inference_pipeline_but_generation
 
+guardrails:
+  - RAGGuardrails.guardrails_query_analysis
+
 inference_pipeline_but_generation:
   - pre_treatment
   - data_retrieval
-
-guardrails:
-  - RAGGuardrails.guardrails_query_analysis
 
 pre_treatment:  
   - RAGPreTreatment.query_standalone_from_history
   - RAGPreTreatment.query_rewritting
   #- RAGPreTreatment.query_standalone_rewritten_from_history
-  - parallel_threads:
-    - RAGPreTreatment.analyse_query_for_metadata      
-    - RAGPreTreatment.extract_explicit_metadata
-  - RAGPreTreatment.get_merged_metadata_and_question_analysis
+  - RAGPreTreatment.analyse_query_for_metadata
   - RAGPreTreatment.metadata_filters_validation_and_correction
 
 data_retrieval:

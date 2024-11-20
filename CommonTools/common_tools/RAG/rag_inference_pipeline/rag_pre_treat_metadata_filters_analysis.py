@@ -3,6 +3,7 @@ import json
 from typing import Optional, Union
 from langchain_community.query_constructors.chroma import ChromaTranslator
 from langchain_community.query_constructors.qdrant import QdrantTranslator
+from langchain_community.query_constructors.pinecone import PineconeTranslator
 from langchain.retrievers.self_query.base import SelfQueryRetriever
 from langchain.chains.query_constructor.base import StructuredQueryOutputParser, get_query_constructor_prompt
 from langchain_core.documents import Document
@@ -19,7 +20,7 @@ class RagPreTreatMetadataFiltersAnalysis:
         if create_custom_query_constructor:
             # Get query translator adapted to the vectorstore type
             if vector_db_type == "qdrant":
-                translator = QdrantTranslator('')
+                translator = QdrantTranslator('metadata')
             elif vector_db_type == "chroma":
                 translator = ChromaTranslator()
             else:

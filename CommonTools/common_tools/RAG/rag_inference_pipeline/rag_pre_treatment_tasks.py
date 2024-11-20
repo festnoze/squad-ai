@@ -16,9 +16,19 @@ from common_tools.rag.rag_inference_pipeline.greetings_ends_pipeline_exception i
 from common_tools.rag.rag_inference_pipeline.rag_pre_treat_metadata_filters_analysis import RagPreTreatMetadataFiltersAnalysis
 from common_tools.rag.rag_service import RagService
 from common_tools.workflows.output_name_decorator import output_name
+from langchain_core.structured_query import (
+    Comparator,
+    Comparison,
+    Operation,
+    Operator,
+    StructuredQuery,
+    Visitor,
+)
 
 class RAGPreTreatment:
+    metadata_descriptions = None
     default_filters = {}
+
     @staticmethod
     def rag_static_pre_treatment(rag:RagService, query:Union[str, Conversation], default_filters:dict = {}) -> tuple[QuestionTranslation, dict]:
         question_analysis, extracted_implicit_metadata, extracted_explicit_metadata = Execute.run_sync_functions_in_parallel_threads(
@@ -32,7 +42,7 @@ class RAGPreTreatment:
         query_wo_metadata_explicit = extracted_explicit_metadata[0]
         metadata_explicit = extracted_explicit_metadata[1]
 
-        merged_metadata = RAGPreTreatment.get_merged_metadata_and_question_analysis(question_analysis, query_wo_metadata_implicit, metadata_implicit, query_wo_metadata_explicit, metadata_explicit)
+        merged_metadata = RAGPreTreatment.get_transformed_metadata_and_question_analysis(question_analysis, query_wo_metadata_implicit, metadata_implicit, query_wo_metadata_explicit, metadata_explicit)
         return question_analysis, merged_metadata
     
     @staticmethod
@@ -158,27 +168,22 @@ class RAGPreTreatment:
             query_wo_metadata = user_query
         return query_wo_metadata, filters
     
-
-    metadata_infos = None
     @staticmethod
-    def analyse_query_for_metadata(rag:RagService, analysed_query:QuestionAnalysisBase) -> tuple[str, dict]:
-        if not RAGPreTreatment.metadata_infos:
-            RAGPreTreatment.metadata_infos = RagFilteringMetadataHelper.auto_generate_metadata_descriptions_from_docs_metadata(rag.langchain_documents, 30)
-        
-        query = QuestionAnalysisBase.get_modified_question(analysed_query)
-        
-        #query_constructor = RagPreTreatMetadataFiltersAnalysis.get_query_constructor_langchain(rag.llm_2, RAGPreTreatment.metadata_infos)
-        self_querying_retriever = RagPreTreatMetadataFiltersAnalysis.build_self_querying_retriever_langchain(rag.vectorstore, rag.vector_db_type, rag.llm_2, RAGPreTreatment.metadata_infos, True)
-        query_constructor = self_querying_retriever.query_constructor
+    def analyse_query_for_metadata(rag:RagService, analysed_query:QuestionAnalysisBase) -> tuple[str, Operation]:        
+        query = QuestionAnalysisBase.get_modified_question(analysed_query)        
+        query_constructor = RagPreTreatMetadataFiltersAnalysis.get_query_constructor_langchain(rag.llm_2, RAGPreTreatment.metadata_descriptions)
+        # self_querying_retriever = RagPreTreatMetadataFiltersAnalysis.build_self_querying_retriever_langchain(rag.vectorstore, rag.vector_db_type, rag.llm_2, RAGPreTreatment.metadata_infos, True)
+        # query_constructor = self_querying_retriever.query_constructor
 
         ## WARNING: Not work as async. This is a fix as langchain query contructor (or our async to sync) seems to fails while async with error: Connection error.
         # try:
         #     response_with_filters = Execute.get_sync_from_async(Llm.invoke_chain_with_input_async, 'Analyse metadata', query_constructor, query)
         # except Exception as e:
         #     print(f'+++ Error on "analyse_query_for_metadata": {e}')
+        
         response_with_filters = query_constructor.invoke(query)
 
-        metadata_filters = RagFilteringMetadataHelper.get_filters_from_comparison(response_with_filters.filter, RAGPreTreatment.metadata_infos)
+        metadata_filters = response_with_filters.filter
         return response_with_filters.query, metadata_filters
             
     @staticmethod
@@ -186,8 +191,9 @@ class RAGPreTreatment:
         query = QuestionAnalysisBase.get_modified_question(analysed_query)
         return Conversation.get_user_query(query), {}
         
+    #OBSOLETE: as it don't take langchain 'Operation' as metadata_filters but a dict (which only works on chroma format of filtering)
     @staticmethod
-    def get_merged_metadata_and_question_analysis(query:Union[str, Conversation], analysed_query :QuestionAnalysisBase, query_wo_metadata_from_implicit:str, implicit_metadata:dict, query_wo_metadata_from_explicit:str, explicit_metadata:dict) -> dict:
+    def get_transformed_metadata_and_question_analysis(query:Union[str, Conversation], analysed_query :QuestionAnalysisBase, query_wo_metadata_from_implicit:str, implicit_metadata:dict, query_wo_metadata_from_explicit:str = '', explicit_metadata:dict = None) -> dict:
         if isinstance(query, Conversation):
             query.last_message.content = analysed_query.modified_question
         # if query_wo_metadata_from_explicit:
@@ -207,11 +213,15 @@ class RAGPreTreatment:
         return merged_metadata_filters
     
     @staticmethod
-    def metadata_filters_validation_and_correction(metadata_filters_to_validate):
+    def metadata_filters_validation_and_correction(query_and_metadata_filters:tuple) -> tuple[str, Operation]:
         """Validate or fix values of metadata filters, like : academic_level, name, domain_name, sub_domain_name, certification_name"""
+        query, metadata_filters_to_validate = query_and_metadata_filters
         
+        # Translate to chroma DB format for proccessing, then will be re-translated into langchain format 
+        metadata_filters_to_validate = RagFilteringMetadataHelper.translate_langchain_metadata_filters_into_chroma_db_format(metadata_filters_to_validate, RAGPreTreatment.metadata_descriptions)
+
         ### Check for validity of names of metadata filters
-        existing_metadata_names = [metadata.name for metadata in RAGPreTreatment.metadata_infos]
+        existing_metadata_names = [metadata.name for metadata in RAGPreTreatment.metadata_descriptions]
         metadata_filters_names = RagFilteringMetadataHelper.get_all_filters_keys(metadata_filters_to_validate)
         for metadata_filter_name in metadata_filters_names:
             if metadata_filter_name not in existing_metadata_names:
@@ -226,7 +236,7 @@ class RAGPreTreatment:
         # Generic check for metadata filters values against possible values defined in the MetadataDescription        
         metadata_filters = RagFilteringMetadataHelper.get_flatten_filters_list(metadata_filters_to_validate)
         for metadata_filter_name, metadata_filter_value in metadata_filters.items():
-            corresponding_metadata_info = RAGPreTreatment.metadata_infos[existing_metadata_names.index(metadata_filter_name)]
+            corresponding_metadata_info = RAGPreTreatment.metadata_descriptions[existing_metadata_names.index(metadata_filter_name)]
             if corresponding_metadata_info.possible_values:
                 if metadata_filter_value not in corresponding_metadata_info.possible_values:
                     retrieved_value, retrieval_score = BM25RetrieverHelper.find_best_match_bm25(corresponding_metadata_info.possible_values, metadata_filter_value)                    
@@ -238,6 +248,7 @@ class RAGPreTreatment:
                         print(f"/!\\ Filter on metadata '{metadata_filter_name}' with invalid value: '{metadata_filter_value}'. It has been removed from metadata filters.")
 
         print(f"Corrected metadata filters: '{metadata_filters_to_validate}'")
+        metadata_filters_to_validate = RagFilteringMetadataHelper.translate_chroma_db_metadata_filters_to_langchain_format(metadata_filters_to_validate)
         return metadata_filters_to_validate
 
     #TODO: the following checks are not generic and shouldn't be in common_tools

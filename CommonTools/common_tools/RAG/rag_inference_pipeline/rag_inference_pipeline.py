@@ -7,6 +7,7 @@ from langchain_experimental.utilities import PythonREPL
 
 # Import the task classes from other files
 from common_tools.helpers.execute_helper import Execute
+from common_tools.helpers.rag_filtering_metadata_helper import RagFilteringMetadataHelper
 from common_tools.rag.rag_service import RagService
 from common_tools.rag.rag_inference_pipeline.rag_pre_treatment_tasks import RAGPreTreatment
 from common_tools.rag.rag_inference_pipeline.rag_guardrails_tasks import RAGGuardrails
@@ -22,8 +23,14 @@ class RagInferencePipeline:
     def __init__(self, rag: RagService, default_filters: dict = {}, metadata_descriptions = None, tools: list = None):
         self.rag: RagService = rag
         self.default_filters = default_filters
+
+        # If the metadata descriptions are not provided, generate them from the all the metadata with their values found within the documents
+        if not metadata_descriptions:
+            metadata_descriptions = RagFilteringMetadataHelper.auto_generate_metadata_descriptions_from_docs_metadata(rag.langchain_documents, 30)
+            
         self.metadata_descriptions = metadata_descriptions
-        RAGPreTreatment.metadata_infos = metadata_descriptions
+        RAGPreTreatment.metadata_descriptions = metadata_descriptions
+        RAGHybridRetrieval.metadata_descriptions = metadata_descriptions
         RAGPreTreatment.default_filters = default_filters #only useful for dynamic pipeline, to rethink #todo: think to rather instanciate current class for setting specific filters by app.
         self.tools: list = tools
 
