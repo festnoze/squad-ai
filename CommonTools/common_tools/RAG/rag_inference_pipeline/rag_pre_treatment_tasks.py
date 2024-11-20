@@ -190,103 +190,103 @@ class RAGPreTreatment:
     def bypassed_analyse_query_for_metadata(rag:RagService, analysed_query:QuestionAnalysisBase) -> tuple[str, dict]:
         query = QuestionAnalysisBase.get_modified_question(analysed_query)
         return Conversation.get_user_query(query), {}
-        
-    #OBSOLETE: as it don't take langchain 'Operation' as metadata_filters but a dict (which only works on chroma format of filtering)
-    @staticmethod
-    def get_transformed_metadata_and_question_analysis(query:Union[str, Conversation], analysed_query :QuestionAnalysisBase, query_wo_metadata_from_implicit:str, implicit_metadata:dict, query_wo_metadata_from_explicit:str = '', explicit_metadata:dict = None) -> dict:
-        if isinstance(query, Conversation):
-            query.last_message.content = analysed_query.modified_question
-        # if query_wo_metadata_from_explicit:
-        #     QuestionAnalysisBase.set_modified_question(analysed_query, query_wo_metadata_from_explicit.strip())
-        # elif query_wo_metadata_from_implicit.strip():
-        #     QuestionAnalysisBase.set_modified_question(analysed_query, query_wo_metadata_from_implicit.strip())
-        merged_metadata_filters = {}
-        if explicit_metadata and any(explicit_metadata):
-            merged_metadata_filters = explicit_metadata.copy()
-        
-        if implicit_metadata and any(implicit_metadata):
-            for key, value in implicit_metadata.items():
-                if key not in merged_metadata_filters:
-                    merged_metadata_filters[key] = value
-
-        print(f"Extracted metadata filters: '{merged_metadata_filters}'")
-        return merged_metadata_filters
-    
+            
+    #TODO: the param shouldn't be a tuple but the two params directly if flatten tuple works as intended
     @staticmethod
     def metadata_filters_validation_and_correction(query_and_metadata_filters:tuple) -> tuple[str, Operation]:
         """Validate or fix values of metadata filters, like : academic_level, name, domain_name, sub_domain_name, certification_name"""
         query, metadata_filters_to_validate = query_and_metadata_filters
-        
-        # Translate to chroma DB format for proccessing, then will be re-translated into langchain format 
-        metadata_filters_to_validate = RagFilteringMetadataHelper.translate_langchain_metadata_filters_into_chroma_db_format(metadata_filters_to_validate, RAGPreTreatment.metadata_descriptions)
 
-        ### Check for validity of names of metadata filters
-        existing_metadata_names = [metadata.name for metadata in RAGPreTreatment.metadata_descriptions]
-        metadata_filters_names = RagFilteringMetadataHelper.get_all_filters_keys(metadata_filters_to_validate)
-        for metadata_filter_name in metadata_filters_names:
-            if metadata_filter_name not in existing_metadata_names:
-                RagFilteringMetadataHelper.remove_filter_by_name(metadata_filters_to_validate, metadata_filter_name)
-                print(f"/!\\ Filter on invalid metadata name: '{metadata_filter_name}'. It has been removed from metadata filters.")
-        
-        ### Check for validity of values of metadata filters
- 
+        # Domain specific extra validity check of metadata filters
         #TODO: the following checks are not generic and shouldn't be in common_tools
-        metadata_filters_to_validate = RAGPreTreatment.domain_specific_extra_metadata_filters_validation_and_correction(metadata_filters_to_validate)
-        
-        # Generic check for metadata filters values against possible values defined in the MetadataDescription        
-        metadata_filters = RagFilteringMetadataHelper.get_flatten_filters_list(metadata_filters_to_validate)
-        for metadata_filter_name, metadata_filter_value in metadata_filters.items():
-            corresponding_metadata_info = RAGPreTreatment.metadata_descriptions[existing_metadata_names.index(metadata_filter_name)]
-            if corresponding_metadata_info.possible_values:
-                if metadata_filter_value not in corresponding_metadata_info.possible_values:
-                    retrieved_value, retrieval_score = BM25RetrieverHelper.find_best_match_bm25(corresponding_metadata_info.possible_values, metadata_filter_value)                    
-                    if retrieval_score > 0.5:
-                        RagFilteringMetadataHelper.update_filter_value(metadata_filters_to_validate, metadata_filter_name, retrieved_value)
-                        print(f"/!\\ Filter on metadata '{metadata_filter_name}' with invalid value: '{metadata_filter_value}' was replaced by the nearest match: '{retrieved_value}' with score: [{retrieval_score}].")
-                    else:
-                        RagFilteringMetadataHelper.remove_filter_by_name(metadata_filters_to_validate, metadata_filter_name)
-                        print(f"/!\\ Filter on metadata '{metadata_filter_name}' with invalid value: '{metadata_filter_value}'. It has been removed from metadata filters.")
-
-        print(f"Corrected metadata filters: '{metadata_filters_to_validate}'")
-        metadata_filters_to_validate = RagFilteringMetadataHelper.translate_chroma_db_metadata_filters_to_langchain_format(metadata_filters_to_validate)
+        metadata_filters_to_validate = RAGPreTreatment.domain_specific_metadata_filters_validation_and_correction(metadata_filters_to_validate)
+                
+        # Generic validity check of metadata filters keys or values, and remove filters with invalid ones
+        RagFilteringMetadataHelper.validate_langchain_metadata_filters_against_metadata_descriptions(metadata_filters_to_validate, RAGPreTreatment.metadata_descriptions, does_throw_error_upon_failure= False)
+      
+        print(f"Corrected metadata filters: '{str(metadata_filters_to_validate)}'")
         return metadata_filters_to_validate
 
     #TODO: the following checks are not generic and shouldn't be in common_tools
-    def domain_specific_extra_metadata_filters_validation_and_correction(metadata_filters_to_validate):
-        # Update value of 'academic_level' metadata filter in some cases (like: pre-graduate, BTS, graduate)
-        filter_by_academic_level_value = RagFilteringMetadataHelper.find_filter_value(metadata_filters_to_validate, 'academic_level')
-        if filter_by_academic_level_value:
-            if filter_by_academic_level_value == 'pre-graduate' or filter_by_academic_level_value == 'pré-graduate':
-                RagFilteringMetadataHelper.update_filter_value(metadata_filters_to_validate, 'academic_level', 'Bac')
-            elif filter_by_academic_level_value == 'BTS':
-                RagFilteringMetadataHelper.update_filter_value(metadata_filters_to_validate, 'academic_level', 'Bac+2')
-            elif filter_by_academic_level_value == 'graduate':
-                RagFilteringMetadataHelper.update_filter_value(metadata_filters_to_validate, 'academic_level', 'Bac+3')
+    @staticmethod
+    def domain_specific_metadata_filters_validation_and_correction(langchain_filters: Union[Operation, Comparison]) -> Union[Operation, Comparison, None]:
+        """
+        Perform domain-specific validation and correction on LangChain filters (Operation or Comparison).
 
-        # Update value of 'name' metadata filter if its value has no perfect match (in all_trainings_names or all_jobs_names)
-        filter_by_name_value = RagFilteringMetadataHelper.find_filter_value(metadata_filters_to_validate, 'name')
-        if filter_by_name_value:
-            all_dir = "./outputs/all/"
-            filter_by_type_value = RagFilteringMetadataHelper.find_filter_value(metadata_filters_to_validate, 'type')
-            if filter_by_type_value and filter_by_type_value == 'formation':
-                all_trainings_names = file.get_as_json(all_dir + 'all_trainings_names') #TODO: single loading
-                if filter_by_name_value not in all_trainings_names:
-                    retrieved_value, retrieval_score = BM25RetrieverHelper.find_best_match_bm25(all_trainings_names, filter_by_name_value)                    
-                    if retrieval_score > 0.5:
-                        RagFilteringMetadataHelper.update_filter_value(metadata_filters_to_validate, 'name', retrieved_value)
-                        print(f"No match found for metadata value: '{filter_by_name_value}'in all trainings names. Replcaed by the nearest match: '{retrieved_value}' with score of: [{retrieval_score}].")
-                    else:
-                        RagFilteringMetadataHelper.remove_filter_by_name(metadata_filters_to_validate, 'name')
-                        print(f"No match found for metadata value: '{filter_by_name_value}'in all trainings names. Nearest match: '{retrieved_value}' has a low score of: [{retrieval_score}].")
-            
-            elif filter_by_type_value and filter_by_type_value == 'metier':
-                all_trainings_names = file.get_as_json(all_dir + 'all_jobs_names')
-                if filter_by_name_value not in all_trainings_names:
-                    retrieved_value, retrieval_score = BM25RetrieverHelper.find_best_match_bm25(all_trainings_names, filter_by_name_value)                    
-                    if retrieval_score > 0.5:
-                        RagFilteringMetadataHelper.update_filter_value(metadata_filters_to_validate, 'name', retrieved_value)
-                    else:
-                        RagFilteringMetadataHelper.remove_filter_by_name(metadata_filters_to_validate, 'name')
-                        print(f"No match found for metadata value: '{filter_by_name_value}'in all trainings names. Nearest match: '{retrieved_value}' has a score of: {retrieval_score}")             
+        :param langchain_filters: The LangChain-style filter object (Operation or Comparison).
+        :return: The validated and corrected filter object, or None if all filters are invalid.
+        """
+        def validate_and_correct(filter_obj):
+            if isinstance(filter_obj, Comparison):
+                # Academic level corrections
+                if filter_obj.attribute == "academic_level":
+                    if filter_obj.value in ["pre-graduate", "pré-graduate"]:
+                        return Comparison(attribute=filter_obj.attribute, comparator=filter_obj.comparator, value="Bac")
+                    elif filter_obj.value == "BTS":
+                        return Comparison(attribute=filter_obj.attribute, comparator=filter_obj.comparator, value="Bac+2")
+                    elif filter_obj.value == "graduate":
+                        return Comparison(attribute=filter_obj.attribute, comparator=filter_obj.comparator, value="Bac+3")
+                
+                # Name corrections based on type (formation or métier)
+                elif filter_obj.attribute == "name":
+                    # Load type filter value
+                    type_filter = RagFilteringMetadataHelper.find_filter(langchain_filters, "type")
+                    filter_by_type_value = type_filter.value if type_filter else None
 
-        return metadata_filters_to_validate
+                    all_dir = "./outputs/all/"
+                    if filter_by_type_value == "formation":
+                        all_trainings_names = file.get_as_json(all_dir + "all_trainings_names")
+                        if filter_obj.value not in all_trainings_names:
+                            retrieved_value, retrieval_score = BM25RetrieverHelper.find_best_match_bm25(all_trainings_names, filter_obj.value)
+                            if retrieval_score > 0.5:
+                                print(
+                                    f"No match found for metadata value: '{filter_obj.value}' in all trainings names. "
+                                    f"Replaced by the nearest match: '{retrieved_value}' with score: [{retrieval_score}]."
+                                )
+                                return Comparison(attribute=filter_obj.attribute, comparator=filter_obj.comparator, value=retrieved_value)
+                            else:
+                                print(
+                                    f"No match found for metadata value: '{filter_obj.value}' in all trainings names. "
+                                    f"Nearest match: '{retrieved_value}' has a low score: [{retrieval_score}]. Filter removed."
+                                )
+                                return None
+                    elif filter_by_type_value == "metier":
+                        all_jobs_names = file.get_as_json(all_dir + "all_jobs_names")
+                        if filter_obj.value not in all_jobs_names:
+                            retrieved_value, retrieval_score = BM25RetrieverHelper.find_best_match_bm25(all_jobs_names, filter_obj.value)
+                            if retrieval_score > 0.5:
+                                print(
+                                    f"No match found for metadata value: '{filter_obj.value}' in all jobs names. "
+                                    f"Replaced by the nearest match: '{retrieved_value}' with score: [{retrieval_score}]."
+                                )
+                                return Comparison(attribute=filter_obj.attribute, comparator=filter_obj.comparator, value=retrieved_value)
+                            else:
+                                print(
+                                    f"No match found for metadata value: '{filter_obj.value}' in all jobs names. "
+                                    f"Nearest match: '{retrieved_value}' has a low score: [{retrieval_score}]. Filter removed."
+                                )
+                                return None
+
+                # Return unchanged Comparison if no corrections were needed
+                return filter_obj
+
+            elif isinstance(filter_obj, Operation):
+                # Recursively validate and correct arguments
+                validated_arguments = [
+                    validate_and_correct(arg) for arg in filter_obj.arguments
+                ]
+                # Remove None values (invalid filters)
+                validated_arguments = [arg for arg in validated_arguments if arg is not None]
+
+                # If no arguments remain valid, return None
+                if not validated_arguments:
+                    return None
+
+                # Return the corrected Operation
+                return Operation(operator=filter_obj.operator, arguments=validated_arguments)
+
+            else:
+                raise ValueError(f"Unsupported filter type: {type(filter_obj)}")
+
+        # Start validation and correction
+        return validate_and_correct(langchain_filters)

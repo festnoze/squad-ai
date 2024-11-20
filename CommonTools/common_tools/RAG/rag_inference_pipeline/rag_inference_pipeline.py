@@ -30,7 +30,6 @@ class RagInferencePipeline:
             
         self.metadata_descriptions = metadata_descriptions
         RAGPreTreatment.metadata_descriptions = metadata_descriptions
-        RAGHybridRetrieval.metadata_descriptions = metadata_descriptions
         RAGPreTreatment.default_filters = default_filters #only useful for dynamic pipeline, to rethink #todo: think to rather instanciate current class for setting specific filters by app.
         self.tools: list = tools
 

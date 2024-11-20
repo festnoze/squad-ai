@@ -25,8 +25,6 @@ from langchain_core.structured_query import (
 )
 
 class RAGHybridRetrieval:
-    metadata_descriptions = None
-
     @staticmethod    
     def rag_hybrid_retrieval_custom(rag: RagService, analysed_query: QuestionAnalysisBase, metadata: dict, include_bm25_retrieval: bool = False, give_score: bool = True, max_retrived_count: int = 20):
         if not include_bm25_retrieval:
@@ -54,7 +52,7 @@ class RAGHybridRetrieval:
 
         retrievers = []
         if include_semantic_retrieval:
-            metadata_filters_in_specific_db_type_format = RagFilteringMetadataHelper.translate_langchain_metadata_filters_into_specified_db_type_format(metadata_filters, RAGHybridRetrieval.metadata_descriptions, rag.vector_db_type)
+            metadata_filters_in_specific_db_type_format = RagFilteringMetadataHelper.translate_langchain_metadata_filters_into_specified_db_type_format(metadata_filters, rag.vector_db_type)
             vector_retriever = rag.vectorstore.as_retriever(search_kwargs={'k': int(max_retrived_count * semantic_k_ratio), 'filter': metadata_filters_in_specific_db_type_format}) 
             retrievers.append(vector_retriever)
         

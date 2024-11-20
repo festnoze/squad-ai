@@ -2,6 +2,7 @@ from collections import defaultdict
 from typing import Optional, Union
 from common_tools.models.logical_operator import LogicalOperator
 from common_tools.models.metadata_description import MetadataDescription
+from common_tools.helpers.rag_bm25_retriever_helper import BM25RetrieverHelper
 #
 from langchain.schema import Document
 from langchain_community.query_constructors.chroma import ChromaTranslator
@@ -98,7 +99,6 @@ class RagFilteringMetadataHelper:
     @staticmethod
     def translate_langchain_metadata_filters_into_specified_db_type_format(
             langchain_filters: Union[Comparison, Operation],
-            metadata_descriptions: list[MetadataDescription] = None,
             vector_db_type: str = "chroma",
             metadata_key: str = "metadata"
         ) -> dict:
@@ -106,16 +106,15 @@ class RagFilteringMetadataHelper:
         Translate LangChain-style filters into vector database-specific filter formats.
 
         :param langchain_filters: The LangChain-style filter object (Comparison or Operation).
-        :param metadata_descriptions: Optional list of metadata descriptions to validate filter attributes.
         :param vector_db_type: The target database translator type (e.g., "chroma", "qdrant", "pinecone").
         :param metadata_key: The key under which metadata is stored (used by QdrantTranslator).
         :return: A dictionary representing the translated filter for the specified database.
         """
         if langchain_filters is None:
             return None
-        
+
         # Initialize the appropriate translator based on the specified type
-        translator:Visitor = None
+        translator: Visitor = None
         if vector_db_type == "chroma":
             translator = ChromaTranslator()
         elif vector_db_type == "qdrant":
@@ -125,37 +124,24 @@ class RagFilteringMetadataHelper:
         else:
             raise ValueError(f"Unsupported translator type: {vector_db_type}")
 
-        # Validate the filter attributes against provided metadata descriptions
-        valid_metadata_keys = set(metadata_description.name if hasattr(metadata_description, 'name') else metadata_description['name'] for metadata_description in metadata_descriptions) if metadata_descriptions else set()
-
-        def validate_and_translate(filter_obj):
+        def translate(filter_obj):
             if isinstance(filter_obj, Operation):
                 # Recursively process operations
-                translated_args = [
-                    validate_and_translate(arg) for arg in filter_obj.arguments
-                ]
-                # Filter out None values resulting from invalid attributes
-                translated_args = [arg for arg in translated_args if arg is not None]
-                if not translated_args:
-                    return None
+                translated_args = [translate(arg) for arg in filter_obj.arguments]
                 return Operation(operator=filter_obj.operator, arguments=translated_args)
             elif isinstance(filter_obj, Comparison):
-                # Check if the attribute is valid
-                if not valid_metadata_keys or filter_obj.attribute in valid_metadata_keys:
-                    return filter_obj
-                else:
-                    print(f"Warning: Attribute '{filter_obj.attribute}' is not recognized.")
-                    return None
+                # Directly translate Comparison
+                return filter_obj
             else:
                 raise ValueError(f"Unsupported filter type: {type(filter_obj)}")
 
-        # Validate and translate the filters
-        validated_filters = validate_and_translate(langchain_filters)
-        if validated_filters is None:
+        # Translate the filters without validation
+        translated_filters = translate(langchain_filters)
+        if translated_filters is None:
             return {}
-
+        
         # Use the translator to convert the validated filters into the target format
-        translated_filter = translator.visit_operation(validated_filters)
+        translated_filter = translator.visit_operation(translated_filters)
         return translated_filter
     
     @staticmethod
@@ -448,3 +434,78 @@ class RagFilteringMetadataHelper:
             metadata_field_info.append(MetadataDescription(name=key, description=description, type=value_type, possible_values=possible_values))
 
         return metadata_field_info
+    
+    @staticmethod
+    def validate_langchain_metadata_filters_against_metadata_descriptions(
+        langchain_filters: Union[Operation, Comparison],
+        metadata_descriptions: list[MetadataDescription],
+        does_throw_error_upon_failure: bool = True,
+        search_nearest_value_if_not_found: bool = False
+    ) -> Union[Operation, Comparison, None]:
+        """
+        Validate the metadata filters provided as LangChain Operation (or Comparison) against the existing metadata descriptions,
+        Checking for each metadata filter name and value validity. 
+        Optionally, find the nearest value for invalid values using BM25 if 'search_nearest_value_if_not_found' = True.
+
+        :param langchain_filters: The LangChain-style filter object (Operation or Comparison).
+        :param metadata_descriptions: List of MetadataDescription instances.
+        :param does_throw_error_upon_failure: If True, raises errors on invalid filters;
+                                            otherwise removes invalid filters silently.
+        :param search_nearest_value_if_not_found: If True, attempts to find the nearest valid value for invalid values.
+        :return: The validated LangChain filter object, or None if all filters are invalid.
+        """
+        # Create a lookup dictionary for quick metadata validation
+        metadata_lookup = {desc.name: desc.possible_values for desc in metadata_descriptions}
+
+        def validate_filter(filter_obj):
+            if isinstance(filter_obj, Comparison):
+                # Validate attribute existence
+                if filter_obj.attribute not in metadata_lookup:
+                    if does_throw_error_upon_failure:
+                        raise ValueError(
+                            f"Attribute '{filter_obj.attribute}' is not recognized in the metadata descriptions."
+                        )
+                    print(f"/!\\ Filter on invalid metadata name: '{filter_obj.attribute}'. It has been removed.")
+                    return None
+
+                # Validate value existence in possible_values
+                possible_values = metadata_lookup[filter_obj.attribute]
+                if not possible_values or filter_obj.value in possible_values:
+                    return filter_obj
+
+                if search_nearest_value_if_not_found:
+                    # Find the nearest match using BM25
+                    retrieved_value, retrieval_score = BM25RetrieverHelper.find_best_match_bm25(
+                        possible_values, filter_obj.value
+                    )
+                    # Update the filter value
+                    if retrieval_score > 0.5:
+                        print(f"/!\\ Filter on metadata '{filter_obj.attribute}' with invalid value: '{filter_obj.value}' was replaced by the nearest match value: '{retrieved_value}' with score: [{retrieval_score}].")
+                        return Comparison(attribute=filter_obj.attribute, comparator=filter_obj.comparator, value=retrieved_value)
+                    # Delete the filter if no close enough match is found
+                    else:
+                        print(f"/!\\ Filter on metadata '{filter_obj.attribute}' with invalid value: '{filter_obj.value}'. Filter has been removed from metadata filters.")
+                
+                if does_throw_error_upon_failure:
+                    raise ValueError(f"Value: '{filter_obj.value}' for metadata filter: '{filter_obj.attribute}' is not valid. Allowed values are: {', '.join(possible_values)}"
+                    )
+                else:
+                    #Remove the filter if the value is not found in the possible values
+                    print( f"/!\\ Filter on metadata '{filter_obj.attribute}' with invalid value: '{filter_obj.value}'. Filter has been removed from metadata filters.")
+                    return None                
+
+            elif isinstance(filter_obj, Operation):
+                validated_arguments = [
+                    validate_filter(arg) for arg in filter_obj.arguments
+                ]
+                validated_arguments = [arg for arg in validated_arguments if arg is not None]
+                if not validated_arguments:
+                    return None
+                return Operation(operator=filter_obj.operator, arguments=validated_arguments)
+            else:
+                if does_throw_error_upon_failure:
+                    raise ValueError(f"Unsupported filter type: {type(filter_obj)}")
+                return None
+            
+        validated_filters = validate_filter(langchain_filters)
+        return validated_filters
