@@ -11,7 +11,7 @@ public static class ConversationConverter
         {
             Messages = conversationModel.Select(msg => new MessageRequestModel
             {
-                Source = msg.Source,
+                Role = msg.Role,
                 Content = msg.Content,
                 DurationSeconds = msg.DurationSeconds
             }).ToList()
@@ -26,7 +26,7 @@ public static class ConversationConverter
         foreach (var msg in requestModel.Messages)
         {
             var messageModel = new MessageModel(
-                source: msg.Source,
+                source: msg.Role,
                 content: msg.Content,
                 durationSeconds: (int)msg.DurationSeconds // Assuming truncation to integer is acceptable
             );

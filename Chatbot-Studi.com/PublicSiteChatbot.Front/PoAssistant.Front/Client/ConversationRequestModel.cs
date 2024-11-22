@@ -13,7 +13,7 @@ public class ConversationRequestModel
 public class MessageRequestModel
 {
     [JsonPropertyName("role")]
-    public string Source { get; set; } = "";
+    public string Role { get; set; } = "";
 
     [JsonPropertyName("content")]
     public string Content { get; set; } = "";

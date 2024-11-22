@@ -27,7 +27,7 @@
         {
             @* Display message bubble header *@
             <div class="@($"{(message.IsSender ? "message-source-sender" : "message-source-receiver")}")">
-                @message.Source
+                @message.Role
                 @if (message.DurationSeconds > 0)
                 {
                     <span class="duration-text">(@message.DurationSeconds s.)</span>

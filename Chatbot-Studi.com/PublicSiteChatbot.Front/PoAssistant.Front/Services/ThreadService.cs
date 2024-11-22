@@ -29,7 +29,7 @@ public class ThreadService : IDisposable
         this.chatbotApiClient = new ChatbotAPIClient("http://127.0.0.1:8000");
         if (messages is null || !messages.Any())
         {
-            messages = new ConversationModel(MessageModel.BusinessExpertName, string.Empty, true);
+            messages = new ConversationModel(MessageModel.UserRole, string.Empty, true);
             isWaitingForLLM = false;
         }
     }
@@ -148,7 +148,7 @@ public class ThreadService : IDisposable
 
     public void EndMetierMetierExchange()
     {
-        messages!.Add(new MessageModel(MessageModel.ProjectManagerName, "Le PO a maintenant rédigé la User Story et ses 'use cases'.", 0, true));
+        messages!.Add(new MessageModel(MessageModel.AiRole, "Le PO a maintenant rédigé la User Story et ses 'use cases'.", 0, true));
         isWaitingForLLM = false;
         NotifyForUserStoryReady();
         OnThreadChanged?.Invoke();
@@ -164,7 +164,7 @@ public class ThreadService : IDisposable
                 if (messages!.Last().Content.Contains(endPmTag) /*|| !messages!.Last().Content.Contains("?")*/)
                 {
                     messages!.Last().ChangeContent(messages!.Last().Content.Replace(endPmTag, string.Empty)); //"Merci. Nous avons fini, j'ai tous les éléments dont j'ai besoin. Avez-vous d'autres points à aborder ?");
-                    messages.Add(new MessageModel(MessageModel.BusinessExpertName, endExchangeProposalMessage, 0, false, true));
+                    messages.Add(new MessageModel(MessageModel.UserRole, endExchangeProposalMessage, 0, false, true));
                     isWaitingForLLM = false;
                 }
                 else
@@ -251,7 +251,7 @@ public class ThreadService : IDisposable
 
         var role = "Métier";
         if (messages?.Any() ?? false)
-            role =  messages.Last().IsSender ? MessageModel.BusinessExpertName : MessageModel.ProjectManagerName;
+            role =  messages.Last().IsSender ? MessageModel.UserRole : MessageModel.AiRole;
         var newMessage = new MessageModel(role, string.Empty, -1, false);
         newMessage.IsStreaming = true;
 

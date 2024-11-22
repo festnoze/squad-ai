@@ -4,10 +4,10 @@ namespace PoAssistant.Front.Data;
 
 public record MessageModel
 {
-    public static string BusinessExpertName = "Métier";
-    public static string ProjectManagerName = "Chef de Projet";
-    [JsonPropertyName("source")]
-    public string Source { get; init; }
+    public static string UserRole = "user";
+    public static string AiRole = "assistant";
+    [JsonPropertyName("role")]
+    public string Role { get; init; }
 
     [JsonPropertyName("content")]
     public string Content { get; set; }
@@ -17,7 +17,7 @@ public record MessageModel
 
     public DateTime Timestamp { get; init; }
 
-    public bool IsSender => Source != BusinessExpertName;
+    public bool IsSender => Role != UserRole;
 
     public bool IsLastThreadMessage { get; private set; } = false;
 
@@ -32,10 +32,11 @@ public record MessageModel
 
     public MessageModel(string source, string content, int durationSeconds, bool isSavedMessage = true, bool isEndMessage = false)
     {
-        if (source == "PM") source = ProjectManagerName;
-        if (source.StartsWith("Business")) source = BusinessExpertName;
+        //TODO ETM: change the roles names: user -> BusinessExpert, assistant -> PM
+        if (source == "PM") source = AiRole;
+        if (source.StartsWith("Business")) source = UserRole;
 
-        Source = source;
+        Role = source;
         Content = content;
         DurationSeconds = durationSeconds;
         Timestamp = DateTime.Now;
