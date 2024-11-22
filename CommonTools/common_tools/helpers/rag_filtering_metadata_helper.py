@@ -458,7 +458,9 @@ class RagFilteringMetadataHelper:
         metadata_lookup = {desc.name: desc.possible_values for desc in metadata_descriptions}
 
         def validate_filter(filter_obj):
-            if isinstance(filter_obj, Comparison):
+            if filter_obj is None:
+                return None
+            elif isinstance(filter_obj, Comparison):
                 # Validate attribute existence
                 if filter_obj.attribute not in metadata_lookup:
                     if does_throw_error_upon_failure:

@@ -29,7 +29,7 @@ class RAGAugmentedGeneration:
                 chunks.append(chunk)
             return ''.join(chunk.decode('utf-8') for chunk in chunks)
 
-        #todo: to replace with: Execute.get_sync_generator_from_async
+        #TODO: to replace with: Execute.async_generator_wrapper_to_sync
 
         # Ensure an event loop is available in the current thread
         try:

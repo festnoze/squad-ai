@@ -109,7 +109,7 @@ class RAGPreTreatment:
     def query_rewritting(rag:RagService, analysed_query:QuestionRewritting) -> str:        
         query_rewritting_prompt = RAGPreTreatment._query_rewritting_prompt_replace_all_categories(analysed_query.question_with_context)
 
-        response = Execute.get_sync_from_async(Llm.invoke_chain_with_input_async, 'Query rewritting', rag.llm_1, query_rewritting_prompt)
+        response = Execute.async_wrapper_to_sync(Llm.invoke_chain_with_input_async, 'Query rewritting', rag.llm_1, query_rewritting_prompt)
         
         content =  Llm.extract_json_from_llm_response(Llm.get_content(response))
         analysed_query.modified_question = content['modified_question']
@@ -177,7 +177,7 @@ class RAGPreTreatment:
 
         ## WARNING: Not work as async. This is a fix as langchain query contructor (or our async to sync) seems to fails while async with error: Connection error.
         # try:
-        #     response_with_filters = Execute.get_sync_from_async(Llm.invoke_chain_with_input_async, 'Analyse metadata', query_constructor, query)
+        #     response_with_filters = Execute.async_wrapper_to_sync(Llm.invoke_chain_with_input_async, 'Analyse metadata', query_constructor, query)
         # except Exception as e:
         #     print(f'+++ Error on "analyse_query_for_metadata": {e}')
         
@@ -217,7 +217,9 @@ class RAGPreTreatment:
         :return: The validated and corrected filter object, or None if all filters are invalid.
         """
         def validate_and_correct(filter_obj):
-            if isinstance(filter_obj, Comparison):
+            if filter_obj is None:
+                return None
+            elif isinstance(filter_obj, Comparison):
                 # Academic level corrections
                 if filter_obj.attribute == "academic_level":
                     if filter_obj.value in ["pre-graduate", "pré-graduate"]:
@@ -230,7 +232,7 @@ class RAGPreTreatment:
                 # Name corrections based on type (formation or métier)
                 elif filter_obj.attribute == "name":
                     # Load type filter value
-                    type_filter = RagFilteringMetadataHelper.find_filter(langchain_filters, "type")
+                    type_filter = RagFilteringMetadataHelper.find_filter_value(langchain_filters, "type")
                     filter_by_type_value = type_filter.value if type_filter else None
 
                     all_dir = "./outputs/all/"

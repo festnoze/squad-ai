@@ -9,3 +9,4 @@ requests
 BeautifulSoup4
 selenium
 fastapi
+uvicorn

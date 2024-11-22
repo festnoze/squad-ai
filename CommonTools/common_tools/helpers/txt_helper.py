@@ -37,6 +37,7 @@ class txt:
     @staticmethod
     def get_elapsed_str(elapsed_sec: float) -> str:
         elapsed_str = ''
+        if not elapsed_sec: return ''
         elapsed_minutes = int(elapsed_sec / 60)
         if elapsed_minutes != 0:
             elapsed_seconds = int(elapsed_sec % 60)
@@ -44,11 +45,11 @@ class txt:
             elapsed_seconds = round(float(elapsed_sec % 60), 2)
             seconds_int = int(elapsed_seconds)
             if seconds_int == 0:
-                elapsed_seconds = round(elapsed_seconds, 2)
+                elapsed_seconds = round(elapsed_seconds, 3)
             elif seconds_int <= 9:
-                elapsed_seconds = round(elapsed_seconds, 1)
+                elapsed_seconds = round(elapsed_seconds, 2)
             else:
-                elapsed_seconds = int(elapsed_seconds)
+                elapsed_seconds = round(elapsed_seconds, 1)
 
         if elapsed_minutes != 0:
             elapsed_str += f"{elapsed_minutes}m "
@@ -113,7 +114,7 @@ class txt:
         txt.start_time = time.time()
 
         # Ensure only one spinner thread is running at a time
-        if txt.waiting_spinner_thread and txt.waiting_spinner_thread.is_alive():
+        if txt.is_thread_spinner_alive():
             txt.stop_spinner()
             txt.print("Previous waiting spinner thread wasn't halted before creating a new one")
 
@@ -122,6 +123,10 @@ class txt:
         txt.waiting_spinner_thread.daemon = True
         txt.waiting_spinner_thread.start()
         return txt.waiting_spinner_thread
+
+    @staticmethod
+    def is_thread_spinner_alive():
+        return txt.waiting_spinner_thread and txt.waiting_spinner_thread.is_alive()
     
     @staticmethod
     def to_python_case(text: str) -> str:
@@ -141,12 +146,23 @@ class txt:
     @staticmethod
     def stop_spinner():
         if txt.waiting_spinner_thread:
-            txt.stop_event.set()  # Signal the thread to stop
-            txt.waiting_spinner_thread.join(timeout=1.0)  # Wait for the thread to stop
-            if txt.waiting_spinner_thread and txt.waiting_spinner_thread.is_alive():
-                print("Warning: Spinner thread did not stop in time.")
+            # Signal the thread to stop
+            txt.stop_event.set()
+
+            # Wait for the thread to stop with a hard timeout of 5 seconds
+            total_wait_time = 0
+            interval = 0.1  # Check every 100ms
+            while total_wait_time < 5.0:
+                txt.waiting_spinner_thread.join(timeout=interval)
+                if not txt.is_thread_spinner_alive():
+                    break  # Exit the loop if the thread has stopped
+                total_wait_time += interval
+
+            # Final check if the thread is still alive
+            if txt.is_thread_spinner_alive():
+                print("Spinner Error: thread did not stop within 5 seconds. Forcing termination.")
             else:
-                txt.waiting_spinner_thread = None
+                txt.waiting_spinner_thread = None  # Reset the reference if stopped
 
     @staticmethod
     def stop_spinner_replace_text(text=None)-> int:

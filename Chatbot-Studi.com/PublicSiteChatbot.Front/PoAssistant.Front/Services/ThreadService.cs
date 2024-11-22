@@ -1,21 +1,23 @@
+using System.Collections.Generic;
 using System.Linq;
-using System.Text.Json;
 using PoAssistant.Front.Data;
 using PoAssistant.Front.Helpers;
 using PoAssistant.Front.Infrastructure;
+using PoAssistant.Front.Client;
 
 namespace PoAssistant.Front.Services;
 
-public class ThreadMetierCdPService : IDisposable
+public class ThreadService : IDisposable
 {
+    private ChatbotAPIClient chatbotApiClient;
     private readonly IExchangesRepository _exchangesRepository;
-    private ThreadModel? messages = null;
+    private ConversationModel? messages = null;
     public event Action? OnThreadChanged = null;
     private bool isWaitingForLLM = false;
     public const string endPmTag = "[FIN_PM_ASSIST]";
     private static string endExchangeProposalMessage = "Ajouter des points à aborder avec le Project Manager si vous le souhaitez. Sinon, cliquez sur le bouton : 'Terminer l'échange' pour passer à l'étape de rédaction de l'US";
 
-    public ThreadMetierCdPService(IExchangesRepository exchangesRepository)
+    public ThreadService(IExchangesRepository exchangesRepository)
     {
         _exchangesRepository = exchangesRepository;
         InitializeThread();
@@ -23,9 +25,11 @@ public class ThreadMetierCdPService : IDisposable
 
     private void InitializeThread()
     {
+        // TODO: Add to appsettings.json and IoC on startup
+        this.chatbotApiClient = new ChatbotAPIClient("http://127.0.0.1:8000");
         if (messages is null || !messages.Any())
         {
-            messages = new ThreadModel(MessageModel.BusinessExpertName, string.Empty, true);
+            messages = new ConversationModel(MessageModel.BusinessExpertName, string.Empty, true);
             isWaitingForLLM = false;
         }
     }
@@ -58,7 +62,7 @@ public class ThreadMetierCdPService : IDisposable
         return lastMessage.Content;
     }
 
-    public ThreadModel GetPoMetierThread()
+    public ConversationModel GetPoMetierThread()
     {
         return messages!;
     }
@@ -77,7 +81,7 @@ public class ThreadMetierCdPService : IDisposable
     public void AddNewMessage(MessageModel newMessage)
     {
         if (messages is null)
-            messages = new ThreadModel();
+            messages = new ConversationModel();
 
         newMessage.IsSavedMessage = false;
         messages!.Add(newMessage);
@@ -100,7 +104,7 @@ public class ThreadMetierCdPService : IDisposable
     public void SaveThread()
     {
         if (username is null)
-            throw new InvalidOperationException($"Cannot save the thread as the user is not set to service: {nameof(ThreadMetierCdPService)}");
+            throw new InvalidOperationException($"Cannot save the thread as the user is not set to service: {nameof(ThreadService)}");
 
         var newThread = _exchangesRepository.SaveUserExchange(username, messages!);
         if (newThread) _isExchangesLoaded = false;
@@ -137,7 +141,7 @@ public class ThreadMetierCdPService : IDisposable
     public void DeleteMetierPoThread()
     {
         _isExchangesLoaded = false;
-        messages = new ThreadModel();
+        messages = new ConversationModel();
         InitializeThread();
         OnThreadChanged?.Invoke();
     }
@@ -198,7 +202,7 @@ public class ThreadMetierCdPService : IDisposable
             messages!.Last().ChangeContent(string.Empty);
     }
 
-    public void ValidateMetierAnswer(string modifiedMessageContent)
+    public async Task ValidateMetierAnswer(string modifiedMessageContent)
     {
         if (!messages?.Any() ?? true)
             return;
@@ -212,6 +216,15 @@ public class ThreadMetierCdPService : IDisposable
 
         lastMessage.IsSavedMessage = true;
         SaveThread();
+        var conversationRequestModel = messages!.ToRequestModel();
+        var chunks = this.chatbotApiClient.GetQueryRagAnswerStreamingAsync(conversationRequestModel);
+        // var answer = await chunks.ToArrayAsync();
+        var list = new List<string>();
+        await foreach (var item in chunks)
+        {
+            list.Add(item);
+        }
+        var answer = list.ToArray();
     }
 
     public event Action? UserStoryReadyNotification;
@@ -223,8 +236,8 @@ public class ThreadMetierCdPService : IDisposable
 
     public void DoEndBusinessPoExchange()
     {
-        messages.Last().IsEndMessage = true;
-        messages.Last().IsSavedMessage = true;
+        messages!.Last().IsEndMessage = true;
+        messages!.Last().IsSavedMessage = true;
     }
 
     public void Dispose()
@@ -234,7 +247,7 @@ public class ThreadMetierCdPService : IDisposable
     public void InitStreamMessage()
     {
         if (messages is null)
-            messages = new ThreadModel();
+            messages = new ConversationModel();
 
         var role = "Métier";
         if (messages?.Any() ?? false)

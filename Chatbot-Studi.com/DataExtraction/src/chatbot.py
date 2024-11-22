@@ -1,3 +1,4 @@
+import sys
 import time
 from typing import Generator
 #
@@ -88,7 +89,7 @@ class ChatbotFront:
         for msg in st.session_state.messages:
             st.chat_message(msg['role']).write(msg['content'])
         
-        #ChatbotFront.build_summary_vectorstore() #TODO: TMP, to remove when summarization is done and working
+        #ChatbotFront.build_summary_vectorstore() #TODO: tmp, to remove when summarization is done and working
         
         if user_query := st.chat_input(placeholder= 'Ecrivez votre question ici ...'):
             #TODO: tmp to remove
@@ -208,4 +209,5 @@ class ChatbotFront:
             time.sleep(interval_btw_words)
 
 if __name__ == "__main__":
+    sys.tracebacklimit = 5  # Limit traceback to 5 levels
     ChatbotFront.main() # startup with launching the chatbot

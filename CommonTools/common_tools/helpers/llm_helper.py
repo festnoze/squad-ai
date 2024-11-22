@@ -66,7 +66,7 @@ class Llm:
    
     @staticmethod
     def invoke_parallel_prompts_with_parser_batchs_fallbacks(action_name: str, llms_with_fallbacks: Union[Runnable, list[Runnable]], output_parser: BaseTransformOutputParser, batch_size: int = None, *prompts: Union[str, ChatPromptTemplate]) -> list[str]:
-        return Execute.get_sync_from_async(Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks_async, action_name, llms_with_fallbacks, output_parser, batch_size, *prompts)
+        return Execute.async_wrapper_to_sync(Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks_async, action_name, llms_with_fallbacks, output_parser, batch_size, *prompts)
     
     @staticmethod
     async def invoke_parallel_prompts_with_parser_batchs_fallbacks_async(action_name: str, llms_with_fallbacks: Union[Runnable, list[Runnable]], output_parser: BaseTransformOutputParser, batch_size: int = None, *prompts: Union[str, ChatPromptTemplate]) -> list[str]:
@@ -101,7 +101,7 @@ class Llm:
         
     @staticmethod
     def _invoke_parallel_chains(action_name: str = "", inputs: dict = None, batch_size: int = None, *chains: Chain) -> list[str]:
-        Execute.get_sync_from_async(Llm._invoke_parallel_chains_async, action_name, inputs, batch_size, *chains)
+        Execute.async_wrapper_to_sync(Llm._invoke_parallel_chains_async, action_name, inputs, batch_size, *chains)
     
     @staticmethod
     async def _invoke_parallel_chains_async(action_name: str = "", inputs: dict = None, batch_size: int = None, *chains: Chain) -> list[str]:

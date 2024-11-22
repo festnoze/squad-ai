@@ -211,7 +211,7 @@ class GenerateDocumentsSummariesChunksQuestionsAndMetadata:
     def generate_trainings_summaries_chunks_and_questions(self, llm_and_fallback, trainings_docs, docs_with_summary_chunks_and_questions_file_path):
         start = time.time()
         txt.print_with_spinner(f"Generating summaries, chunking and questions in 3 steps for each {len(trainings_docs)} documents")
-        docs_with_summary_chunks_and_questions = Execute.get_sync_from_async(
+        docs_with_summary_chunks_and_questions = Execute.async_wrapper_to_sync(
                             self.create_summary_and_questions_from_docs_in_three_steps_async, 
                             llm_and_fallback, 
                             trainings_docs, 50)

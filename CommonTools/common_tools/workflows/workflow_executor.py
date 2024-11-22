@@ -6,6 +6,7 @@ import typing
 from collections.abc import Iterable
 #
 from common_tools.helpers.file_helper import file
+from common_tools.helpers.method_decorator_helper import MethodDecorator
 from common_tools.rag.rag_inference_pipeline.end_pipeline_exception import EndPipelineException
 
 class WorkflowExecutor:
@@ -119,6 +120,7 @@ class WorkflowExecutor:
     def _is_sub_workflow(self, step):
         return isinstance(step, str) and step in self.config and isinstance(self.config[step], (list, dict))
 
+    @MethodDecorator.print_function_name_and_elapsed_time(display_param_value="class_and_function_name")
     def execute_function(self, class_and_function_name, previous_results, kwargs_values):
         func = self.get_static_method(class_and_function_name)
         func_kwargs = self._prepare_arguments_for_function(func, previous_results, kwargs_values)
@@ -133,6 +135,7 @@ class WorkflowExecutor:
         self._add_function_output_names_and_values_to_kwargs(func, result, kwargs_values)
         return result
 
+    @MethodDecorator.print_function_name_and_elapsed_time(display_param_value="class_and_function_name")
     async def execute_function_async(self, class_and_function_name, previous_results, kwargs_values):
         func = self.get_static_method(class_and_function_name)
         func_kwargs = self._prepare_arguments_for_function(func, previous_results, kwargs_values)

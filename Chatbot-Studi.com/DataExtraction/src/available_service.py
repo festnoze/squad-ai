@@ -24,6 +24,7 @@ from common_tools.helpers.ressource_helper import Ressource
 from common_tools.models.embedding import EmbeddingModel, EmbeddingType
 from common_tools.models.conversation import Conversation
 from common_tools.models.doc_w_summary_chunks_questions import DocWithSummaryChunksAndQuestions
+from common_tools.helpers.method_decorator_helper import MethodDecorator
 #
 from langchain.chains.query_constructor.schema import AttributeInfo
 from langchain_core.runnables import Runnable, RunnablePassthrough
@@ -154,30 +155,31 @@ class AvailableService:
     def rag_query_retrieval_but_augmented_generation(conversation_history: Conversation):
         return AvailableService.inference.run_pipeline_dynamic_but_augmented_generation(conversation_history, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
 
-    def rag_query_augmented_generation_streaming(analysed_query: QuestionRewritting, retrieved_chunks: list[Document], decoded_stream = False, all_chunks_output: list[str] = []):
-         for chunk in Execute.get_sync_generator_from_async(RAGAugmentedGeneration.rag_augmented_answer_generation_streaming_async, AvailableService.rag_service, analysed_query.modified_question, retrieved_chunks, analysed_query, AvailableService.format_retrieved_docs_function):  
-            if decoded_stream:
-                chunk_final = chunk.decode('utf-8').replace(Llm.new_line_for_stream_over_http, '\n')
-                #if remove_markdown: chunk_final = txt.remove_markdown(chunk_final)
-            else:
-                chunk_final = chunk
-
+    @MethodDecorator.print_function_name_and_elapsed_time(display_param_value="class_and_function_name")
+    async def rag_query_augmented_generation_streaming(analysed_query: QuestionRewritting, retrieved_chunks: list[Document], decoded_stream = False, all_chunks_output: list[str] = []):
+         async for chunk in RAGAugmentedGeneration.rag_augmented_answer_generation_streaming_async( 
+                                AvailableService.rag_service, 
+                                analysed_query.modified_question, 
+                                retrieved_chunks, 
+                                analysed_query, 
+                                AvailableService.format_retrieved_docs_function):
+            chunk_final = chunk if not decoded_stream else chunk.decode('utf-8').replace(Llm.new_line_for_stream_over_http, '\n')
             all_chunks_output.append(chunk_final)
             yield chunk_final
 
-    async def rag_query_dynamic_pipeline_streaming_async(conversation_history: Conversation, all_chunks_output = [], use_dynamic_pipeline = True, special_streaming_chars = True):
+    async def rag_query_dynamic_pipeline_streaming_async(conversation_history: Conversation, all_chunks_output = [], use_dynamic_pipeline = True, decoded_stream = False):
         if conversation_history.last_message.role != 'user':
             raise ValueError("Conversation history should end with a user message")
         txt.print_with_spinner("Exécution du pipeline d'inférence ...")
         
-        for stream_chunk in AvailableService.inference.run_pipeline_dynamic_async(
+        async for stream_chunk in AvailableService.inference.run_pipeline_dynamic_async(
             conversation_history,
             include_bm25_retrieval=True,
             give_score=True,
             format_retrieved_docs_function=AvailableService.format_retrieved_docs_function,
             all_chunks_output=all_chunks_output
         ):
-            if not special_streaming_chars:
+            if decoded_stream:
                 yield stream_chunk.decode('utf-8').replace(Llm.new_line_for_stream_over_http, '\n')
             else:
                 yield stream_chunk
@@ -195,7 +197,7 @@ class AvailableService:
         else:
             pipeline_method = AvailableService.inference.run_pipeline_static_async
 
-        for stream_chunk in Execute.get_sync_generator_from_async(
+        for stream_chunk in Execute.async_generator_wrapper_to_sync(
             pipeline_method,
             conversation_history,
             include_bm25_retrieval=True,
@@ -217,7 +219,7 @@ class AvailableService:
         else:
             pipeline_method = AvailableService.inference.run_pipeline_static_async
 
-        sync_generator = Execute.get_sync_generator_from_async(
+        sync_generator = Execute.async_generator_wrapper_to_sync(
             pipeline_method,
             conversation_history,
             True, #include_bm25_retrieval
@@ -233,7 +235,7 @@ class AvailableService:
         summarize_rag_answer_prompt = Ressource.load_ressource_file('summarize_rag_answer_prompt.french.txt')
         promptlate = ChatPromptTemplate.from_template(summarize_rag_answer_prompt)
         chain = promptlate | AvailableService.rag_service.llm_1 | RunnablePassthrough()
-        result = Execute.get_sync_from_async(Llm.invoke_chain_with_input_async, 'Answer summarization', chain, text)
+        result = Execute.async_wrapper_to_sync(Llm.invoke_chain_with_input_async, 'Answer summarization', chain, text)
         return Llm.get_content(result)
 
     def generate_ground_truth():

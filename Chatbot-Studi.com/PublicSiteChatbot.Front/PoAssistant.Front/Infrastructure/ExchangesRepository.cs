@@ -7,8 +7,8 @@ namespace PoAssistant.Front.Infrastructure;
 public interface IExchangesRepository
 {
     List<string> GetAllUserExchangesNames(string username);
-    ThreadModel? LoadUserExchange(string username, string exchangeDisplayName, bool truncatedExchangeName = false);
-    bool SaveUserExchange(string username, ThreadModel exchange);
+    ConversationModel? LoadUserExchange(string username, string exchangeDisplayName, bool truncatedExchangeName = false);
+    bool SaveUserExchange(string username, ConversationModel exchange);
 }
 
 public class ExchangesRepository : IExchangesRepository
@@ -30,7 +30,7 @@ public class ExchangesRepository : IExchangesRepository
         return userExchangesNames;
     }
 
-    public ThreadModel? LoadUserExchange(string username, string exchangeDisplayName, bool isTruncatedExchangeName = false)
+    public ConversationModel? LoadUserExchange(string username, string exchangeDisplayName, bool isTruncatedExchangeName = false)
     {
         if (isTruncatedExchangeName)
         {
@@ -48,10 +48,10 @@ public class ExchangesRepository : IExchangesRepository
 
         var exchangeJson = LoadExchangeFromPath(exchangePath);
 
-        return JsonConvert.DeserializeObject<ThreadModel>(exchangeJson);
+        return JsonConvert.DeserializeObject<ConversationModel>(exchangeJson);
     }
 
-    public bool SaveUserExchange(string username, ThreadModel exchange)
+    public bool SaveUserExchange(string username, ConversationModel exchange)
     {
         var maxTitleLength = 100;
         if (exchange.First().Content.Length < maxTitleLength)

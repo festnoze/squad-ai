@@ -25,7 +25,7 @@ class Conversation:
     def get_user_query(query_or_conv: Union[str, 'Conversation']) -> str:
         if isinstance(query_or_conv, str):
             return query_or_conv
-        elif isinstance(query_or_conv, Conversation):
+        elif type(query_or_conv).__name__ == Conversation.__name__: #isinstance(query_or_conv, Conversation):
             if not any(query_or_conv.messages): 
                 raise ValueError("Invalid query, no message found into the conversation")
             if not query_or_conv.last_message.role == "user":

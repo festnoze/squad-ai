@@ -11,13 +11,13 @@ namespace PoAssistant.Front.Controller;
 [Route("[controller]")]
 public class FrontendProxyController : ControllerBase
 {
-    public FrontendProxyController(ThreadMetierCdPService threadService, UserStoryService userStoryService)
+    public FrontendProxyController(ThreadService threadService, UserStoryService userStoryService)
     {
         _threadService = threadService;
         _userStoryService = userStoryService;
     }
 
-    private readonly ThreadMetierCdPService _threadService;
+    private readonly ThreadService _threadService;
     private readonly UserStoryService _userStoryService;
 
     /// <summary>

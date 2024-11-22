@@ -1,11 +1,11 @@
 namespace PoAssistant.Front.Data;
 
-public class ThreadModel : List<MessageModel>
+public class ConversationModel : List<MessageModel>
 {
-    public ThreadModel()
+    public ConversationModel()
     {}
 
-    public ThreadModel(string source, string firstThreadMessage, bool isLastMessage)
+    public ConversationModel(string source, string firstThreadMessage, bool isLastMessage)
     {
         this.Add(new MessageModel(source, firstThreadMessage, 0, false));
         if (isLastMessage)

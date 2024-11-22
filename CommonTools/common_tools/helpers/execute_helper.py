@@ -8,6 +8,92 @@ from functools import partial
 from common_tools.helpers.txt_helper import txt
 
 class Execute:
+
+    # def async_wrapper_to_sync(async_function, *args, **kwargs):
+    #     """A helper function to run async code in a synchronous context."""
+    #     return asyncio.run(async_function(*args, **kwargs))
+    
+    # def async_generator_wrapper_to_sync(async_function: Callable[..., Any], *args: Any, **kwargs: Any) -> Generator:
+    #     """Wrap an async generator to work as a sync generator."""
+    #     async def async_gen():
+    #         async for item in async_function(*args, **kwargs):
+    #             yield item
+
+    #     loop = asyncio.new_event_loop()
+    #     asyncio.set_event_loop(loop)
+    #     gen = async_gen()
+
+    #     try:
+    #         while True:
+    #             yield loop.run_until_complete(gen.__anext__())
+    #     except StopAsyncIteration:
+    #         loop.close()
+
+    
+    # TODO: WARNING - It have issues with the event loop
+    @staticmethod
+    def async_wrapper_to_sync(function_to_call: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
+        """
+        Encapsulate an asynchronous function into a synchronous function.
+        Ensures compatibility with existing event loops or creates a new one as needed.
+        """
+        try:
+            # Attempt to get the current event loop
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # If an event loop is already running, use a temporary loop
+                # because `run_until_complete` cannot be used in a running loop
+                return asyncio.run(function_to_call(*args, **kwargs))
+            elif loop.is_closed():
+                raise RuntimeError("Event loop is closed")
+        except RuntimeError:
+            # Create a new event loop if none exists or the current one is closed
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        # Run the async function on the identified loop
+        return loop.run_until_complete(function_to_call(*args, **kwargs))
+   
+    # TODO: WARNING - It have issues with the event loop
+    @staticmethod
+    def async_generator_wrapper_to_sync(function_to_call: Callable[..., AsyncGenerator], *args: Any, **kwargs: Any) -> Generator:
+        """
+        Convert an asynchronous generator function to a synchronous generator.
+        Use asyncio.Queue to bridge async results to the sync context.
+        """
+        async def put_results_in_queue(loop: asyncio.AbstractEventLoop):
+            # Collect the results from the async generator and put them in the queue
+            try:
+                async for chunk in function_to_call(*args, **kwargs):
+                    await queue.put(chunk)
+                await queue.put(None)  # Indicate the end of the stream
+            except Exception as e:
+                await queue.put(e)  # Pass exceptions to the sync consumer
+
+        # Create an event loop or use the existing one
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_closed():
+                raise RuntimeError
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+        # Create a queue to stream results from the async context to the sync context
+        queue = asyncio.Queue()
+
+        # Run the async producer in the same loop
+        loop.create_task(put_results_in_queue(loop))
+
+        # Consume results from the queue synchronously
+        while True:
+            item = loop.run_until_complete(queue.get())
+            if item is None:  # End of the stream
+                break
+            if isinstance(item, Exception):  # Handle exceptions
+                raise item
+            yield item
+
     @staticmethod
     def run_sync_functions_in_parallel_threads(*functions_with_args):
         """
@@ -62,9 +148,9 @@ class Execute:
         return tuple(results)
 
     @staticmethod
-    async def run_sync_async_stream_functions_as_concurrent_async_tasks(*functions_with_args, functions_with_streaming_indexes=None):
+    async def run_several_functions_as_concurrent_async_tasks(*functions_with_args, functions_with_streaming_indexes=None):
         """
-        Run synchronous and asynchronous functions (even with streaming) in parallel, as concurrent async tasks.
+        Run all kind of functions (synchronous, or asynchronous, or even with streaming) in parallel, as concurrent async tasks.
         
         :param functions_with_args: A mix of functions, both synchronous and asynchronous.
         :param functions_with_streaming_indexes: A list specifying the indices of functions that should be streamed.
@@ -136,71 +222,6 @@ class Execute:
             async for item in func(*args, **kwargs):
                 yield (idx, item)
     
-    @staticmethod
-    def get_sync_from_async(function_to_call: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
-        """
-        Encapsulate an asynchronous function into a synchronous function.
-        Explanation: This method runs the async function in the current event loop or a new one if necessary.
-        The async function completes its execution and returns the final result synchronously.
-        """
-
-        # Create an event loop if there isn't one already
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_closed():
-                raise RuntimeError
-        except RuntimeError:
-            # If there is no event loop or it is closed, create a new one
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        
-        # Run the async function and return its result synchronously
-        return loop.run_until_complete(function_to_call(*args, **kwargs))
-    
-    @staticmethod
-    def get_sync_generator_from_async(function_to_call: Callable[..., AsyncGenerator], *args: Any, **kwargs: Any) -> Generator:
-        """
-        Convert an asynchronous streaming function to a synchronous streaming generator.
-        Explaination: Use asyncio.Queue() to bridge the asynchronous and synchronous contexts. 
-        The asynchronous task put result chunks into the queue, which are then consumed synchronously. 
-        This approach ensures that chunks are yielded incrementally, maintaining streaming behavior while going synchronous.
-        """
-        async def collect_results():
-            # Use an async generator to collect results and yield them one by one
-            async for chunk in function_to_call(*args, **kwargs):
-                yield chunk
-        
-        async def put_results_in_queue():
-            # Collect the results and put them in the queue for synchronous consumption
-            try:
-                async for chunk in collect_results():
-                    await queue.put(chunk)
-                # Indicate that all results have been put in the queue
-                await queue.put(None)
-            except Exception as e:
-                await queue.put(e)
-
-        # Create an event loop if there isn't one already
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_closed():
-                raise RuntimeError
-        except RuntimeError:
-            # If there is no event loop or it is closed, create a new one
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-                
-        # Create a queue to stream results from the async context to the sync context
-        queue = asyncio.Queue()
-        loop.create_task(put_results_in_queue())
-        while True:
-            item = loop.run_until_complete(queue.get())
-            if item is None:  # End of the stream
-                break
-            if isinstance(item, Exception):  # If there was an error
-                raise item
-            yield item
-
     @staticmethod
     def activate_global_function_parameters_types_verification():
         sys.setprofile(Execute._activate_strong_typed_functions_parameters)
