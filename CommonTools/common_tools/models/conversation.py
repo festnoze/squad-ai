@@ -5,11 +5,18 @@ from langchain.memory import ConversationBufferMemory
 from langchain_core.messages.base import BaseMessage, BaseMessageChunk
 
 class Conversation:
-    def __init__(self, messages: list[dict] = None) -> None:
+    def __init__(self, messages: list = None) -> None:
         self.messages: list[Message] = []
         if messages:
             for message in messages:
-                self.add_message(Message(message['role'], message['content']))
+                if isinstance(message, Message):
+                    self.add_message(message)
+                elif isinstance(message, dict):
+                    self.add_message(Message(message['role'], message['content']))
+                elif hasattr(message, 'role') and hasattr(message, 'content'):
+                    self.add_message(Message(message.role, message.content))
+                else:
+                    raise ValueError("Unable to instanciate Conversation from the provided parameters")
 
     def add_message(self, message: Message) -> None:
         self.messages.append(message)

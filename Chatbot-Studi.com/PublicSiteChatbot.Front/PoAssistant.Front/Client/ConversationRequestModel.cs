@@ -19,5 +19,5 @@ public class MessageRequestModel
     public string Content { get; set; } = "";
 
     [JsonPropertyName("duration_seconds")]
-    public float DurationSeconds { get; set; } = 0;
+    public float DurationSeconds { get; set; } = 0.0f;
 }

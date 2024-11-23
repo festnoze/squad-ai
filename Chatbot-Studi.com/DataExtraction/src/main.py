@@ -1,20 +1,39 @@
-from fastapi import FastAPI
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import StreamingResponse, JSONResponse
+from contextlib import asynccontextmanager
+import logging
+
 from common_tools.models.conversation import Conversation
 from available_service import AvailableService
-from contextlib import asynccontextmanager
 
 from request_models.conversation_request_model import ConversationRequestModel
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
-        AvailableService.init()
+        AvailableService.init(activate_print=True)
         yield
     finally:
         await app.state.shutdown()
 
 app = FastAPI(lifespan=lifespan)
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+@app.middleware("http")
+async def log_validation_errors(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except Exception as exc:
+        # Log the error
+        logger.error("Validation error: %s", exc)
+        # Return the default response
+        return JSONResponse(
+            status_code=422,
+            content={"detail": str(exc)}
+        )
 
 @app.post("/data/vector_db")
 async def create_vector_db():

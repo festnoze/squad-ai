@@ -119,7 +119,8 @@ class txt:
             txt.print("Previous waiting spinner thread wasn't halted before creating a new one")
 
         txt.stop_event.clear()
-        txt.waiting_spinner_thread = Thread(target=txt.wait_spinner, args=(text,))
+        if not txt.waiting_spinner_thread:
+            txt.waiting_spinner_thread = Thread(target=txt.wait_spinner, args=(text,))
         txt.waiting_spinner_thread.daemon = True
         txt.waiting_spinner_thread.start()
         return txt.waiting_spinner_thread

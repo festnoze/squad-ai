@@ -238,7 +238,7 @@
 
         isEditingLastMessage = false;
         isWaitingForLLM = true;
-        threadService.ValidateMetierAnswer(modifiedMessageContent);
+        await threadService.SendUserQueryToApiAsync(modifiedMessageContent);
         modifiedMessageContent = string.Empty;
         await InvokeAsync(StateHasChanged);
     }

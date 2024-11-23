@@ -202,7 +202,7 @@ public class ThreadService : IDisposable
             messages!.Last().ChangeContent(string.Empty);
     }
 
-    public async Task ValidateMetierAnswer(string modifiedMessageContent)
+    public async Task SendUserQueryToApiAsync(string modifiedMessageContent)
     {
         if (!messages?.Any() ?? true)
             return;
