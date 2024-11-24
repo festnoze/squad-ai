@@ -156,7 +156,7 @@ class AvailableService:
         return AvailableService.inference.run_pipeline_dynamic_but_augmented_generation(conversation_history, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
 
     @MethodDecorator.print_function_name_and_elapsed_time(display_param_value="class_and_function_name")
-    async def rag_query_augmented_generation_streaming(analysed_query: QuestionRewritting, retrieved_chunks: list[Document], decoded_stream = False, all_chunks_output: list[str] = []):
+    async def rag_query_augmented_generation_streaming_async(analysed_query: QuestionRewritting, retrieved_chunks: list[Document], decoded_stream = False, all_chunks_output: list[str] = []):
          async for chunk in RAGAugmentedGeneration.rag_augmented_answer_generation_streaming_async( 
                                 AvailableService.rag_service, 
                                 analysed_query.modified_question, 

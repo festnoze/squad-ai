@@ -10,7 +10,7 @@ builder.Services.AddServerSideBlazor();
 
 builder.Services.AddControllers();
 
-builder.Services.AddSingleton<ThreadService>();
+builder.Services.AddSingleton<ConversationService>();
 builder.Services.AddSingleton<UserStoryService>();
 builder.Services.AddScoped<NavigationService>();
 builder.Services.AddSingleton<IUserRepository, UserRepository>();

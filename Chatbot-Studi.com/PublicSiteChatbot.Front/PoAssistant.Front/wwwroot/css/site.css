@@ -306,7 +306,7 @@ html, body {
         font-size: 1.5em; /* Ajuste la taille à 1.5 fois la taille normale */
     }
 
-.user-story-notification {
+.api-communication-error {
     position: fixed;
     right: 20px;
     bottom: 20px;
@@ -320,13 +320,13 @@ html, body {
     align-items: center;
 }
 
-    .user-story-notification .oi {
+    .api-communication-error .oi {
         top: -1px;
         margin-right: 10px; /* Ajoute un espace entre l'icône et le texte */
         font-size: 1.3em; /* Ajuste la taille à 1.5 fois la taille normale */
     }
 
-    .user-story-notification .close-btn {
+    .api-communication-error .close-btn {
         color: #dcdcdc;
         position: absolute;
         top: 0px;
@@ -336,7 +336,7 @@ html, body {
     }
 
         /* Optionnel : Ajouter un effet au survol pour la croix */
-        .user-story-notification .close-btn:hover {
+        .api-communication-error .close-btn:hover {
             color: #ffffff; /* Changez la couleur au survol */
         }
 

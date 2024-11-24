@@ -122,7 +122,7 @@ class ChatbotFront:
                         pipeline_ended_response = ex.message
 
                 if pipeline_succeeded:
-                    st.write_stream(AvailableService.rag_query_augmented_generation_streaming(analysed_query, retrieved_chunks[0], True, all_chunks_output))
+                    st.write_stream(AvailableService.rag_query_augmented_generation_streaming_async(analysed_query, retrieved_chunks[0], True, all_chunks_output))
                     full_response = ''.join(all_chunks_output)
                 else:
                     st.write_stream(ChatbotFront._write_stream(pipeline_ended_response))

@@ -4,10 +4,11 @@ using PoAssistant.Front.Data;
 using PoAssistant.Front.Helpers;
 using PoAssistant.Front.Infrastructure;
 using PoAssistant.Front.Client;
+using System.Text;
 
 namespace PoAssistant.Front.Services;
 
-public class ThreadService : IDisposable
+public class ConversationService : IDisposable
 {
     private ChatbotAPIClient chatbotApiClient;
     private readonly IExchangesRepository _exchangesRepository;
@@ -17,7 +18,7 @@ public class ThreadService : IDisposable
     public const string endPmTag = "[FIN_PM_ASSIST]";
     private static string endExchangeProposalMessage = "Ajouter des points à aborder avec le Project Manager si vous le souhaitez. Sinon, cliquez sur le bouton : 'Terminer l'échange' pour passer à l'étape de rédaction de l'US";
 
-    public ThreadService(IExchangesRepository exchangesRepository)
+    public ConversationService(IExchangesRepository exchangesRepository)
     {
         _exchangesRepository = exchangesRepository;
         InitializeThread();
@@ -104,10 +105,11 @@ public class ThreadService : IDisposable
     public void SaveThread()
     {
         if (username is null)
-            throw new InvalidOperationException($"Cannot save the thread as the user is not set to service: {nameof(ThreadService)}");
+            username = "defaultUser";
 
         var newThread = _exchangesRepository.SaveUserExchange(username, messages!);
-        if (newThread) _isExchangesLoaded = false;
+        if (newThread) 
+            _isExchangesLoaded = false;
     }
 
     public void UpdateLastMessage(MessageModel updatedLastMessage)
@@ -150,8 +152,6 @@ public class ThreadService : IDisposable
     {
         messages!.Add(new MessageModel(MessageModel.AiRole, "Le PO a maintenant rédigé la User Story et ses 'use cases'.", 0, true));
         isWaitingForLLM = false;
-        NotifyForUserStoryReady();
-        OnThreadChanged?.Invoke();
     }
 
     private void HandleWaitingStateAndEndExchange()
@@ -217,21 +217,29 @@ public class ThreadService : IDisposable
         lastMessage.IsSavedMessage = true;
         SaveThread();
         var conversationRequestModel = messages!.ToRequestModel();
-        var chunks = this.chatbotApiClient.GetQueryRagAnswerStreamingAsync(conversationRequestModel);
-        // var answer = await chunks.ToArrayAsync();
-        var list = new List<string>();
-        await foreach (var item in chunks)
+        try
         {
-            list.Add(item);
+            this.InitStreamMessage();
+
+            await foreach (var chunk in this.chatbotApiClient.GetQueryRagAnswerStreamingAsync(conversationRequestModel))
+            {
+                this.DisplayStreamMessage(chunk);
+            }
+
+            this.EndsStreamMessage();
         }
-        var answer = list.ToArray();
+        catch (Exception e)
+        {
+            this.NotifyForApiCommunicationError(e.Message);
+            OnThreadChanged?.Invoke();
+        }
     }
 
-    public event Action? UserStoryReadyNotification;
+    public event Action? ApiCommunicationErrorNotification;
 
-    protected virtual void NotifyForUserStoryReady()
+    protected virtual void NotifyForApiCommunicationError(string errorMessage)
     {
-        UserStoryReadyNotification?.Invoke();
+        ApiCommunicationErrorNotification?.Invoke();
     }
 
     public void DoEndBusinessPoExchange()

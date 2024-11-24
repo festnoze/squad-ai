@@ -4,7 +4,7 @@
 @using Microsoft.AspNetCore.Components.Authorization
 
 @inject IJSRuntime JSRuntime
-@inject ThreadService threadService
+@inject ConversationService threadService
 @inject IExchangesRepository exchangesRepository
 
 <div class="sidebar @(isMenuReduced ? "menu-reduced" : "")">
@@ -12,7 +12,7 @@
         <div style="padding-top: 5px;">
             <span class="oi oi-double-quote-serif-right" style="color: #1e8a56; font-size: 1.9rem; top: -5px; padding-left: 9px;" />
             <span class="oi oi-double-quote-serif-left" style="color: #aaaaaa; font-size: 2.9rem; top: -15px; opacity: 0.1; @(isMenuReduced ? "top: -15px; left: -40px" : "top: -15px; left: -20px;")" />
-            <a class="navbar-brand">@(!isMenuReduced ? "Assistant cadrage" : "")</a>
+            <a class="navbar-brand">@(!isMenuReduced ? "Chatbot Studi.com" : "")</a>
             <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
                 <span class="navbar-toggler-icon"></span>
             </button>
@@ -24,17 +24,32 @@
         <nav class="flex-column">
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                    <span class="oi oi-people nav-icon" aria-hidden="true"></span>@(!isMenuReduced ? "Métier/CdP : Cadrage du brief" : "")
+                    <span class="oi oi-people nav-icon" aria-hidden="true"></span>@(!isMenuReduced ? "Echange Chatbot" : "")
                 </NavLink>
             </div>
             <div class="nav-item px-3">
-                <NavLink class="nav-link" href="po">
-                    <span class="oi oi-file nav-icon" aria-hidden="true"></span> @(!isMenuReduced ? "PO : Rédaction User Story" : "")
+                <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                    <span class="oi oi-delete nav-icon" aria-hidden="true"></span>@(!isMenuReduced ? "Effacer la conversation" : "")
                 </NavLink>
             </div>
             <div class="nav-item px-3">
                 <NavLink class="nav-link" href="qa">
-                    <span class="oi oi-check nav-icon" aria-hidden="true"></span> @(!isMenuReduced ? "QA : Tests d'acceptance" : "")
+                    <span class="oi oi-check nav-icon" aria-hidden="true"></span> @(!isMenuReduced ? "Récupération Drupal json-api" : "")
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="po">
+                    <span class="oi oi-file nav-icon" aria-hidden="true"></span> @(!isMenuReduced ? "Scraping des pages web" : "")
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="po">
+                    <span class="oi oi-calendar nav-icon" aria-hidden="true"></span> @(!isMenuReduced ? "Construction base vectorielle" : "")
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="po">
+                    <span class="oi oi-calendar nav-icon" aria-hidden="true"></span> @(!isMenuReduced ? "Construction base résumée" : "")
                 </NavLink>
             </div>
             @if (exchangesNames != null && exchangesNames.Count > 0)

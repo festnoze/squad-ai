@@ -5,16 +5,16 @@
 @using Microsoft.AspNetCore.Components.Authorization
 
 @inject IJSRuntime JSRuntime
-@inject ThreadService threadService
+@inject ConversationService conversationService
 @inject NavigationService navigationService
 @inject ISimpleAuthenticationStateProvider authenticationStateProvider
 
-<PageTitle>Assistant Cadrage</PageTitle>
+<PageTitle>Chatbot Studi.com</PageTitle>
 
 <head>
 </head>
 
-<h4>Atelier de conception Métier/Chef de Projet : Cadrons le brief</h4>
+<h4>🔎 Chatbot site public Studi.com</h4>
 
 <Modal @ref="modal" IsVisible="@IsLoginModalVisible" IsVisibleChanged="@LoginModalIsVisibleChangedAsync">
     <Login IsVisibleChanged="@LoginModalIsVisibleChangedAsync" />
@@ -53,11 +53,11 @@
 
                             @if (!message.IsEndMessage)
                             {
-                                <button title="Valider la réponse" @onclick="() => ValidateMetierAnswer()" class="next-button"><span class="oi oi-arrow-right"></span></button>
+                                <button title="Valider la réponse" @onclick="() => SendMessage()" class="next-button"><span class="oi oi-arrow-right"></span></button>
                             }
                             else
                             {
-                                <button title="Terminer l'échange" @onclick="() => DoEndBusinessPoExchange()" class="end-exchange-button"><span class="oi oi-account-login"></span></button>
+                                <button title="Terminer l'échange" @onclick="() => DoEndConversation()" class="end-exchange-button"><span class="oi oi-account-login"></span></button>
                             }
                         </div>
                     }
@@ -73,17 +73,19 @@
                 @if (IsEditingMode(message))
                 {
                     @* Display message for editing *@
-                    <textarea id="editingMessageTextarea" @onblur="HandleEditMessageExit" class="message-editable" placeholder="Décrivez ici le besoin à spécifier">
-                        @message.Content
+                    <textarea id="editingMessageTextarea"
+                                @onblur="HandleEditMessageExit"
+                                @onkeydown="HandleEditMessageKeyDown"
+                                class="message-editable"
+                                placeholder="Ecrivez votre question ici ...">
+                                  @message.Content
                     </textarea>
 
                     @* Display editing actions buttons *@
                     <div class="edit-button-wrapper">
-                        <button title="Valider la réponse" @onclick="() => ValidateMetierAnswer()" class="next-button" style="@(message.IsEndMessage ? "right: 68px;" : "")"><span class="oi oi-check"></span></button>
-                        @if (message.IsEndMessage)
-                        {
-                            <button title="Terminer l'échange" @onclick="() => DoEndBusinessPoExchange()" class="end-exchange-button"><span class="oi oi-account-login"></span></button>
-                        }
+                        <button title="Valider la réponse" @onclick="() => SendMessage()" class="next-button" style="@(message.IsEndMessage ? "right: 68px;" : null)">
+                            <span class="oi oi-check"></span>
+                        </button>
                     </div>
                 }
             </div>
@@ -96,12 +98,12 @@
             <span>Impossible d'envoyer un message vide</span>
         </div>
     }
-    @if (showUserStoryNotification)
+    @if (showApiCommunicationErrorNotification)
     {
-        <div class="user-story-notification">
+        <div class="api-communication-error">
             <span class="oi oi-task" aria-hidden="true"></span>
             <span>La rédaction de la User Story est terminée</span>
-            <span class="close-btn" @onclick="() => showUserStoryNotification = false">&times;</span>
+            <span class="close-btn" @onclick="() => showApiCommunicationErrorNotification = false">&times;</span>
         </div>
     }
 </div>
@@ -111,7 +113,12 @@
 
 <script>
     function getTextareaValue(id) {
-        return document.getElementById(id).value;
+        var element = document.getElementById(id);
+        if (!element) {
+            console.error(`Element with id "${id}" not found in DOM.`);
+            return "";
+        }
+        return element.value;
     }
     function autoResizeTextarea(id) {
         var textarea = document.getElementById(id);
@@ -142,18 +149,18 @@
     private bool isWaitingForLLM = true;
     private bool isEditingLastMessage = false;
     private bool showMessageEmptyError = false; 
-    private bool showUserStoryNotification = false;
+    private bool showApiCommunicationErrorNotification = false;
     public string modifiedMessageContent = string.Empty;
     private Modal modal { get; set; } = new Modal();
     private bool IsLoginModalVisible { get; set; } 
 
     protected override async Task OnInitializedAsync()
     {
-        messages = threadService.GetPoMetierThread();
-        isEditingLastMessage = threadService.IsEditingLastMessage();
-        isWaitingForLLM = threadService.IsWaitingForLLM();
-        threadService.OnThreadChanged += ReloadThread;
-        threadService.UserStoryReadyNotification += HandleUserStoryReadyNotification;
+        messages = conversationService.GetPoMetierThread();
+        isEditingLastMessage = conversationService.IsEditingLastMessage();
+        isWaitingForLLM = conversationService.IsWaitingForLLM();
+        conversationService.OnThreadChanged += ReloadConversation;
+        conversationService.ApiCommunicationErrorNotification += HandleApiCommunicationErrorNotification;
     }
 
     private async Task LoginModalIsVisibleChangedAsync(bool isVisible)
@@ -167,6 +174,22 @@
         modifiedMessageContent = await JSRuntime.InvokeAsync<string>("getTextareaValue", "editingMessageTextarea");
     }
 
+    private async Task HandleEditMessageKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" && !e.CtrlKey && !e.ShiftKey)
+        {
+            // Prevent default behavior to avoid adding a newline
+            await JSRuntime.InvokeVoidAsync("event.preventDefault");
+            modifiedMessageContent = await JSRuntime.InvokeAsync<string>("getTextareaValue", "editingMessageTextarea");
+            await SendMessage();
+        }
+        // else if (e.Key == "Enter" && e.CtrlKey)
+        // {
+        //     // Enter + Ctrl add a new line
+        //     modifiedMessageContent = await JSRuntime.InvokeAsync<string>("getTextareaValue", "editingMessageTextarea") + "\n";
+        // }
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
@@ -174,17 +197,19 @@
             await AutosizeEditingTextAreaAsync();
         }
 
-        if (!IsLoginModalVisible)
-        {
-            userName = await JSRuntime.InvokeAsync<string>("blazorExtensions.ReadStorage", "userName");
-            threadService.SetCurrentUser(userName);
-            var authState = await authenticationStateProvider.GetAuthenticationStateAsync(userName);
-            if (!authState.User.Identity!.IsAuthenticated)
-            {
-                IsLoginModalVisible = true;
-                await InvokeAsync(StateHasChanged);
-            }
-        }
+        // Desactivated Login
+        IsLoginModalVisible = false;
+        // if (!IsLoginModalVisible)
+        // {
+        //     userName = await JSRuntime.InvokeAsync<string>("blazorExtensions.ReadStorage", "userName");
+        //     conversationService.SetCurrentUser(userName);
+        //     var authState = await authenticationStateProvider.GetAuthenticationStateAsync(userName);
+        //     if (!authState.User.Identity!.IsAuthenticated)
+        //     {
+        //         IsLoginModalVisible = true;
+        //         await InvokeAsync(StateHasChanged);
+        //     }
+        // }
 
         await base.OnAfterRenderAsync(firstRender);
     }
@@ -212,7 +237,7 @@
     private async Task EditLastMessage()
     {
         isEditingLastMessage = true;
-        threadService.EditingLastMessage();
+        conversationService.EditingLastMessage();
 
         // Notify the component to re-render
         await AutosizeEditingTextAreaAsync();
@@ -228,7 +253,7 @@
         var task = Task.Delay(4000).ContinueWith(t => { showMessageEmptyError = false; InvokeAsync(StateHasChanged); });
     }
 
-    private async Task ValidateMetierAnswer()
+    private async Task SendMessage()
     {
         if (isEditingLastMessage && string.IsNullOrEmpty(modifiedMessageContent))
         {
@@ -238,34 +263,34 @@
 
         isEditingLastMessage = false;
         isWaitingForLLM = true;
-        await threadService.SendUserQueryToApiAsync(modifiedMessageContent);
+        await conversationService.SendUserQueryToApiAsync(modifiedMessageContent);
         modifiedMessageContent = string.Empty;
         await InvokeAsync(StateHasChanged);
     }
 
-    private void DoEndBusinessPoExchange()
+    private void DoEndConversation()
     {
         isEditingLastMessage = false;
         isWaitingForLLM = true;
-        threadService.DoEndBusinessPoExchange();
+        conversationService.DoEndBusinessPoExchange();
     }
 
-    private async void ReloadThread()
+    private async void ReloadConversation()
     {
-        messages = threadService.GetPoMetierThread();
-        isWaitingForLLM = threadService.IsWaitingForLLM();
+        messages = conversationService.GetPoMetierThread();
+        isWaitingForLLM = conversationService.IsWaitingForLLM();
         await InvokeAsync(StateHasChanged);
     }
 
-    private async void HandleUserStoryReadyNotification()
+    private async void HandleApiCommunicationErrorNotification()
     {
-        showUserStoryNotification = true;
+        showApiCommunicationErrorNotification = true;
         await InvokeAsync(StateHasChanged);
     }
 
     public void Dispose()
     {
-        threadService.OnThreadChanged -= ReloadThread; 
-        threadService.UserStoryReadyNotification -= HandleUserStoryReadyNotification;
+        conversationService.OnThreadChanged -= ReloadConversation; 
+        conversationService.ApiCommunicationErrorNotification -= HandleApiCommunicationErrorNotification;
     }
 }

@@ -11,53 +11,15 @@ namespace PoAssistant.Front.Controller;
 [Route("[controller]")]
 public class FrontendProxyController : ControllerBase
 {
-    public FrontendProxyController(ThreadService threadService, UserStoryService userStoryService)
+    public FrontendProxyController(ConversationService threadService, UserStoryService userStoryService)
     {
         _threadService = threadService;
         _userStoryService = userStoryService;
     }
 
-    private readonly ThreadService _threadService;
+    private readonly ConversationService _threadService;
     private readonly UserStoryService _userStoryService;
 
-    /// <summary>
-    /// Send the brief if ready, or an empty string otherwise
-    /// </summary>
-    /// <returns></returns>
-    [HttpGet("metier/brief")]
-    public string GetMetierBriefIfReady()
-    {
-        return _threadService.GetMetierBriefIfReady();
-    }
-
-    /// <summary>
-    /// Send the latest business expert answer if validated, or an empty string otherwise
-    /// </summary>
-    /// <returns></returns>
-    [HttpGet("metier/last-answer")]
-    public string GetLatestBusinessExpertAnswerIfValidated()
-    {
-        return _threadService.GetLatestBusinessExpertAnswerIfValidated();
-    }
-
-    [HttpPost("metier-po/new-message")]
-    public void NewMetierPoMessage([FromBody] MessageModel newMessage)
-    {
-        _threadService.AddNewMessage(newMessage);
-    }
-
-    [HttpDelete("metier-po/delete-all")]
-    public void DeleteMetierPoThread()
-    {
-        _threadService.DeleteMetierPoThread();
-    }
-
-    [HttpPost("po/us")]
-    public void ReadyPoUserStory([FromBody]IEnumerable<UserStoryModel> userStories)
-    {
-        _threadService.EndMetierMetierExchange();
-        _userStoryService.SetPoUserStory(userStories);
-    }
 
     [HttpPost("metier-po/new-message/stream")]
     public async Task ReceiveMessageAsStream()
