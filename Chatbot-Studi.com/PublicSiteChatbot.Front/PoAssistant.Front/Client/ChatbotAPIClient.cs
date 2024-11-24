@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using PoAssistant.Front.Client;
+using PoAssistant.Front.Helpers;
 
 public class ChatbotAPIClient
 {
@@ -34,9 +35,9 @@ public class ChatbotAPIClient
             {
                 while (!reader.EndOfStream)
                 {
-                    var line = await reader.ReadLineAsync();
-                    if (!string.IsNullOrWhiteSpace(line))
-                        yield return line; // Return each chunk as part of the async enumeration
+                    var word = await reader.ReadWordAsync();
+                    if (!string.IsNullOrWhiteSpace(word))
+                        yield return word;
                 }
             }
         }

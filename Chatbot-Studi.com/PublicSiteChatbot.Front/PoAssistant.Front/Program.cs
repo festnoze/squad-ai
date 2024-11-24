@@ -1,8 +1,12 @@
 using Microsoft.AspNetCore.Components.Authorization;
+using PoAssistant.Front.Data;
 using PoAssistant.Front.Infrastructure;
 using PoAssistant.Front.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Add strongly type settings
+builder.Services.Configure<ApiSettings>(builder.Configuration.GetSection("ApiSettings"));
 
 // Add services to the container.
 builder.Services.AddRazorPages();

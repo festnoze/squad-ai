@@ -5,6 +5,7 @@ using PoAssistant.Front.Helpers;
 using PoAssistant.Front.Infrastructure;
 using PoAssistant.Front.Client;
 using System.Text;
+using Microsoft.Extensions.Options;
 
 namespace PoAssistant.Front.Services;
 
@@ -17,17 +18,19 @@ public class ConversationService : IDisposable
     private bool isWaitingForLLM = false;
     public const string endPmTag = "[FIN_PM_ASSIST]";
     private static string endExchangeProposalMessage = "Ajouter des points à aborder avec le Project Manager si vous le souhaitez. Sinon, cliquez sur le bouton : 'Terminer l'échange' pour passer à l'étape de rédaction de l'US";
+    private readonly string _apiHostUri;
+    private const string newLineForStreamOverHttp = "\\/%*/\\";
 
-    public ConversationService(IExchangesRepository exchangesRepository)
+    public ConversationService(IExchangesRepository exchangesRepository, IOptions<ApiSettings> apiSettings)
     {
         _exchangesRepository = exchangesRepository;
+        _apiHostUri = apiSettings.Value.ApiHostUri;
         InitializeThread();
     }
 
     private void InitializeThread()
     {
-        // TODO: Add to appsettings.json and IoC on startup
-        this.chatbotApiClient = new ChatbotAPIClient("http://127.0.0.1:8000");
+        this.chatbotApiClient = new ChatbotAPIClient(this._apiHostUri);
         if (messages is null || !messages.Any())
         {
             messages = new ConversationModel(MessageModel.UserRole, string.Empty, true);
@@ -76,7 +79,7 @@ public class ConversationService : IDisposable
 
     public bool IsEditingLastMessage()
     {
-        return messages.Last().IsLastThreadMessage && !messages.Last().IsSavedMessage;
+        return messages.Last().IsLastConversationMessage && !messages.Last().IsSavedMessage;
     }
 
     public void AddNewMessage(MessageModel newMessage)
@@ -219,14 +222,18 @@ public class ConversationService : IDisposable
         var conversationRequestModel = messages!.ToRequestModel();
         try
         {
-            this.InitStreamMessage();
+            this.AddNewMessage();
 
             await foreach (var chunk in this.chatbotApiClient.GetQueryRagAnswerStreamingAsync(conversationRequestModel))
             {
-                this.DisplayStreamMessage(chunk);
+                var decodedChunk = chunk.Replace(ConversationService.newLineForStreamOverHttp, "\r\n");
+                this.DisplayStreamMessage(decodedChunk);
             }
 
             this.EndsStreamMessage();
+
+            this.AddNewMessage(isStreaming: false);
+
         }
         catch (Exception e)
         {
@@ -252,7 +259,7 @@ public class ConversationService : IDisposable
     {
     }
 
-    public void InitStreamMessage()
+    public void AddNewMessage(bool isStreaming = true)
     {
         if (messages is null)
             messages = new ConversationModel();
@@ -261,7 +268,7 @@ public class ConversationService : IDisposable
         if (messages?.Any() ?? false)
             role =  messages.Last().IsSender ? MessageModel.UserRole : MessageModel.AiRole;
         var newMessage = new MessageModel(role, string.Empty, -1, false);
-        newMessage.IsStreaming = true;
+        newMessage.IsStreaming = isStreaming;
 
         messages!.Add(newMessage);
 
@@ -272,6 +279,8 @@ public class ConversationService : IDisposable
     public void EndsStreamMessage()
     {
         messages!.Last().IsStreaming = false;
+
+        messages!.Last().IsSavedMessage = true;
     }
 
     private bool _isExchangesLoaded = false;

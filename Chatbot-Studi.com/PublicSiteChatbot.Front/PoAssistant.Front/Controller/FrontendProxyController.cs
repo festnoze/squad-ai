@@ -25,7 +25,7 @@ public class FrontendProxyController : ControllerBase
     public async Task ReceiveMessageAsStream()
     {
         var buffer = new StringBuilder();
-        _threadService.InitStreamMessage();
+        _threadService.AddNewMessage();
         string? newWord = string.Empty;
         using (var reader = new StreamReader(Request.Body, Encoding.UTF8))
         {

@@ -19,7 +19,7 @@ public record MessageModel
 
     public bool IsSender => Role != UserRole;
 
-    public bool IsLastThreadMessage { get; private set; } = false;
+    public bool IsLastConversationMessage { get; private set; } = false;
 
     public bool IsStreaming { get; set; } = false;
 
@@ -27,8 +27,8 @@ public record MessageModel
 
     public bool IsEndMessage { get; set; } = false;
 
-    public void SetAsLastThreadMessage () => IsLastThreadMessage = true;
-    public bool SetAsLNotLastThreadMessage() => IsLastThreadMessage = false;
+    public void SetAsLastThreadMessage () => IsLastConversationMessage = true;
+    public bool SetAsLNotLastThreadMessage() => IsLastConversationMessage = false;
 
     public MessageModel(string source, string content, int durationSeconds, bool isSavedMessage = true, bool isEndMessage = false)
     {

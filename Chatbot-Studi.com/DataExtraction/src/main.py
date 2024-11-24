@@ -1,15 +1,14 @@
+import uvicorn
 import asyncio
-import time
 from typing import AsyncGenerator, Generator
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse, JSONResponse
 from contextlib import asynccontextmanager
 import logging
-
-from common_tools.models.conversation import Conversation
 from available_service import AvailableService
 from request_models.conversation_request_model import ConversationRequestModel
 
+from common_tools.models.conversation import Conversation
 from common_tools.rag.rag_inference_pipeline.end_pipeline_exception import EndPipelineException
 
 @asynccontextmanager
@@ -45,7 +44,7 @@ async def create_vector_db():
     return AvailableService.create_vector_db_from_generated_embeded_documents(output_dir)
 
 @app.post("/rag/query/stream")
-async def rag_query_stream(conversation_history_request_model: ConversationRequestModel):
+async def rag_query_stream_async(conversation_history_request_model: ConversationRequestModel):
     conversation_history = Conversation(conversation_history_request_model.messages)
     async def generate_chunks_full_pipeline_streaming_async():
         try:
@@ -57,8 +56,7 @@ async def rag_query_stream(conversation_history_request_model: ConversationReque
             pipeline_ended_response = ex.message
 
         if pipeline_succeeded:
-            all_chunks_output = []
-            async for chunk in (AvailableService.rag_query_augmented_generation_streaming_async(analysed_query, retrieved_chunks[0], True, all_chunks_output)):
+            async for chunk in (AvailableService.rag_query_augmented_generation_streaming_async(analysed_query, retrieved_chunks[0])):
                 yield chunk
         else:
             async def write_stream(text: str, interval_btw_words: float = 0.02) -> AsyncGenerator[str, None]:
@@ -71,5 +69,4 @@ async def rag_query_stream(conversation_history_request_model: ConversationReque
     return StreamingResponse(generate_chunks_full_pipeline_streaming_async(), media_type="text/event-stream")
 
 if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, timeout_keep_alive=180, reload=True)

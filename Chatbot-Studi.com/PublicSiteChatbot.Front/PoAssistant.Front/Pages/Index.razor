@@ -102,7 +102,7 @@
     {
         <div class="api-communication-error">
             <span class="oi oi-task" aria-hidden="true"></span>
-            <span>La rédaction de la User Story est terminée</span>
+            <span>Erreur de communication avec l'API du chatbot</span>
             <span class="close-btn" @onclick="() => showApiCommunicationErrorNotification = false">&times;</span>
         </div>
     }
@@ -221,7 +221,7 @@
 
     private bool DisplayEditingButtons(MessageModel message)
     {
-        return !isEditingLastMessage && !isWaitingForLLM && message.IsLastThreadMessage && !message.IsSavedMessage;
+        return !isEditingLastMessage && !isWaitingForLLM && message.IsLastConversationMessage && !message.IsSavedMessage;
     }
 
     private bool DisplayLoader(MessageModel message)
@@ -231,7 +231,7 @@
 
     private bool IsEditingMode(MessageModel message)
     {
-        return isEditingLastMessage && message.IsLastThreadMessage;
+        return isEditingLastMessage && message.IsLastConversationMessage;
     }
 
     private async Task EditLastMessage()
