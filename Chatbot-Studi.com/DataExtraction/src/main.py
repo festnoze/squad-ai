@@ -9,7 +9,6 @@ from available_service import AvailableService
 from request_models.conversation_request_model import ConversationRequestModel
 
 from common_tools.models.conversation import Conversation
-from common_tools.rag.rag_inference_pipeline.end_pipeline_exception import EndPipelineException
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -46,27 +45,8 @@ async def create_vector_db():
 @app.post("/rag/query/stream")
 async def rag_query_stream_async(conversation_history_request_model: ConversationRequestModel):
     conversation_history = Conversation(conversation_history_request_model.messages)
-    async def generate_chunks_full_pipeline_streaming_async():
-        try:
-            analysed_query, retrieved_chunks = AvailableService.rag_query_retrieval_but_augmented_generation(conversation_history)             
-            pipeline_succeeded = True
-        except EndPipelineException as ex:                        
-            pipeline_succeeded = False
-            #pipeline_ends_reason = ex.name
-            pipeline_ended_response = ex.message
-
-        if pipeline_succeeded:
-            async for chunk in (AvailableService.rag_query_augmented_generation_streaming_async(analysed_query, retrieved_chunks[0])):
-                yield chunk
-        else:
-            async def write_stream(text: str, interval_btw_words: float = 0.02) -> AsyncGenerator[str, None]:
-                words = text.split(" ")
-                for word in words:
-                    yield word + " "
-                    await asyncio.sleep(interval_btw_words)
-            async for chunk in write_stream(pipeline_ended_response):
-                yield chunk
-    return StreamingResponse(generate_chunks_full_pipeline_streaming_async(), media_type="text/event-stream")
+    response_generator = AvailableService.rag_query_retrieval_and_augmented_generation_streaming_async(conversation_history)
+    return StreamingResponse(response_generator, media_type="text/event-stream")
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8000, timeout_keep_alive=180, reload=True)

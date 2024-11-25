@@ -48,7 +48,7 @@ class RAGAugmentedGeneration:
             return loop.run_until_complete(run_async())
 
     @staticmethod
-    @MethodDecorator.print_function_name_and_elapsed_time()
+    @MethodDecorator.print_func_execution_infos()
     async def rag_augmented_answer_generation_streaming_async(rag: RagService, query:Union[str, Conversation], retrieved_chunks: list, analysed_query: QuestionAnalysisBase, is_stream_decoded = False, all_chunks_output: list[str] = [], function_for_specific_formating_retrieved_docs = None):
         if retrieved_chunks and any(retrieved_chunks) and isinstance(retrieved_chunks[0], tuple): 
             retrieved_chunks = [doc[0] for doc in retrieved_chunks] # Remove scores if present

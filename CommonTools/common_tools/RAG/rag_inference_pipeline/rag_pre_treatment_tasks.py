@@ -47,7 +47,7 @@ class RAGPreTreatment:
     
     @staticmethod
     @workflow_output('analysed_query')
-    def query_standalone_rewritten_from_history(rag:RagService, query:Union[str, Conversation]) -> QuestionRewritting:
+    async def query_standalone_rewritten_from_history_async(rag:RagService, query:Union[str, Conversation]) -> QuestionRewritting:
         query_standalone_rewritten_prompt = Ressource.load_ressource_file('create_standalone_and_rewritten_query_from_history_prompt.txt')
         query_standalone_rewritten_prompt = RAGPreTreatment._query_rewritting_prompt_replace_all_categories(query_standalone_rewritten_prompt)
         query_standalone_rewritten_prompt = RAGPreTreatment._replace_query_and_history_in_prompt(query, query_standalone_rewritten_prompt)  
@@ -55,8 +55,8 @@ class RAGPreTreatment:
         prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(
                         query_standalone_rewritten_prompt, QuestionRewrittingPydantic, QuestionRewritting)
 
-        response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(
-                'Make standalone and rewritten query', [rag.llm_2, rag.llm_3], output_parser, 10, *[prompt_for_output_parser])
+        response = await Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks_async(
+                'Standalone and rewritten query', [rag.llm_2, rag.llm_3], output_parser, 10, *[prompt_for_output_parser])
         
         question_rewritting = QuestionRewritting(**response[0])
         print(f'> Standalone query: "{question_rewritting.question_with_context}" and rewritten query: "{question_rewritting.modified_question}"')
@@ -134,14 +134,14 @@ class RAGPreTreatment:
                
     @staticmethod    
     @workflow_output('analysed_query')
-    def query_translation(rag:RagService, query:Union[str, Conversation]) -> QuestionTranslation:
+    async def query_translation_async(rag:RagService, query:Union[str, Conversation]) -> QuestionTranslation:
         user_query = Conversation.get_user_query(query)
         prefilter_prompt = Ressource.get_language_detection_prompt()
         prefilter_prompt = prefilter_prompt.replace("{question}", user_query)
         prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(
             prefilter_prompt, QuestionTranslationPydantic, QuestionTranslation
         )
-        response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(
+        response = await Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks_async(
             'query_translation', [rag.llm_1, rag.llm_2, rag.llm_3], output_parser, 10, *[prompt_for_output_parser]
         )
         question_analysis = response[0]
@@ -152,7 +152,7 @@ class RAGPreTreatment:
 
     @staticmethod    
     @workflow_output('analysed_query') #todo: to replace with above
-    def bypassed_query_translation(rag:RagService, query:Union[str, Conversation]) -> QuestionTranslation:
+    async def bypassed_query_translation_async(rag:RagService, query:Union[str, Conversation]) -> QuestionTranslation:
         user_query = Conversation.get_user_query(query)
         question_analysis = QuestionTranslation(query, query, 'request', 'french')
         return question_analysis

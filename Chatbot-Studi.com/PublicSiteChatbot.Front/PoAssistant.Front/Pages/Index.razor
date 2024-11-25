@@ -67,6 +67,8 @@
                         <div class="circle"></div>
                         <div class="circle"></div>
                         <div class="circle"></div>
+                        <div class="circle"></div>
+                        <div class="circle"></div>
                     </div>
                 }
                 @if (IsEditingMode(message))
@@ -245,7 +247,7 @@
     private void ShowMessageEmptyError()
     {
         showMessageEmptyError = true;
-        var task = Task.Delay(4000).ContinueWith(t => { showMessageEmptyError = false; InvokeAsync(StateHasChanged); });
+        var task = Task.Delay(7000).ContinueWith(t => { showMessageEmptyError = false; InvokeAsync(StateHasChanged); });
     }
 
     private async Task SendMessage()
@@ -272,6 +274,11 @@
     private async void HandleApiCommunicationErrorNotification()
     {
         showApiCommunicationErrorNotification = true;
+        await InvokeAsync(StateHasChanged);
+
+        await Task.Delay(5000);
+
+        showApiCommunicationErrorNotification = false;
         await InvokeAsync(StateHasChanged);
     }
 

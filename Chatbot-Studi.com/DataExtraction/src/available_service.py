@@ -1,9 +1,10 @@
+import asyncio
 import os
 import re
 from textwrap import dedent
 import time
+from typing import AsyncGenerator
 from dotenv import find_dotenv, load_dotenv
-from generate_summaries_chunks_questions_and_metadata import GenerateDocumentsSummariesChunksQuestionsAndMetadata
 from ragas_service import RagasService
 #
 from common_tools.helpers.txt_helper import txt
@@ -24,6 +25,7 @@ from common_tools.helpers.ressource_helper import Ressource
 from common_tools.models.embedding import EmbeddingModel, EmbeddingType
 from common_tools.models.conversation import Conversation
 from common_tools.models.doc_w_summary_chunks_questions import DocWithSummaryChunksAndQuestions
+from common_tools.rag.rag_inference_pipeline.end_pipeline_exception import EndPipelineException
 #
 from langchain.chains.query_constructor.schema import AttributeInfo
 from langchain_core.runnables import Runnable, RunnablePassthrough
@@ -33,6 +35,7 @@ from langchain.docstore.document import Document
 from drupal_data_retireval import DrupalDataRetireval
 from generate_documents_and_metadata import GenerateDocumentsAndMetadata
 from site_public_metadata_descriptions import MetadataDescriptionHelper
+from generate_summaries_chunks_questions_and_metadata import GenerateDocumentsSummariesChunksQuestionsAndMetadata
 
 class AvailableService:
     inference: RagInferencePipeline = None
@@ -151,18 +154,40 @@ class AvailableService:
             response, sources = AvailableService.inference.run(query, include_bm25_retrieval= True, give_score=True)
             txt.print(response)
 
-    def rag_query_retrieval_but_augmented_generation(conversation_history: Conversation):
-        return AvailableService.inference.run_pipeline_dynamic_but_augmented_generation(conversation_history, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
+    @staticmethod
+    async def rag_query_retrieval_and_augmented_generation_streaming_async(conversation_history:Conversation):
+        try:
+            analysed_query, retrieved_chunks = await AvailableService.rag_query_retrieval_but_augmented_generation_async(conversation_history)             
+            pipeline_succeeded = True
+        except EndPipelineException as ex:                        
+            pipeline_succeeded = False
+            #pipeline_ends_reason = ex.name
+            pipeline_ended_response = ex.message
+
+        if pipeline_succeeded:
+            async for chunk in (AvailableService.rag_query_augmented_generation_streaming_async(analysed_query, retrieved_chunks[0])):
+                yield chunk
+        else:
+            async def write_stream(text: str, interval_btw_words: float = 0.02) -> AsyncGenerator[str, None]:
+                words = text.split(" ")
+                for word in words:
+                    yield word + " "
+                    await asyncio.sleep(interval_btw_words)
+            async for chunk in write_stream(pipeline_ended_response):
+                yield chunk
+
+    async def rag_query_retrieval_but_augmented_generation_async(conversation_history: Conversation):
+        return await AvailableService.inference.run_pipeline_dynamic_but_augmented_generation_async(conversation_history, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
 
     async def rag_query_augmented_generation_streaming_async(analysed_query: QuestionRewritting, retrieved_chunks: list[Document], is_stream_decoded = False, all_chunks_output: list[str] = []):
          async for chunk in RAGAugmentedGeneration.rag_augmented_answer_generation_streaming_async( 
-                                AvailableService.rag_service, 
-                                analysed_query.modified_question, 
-                                retrieved_chunks, 
-                                analysed_query, 
-                                is_stream_decoded,
-                                all_chunks_output,
-                                AvailableService.format_retrieved_docs_function):
+                AvailableService.rag_service, 
+                analysed_query.modified_question, 
+                retrieved_chunks, 
+                analysed_query, 
+                is_stream_decoded,
+                all_chunks_output,
+                AvailableService.format_retrieved_docs_function):
             yield chunk
 
     async def rag_query_dynamic_pipeline_streaming_async(conversation_history: Conversation, all_chunks_output = [], decoded_stream = False):

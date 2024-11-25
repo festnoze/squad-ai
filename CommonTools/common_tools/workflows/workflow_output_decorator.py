@@ -1,11 +1,19 @@
 from collections import namedtuple
 from functools import wraps
+import inspect
 
+#TODO: Handle namedtuple as output like this decorator allows 
 def workflow_output(*names):
     def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            return func(*args, **kwargs)
+        # Handle async functions 
+        if inspect.iscoroutinefunction(func):
+            @wraps(func)
+            async def wrapper(*args, **kwargs):
+                return await func(*args, **kwargs)
+        else:
+            @wraps(func)
+            def wrapper(*args, **kwargs):
+                return func(*args, **kwargs)
 
         # Set the attribute for the function to hold the output name(s)
         if len(names) == 1:

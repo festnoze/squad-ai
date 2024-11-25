@@ -13,7 +13,7 @@ inference_pipeline_but_generation:
 pre_treatment:  
   - RAGPreTreatment.query_standalone_from_history_async
   - RAGPreTreatment.query_rewritting_async
-  #- RAGPreTreatment.query_standalone_rewritten_from_history
+  #- RAGPreTreatment.query_standalone_rewritten_from_history_async
   - RAGPreTreatment.analyse_query_for_metadata_async
   - RAGPreTreatment.metadata_filters_validation_and_correction_async
 

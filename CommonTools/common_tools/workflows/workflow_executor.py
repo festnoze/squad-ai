@@ -7,6 +7,7 @@ from collections.abc import Iterable
 #
 from common_tools.helpers.file_helper import file
 from common_tools.helpers.method_decorator_helper import MethodDecorator
+from common_tools.helpers.reflexion_helper import Reflexion
 from common_tools.rag.rag_inference_pipeline.end_pipeline_exception import EndPipelineException
 from common_tools.helpers.execute_helper import Execute
 
@@ -21,7 +22,7 @@ class WorkflowExecutor:
         
         self.available_classes = available_classes
 
-    def execute_workflow(self, workflow_config=None, previous_results=None, kwargs_values=None, config_entry_point_name=None):
+    async def execute_workflow_async(self, workflow_config=None, previous_results=None, kwargs_values=None, config_entry_point_name=None):
         if workflow_config is None:
             workflow_config = self._determine_workflow_config(config_entry_point_name)
         else:
@@ -34,7 +35,7 @@ class WorkflowExecutor:
         
         results = []
         for step in workflow_config:
-            results = self.execute_step(step, previous_results, kwargs_values, workflow_config)
+            results = await self.execute_step_async(step, previous_results, kwargs_values, workflow_config)
             previous_results = results
         return results
 
@@ -46,107 +47,93 @@ class WorkflowExecutor:
         else:
             raise ValueError('Starting step must either be provided or a step named "start" must be set in config.')
 
-    def execute_step(self, step, previous_results, kwargs_values, workflow_config):
+    async def execute_step_async(self, step, previous_results, kwargs_values, workflow_config):
         if isinstance(step, dict):
-            return self.execute_dict_step(step, previous_results, kwargs_values)
+            return await self.execute_dict_step_async(step, previous_results, kwargs_values)
         elif isinstance(step, list):
-            return self.execute_list_step(step, previous_results, kwargs_values)
+            return await self.execute_list_step_async(step, previous_results, kwargs_values)
         elif isinstance(step, str):
-            return self.execute_str_step(step, previous_results, kwargs_values, workflow_config)
+            return await self.execute_str_step_async(step, previous_results, kwargs_values, workflow_config)
         else:
             raise TypeError(f"Invalid step type: {type(step).__name__}")
 
-    def execute_dict_step(self, step, previous_results, kwargs_values):
-        if 'parallel_threads' in step or 'parallel_async' in step:
-            parallel_type = 'threads' if 'parallel_threads' in step else 'async'
-            parallel_steps = step.get('parallel_threads') or step.get('parallel_async')
-            parallel_results = self.execute_parallel_steps(parallel_steps, previous_results, kwargs_values, parallel_type)
+    async def execute_dict_step_async(self, step, previous_results, kwargs_values):
+        if 'parallel_async' in step:
+            parallel_steps = step.get('parallel_async')
+            parallel_results = await self.execute_parallel_steps_async(parallel_steps, previous_results, kwargs_values)
             return self.flatten_tuples(parallel_results)
         else:
             # Treat the dict as a sub-workflow
-            sub_workflow_results = self.execute_workflow(step, previous_results, kwargs_values)
+            sub_workflow_results = await self.execute_workflow_async(step, previous_results, kwargs_values)
             return self.flatten_tuples(sub_workflow_results)
 
-    def execute_list_step(self, step, previous_results, kwargs_values):
-        sub_workflow_results = self.execute_workflow(step, previous_results, kwargs_values)
+    async def execute_list_step_async(self, step, previous_results, kwargs_values):
+        sub_workflow_results = await self.execute_workflow_async(step, previous_results, kwargs_values)
         return self.flatten_tuples(sub_workflow_results)
 
-    def execute_str_step(self, step, previous_results, kwargs_values, workflow_config):
-        if step in ['parallel_threads', 'parallel_async']:
-            parallel_type = 'threads' if step == 'parallel_threads' else 'async'
+    async def execute_str_step_async(self, step, previous_results, kwargs_values, workflow_config):
+        if 'parallel_async' in step:
             if step in workflow_config:
                 parallel_steps = workflow_config[step]
-                parallel_results = self.execute_parallel_steps(parallel_steps, previous_results, kwargs_values, parallel_type)
+                parallel_results = await self.execute_parallel_steps_async(parallel_steps, previous_results, kwargs_values)
                 return self.flatten_tuples(parallel_results)
             else:
                 raise KeyError(f"Key '{step}' not found in the current workflow configuration.")
         elif step in self.config and isinstance(self.config[step], (list, dict)):
-            sub_workflow_results = self.execute_workflow(self.config[step], previous_results, kwargs_values)
+            sub_workflow_results = await self.execute_workflow_async(self.config[step], previous_results, kwargs_values)
             return self.flatten_tuples(sub_workflow_results)
         else:
-            result = self.execute_function(step, previous_results, kwargs_values)
+            result = await self.execute_function_async(step, previous_results, kwargs_values)
             return [result]
 
-    def execute_parallel_steps(self, steps, previous_results, kwargs_values, parallel_type):
-        if parallel_type == 'threads':
-            return self._execute_steps_in_threads(steps, previous_results, kwargs_values)
-        elif parallel_type == 'async':
-            return Execute.async_wrapper_to_sync(self._execute_steps_in_async(steps, previous_results, kwargs_values))
-        else:
-            raise ValueError(f"Unknown parallel execution type: {parallel_type}")
-
-    def _execute_steps_in_threads(self, steps, previous_results, kwargs_values):
-        with ThreadPoolExecutor(max_workers=5) as executor:
-            futures = [executor.submit(self.execute_func_or_workflow, step, previous_results, kwargs_values) for step in steps]
-            return [future.result() for future in futures]
-
-    async def _execute_steps_in_async(self, steps, previous_results, kwargs_values):
-        tasks = [self.execute_async_func_or_workflow(step, previous_results, kwargs_values) for step in steps]
+    async def execute_parallel_steps_async(self, steps, previous_results, kwargs_values):
+        tasks = [self.execute_func_or_workflow_async(step, previous_results, kwargs_values) for step in steps]
         return await asyncio.gather(*tasks)
 
-    def execute_func_or_workflow(self, step, previous_results, kwargs_values):
+    async def execute_func_or_workflow_async(self, step, previous_results, kwargs_values):
         if self._is_sub_workflow(step):
             inner_workflow_config = self.config[step]
-            return self.execute_workflow(inner_workflow_config, previous_results, kwargs_values)
-        else:
-            return self.execute_function(step, previous_results, kwargs_values)
-
-    async def execute_async_func_or_workflow(self, step, previous_results, kwargs_values):
-        if self._is_sub_workflow(step):
-            inner_workflow_config = self.config[step]
-            return await asyncio.to_thread(self.execute_workflow, inner_workflow_config, previous_results, kwargs_values)
+            return await self.execute_workflow_async(inner_workflow_config, previous_results, kwargs_values)
         else:
             return await self.execute_function_async(step, previous_results, kwargs_values)
 
     def _is_sub_workflow(self, step):
         return isinstance(step, str) and step in self.config and isinstance(self.config[step], (list, dict))
 
-    @MethodDecorator.print_function_name_and_elapsed_time(display_param_value="class_and_function_name")
+    @MethodDecorator.print_func_execution_infos(display_param_value="class_and_function_name")
     def execute_function(self, class_and_function_name, previous_results, kwargs_values):
-        func = self.get_static_method(class_and_function_name)
+        func = Reflexion.get_static_method(class_and_function_name, self.available_classes)
         func_kwargs = self._prepare_arguments_for_function(func, previous_results, kwargs_values)
         
         try:
-            result = func(**func_kwargs)
+            if inspect.isgeneratorfunction(func):
+                for item in func(**func_kwargs):
+                    yield item
+            else:
+                result = func(**func_kwargs)
+                self._add_function_output_names_and_values_to_kwargs(func, result, kwargs_values)
+                yield result
         except EndPipelineException as epe:
             raise epe
         except Exception as e:
             self._raise_fail_func_execution(class_and_function_name, previous_results, kwargs_values, e)
 
-        self._add_function_output_names_and_values_to_kwargs(func, result, kwargs_values)
-        return result
-
-    @MethodDecorator.print_function_name_and_elapsed_time(display_param_value="class_and_function_name")
+    @MethodDecorator.print_func_execution_infos(display_param_value="class_and_function_name")
     async def execute_function_async(self, class_and_function_name, previous_results, kwargs_values):
-        func = self.get_static_method(class_and_function_name)
+        func = Reflexion.get_static_method(class_and_function_name, self.available_classes)
         func_kwargs = self._prepare_arguments_for_function(func, previous_results, kwargs_values)
         try:
+            # if inspect.isasyncgenfunction(func):
+            #     async for item in func(**func_kwargs):
+            #         yield item
+            # else:
             if inspect.iscoroutinefunction(func):
                 result = await func(**func_kwargs)
             else:
                 result = func(**func_kwargs)
             self._add_function_output_names_and_values_to_kwargs(func, result, kwargs_values)
             return result
+            
         except Exception as e:
             self._raise_fail_func_execution(class_and_function_name, previous_results, kwargs_values, e)
 
@@ -216,7 +203,7 @@ class WorkflowExecutor:
                 # Use the next value from previous_results if not already set in kwargs
                 arg_value = prev_results[prev_results_index]
                 # Raise an error only if: The arg type is specified, the previous_results value type does not match it, and the arg has no default value
-                if arg.annotation != inspect.Parameter.empty and not WorkflowExecutor.is_matching_type_and_subtypes(arg_value, arg.annotation):
+                if arg.annotation != inspect.Parameter.empty and not Reflexion.is_matching_type_and_subtypes(arg_value, arg.annotation):
                     if arg.default is not inspect.Parameter.empty:
                         continue
                     else:
@@ -240,119 +227,6 @@ class WorkflowExecutor:
             elif isinstance(output_names, (list, tuple)):
                 return {'output_names': list(output_names)}
         return None
-    
-    @staticmethod
-    def is_matching_type_and_subtypes(arg_value, param_annotation):
-        # If value has no type (=None), or the receiving parameter has no defined type, it's a match
-        if arg_value is None or param_annotation is inspect.Parameter.empty:
-            return True
-        
-        origin, args = typing.get_origin(param_annotation), typing.get_args(param_annotation)
-
-        if origin in {list, tuple, set}:
-            if not isinstance(arg_value, origin):
-                return False
-            if not args:
-                return True
-            if origin in {list, set}:
-                return all(WorkflowExecutor.is_matching_type_and_subtypes(item, args[0]) for item in arg_value)
-            elif origin is tuple:
-                return all(WorkflowExecutor.is_matching_type_and_subtypes(item, args[i]) for i, item in enumerate(arg_value))
-            else:
-                raise ValueError(f"Unhandled origin type: {origin}")
-        
-        if origin is dict:
-            return isinstance(arg_value, dict) and (not args or all(
-                WorkflowExecutor.is_matching_type_and_subtypes(k, args[0]) and 
-                WorkflowExecutor.is_matching_type_and_subtypes(v, args[1])
-                for k, v in arg_value.items()
-            ))
-
-        return isinstance(arg_value, origin or param_annotation)
-
-    def get_function_by_name_dynamic(self, step_name):
-        """
-        Given a string like 'RAGPreTreatment.analyse_query_language', return the function.
-        """
-        module_name, func_name = step_name.rsplit('.', 1)
-        module = importlib.import_module(module_name)
-        func = getattr(module, func_name)
-        return func
-    
-    def get_static_method(self, class_and_function_name):
-        """
-        Retrieve a function or class method based on a string name.
-        
-        The format should be 'Class.method', where Class is one of the pre-imported classes.
-        """
-        parts = class_and_function_name.split('.')
-        if len(parts) != 2: 
-            raise ValueError(f"Invalid function name '{class_and_function_name}'. It should be in 'Class.method' format.")
-        class_name, method_name = parts
-        
-        cls = self.available_classes.get(class_name)
-        if not cls:
-            raise ValueError(f"Class '{class_name}' not found.")
-        
-        # Check if the method exists in the class
-        method = getattr(cls, method_name, None)
-        if method is None or not callable(method):
-            raise AttributeError(f"Class '{class_name}' does not have a callable method '{method_name}'.")
-        
-        return method
-    
-    def get_function(self, class_and_function_name, instance=None):
-        """
-        Retrieve a function or class method based on a string name.
-
-        The format should be 'Class.method', where Class is one of the pre-imported classes.
-        If an instance of the class is provided, the method will be bound to that instance.
-        If no instance is provided, and the method is not static, the class will be instantiated.
-        """
-        parts = class_and_function_name.split('.')
-        if len(parts) != 2:
-            raise ValueError(f"Invalid function name '{class_and_function_name}'. It should be in 'Class.method' format.")
-        
-        class_name, method_name = parts
-
-        # Retrieve the class from the available_classes
-        cls = self.available_classes.get(class_name)
-        if not cls:
-            raise ValueError(f"Class '{class_name}' not found.")
-
-        # Check if the method exists in the class
-        method = getattr(cls, method_name, None)
-        if method is None or not callable(method):
-            raise AttributeError(f"Class '{class_name}' does not have a callable method '{method_name}'.")
-
-        # If an instance is provided, bind the method to the instance
-        if instance:
-            return getattr(instance, method_name)
-        
-        # If no instance is provided and the method is not static, create an instance of the class
-        if not isinstance(method, staticmethod):
-            # Instantiate the class if no instance is provided
-            instance = cls()
-            return getattr(instance, method_name)
-
-        # For static methods, simply return the method
-        return method
-
-    def get_function_kwargs_with_values(self, func, provided_kwargs):
-        """
-        Inspects a function and returns a dictionary of the required arguments
-        filtered from the available kwargs. Raises KeyError if a required 
-        argument without a default value is missing.
-        """
-        sig = inspect.signature(func)
-        required_args = {}
-        for param_name, param in sig.parameters.items():
-            if param.default == inspect.Parameter.empty and param_name not in provided_kwargs:
-                raise KeyError(f"Missing required argument: {param_name}")
-            if param_name in provided_kwargs:
-                required_args[param_name] = provided_kwargs[param_name]
-
-        return required_args
 
     def flatten_tuples(self, items):
         """

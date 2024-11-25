@@ -114,7 +114,7 @@ class ChatbotFront:
                 start = time.time()
                 with st.spinner('Je réfléchis à votre question ...'):
                     try:
-                        analysed_query, retrieved_chunks = AvailableService.rag_query_retrieval_but_augmented_generation(st.session_state.conversation)             
+                        analysed_query, retrieved_chunks = AvailableService.rag_query_retrieval_but_augmented_generation_async(st.session_state.conversation)             
                         pipeline_succeeded = True
                     except EndPipelineException as ex:                        
                         pipeline_succeeded = False
