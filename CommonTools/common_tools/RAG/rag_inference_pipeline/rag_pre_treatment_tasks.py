@@ -15,7 +15,7 @@ from common_tools.rag.rag_inference_pipeline.end_message_ends_pipeline_exception
 from common_tools.rag.rag_inference_pipeline.greetings_ends_pipeline_exception import GreetingsEndsPipelineException
 from common_tools.rag.rag_inference_pipeline.rag_pre_treat_metadata_filters_analysis import RagPreTreatMetadataFiltersAnalysis
 from common_tools.rag.rag_service import RagService
-from common_tools.workflows.output_name_decorator import output_name
+from common_tools.workflows.workflow_output_decorator import workflow_output
 from langchain_core.structured_query import (
     Comparator,
     Comparison,
@@ -46,7 +46,7 @@ class RAGPreTreatment:
         return question_analysis, merged_metadata
     
     @staticmethod
-    @output_name('analysed_query')
+    @workflow_output('analysed_query')
     def query_standalone_rewritten_from_history(rag:RagService, query:Union[str, Conversation]) -> QuestionRewritting:
         query_standalone_rewritten_prompt = Ressource.load_ressource_file('create_standalone_and_rewritten_query_from_history_prompt.txt')
         query_standalone_rewritten_prompt = RAGPreTreatment._query_rewritting_prompt_replace_all_categories(query_standalone_rewritten_prompt)
@@ -77,7 +77,7 @@ class RAGPreTreatment:
         return prompt
     
     @staticmethod
-    @output_name('analysed_query')
+    @workflow_output('analysed_query')
     async def query_standalone_from_history_async(rag:RagService, query:Union[str, Conversation]) -> QuestionRewritting:
         query_standalone_prompt = Ressource.get_create_standalone_query_from_history_prompt()
         user_query = Conversation.get_user_query(query)
@@ -105,7 +105,7 @@ class RAGPreTreatment:
 
     #TODO: /!\ WARNING /!\ the query rewritting is domain specific and its prompt too (for studi.com). Thus, it shouldn't be in common_tools
     @staticmethod
-    @output_name('analysed_query')
+    @workflow_output('analysed_query')
     async def query_rewritting_async(rag:RagService, analysed_query:QuestionRewritting) -> str:        
         query_rewritting_prompt = RAGPreTreatment._query_rewritting_prompt_replace_all_categories(analysed_query.question_with_context)
 
@@ -133,7 +133,7 @@ class RAGPreTreatment:
         return query_rewritting_prompt
                
     @staticmethod    
-    @output_name('analysed_query')
+    @workflow_output('analysed_query')
     def query_translation(rag:RagService, query:Union[str, Conversation]) -> QuestionTranslation:
         user_query = Conversation.get_user_query(query)
         prefilter_prompt = Ressource.get_language_detection_prompt()
@@ -151,7 +151,7 @@ class RAGPreTreatment:
         return QuestionTranslation(**question_analysis)
 
     @staticmethod    
-    @output_name('analysed_query') #todo: to replace with above
+    @workflow_output('analysed_query') #todo: to replace with above
     def bypassed_query_translation(rag:RagService, query:Union[str, Conversation]) -> QuestionTranslation:
         user_query = Conversation.get_user_query(query)
         question_analysis = QuestionTranslation(query, query, 'request', 'french')

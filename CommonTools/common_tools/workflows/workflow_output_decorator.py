@@ -1,7 +1,7 @@
 from collections import namedtuple
 from functools import wraps
 
-def output_name(*names):
+def workflow_output(*names):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):

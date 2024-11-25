@@ -2,11 +2,11 @@ import time
 from typing import Optional, Union
 from common_tools.helpers.txt_helper import txt
 from common_tools.models.conversation import Conversation
-from common_tools.workflows.output_name_decorator import output_name
+from common_tools.workflows.workflow_output_decorator import workflow_output
 
 class RAGGuardrails:
     @staticmethod
-    @output_name('guardrails_result')
+    @workflow_output('guardrails_result')
     def guardrails_query_analysis(query:Union[str, Conversation]) -> bool:
         time.sleep(0.5) #todo: to implement
         user_query = Conversation.get_user_query(query)
@@ -15,7 +15,7 @@ class RAGGuardrails:
         return True
     
     @staticmethod
-    @output_name('guardrails_result')
+    @workflow_output('guardrails_result')
     async def guardrails_query_analysis_async(query:Union[str, Conversation]) -> bool:
         time.sleep(0.5) #todo: to implement
         user_query = Conversation.get_user_query(query)

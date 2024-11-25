@@ -24,7 +24,6 @@ from common_tools.helpers.ressource_helper import Ressource
 from common_tools.models.embedding import EmbeddingModel, EmbeddingType
 from common_tools.models.conversation import Conversation
 from common_tools.models.doc_w_summary_chunks_questions import DocWithSummaryChunksAndQuestions
-from common_tools.helpers.method_decorator_helper import MethodDecorator
 #
 from langchain.chains.query_constructor.schema import AttributeInfo
 from langchain_core.runnables import Runnable, RunnablePassthrough
@@ -155,17 +154,16 @@ class AvailableService:
     def rag_query_retrieval_but_augmented_generation(conversation_history: Conversation):
         return AvailableService.inference.run_pipeline_dynamic_but_augmented_generation(conversation_history, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
 
-    @MethodDecorator.print_function_name_and_elapsed_time()
-    async def rag_query_augmented_generation_streaming_async(analysed_query: QuestionRewritting, retrieved_chunks: list[Document], decoded_stream = False, all_chunks_output: list[str] = []):
+    async def rag_query_augmented_generation_streaming_async(analysed_query: QuestionRewritting, retrieved_chunks: list[Document], is_stream_decoded = False, all_chunks_output: list[str] = []):
          async for chunk in RAGAugmentedGeneration.rag_augmented_answer_generation_streaming_async( 
                                 AvailableService.rag_service, 
                                 analysed_query.modified_question, 
                                 retrieved_chunks, 
                                 analysed_query, 
+                                is_stream_decoded,
+                                all_chunks_output,
                                 AvailableService.format_retrieved_docs_function):
-            chunk_final = chunk if not decoded_stream else chunk.decode('utf-8').replace(Llm.new_line_for_stream_over_http, '\n')
-            all_chunks_output.append(chunk_final)
-            yield chunk_final
+            yield chunk
 
     async def rag_query_dynamic_pipeline_streaming_async(conversation_history: Conversation, all_chunks_output = [], decoded_stream = False):
         if conversation_history.last_message.role != 'user':

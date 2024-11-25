@@ -2,7 +2,7 @@ import asyncio
 import uuid
 import pytest
 from langchain_core.documents import Document
-from common_tools.workflows.output_name_decorator import output_name
+from common_tools.workflows.workflow_output_decorator import output_name
 from common_tools.workflows.workflow_executor import WorkflowExecutor
 
 class Test_WorkflowExecutor:
