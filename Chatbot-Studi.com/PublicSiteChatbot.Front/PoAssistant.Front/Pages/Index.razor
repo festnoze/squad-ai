@@ -14,8 +14,6 @@
 <head>
 </head>
 
-<h4>🔎 Chatbot site public Studi.com</h4>
-
 <Modal @ref="modal" IsVisible="@IsLoginModalVisible" IsVisibleChanged="@LoginModalIsVisibleChangedAsync">
     <Login IsVisibleChanged="@LoginModalIsVisibleChangedAsync" />
 </Modal>
@@ -26,7 +24,7 @@
         @foreach (var message in messages)
         {
             @* Display message bubble header *@
-            <div class="@($"{(message.IsSender ? "message-source-sender" : "message-source-receiver")}")">
+            <div class="@($"{(message.IsFromAI ? "message-source-sender" : "message-source-receiver")}")">
                 @message.Role
                 @if (message.DurationSeconds > 0)
                 {
@@ -39,17 +37,18 @@
             </div>
             
             @* Display message bubble & its content *@
-            <div class="@($"message-bubble {(message.IsSender ? "message-sender" : "message-receiver")}")" style="@(DisplayEditingButtons(message) ? "padding-bottom: 35px;" : "")">
+            <div class="@($"message-bubble {(message.IsFromAI ? "message-sender" : "message-receiver")}")" style="@(DisplayEditingButtons(message) ? "padding-bottom: 35px;" : "")">
                 @if (!IsEditingMode(message))
                 {
                     @* Display message for reading *@
-                    @message.Content.Replace("[ENDS_EXCHANGE]", "- Fin de l'échange -")
+                    @message.Content
 
                     @if (DisplayEditingButtons(message))
                     {
                         @* Display reading actions buttons*@
                         <div class="edit-button-wrapper">
-                            <button title="Modifier la réponse" @onclick="() => EditLastMessage()" class="edit-button"><span class="oi oi-pencil"></span></button>
+                                <button title="Valider la réponse" @onclick="() => SendMessage()" class="next-button"><span class="oi oi-arrow-right"></span></button>
+                            @* <button title="Modifier la réponse" @onclick="() => EditLastMessage()" class="edit-button"><span class="oi oi-pencil"></span></button>
 
                             @if (!message.IsEndMessage)
                             {
@@ -58,7 +57,7 @@
                             else
                             {
                                 <button title="Terminer l'échange" @onclick="() => DoEndConversation()" class="end-exchange-button"><span class="oi oi-account-login"></span></button>
-                            }
+                            } *@
                         </div>
                     }
                 }
@@ -83,7 +82,7 @@
 
                     @* Display editing actions buttons *@
                     <div class="edit-button-wrapper">
-                        <button title="Valider la réponse" @onclick="() => SendMessage()" class="next-button" style="@(message.IsEndMessage ? "right: 68px;" : null)">
+                        <button title="Valider la réponse" @onclick="() => SendMessage()" class="next-button">
                             <span class="oi oi-check"></span>
                         </button>
                     </div>
@@ -94,14 +93,14 @@
     @if (showMessageEmptyError)
     {
         <div class="notification">
-            <span class="oi oi-circle-x" aria-hidden="true"></span>
+            <span class="oi oi-task" aria-hidden="true"></span>
             <span>Impossible d'envoyer un message vide</span>
         </div>
     }
     @if (showApiCommunicationErrorNotification)
     {
         <div class="api-communication-error">
-            <span class="oi oi-task" aria-hidden="true"></span>
+            <span class="oi oi-circle-x" aria-hidden="true"></span>
             <span>Erreur de communication avec l'API du chatbot</span>
             <span class="close-btn" @onclick="() => showApiCommunicationErrorNotification = false">&times;</span>
         </div>
@@ -147,7 +146,7 @@
     private ConversationModel messages = null!;
     private ElementReference textAreaElement;
     private bool isWaitingForLLM = true;
-    private bool isEditingLastMessage = false;
+    private bool isLastMessageEditable => conversationService.IsLastMessageEditable();
     private bool showMessageEmptyError = false; 
     private bool showApiCommunicationErrorNotification = false;
     public string modifiedMessageContent = string.Empty;
@@ -156,10 +155,9 @@
 
     protected override async Task OnInitializedAsync()
     {
-        messages = conversationService.GetPoMetierThread();
-        isEditingLastMessage = conversationService.IsEditingLastMessage();
+        messages = conversationService.GetConversation();
         isWaitingForLLM = conversationService.IsWaitingForLLM();
-        conversationService.OnThreadChanged += ReloadConversation;
+        conversationService.OnConversationChanged += ReloadConversation;
         conversationService.ApiCommunicationErrorNotification += HandleApiCommunicationErrorNotification;
     }
 
@@ -221,31 +219,28 @@
 
     private bool DisplayEditingButtons(MessageModel message)
     {
-        return !isEditingLastMessage && !isWaitingForLLM && message.IsLastConversationMessage && !message.IsSavedMessage;
+        return !isLastMessageEditable && !isWaitingForLLM && message.IsLastConversationMessage && !message.IsSavedMessage;
     }
 
     private bool DisplayLoader(MessageModel message)
     {
-        return !isEditingLastMessage && isWaitingForLLM && message.IsStreaming;
+        return !isLastMessageEditable && isWaitingForLLM && message.IsStreaming;
     }
 
     private bool IsEditingMode(MessageModel message)
     {
-        return isEditingLastMessage && message.IsLastConversationMessage;
+        return isLastMessageEditable && message.IsLastConversationMessage;
     }
 
-    private async Task EditLastMessage()
-    {
-        isEditingLastMessage = true;
-        conversationService.EditingLastMessage();
+    // private async Task EditLastMessage()
+    // {
+    //     // Notify the component to re-render
+    //     await AutosizeEditingTextAreaAsync();
+    //     await InvokeAsync(StateHasChanged);
 
-        // Notify the component to re-render
-        await AutosizeEditingTextAreaAsync();
-        await InvokeAsync(StateHasChanged);
-
-        await AutosizeEditingTextAreaAsync();
-        await InvokeAsync(StateHasChanged);
-    }
+    //     await AutosizeEditingTextAreaAsync();
+    //     await InvokeAsync(StateHasChanged);
+    // }
 
     private void ShowMessageEmptyError()
     {
@@ -255,29 +250,21 @@
 
     private async Task SendMessage()
     {
-        if (isEditingLastMessage && string.IsNullOrEmpty(modifiedMessageContent))
+        if (isLastMessageEditable && string.IsNullOrEmpty(modifiedMessageContent))
         {
             ShowMessageEmptyError();
             return;
         }
 
-        isEditingLastMessage = false;
         isWaitingForLLM = true;
-        await conversationService.SendUserQueryToApiAsync(modifiedMessageContent);
+        await conversationService.InvokeRagApiOnUserQueryAsync(modifiedMessageContent);
         modifiedMessageContent = string.Empty;
         await InvokeAsync(StateHasChanged);
     }
 
-    private void DoEndConversation()
-    {
-        isEditingLastMessage = false;
-        isWaitingForLLM = true;
-        conversationService.DoEndBusinessPoExchange();
-    }
-
     private async void ReloadConversation()
     {
-        messages = conversationService.GetPoMetierThread();
+        messages = conversationService.GetConversation();
         isWaitingForLLM = conversationService.IsWaitingForLLM();
         await InvokeAsync(StateHasChanged);
     }
@@ -290,7 +277,7 @@
 
     public void Dispose()
     {
-        conversationService.OnThreadChanged -= ReloadConversation; 
+        conversationService.OnConversationChanged -= ReloadConversation; 
         conversationService.ApiCommunicationErrorNotification -= HandleApiCommunicationErrorNotification;
     }
 }

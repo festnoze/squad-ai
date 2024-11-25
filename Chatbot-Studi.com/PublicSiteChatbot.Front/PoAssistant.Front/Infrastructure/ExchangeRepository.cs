@@ -4,18 +4,18 @@ using System.Text.RegularExpressions;
 
 namespace PoAssistant.Front.Infrastructure;
 
-public interface IExchangesRepository
+public interface IExchangeRepository
 {
     List<string> GetAllUserExchangesNames(string username);
     ConversationModel? LoadUserExchange(string username, string exchangeDisplayName, bool truncatedExchangeName = false);
     bool SaveUserExchange(string username, ConversationModel exchange);
 }
 
-public class ExchangesRepository : IExchangesRepository
+public class ExchangeRepository : IExchangeRepository
 {
     private const string _exchangesDataPath = "savedData\\exchanges\\";
 
-    public ExchangesRepository()
+    public ExchangeRepository()
     {
     }
 

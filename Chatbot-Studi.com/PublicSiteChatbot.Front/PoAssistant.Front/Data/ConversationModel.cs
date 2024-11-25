@@ -1,18 +1,41 @@
+using Microsoft.VisualBasic;
+
 namespace PoAssistant.Front.Data;
 
 public class ConversationModel : List<MessageModel>
 {
-    public ConversationModel()
-    {}
-
-    public ConversationModel(string source, string firstThreadMessage, bool isLastMessage)
+    public ConversationModel(Guid? id = null)
     {
-        this.Add(new MessageModel(source, firstThreadMessage, 0, false));
-        if (isLastMessage)
-            this.Last().SetAsLastThreadMessage();
+        if (id is null)
+            Id = Guid.NewGuid();
+        else
+            Id = id.Value;
     }
 
-    public void RemoveLastThreadMessageFlags() => this.ForEach(msg => msg.SetAsLNotLastThreadMessage());
+    public Guid Id { get; set; }
+    public void RemoveLastConversationMessageFlags() => this.ForEach(msg => msg.SetAsNotLastConversationMessage());
     public void RemoveLastMessage() => this.RemoveAt(this.Count - 1);
-    public bool IsLastMessageFromSender => this[this.Count - 1].IsSender;
+    public bool IsLastMessageFromUser => this.Last().IsFromUser;
+
+    public void AddMessage(string source, string content, int durationSeconds, bool isSavedMessage = true, bool isStreaming = false)
+    {
+        AddMessage(new MessageModel(source, content, durationSeconds, isSavedMessage, isStreaming));
+    }
+
+    public void AddMessage(MessageModel newMessage)
+    {
+        this.Add(newMessage);
+        RefreshLastMessageInConversation();
+    }
+
+    private void RefreshLastMessageInConversation()
+    {
+        if (this.Any())
+        {
+            this!.RemoveLastConversationMessageFlags();
+
+            if (!this!.Last().IsFromAI)
+                this?.Last().SetAsLastConversationMessage();
+        }
+    }
 }

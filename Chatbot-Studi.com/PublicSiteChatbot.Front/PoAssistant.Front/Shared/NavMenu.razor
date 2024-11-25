@@ -4,8 +4,8 @@
 @using Microsoft.AspNetCore.Components.Authorization
 
 @inject IJSRuntime JSRuntime
-@inject ConversationService threadService
-@inject IExchangesRepository exchangesRepository
+@inject ConversationService ConversationService
+@inject IExchangeRepository exchangesRepository
 
 <div class="sidebar @(isMenuReduced ? "menu-reduced" : "")">
     <div class="top-row ps-3 navbar navbar-dark">
@@ -28,7 +28,7 @@
                 </NavLink>
             </div>
             <div class="nav-item px-3">
-                <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <NavLink class="nav-link" href="" Match="NavLinkMatch.All" @onclick="NewExchange">
                     <span class="oi oi-delete nav-icon" aria-hidden="true"></span>@(!isMenuReduced ? "Effacer la conversation" : "")
                 </NavLink>
             </div>
@@ -97,9 +97,9 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         username = await JSRuntime.InvokeAsync<string>("blazorExtensions.ReadStorage", "userName");
-        if (!threadService.IsExchangesLoaded() && username != null)
+        if (!ConversationService.IsExchangesLoaded && username != null)
         {
-            threadService.ExchangesIsLoaded();
+            ConversationService.MarkConversationAsLoaded();
             exchangesNames = exchangesRepository.GetAllUserExchangesNames(username);
             await InvokeAsync(StateHasChanged);
         }
@@ -132,11 +132,11 @@
 
     private void LoadExchangeList(string exchangeNameTruncated)
     {
-        threadService.LoadThreadByName(exchangeNameTruncated, true);
+        ConversationService.LoadConversationByName(exchangeNameTruncated, true);
     }
 
     private void NewExchange()
     {
-        threadService.DeleteMetierPoThread();
+        ConversationService.DeleteCurrentConversation();
     }
 }

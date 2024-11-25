@@ -1,10 +1,9 @@
-﻿namespace PoAssistant.Front.Services;
-
-using Microsoft.AspNetCore.Components.Authorization;
+﻿using Microsoft.AspNetCore.Components.Authorization;
 using PoAssistant.Front.Data;
 using PoAssistant.Front.Infrastructure;
 using System.Security.Claims;
-using System.Threading.Tasks;
+
+namespace PoAssistant.Front.Services;
 
 public class SimpleAuthenticationStateProvider : ISimpleAuthenticationStateProvider
 {

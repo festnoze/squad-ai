@@ -18,7 +18,7 @@ builder.Services.AddSingleton<ConversationService>();
 builder.Services.AddSingleton<UserStoryService>();
 builder.Services.AddScoped<NavigationService>();
 builder.Services.AddSingleton<IUserRepository, UserRepository>();
-builder.Services.AddSingleton<IExchangesRepository, ExchangesRepository>();
+builder.Services.AddSingleton<IExchangeRepository, ExchangeRepository>();
 builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 builder.Services.AddScoped<ISimpleAuthenticationStateProvider, SimpleAuthenticationStateProvider>();
 

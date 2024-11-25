@@ -47,7 +47,7 @@ else
 
         </div>
         @*<div c lass="input-area">
-            @if (userStory.Any() && userStory.Last().IsLastThreadMessage)
+            @if (userStory.Any() && userStory.Last().IsLastConversationMessage)
             {
                 <textarea class="input-text" @bind="userStory.Last().Content"></textarea>
             }
@@ -55,7 +55,7 @@ else
             {
                 <textarea class="input-text" placeholder="Attendre le prochain message Métier à corriger" readonly></textarea>
             }
-            <button class="send-button" disabled="@(userStory.Any() && userStory.Last().IsLastThreadMessage ? false : true)">Send</button>
+            <button class="send-button" disabled="@(userStory.Any() && userStory.Last().IsLastConversationMessage ? false : true)">Send</button>
         </div> *@
 
     </div>

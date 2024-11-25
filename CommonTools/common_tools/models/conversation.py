@@ -31,15 +31,15 @@ class Conversation:
     @staticmethod
     def get_user_query(query_or_conv: Union[str, 'Conversation']) -> str:
         if isinstance(query_or_conv, str):
-            return query_or_conv
+            return query_or_conv.strip()
         elif type(query_or_conv).__name__ == Conversation.__name__: #isinstance(query_or_conv, Conversation):
             if not any(query_or_conv.messages): 
                 raise ValueError("Invalid query, no message found into the conversation")
-            if not query_or_conv.last_message.role == "user":
+            if not query_or_conv.last_message.role.lower() == "user" and not query_or_conv.last_message.role.lower() == "utilisateur":
                 raise ValueError("Invalid query, last message should be from user")
-            return query_or_conv.last_message.content
+            return query_or_conv.last_message.content.strip()
         elif 'messages' in query_or_conv:
-            return query_or_conv['messages'][-1]['content']
+            return str(query_or_conv['messages'][-1]['content']).strip()
         else:
             raise ValueError("get_user_query don't handle query type")
         

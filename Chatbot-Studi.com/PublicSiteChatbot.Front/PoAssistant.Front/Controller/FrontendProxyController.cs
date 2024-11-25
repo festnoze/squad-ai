@@ -11,13 +11,13 @@ namespace PoAssistant.Front.Controller;
 [Route("[controller]")]
 public class FrontendProxyController : ControllerBase
 {
-    public FrontendProxyController(ConversationService threadService, UserStoryService userStoryService)
+    public FrontendProxyController(ConversationService ConversationService, UserStoryService userStoryService)
     {
-        _threadService = threadService;
+        _ConversationService = ConversationService;
         _userStoryService = userStoryService;
     }
 
-    private readonly ConversationService _threadService;
+    private readonly ConversationService _ConversationService;
     private readonly UserStoryService _userStoryService;
 
 
@@ -25,23 +25,17 @@ public class FrontendProxyController : ControllerBase
     public async Task ReceiveMessageAsStream()
     {
         var buffer = new StringBuilder();
-        _threadService.AddNewMessage();
+        _ConversationService.AddNewMessage();
         string? newWord = string.Empty;
         using (var reader = new StreamReader(Request.Body, Encoding.UTF8))
         {
             //StreamReaderExtensions.AddNewCharDelimiters(StreamHelper.NewLineForStream);
             while ((newWord = await reader.ReadWordAsync()) != null)
             {
-                _threadService.DisplayStreamMessage(newWord);
+                _ConversationService.DisplayStreamMessage(newWord);
             }
         }
-        _threadService.EndsStreamMessage();
-    }
-
-    [HttpPost("metier-po/update-last-message")]
-    public void UpdateLastMetierPoMessage([FromBody] MessageModel newMessage)
-    {
-        _threadService.UpdateLastMessage(newMessage);
+        _ConversationService.EndsStreamMessage();
     }
 
     [HttpGet("ping")]

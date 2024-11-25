@@ -4,8 +4,9 @@ namespace PoAssistant.Front.Data;
 
 public record MessageModel
 {
-    public static string UserRole = "user";
-    public static string AiRole = "assistant";
+    public static string UserRole = "Utilisateur";
+    public static string AiRole = "Assistant IA";
+
     [JsonPropertyName("role")]
     public string Role { get; init; }
 
@@ -17,7 +18,8 @@ public record MessageModel
 
     public DateTime Timestamp { get; init; }
 
-    public bool IsSender => Role != UserRole;
+    public bool IsFromAI => Role == AiRole;
+    public bool IsFromUser => Role == UserRole;
 
     public bool IsLastConversationMessage { get; private set; } = false;
 
@@ -25,24 +27,22 @@ public record MessageModel
 
     public bool IsSavedMessage { get; set; }
 
-    public bool IsEndMessage { get; set; } = false;
+    public void SetAsLastConversationMessage () => IsLastConversationMessage = true;
+    public bool SetAsNotLastConversationMessage() => IsLastConversationMessage = false;
 
-    public void SetAsLastThreadMessage () => IsLastConversationMessage = true;
-    public bool SetAsLNotLastThreadMessage() => IsLastConversationMessage = false;
-
-    public MessageModel(string source, string content, int durationSeconds, bool isSavedMessage = true, bool isEndMessage = false)
+    public MessageModel(string source, string content, int durationSeconds, bool isSavedMessage = true, bool isStreaming = false)
     {
-        //TODO ETM: change the roles names: user -> BusinessExpert, assistant -> PM
-        if (source == "PM") source = AiRole;
-        if (source.StartsWith("Business")) source = UserRole;
+        if (source == MessageModel.AiRole) 
+            source = AiRole;
+        if (source == MessageModel.UserRole) 
+            source = UserRole;
 
         Role = source;
         Content = content;
         DurationSeconds = durationSeconds;
         Timestamp = DateTime.Now;
         IsSavedMessage = isSavedMessage;
-        IsEndMessage = isEndMessage;
-        IsStreaming = false;
+        IsStreaming = isStreaming;
     }
 
     public void ChangeContent(string newContent)

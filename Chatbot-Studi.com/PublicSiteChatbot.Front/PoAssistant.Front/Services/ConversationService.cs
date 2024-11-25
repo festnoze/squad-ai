@@ -6,69 +6,43 @@ using PoAssistant.Front.Infrastructure;
 using PoAssistant.Front.Client;
 using System.Text;
 using Microsoft.Extensions.Options;
+using Microsoft.VisualBasic;
 
 namespace PoAssistant.Front.Services;
 
 public class ConversationService : IDisposable
 {
-    private ChatbotAPIClient chatbotApiClient;
-    private readonly IExchangesRepository _exchangesRepository;
-    private ConversationModel? messages = null;
-    public event Action? OnThreadChanged = null;
+    private ChatbotAPIClient _chatbotApiClient;
+    private readonly IExchangeRepository _exchangeRepository;
+    private ConversationModel? conversation = null;
+    public event Action? OnConversationChanged = null;
     private bool isWaitingForLLM = false;
-    public const string endPmTag = "[FIN_PM_ASSIST]";
-    private static string endExchangeProposalMessage = "Ajouter des points à aborder avec le Project Manager si vous le souhaitez. Sinon, cliquez sur le bouton : 'Terminer l'échange' pour passer à l'étape de rédaction de l'US";
-    private readonly string _apiHostUri;
-    private const string newLineForStreamOverHttp = "\\/%*/\\";
+private readonly string _apiHostUri;
 
-    public ConversationService(IExchangesRepository exchangesRepository, IOptions<ApiSettings> apiSettings)
+    public ConversationService(IExchangeRepository exchangesRepository, IOptions<ApiSettings> apiSettings)
     {
-        _exchangesRepository = exchangesRepository;
+        _exchangeRepository = exchangesRepository;
         _apiHostUri = apiSettings.Value.ApiHostUri;
-        InitializeThread();
+        _chatbotApiClient = new ChatbotAPIClient(_apiHostUri);
+        InitializeConversation();
     }
 
-    private void InitializeThread()
+    private void InitializeConversation()
     {
-        this.chatbotApiClient = new ChatbotAPIClient(this._apiHostUri);
-        if (messages is null || !messages.Any())
+        if (conversation is null || !conversation.Any())
         {
-            messages = new ConversationModel(MessageModel.UserRole, string.Empty, true);
+            var startMessage = "Bonjour, je suis Studia, votre agent virtuel. Comment puis-je vous aider ?";
+            
+            conversation = new ConversationModel();
+            conversation.AddMessage(MessageModel.AiRole, startMessage, 0, true, false);
+            conversation.AddMessage(MessageModel.UserRole, string.Empty, 0, false, false);
             isWaitingForLLM = false;
         }
     }
 
-    public string GetMetierBriefIfReady()
+    public ConversationModel GetConversation()
     {
-        if (messages is null ||
-            !messages.Any() || 
-            !messages!.First().IsSavedMessage || 
-            messages!.First().Content.Length < 1)
-            return string.Empty;
-
-        return messages!.First().Content;
-    }
-
-    public string GetLatestBusinessExpertAnswerIfValidated()
-    {
-        if (messages == null ||
-            !messages.Any() ||
-            messages.Last().IsSender ||
-            !messages!.Last().IsSavedMessage ||
-            messages!.Last().Content.Length < 1)
-            return string.Empty;
-
-        // Handle end exchange case
-        var lastMessage = messages!.Last();
-        if (lastMessage.IsEndMessage && lastMessage.IsSavedMessage)
-            return "[ENDS_EXCHANGE]";
-
-        return lastMessage.Content;
-    }
-
-    public ConversationModel GetPoMetierThread()
-    {
-        return messages!;
+        return conversation!;
     }
 
     private string? username = null;
@@ -77,168 +51,48 @@ public class ConversationService : IDisposable
         this.username = userName;
     }
 
-    public bool IsEditingLastMessage()
+    public bool IsLastMessageEditable()
     {
-        return messages.Last().IsLastConversationMessage && !messages.Last().IsSavedMessage;
+        return conversation!.IsLastMessageFromUser && !conversation!.Last().IsSavedMessage;
     }
 
-    public void AddNewMessage(MessageModel newMessage)
+    public bool IsWaitingForLLM() => isWaitingForLLM;
+
+    public async Task InvokeRagApiOnUserQueryAsync(string modifiedMessageContent)
     {
-        if (messages is null)
-            messages = new ConversationModel();
-
-        newMessage.IsSavedMessage = false;
-        messages!.Add(newMessage);
-
-        SaveThread();
-        HandleWaitingStateAndEndExchange();
-    }
-
-    public void LoadThreadByName(string exchangeNameTruncated, bool truncatedExchangeName = false)
-    {
-        _isExchangesLoaded = false;
-        messages = _exchangesRepository.LoadUserExchange(username!, exchangeNameTruncated, truncatedExchangeName);
-        if (messages is null)
-            throw new InvalidOperationException($"Cannot load the thread as the exchange is not found for user: {username}");
-
-        HandleWaitingStateAndEndExchange();
-        OnThreadChanged?.Invoke();
-    }
-
-    public void SaveThread()
-    {
-        if (username is null)
-            username = "defaultUser";
-
-        var newThread = _exchangesRepository.SaveUserExchange(username, messages!);
-        if (newThread) 
-            _isExchangesLoaded = false;
-    }
-
-    public void UpdateLastMessage(MessageModel updatedLastMessage)
-    {
-        if (messages is null || !messages.Any())
-            throw new InvalidOperationException("Cannot modify the last messages as the thread don't has any message yet");
-
-        messages.RemoveLastMessage();
-
-        isWaitingForLLM = false;
-        updatedLastMessage.IsSavedMessage = false;
-        updatedLastMessage.IsStreaming = false;
-
-        messages.Add(updatedLastMessage);
-        SaveThread();
-
-        HandleWaitingStateAndEndExchange();
-    }
-
-    public void DisplayStreamMessage(string? messageChunk)
-    {
-        if (messageChunk != null)
-        {
-            // New line are specific to the stream to allow stream spliting words and avoid win/mac issue
-            isWaitingForLLM = true;
-            messages!.Last().Content += messageChunk.Replace(StreamHelper.NewLineForStream, StreamHelper.WindowsNewLine);
-            OnThreadChanged?.Invoke();
-        }
-    }
-
-    public void DeleteMetierPoThread()
-    {
-        _isExchangesLoaded = false;
-        messages = new ConversationModel();
-        InitializeThread();
-        OnThreadChanged?.Invoke();
-    }
-
-    public void EndMetierMetierExchange()
-    {
-        messages!.Add(new MessageModel(MessageModel.AiRole, "Le PO a maintenant rédigé la User Story et ses 'use cases'.", 0, true));
-        isWaitingForLLM = false;
-    }
-
-    private void HandleWaitingStateAndEndExchange()
-    {
-        if (messages != null && messages.Any())
-        {
-            // Change end message of PO & make it editable by user
-            if (messages!.Last().IsSender)
-            {
-                if (messages!.Last().Content.Contains(endPmTag) /*|| !messages!.Last().Content.Contains("?")*/)
-                {
-                    messages!.Last().ChangeContent(messages!.Last().Content.Replace(endPmTag, string.Empty)); //"Merci. Nous avons fini, j'ai tous les éléments dont j'ai besoin. Avez-vous d'autres points à aborder ?");
-                    messages.Add(new MessageModel(MessageModel.UserRole, endExchangeProposalMessage, 0, false, true));
-                    isWaitingForLLM = false;
-                }
-                else
-                    isWaitingForLLM = true;
-            }
-            else if (!messages!.Last().IsSender)
-                isWaitingForLLM = false;
-        }
-        else
-            isWaitingForLLM = false;
-
-        RefreshLastMessageInThread();
-        OnThreadChanged?.Invoke();
-    }
-
-    private void RefreshLastMessageInThread()
-    {
-        if (messages != null && messages.Any())
-        {
-            messages!.RemoveLastThreadMessageFlags();
-
-            if (!messages!.Last().IsSender)
-                messages?.Last().SetAsLastThreadMessage();
-        }
-    }
-
-    public bool IsWaitingForLLM()
-    {
-        return isWaitingForLLM;
-    }
-
-    public void EditingLastMessage()
-    {
-        if (messages != null && messages.Last().IsEndMessage)
-            messages!.Last().ChangeContent(string.Empty);
-    }
-
-    public async Task SendUserQueryToApiAsync(string modifiedMessageContent)
-    {
-        if (!messages?.Any() ?? true)
+        if (!conversation?.Any() ?? true)
             return;
-        
-        var lastMessage = messages!.Last();
+
+        var lastMessage = conversation!.Last();
         if (!string.IsNullOrWhiteSpace(modifiedMessageContent))
             lastMessage.Content = modifiedMessageContent;
-
-        if (lastMessage.IsEndMessage && lastMessage.Content != endExchangeProposalMessage)
-            lastMessage.IsEndMessage = false;
-
         lastMessage.IsSavedMessage = true;
-        SaveThread();
-        var conversationRequestModel = messages!.ToRequestModel();
+        //SaveConversation();
+
+        var conversationRequestModel = conversation!.ToRequestModel();
         try
         {
             this.AddNewMessage();
+            OnConversationChanged?.Invoke();
 
-            await foreach (var chunk in this.chatbotApiClient.GetQueryRagAnswerStreamingAsync(conversationRequestModel))
+            await foreach (var chunk in this._chatbotApiClient.GetQueryRagAnswerStreamingAsync(conversationRequestModel))
             {
-                var decodedChunk = chunk.Replace(ConversationService.newLineForStreamOverHttp, "\r\n");
-                this.DisplayStreamMessage(decodedChunk);
+                this.DisplayStreamMessage(chunk);
             }
 
             this.EndsStreamMessage();
 
-            this.AddNewMessage(isStreaming: false);
+            this.AddNewMessage(isSaved:false, isStreaming: false);
 
         }
         catch (Exception e)
         {
             this.NotifyForApiCommunicationError(e.Message);
-            OnThreadChanged?.Invoke();
+        }
+        finally
+        {
+            isWaitingForLLM = false;
+            OnConversationChanged?.Invoke();
         }
     }
 
@@ -249,48 +103,76 @@ public class ConversationService : IDisposable
         ApiCommunicationErrorNotification?.Invoke();
     }
 
-    public void DoEndBusinessPoExchange()
+    public void AddNewMessage(bool isSaved = false, bool isStreaming = true)
     {
-        messages!.Last().IsEndMessage = true;
-        messages!.Last().IsSavedMessage = true;
-    }
-
-    public void Dispose()
-    {
-    }
-
-    public void AddNewMessage(bool isStreaming = true)
-    {
-        if (messages is null)
-            messages = new ConversationModel();
+        if (conversation is null)
+            conversation = new ConversationModel();
 
         var role = "Métier";
-        if (messages?.Any() ?? false)
-            role =  messages.Last().IsSender ? MessageModel.UserRole : MessageModel.AiRole;
-        var newMessage = new MessageModel(role, string.Empty, -1, false);
-        newMessage.IsStreaming = isStreaming;
+        if (conversation?.Any() ?? false)
+            role = conversation.Last().IsFromAI ? MessageModel.UserRole : MessageModel.AiRole;
+        var newMessage = new MessageModel(role, string.Empty, -1, isSaved, isStreaming);
 
-        messages!.Add(newMessage);
+        conversation!.AddMessage(newMessage);
 
         isWaitingForLLM = true;
-        RefreshLastMessageInThread();
+    }
+
+    public void DisplayStreamMessage(string? messageChunk)
+    {
+        // New lines are a specific pattern to allow spliting words and avoid win/mac issue over the streaming
+        if (!string.IsNullOrWhiteSpace(messageChunk))
+        {
+            isWaitingForLLM = true;
+            conversation!.Last().Content += messageChunk.Replace(StreamHelper.NewLineForStream, StreamHelper.WindowsNewLine);
+            OnConversationChanged?.Invoke();
+        }
     }
 
     public void EndsStreamMessage()
     {
-        messages!.Last().IsStreaming = false;
+        conversation!.Last().IsStreaming = false;
 
-        messages!.Last().IsSavedMessage = true;
+        conversation!.Last().IsSavedMessage = true;
+    }
+
+    public void LoadConversationByName(string exchangeNameTruncated, bool truncatedExchangeName = false)
+    {
+        _isExchangesLoaded = false;
+        conversation = _exchangeRepository.LoadUserExchange(username!, exchangeNameTruncated, truncatedExchangeName);
+        if (conversation is null)
+            throw new InvalidOperationException($"Cannot load the Conversation as the exchange is not found for user: {username}");
+
+        OnConversationChanged?.Invoke();
+    }
+
+    public void SaveConversation()
+    {
+        if (username is null)
+            username = "defaultUser";
+
+        var newConversation = _exchangeRepository.SaveUserExchange(username, conversation!);
+        if (newConversation)
+            _isExchangesLoaded = false;
+    }
+
+    public void DeleteCurrentConversation()
+    {
+        _isExchangesLoaded = false;
+        conversation = new ConversationModel();
+        InitializeConversation();
+        OnConversationChanged?.Invoke();
     }
 
     private bool _isExchangesLoaded = false;
-    public bool IsExchangesLoaded()
-    {
-        return _isExchangesLoaded;
-    }
+    public bool IsExchangesLoaded => _isExchangesLoaded;
 
-    public void ExchangesIsLoaded()
+    public void MarkConversationAsLoaded()
     {
         _isExchangesLoaded = true;
+    }
+
+    public void Dispose()
+    {
     }
 }
