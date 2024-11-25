@@ -8,6 +8,7 @@ from collections.abc import Iterable
 from common_tools.helpers.file_helper import file
 from common_tools.helpers.method_decorator_helper import MethodDecorator
 from common_tools.rag.rag_inference_pipeline.end_pipeline_exception import EndPipelineException
+from common_tools.helpers.execute_helper import Execute
 
 class WorkflowExecutor:
     def __init__(self, config_or_config_file_path=None, available_classes:dict={}):
@@ -90,7 +91,7 @@ class WorkflowExecutor:
         if parallel_type == 'threads':
             return self._execute_steps_in_threads(steps, previous_results, kwargs_values)
         elif parallel_type == 'async':
-            return asyncio.run(self._execute_steps_in_async(steps, previous_results, kwargs_values))
+            return Execute.async_wrapper_to_sync(self._execute_steps_in_async(steps, previous_results, kwargs_values))
         else:
             raise ValueError(f"Unknown parallel execution type: {parallel_type}")
 

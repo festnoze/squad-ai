@@ -436,7 +436,7 @@ class RagFilteringMetadataHelper:
         return metadata_field_info
     
     @staticmethod
-    def validate_langchain_metadata_filters_against_metadata_descriptions(
+    async def validate_langchain_metadata_filters_against_metadata_descriptions_async(
         langchain_filters: Union[Operation, Comparison],
         metadata_descriptions: list[MetadataDescription],
         does_throw_error_upon_failure: bool = True,
@@ -457,7 +457,7 @@ class RagFilteringMetadataHelper:
         # Create a lookup dictionary for quick metadata validation
         metadata_lookup = {desc.name: desc.possible_values for desc in metadata_descriptions}
 
-        def validate_filter(filter_obj):
+        async def validate_filter_async(filter_obj):
             if filter_obj is None:
                 return None
             elif isinstance(filter_obj, Comparison):
@@ -477,7 +477,7 @@ class RagFilteringMetadataHelper:
 
                 if search_nearest_value_if_not_found:
                     # Find the nearest match using BM25
-                    retrieved_value, retrieval_score = BM25RetrieverHelper.find_best_match_bm25(
+                    retrieved_value, retrieval_score = await BM25RetrieverHelper.find_best_match_bm25_async(
                         possible_values, filter_obj.value
                     )
                     # Update the filter value
@@ -498,7 +498,7 @@ class RagFilteringMetadataHelper:
 
             elif isinstance(filter_obj, Operation):
                 validated_arguments = [
-                    validate_filter(arg) for arg in filter_obj.arguments
+                    await validate_filter_async(arg) for arg in filter_obj.arguments
                 ]
                 validated_arguments = [arg for arg in validated_arguments if arg is not None]
                 if not validated_arguments:
@@ -509,5 +509,5 @@ class RagFilteringMetadataHelper:
                     raise ValueError(f"Unsupported filter type: {type(filter_obj)}")
                 return None
             
-        validated_filters = validate_filter(langchain_filters)
+        validated_filters = await validate_filter_async(langchain_filters)
         return validated_filters
