@@ -4,7 +4,7 @@
 @using Microsoft.AspNetCore.Components.Authorization
 
 @inject IJSRuntime JSRuntime
-@inject ConversationService ConversationService
+@inject IConversationService conversationService
 @inject IExchangeRepository exchangesRepository
 
 <div class="sidebar @(isMenuReduced ? "menu-reduced" : "")">
@@ -97,9 +97,9 @@
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         username = await JSRuntime.InvokeAsync<string>("blazorExtensions.ReadStorage", "userName");
-        if (!ConversationService.IsExchangesLoaded && username != null)
+        if (!conversationService.IsExchangesLoaded && username != null)
         {
-            ConversationService.MarkConversationAsLoaded();
+            conversationService.MarkConversationAsLoaded();
             exchangesNames = exchangesRepository.GetAllUserExchangesNames(username);
             await InvokeAsync(StateHasChanged);
         }
@@ -132,11 +132,11 @@
 
     private void LoadExchangeList(string exchangeNameTruncated)
     {
-        ConversationService.LoadConversationByName(exchangeNameTruncated, true);
+        conversationService.LoadConversationByName(exchangeNameTruncated, true);
     }
 
     private void NewExchange()
     {
-        ConversationService.DeleteCurrentConversation();
+        conversationService.DeleteCurrentConversation();
     }
 }

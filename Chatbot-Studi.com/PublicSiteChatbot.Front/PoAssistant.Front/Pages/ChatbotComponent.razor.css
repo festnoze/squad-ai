@@ -1,0 +1,141 @@
+﻿/* Chatbot Container */
+.chatbot-container {
+    font-family: 'Roboto', sans-serif;
+    height: 100%;
+    background-color: #fff;
+    margin: 0;
+}
+
+/* Header Styles */
+.headerStyle {
+    background-color: #de2554;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    position: relative;
+}
+
+.HeaderBloc {
+    width: 100%;
+    text-align: center;
+}
+
+.HeaderText {
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+}
+
+.closeFenetre {
+    position: absolute;
+    right: 30px;
+    top: 10px;
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 24px;
+    cursor: pointer;
+}
+
+/* Main Content Styles */
+.main {
+    display: flex;
+    flex-direction: column;
+    height: calc(100% - 50px);
+}
+
+/* Discussion Panel */
+.discussionPanel {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 30px 0 0;
+    scroll-behavior: smooth;
+}
+
+.msgBloc {
+    margin-bottom: 15px;
+}
+
+.ob1-bubble-header {
+    display: flex;
+    align-items: center;
+}
+
+.ob1-bubble-header-icon {
+    font-size: 24px;
+    margin-right: 10px;
+    color: #000;
+}
+
+.ob1-bubble-header-title {
+    font-weight: bold;
+}
+
+.bubble-container {
+    background-color: #f4f4f4;
+    border-radius: 20px;
+    padding: 10px;
+    max-width: 70%;
+    word-wrap: break-word;
+}
+
+.ob1-bubble-content {
+    margin: 0;
+}
+
+.emoji {
+    vertical-align: middle;
+    width: 20px;
+    height: 20px;
+}
+
+/* Footer Styles */
+footer#send-bloc {
+    border-top: 1px solid #ddd;
+    padding: 10px 0;
+}
+
+.send-bloc-container {
+    width: 100%;
+}
+
+.message-side {
+    width: 100%;
+    border: none;
+    background-color: unset;
+    font-size: 14px;
+    color: #555;
+    padding: 10px;
+    box-sizing: border-box;
+}
+
+#sender {
+    background: center no-repeat url('/assets/images/send-sosh1.png');
+    background-color: transparent;
+    border: none;
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+    margin-left: 10px;
+}
+
+.menuButton {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+}
+
+.container .bar {
+    width: 20px;
+    height: 2px;
+    background-color: #de2554;
+    margin: 4px 0;
+    transition: 0.4s;
+}
+
+/* Responsive Styles */
+@media screen and (max-width: 500px) {
+    .bubble-container {
+        max-width: 100%;
+    }
+}

@@ -321,8 +321,8 @@ html, body {
     align-items: center;
     /* Set the initial opacity and transition */
     opacity: 1;
-    transition: opacity 4s ease-out;
-    animation: autoFadeOut 4s ease-out forwards;
+    transition: opacity 6s ease-out;
+    animation: autoFadeOut 6s ease-out forwards;
 }
 
 /* Keyframes to ensure it transitions automatically */
@@ -330,9 +330,8 @@ html, body {
     0% {
         opacity: 1;
     }
-
     100% {
-        opacity: 0;
+        opacity: 0.1;
     }
 }
 

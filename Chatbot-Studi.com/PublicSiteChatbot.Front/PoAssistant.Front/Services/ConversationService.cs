@@ -1,23 +1,19 @@
-using System.Collections.Generic;
-using System.Linq;
 using PoAssistant.Front.Data;
 using PoAssistant.Front.Helpers;
 using PoAssistant.Front.Infrastructure;
 using PoAssistant.Front.Client;
-using System.Text;
 using Microsoft.Extensions.Options;
-using Microsoft.VisualBasic;
 
 namespace PoAssistant.Front.Services;
 
-public class ConversationService : IDisposable
+public class ConversationService : IConversationService
 {
     private ChatbotAPIClient _chatbotApiClient;
     private readonly IExchangeRepository _exchangeRepository;
     private ConversationModel? conversation = null;
     public event Action? OnConversationChanged = null;
     private bool isWaitingForLLM = false;
-private readonly string _apiHostUri;
+    private readonly string _apiHostUri;
 
     public ConversationService(IExchangeRepository exchangesRepository, IOptions<ApiSettings> apiSettings)
     {
@@ -32,7 +28,7 @@ private readonly string _apiHostUri;
         if (conversation is null || !conversation.Any())
         {
             var startMessage = "Bonjour, je suis Studia, votre agent virtuel. Comment puis-je vous aider ?";
-            
+
             conversation = new ConversationModel();
             conversation.AddMessage(MessageModel.AiRole, startMessage, 0, true, false);
             conversation.AddMessage(MessageModel.UserRole, string.Empty, 0, false, false);
@@ -82,7 +78,7 @@ private readonly string _apiHostUri;
 
             this.EndsStreamMessage();
 
-            this.AddNewMessage(isSaved:false, isStreaming: false);
+            this.AddNewMessage(isSaved: false, isStreaming: false);
 
         }
         catch (Exception e)

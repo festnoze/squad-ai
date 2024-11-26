@@ -5,8 +5,8 @@
 @using Microsoft.AspNetCore.Components.Authorization
 
 @inject IJSRuntime JSRuntime
-@inject ConversationService conversationService
-@inject NavigationService navigationService
+@inject IConversationService conversationService
+@inject INavigationService navigationService
 @inject ISimpleAuthenticationStateProvider authenticationStateProvider
 
 <PageTitle>Chatbot Studi.com</PageTitle>
@@ -247,7 +247,10 @@
     private void ShowMessageEmptyError()
     {
         showMessageEmptyError = true;
-        var task = Task.Delay(7000).ContinueWith(t => { showMessageEmptyError = false; InvokeAsync(StateHasChanged); });
+        var task = Task.Delay(8000).ContinueWith(t => { 
+            showMessageEmptyError = false; 
+            InvokeAsync(StateHasChanged); 
+        });
     }
 
     private async Task SendMessage()
