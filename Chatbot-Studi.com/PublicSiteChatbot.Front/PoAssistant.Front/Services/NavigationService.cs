@@ -2,7 +2,7 @@
 
 using Microsoft.AspNetCore.Components;
 
-public class NavigationService
+public class NavigationService : INavigationService
 {
     private NavigationManager _navigationManager;
 

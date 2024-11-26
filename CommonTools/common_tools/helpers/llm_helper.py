@@ -54,19 +54,19 @@ class Llm:
         chain_w_config = chain.with_config({"run_name": f"{action_name}"})
         return await chain_w_config.ainvoke(input)  
      
-    @staticmethod
-    def invoke_prompt_with_output_parser_and_fallbacks(action_name: str, llms_with_fallbacks: Union[Runnable, list[Runnable]], prompt: Union[str, ChatPromptTemplate], output_parser: BaseTransformOutputParser = None, batch_size:int = None) -> list[str]:
-        """Invoke a single LLM prompt (fallbacks, output parser, batching possible in option, no parallel multiple prompts)"""
-        return Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(action_name, llms_with_fallbacks, output_parser, batch_size, *[prompt])
+    # @staticmethod
+    # def invoke_prompt_with_output_parser_and_fallbacks(action_name: str, llms_with_fallbacks: Union[Runnable, list[Runnable]], prompt: Union[str, ChatPromptTemplate], output_parser: BaseTransformOutputParser = None, batch_size:int = None) -> list[str]:
+    #     """Invoke a single LLM prompt (fallbacks, output parser, batching possible in option, no parallel multiple prompts)"""
+    #     return Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(action_name, llms_with_fallbacks, output_parser, batch_size, *[prompt])
     
     @staticmethod
     async def invoke_parallel_prompts_async(action_name: str, llms_with_fallbacks: Union[Runnable, list[Runnable]], *prompts: Union[str, ChatPromptTemplate]) -> list[str]:
         """Invoke LLM in parallel, w/o output parser, nor batching (fallbacks possible)"""
         return await Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks_async(action_name, llms_with_fallbacks, None, None, *prompts)
    
-    @staticmethod
-    def invoke_parallel_prompts_with_parser_batchs_fallbacks(action_name: str, llms_with_fallbacks: Union[Runnable, list[Runnable]], output_parser: BaseTransformOutputParser, batch_size: int = None, *prompts: Union[str, ChatPromptTemplate]) -> list[str]:
-        return Execute.async_wrapper_to_sync(Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks_async, action_name, llms_with_fallbacks, output_parser, batch_size, *prompts)
+    # @staticmethod
+    # def invoke_parallel_prompts_with_parser_batchs_fallbacks(action_name: str, llms_with_fallbacks: Union[Runnable, list[Runnable]], output_parser: BaseTransformOutputParser, batch_size: int = None, *prompts: Union[str, ChatPromptTemplate]) -> list[str]:
+    #     return Execute.async_wrapper_to_sync(Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks_async, action_name, llms_with_fallbacks, output_parser, batch_size, *prompts)
     
     @staticmethod
     async def invoke_parallel_prompts_with_parser_batchs_fallbacks_async(action_name: str, llms_with_fallbacks: Union[Runnable, list[Runnable]], output_parser: BaseTransformOutputParser, batch_size: int = None, *prompts: Union[str, ChatPromptTemplate]) -> list[str]:
@@ -99,9 +99,9 @@ class Llm:
         answers = await Llm._invoke_parallel_chains_async(action_name, inputs, batch_size, *chains)
         return answers
         
-    @staticmethod
-    def _invoke_parallel_chains(action_name: str = "", inputs: dict = None, batch_size: int = None, *chains: Chain) -> list[str]:
-        Execute.async_wrapper_to_sync(Llm._invoke_parallel_chains_async, action_name, inputs, batch_size, *chains)
+    # @staticmethod
+    # def _invoke_parallel_chains(action_name: str = "", inputs: dict = None, batch_size: int = None, *chains: Chain) -> list[str]:
+    #     Execute.async_wrapper_to_sync(Llm._invoke_parallel_chains_async, action_name, inputs, batch_size, *chains)
     
     @staticmethod
     async def _invoke_parallel_chains_async(action_name: str = "", inputs: dict = None, batch_size: int = None, *chains: Chain) -> list[str]:
@@ -120,7 +120,7 @@ class Llm:
         for chains_batch in chains_batches:
             combined = RunnableParallel(**{f"invoke_{i}": chain for i, chain in enumerate(chains_batch)})
             parallel_chains = combined.with_config({"run_name": f"{action_name}{f"- batch x{str(batch_size)}" if (batch_size and len(chains_batches)>1) else ""}"})
-            responses = await parallel_chains.ainvoke(inputs) 
+            responses = await parallel_chains.ainvoke(inputs) #TODO: try replace by: abatch
 
             responses_list = [responses[key] for key in responses.keys()]
             batch_answers = [Llm.get_content(response) for response in responses_list]
@@ -128,8 +128,7 @@ class Llm:
         return answers    
     
     @staticmethod
-    def invoke_llm_with_tools(llm_or_chain: Runnable, tools: list[any], input: str) -> str:
-        #prompt = hub.pull("hwchase17/openai-tools-agent")
+    async def invoke_llm_with_tools_async(llm_or_chain: Runnable, tools: list[any], input: str) -> str:
         prompt = ChatPromptTemplate.from_messages(
             [
                 ("system", "You're a helpful AI assistant. You know which tools use to solve the given user problem."),
@@ -139,11 +138,11 @@ class Llm:
         )
         agent = create_tool_calling_agent(llm_or_chain, tools, prompt)
         agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
-        res = agent_executor.invoke({"input": input})
+        res = await agent_executor.ainvoke({"input": input})
         return res["output"]
 
     @staticmethod
-    def invoke_json_llm_with_tools(llm_or_chain: Runnable, tools: list[any], input: str) -> str:
+    async def invoke_json_llm_with_tools_async(llm_or_chain: Runnable, tools: list[any], input: str) -> str:
         #prompt = hub.pull("hwchase17/openai-tools-agent")
         prompt = ChatPromptTemplate.from_messages(
             [
@@ -155,7 +154,7 @@ class Llm:
         
         agent = create_json_chat_agent(llm_or_chain, tools, ChatPromptTemplate.from_messages([("human", "{input}")]))
         agent_executor = AgentExecutor(agent=agent, tools=tools)
-        res = agent_executor.invoke({"input": input})
+        res = await agent_executor.ainvoke({"input": input})
         return res["output"]
     
     new_line_for_stream_over_http = "\\/%*/\\" # use specific new line conversion over streaming, as new line is handled differently across platforms

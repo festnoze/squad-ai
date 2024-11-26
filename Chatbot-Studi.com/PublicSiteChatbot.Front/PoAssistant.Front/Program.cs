@@ -14,13 +14,14 @@ builder.Services.AddServerSideBlazor();
 
 builder.Services.AddControllers();
 
-builder.Services.AddSingleton<ConversationService>();
-builder.Services.AddSingleton<UserStoryService>();
-builder.Services.AddScoped<NavigationService>();
+builder.Services.AddScoped<ISimpleAuthenticationStateProvider, SimpleAuthenticationStateProvider>();
+
+builder.Services.AddScoped<IConversationService, ConversationService>();
+builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
+builder.Services.AddScoped<INavigationService, NavigationService>();
+
 builder.Services.AddSingleton<IUserRepository, UserRepository>();
 builder.Services.AddSingleton<IExchangeRepository, ExchangeRepository>();
-builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
-builder.Services.AddScoped<ISimpleAuthenticationStateProvider, SimpleAuthenticationStateProvider>();
 
 
 var app = builder.Build();

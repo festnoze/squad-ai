@@ -5,8 +5,8 @@
 @using Microsoft.AspNetCore.Components.Authorization
 
 @inject IJSRuntime JSRuntime
-@inject ConversationService conversationService
-@inject NavigationService navigationService
+@inject IConversationService conversationService
+@inject INavigationService navigationService
 @inject ISimpleAuthenticationStateProvider authenticationStateProvider
 
 <PageTitle>Chatbot Studi.com</PageTitle>
@@ -64,6 +64,8 @@
                 @if (DisplayLoader(message))
                 {
                     <div class="loader">
+                        <div class="circle"></div>
+                        <div class="circle"></div>
                         <div class="circle"></div>
                         <div class="circle"></div>
                         <div class="circle"></div>
@@ -245,7 +247,10 @@
     private void ShowMessageEmptyError()
     {
         showMessageEmptyError = true;
-        var task = Task.Delay(4000).ContinueWith(t => { showMessageEmptyError = false; InvokeAsync(StateHasChanged); });
+        var task = Task.Delay(8000).ContinueWith(t => { 
+            showMessageEmptyError = false; 
+            InvokeAsync(StateHasChanged); 
+        });
     }
 
     private async Task SendMessage()
@@ -272,6 +277,11 @@
     private async void HandleApiCommunicationErrorNotification()
     {
         showApiCommunicationErrorNotification = true;
+        await InvokeAsync(StateHasChanged);
+
+        await Task.Delay(5000);
+
+        showApiCommunicationErrorNotification = false;
         await InvokeAsync(StateHasChanged);
     }
 

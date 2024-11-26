@@ -1,0 +1,100 @@
+﻿@page "/chatbot"
+
+<div class="chatbot-container">
+    <!-- Header -->
+    <div class="headerStyle commonHeaderStyle">
+        <div class="HeaderBloc">
+            <span class="HeaderText">Djingo</span>
+            <!-- Close button -->
+            <button class="closeFenetre" aria-label="Close Chat">
+                &times;
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main">
+        <!-- Discussion Panel -->
+        <div aria-live="polite" class="discussionPanel" tabindex="6">
+            <div id="messageHolder">
+                <!-- Bot Message -->
+                <div class="msgBloc ob1-bubble bot-answer-stack">
+                    <div class="ob1-bubble-header">
+                        <span class="icon icon-Djingo ob1-bubble-header-icon"></span>
+                        <span class="ob1-bubble-header-title botId">Djingo</span>
+                    </div>
+                    <div class="ob1-bubble-body">
+                        <div class="bubble-container">
+                            <p class="ob1-bubble-content">
+                                Dites-moi en quelques mots ce que je peux faire pour vous
+                                <img class="emoji" alt="😊" src="https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/72x72/1f60a.png" />
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer with Send Message Form -->
+        <footer id="send-bloc">
+            <div>
+                <table border="0" aria-describedby="send bloc container" class="send-bloc-container">
+                    <thead>
+                        <tr>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <!-- Menu Button -->
+                            <td id="menu">
+                                <button aria-label="menu burger" tabindex="5" type="button" class="menuButton">
+                                    <div class="container">
+                                        <div id="bar1" class="bar bar1"></div>
+                                        <div id="bar2" class="bar bar2"></div>
+                                        <div id="bar3" class="bar bar3"></div>
+                                    </div>
+                                </button>
+                            </td>
+                            <!-- Message Input and Send Button -->
+                            <td id="send">
+                                <form novalidate id="send-form" style="width: 100%;">
+                                    <input id="messageSide"
+                                           type="search"
+                                           autocomplete="off"
+                                           aria-label="Saisir un message"
+                                           class="message-side"
+                                           placeholder="Saisissez votre message"
+                                           maxlength="150"
+                                           style="font-size: 14px;"
+                                           @bind="userMessage"
+                                           @bind:event="oninput" />
+                                    <button aria-label="envoyer"
+                                            type="submit"
+                                            tabindex="4"
+                                            id="sender"
+                                            class="btn tab-focus-indicator"
+                                            @onclick="SendMessage"
+                                            disabled="@(string.IsNullOrWhiteSpace(userMessage))"></button>
+                                </form>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </footer>
+    </div>
+</div>
+
+@code {
+    private string userMessage = string.Empty;
+
+    private void SendMessage()
+    {
+        if (!string.IsNullOrWhiteSpace(userMessage))
+        {
+            // Handle sending the message
+            userMessage = string.Empty;
+        }
+    }
+}

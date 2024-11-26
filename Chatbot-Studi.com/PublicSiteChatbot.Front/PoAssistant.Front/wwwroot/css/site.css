@@ -151,7 +151,7 @@ html, body {
 
 .loader {
     display: flex;
-    justify-content: right;
+    justify-content: center;
     align-items: center;
 }
 
@@ -287,6 +287,7 @@ html, body {
         box-shadow: 0 10px 40px 0 rgba(0,0,0,0.24), 0 17px 50px 0 rgba(0,0,0,0.22); /* Deeper shadow on hover */
     }
 
+
 .notification {
     position: fixed;
     right: 20px;
@@ -318,6 +319,20 @@ html, body {
     box-shadow: 0px 0px 10px rgba(0,0,0,0.5);
     display: flex;
     align-items: center;
+    /* Set the initial opacity and transition */
+    opacity: 1;
+    transition: opacity 6s ease-out;
+    animation: autoFadeOut 6s ease-out forwards;
+}
+
+/* Keyframes to ensure it transitions automatically */
+@keyframes autoFadeOut {
+    0% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0.1;
+    }
 }
 
     .api-communication-error .oi {
@@ -339,6 +354,22 @@ html, body {
         .api-communication-error .close-btn:hover {
             color: #ffffff; /* Changez la couleur au survol */
         }
+
+/* Define the fade-out animation */
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0.1;
+    }
+}
+
+/* Apply fade-out animation */
+.fade-out {
+    animation: fadeOut 4s ease-out forwards;
+}
 
 .nav-link-po {
     height:50px;

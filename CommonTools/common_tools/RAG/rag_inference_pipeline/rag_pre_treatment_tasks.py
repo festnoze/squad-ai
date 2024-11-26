@@ -15,7 +15,7 @@ from common_tools.rag.rag_inference_pipeline.end_message_ends_pipeline_exception
 from common_tools.rag.rag_inference_pipeline.greetings_ends_pipeline_exception import GreetingsEndsPipelineException
 from common_tools.rag.rag_inference_pipeline.rag_pre_treat_metadata_filters_analysis import RagPreTreatMetadataFiltersAnalysis
 from common_tools.rag.rag_service import RagService
-from common_tools.workflows.output_name_decorator import output_name
+from common_tools.workflows.workflow_output_decorator import workflow_output
 from langchain_core.structured_query import (
     Comparator,
     Comparison,
@@ -31,9 +31,9 @@ class RAGPreTreatment:
 
     @staticmethod
     def rag_static_pre_treatment(rag:RagService, query:Union[str, Conversation], default_filters:dict = {}) -> tuple[QuestionTranslation, dict]:
-        question_analysis, extracted_implicit_metadata, extracted_explicit_metadata = Execute.run_sync_functions_in_parallel_threads(
-            (RAGPreTreatment.query_rewritting, (rag, query)),
-            (RAGPreTreatment.analyse_query_for_metadata, (rag, query)),
+        question_analysis, extracted_implicit_metadata, extracted_explicit_metadata = Execute.run_several_functions_as_concurrent_async_tasks(
+            (RAGPreTreatment.query_rewritting_async, (rag, query)),
+            (RAGPreTreatment.analyse_query_for_metadata_async, (rag, query)),
             (RAGPreTreatment.extract_explicit_metadata, (query)),
         )
         
@@ -46,8 +46,8 @@ class RAGPreTreatment:
         return question_analysis, merged_metadata
     
     @staticmethod
-    @output_name('analysed_query')
-    def query_standalone_rewritten_from_history(rag:RagService, query:Union[str, Conversation]) -> QuestionRewritting:
+    @workflow_output('analysed_query')
+    async def query_standalone_rewritten_from_history_async(rag:RagService, query:Union[str, Conversation]) -> QuestionRewritting:
         query_standalone_rewritten_prompt = Ressource.load_ressource_file('create_standalone_and_rewritten_query_from_history_prompt.txt')
         query_standalone_rewritten_prompt = RAGPreTreatment._query_rewritting_prompt_replace_all_categories(query_standalone_rewritten_prompt)
         query_standalone_rewritten_prompt = RAGPreTreatment._replace_query_and_history_in_prompt(query, query_standalone_rewritten_prompt)  
@@ -55,8 +55,8 @@ class RAGPreTreatment:
         prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(
                         query_standalone_rewritten_prompt, QuestionRewrittingPydantic, QuestionRewritting)
 
-        response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(
-                'Make standalone and rewritten query', [rag.llm_2, rag.llm_3], output_parser, 10, *[prompt_for_output_parser])
+        response = await Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks_async(
+                'Standalone and rewritten query', [rag.llm_2, rag.llm_3], output_parser, 10, *[prompt_for_output_parser])
         
         question_rewritting = QuestionRewritting(**response[0])
         print(f'> Standalone query: "{question_rewritting.question_with_context}" and rewritten query: "{question_rewritting.modified_question}"')
@@ -77,8 +77,8 @@ class RAGPreTreatment:
         return prompt
     
     @staticmethod
-    @output_name('analysed_query')
-    def query_standalone_from_history(rag:RagService, query:Union[str, Conversation]) -> QuestionRewritting:
+    @workflow_output('analysed_query')
+    async def query_standalone_from_history_async(rag:RagService, query:Union[str, Conversation]) -> QuestionRewritting:
         query_standalone_prompt = Ressource.get_create_standalone_query_from_history_prompt()
         user_query = Conversation.get_user_query(query)
         query_standalone_prompt = query_standalone_prompt.replace('{user_query}', user_query)
@@ -88,7 +88,7 @@ class RAGPreTreatment:
             query_standalone_prompt, QuestionRewrittingPydantic, QuestionRewritting
         )
 
-        response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(
+        response = await Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks_async(
             'Standalone query from history', [rag.llm_2, rag.llm_3], output_parser, 10, *[prompt_for_output_parser]
         )
         question_rewritting = QuestionRewritting(**response[0])
@@ -105,11 +105,11 @@ class RAGPreTreatment:
 
     #TODO: /!\ WARNING /!\ the query rewritting is domain specific and its prompt too (for studi.com). Thus, it shouldn't be in common_tools
     @staticmethod
-    @output_name('analysed_query')
-    def query_rewritting(rag:RagService, analysed_query:QuestionRewritting) -> str:        
+    @workflow_output('analysed_query')
+    async def query_rewritting_async(rag:RagService, analysed_query:QuestionRewritting) -> str:        
         query_rewritting_prompt = RAGPreTreatment._query_rewritting_prompt_replace_all_categories(analysed_query.question_with_context)
 
-        response = Execute.async_wrapper_to_sync(Llm.invoke_chain_with_input_async, 'Query rewritting', rag.llm_1, query_rewritting_prompt)
+        response = await Llm.invoke_chain_with_input_async('Query rewritting', rag.llm_1, query_rewritting_prompt)
         
         content =  Llm.extract_json_from_llm_response(Llm.get_content(response))
         analysed_query.modified_question = content['modified_question']
@@ -133,15 +133,15 @@ class RAGPreTreatment:
         return query_rewritting_prompt
                
     @staticmethod    
-    @output_name('analysed_query')
-    def query_translation(rag:RagService, query:Union[str, Conversation]) -> QuestionTranslation:
+    @workflow_output('analysed_query')
+    async def query_translation_async(rag:RagService, query:Union[str, Conversation]) -> QuestionTranslation:
         user_query = Conversation.get_user_query(query)
         prefilter_prompt = Ressource.get_language_detection_prompt()
         prefilter_prompt = prefilter_prompt.replace("{question}", user_query)
         prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(
             prefilter_prompt, QuestionTranslationPydantic, QuestionTranslation
         )
-        response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks(
+        response = await Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks_async(
             'query_translation', [rag.llm_1, rag.llm_2, rag.llm_3], output_parser, 10, *[prompt_for_output_parser]
         )
         question_analysis = response[0]
@@ -151,8 +151,8 @@ class RAGPreTreatment:
         return QuestionTranslation(**question_analysis)
 
     @staticmethod    
-    @output_name('analysed_query') #todo: to replace with above
-    def bypassed_query_translation(rag:RagService, query:Union[str, Conversation]) -> QuestionTranslation:
+    @workflow_output('analysed_query') #todo: to replace with above
+    async def bypassed_query_translation_async(rag:RagService, query:Union[str, Conversation]) -> QuestionTranslation:
         user_query = Conversation.get_user_query(query)
         question_analysis = QuestionTranslation(query, query, 'request', 'french')
         return question_analysis
@@ -169,7 +169,7 @@ class RAGPreTreatment:
         return query_wo_metadata, filters
     
     @staticmethod
-    def analyse_query_for_metadata(rag:RagService, analysed_query:QuestionAnalysisBase) -> tuple[str, Operation]:        
+    async def analyse_query_for_metadata_async(rag:RagService, analysed_query:QuestionAnalysisBase) -> tuple[str, Operation]:        
         query = QuestionAnalysisBase.get_modified_question(analysed_query)        
         query_constructor = RagPreTreatMetadataFiltersAnalysis.get_query_constructor_langchain(rag.llm_2, RAGPreTreatment.metadata_descriptions)
         # self_querying_retriever = RagPreTreatMetadataFiltersAnalysis.build_self_querying_retriever_langchain(rag.vectorstore, rag.vector_db_type, rag.llm_2, RAGPreTreatment.metadata_infos, True)
@@ -181,7 +181,7 @@ class RAGPreTreatment:
         # except Exception as e:
         #     print(f'+++ Error on "analyse_query_for_metadata": {e}')
         
-        response_with_filters = query_constructor.invoke(query)
+        response_with_filters = await query_constructor.ainvoke(query)
 
         metadata_filters = response_with_filters.filter
         return response_with_filters.query, metadata_filters
@@ -193,30 +193,31 @@ class RAGPreTreatment:
             
     #TODO: the param shouldn't be a tuple but the two params directly if flatten tuple works as intended
     @staticmethod
-    def metadata_filters_validation_and_correction(query_and_metadata_filters:tuple) -> tuple[str, Operation]:
+    async def metadata_filters_validation_and_correction_async(query_and_metadata_filters:tuple) -> tuple[str, Operation]:
         """Validate or fix values of metadata filters, like : academic_level, name, domain_name, sub_domain_name, certification_name"""
+        #TODO: the following tuple flattening should not be done by the method itself but by the flatten_tuples methods
         query, metadata_filters_to_validate = query_and_metadata_filters
 
         # Domain specific extra validity check of metadata filters
         #TODO: the following checks are not generic and shouldn't be in common_tools
-        metadata_filters_to_validate = RAGPreTreatment.domain_specific_metadata_filters_validation_and_correction(metadata_filters_to_validate)
+        metadata_filters_to_validate = await RAGPreTreatment.domain_specific_metadata_filters_validation_and_correction_async(metadata_filters_to_validate)
                 
         # Generic validity check of metadata filters keys or values, and remove filters with invalid ones
-        RagFilteringMetadataHelper.validate_langchain_metadata_filters_against_metadata_descriptions(metadata_filters_to_validate, RAGPreTreatment.metadata_descriptions, does_throw_error_upon_failure= False)
+        await RagFilteringMetadataHelper.validate_langchain_metadata_filters_against_metadata_descriptions_async(metadata_filters_to_validate, RAGPreTreatment.metadata_descriptions, does_throw_error_upon_failure= False)
       
         print(f"Corrected metadata filters: '{str(metadata_filters_to_validate)}'")
         return metadata_filters_to_validate
 
     #TODO: the following checks are not generic and shouldn't be in common_tools
     @staticmethod
-    def domain_specific_metadata_filters_validation_and_correction(langchain_filters: Union[Operation, Comparison]) -> Union[Operation, Comparison, None]:
+    async def domain_specific_metadata_filters_validation_and_correction_async(langchain_filters: Union[Operation, Comparison]) -> Union[Operation, Comparison, None]:
         """
         Perform domain-specific validation and correction on LangChain filters (Operation or Comparison).
 
         :param langchain_filters: The LangChain-style filter object (Operation or Comparison).
         :return: The validated and corrected filter object, or None if all filters are invalid.
         """
-        def validate_and_correct(filter_obj):
+        async def validate_and_correct_async(filter_obj):
             if filter_obj is None:
                 return None
             elif isinstance(filter_obj, Comparison):
@@ -239,7 +240,7 @@ class RAGPreTreatment:
                     if filter_by_type_value == "formation":
                         all_trainings_names = file.get_as_json(all_dir + "all_trainings_names")
                         if filter_obj.value not in all_trainings_names:
-                            retrieved_value, retrieval_score = BM25RetrieverHelper.find_best_match_bm25(all_trainings_names, filter_obj.value)
+                            retrieved_value, retrieval_score = await BM25RetrieverHelper.find_best_match_bm25_async(all_trainings_names, filter_obj.value)
                             if retrieval_score > 0.5:
                                 print(
                                     f"No match found for metadata value: '{filter_obj.value}' in all trainings names. "
@@ -255,7 +256,7 @@ class RAGPreTreatment:
                     elif filter_by_type_value == "metier":
                         all_jobs_names = file.get_as_json(all_dir + "all_jobs_names")
                         if filter_obj.value not in all_jobs_names:
-                            retrieved_value, retrieval_score = BM25RetrieverHelper.find_best_match_bm25(all_jobs_names, filter_obj.value)
+                            retrieved_value, retrieval_score = await BM25RetrieverHelper.find_best_match_bm25_async(all_jobs_names, filter_obj.value)
                             if retrieval_score > 0.5:
                                 print(
                                     f"No match found for metadata value: '{filter_obj.value}' in all jobs names. "
@@ -275,7 +276,7 @@ class RAGPreTreatment:
             elif isinstance(filter_obj, Operation):
                 # Recursively validate and correct arguments
                 validated_arguments = [
-                    validate_and_correct(arg) for arg in filter_obj.arguments
+                    await validate_and_correct_async(arg) for arg in filter_obj.arguments
                 ]
                 # Remove None values (invalid filters)
                 validated_arguments = [arg for arg in validated_arguments if arg is not None]
@@ -291,4 +292,4 @@ class RAGPreTreatment:
                 raise ValueError(f"Unsupported filter type: {type(filter_obj)}")
 
         # Start validation and correction
-        return validate_and_correct(langchain_filters)
+        return await validate_and_correct_async(langchain_filters)

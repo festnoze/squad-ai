@@ -2,7 +2,7 @@ import asyncio
 import uuid
 import pytest
 from langchain_core.documents import Document
-from common_tools.workflows.output_name_decorator import output_name
+from common_tools.workflows.workflow_output_decorator import output_name
 from common_tools.workflows.workflow_executor import WorkflowExecutor
 
 class Test_WorkflowExecutor:
@@ -35,7 +35,7 @@ class Test_WorkflowExecutor:
     def test_execute_dict_step_with_sub_workflow(self):
         step = {'sub_workflow': ['workflow_executor_test_methods.step_two']}
         self.executor.config = {'sub_workflow': ['workflow_executor_test_methods.step_two']}
-        results = self.executor.execute_dict_step(step, [5], {})
+        results = self.executor.execute_dict_step_async(step, [5], {})
         assert results == [10]  # Assuming step_two multiplies by 2
 
     def test_execute_str_step_with_invalid_step(self):
@@ -246,20 +246,6 @@ class Test_WorkflowExecutor:
         results = self.executor.execute_workflow(steps_config, kwargs_values=kwargs)
         assert results == [9]
 
-    def test_execute_workflow_parallel_threads(self):
-        steps_config = [
-            {
-                'parallel_threads': 
-                [
-                    'workflow_executor_test_methods.step_one', 
-                    'workflow_executor_test_methods.step_three'
-                ]
-            }
-        ]
-        kwargs = {'a': 2, 'b': 3, 'd': 5}
-        results = self.executor.execute_workflow(steps_config, kwargs_values=kwargs)
-        assert results == [5, 4]
-
     def test_execute_workflow_parallel_async(self):
         steps_config = [{'parallel_async': ['workflow_executor_test_methods.step_async', 'workflow_executor_test_methods.step_three']}]
         kwargs = {'e': 3, 'd': 10}
@@ -274,19 +260,6 @@ class Test_WorkflowExecutor:
         kwargs = {'a': 2, 'b': 3}
         results = self.executor.execute_workflow(steps_config, kwargs_values=kwargs)
         assert results == [9]
-
-    def test_execute_parallel_threads(self):
-        self.executor.config = {
-            'start': {
-                'parallel_threads': [
-                    'workflow_executor_test_methods.step_one', 
-                    'workflow_executor_test_methods.step_three'
-                ]
-            }
-        }
-        kwargs = {'a': 2, 'b': 3, 'd': 5}
-        results = self.executor.execute_workflow(kwargs_values=kwargs)
-        assert results == [5, 4]
 
     def test_execute_parallel_async(self):
         self.executor.config = {
@@ -338,7 +311,7 @@ class Test_WorkflowExecutor:
         self.executor.config = {
             'sub_workflow': [
                 {
-                    'parallel_threads': 
+                    'parallel_async': 
                     [
                         'workflow_executor_test_methods.step_two', 
                         'workflow_executor_test_methods.step_three'
@@ -382,25 +355,6 @@ class Test_WorkflowExecutor:
     def test_get_function_invalid_method(self):
         with pytest.raises(AttributeError):
             self.executor.get_function('workflow_executor_test_methods.invalid_method')
-
-    def test_nested_parallel_threads(self):
-        self.executor.config = {
-            'start': {
-                'parallel_threads': [
-                    'workflow_executor_test_methods.step_one',
-                    'nested_parallel'
-                ]
-            },
-            'nested_parallel': {
-                'parallel_threads': [
-                    'workflow_executor_test_methods.step_two',
-                    'workflow_executor_test_methods.step_three'
-                ]
-            }
-        }
-        kwargs = {'a': 1, 'b': 2, 'c': 3, 'd': 8}
-        results = self.executor.execute_workflow(kwargs_values=kwargs)
-        assert results == [3, [6, 7]]
 
     def test_nested_parallel_async(self):
         self.executor.config = {

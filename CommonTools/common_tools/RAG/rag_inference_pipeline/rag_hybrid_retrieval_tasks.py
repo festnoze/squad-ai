@@ -39,7 +39,7 @@ class RAGHybridRetrieval:
         return retained_chunks
     
     @staticmethod    
-    def rag_hybrid_retrieval_langchain(rag: RagService, analysed_query: QuestionAnalysisBase, metadata_filters:Operation, include_bm25_retrieval: bool = True, include_contextual_compression: bool = False, include_semantic_retrieval: bool = True, give_score: bool = True, max_retrived_count: int = 20, bm25_ratio: float = 0.2):
+    async def rag_hybrid_retrieval_langchain_async(rag: RagService, analysed_query: QuestionAnalysisBase, metadata_filters:Operation, include_bm25_retrieval: bool = True, include_contextual_compression: bool = False, include_semantic_retrieval: bool = True, give_score: bool = True, max_retrived_count: int = 20, bm25_ratio: float = 0.2):
         if metadata_filters and not any(metadata_filters):
             metadata_filters = None
         
@@ -90,14 +90,14 @@ class RAGHybridRetrieval:
             final_retriever = ensemble_retriever
 
         try:
-            retrieved_chunks = final_retriever.invoke(QuestionAnalysisBase.get_modified_question(analysed_query))
+            retrieved_chunks = await final_retriever.ainvoke(QuestionAnalysisBase.get_modified_question(analysed_query))
         except Exception as e:
             raise e
         
         # In case no docs are retrieved, re-launch the hybrid retrieval, but without metadata filters
         if metadata_filters and (not retrieved_chunks or not any(retrieved_chunks)):
             print(f">> Hybid retrieval returns no documents. Retrying without any metadata filters.")
-            return RAGHybridRetrieval.rag_hybrid_retrieval_langchain(rag, analysed_query, None, include_bm25_retrieval, include_contextual_compression, include_semantic_retrieval, give_score, max_retrived_count, bm25_ratio)
+            return await RAGHybridRetrieval.rag_hybrid_retrieval_langchain_async(rag, analysed_query, None, include_bm25_retrieval, include_contextual_compression, include_semantic_retrieval, give_score, max_retrived_count, bm25_ratio)
 
         # Remove 'rel_ids' from metadata: useless for augmented generation and limit token usage
         for doc in retrieved_chunks:

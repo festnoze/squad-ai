@@ -50,16 +50,21 @@ class RagInferencePipeline:
     async def run_pipeline_dynamic_async(self, query: Union[str, Conversation], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None, override_workflow_available_classes:dict = None, all_chunks_output = []):
         """Run the full rag inference pipeline: use dynamic pipeline until augmented generation which is streamed async"""
         try:
-            analysed_query, retrieved_chunks = self.run_pipeline_dynamic_but_augmented_generation(query, include_bm25_retrieval, give_score, format_retrieved_docs_function, override_workflow_available_classes)
+            analysed_query, retrieved_chunks = await self.run_pipeline_dynamic_but_augmented_generation_async(query, include_bm25_retrieval, give_score, format_retrieved_docs_function, override_workflow_available_classes)
         except EndPipelineException as ex:
             yield ex.message
             return
+        except Exception as ex:
+            yield str(ex)
+            return
+        
         augmented_generation_class = self.get_available_classes(override_workflow_available_classes)['RAGAugmentedGeneration']
+
         async for chunk in augmented_generation_class.rag_augmented_answer_generation_streaming_async(self.rag, query, retrieved_chunks[0], analysed_query, format_retrieved_docs_function):
             all_chunks_output.append(chunk)
             yield chunk
             
-    def run_pipeline_dynamic_but_augmented_generation(self, query: Union[str, Conversation], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None, override_workflow_available_classes:dict = None):
+    async def run_pipeline_dynamic_but_augmented_generation_async(self, query: Union[str, Conversation], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None, override_workflow_available_classes:dict = None):
         config = Ressource.get_rag_pipeline_default_config_wo_AG_for_streaming()
         workflow_available_classes = self.get_available_classes(override_workflow_available_classes)
         
@@ -73,9 +78,11 @@ class RagInferencePipeline:
             'format_retrieved_docs_function': format_retrieved_docs_function
         }
         try:
-            guardrails_result, retrieved_chunks = workflow_executor.execute_workflow(kwargs_values=kwargs_values)
+            guardrails_result, retrieved_chunks = await workflow_executor.execute_workflow_async(kwargs_values=kwargs_values)
         except EndPipelineException as ex:
             raise ex
+        except Exception as ex:
+            raise Exception(f"Error in the workflow: {str(ex)}")
 
         self.check_for_guardrails(guardrails_result[0])
         analysed_query = kwargs_values['analysed_query']
@@ -127,7 +134,7 @@ class RagInferencePipeline:
         analysed_query, metadata = RAGPreTreatment.rag_static_pre_treatment(self.rag, query, self.default_filters)
 
         # Data Retrieval
-        retrieved_chunks = RAGHybridRetrieval.rag_hybrid_retrieval_langchain(self.rag, query, metadata, include_bm25_retrieval, True, give_score)
+        retrieved_chunks = RAGHybridRetrieval.rag_hybrid_retrieval_langchain_async(self.rag, query, metadata, include_bm25_retrieval, True, give_score)
 
         # Augmented Answer Generation
         async for chunk in RAGAugmentedGeneration.rag_augmented_answer_generation_streaming_async(self.rag, query, retrieved_chunks, analysed_query, format_retrieved_docs_function):
