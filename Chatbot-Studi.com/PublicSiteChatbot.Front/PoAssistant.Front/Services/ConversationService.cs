@@ -32,6 +32,7 @@ public class ConversationService : IConversationService
             conversation = new ConversationModel();
             conversation.AddMessage(MessageModel.AiRole, startMessage, 0, true, false);
             conversation.AddMessage(MessageModel.UserRole, string.Empty, 0, false, false);
+            _isExchangesLoaded = true;
             isWaitingForLLM = false;
         }
     }
@@ -54,22 +55,21 @@ public class ConversationService : IConversationService
 
     public bool IsWaitingForLLM() => isWaitingForLLM;
 
-    public async Task InvokeRagApiOnUserQueryAsync(string modifiedMessageContent)
+    public async Task InvokeRagApiOnUserQueryAsync(ConversationModel conversation)
     {
         if (!conversation?.Any() ?? true)
             return;
 
-        var lastMessage = conversation!.Last();
-        if (!string.IsNullOrWhiteSpace(modifiedMessageContent))
-            lastMessage.Content = modifiedMessageContent;
-        lastMessage.IsSavedMessage = true;
+        conversation!.Last().Content = conversation!.Last().Content.Trim();
+        if (string.IsNullOrWhiteSpace(conversation!.Last().Content))
+            return;
+        conversation!.Last().IsSavedMessage = true;
         //SaveConversation();
 
         var conversationRequestModel = conversation!.ToRequestModel();
         try
         {
-            this.AddNewMessage();
-            OnConversationChanged?.Invoke();
+            this.AddNewMessage(isSaved: false, isStreaming: true);
 
             await foreach (var chunk in this._chatbotApiClient.GetQueryRagAnswerStreamingAsync(conversationRequestModel))
             {
@@ -77,18 +77,11 @@ public class ConversationService : IConversationService
             }
 
             this.EndsStreamMessage();
-
             this.AddNewMessage(isSaved: false, isStreaming: false);
-
         }
         catch (Exception e)
         {
             this.NotifyForApiCommunicationError(e.Message);
-        }
-        finally
-        {
-            isWaitingForLLM = false;
-            OnConversationChanged?.Invoke();
         }
     }
 
@@ -104,14 +97,15 @@ public class ConversationService : IConversationService
         if (conversation is null)
             conversation = new ConversationModel();
 
-        var role = "Métier";
-        if (conversation?.Any() ?? false)
-            role = conversation.Last().IsFromAI ? MessageModel.UserRole : MessageModel.AiRole;
-        var newMessage = new MessageModel(role, string.Empty, -1, isSaved, isStreaming);
+        if (!conversation?.Any() ?? true)
+            throw new Exception($"{nameof(AddNewMessage)} cannot be used on a null or empty conversation.");
 
+        var role = conversation!.Last().IsFromAI ? MessageModel.UserRole : MessageModel.AiRole;
+        var newMessage = new MessageModel(role, string.Empty, -1, isSaved, isStreaming);
         conversation!.AddMessage(newMessage);
 
-        isWaitingForLLM = true;
+        isWaitingForLLM = isStreaming;
+        OnConversationChanged?.Invoke();
     }
 
     public void DisplayStreamMessage(string? messageChunk)
@@ -128,7 +122,6 @@ public class ConversationService : IConversationService
     public void EndsStreamMessage()
     {
         conversation!.Last().IsStreaming = false;
-
         conversation!.Last().IsSavedMessage = true;
     }
 
@@ -155,7 +148,7 @@ public class ConversationService : IConversationService
     public void DeleteCurrentConversation()
     {
         _isExchangesLoaded = false;
-        conversation = new ConversationModel();
+        conversation = null;
         InitializeConversation();
         OnConversationChanged?.Invoke();
     }

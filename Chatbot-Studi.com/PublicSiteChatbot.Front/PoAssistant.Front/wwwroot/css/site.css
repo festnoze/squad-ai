@@ -10,8 +10,9 @@ html, body {
 
 /* Container for chat and input */
 .chat-wrapper {
-    max-width: none; /* Allowing the container to expand */
-    min-width: 450px;
+    max-width: 700px;
+    /*max-width: none;  Allowing the container to expand */
+    min-width: 350px;
     resize: horizontal; /* Make the container resizable */
     overflow: auto;
     border: 1px solid #d3d3d3;
@@ -26,6 +27,7 @@ html, body {
 .chat-container {
     width: auto;
     padding: 10px;
+    margin: 10px;
     display: flex;
     flex-direction: column;
     overflow-y: auto;
@@ -34,27 +36,26 @@ html, body {
 }
 
 .message-source-sender {
-    font-size: 0.85em;
-    width: 80%;
+    font-size: 0.75em;
     margin-left: 15px;
     color: #6495ED;
     align-self: flex-start; /* Align to the left */
 }
 
 .message-source-receiver {
-    font-size: 0.85em;
-    width: 80%;
+    font-size: 0.75em;
     margin-right: 15px;
-    color: #7E74FD;
+    color: #6459EE;
     align-self: flex-end; /* Align to the right */
 }
+
 .message-bubble {
     position: relative;
     width: 80%;
-    margin-bottom: 25px;
+    margin-bottom: 15px;
     margin-left: 15px;
     margin-right: 15px;
-    padding: 15px;
+    padding: 12px 20px;
     color: #333;
     border-radius: 10px;
     box-shadow: 0 12px 15px rgba(100, 100, 100, 0.3);
@@ -64,7 +65,7 @@ html, body {
 
 /* Sender's message bubble */
 .message-sender {
-    background-color: #edf7fb;
+    background-color: #f0f7fb;
     align-self: flex-start; /* Align to the left */
 }
 
@@ -104,13 +105,13 @@ html, body {
     font-family: "Mulish", sans-serif;
     font-weight: 400;
     outline: none; /* Remove the default focus outline */
+    overflow-y: auto;
 }
 
 .message-editable:focus {
     box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25); /* Optional: Add a subtle focus outline */
     background-color: white;
-    overflow-y: hidden; /* Cache la scrollbar verticale */
-    /*height: auto;*/
+    overflow-y: auto;
 }
 
 .input-area {
@@ -131,6 +132,21 @@ html, body {
     background-color: #fff; /* Fond blanc */
     font-family: inherit; /* Utilise la même police que le reste de l'application */
     margin-bottom: 10px; /* Espacement avec le bouton envoyer */
+}
+
+.bottom-input-message {
+    position: relative;
+    margin-bottom: 15px;
+    margin-left: 15px;
+    margin-right: 15px;
+    padding: 12px 20px;
+    color: #333;
+    border-radius: 10px;
+    box-shadow: 0 12px 15px rgba(100, 100, 100, 0.3);
+    text-align: justify;
+    white-space: pre-wrap;
+    overflow-y: hidden;
+    overscroll-behavior-y: auto
 }
 
 .send-button {
@@ -230,11 +246,11 @@ html, body {
         transform: translateY(4px); /* Slight push down */
     }
 
-.next-button {
-    position: absolute;
-    right: 0px;
-    bottom: 2px;
-    background-color: #48b13c;
+.send-message-button {
+    position: relative;
+    right: -10px;
+    bottom: -10px;
+    background-color: #47C239;
     border: none; /* Remove borders */
     color: white; /* White text */
     padding: 6px 20px;
@@ -250,12 +266,12 @@ html, body {
     cursor: pointer; /* Change mouse pointer on hover */
 }
 
-    .next-button:hover {
-        background-color: #178734; /* Darker shade of green */
+    .send-message-button:hover {
+        background-color: #119C35; /* Darker shade of green */
         box-shadow: 0 10px 40px 0 rgba(0,0,0,0.24), 0 17px 50px 0 rgba(0,0,0,0.22); /* Deeper shadow on hover */
     }
 
-    .next-button:active {
+    .send-message-button:active {
         background-color: #3e8e41;
         box-shadow: 0 5px #666;
         transform: translateY(4px); /* Slight push down */
@@ -371,10 +387,9 @@ html, body {
     animation: fadeOut 4s ease-out forwards;
 }
 
-.nav-link-po {
-    height:50px;
-    padding: 10px;
-}
+
+
+
 
 h1:focus {
     outline: none;

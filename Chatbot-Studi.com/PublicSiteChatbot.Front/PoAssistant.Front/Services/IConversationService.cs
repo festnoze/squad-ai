@@ -13,7 +13,7 @@ public interface IConversationService : IDisposable
     void DisplayStreamMessage(string? messageChunk);
     void EndsStreamMessage();
     ConversationModel GetConversation();
-    Task InvokeRagApiOnUserQueryAsync(string modifiedMessageContent);
+    Task InvokeRagApiOnUserQueryAsync(ConversationModel conversation);
     bool IsLastMessageEditable();
     bool IsWaitingForLLM();
     void LoadConversationByName(string exchangeNameTruncated, bool truncatedExchangeName = false);

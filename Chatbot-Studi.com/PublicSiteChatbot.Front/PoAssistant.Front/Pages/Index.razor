@@ -23,103 +23,131 @@
         @if (messages != null)
         @foreach (var message in messages)
         {
-            @* Display message bubble header *@
-            <div class="@($"{(message.IsFromAI ? "message-source-sender" : "message-source-receiver")}")">
-                @message.Role
-                @if (message.DurationSeconds > 0)
-                {
-                    <span class="duration-text">(@message.DurationSeconds s.)</span>
-                }
-                else if (message.DurationSeconds == -1)
-                {
-                    <span class="duration-text">[...]</span>
-                }
-            </div>
-            
-            @* Display message bubble & its content *@
-            <div class="@($"message-bubble {(message.IsFromAI ? "message-sender" : "message-receiver")}")" style="@(DisplayEditingButtons(message) ? "padding-bottom: 35px;" : "")">
-                @if (!IsEditingMode(message))
-                {
-                    @* Display message for reading *@
-                    @message.Content
-
-                    @if (DisplayEditingButtons(message))
+            @if (!(showBottomInputMessage && message.IsLastConversationMessage && !showOngoingMessageInConversation))
+            {
+                @* Header of messages bubbles *@
+                <div class="@($"{(message.IsFromAI ? "message-source-sender" : "message-source-receiver")}")">
+                    @message.Role
+                    @if (message.DurationSeconds > 0)
                     {
-                        @* Display reading actions buttons*@
-                        <div class="edit-button-wrapper">
-                                <button title="Valider la réponse" @onclick="() => SendMessage()" class="next-button"><span class="oi oi-arrow-right"></span></button>
-                            @* <button title="Modifier la réponse" @onclick="() => EditLastMessage()" class="edit-button"><span class="oi oi-pencil"></span></button>
-
-                            @if (!message.IsEndMessage)
-                            {
-                                <button title="Valider la réponse" @onclick="() => SendMessage()" class="next-button"><span class="oi oi-arrow-right"></span></button>
-                            }
-                            else
-                            {
-                                <button title="Terminer l'échange" @onclick="() => DoEndConversation()" class="end-exchange-button"><span class="oi oi-account-login"></span></button>
-                            } *@
-                        </div>
+                        <span class="duration-text">(@message.DurationSeconds s.)</span>
                     }
-                }
-                @if (DisplayLoader(message))
-                {
-                    <div class="loader">
-                        <div class="circle"></div>
-                        <div class="circle"></div>
-                        <div class="circle"></div>
-                        <div class="circle"></div>
-                        <div class="circle"></div>
-                    </div>
-                }
-                @if (IsEditingMode(message))
-                {
-                    @* Display message for editing *@
-                    <textarea id="editingMessageTextarea"
-                                @onblur="HandleEditMessageExit"
-                                @onkeydown="HandleEditMessageKeyDown"
-                                class="message-editable"
-                                placeholder="Ecrivez votre question ici ...">
-                                  @message.Content
-                    </textarea>
+                    else if (message.DurationSeconds == -1)
+                    {
+                        <span class="duration-text">[...]</span>
+                    }
+                </div>
 
-                    @* Display editing actions buttons *@
-                    <div class="edit-button-wrapper">
-                        <button title="Valider la réponse" @onclick="() => SendMessage()" class="next-button">
-                            <span class="oi oi-check"></span>
-                        </button>
-                    </div>
-                }
-            </div>
+                @* Messages bubbles & contents *@
+                <div class="@($"message-bubble {(message.IsFromAI ? "message-sender" : "message-receiver")}")" style="@(DisplayEditingButtons(message) ? "padding-bottom: 35px;" : "")">
+                    @if (!IsEditableLastMessage(message) || showBottomInputMessage)
+                    {
+                        @message.Content
+                    }
+                    else
+                    {
+                        @* Display message for editing *@
+                        <textarea id="editingMessageTextarea"
+                                    @onblur="RetrieveInputTextAreaValue"
+                                    @onkeydown="HandleEditMessageKeyDown"
+                                    class="message-editable"
+                                    placeholder="Ecrivez votre question ici ...">
+                                        @message.Content
+                        </textarea>
+
+                        @* Display editing actions buttons *@
+                        @if (DisplayEditingButtons(message))
+                        {
+                            <div class="edit-button-wrapper">
+                                <button title="Valider la réponse" @onclick="() => SendMessage()" class="send-message-button">
+                                    <span class="oi oi-arrow-right"></span>
+                                </button>
+                            </div>
+                        }                        
+                    }
+                </div>
+            }
         }
     </div> 
-    @if (showMessageEmptyError)
+
+    @* Display the user input textArea at the window bottom *@
+    @if (showBottomInputMessage)
     {
-        <div class="notification">
-            <span class="oi oi-task" aria-hidden="true"></span>
-            <span>Impossible d'envoyer un message vide</span>
-        </div>
-    }
-    @if (showApiCommunicationErrorNotification)
-    {
-        <div class="api-communication-error">
-            <span class="oi oi-circle-x" aria-hidden="true"></span>
-            <span>Erreur de communication avec l'API du chatbot</span>
-            <span class="close-btn" @onclick="() => showApiCommunicationErrorNotification = false">&times;</span>
+        <div class="input-area">
+            <div>
+                <button title="Options" @onclick="() => SendMessage()" class="send-message-button">
+                    <span class="oi oi-check"></span>
+                </button>
+            </div>
+            <div>
+                <textarea id="editingMessageTextarea"
+                            @onblur="RetrieveInputTextAreaValue"
+                            @onkeydown="HandleEditMessageKeyDown"
+                            class="message-editable"
+                            placeholder="Ecrivez votre question ici ..."
+                            disabled="@(messages!.Last().IsSavedMessage)">
+                    @if (messages!.Last().IsFromUser && !messages!.Last().IsSavedMessage)
+                    {
+                        @messages!.Last().Content
+                    }
+                    else
+                    {
+                    }
+                </textarea>
+
+                @* Display editing actions buttons *@
+                <div class="edit-button-wrapper">
+                    <button title="Valider la réponse 22" @onclick="() => SendMessage()" class="send-message-button">
+                        <span class="oi oi-arrow-right"></span>
+                    </button>
+                </div>
+            </div>
         </div>
     }
 </div>
+@if (showMessageEmptyError)
+{
+    <div class="notification">
+        <span class="oi oi-task" aria-hidden="true"></span>
+        <span>Impossible d'envoyer un message vide</span>
+    </div>
+}
+@if (showApiCommunicationErrorNotification)
+{
+    <div class="api-communication-error">
+        <span class="oi oi-circle-x" aria-hidden="true"></span>
+        <span>Erreur de communication avec l'API du chatbot</span>
+        <span class="close-btn" @onclick="() => showApiCommunicationErrorNotification = false">&times;</span>
+    </div>
+}
 
 <body>
 </body>
 
 <script>
-    function getTextareaValue(id) {
-        var element = document.getElementById(id);
+    function getElementValue(elementId) {
+        var element = document.getElementById(elementId);
         if (!element) {
-            console.error(`Element with id "${id}" not found in DOM.`);
+            console.error(`Element with id "${elementId}" were not found in DOM.`);
             return "";
         }
         return element.value;
+    }
+    function setElementValue(elementId, value) {
+        const element = document.getElementById(elementId);
+        if (!element) {
+            console.error(`Element with id "${elementId}" were not found in DOM.`);
+            return;
+        }
+        element.value = value;
+    }
+    function setDisabledValueToElement(elementId, disabledValue) {
+        const element = document.getElementById(elementId);
+        if (!element) {
+            console.error(`Element with id "${elementId}" were not found in DOM.`);
+            return;
+        }
+        element.disabled = disabledValue;
     }
     function autoResizeTextarea(id) {
         var textarea = document.getElementById(id);
@@ -142,152 +170,3 @@
         }
     };
 </script>
-
-@code {
-    private string? userName = null;
-    private ConversationModel messages = null!;
-    private ElementReference textAreaElement;
-    private bool isWaitingForLLM = true;
-    private bool isLastMessageEditable => conversationService.IsLastMessageEditable();
-    private bool showMessageEmptyError = false; 
-    private bool showApiCommunicationErrorNotification = false;
-    public string modifiedMessageContent = string.Empty;
-    private Modal modal { get; set; } = new Modal();
-    private bool IsLoginModalVisible { get; set; } 
-
-    protected override async Task OnInitializedAsync()
-    {
-        messages = conversationService.GetConversation();
-        isWaitingForLLM = conversationService.IsWaitingForLLM();
-        conversationService.OnConversationChanged += ReloadConversation;
-        conversationService.ApiCommunicationErrorNotification += HandleApiCommunicationErrorNotification;
-    }
-
-    private async Task LoginModalIsVisibleChangedAsync(bool isVisible)
-    {
-        IsLoginModalVisible = isVisible;
-        await InvokeAsync(StateHasChanged);
-    }
-
-    private async Task HandleEditMessageExit()
-    {
-        modifiedMessageContent = await JSRuntime.InvokeAsync<string>("getTextareaValue", "editingMessageTextarea");
-    }
-
-    private async Task HandleEditMessageKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key == "Enter" && !e.CtrlKey && !e.ShiftKey)
-        {
-            // Prevent default behavior to avoid adding a newline
-            await JSRuntime.InvokeVoidAsync("event.preventDefault");
-            modifiedMessageContent = await JSRuntime.InvokeAsync<string>("getTextareaValue", "editingMessageTextarea");
-            await SendMessage();
-        }
-        // else if (e.Key == "Enter" && e.CtrlKey)
-        // {
-        //     // Enter + Ctrl add a new line
-        //     modifiedMessageContent = await JSRuntime.InvokeAsync<string>("getTextareaValue", "editingMessageTextarea") + "\n";
-        // }
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            await AutosizeEditingTextAreaAsync();
-        }
-
-        // Desactivated Login
-        IsLoginModalVisible = false;
-        // if (!IsLoginModalVisible)
-        // {
-        //     userName = await JSRuntime.InvokeAsync<string>("blazorExtensions.ReadStorage", "userName");
-        //     conversationService.SetCurrentUser(userName);
-        //     var authState = await authenticationStateProvider.GetAuthenticationStateAsync(userName);
-        //     if (!authState.User.Identity!.IsAuthenticated)
-        //     {
-        //         IsLoginModalVisible = true;
-        //         await InvokeAsync(StateHasChanged);
-        //     }
-        // }
-
-        await base.OnAfterRenderAsync(firstRender);
-    }
-
-    private async Task AutosizeEditingTextAreaAsync()
-    {
-        await JSRuntime.InvokeVoidAsync("autoResizeTextarea", "editingMessageTextarea");
-    }
-
-    private bool DisplayEditingButtons(MessageModel message)
-    {
-        return !isLastMessageEditable && !isWaitingForLLM && message.IsLastConversationMessage && !message.IsSavedMessage;
-    }
-
-    private bool DisplayLoader(MessageModel message)
-    {
-        return !isLastMessageEditable && isWaitingForLLM && message.IsStreaming;
-    }
-
-    private bool IsEditingMode(MessageModel message)
-    {
-        return isLastMessageEditable && message.IsLastConversationMessage;
-    }
-
-    // private async Task EditLastMessage()
-    // {
-    //     // Notify the component to re-render
-    //     await AutosizeEditingTextAreaAsync();
-    //     await InvokeAsync(StateHasChanged);
-
-    //     await AutosizeEditingTextAreaAsync();
-    //     await InvokeAsync(StateHasChanged);
-    // }
-
-    private void ShowMessageEmptyError()
-    {
-        showMessageEmptyError = true;
-        var task = Task.Delay(8000).ContinueWith(t => { 
-            showMessageEmptyError = false; 
-            InvokeAsync(StateHasChanged); 
-        });
-    }
-
-    private async Task SendMessage()
-    {
-        if (isLastMessageEditable && string.IsNullOrEmpty(modifiedMessageContent))
-        {
-            ShowMessageEmptyError();
-            return;
-        }
-
-        isWaitingForLLM = true;
-        await conversationService.InvokeRagApiOnUserQueryAsync(modifiedMessageContent);
-        modifiedMessageContent = string.Empty;
-        await InvokeAsync(StateHasChanged);
-    }
-
-    private async void ReloadConversation()
-    {
-        messages = conversationService.GetConversation();
-        isWaitingForLLM = conversationService.IsWaitingForLLM();
-        await InvokeAsync(StateHasChanged);
-    }
-
-    private async void HandleApiCommunicationErrorNotification()
-    {
-        showApiCommunicationErrorNotification = true;
-        await InvokeAsync(StateHasChanged);
-
-        await Task.Delay(5000);
-
-        showApiCommunicationErrorNotification = false;
-        await InvokeAsync(StateHasChanged);
-    }
-
-    public void Dispose()
-    {
-        conversationService.OnConversationChanged -= ReloadConversation; 
-        conversationService.ApiCommunicationErrorNotification -= HandleApiCommunicationErrorNotification;
-    }
-}
