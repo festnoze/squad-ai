@@ -10,11 +10,12 @@ public partial class Index : ComponentBase
     private string? userName = null;
     private ConversationModel messages = null!;
     private string newMessageContent = string.Empty;
+    private bool disableConversationModification = false;
     private ElementReference textAreaElement;
     private bool isWaitingForLLM = true;
     private bool isLastMessageEditable => conversationService.IsLastMessageEditable();
     private bool showBottomInputMessage = true;
-    private bool showOngoingMessageInConversation = false;
+    private bool showOngoingMessageInConversation = true;
     private bool isMenuOpen = false;
     private bool showMessageEmptyError = false;
     private bool showApiCommunicationErrorNotification = false;
@@ -37,18 +38,23 @@ public partial class Index : ComponentBase
 
     private async Task RetrieveInputTextAreaValueAsync()
     {
-        messages!.Last().Content = await JSRuntime.InvokeAsync<string>("getElementValue", "editingMessageTextarea");
+        if (!disableConversationModification)
+        {
+            messages!.Last().Content = await JSRuntime.InvokeAsync<string>("getElementValue", "editingMessageTextarea");
+        }
     }
 
     private async Task EmptyAndDisableInputTextAreaAsync()
     {
         await JSRuntime.InvokeAsync<string>("setElementValue", "editingMessageTextarea", "");
         await JSRuntime.InvokeAsync<string>("setDisabledValueToElement", "editingMessageTextarea", true);
+        await JSRuntime.InvokeAsync<string>("setDisabledValueToElement", "sendEditingMessageButton", true);
     }
 
     private async Task EnableInputTextAreaAsync()
     {
-        await JSRuntime.InvokeAsync<string>("setDisabledValueToElement", "editingMessageTextarea", false);        
+        await JSRuntime.InvokeAsync<string>("setDisabledValueToElement", "editingMessageTextarea", false);  
+        await JSRuntime.InvokeAsync<string>("setDisabledValueToElement", "sendEditingMessageButton", false);        
     }
 
     private async Task HandleEditMessageKeyDown(KeyboardEventArgs e)
@@ -127,6 +133,7 @@ public partial class Index : ComponentBase
     private async Task SendMessage()
     {
         await RetrieveInputTextAreaValueAsync();
+        disableConversationModification = true;
         messages!.Last().Content = messages!.Last().Content.Trim();
         if (isLastMessageEditable && string.IsNullOrEmpty(messages!.Last().Content))
         {
@@ -140,6 +147,7 @@ public partial class Index : ComponentBase
         await conversationService.InvokeRagApiOnUserQueryAsync(messages!);
 
         await EnableInputTextAreaAsync();
+        disableConversationModification = false;
         await InvokeAsync(StateHasChanged);
     }
 

@@ -94,8 +94,8 @@ html, body {
 }
 
 .message-editable {
-    width: 100%; /* Full width of the bubble */
-    /*height: auto;*/ /* Adjust height based on content */
+    width: 100%;
+    margin-right: 10px;
     border: none; /* Remove border */
     padding: 10px; /* Same padding as the bubble for internal spacing */
     border-radius: 10px; /* Match the bubble's border radius */
@@ -115,9 +115,9 @@ html, body {
 }
 
 .input-area {
-    display: flex;
-    flex-direction: column;
     padding: 10px;
+    position: relative; /* Ensure positioning context for the button */
+    width: 100%;
 }
 
 .input-text {
@@ -149,21 +149,52 @@ html, body {
     overscroll-behavior-y: auto
 }
 
-.send-button {
-    width: 100%; /* Prend toute la largeur */
-    padding: 10px 0; /* Padding vertical pour agrandir le bouton */
-    border-radius: 15px; /* Bords arrondis */
-    border: none; /* Pas de bordure */
-    background-color: cornflowerblue; /* Couleur de fond */
-    color: white; /* Couleur du texte */
-    cursor: pointer; /* Change le curseur */
-    font-size: 16px; /* Taille du texte */
+.send-message-button {
+    background-color: #47C239;
+    border: none;
+    color: white;
+    padding: 6px 20px;
+    font-size: 16px;
+    border-radius: 18px;
+    box-shadow: 0 8px 16px 0 rgba(0, 0, 0, 0.2);
+    cursor: pointer;
+    transition: background-color 0.3s, box-shadow 0.3s;
 }
 
-.send-button:disabled {
-    background-color: #cccccc; /* Couleur de fond lorsque désactivé */
-    cursor: not-allowed; /* Change le curseur */
+    .send-message-button:hover {
+        background-color: #119C35;
+        box-shadow: 0 10px 40px 0 rgba(0, 0, 0, 0.24), 0 17px 50px 0 rgba(0, 0, 0, 0.22);
+    }
+
+    .send-message-button:active {
+        background-color: #3e8e41;
+        box-shadow: 0 5px #666;
+        transform: translateY(4px); /* Slight push down */
+    }
+
+
+.send-button-wrapper {
+    position: absolute;
+    bottom: 0px; 
+    right: 8px; 
+    z-index: 2;
 }
+
+/*.send-button {
+    width: 100%;*/ /* Prend toute la largeur */
+    /*padding: 10px 0;*/ /* Padding vertical pour agrandir le bouton */
+    /*border-radius: 15px;*/ /* Bords arrondis */
+    /*border: none;*/ /* Pas de bordure */
+    /*background-color: cornflowerblue;*/ /* Couleur de fond */
+    /*color: white;*/ /* Couleur du texte */
+    /*cursor: pointer;*/ /* Change le curseur */
+    /*font-size: 16px;*/ /* Taille du texte */
+/*}
+
+.send-button:disabled {
+    background-color: #cccccc;*/ /* Couleur de fond lorsque désactivé */
+    /*cursor: not-allowed;*/ /* Change le curseur */
+/*}*/
 
 .loader {
     display: flex;
@@ -208,101 +239,6 @@ html, body {
         transform: scale(1.0);
     }
 }
-
-.edit-button-wrapper {
-    position: absolute;
-    right: 0px;
-    bottom: 0px;
-}
-
-.edit-button {
-    position: absolute;
-    right: 64px;
-    bottom: 2px;
-    background-color: #ffcc40;
-    border: none; /* Remove borders */
-    color: white; /* White text */
-    padding: 6px 20px;
-    margin-left: auto; /* Pushes the button to the right */
-    text-align: center; /* Centered text */
-    text-decoration: none; /* No underline */
-    display: inline-block; /* Allow it to be inline with other elements */
-    font-size: 16px; /* Set font-size */
-    margin: 6px 4px;
-    transition: 0.8s; /* 300ms transition effect on hover */
-    border-radius: 18px; /* Rounded corners */
-    box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2); /* Add a shadow effect */
-    cursor: pointer; /* Change mouse pointer on hover */
-}
-
-    .edit-button:hover {
-        background-color: #ffa13a; 
-        box-shadow: 0 10px 40px 0 rgba(0,0,0,0.24), 0 17px 50px 0 rgba(0,0,0,0.22); /* Deeper shadow on hover */
-    }
-
-    .edit-button:active {
-        background-color: #3e8e41;
-        box-shadow: 0 5px #666;
-        transform: translateY(4px); /* Slight push down */
-    }
-
-.send-message-button {
-    position: relative;
-    right: -10px;
-    bottom: -10px;
-    background-color: #47C239;
-    border: none; /* Remove borders */
-    color: white; /* White text */
-    padding: 6px 20px;
-    margin-left: auto; /* Pushes the button to the right */
-    text-align: center; /* Centered text */
-    text-decoration: none; /* No underline */
-    display: inline-block; /* Allow it to be inline with other elements */
-    font-size: 16px; /* Set font-size */
-    margin: 6px 4px;
-    transition: 0.8s; /* 300ms transition effect on hover */
-    border-radius: 18px; /* Rounded corners */
-    box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2); /* Add a shadow effect */
-    cursor: pointer; /* Change mouse pointer on hover */
-}
-
-    .send-message-button:hover {
-        background-color: #119C35; /* Darker shade of green */
-        box-shadow: 0 10px 40px 0 rgba(0,0,0,0.24), 0 17px 50px 0 rgba(0,0,0,0.22); /* Deeper shadow on hover */
-    }
-
-    .send-message-button:active {
-        background-color: #3e8e41;
-        box-shadow: 0 5px #666;
-        transform: translateY(4px); /* Slight push down */
-    }
-
-
-.end-exchange-button {
-    position: absolute;
-    right: 0px;
-    bottom: 2px;
-    background-color: #ff6961;
-    border: none;
-    color: white;
-    padding: 6px 20px;
-    margin-left: auto;
-    text-align: center;
-    text-decoration: none;
-    display: inline-block;
-    font-size: 16px;
-    margin: 6px 4px;
-    transition: 0.8s;
-    border-radius: 18px;
-    box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2);
-    cursor: pointer;
-}
-
-    .end-exchange-button:hover {
-        background-color: #ff3d33; /* Darker shade of green */
-        box-shadow: 0 10px 40px 0 rgba(0,0,0,0.24), 0 17px 50px 0 rgba(0,0,0,0.22); /* Deeper shadow on hover */
-    }
-
 
 .notification {
     position: fixed;

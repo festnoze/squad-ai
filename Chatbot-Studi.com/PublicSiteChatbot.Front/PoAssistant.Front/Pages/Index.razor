@@ -23,9 +23,10 @@
         @if (messages != null)
         @foreach (var message in messages)
         {
-            @if (!(showBottomInputMessage && message.IsLastConversationMessage && !showOngoingMessageInConversation))
+            @* Display all messages (but the last one if ongoing message under edition is handled in the bottom textarea) *@
+            @if (!(message.IsLastConversationMessage && !showOngoingMessageInConversation && showBottomInputMessage))
             {
-                @* Header of messages bubbles *@
+                @* Messages headers *@
                 <div class="@($"{(message.IsFromAI ? "message-source-sender" : "message-source-receiver")}")">
                     @message.Role
                     @if (message.DurationSeconds > 0)
@@ -42,11 +43,12 @@
                 <div class="@($"message-bubble {(message.IsFromAI ? "message-sender" : "message-receiver")}")" style="@(DisplayEditingButtons(message) ? "padding-bottom: 35px;" : "")">
                     @if (!IsEditableLastMessage(message) || showBottomInputMessage)
                     {
+                        @* Display regular messages (non editable) *@
                         @message.Content
                     }
                     else
                     {
-                        @* Display message for editing *@
+                        @* Display editing message *@
                         <textarea id="editingMessageTextarea"
                                     @onblur="RetrieveInputTextAreaValueAsync"
                                     @onkeydown="HandleEditMessageKeyDown"
@@ -55,12 +57,12 @@
                                         @newMessageContent
                         </textarea>
 
-                        @* Display editing actions buttons *@
+                        @* Display actions buttons *@
                         @if (DisplayEditingButtons(message))
                         {
-                            <div class="edit-button-wrapper">
+                            <div class="send-button-wrapper">
                                 <button title="Valider la réponse" @onclick="() => SendMessage()" class="send-message-button">
-                                    <span class="oi oi-arrow-right"></span>
+                                    <span class="oi oi-check"></span>
                                 </button>
                             </div>
                         }                        
@@ -84,33 +86,29 @@
     @if (showBottomInputMessage)
     {
         <div class="input-area">
-            <div>
+            @* <div>
                 <button title="Options" @onclick="() => SendMessage()" class="send-message-button">
                     <span class="oi oi-check"></span>
                 </button>
-            </div>
-            <div>
-                <textarea id="editingMessageTextarea"
-                            @onblur="RetrieveInputTextAreaValueAsync"
-                            @onkeydown="HandleEditMessageKeyDown"
-                            class="message-editable"
-                            placeholder="Ecrivez votre question ici ..."
-                            disabled="@(messages!.Last().IsSavedMessage)">
-                    @if (messages!.Last().IsFromUser && !messages!.Last().IsSavedMessage)
-                    {
-                        @messages!.Last().Content
-                    }
-                    else
-                    {
-                    }
-                </textarea>
-
-                @* Display editing actions buttons *@
-                <div class="edit-button-wrapper">
-                    <button title="Valider la réponse 22" @onclick="() => SendMessage()" class="send-message-button">
-                        <span class="oi oi-arrow-right"></span>
-                    </button>
-                </div>
+            </div> *@
+            <textarea id="editingMessageTextarea"
+                        @onblur="RetrieveInputTextAreaValueAsync"
+                        @onkeydown="HandleEditMessageKeyDown"
+                        class="message-editable"
+                        placeholder="Ecrivez votre question ici ..."
+                        disabled="@(messages!.Last().IsSavedMessage)">
+                @if (messages!.Last().IsFromUser && !messages!.Last().IsSavedMessage)
+                {
+                    @messages!.Last().Content
+                }
+                else
+                {
+                }
+            </textarea>
+            <div class="send-button-wrapper">
+                <button id="sendEditingMessageButton" title="Valider la question" @onclick="() => SendMessage()" class="send-message-button">
+                    <span class="oi oi-arrow-right"></span>
+                </button>
             </div>
         </div>
     }
