@@ -48,11 +48,11 @@
                     {
                         @* Display message for editing *@
                         <textarea id="editingMessageTextarea"
-                                    @onblur="RetrieveInputTextAreaValue"
+                                    @onblur="RetrieveInputTextAreaValueAsync"
                                     @onkeydown="HandleEditMessageKeyDown"
                                     class="message-editable"
                                     placeholder="Ecrivez votre question ici ...">
-                                        @message.Content
+                                        @newMessageContent
                         </textarea>
 
                         @* Display editing actions buttons *@
@@ -64,6 +64,16 @@
                                 </button>
                             </div>
                         }                        
+                    }
+                    @if (DisplayLoader(message))
+                    {
+                        <div class="loader">
+                            <div class="circle"></div>
+                            <div class="circle"></div>
+                            <div class="circle"></div>
+                            <div class="circle"></div>
+                            <div class="circle"></div>
+                        </div>
                     }
                 </div>
             }
@@ -81,7 +91,7 @@
             </div>
             <div>
                 <textarea id="editingMessageTextarea"
-                            @onblur="RetrieveInputTextAreaValue"
+                            @onblur="RetrieveInputTextAreaValueAsync"
                             @onkeydown="HandleEditMessageKeyDown"
                             class="message-editable"
                             placeholder="Ecrivez votre question ici ..."

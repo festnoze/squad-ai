@@ -9,6 +9,7 @@ public partial class Index : ComponentBase
 {
     private string? userName = null;
     private ConversationModel messages = null!;
+    private string newMessageContent = string.Empty;
     private ElementReference textAreaElement;
     private bool isWaitingForLLM = true;
     private bool isLastMessageEditable => conversationService.IsLastMessageEditable();
@@ -34,18 +35,18 @@ public partial class Index : ComponentBase
         await InvokeAsync(StateHasChanged);
     }
 
-    private async Task RetrieveInputTextAreaValue()
+    private async Task RetrieveInputTextAreaValueAsync()
     {
         messages!.Last().Content = await JSRuntime.InvokeAsync<string>("getElementValue", "editingMessageTextarea");
     }
 
-    private async Task EmptyAndDisableInputTextArea()
+    private async Task EmptyAndDisableInputTextAreaAsync()
     {
         await JSRuntime.InvokeAsync<string>("setElementValue", "editingMessageTextarea", "");
         await JSRuntime.InvokeAsync<string>("setDisabledValueToElement", "editingMessageTextarea", true);
     }
 
-    private async Task EnableInputTextArea()
+    private async Task EnableInputTextAreaAsync()
     {
         await JSRuntime.InvokeAsync<string>("setDisabledValueToElement", "editingMessageTextarea", false);        
     }
@@ -55,12 +56,12 @@ public partial class Index : ComponentBase
         if (e.Key == "Enter" && !e.CtrlKey && !e.ShiftKey)
         {
             await JSRuntime.InvokeVoidAsync("event.preventDefault"); // Prevent default behavior to avoid adding a newline
-            await RetrieveInputTextAreaValue();
+            await RetrieveInputTextAreaValueAsync();
             await SendMessage();
         }
         else
         {
-            await RetrieveInputTextAreaValue();
+            await RetrieveInputTextAreaValueAsync();
         }
     }
 
@@ -125,15 +126,20 @@ public partial class Index : ComponentBase
 
     private async Task SendMessage()
     {
-        if (isLastMessageEditable && string.IsNullOrEmpty(messages!.Last().Content.Trim()))
+        await RetrieveInputTextAreaValueAsync();
+        messages!.Last().Content = messages!.Last().Content.Trim();
+        if (isLastMessageEditable && string.IsNullOrEmpty(messages!.Last().Content))
         {
             ShowMessageEmptyError();
             return;
         }
 
         isWaitingForLLM = true;
-        await EmptyAndDisableInputTextArea();
+        await EmptyAndDisableInputTextAreaAsync();
+
         await conversationService.InvokeRagApiOnUserQueryAsync(messages!);
+
+        await EnableInputTextAreaAsync();
         await InvokeAsync(StateHasChanged);
     }
 
