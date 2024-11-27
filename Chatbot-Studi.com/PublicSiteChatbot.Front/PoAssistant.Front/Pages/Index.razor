@@ -27,7 +27,7 @@
             @if (ShouldDisplayMessage(message))
             {
                 @* Messages headers *@
-                <div class="@($"{(message.IsFromAI ? "message-source-sender" : "message-source-receiver")}")">
+                <div class="@((message.IsFromAI ? "message-header-receiver" : "message-header-sender"))">
                     @message.Role
                     @if (message.DurationSeconds > 0)
                     {
@@ -40,10 +40,11 @@
                 </div>
 
                 @* Messages bubbles & contents *@
-                <div class="@($"message-bubble {(message.IsFromAI ? "message-sender" : "message-receiver")}")" style="@(DisplayEditingButtons(message) ? "padding-bottom: 35px;" : "")">
+                <div class="@($"message-bubble {(message.IsFromAI ? "message-receiver" : "message-sender")}")" 
+                    style="@((DisplayEditingButtons(message) ? "padding-bottom: 35px;" : ""))">
                     @if (!IsEditableLastMessage(message) || showBottomInputMessage)
                     {
-                        @* Display regular messages (non editable) *@
+                        @* Display regular messages' content (as non-editable) *@
                         @message.Content
                     }
                     else
@@ -107,7 +108,7 @@
             </textarea>
             <div class="send-button-wrapper">
                 <button id="sendEditingMessageButton" title="Valider la question" @onclick="() => SendMessage()" class="send-message-button">
-                    <span class="oi oi-arrow-right"></span>
+                    <span class="oi oi-check"></span>
                 </button>
             </div>
         </div>

@@ -16,6 +16,7 @@ public partial class Index : ComponentBase
     private bool isLastMessageEditable => conversationService.IsLastMessageEditable();
     private bool showBottomInputMessage = true;
     private bool showOngoingMessageInConversation = true;
+    private bool showEmptyOngoingMessageInConversation = true;
     private bool isMenuOpen = false;
     private bool showMessageEmptyError = false;
     private bool showApiCommunicationErrorNotification = false;
@@ -73,7 +74,7 @@ public partial class Index : ComponentBase
 
     private bool ShouldDisplayMessage(MessageModel message)
     {
-        return !message.IsLastMessageOfConversation || !showBottomInputMessage || (showOngoingMessageInConversation && !message.IsEmpty);
+        return !message.IsLastMessageOfConversation || !showBottomInputMessage || (showOngoingMessageInConversation && (!message.IsEmpty || showEmptyOngoingMessageInConversation));
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

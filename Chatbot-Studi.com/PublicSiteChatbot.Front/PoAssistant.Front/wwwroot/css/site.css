@@ -26,25 +26,24 @@ html, body {
 /* Chat container */
 .chat-container {
     width: auto;
-    padding: 10px;
-    margin: 10px;
+    padding-bottom: 10px;
     display: flex;
     flex-direction: column;
     overflow-y: auto;
 }
 
-.message-source-sender {
+.message-header-receiver {
     font-size: 0.75em;
-    margin-left: 15px;
+    margin-left: 18px;
     color: #6495ED;
-    align-self: flex-start; /* Align to the left */
+    align-self: flex-start;
 }
 
-.message-source-receiver {
+.message-header-sender {
     font-size: 0.75em;
-    margin-right: 15px;
-    color: #6459EE;
-    align-self: flex-end; /* Align to the right */
+    margin-right: 18px;
+    color: #6495ED;
+    align-self: flex-end;
 }
 
 .message-bubble {
@@ -54,7 +53,7 @@ html, body {
     margin-bottom: 15px;
     margin-left: 15px;
     margin-right: 15px;
-    padding: 12px 20px;
+    padding: 8px 18px;
     color: #333;
     border-radius: 10px;
     box-shadow: 0 12px 15px rgba(100, 100, 100, 0.3);
@@ -62,16 +61,14 @@ html, body {
     white-space: pre-wrap; /* Respects new lines and spaces */
 }
 
-/* Sender's message bubble */
-.message-sender {
+.message-receiver {
     background-color: #f0f7fb;
-    align-self: flex-start; /* Align to the left */
+    align-self: flex-start;
 }
 
-/* Receiver's message bubble */
-.message-receiver {
+.message-sender {
     background-color: #fffcec;
-    align-self: flex-end; /* Align to the right */
+    align-self: flex-end;
 }
 
 /* Responsive adjustments */
@@ -108,13 +105,13 @@ html, body {
 
 .message-editable:focus {
     box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25); /* Optional: Add a subtle focus outline */
-    background-color: white;
-    overflow-y: auto;
 }
 
 .input-area {
     position: relative; /* Ensure positioning context for the button */
-    padding: 10px;
+    /*padding-left: 10px;
+    padding-right: 10px;
+    padding-top: 10px;*/
     width: 100%;
     border-top: 1px solid #d3d3d3; /* Separate the chat from input area */
     border-radius: 10px;
@@ -158,26 +155,23 @@ html, body {
     border-radius: 18px;
     box-shadow: 0 8px 16px 0 rgba(0, 0, 0, 0.2);
     cursor: pointer;
-    transition: background-color 0.3s, box-shadow 0.3s;
+    transition: background-color 1.3s, box-shadow 0.3s;
 }
 
     .send-message-button:hover {
-        background-color: #119C35;
+        background-color: #6cd35f;
+        font-size: 20px;
+        padding: 2px 16px;
+        border: 1px double #47C239;
         box-shadow: 0 10px 40px 0 rgba(0, 0, 0, 0.24), 0 17px 50px 0 rgba(0, 0, 0, 0.22);
-    }
-
-    .send-message-button:active {
-        background-color: #3e8e41;
-        box-shadow: 0 5px #666;
-        transform: translateY(4px); /* Slight push down */
     }
 
 
 .send-button-wrapper {
     position: absolute;
-    bottom: 0px; 
-    right: 8px; 
-    z-index: 2;
+    bottom: -6px; 
+    right: -6px; 
+    z-index: 1;
 }
 
 /*.send-button {
