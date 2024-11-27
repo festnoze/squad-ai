@@ -27,7 +27,7 @@ public partial class Index : ComponentBase
         messages = conversationService.GetConversation();
         isWaitingForLLM = conversationService.IsWaitingForLLM();
         conversationService.OnConversationChanged += ReloadConversation;
-        conversationService.ApiCommunicationErrorNotification += HandleApiCommunicationErrorNotification;
+        conversationService.ApiCommunicationErrorNotification += ShowApiCommunicationError;
     }
 
     private async Task LoginModalIsVisibleChangedAsync(bool isVisible)
@@ -71,6 +71,11 @@ public partial class Index : ComponentBase
         }
     }
 
+    private bool ShouldDisplayMessage(MessageModel message)
+    {
+        return !message.IsLastMessageOfConversation || !showBottomInputMessage || (showOngoingMessageInConversation && !message.IsEmpty);
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
@@ -78,8 +83,9 @@ public partial class Index : ComponentBase
             await AutosizeEditingTextAreaAsync();
         }
 
-        // Desactivated Login TODO: make optionnal through env. config.
         IsLoginModalVisible = false;
+
+        // Desactivated Login TODO: make optionnal through env. config.
         // if (!IsLoginModalVisible)
         // {
         //     userName = await JSRuntime.InvokeAsync<string>("blazorExtensions.ReadStorage", "userName");
@@ -102,7 +108,7 @@ public partial class Index : ComponentBase
 
     private bool DisplayEditingButtons(MessageModel message)
     {
-        return !isLastMessageEditable && !showBottomInputMessage && !isWaitingForLLM && message.IsLastConversationMessage && !message.IsSavedMessage;
+        return !isLastMessageEditable && !showBottomInputMessage && !isWaitingForLLM && message.IsLastMessageOfConversation && !message.IsSavedMessage;
     }
 
     private bool DisplayLoader(MessageModel message)
@@ -112,22 +118,7 @@ public partial class Index : ComponentBase
 
     private bool IsEditableLastMessage(MessageModel message)
     {
-        return isLastMessageEditable && message.IsLastConversationMessage && message.IsFromUser && !message.IsSavedMessage;
-    }
-
-    private void ShowMessageEmptyError()
-    {
-        showMessageEmptyError = true;
-        var task = Task.Delay(8000).ContinueWith(t =>
-        {
-            showMessageEmptyError = false;
-            InvokeAsync(StateHasChanged);
-        });
-    }
-
-    private void ToggleMenu()
-    {
-        isMenuOpen = !isMenuOpen;
+        return isLastMessageEditable && message.IsLastMessageOfConversation && message.IsFromUser && !message.IsSavedMessage;
     }
 
     private async Task SendMessage()
@@ -137,7 +128,7 @@ public partial class Index : ComponentBase
         messages!.Last().Content = messages!.Last().Content.Trim();
         if (isLastMessageEditable && string.IsNullOrEmpty(messages!.Last().Content))
         {
-            ShowMessageEmptyError();
+            ShowEmptyMessageError();
             return;
         }
 
@@ -158,20 +149,35 @@ public partial class Index : ComponentBase
         await InvokeAsync(StateHasChanged);
     }
 
-    private async void HandleApiCommunicationErrorNotification()
+    private void ShowEmptyMessageError()
+    {
+        showMessageEmptyError = true;
+        var task = Task.Delay(8000).ContinueWith(t =>
+        {
+            showMessageEmptyError = false;
+            InvokeAsync(StateHasChanged);
+        });
+    }
+
+    private void ShowApiCommunicationError()
     {
         showApiCommunicationErrorNotification = true;
-        await InvokeAsync(StateHasChanged);
+        //await InvokeAsync(StateHasChanged);
+        var task = Task.Delay(8000).ContinueWith(t =>
+        {
+            showApiCommunicationErrorNotification = false;
+            InvokeAsync(StateHasChanged);
+        });
+    }
 
-        await Task.Delay(5000);
-
-        showApiCommunicationErrorNotification = false;
-        await InvokeAsync(StateHasChanged);
+    private void ToggleMenu()
+    {
+        isMenuOpen = !isMenuOpen;
     }
 
     public void Dispose()
     {
         conversationService.OnConversationChanged -= ReloadConversation;
-        conversationService.ApiCommunicationErrorNotification -= HandleApiCommunicationErrorNotification;
+        conversationService.ApiCommunicationErrorNotification -= ShowApiCommunicationError;
     }
 }

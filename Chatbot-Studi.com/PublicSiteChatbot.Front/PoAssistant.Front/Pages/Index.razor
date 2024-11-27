@@ -23,8 +23,8 @@
         @if (messages != null)
         @foreach (var message in messages)
         {
-            @* Display all messages (but the last one if ongoing message under edition is handled in the bottom textarea) *@
-            @if (!(message.IsLastConversationMessage && !showOngoingMessageInConversation && showBottomInputMessage))
+            <!-- Display all messages (but the last one if ongoing message under edition is handled in the bottom textarea) -->
+            @if (ShouldDisplayMessage(message))
             {
                 @* Messages headers *@
                 <div class="@($"{(message.IsFromAI ? "message-source-sender" : "message-source-receiver")}")">

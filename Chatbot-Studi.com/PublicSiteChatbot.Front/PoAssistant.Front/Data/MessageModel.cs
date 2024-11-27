@@ -20,15 +20,16 @@ public record MessageModel
 
     public bool IsFromAI => Role == AiRole;
     public bool IsFromUser => Role == UserRole;
+    public bool IsEmpty => this.Content.Trim().Length == 0;
 
-    public bool IsLastConversationMessage { get; private set; } = false;
+    public bool IsLastMessageOfConversation { get; private set; } = false;
 
     public bool IsStreaming { get; set; } = false;
 
     public bool IsSavedMessage { get; set; }
 
-    public void SetAsLastConversationMessage () => IsLastConversationMessage = true;
-    public bool SetAsNotLastConversationMessage() => IsLastConversationMessage = false;
+    public void SetAsLastConversationMessage () => IsLastMessageOfConversation = true;
+    public bool SetAsNotLastConversationMessage() => IsLastMessageOfConversation = false;
 
     public MessageModel(string source, string content, int durationSeconds, bool isSavedMessage = true, bool isStreaming = false)
     {
