@@ -7,6 +7,9 @@ namespace PoAssistant.Front.Pages;
 
 public partial class Index : ComponentBase
 {
+    private bool showBottomInputMessage = false;
+    private bool showOngoingMessageInConversation = true;
+    private bool showEmptyOngoingMessageInConversation = true;
     private string? userName = null;
     private ConversationModel messages = null!;
     private string newMessageContent = string.Empty;
@@ -14,9 +17,6 @@ public partial class Index : ComponentBase
     private ElementReference textAreaElement;
     private bool isWaitingForLLM = true;
     private bool isLastMessageEditable => conversationService.IsLastMessageEditable();
-    private bool showBottomInputMessage = true;
-    private bool showOngoingMessageInConversation = true;
-    private bool showEmptyOngoingMessageInConversation = true;
     private bool isMenuOpen = false;
     private bool showMessageEmptyError = false;
     private bool showApiCommunicationErrorNotification = false;
@@ -66,6 +66,11 @@ public partial class Index : ComponentBase
             await RetrieveInputTextAreaValueAsync();
             await SendMessage();
         }
+        else if (e.Key == "Enter" && e.CtrlKey)
+        {
+            await RetrieveInputTextAreaValueAsync(); 
+            await JSRuntime.InvokeAsync<string>("setElementValue", "editingMessageTextarea", messages!.Last().Content + "\n");
+        }
         else
         {
             await RetrieveInputTextAreaValueAsync();
@@ -109,7 +114,7 @@ public partial class Index : ComponentBase
 
     private bool DisplayEditingButtons(MessageModel message)
     {
-        return !isLastMessageEditable && !showBottomInputMessage && !isWaitingForLLM && message.IsLastMessageOfConversation && !message.IsSavedMessage;
+        return isLastMessageEditable && !showBottomInputMessage && !isWaitingForLLM && message.IsLastMessageOfConversation && !message.IsSavedMessage;
     }
 
     private bool DisplayLoader(MessageModel message)

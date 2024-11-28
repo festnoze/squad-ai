@@ -40,8 +40,8 @@
                 </div>
 
                 @* Messages bubbles & contents *@
-                <div class="@($"message-bubble {(message.IsFromAI ? "message-receiver" : "message-sender")}")" 
-                    style="@((DisplayEditingButtons(message) ? "padding-bottom: 35px;" : ""))">
+                <div class="@($"message-bubble {(message.IsFromAI ? "message-receiver" : "message-sender")}")"
+                         style="@($"{(DisplayEditingButtons(message) ? "width: 80%;" : "")}")">
                     @if (!IsEditableLastMessage(message) || showBottomInputMessage)
                     {
                         @* Display regular messages' content (as non-editable) *@
@@ -54,6 +54,7 @@
                                     @onblur="RetrieveInputTextAreaValueAsync"
                                     @onkeydown="HandleEditMessageKeyDown"
                                     class="message-editable"
+                                    style="margin-top: 10px;"
                                     placeholder="Ecrivez votre question ici ...">
                                         @newMessageContent
                         </textarea>
@@ -71,8 +72,6 @@
                     @if (DisplayLoader(message))
                     {
                         <div class="loader">
-                            <div class="circle"></div>
-                            <div class="circle"></div>
                             <div class="circle"></div>
                             <div class="circle"></div>
                             <div class="circle"></div>
