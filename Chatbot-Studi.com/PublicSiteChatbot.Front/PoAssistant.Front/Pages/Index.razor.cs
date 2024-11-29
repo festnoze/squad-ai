@@ -2,14 +2,19 @@
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using PoAssistant.Front.Data;
+using Microsoft.Extensions.Options;
 
 namespace PoAssistant.Front.Pages;
 
 public partial class Index : ComponentBase
 {
-    private bool showBottomInputMessage = true;
-    private bool showOngoingMessageInConversation = true;
-    private bool showEmptyOngoingMessageInConversation = true;
+    [Inject]
+    public IOptions<ChatbotSettings> ChatbotSettings { get; set; }
+
+    private bool showBottomInputMessage => ChatbotSettings.Value.ShowBottomInputMessage;
+    private bool showOngoingMessageInConversation => ChatbotSettings.Value.ShowOngoingMessageInConversation;
+    private bool showEmptyOngoingMessageInConversation => ChatbotSettings.Value.ShowEmptyOngoingMessageInConversation;
+
     //
     private string? userName = null;
     private ConversationModel messages = null!;
