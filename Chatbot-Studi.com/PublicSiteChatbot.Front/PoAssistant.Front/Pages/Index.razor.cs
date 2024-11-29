@@ -16,6 +16,7 @@ public partial class Index : ComponentBase
     private bool showEmptyOngoingMessageInConversation => ChatbotSettings.Value.ShowEmptyOngoingMessageInConversation;
 
     //
+    private string popupClass = "visible";
     private string? userName = null;
     private ConversationModel messages = null!;
     private string newMessageContent = string.Empty;
@@ -35,6 +36,18 @@ public partial class Index : ComponentBase
         isWaitingForLLM = conversationService.IsWaitingForLLM();
         conversationService.OnConversationChanged += ReloadConversation;
         conversationService.ApiCommunicationErrorNotification += ShowApiCommunicationError;
+    }
+
+    public async Task OpenPopup()
+    {
+        popupClass = "visible";
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ClosePopup()
+    {
+        popupClass = "hidden";
+        await InvokeAsync(StateHasChanged);
     }
 
     private async Task LoginModalIsVisibleChangedAsync(bool isVisible)

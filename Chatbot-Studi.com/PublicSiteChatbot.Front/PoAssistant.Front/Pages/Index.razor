@@ -20,7 +20,7 @@
     <Login IsVisibleChanged="@LoginModalIsVisibleChangedAsync" />
 </Modal>
 
-<div class="chat-wrapper">
+<div id="chatbot-window" class="@popupClass">
     <div class="chat-container">
         @if (messages != null)
         @foreach (var message in messages)

@@ -1,5 +1,3 @@
-using Microsoft.AspNetCore.Components.Authorization;
-using PoAssistant.Front;
 using PoAssistant.Front.Data;
 using PoAssistant.Front.Infrastructure;
 using PoAssistant.Front.Services;
@@ -45,5 +43,6 @@ app.MapBlazorHub();
 app.UsePathBase("/MetierPoExchange");
 app.MapFallbackToPage("/_Host");
 
-app.MapControllers(); // Handle proxy API controllers
+//app.MapControllers(); // Handle proxy API controllers
+
 await app.RunAsync();
