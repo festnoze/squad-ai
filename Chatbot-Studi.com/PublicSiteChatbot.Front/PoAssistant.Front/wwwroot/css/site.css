@@ -3,9 +3,9 @@
 
 html, body {
     font-family: "Mulish", sans-serif;
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 400;
-    line-height: 1.5;
+    line-height: 1.3;
 }
 
 /* Container for chat and input */
@@ -53,7 +53,7 @@ html, body {
     margin-bottom: 15px;
     margin-left: 15px;
     margin-right: 15px;
-    padding: 8px 18px;
+    padding: 10px 14px;
     color: #333;
     border-radius: 10px;
     box-shadow: 0 12px 15px rgba(100, 100, 100, 0.3);
@@ -169,28 +169,19 @@ html, body {
     }
 
 
+.send-inline-button-wrapper {
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    z-index: 1;
+}
+
 .send-button-wrapper {
     position: absolute;
     bottom: -6px; 
     right: -6px; 
     z-index: 1;
 }
-
-/*.send-button {
-    width: 100%;*/ /* Prend toute la largeur */
-    /*padding: 10px 0;*/ /* Padding vertical pour agrandir le bouton */
-    /*border-radius: 15px;*/ /* Bords arrondis */
-    /*border: none;*/ /* Pas de bordure */
-    /*background-color: cornflowerblue;*/ /* Couleur de fond */
-    /*color: white;*/ /* Couleur du texte */
-    /*cursor: pointer;*/ /* Change le curseur */
-    /*font-size: 16px;*/ /* Taille du texte */
-/*}
-
-.send-button:disabled {
-    background-color: #cccccc;*/ /* Couleur de fond lorsque désactivé */
-    /*cursor: not-allowed;*/ /* Change le curseur */
-/*}*/
 
 .loader {
     display: flex;
@@ -319,7 +310,28 @@ html, body {
     animation: fadeOut 4s ease-out forwards;
 }
 
+.markdown-content {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: normal;
+}
 
+    .markdown-content a {
+        color: #2a7ae2;
+        text-decoration: none;
+    }
+
+        .markdown-content a:hover {
+            color: #0056b3;
+            text-decoration: underline;
+        }
+
+    .markdown-content code {
+        background-color: #f5f5f5;
+        padding: 2px 4px;
+        border-radius: 4px;
+        font-family: monospace;
+    }
 
 
 
@@ -329,6 +341,10 @@ h1:focus {
 
 a, .btn-link {
     color: #0071c1;
+}
+
+p {
+    margin: 0;
 }
 
 .btn-primary {

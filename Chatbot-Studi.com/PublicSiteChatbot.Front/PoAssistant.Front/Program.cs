@@ -5,8 +5,9 @@ using PoAssistant.Front.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add strongly type settings
+// Load settings in strongly typed classes objects from appsettings.json (or development.appsettings.json)
 builder.Services.Configure<ApiSettings>(builder.Configuration.GetSection("ApiSettings"));
+builder.Services.Configure<ChatbotSettings>(builder.Configuration.GetSection("ChatbotSettings"));
 
 // Add services to the container.
 builder.Services.AddRazorPages();

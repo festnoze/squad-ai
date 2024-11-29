@@ -27,7 +27,7 @@ public class ConversationService : IConversationService
     {
         if (conversation is null || !conversation.Any())
         {
-            var startMessage = "Bonjour,\nJe suis Studia, votre agent virtuel. Comment puis-je vous aider ?";
+            var startMessage = "Bonjour,\nJe suis Studia, votre assistant virtuel.\nComment puis-je vous aider ?";
 
             conversation = new ConversationModel();
             conversation.AddMessage(MessageModel.AiRole, startMessage, 0, true, false);
@@ -60,7 +60,7 @@ public class ConversationService : IConversationService
         if (!conversation?.Any() ?? true)
             return;
 
-        conversation!.Last().Content = conversation!.Last().Content.Trim();
+        conversation!.Last().ChangeContent(conversation!.Last().Content.Trim());
         if (string.IsNullOrWhiteSpace(conversation!.Last().Content))
             return;
         conversation!.Last().IsSavedMessage = true;
@@ -114,7 +114,7 @@ public class ConversationService : IConversationService
         if (!string.IsNullOrWhiteSpace(messageChunk))
         {
             isWaitingForLLM = true;
-            conversation!.Last().Content += messageChunk.Replace(StreamHelper.NewLineForStream, StreamHelper.WindowsNewLine);
+            conversation!.Last().AddContent(messageChunk.Replace(StreamHelper.NewLineForStream, StreamHelper.WindowsNewLine));
             OnConversationChanged?.Invoke();
         }
     }

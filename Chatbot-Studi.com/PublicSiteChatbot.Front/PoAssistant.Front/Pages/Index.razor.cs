@@ -7,9 +7,10 @@ namespace PoAssistant.Front.Pages;
 
 public partial class Index : ComponentBase
 {
-    private bool showBottomInputMessage = false;
+    private bool showBottomInputMessage = true;
     private bool showOngoingMessageInConversation = true;
     private bool showEmptyOngoingMessageInConversation = true;
+    //
     private string? userName = null;
     private ConversationModel messages = null!;
     private string newMessageContent = string.Empty;
@@ -41,7 +42,7 @@ public partial class Index : ComponentBase
     {
         if (!disableConversationModification)
         {
-            messages!.Last().Content = await JSRuntime.InvokeAsync<string>("getElementValue", "editingMessageTextarea");
+            messages!.Last().ChangeContent(await JSRuntime.InvokeAsync<string>("getElementValue", "editingMessageTextarea"));
         }
     }
 
@@ -131,7 +132,8 @@ public partial class Index : ComponentBase
     {
         await RetrieveInputTextAreaValueAsync();
         disableConversationModification = true;
-        messages!.Last().Content = messages!.Last().Content.Trim();
+        messages!.Last().ChangeContent(messages!.Last().Content.Trim());
+
         if (isLastMessageEditable && string.IsNullOrEmpty(messages!.Last().Content))
         {
             ShowEmptyMessageError();
