@@ -10,9 +10,8 @@ namespace PoAssistant.Front.Data;
 public record MessageModel
 {
     public static string UserRole = "Utilisateur";
-    public static string AiRole = "Assistant IA";
+    public static string AiRole = "Assistant";
     private static MarkdownPipeline markdownPipeline = new MarkdownPipelineBuilder().UseSoftlineBreakAsHardlineBreak().Build();
-
 
     [JsonPropertyName("id")]
     public Guid Id { get; init; }
