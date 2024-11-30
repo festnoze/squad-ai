@@ -440,7 +440,7 @@ class RagFilteringMetadataHelper:
         langchain_filters: Union[Operation, Comparison],
         metadata_descriptions: list[MetadataDescription],
         does_throw_error_upon_failure: bool = True,
-        search_nearest_value_if_not_found: bool = False
+        search_nearest_value_if_not_found: bool = True,
     ) -> Union[Operation, Comparison, None]:
         """
         Validate the metadata filters provided as LangChain Operation (or Comparison) against the existing metadata descriptions,
@@ -455,59 +455,59 @@ class RagFilteringMetadataHelper:
         :return: The validated LangChain filter object, or None if all filters are invalid.
         """
         # Create a lookup dictionary for quick metadata validation
-        metadata_lookup = {desc.name: desc.possible_values for desc in metadata_descriptions}
-
-        async def validate_filter_async(filter_obj):
-            if filter_obj is None:
-                return None
-            elif isinstance(filter_obj, Comparison):
-                # Validate attribute existence
-                if filter_obj.attribute not in metadata_lookup:
-                    if does_throw_error_upon_failure:
-                        raise ValueError(
-                            f"Attribute '{filter_obj.attribute}' is not recognized in the metadata descriptions."
-                        )
-                    print(f"/!\\ Filter on invalid metadata name: '{filter_obj.attribute}'. It has been removed.")
-                    return None
-
-                # Validate value existence in possible_values
-                possible_values = metadata_lookup[filter_obj.attribute]
-                if not possible_values or filter_obj.value in possible_values:
-                    return filter_obj
-
-                if search_nearest_value_if_not_found:
-                    # Find the nearest match using BM25
-                    retrieved_value, retrieval_score = await BM25RetrieverHelper.find_best_match_bm25_async(
-                        possible_values, filter_obj.value
-                    )
-                    # Update the filter value
-                    if retrieval_score > 0.5:
-                        print(f"/!\\ Filter on metadata '{filter_obj.attribute}' with invalid value: '{filter_obj.value}' was replaced by the nearest match value: '{retrieved_value}' with score: [{retrieval_score}].")
-                        return Comparison(attribute=filter_obj.attribute, comparator=filter_obj.comparator, value=retrieved_value)
-                    # Delete the filter if no close enough match is found
-                    else:
-                        print(f"/!\\ Filter on metadata '{filter_obj.attribute}' with invalid value: '{filter_obj.value}'. Filter has been removed from metadata filters.")
-                
-                if does_throw_error_upon_failure:
-                    raise ValueError(f"Value: '{filter_obj.value}' for metadata filter: '{filter_obj.attribute}' is not valid. Allowed values are: {', '.join(possible_values)}"
-                    )
-                else:
-                    #Remove the filter if the value is not found in the possible values
-                    print( f"/!\\ Filter on metadata '{filter_obj.attribute}' with invalid value: '{filter_obj.value}'. Filter has been removed from metadata filters.")
-                    return None                
-
-            elif isinstance(filter_obj, Operation):
-                validated_arguments = [
-                    await validate_filter_async(arg) for arg in filter_obj.arguments
-                ]
-                validated_arguments = [arg for arg in validated_arguments if arg is not None]
-                if not validated_arguments:
-                    return None
-                return Operation(operator=filter_obj.operator, arguments=validated_arguments)
-            else:
-                if does_throw_error_upon_failure:
-                    raise ValueError(f"Unsupported filter type: {type(filter_obj)}")
-                return None
-            
-        validated_filters = await validate_filter_async(langchain_filters)
+        metadata_lookup = {desc.name: desc.possible_values for desc in metadata_descriptions} 
+        validated_filters = await RagFilteringMetadataHelper._validate_filter_async(langchain_filters, metadata_lookup, does_throw_error_upon_failure, search_nearest_value_if_not_found)
         return validated_filters
+    
+    async def _validate_filter_async(filter_obj, metadata_lookup, does_throw_error_upon_failure, search_nearest_value_if_not_found):
+        if filter_obj is None:
+            return None
+        elif isinstance(filter_obj, Comparison):
+            # Validate attribute existence
+            if filter_obj.attribute not in metadata_lookup:
+                if does_throw_error_upon_failure:
+                    raise ValueError(
+                        f"Attribute '{filter_obj.attribute}' is not recognized in the metadata descriptions."
+                    )
+                print(f"/!\\ Filter on invalid metadata name: '{filter_obj.attribute}'. It has been removed.")
+                return None
+
+            # Validate value existence in possible_values
+            possible_values = metadata_lookup[filter_obj.attribute]
+            if not possible_values or filter_obj.value in possible_values:
+                return filter_obj
+
+            if search_nearest_value_if_not_found:
+                # Find the nearest match using BM25
+                retrieved_value, retrieval_score = await BM25RetrieverHelper.find_best_match_bm25_async(
+                    possible_values, filter_obj.value
+                )
+                # Update the filter value
+                if retrieval_score > 0.5:
+                    print(f"/!\\ Filter on metadata '{filter_obj.attribute}' with invalid value: '{filter_obj.value}' was replaced by the nearest match value: '{retrieved_value}' with score: [{retrieval_score}].")
+                    return Comparison(attribute=filter_obj.attribute, comparator=filter_obj.comparator, value=retrieved_value)
+                # Delete the filter if no close enough match is found
+                else:
+                    print(f"/!\\ Filter on metadata '{filter_obj.attribute}' with invalid value: '{filter_obj.value}'. Filter has been removed from metadata filters.")
+            
+            if does_throw_error_upon_failure:
+                raise ValueError(f"Value: '{filter_obj.value}' for metadata filter: '{filter_obj.attribute}' is not valid. Allowed values are: {', '.join(possible_values)}"
+                )
+            else:
+                #Remove the filter if the value is not found in the possible values
+                print( f"/!\\ Filter on metadata '{filter_obj.attribute}' with invalid value: '{filter_obj.value}'. Filter has been removed from metadata filters.")
+                return None                
+
+        elif isinstance(filter_obj, Operation):
+            validated_arguments = [
+                await RagFilteringMetadataHelper._validate_filter_async(arg, metadata_lookup, does_throw_error_upon_failure, search_nearest_value_if_not_found) 
+                for arg in filter_obj.arguments
+            ]
+            validated_arguments = [arg for arg in validated_arguments if arg is not None]
+            if not validated_arguments:
+                return None
+            return Operation(operator=filter_obj.operator, arguments=validated_arguments)
+        else:
+            if does_throw_error_upon_failure:
+                raise ValueError(f"Unsupported filter type: {type(filter_obj)}")
+            return None

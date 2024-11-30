@@ -201,12 +201,13 @@ class RAGPreTreatment:
         # Domain specific extra validity check of metadata filters
         #TODO: the following checks are not generic and shouldn't be in common_tools
         metadata_filters_to_validate = await RAGPreTreatment.domain_specific_metadata_filters_validation_and_correction_async(metadata_filters_to_validate)
-                
+        print(f"> Metadata filters before validation: '{str(metadata_filters_to_validate)}'")
+
         # Generic validity check of metadata filters keys or values, and remove filters with invalid ones
-        await RagFilteringMetadataHelper.validate_langchain_metadata_filters_against_metadata_descriptions_async(metadata_filters_to_validate, RAGPreTreatment.metadata_descriptions, does_throw_error_upon_failure= False)
+        validated_metadata_filters = await RagFilteringMetadataHelper.validate_langchain_metadata_filters_against_metadata_descriptions_async(metadata_filters_to_validate, RAGPreTreatment.metadata_descriptions, does_throw_error_upon_failure= False)
       
-        print(f"Corrected metadata filters: '{str(metadata_filters_to_validate)}'")
-        return metadata_filters_to_validate
+        print(f"> Corrected metadata filters: '{str(validated_metadata_filters)}'")
+        return validated_metadata_filters
 
     #TODO: the following checks are not generic and shouldn't be in common_tools
     @staticmethod

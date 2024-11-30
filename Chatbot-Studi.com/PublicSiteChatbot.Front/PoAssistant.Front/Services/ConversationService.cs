@@ -111,7 +111,7 @@ public class ConversationService : IConversationService
     public void DisplayStreamMessage(string? messageChunk)
     {
         // New lines are a specific pattern to allow spliting words and avoid win/mac issue over the streaming
-        if (!string.IsNullOrWhiteSpace(messageChunk))
+        if (!string.IsNullOrEmpty(messageChunk))
         {
             isWaitingForLLM = true;
             conversation!.Last().AddContent(messageChunk.Replace(StreamHelper.NewLineForStream, StreamHelper.WindowsNewLine));

@@ -93,6 +93,7 @@ public partial class Index : ComponentBase
         else
         {
             await RetrieveInputTextAreaValueAsync();
+            await JSRuntime.InvokeVoidAsync("scrollChatContainerToBottom");
         }
     }
 
@@ -105,7 +106,8 @@ public partial class Index : ComponentBase
     {
         if (firstRender)
         {
-            await AutosizeEditingTextAreaAsync();
+            //await JSRuntime.InvokeVoidAsync("autoResizeTextarea", "editingMessageTextarea");
+            await JSRuntime.InvokeVoidAsync("scrollChatContainerToBottom");
         }
 
         IsLoginModalVisible = false;
@@ -124,11 +126,6 @@ public partial class Index : ComponentBase
         // }
 
         await base.OnAfterRenderAsync(firstRender);
-    }
-
-    private async Task AutosizeEditingTextAreaAsync()
-    {
-        await JSRuntime.InvokeVoidAsync("autoResizeTextarea", "editingMessageTextarea");
     }
 
     private bool DisplayEditingButtons(MessageModel message)

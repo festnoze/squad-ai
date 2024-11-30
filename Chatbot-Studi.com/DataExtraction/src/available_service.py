@@ -161,20 +161,20 @@ class AvailableService:
             pipeline_succeeded = True
         except EndPipelineException as ex:                        
             pipeline_succeeded = False
-            #pipeline_ends_reason = ex.name
             pipeline_ended_response = ex.message
 
         if pipeline_succeeded:
             async for chunk in (AvailableService.rag_query_augmented_generation_streaming_async(analysed_query, retrieved_chunks[0])):
                 yield chunk
-        else:
-            async def write_stream(text: str, interval_btw_words: float = 0.02) -> AsyncGenerator[str, None]:
-                words = text.split(" ")
-                for word in words:
-                    yield word + " "
-                    await asyncio.sleep(interval_btw_words)
-            async for chunk in write_stream(pipeline_ended_response):
+        else:            
+            async for chunk in AvailableService.write_static_text_as_stream(pipeline_ended_response):
                 yield chunk
+
+    async def write_static_text_as_stream(text: str, interval_btw_words: float = 0.02) -> AsyncGenerator[str, None]:
+        words = text.split(" ")
+        for word in words:
+            yield f"{word} "
+            await asyncio.sleep(interval_btw_words)
 
     async def rag_query_retrieval_but_augmented_generation_async(conversation_history: Conversation):
         return await AvailableService.inference.run_pipeline_dynamic_but_augmented_generation_async(conversation_history, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)

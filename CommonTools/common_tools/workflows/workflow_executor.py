@@ -133,7 +133,8 @@ class WorkflowExecutor:
                 result = func(**func_kwargs)
             self._add_function_output_names_and_values_to_kwargs(func, result, kwargs_values)
             return result
-            
+        except EndPipelineException as epe:
+            raise epe   
         except Exception as e:
             self._raise_fail_func_execution(class_and_function_name, previous_results, kwargs_values, e)
 

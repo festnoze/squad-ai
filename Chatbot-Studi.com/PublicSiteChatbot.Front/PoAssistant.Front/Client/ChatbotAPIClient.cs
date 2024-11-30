@@ -33,7 +33,7 @@ public class ChatbotAPIClient
                 while (!reader.EndOfStream)
                 {
                     var word = await reader.ReadWordAsync();
-                    if (!string.IsNullOrWhiteSpace(word))
+                    if (!string.IsNullOrEmpty(word))
                         yield return word;
                 }
             }

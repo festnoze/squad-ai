@@ -33,7 +33,7 @@
         </div>
     </div>
 
-    <div class="chat-container">
+    <div id="chat-container" class="chat-container">
         @if (messages != null)
         @foreach (var message in messages)
         {
@@ -181,7 +181,6 @@
     function autoResizeTextarea(id) {
         var textarea = document.getElementById(id);
         if (textarea) {
-            console.error('testy!');
             textarea.style.height = 'auto';
             textarea.style.height = textarea.scrollHeight + 'px';
             textarea.addEventListener('input', function () {
@@ -189,6 +188,10 @@
                 this.style.height = this.scrollHeight + 'px';
             }, false);
         }
+    }
+    function scrollChatContainerToBottom() {
+        const container = document.getElementById("chat-container");
+        container.scrollTop = container.scrollHeight;
     }
     window.blazorExtensions = {
         WriteStorage: function (key, value) {

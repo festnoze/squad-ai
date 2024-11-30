@@ -47,6 +47,7 @@ async def rag_query_stream_async(conversation_history_request_model: Conversatio
     conversation_history = Conversation(conversation_history_request_model.messages)
     response_generator = AvailableService.rag_query_retrieval_and_augmented_generation_streaming_async(conversation_history)
     return StreamingResponse(response_generator, media_type="text/event-stream")
+    #TODO: miss this (doable when conversation are identified w/ id and saved/cache on API) : conversation.last_message.content = AvailableService.get_summarized_answer(st.session_state.conversation.last_message.content)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8000, timeout_keep_alive=180, reload=True)
