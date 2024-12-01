@@ -55,7 +55,12 @@ public class ConversationService : IConversationService
 
     public bool IsWaitingForLLM() => isWaitingForLLM;
 
-    public async Task InvokeRagApiOnUserQueryAsync(ConversationModel conversation)
+    public async Task<Guid> ApiCallGetNewConversationIdAsync(string? userName)
+    {
+        return await this._chatbotApiClient.GetNewConversationIdAsync(userName);
+    }
+
+    public async Task ApiCallAnswerUserQueryAsync(ConversationModel conversation)
     {
         if (!conversation?.Any() ?? true)
             return;

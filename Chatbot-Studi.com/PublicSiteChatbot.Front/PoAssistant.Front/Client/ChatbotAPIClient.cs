@@ -39,4 +39,31 @@ public class ChatbotAPIClient
             }
         }
     }
+
+    public async Task<Guid> GetNewConversationIdAsync(string? userName)
+    {
+        string endpoint = $"{_baseUrl}/rag/query/create";
+        string jsonPayload = JsonSerializer.Serialize(userName);
+        var request = new HttpRequestMessage(HttpMethod.Get, endpoint)
+        {
+            Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json")
+        };
+
+        using (HttpResponseMessage response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead))
+        {
+            response.EnsureSuccessStatusCode();
+
+            var result = await response.Content.ReadAsStringAsync();
+
+            // Deserialize the JSON object into a class
+            var conversationResponse = JsonSerializer.Deserialize<CreateConversationResponseModel>(result);
+
+            if (conversationResponse == null || conversationResponse.Id == Guid.Empty)
+            {
+                throw new Exception($"Invalid response from client to {nameof(GetNewConversationIdAsync)} endpoint.");
+            }
+
+            return conversationResponse.Id;
+        }
+    }
 }

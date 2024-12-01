@@ -1,8 +1,8 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from application.available_service import AvailableService
 from web_services.request_models.conversation_request_model import ConversationRequestModel
 from common_tools.models.conversation import Conversation
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, Response
 
 router = APIRouter()
 
@@ -15,9 +15,20 @@ async def create_vector_db():
     output_dir = AvailableService.out_dir
     return AvailableService.create_vector_db_from_generated_embeded_documents(output_dir)
 
+@router.get("/rag/query/create")
+async def create_new_conversation(user_name: str = None):
+    try:
+        new_conv = await AvailableService.create_new_conversation_async(user_name)
+        return JSONResponse(
+            content={"id": str(new_conv.id)},  # Convert UUID to string for JSON serialization
+            status_code=200
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/rag/query/stream")
 async def rag_query_stream_async(conversation_history_request_model: ConversationRequestModel):
-    conversation_history = Conversation(conversation_history_request_model.messages)
+    conversation_history = Conversation(None, conversation_history_request_model.messages)
     response_generator = AvailableService.rag_query_retrieval_and_augmented_generation_streaming_async(conversation_history)
     return StreamingResponse(response_generator, media_type="text/event-stream")
     #TODO: miss this (doable when conversation are identified w/ id and saved/cache on API) : conversation.last_message.content = AvailableService.get_summarized_answer(st.session_state.conversation.last_message.content)

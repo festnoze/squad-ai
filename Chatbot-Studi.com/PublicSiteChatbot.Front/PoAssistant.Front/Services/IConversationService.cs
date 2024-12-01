@@ -13,11 +13,12 @@ public interface IConversationService : IDisposable
     void DisplayStreamMessage(string? messageChunk);
     void EndsStreamMessage();
     ConversationModel GetConversation();
-    Task InvokeRagApiOnUserQueryAsync(ConversationModel conversation);
     bool IsLastMessageEditable();
     bool IsWaitingForLLM();
     void LoadConversationByName(string exchangeNameTruncated, bool truncatedExchangeName = false);
     void MarkConversationAsLoaded();
     void SaveConversation();
     void SetCurrentUser(string userName);
+    Task<Guid> ApiCallGetNewConversationIdAsync(string? userName);
+    Task ApiCallAnswerUserQueryAsync(ConversationModel conversation);
 }

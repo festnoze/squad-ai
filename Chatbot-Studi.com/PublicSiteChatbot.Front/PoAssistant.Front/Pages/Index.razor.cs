@@ -17,8 +17,9 @@ public partial class Index : ComponentBase
     private bool doLoginOnStartup => ChatbotSettings.Value.DoLoginOnStartup;
 
     //
-    private string popupClass = "visible";
     private string? userName = null;
+    private Guid? conversationId = null;
+    private string popupClass = "visible";
     private ConversationModel messages = null!;
     private string newMessageContent = string.Empty;
     private bool disableConversationModification = false;
@@ -156,7 +157,12 @@ public partial class Index : ComponentBase
         isWaitingForLLM = true;
         await EmptyAndDisableInputTextAreaAsync();
 
-        await conversationService.InvokeRagApiOnUserQueryAsync(messages!);
+        if (conversationId is null || messages!.IsFirstUserMessage)
+        {
+            conversationId = await conversationService.ApiCallGetNewConversationIdAsync(userName);
+        }
+
+        await conversationService.InvokeApiOnUserQueryAsync(conversationId, messages!.Last().Content);
 
         await EnableInputTextAreaAsync();
         disableConversationModification = false;

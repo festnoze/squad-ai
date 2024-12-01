@@ -155,6 +155,12 @@ class AvailableService:
             txt.print(response)
 
     @staticmethod
+    async def create_new_conversation_async(user_name: str = None):
+        new_conv = Conversation(user_name)
+        #await AvailableService.save_conversation_async(new_conv)
+        return new_conv
+
+    @staticmethod
     async def rag_query_retrieval_and_augmented_generation_streaming_async(conversation_history:Conversation):
         try:
             analysed_query, retrieved_chunks = await AvailableService.rag_query_retrieval_but_augmented_generation_async(conversation_history)             
