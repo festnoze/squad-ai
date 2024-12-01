@@ -30,14 +30,9 @@ async def create_new_conversation(user_name: str = None):
 
 @router.post("/rag/query/stream")
 async def rag_query_stream_async(user_query_request_model: UserQueryAskingRequestModel):
-    # Load the conversation history from the id of the request model
-
-    conversation_history = Conversation(None, conversation_history_request_model.messages)
-    conversation_history.add_new_message("user", user_query_request_model.user_query)
-    
-    response_generator = AvailableService.rag_query_retrieval_and_augmented_generation_streaming_async(conversation_history)
+    response_generator = AvailableService.rag_query_stream_async(user_query_request_model)
     return StreamingResponse(response_generator, media_type="text/event-stream")
-    #TODO: miss this (doable when conversation are identified w/ id and saved/cache on API) : conversation.last_message.content = AvailableService.get_summarized_answer(st.session_state.conversation.last_message.content)
+
 
 # Launch the API with Uvicorn server:
 # if __name__ == "__rag_query_controller__":

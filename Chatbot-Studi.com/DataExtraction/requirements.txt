@@ -1,6 +1,6 @@
 -e C:/Dev/squad-ai/CommonTools # local package to internal tooling
 pytest
-#sqlalchemy
+sqlalchemy
 numpy
 streamlit
 nltk

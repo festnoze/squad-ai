@@ -7,6 +7,18 @@ from typing import AsyncGenerator
 from dotenv import find_dotenv, load_dotenv
 from application.ragas_service import RagasService
 #
+from langchain.chains.query_constructor.schema import AttributeInfo
+from langchain_core.runnables import Runnable, RunnablePassthrough
+from langchain_core.prompts import ChatPromptTemplate
+from langchain.docstore.document import Document
+from data_retrieval.drupal_data_retrieval import DrupalDataRetrieval
+from database_conversations.converter import ConversationConverter
+from infrastructure.conversation_repository import ConversationRepository
+from site_public_metadata_descriptions import MetadataDescriptionHelper
+from vector_database_creation.generate_documents_and_metadata import GenerateDocumentsAndMetadata
+from vector_database_creation.generate_summaries_chunks_questions_and_metadata import GenerateDocumentsSummariesChunksQuestionsAndMetadata
+from web_services.request_models.user_query_asking_request_model import UserQueryAskingRequestModel
+#
 from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.execute_helper import Execute
 from common_tools.models.llm_info import LlmInfo
@@ -23,19 +35,9 @@ from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagIn
 from common_tools.rag.rag_inference_pipeline.rag_answer_generation_tasks import RAGAugmentedGeneration
 from common_tools.helpers.ressource_helper import Ressource
 from common_tools.models.embedding import EmbeddingModel, EmbeddingType
-from common_tools.models.conversation import Conversation
+from common_tools.models.conversation import Conversation, Message
 from common_tools.models.doc_w_summary_chunks_questions import DocWithSummaryChunksAndQuestions
 from common_tools.rag.rag_inference_pipeline.end_pipeline_exception import EndPipelineException
-#
-from langchain.chains.query_constructor.schema import AttributeInfo
-from langchain_core.runnables import Runnable, RunnablePassthrough
-from langchain_core.prompts import ChatPromptTemplate
-from langchain.docstore.document import Document
-#from database.database import DB
-from data_retrieval.drupal_data_retireval import DrupalDataRetireval
-from site_public_metadata_descriptions import MetadataDescriptionHelper
-from vector_database_creation.generate_documents_and_metadata import GenerateDocumentsAndMetadata
-from vector_database_creation.generate_summaries_chunks_questions_and_metadata import GenerateDocumentsSummariesChunksQuestionsAndMetadata
 
 class AvailableService:
     inference: RagInferencePipeline = None
@@ -79,7 +81,7 @@ class AvailableService:
         AvailableService.init(txt.activate_print)
 
     def retrieve_all_data():
-        drupal = DrupalDataRetireval(AvailableService.out_dir)
+        drupal = DrupalDataRetrieval(AvailableService.out_dir)
         drupal.retrieve_all_data()
 
     def create_vector_db_from_generated_embeded_documents(out_dir):
@@ -156,12 +158,29 @@ class AvailableService:
 
     @staticmethod
     async def create_new_conversation_async(user_name: str = None):
-        new_conv = Conversation(user_name)
-        #await AvailableService.save_conversation_async(new_conv)
-        return new_conv
+        new_conv_model = Conversation(user_name)
+        new_conv_entity = ConversationConverter.convert_conversation_model_to_entity(new_conv_model)
+        await ConversationRepository().create_new_conversation_async(new_conv_entity)
+        return ConversationConverter.convert_conversation_entity_to_model(new_conv_entity)
 
     @staticmethod
-    async def rag_query_retrieval_and_augmented_generation_streaming_async(conversation_history:Conversation):
+    async def rag_query_stream_async(user_query_request_model: UserQueryAskingRequestModel):
+        conversation = await ConversationRepository().get_conversation_by_id_async(user_query_request_model.conversation_id)
+        conversation.add_new_message("user", user_query_request_model.user_query)
+        all_chunks_output=[]
+        response_generator = AvailableService.rag_query_retrieval_and_augmented_generation_streaming_async(conversation, False, all_chunks_output)
+        
+        # Stream the response
+        async for chunk in response_generator:
+            yield chunk
+        
+        # Update the conversation last message with a summary of the response
+        summarized_response = AvailableService.get_summarized_answer(''.join(all_chunks_output))
+        conversation.add_new_message("assistant", summarized_response)
+        await ConversationRepository().add_message_to_conversation_async(conversation.id, Message("assistant", summarized_response))
+    
+    @staticmethod
+    async def rag_query_retrieval_and_augmented_generation_streaming_async(conversation_history:Conversation, is_stream_decoded = False, all_chunks_output: list[str] = []):
         try:
             analysed_query, retrieved_chunks = await AvailableService.rag_query_retrieval_but_augmented_generation_async(conversation_history)             
             pipeline_succeeded = True
@@ -170,10 +189,13 @@ class AvailableService:
             pipeline_ended_response = ex.message
 
         if pipeline_succeeded:
-            async for chunk in (AvailableService.rag_query_augmented_generation_streaming_async(analysed_query, retrieved_chunks[0])):
+            augmented_generation_streaming = AvailableService.rag_query_augmented_generation_streaming_async(analysed_query, retrieved_chunks[0], is_stream_decoded, all_chunks_output)
+            async for chunk in augmented_generation_streaming:
                 yield chunk
-        else:            
-            async for chunk in AvailableService.write_static_text_as_stream(pipeline_ended_response):
+        else:
+            static_text_streaming = AvailableService.write_static_text_as_stream(pipeline_ended_response)
+            all_chunks_output.append(pipeline_ended_response)
+            async for chunk in static_text_streaming:
                 yield chunk
 
     async def write_static_text_as_stream(text: str, interval_btw_words: float = 0.02) -> AsyncGenerator[str, None]:
@@ -285,7 +307,7 @@ class AvailableService:
                 5 - Exit
             """))
             if choice == "1":
-                drupal = DrupalDataRetireval(AvailableService.out_dir)
+                drupal = DrupalDataRetrieval(AvailableService.out_dir)
                 drupal.diplay_select_menu()
             elif choice == "2":
                 AvailableService.create_vector_db_from_generated_embeded_documents(AvailableService.out_dir)
@@ -319,8 +341,10 @@ class AvailableService:
         else:
             return retrieved_docs
 
-    # def create_sqlLite_database(out_dir):
-    #     db_instance = DB()
-    #     db_instance.create_database()
-    #     # db_instance.add_data()
-    #     db_instance.import_data_from_json(out_dir)
+    @staticmethod
+    def create_and_fill_retrieved_data_sqlLite_database(out_dir):
+        from database_retrieved_data.datacontext import DataContextRetrievedData
+        db = DataContextRetrievedData()
+        db.create_database()
+        #db.add_fake_data()
+        db.import_data_from_json(out_dir)

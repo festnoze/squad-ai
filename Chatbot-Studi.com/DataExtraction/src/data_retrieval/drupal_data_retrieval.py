@@ -6,7 +6,7 @@ from common_tools.models.file_already_exists_policy import FileAlreadyExistsPoli
 from helpers.unicode_helper import UnicodeHelper
 from textwrap import dedent
 
-class DrupalDataRetireval:
+class DrupalDataRetrieval:
     def __init__(self, outdir):
         txt.activate_print = True
         self.out_dir = outdir

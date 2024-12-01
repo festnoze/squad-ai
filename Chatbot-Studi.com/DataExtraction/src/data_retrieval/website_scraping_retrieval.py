@@ -11,7 +11,7 @@ from selenium.webdriver.common.by import By
 from common_tools.models.file_already_exists_policy import FileAlreadyExistsPolicy
 from common_tools.helpers.ressource_helper import Ressource
 
-class ScrapeService:
+class WebsiteScrapingRetrieval:
     def __init__(self):
         pass
 

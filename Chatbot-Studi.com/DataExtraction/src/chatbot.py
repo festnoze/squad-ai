@@ -11,7 +11,7 @@ from common_tools.rag.rag_inference_pipeline.end_pipeline_exception import EndPi
 
 # internal import
 from application.available_service import AvailableService
-from data_retrieval.scrape_service import ScrapeService
+from data_retrieval.website_scraping_retrieval import WebsiteScrapingRetrieval
 
 class ChatbotFront:
     def main():
@@ -164,7 +164,7 @@ class ChatbotFront:
     def scrape_website_pages():
         prompt = f'Scraping des pages web des formations'
         with st.spinner('En cours ... ' + prompt):
-            scraper = ScrapeService()
+            scraper = WebsiteScrapingRetrieval()
             scraper.scrape_all_trainings()            
             st.session_state.messages.append({'role': 'assistant', 'content': txt.remove_markdown("Terminé avec succès : " + prompt)})
 
