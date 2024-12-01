@@ -6,7 +6,7 @@ using System.Text.Json.Serialization;
 
 public class ConversationRequestModel
 {
-    [JsonPropertyName("messages")]
+    [JsonPropertyName("conversation")]
     public List<MessageRequestModel> Messages { get; set; } = new List<MessageRequestModel>();
 }
 

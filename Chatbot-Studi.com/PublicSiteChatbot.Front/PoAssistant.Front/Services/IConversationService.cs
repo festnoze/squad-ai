@@ -8,10 +8,11 @@ public interface IConversationService : IDisposable
     event Action? ApiCommunicationErrorNotification;
     event Action? OnConversationChanged;
 
+    Task GetAnswerToUserLastQueryAsync();
     void AddNewMessage(bool isSaved = false, bool isStreaming = true);
     void DeleteCurrentConversation();
-    void DisplayStreamMessage(string? messageChunk);
-    void EndsStreamMessage();
+    void AddStreamToLastMessage(string? messageChunk);
+    void EndsMessageStream();
     ConversationModel GetConversation();
     bool IsLastMessageEditable();
     bool IsWaitingForLLM();
@@ -19,6 +20,4 @@ public interface IConversationService : IDisposable
     void MarkConversationAsLoaded();
     void SaveConversation();
     void SetCurrentUser(string userName);
-    Task<Guid> ApiCallGetNewConversationIdAsync(string? userName);
-    Task ApiCallAnswerUserQueryAsync(ConversationModel conversation);
 }

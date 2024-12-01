@@ -4,6 +4,16 @@ namespace PoAssistant.Front.Client;
 
 public static class ConversationConverter
 {
+    // Convert ConversationModel to UserQueryAskingRequestModel
+    public static UserQueryAskingRequestModel ToUserQueryAskingRequestModel(this ConversationModel conversationModel)
+    {
+        return new UserQueryAskingRequestModel
+        {
+            ConversationId = conversationModel.Id ?? throw new InvalidOperationException("Conversation ID is not set"),
+            UserQueryContent = conversationModel.Last().Content
+        };
+    }
+    
     // Convert ConversationModel to ConversationRequestModel
     public static ConversationRequestModel ToRequestModel(this ConversationModel conversationModel)
     {

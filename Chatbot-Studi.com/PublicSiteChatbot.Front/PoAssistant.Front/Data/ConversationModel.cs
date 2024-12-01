@@ -6,13 +6,10 @@ public class ConversationModel : List<MessageModel>
 {
     public ConversationModel(Guid? id = null)
     {
-        if (id is null)
-            Id = Guid.NewGuid();
-        else
-            Id = id.Value;
+        Id = id;
     }
 
-    public Guid Id { get; set; }
+    public Guid? Id { get; set; }
     public void RemoveLastConversationMessageFlags() => this.ForEach(msg => msg.SetAsNotLastConversationMessage());
     public void RemoveLastMessage() => this.RemoveAt(this.Count - 1);
     public bool IsLastMessageFromUser => this.Last().IsFromUser;

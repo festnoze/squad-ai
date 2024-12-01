@@ -34,8 +34,8 @@
     </div>
 
     <div id="chat-container" class="chat-container">
-        @if (messages != null)
-        @foreach (var message in messages)
+        @if (conversation != null)
+        @foreach (var message in conversation)
         {
             <!-- Display all messages (but the last one if ongoing message under edition is handled in the bottom textarea) -->
             @if (ShouldDisplayMessage(message))
@@ -117,10 +117,10 @@
                         @onkeydown="HandleEditMessageKeyDown"
                         class="message-editable"
                         placeholder="Ecrivez votre question ici ..."
-                        disabled="@(messages!.Last().IsSavedMessage)">
-                @if (messages!.Last().IsFromUser && !messages!.Last().IsSavedMessage)
+                        disabled="@(conversation!.Last().IsSavedMessage)">
+                @if (conversation!.Last().IsFromUser && !conversation!.Last().IsSavedMessage)
                 {
-                    @messages!.Last().Content
+                    @conversation!.Last().Content
                 }
                 else
                 {

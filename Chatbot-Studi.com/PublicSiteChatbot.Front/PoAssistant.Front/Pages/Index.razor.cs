@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using PoAssistant.Front.Data;
 using Microsoft.Extensions.Options;
+using PoAssistant.Front.Client;
 
 namespace PoAssistant.Front.Pages;
 
@@ -18,9 +19,8 @@ public partial class Index : ComponentBase
 
     //
     private string? userName = null;
-    private Guid? conversationId = null;
     private string popupClass = "visible";
-    private ConversationModel messages = null!;
+    private ConversationModel conversation = null!;
     private string newMessageContent = string.Empty;
     private bool disableConversationModification = false;
     private ElementReference textAreaElement;
@@ -34,7 +34,7 @@ public partial class Index : ComponentBase
 
     protected override async Task OnInitializedAsync()
     {
-        messages = conversationService.GetConversation();
+        conversation = conversationService.GetConversation();
         isWaitingForLLM = conversationService.IsWaitingForLLM();
         conversationService.OnConversationChanged += ReloadConversation;
         conversationService.ApiCommunicationErrorNotification += ShowApiCommunicationError;
@@ -62,7 +62,7 @@ public partial class Index : ComponentBase
     {
         if (!disableConversationModification)
         {
-            messages!.Last().ChangeContent(await JSRuntime.InvokeAsync<string>("getElementValue", "editingMessageTextarea"));
+            conversation!.Last().ChangeContent(await JSRuntime.InvokeAsync<string>("getElementValue", "editingMessageTextarea"));
         }
     }
 
@@ -90,7 +90,7 @@ public partial class Index : ComponentBase
         else if (e.Key == "Enter" && e.CtrlKey)
         {
             await RetrieveInputTextAreaValueAsync(); 
-            await JSRuntime.InvokeAsync<string>("setElementValue", "editingMessageTextarea", messages!.Last().Content + "\n");
+            await JSRuntime.InvokeAsync<string>("setElementValue", "editingMessageTextarea", conversation!.Last().Content + "\n");
         }
         else
         {
@@ -146,9 +146,9 @@ public partial class Index : ComponentBase
     {
         await RetrieveInputTextAreaValueAsync();
         disableConversationModification = true;
-        messages!.Last().ChangeContent(messages!.Last().Content.Trim());
+        conversation!.Last().ChangeContent(conversation!.Last().Content.Trim());
 
-        if (isLastMessageEditable && string.IsNullOrEmpty(messages!.Last().Content))
+        if (isLastMessageEditable && string.IsNullOrEmpty(conversation!.Last().Content))
         {
             ShowEmptyMessageError();
             return;
@@ -156,13 +156,7 @@ public partial class Index : ComponentBase
 
         isWaitingForLLM = true;
         await EmptyAndDisableInputTextAreaAsync();
-
-        if (conversationId is null || messages!.IsFirstUserMessage)
-        {
-            conversationId = await conversationService.ApiCallGetNewConversationIdAsync(userName);
-        }
-
-        await conversationService.InvokeApiOnUserQueryAsync(conversationId, messages!.Last().Content);
+        await conversationService.GetAnswerToUserLastQueryAsync();
 
         await EnableInputTextAreaAsync();
         disableConversationModification = false;
@@ -171,7 +165,7 @@ public partial class Index : ComponentBase
 
     private async void ReloadConversation()
     {
-        messages = conversationService.GetConversation();
+        conversation = conversationService.GetConversation();
         isWaitingForLLM = conversationService.IsWaitingForLLM();
         await InvokeAsync(StateHasChanged);
     }

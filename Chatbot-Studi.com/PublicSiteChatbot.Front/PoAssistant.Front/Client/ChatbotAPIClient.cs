@@ -14,10 +14,15 @@ public class ChatbotAPIClient
         _httpClient = new HttpClient();
     }
 
-    public async IAsyncEnumerable<string> GetQueryRagAnswerStreamingAsync(ConversationRequestModel conversationRequestModel)
+    /// <summary>
+    /// Ask a question to the chatbot and get the answer as streaming.
+    /// </summary>
+    /// <param name="userQueryAskingRequestModel"></param>
+    /// <returns></returns>
+    public async IAsyncEnumerable<string> GetQueryRagAnswerStreamingAsync(UserQueryAskingRequestModel userQueryAskingRequestModel)
     {
         string endpoint = $"{_baseUrl}/rag/query/stream";
-        string jsonPayload = JsonSerializer.Serialize(conversationRequestModel);
+        string jsonPayload = JsonSerializer.Serialize(userQueryAskingRequestModel);
         var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
         {
             Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json")
@@ -40,6 +45,12 @@ public class ChatbotAPIClient
         }
     }
 
+    /// <summary>
+    /// Get a new conversation ID from the server.
+    /// </summary>
+    /// <param name="userName"></param>
+    /// <returns></returns>
+    /// <exception cref="Exception"></exception>
     public async Task<Guid> GetNewConversationIdAsync(string? userName)
     {
         string endpoint = $"{_baseUrl}/rag/query/create";

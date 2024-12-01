@@ -9,11 +9,12 @@ namespace PoAssistant.Front.Services;
 public class ConversationService : IConversationService
 {
     private ChatbotAPIClient _chatbotApiClient;
-    private readonly IExchangeRepository _exchangeRepository;
+    private string? userName = null;
     private ConversationModel? conversation = null;
     public event Action? OnConversationChanged = null;
     private bool isWaitingForLLM = false;
     private readonly string _apiHostUri;
+    private readonly IExchangeRepository _exchangeRepository;
 
     public ConversationService(IExchangeRepository exchangesRepository, IOptions<ApiSettings> apiSettings)
     {
@@ -42,10 +43,9 @@ public class ConversationService : IConversationService
         return conversation!;
     }
 
-    private string? username = null;
     public void SetCurrentUser(string userName)
     {
-        this.username = userName;
+        this.userName = userName;
     }
 
     public bool IsLastMessageEditable()
@@ -55,12 +55,7 @@ public class ConversationService : IConversationService
 
     public bool IsWaitingForLLM() => isWaitingForLLM;
 
-    public async Task<Guid> ApiCallGetNewConversationIdAsync(string? userName)
-    {
-        return await this._chatbotApiClient.GetNewConversationIdAsync(userName);
-    }
-
-    public async Task ApiCallAnswerUserQueryAsync(ConversationModel conversation)
+    public async Task GetAnswerToUserLastQueryAsync()
     {
         if (!conversation?.Any() ?? true)
             return;
@@ -68,20 +63,28 @@ public class ConversationService : IConversationService
         conversation!.Last().ChangeContent(conversation!.Last().Content.Trim());
         if (string.IsNullOrWhiteSpace(conversation!.Last().Content))
             return;
+        if (!conversation!.IsLastMessageFromUser)
+            return;
+
+        if (conversation!.Id is null)
+        {
+            conversation!.Id = await this._chatbotApiClient.GetNewConversationIdAsync(userName);
+        }
+
         conversation!.Last().IsSavedMessage = true;
         //SaveConversation();
 
-        var conversationRequestModel = conversation!.ToRequestModel();
         try
         {
+            var userQueryAskingRequestModel = conversation!.ToUserQueryAskingRequestModel();
             this.AddNewMessage(isSaved: false, isStreaming: true);
 
-            await foreach (var chunk in this._chatbotApiClient.GetQueryRagAnswerStreamingAsync(conversationRequestModel))
+            await foreach (var chunk in this._chatbotApiClient.GetQueryRagAnswerStreamingAsync(userQueryAskingRequestModel))
             {
-                this.DisplayStreamMessage(chunk);
+                this.AddStreamToLastMessage(chunk);
             }
 
-            this.EndsStreamMessage();
+            this.EndsMessageStream();
             this.AddNewMessage(isSaved: false, isStreaming: false);
         }
         catch (Exception e)
@@ -113,7 +116,7 @@ public class ConversationService : IConversationService
         OnConversationChanged?.Invoke();
     }
 
-    public void DisplayStreamMessage(string? messageChunk)
+    public void AddStreamToLastMessage(string? messageChunk)
     {
         // New lines are a specific pattern to allow spliting words and avoid win/mac issue over the streaming
         if (!string.IsNullOrEmpty(messageChunk))
@@ -124,7 +127,7 @@ public class ConversationService : IConversationService
         }
     }
 
-    public void EndsStreamMessage()
+    public void EndsMessageStream()
     {
         conversation!.Last().IsStreaming = false;
         conversation!.Last().IsSavedMessage = true;
@@ -133,19 +136,19 @@ public class ConversationService : IConversationService
     public void LoadConversationByName(string exchangeNameTruncated, bool truncatedExchangeName = false)
     {
         _isExchangesLoaded = false;
-        conversation = _exchangeRepository.LoadUserExchange(username!, exchangeNameTruncated, truncatedExchangeName);
+        conversation = _exchangeRepository.LoadUserExchange(userName!, exchangeNameTruncated, truncatedExchangeName);
         if (conversation is null)
-            throw new InvalidOperationException($"Cannot load the Conversation as the exchange is not found for user: {username}");
+            throw new InvalidOperationException($"Cannot load the Conversation as the exchange is not found for user: {userName}");
 
         OnConversationChanged?.Invoke();
     }
 
     public void SaveConversation()
     {
-        if (username is null)
-            username = "defaultUser";
+        if (userName is null)
+            userName = "defaultUser";
 
-        var newConversation = _exchangeRepository.SaveUserExchange(username, conversation!);
+        var newConversation = _exchangeRepository.SaveUserExchange(userName, conversation!);
         if (newConversation)
             _isExchangesLoaded = false;
     }
