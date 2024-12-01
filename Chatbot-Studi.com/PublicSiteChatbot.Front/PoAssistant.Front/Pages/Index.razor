@@ -16,7 +16,7 @@
 <head>
 </head>
 
-<Modal @ref="modal" IsVisible="@IsLoginModalVisible" IsVisibleChanged="@LoginModalIsVisibleChangedAsync">
+<Modal @ref="modal" IsVisible="@isLoginModalVisible" IsVisibleChanged="@LoginModalIsVisibleChangedAsync">
     <Login IsVisibleChanged="@LoginModalIsVisibleChangedAsync" />
 </Modal>
 
@@ -29,7 +29,7 @@
             <span class="header-title-text">Votre conseiller en formation virtuel</span>
         </div>
         <div class="header-logo">
-            <img class="" src="https://pbs.twimg.com/profile_images/1419651930293477380/VdtQG2l1_400x400.jpg" alt="logo">
+            <img src="https://www.studi.com/sites/default/files/2021-08/Logo_color.svg" alt="Logo Studi" height="33" width="95">
         </div>
     </div>
 
@@ -55,7 +55,7 @@
                     style="@((DisplayEditingButtons(message) ? "width: 80%;" : ""))">
 
                     @* Display regular messages' content (as non-editable) *@
-                    @if (!IsEditableLastMessage(message) || showBottomInputMessage)
+                    @if (!IsEditableLastMessage(message) || showInputMessageAtBottom)
                     {
                         
                         @(new MarkupString(message.GetContentWithMarkdownAsHtml()));
@@ -83,8 +83,8 @@
                         @* Display actions buttons *@
                         @if (DisplayEditingButtons(message))
                         {
-                            <div class="send-inline-button-wrapper">
-                                <button title="Valider la réponse" @onclick="() => SendMessage()" class="send-message-button">
+                            <div class="send-button-wrapper">
+                                <button id="sendEditingMessageButton" class="send-message-button" title="Valider la question" @onclick="() => SendMessage()">
                                     <span class="oi oi-check"></span>
                                 </button>
                             </div>
@@ -104,7 +104,7 @@
     </div> 
 
     @* Display the user input textArea at the window bottom *@
-    @if (showBottomInputMessage)
+    @if (showInputMessageAtBottom)
     {
         <div class="input-area">
             @* <div>
@@ -127,7 +127,7 @@
                 }
             </textarea>
             <div class="send-button-wrapper">
-                <button id="sendEditingMessageButton" title="Valider la question" @onclick="() => SendMessage()" class="send-message-button">
+                <button id="sendEditingMessageButton" class="send-message-button" title="Valider la question" @onclick="() => SendMessage()">
                     <span class="oi oi-check"></span> @* arrow-thick-right *@
                 </button>
             </div>

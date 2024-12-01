@@ -1,4 +1,4 @@
-from drupal_json_api_client import DrupalJsonApiClient
+from data_retrieval.drupal_json_api_client import DrupalJsonApiClient
 from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.file_helper import file
 from common_tools.helpers.json_helper import json

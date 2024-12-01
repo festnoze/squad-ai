@@ -16,7 +16,6 @@
 }
 
 .modal-content {
-    padding: 20px;
     margin: auto; /* This will take as much space as needed, centered */
     overflow: auto; /* In case the content overflows */
 }

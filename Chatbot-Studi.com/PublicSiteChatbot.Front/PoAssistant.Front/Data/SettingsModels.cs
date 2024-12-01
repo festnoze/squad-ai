@@ -7,7 +7,8 @@ public class ApiSettings
 
 public class ChatbotSettings
 {
-    public bool ShowBottomInputMessage { get; set; } = true;
+    public bool ShowInputMessageAtBottom { get; set; } = true;
     public bool ShowOngoingMessageInConversation { get; set; } = false;
     public bool ShowEmptyOngoingMessageInConversation { get; set; } = false;
+    public bool DoLoginOnStartup { get; set; } = false;
 }

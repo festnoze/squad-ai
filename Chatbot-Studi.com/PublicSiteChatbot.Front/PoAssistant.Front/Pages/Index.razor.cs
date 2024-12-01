@@ -11,9 +11,10 @@ public partial class Index : ComponentBase
     [Inject]
     public IOptions<ChatbotSettings> ChatbotSettings { get; set; }
 
-    private bool showBottomInputMessage => ChatbotSettings.Value.ShowBottomInputMessage;
+    private bool showInputMessageAtBottom => ChatbotSettings.Value.ShowInputMessageAtBottom;
     private bool showOngoingMessageInConversation => ChatbotSettings.Value.ShowOngoingMessageInConversation;
     private bool showEmptyOngoingMessageInConversation => ChatbotSettings.Value.ShowEmptyOngoingMessageInConversation;
+    private bool doLoginOnStartup => ChatbotSettings.Value.DoLoginOnStartup;
 
     //
     private string popupClass = "visible";
@@ -27,7 +28,7 @@ public partial class Index : ComponentBase
     private bool isMenuOpen = false;
     private bool showMessageEmptyError = false;
     private bool showApiCommunicationErrorNotification = false;
-    private bool IsLoginModalVisible { get; set; }
+    private bool isLoginModalVisible { get; set; } = false;
     private Modal modal { get; set; } = new Modal();
 
     protected override async Task OnInitializedAsync()
@@ -52,7 +53,7 @@ public partial class Index : ComponentBase
 
     private async Task LoginModalIsVisibleChangedAsync(bool isVisible)
     {
-        IsLoginModalVisible = isVisible;
+        isLoginModalVisible = isVisible;
         await InvokeAsync(StateHasChanged);
     }
 
@@ -99,7 +100,7 @@ public partial class Index : ComponentBase
 
     private bool ShouldDisplayMessage(MessageModel message)
     {
-        return !message.IsLastMessageOfConversation || !showBottomInputMessage || (showOngoingMessageInConversation && (!message.IsEmpty || showEmptyOngoingMessageInConversation));
+        return !message.IsLastMessageOfConversation || !showInputMessageAtBottom || (showOngoingMessageInConversation && (!message.IsEmpty || showEmptyOngoingMessageInConversation));
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -110,27 +111,24 @@ public partial class Index : ComponentBase
             await JSRuntime.InvokeVoidAsync("scrollChatContainerToBottom");
         }
 
-        IsLoginModalVisible = false;
-
-        // Desactivated Login TODO: make optionnal through env. config.
-        // if (!IsLoginModalVisible)
-        // {
-        //     userName = await JSRuntime.InvokeAsync<string>("blazorExtensions.ReadStorage", "userName");
-        //     conversationService.SetCurrentUser(userName);
-        //     var authState = await authenticationStateProvider.GetAuthenticationStateAsync(userName);
-        //     if (!authState.User.Identity!.IsAuthenticated)
-        //     {
-        //         IsLoginModalVisible = true;
-        //         await InvokeAsync(StateHasChanged);
-        //     }
-        // }
+        if (doLoginOnStartup && userName is null && !isLoginModalVisible)
+        {
+            userName = await JSRuntime.InvokeAsync<string>("blazorExtensions.ReadStorage", "userName");
+            conversationService.SetCurrentUser(userName);
+            var authState = await authenticationStateProvider.GetAuthenticationStateAsync(userName);
+            if (!authState.User.Identity!.IsAuthenticated)
+            {
+                isLoginModalVisible = true;
+                await InvokeAsync(StateHasChanged);
+            }
+        }
 
         await base.OnAfterRenderAsync(firstRender);
     }
 
     private bool DisplayEditingButtons(MessageModel message)
     {
-        return isLastMessageEditable && !showBottomInputMessage && !isWaitingForLLM && message.IsLastMessageOfConversation && !message.IsSavedMessage;
+        return isLastMessageEditable && !showInputMessageAtBottom && !isWaitingForLLM && message.IsLastMessageOfConversation && !message.IsSavedMessage;
     }
 
     private bool DisplayLoader(MessageModel message)

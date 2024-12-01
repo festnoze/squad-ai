@@ -10,8 +10,8 @@ from common_tools.models.conversation import Conversation
 from common_tools.rag.rag_inference_pipeline.end_pipeline_exception import EndPipelineException
 
 # internal import
-from available_service import AvailableService
-from scrape_service import ScrapeService
+from application.available_service import AvailableService
+from data_retrieval.scrape_service import ScrapeService
 
 class ChatbotFront:
     def main():

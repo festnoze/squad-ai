@@ -16,11 +16,10 @@ html, body {
     background-color: #FAFAFA;
     box-shadow: 0 20px 25px rgba(100, 100, 100, 0.4);
     z-index: 1000;
-    display: none;
 }
-
     #chatbot-window.visible {
-        display: block;
+        display: flex;
+        flex-direction: column;
     }
 
     #chatbot-window.hidden {
@@ -38,15 +37,16 @@ html, body {
 }
 
 .chatbot-header {
+    flex: 0 0 auto;
     display: flex; /* Align children horizontally */
     align-items: center; /* Center items vertically */
     justify-content: space-between; /* Spread out the content */
-    width: 100%; /* Full width of the container */
+    width: auto; /* Full width of the container */
     height: 60px; /* Adjust the height as needed */
-    padding: 0 10px; /* Add some padding on the sides */
-    background-color: #59B9C7; /* Adjust background color as needed */
-    border-bottom: 1px solid #ccc; /* Optional: Add a bottom border */
-    border-radius: 20px;
+    padding: 0 10px;
+    background-color: #59B9C7;
+    border-bottom: 1px solid #ccc;
+    border-radius: 15px 25px;
     margin-bottom: 5px;
 }
 
@@ -75,10 +75,12 @@ html, body {
     padding-right:2px;
 }
     .header-logo img {
-        width: 72px; /* Scale the logo to fit nicely */
-        height: 72px; /* Keep the logo square */
+        width: 67px; /* Scale the logo to fit nicely */
+        height: 67px; /* Keep the logo square */
+        background-color: white;
         border-radius: 40%; /* Optional: Make the image circular */
-        padding-bottom: 4px;
+        padding: 5px;
+        padding-bottom: 7px;
     }
 
 
@@ -101,6 +103,11 @@ html, body {
 
 /* Chat container */
 .chat-container {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
     height: 430px; /* worth the height of the iframe container minus 170px */
     width: auto;
     border: 1px solid #CCC;
@@ -108,9 +115,6 @@ html, body {
     padding-top: 5px;
     padding-bottom: 10px;
     margin-bottom: 8px;
-    display: flex;
-    flex-direction: column;
-    overflow-y: auto;
 }
 
 .message-header-receiver {
@@ -192,6 +196,7 @@ html, body {
     }
 
 .input-area {
+    flex: 0 0 auto;
     position: relative;
     width: auto;
     border-top: 1px solid #ccc;
@@ -235,7 +240,7 @@ html, body {
     }
 
 
-.send-inline-button-wrapper {
+.send-button-wrapper {
     position: absolute;
     bottom: 8px;
     right: 8px;
@@ -244,8 +249,8 @@ html, body {
 
 .send-button-wrapper {
     position: absolute;
-    bottom: -22px; 
-    right: -6px; 
+    bottom: 5px;
+    right: 2px;
     z-index: 1;
 }
 

@@ -1,12 +1,10 @@
 import uvicorn
-import asyncio
-from typing import AsyncGenerator, Generator
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse, JSONResponse
 from contextlib import asynccontextmanager
 import logging
-from available_service import AvailableService
-from request_models.conversation_request_model import ConversationRequestModel
+from application.available_service import AvailableService
+from web_services.request_models.conversation_request_model import ConversationRequestModel
 
 from common_tools.models.conversation import Conversation
 

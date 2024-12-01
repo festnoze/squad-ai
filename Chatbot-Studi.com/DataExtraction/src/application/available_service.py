@@ -5,7 +5,7 @@ from textwrap import dedent
 import time
 from typing import AsyncGenerator
 from dotenv import find_dotenv, load_dotenv
-from ragas_service import RagasService
+from application.ragas_service import RagasService
 #
 from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.execute_helper import Execute
@@ -32,10 +32,10 @@ from langchain_core.runnables import Runnable, RunnablePassthrough
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.docstore.document import Document
 #from database.database import DB
-from drupal_data_retireval import DrupalDataRetireval
-from generate_documents_and_metadata import GenerateDocumentsAndMetadata
+from data_retrieval.drupal_data_retireval import DrupalDataRetireval
 from site_public_metadata_descriptions import MetadataDescriptionHelper
-from generate_summaries_chunks_questions_and_metadata import GenerateDocumentsSummariesChunksQuestionsAndMetadata
+from vector_database_creation.generate_documents_and_metadata import GenerateDocumentsAndMetadata
+from vector_database_creation.generate_summaries_chunks_questions_and_metadata import GenerateDocumentsSummariesChunksQuestionsAndMetadata
 
 class AvailableService:
     inference: RagInferencePipeline = None

@@ -6,13 +6,15 @@
 @inject NavigationManager NavigationManager
 
 <div>
-    <div class="top-row ps-3 navbar navbar-dark" style="border-radius: .25rem;">
-        <div style="padding-top: 5px; padding-bottom: 50px; display: flex; justify-content: flex-end;">
-            <a class="connection-header">Connexion</a>
-            <div style="display: flex; justify-content: flex-end;">
-                <span class="oi oi-double-quote-serif-right" style="color: #1e8a56; font-size: 1.9rem; top: -5px; padding-left: 9px; left: 70px;" />
-                <span class="oi oi-double-quote-serif-left" style="color: #333; font-size: 2.9rem; top: -15px; opacity: 0.1; top: -15px; left: 50px;" />
-            </div>
+    <div class="chatbot-header" style="margin: 4px;">
+        <div class="header-left-panel">
+        </div>
+        <div class="header-title">
+            <span class="header-title-text">Connexion</span>
+        </div>
+        <div class="header-logo">
+            @* <img src="https://www.studi.com/sites/default/files/2021-08/Logo_color.svg" alt="Logo Studi" height="33" width="95"> *@
+            <img class="" src="https://pbs.twimg.com/profile_images/1419651930293477380/VdtQG2l1_400x400.jpg" alt="logo">
         </div>
     </div>
 
@@ -27,16 +29,18 @@
     }
 
     <form @onsubmit="DoLogin">
-        <div>
-            <label class="label" for="username"><i>Pseudonyme</i></label>
+        <div style="padding: 14px;">
+            <label class="label" for="username"><i>Identifiant</i></label>
             <input @bind="username" class="form-control" />
         </div>
-        <div>
+        <div style="padding: 14px;">
             <label class="label" for="password">Mot de passe</label>
             <input type="password" @bind="password" class="form-control" />
         </div>
-        <div class="connection-button-area">
-            <button type="submit" class="connection-button">Connexion</button>
+        <div class="send-button-wrapper" style="position: static; justify-self: end; padding: 14px;">
+            <button type="submit" class="send-message-button">Connexion
+                <span class="oi oi-arrow-circle-right" style="vertical-align: text-bottom;"></span>
+            </button>
         </div>
     </form>
 </div>
