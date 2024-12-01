@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Optional, Union
 from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.execute_helper import Execute
 from common_tools.models.conversation import Conversation
@@ -39,7 +39,7 @@ class RAGHybridRetrieval:
         return retained_chunks
     
     @staticmethod    
-    async def rag_hybrid_retrieval_langchain_async(rag: RagService, analysed_query: QuestionAnalysisBase, metadata_filters:Operation, include_bm25_retrieval: bool = True, include_contextual_compression: bool = False, include_semantic_retrieval: bool = True, give_score: bool = True, max_retrived_count: int = 20, bm25_ratio: float = 0.2):
+    async def rag_hybrid_retrieval_langchain_async(rag: RagService, analysed_query: QuestionAnalysisBase, metadata_filters: Optional[Union[Operation, Comparison]], include_bm25_retrieval: bool = True, include_contextual_compression: bool = False, include_semantic_retrieval: bool = True, give_score: bool = True, max_retrived_count: int = 20, bm25_ratio: float = 0.2):
         if metadata_filters and not any(metadata_filters):
             metadata_filters = None
         
@@ -58,6 +58,7 @@ class RAGHybridRetrieval:
         
         if include_bm25_retrieval: 
             # Select documents matching metadata filters
+            #TODO: WARNING: not generic treatment here 
             if metadata_filters:
                 if RagFilteringMetadataHelper.does_contain_filter(metadata_filters, 'domaine','url'):
                     max_retrived_count = 100

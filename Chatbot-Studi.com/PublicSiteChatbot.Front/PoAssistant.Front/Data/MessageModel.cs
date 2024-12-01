@@ -4,6 +4,7 @@ using Markdig.Syntax.Inlines;
 using Markdig.Syntax;
 using Markdig.Renderers.Html;
 using Markdig.Renderers;
+using Markdig.Extensions.Tables;
 
 namespace PoAssistant.Front.Data;
 
@@ -11,7 +12,11 @@ public record MessageModel
 {
     public static string UserRole = "Utilisateur";
     public static string AiRole = "Assistant";
-    private static MarkdownPipeline markdownPipeline = new MarkdownPipelineBuilder().UseSoftlineBreakAsHardlineBreak().Build();
+    private static MarkdownPipeline markdownPipeline = 
+                    new MarkdownPipelineBuilder()
+                    .UseSoftlineBreakAsHardlineBreak()
+                    .UseAdvancedExtensions()
+                    .Build();
 
     [JsonPropertyName("id")]
     public Guid Id { get; init; }
@@ -73,18 +78,31 @@ public record MessageModel
         if (string.IsNullOrEmpty(input))
             return "";
 
-        //var result = Markdown.ToHtml(Content, markdownPipeline);
-        //result = result.Replace("</p>\n", "</p><br>");
-
         var document = Markdown.Parse(input, markdownPipeline);
 
-        // Ajouter l'attribut target="_blank" à chaque lien
+        // Add target="_blank" attribute to all links
         foreach (var link in document.Descendants().OfType<LinkInline>())
         {
             link.GetAttributes().AddPropertyIfNotExist("target", "_blank");
         }
 
-        // Rendre le document en HTML
+        // Process tables: Add classes or custom logic for styling
+        foreach (var table in document.Descendants().OfType<Table>())
+        {
+            table.GetAttributes().AddClass("generated-array-class");
+
+            //foreach (var row in table.Descendants().OfType<TableRow>())
+            //{
+            //    row.GetAttributes().AddClass("custom-row-class");
+            //}
+
+            //foreach (var cell in table.Descendants().OfType<TableCell>())
+            //{
+            //    cell.GetAttributes().AddClass("custom-cell-class");
+            //}
+        }
+
+        // Render the Markdown document into HTML
         var result = "";
         using (var writer = new StringWriter())
         {
@@ -94,6 +112,7 @@ public record MessageModel
             result = writer.ToString();
         }
 
+        // Additional transformations
         result = result.TrimEnd().Replace("</p>\n", "</p><br>");
         return result;
     }

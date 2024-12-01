@@ -10,7 +10,7 @@
             "request": "launch",
             "module": "uvicorn",
             "args": [
-                "main:app", // The FastAPI app instance in main.py
+                "api.startup:app", // The FastAPI app instance in main.py
                 "--host", "127.0.0.1", // Host to bind
                 "--port", "8000",      // Port to bind
                 "--reload"             // Enable auto-reload for development

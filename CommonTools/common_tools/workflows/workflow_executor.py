@@ -1,15 +1,12 @@
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
-import importlib
+from typing import Union, Optional, get_origin, get_args
 import inspect
-import typing
-from collections.abc import Iterable
+import types
 #
 from common_tools.helpers.file_helper import file
 from common_tools.helpers.method_decorator_helper import MethodDecorator
 from common_tools.helpers.reflexion_helper import Reflexion
 from common_tools.rag.rag_inference_pipeline.end_pipeline_exception import EndPipelineException
-from common_tools.helpers.execute_helper import Execute
 
 class WorkflowExecutor:
     def __init__(self, config_or_config_file_path=None, available_classes:dict={}):
@@ -166,6 +163,7 @@ class WorkflowExecutor:
             )
         raise RuntimeError(error_message) from exception
 
+
     def _prepare_arguments_for_function(self, func, previous_results: list, kwargs_value: dict):
         """
         Prepares keyword arguments for a function call.
@@ -187,29 +185,29 @@ class WorkflowExecutor:
 
         for arg_name, arg in function_args:
             if arg.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
-                # Skip *args and **kwargs handling
                 continue
 
             if kwargs_value and arg_name in kwargs_value:
-                # Use the value from kwargs_value
                 func_kwargs[arg_name] = kwargs_value[arg_name]
-                # Check if it also matches the next value from previous_results
                 if prev_results_index < len(prev_results):
                     arg_value = prev_results[prev_results_index]
                     if isinstance(arg_value, list) and len(arg_value) == 1 and arg_value[0] == kwargs_value[arg_name]:
                         prev_results_index += 1
-                    elif arg_value == kwargs_value[arg_name] and (arg.annotation == inspect.Parameter.empty or isinstance(arg_value, arg.annotation)):
+                    elif arg_value == kwargs_value[arg_name] and (
+                            arg.annotation == inspect.Parameter.empty or
+                            self._is_value_matching_annotation(arg_value, arg.annotation)):
                         prev_results_index += 1
             elif prev_results_index < len(prev_results):
-                # Use the next value from previous_results if not already set in kwargs
                 arg_value = prev_results[prev_results_index]
-                # Raise an error only if: The arg type is specified, the previous_results value type does not match it, and the arg has no default value
-                if arg.annotation != inspect.Parameter.empty and not Reflexion.is_matching_type_and_subtypes(arg_value, arg.annotation):
-                    if arg.default is not inspect.Parameter.empty:
-                        continue
-                    else:
-                        raise TypeError(f"Type mismatch while preparing args for function: '{func.__name__}'. Provided value for argument '{arg_name}' is: '{type(arg_value).__name__}', but expected to be: '{arg.annotation.__name__}'")
-
+                if arg.annotation != inspect.Parameter.empty:
+                    if not self._is_value_matching_annotation(arg_value, arg.annotation):
+                        if arg.default is not inspect.Parameter.empty:
+                            continue
+                        else:
+                            raise TypeError(
+                                f"Type mismatch while preparing args for function: '{func.__name__}'. "
+                                f"Provided value for argument '{arg_name}' is: '{type(arg_value).__name__}', "
+                                f"but expected to be: '{arg.annotation}'")
                 func_kwargs[arg_name] = arg_value
                 prev_results_index += 1
             else:
@@ -219,6 +217,23 @@ class WorkflowExecutor:
                     raise TypeError(f"Missing argument: '{arg_name}', which is required, because it has no default value.")
 
         return func_kwargs
+
+    def _is_value_matching_annotation(self, value, annotation):
+        """
+        Check if a value matches an annotation. Supports Optional and Union types.
+        """
+        origin = get_origin(annotation)
+        if origin is Union:
+            # Get all types within Union
+            possible_types = get_args(annotation)
+            # Check if NoneType is allowed (Optional)
+            if type(None) in possible_types and value is None:
+                return True
+            # Check if value matches any other type in Union
+            return any(isinstance(value, t) for t in possible_types if t is not type(None))
+        if value is None and annotation == Optional:
+            return True
+        return isinstance(value, annotation)
 
     def _get_function_output_names(self, func):
         output_names = getattr(func, '_output_name', None)

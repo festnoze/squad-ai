@@ -406,6 +406,40 @@ html, body {
     }
 
 
+.generated-array-class {
+    border-collapse: collapse;
+    border-radius: 6px; /* Rounded corners */
+    width: 100%;
+    margin: 20px 0px;
+    overflow: hidden; /* Ensures proper corner rounding */
+}
+
+    /* Add borders to table cells */
+    .generated-array-class th, .generated-array-class td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+    }
+
+    /* Change header background color, justify text, and style */
+    .generated-array-class th {
+        background-color: #f2f2f2; /* Grey background */
+        color: #333; /* Text color */
+        font-weight: bold; /* Bold text */
+        text-align: center; /* Centered text */
+        padding: 8px; /* Padding for spacing */
+    }
+
+    /* Add hover effect to rows */
+    .generated-array-class tr:hover {
+        background-color: #f9f9f9;
+    }
+
+    /* Add spacing between table rows */
+    .generated-array-class tr {
+        line-height: 1.5;
+    }
+
 
 h1:focus {
     outline: none;
