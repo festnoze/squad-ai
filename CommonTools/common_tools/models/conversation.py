@@ -1,4 +1,5 @@
 from typing import Optional, Union
+import uuid
 from uuid import UUID
 from common_tools.models.message import Message
 from langchain.schema.messages import HumanMessage, AIMessage, SystemMessage
@@ -6,8 +7,12 @@ from langchain.memory import ConversationBufferMemory
 from langchain_core.messages.base import BaseMessage, BaseMessageChunk
 
 class Conversation:
+    id: UUID
+    user_name: str
+    messages: list[Message]
+
     def __init__(self, user_name:str = None, messages: list = None, id:UUID = None) -> None:
-        self.id:UUID = id if id else UUID.uuid4()
+        self.id:UUID = id if id else uuid.uuid4()
         self.user_name:str = user_name if user_name else 'default user'
         self.messages:list[Message] = []
         if messages:

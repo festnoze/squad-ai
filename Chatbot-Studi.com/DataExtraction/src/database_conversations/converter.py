@@ -5,16 +5,19 @@ class ConversationConverter:
     @staticmethod
     def convert_conversation_model_to_entity(conversation: Conversation):
         """Convert Conversation model to Conversation entity"""
+        messages=[]
+        if conversation.messages and any(conversation.messages):
+            messages=[MessageEntity(
+                role=message.role,
+                content=message.content,
+                elapsed_seconds=message.elapsed_seconds) 
+                for message in conversation.messages
+            ]
+       
         conversation_entity = ConversationEntity(
             id=conversation.id,
             user_name=conversation.user_name,
-            messages=[
-                MessageEntity(
-                    role=message.role,
-                    content=message.content,
-                    elapsed_seconds=message.elapsed_seconds) 
-                for message in conversation.messages
-            ]
+            messages=messages
         )
         return conversation_entity
     

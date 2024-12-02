@@ -1,3 +1,7 @@
+import asyncio
+from contextlib import asynccontextmanager
+import os
+from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.future import select
@@ -12,6 +16,9 @@ from common_tools.helpers.file_helper import file
 
 class DataContextConversations:
     def __init__(self, db_path_or_url='database_conversations/conversation_database.db'):
+        if ':' not in db_path_or_url:
+            source_path = os.environ.get("PYTHONPATH").split(';')[-1]
+            db_path_or_url = os.path.join(source_path, db_path_or_url)
         if 'http' not in db_path_or_url and not file.file_exists(db_path_or_url):
             txt.print(f"/!\\ Conversations Database file not found at path: {db_path_or_url}")
             self.create_database(db_path_or_url)
@@ -21,25 +28,26 @@ class DataContextConversations:
         self.SessionLocal = sessionmaker(
                                 bind=self.engine,
                                 expire_on_commit=False,
-                                class_=AsyncSession
-                            )
+                                class_=AsyncSession)
 
-    def create_database(self, db_path: str):
-        engine = create_async_engine(f'sqlite:///{db_path}', echo=True)
-        Base.metadata.create_all(bind=engine.sync_engine)
+    def create_database(self, db_path):
+        sqlite_db_path_sync = f'sqlite:///{db_path}'
+        sync_engine = create_engine(sqlite_db_path_sync, echo=True)
+        with sync_engine.begin() as conn:
+            Base.metadata.create_all(bind=conn)
         txt.print(">>> Conversations Database and tables created successfully.")
 
+    @asynccontextmanager
     async def get_session_async(self):
-        async with self.SessionLocal() as session:
-            try:
-                yield session
-                await session.commit()
-            except SQLAlchemyError as e:
-                await session.rollback()
-                txt.print(f"An error occurred: {e}")
-                raise
-            finally:
-                await session.close()
+        session = self.SessionLocal()
+        try:
+            yield session
+            await session.commit()
+        except Exception as e:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()
 
     async def add_conversation_async(self, user_name: str, conversation_entity: ConversationEntity):
         async with self.get_session_async() as session:

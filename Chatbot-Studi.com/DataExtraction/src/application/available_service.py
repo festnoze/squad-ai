@@ -160,24 +160,28 @@ class AvailableService:
     async def create_new_conversation_async(user_name: str = None):
         new_conv_model = Conversation(user_name)
         new_conv_entity = ConversationConverter.convert_conversation_model_to_entity(new_conv_model)
-        await ConversationRepository().create_new_conversation_async(new_conv_entity)
+        assert await ConversationRepository().create_new_conversation_async(new_conv_entity)
         return ConversationConverter.convert_conversation_entity_to_model(new_conv_entity)
 
     @staticmethod
     async def rag_query_stream_async(user_query_request_model: UserQueryAskingRequestModel):
         conversation = await ConversationRepository().get_conversation_by_id_async(user_query_request_model.conversation_id)
-        conversation.add_new_message("user", user_query_request_model.user_query)
-        all_chunks_output=[]
-        response_generator = AvailableService.rag_query_retrieval_and_augmented_generation_streaming_async(conversation, False, all_chunks_output)
+        if not conversation: 
+            raise ValueError(f"Conversation with ID {user_query_request_model.conversation_id} not found in database.")
+        conversation.add_new_message("user", user_query_request_model.user_query_content)
+        assert await ConversationRepository().add_message_to_conversation_async(conversation.id, conversation.last_message)
         
         # Stream the response
+        all_chunks_output=[]
+        response_generator = AvailableService.rag_query_retrieval_and_augmented_generation_streaming_async(conversation, False, all_chunks_output)
         async for chunk in response_generator:
             yield chunk
         
-        # Update the conversation last message with a summary of the response
-        summarized_response = AvailableService.get_summarized_answer(''.join(all_chunks_output))
+        # Add a summary of the generated answer to conversation messages and save it
+        full_answer_str = txt.get_text_from_chunks(all_chunks_output)
+        summarized_response = await AvailableService.get_summarized_answer_async(full_answer_str)
         conversation.add_new_message("assistant", summarized_response)
-        await ConversationRepository().add_message_to_conversation_async(conversation.id, Message("assistant", summarized_response))
+        assert await ConversationRepository().add_message_to_conversation_async(conversation.id, conversation.last_message)
     
     @staticmethod
     async def rag_query_retrieval_and_augmented_generation_streaming_async(conversation_history:Conversation, is_stream_decoded = False, all_chunks_output: list[str] = []):
@@ -278,15 +282,23 @@ class AvailableService:
             AvailableService.format_retrieved_docs_function, #format_retrieved_docs_function,
             None, #override_workflow_available_classes
         )
-        response = ''.join(chunk.decode('utf-8') for chunk in sync_generator)
+        response = txt.get_text_from_chunks(sync_generator)
         txt.stop_spinner_replace_text("Pipeline d'inférence exectué :")
         return response
     
+    #OBSOLETE: don't use this method, use async version instead
     def get_summarized_answer(text):
         summarize_rag_answer_prompt = Ressource.load_ressource_file('summarize_rag_answer_prompt.french.txt')
         promptlate = ChatPromptTemplate.from_template(summarize_rag_answer_prompt)
         chain = promptlate | AvailableService.rag_service.llm_1 | RunnablePassthrough()
         result = Execute.async_wrapper_to_sync(Llm.invoke_chain_with_input_async, 'Answer summarization', chain, text)
+        return Llm.get_content(result)
+    
+    async def get_summarized_answer_async(text):
+        summarize_rag_answer_prompt = Ressource.load_ressource_file('summarize_rag_answer_prompt.french.txt')
+        promptlate = ChatPromptTemplate.from_template(summarize_rag_answer_prompt)
+        chain = promptlate | AvailableService.rag_service.llm_1 | RunnablePassthrough()
+        result = await Llm.invoke_chain_with_input_async('Answer summarization', chain, text)
         return Llm.get_content(result)
 
     def generate_ground_truth():
@@ -342,9 +354,10 @@ class AvailableService:
             return retrieved_docs
 
     @staticmethod
-    def create_and_fill_retrieved_data_sqlLite_database(out_dir):
+    def create_and_fill_retrieved_data_sqlLite_database(out_dir = None):
         from database_retrieved_data.datacontext import DataContextRetrievedData
         db = DataContextRetrievedData()
         db.create_database()
         #db.add_fake_data()
-        db.import_data_from_json(out_dir)
+        if out_dir:
+            db.import_data_from_json(out_dir)

@@ -1,6 +1,5 @@
 -e C:/Dev/squad-ai/CommonTools # local package to internal tooling
 pytest
-sqlalchemy
 numpy
 streamlit
 nltk
@@ -8,5 +7,7 @@ ragas
 requests
 BeautifulSoup4
 selenium
+sqlalchemy
+aiosqlite
 fastapi
 uvicorn

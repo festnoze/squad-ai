@@ -27,6 +27,7 @@ def create_app() -> FastAPI:
             return await call_next(request)
         except Exception as exc:
             logger.error(str(exc))
+            print(str(exc))
             return JSONResponse(status_code=500, content={"detail": str(exc)})
 
     @app.exception_handler(Exception)

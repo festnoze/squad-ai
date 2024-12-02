@@ -16,7 +16,7 @@
                 "--reload"             // Enable auto-reload for development
             ],
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
+                "PYTHONPATH": "${workspaceFolder}\\src"
             },
             "console": "integratedTerminal"
         }

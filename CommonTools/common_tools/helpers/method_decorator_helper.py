@@ -4,6 +4,7 @@ import inspect
 import asyncio
 from typing import AsyncGenerator, Callable
 from common_tools.helpers.txt_helper import txt
+from common_tools.rag.rag_inference_pipeline.end_pipeline_exception import EndPipelineException
 
 class MethodDecorator:
     @staticmethod
@@ -40,7 +41,10 @@ class MethodDecorator:
                 try:
                     result = func(*args, **kwargs)
                     after_invoke(function_name, param_value_message, start_time)
-                    return result
+                    return result                
+                # Do not display pipeline ending exceptions, as they're not actual errors, but allow to exit the pipeline early
+                except EndPipelineException: 
+                    pass
                 except Exception as e:
                     fails_upon_invoke(function_name, param_value_message)
                     raise e
@@ -52,6 +56,10 @@ class MethodDecorator:
                     result = await func(*args, **kwargs)
                     after_invoke(function_name, param_value_message, start_time)
                     return result
+                
+                # Do not display pipeline ending exceptions, as they're not actual errors, but allow to exit the pipeline early
+                except EndPipelineException: 
+                    pass
                 except Exception as e:
                     fails_upon_invoke(function_name, param_value_message)
                     raise e
@@ -63,6 +71,10 @@ class MethodDecorator:
                     async for item in func(*args, **kwargs):
                         yield item  # Stream the items from the generator
                     after_invoke(function_name, param_value_message, start_time)
+
+                # Do not display pipeline ending exceptions, as they're not actual errors, but allow to exit the pipeline early
+                except EndPipelineException: 
+                    pass
                 except Exception as e:
                     fails_upon_invoke(function_name, param_value_message)
                     raise e

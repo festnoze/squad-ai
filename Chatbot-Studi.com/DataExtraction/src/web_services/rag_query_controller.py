@@ -20,12 +20,14 @@ async def create_vector_db():
 @router.get("/rag/query/create")
 async def create_new_conversation(user_name: str = None):
     try:
+        #AvailableService.create_and_fill_retrieved_data_sqlLite_database()
         new_conv = await AvailableService.create_new_conversation_async(user_name)
         return JSONResponse(
             content={"id": str(new_conv.id)},  # Convert UUID to string for JSON serialization
             status_code=200
         )
     except Exception as e:
+        print(f"Failed to create conversation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/rag/query/stream")

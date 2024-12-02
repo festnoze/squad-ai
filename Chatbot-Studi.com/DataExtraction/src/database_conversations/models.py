@@ -12,9 +12,10 @@ class ConversationEntity(Base):
     user_name = Column(String, nullable=True)
 
     # Relationship to Message
-    messages = relationship("Message", back_populates="conversation", cascade="all, delete-orphan")
+    messages = relationship("MessageEntity", back_populates="conversation", cascade="all, delete-orphan", lazy="joined") # auto load conv messages too
 
-    def __init__(self, user_name: str = None, messages: list = None):
+    def __init__(self, id:UUID, user_name: str = None, messages: list = None):
+        self.id = id
         self.user_name = user_name
         self.messages = messages if messages is not None else []
 
@@ -29,7 +30,7 @@ class MessageEntity(Base):
     elapsed_seconds = Column(Integer, default=0)
 
     # Relationship to Conversation
-    conversation = relationship("Conversation", back_populates="messages")
+    conversation = relationship("ConversationEntity", back_populates="messages")
 
     def __init__(self, role: str, content: str, elapsed_seconds: int = 0):
         self.role = role

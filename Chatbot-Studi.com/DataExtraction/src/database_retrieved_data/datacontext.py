@@ -6,11 +6,24 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from database_retrieved_data.models import Base, Job, Funding, Training, Domain, Diploma, Certification
 from common_tools.helpers.json_helper import JsonHelper
+from common_tools.helpers.txt_helper import txt
+from common_tools.helpers.file_helper import file
 
 class DataContextRetrievedData:
     def __init__(self):
+        #TODO: untested, (half-copied from conversations datacontext)
+        db_path_or_url = 'database_retrieved_data//database.db'
+        if ':' not in db_path_or_url:
+            source_path = os.environ.get("PYTHONPATH").split(';')[-1]
+            db_path_or_url = os.path.join(source_path, db_path_or_url)
+
         # Initialize the SQLite engine
-        self.engine = create_engine('sqlite:///database_retrieved_data//database.db', echo=True)
+        self.engine = create_engine(f'sqlite:///{db_path_or_url}', echo=True)
+
+        # Create the database if it does not exist
+        if 'http' not in db_path_or_url and not file.file_exists(db_path_or_url):
+            txt.print(f"/!\\ Conversations Database file not found at path: {db_path_or_url}")
+            self.create_database(db_path_or_url)
         
         # Create a session factory
         self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)

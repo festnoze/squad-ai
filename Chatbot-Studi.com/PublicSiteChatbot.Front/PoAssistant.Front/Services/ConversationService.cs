@@ -77,15 +77,17 @@ public class ConversationService : IConversationService
         try
         {
             var userQueryAskingRequestModel = conversation!.ToUserQueryAskingRequestModel();
-            this.AddNewMessage(isSaved: false, isStreaming: true);
+            this.AddNewMessage(isSaved: false, isStreaming: true); // Add a new message where the answer will be streamed
 
-            await foreach (var chunk in this._chatbotApiClient.GetQueryRagAnswerStreamingAsync(userQueryAskingRequestModel))
+            var queryAnsweringStream = this._chatbotApiClient.GetQueryRagAnswerStreamingAsync(userQueryAskingRequestModel);
+
+            await foreach (var chunk in queryAnsweringStream)
             {
                 this.AddStreamToLastMessage(chunk);
             }
-
             this.EndsMessageStream();
-            this.AddNewMessage(isSaved: false, isStreaming: false);
+
+            this.AddNewMessage(isSaved: false, isStreaming: false); // Add a new message for the next user query
         }
         catch (Exception e)
         {

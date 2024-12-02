@@ -4,6 +4,7 @@ import sys
 import time
 from threading import Event, Thread
 from typing import Optional, Union
+from common_tools.helpers.llm_helper import Llm
 from common_tools.helpers.python_helpers import staticproperty
 
 class txt:    
@@ -281,3 +282,13 @@ class txt:
             except UnicodeDecodeError as e:
                 return text
         return txt.apply_to_all_str(input, handle_latin_encoding_str)
+    
+    @staticmethod
+    def get_text_from_chunks(chunks: list) -> str:
+        """Concatenate a list of text chunks into a single string."""
+        isBinary = isinstance(chunks[0], bytes)
+        if isBinary:
+            chunks = [chunk.decode('utf-8').replace(Llm.new_line_for_stream_over_http, '\n') for chunk in chunks]
+        else:
+            chunks = [chunk['text'] for chunk in chunks]
+        return ' '.join(chunks)
