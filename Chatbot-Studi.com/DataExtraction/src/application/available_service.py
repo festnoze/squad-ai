@@ -185,6 +185,9 @@ class AvailableService:
     
     @staticmethod
     async def rag_query_retrieval_and_augmented_generation_streaming_async(conversation_history:Conversation, is_stream_decoded = False, all_chunks_output: list[str] = []):
+        waiting_message = "Merci de patienter un instant ... Je cherche les informations correspondant à votre question."
+        async for chunk in Llm.write_static_text_as_stream(waiting_message):
+            yield chunk
         try:
             analysed_query, retrieved_chunks = await AvailableService.rag_query_retrieval_but_augmented_generation_async(conversation_history)             
             pipeline_succeeded = True
@@ -192,21 +195,22 @@ class AvailableService:
             pipeline_succeeded = False
             pipeline_ended_response = ex.message
 
+        # Remove waiting message word by word
+        # words_count_to_remove = len(waiting_message.split(" "))
+        # remove_text = (Llm.erase_single_previous_stream_tag + ' ') * words_count_to_remove
+        # async for chunk in Llm.write_static_text_as_stream(remove_text[:-1]): # remove the last space!
+        #     yield chunk
+        yield Llm.erase_all_previous_stream_tag
+
         if pipeline_succeeded:
             augmented_generation_streaming = AvailableService.rag_query_augmented_generation_streaming_async(analysed_query, retrieved_chunks[0], is_stream_decoded, all_chunks_output)
             async for chunk in augmented_generation_streaming:
                 yield chunk
         else:
-            static_text_streaming = AvailableService.write_static_text_as_stream(pipeline_ended_response)
+            static_text_streaming = Llm.write_static_text_as_stream(pipeline_ended_response)
             all_chunks_output.append(pipeline_ended_response)
             async for chunk in static_text_streaming:
                 yield chunk
-
-    async def write_static_text_as_stream(text: str, interval_btw_words: float = 0.02) -> AsyncGenerator[str, None]:
-        words = text.split(" ")
-        for word in words:
-            yield f"{word} "
-            await asyncio.sleep(interval_btw_words)
 
     async def rag_query_retrieval_but_augmented_generation_async(conversation_history: Conversation):
         return await AvailableService.inference.run_pipeline_dynamic_but_augmented_generation_async(conversation_history, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)

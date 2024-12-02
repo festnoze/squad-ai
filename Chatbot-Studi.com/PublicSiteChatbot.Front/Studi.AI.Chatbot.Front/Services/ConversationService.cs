@@ -124,7 +124,15 @@ public class ConversationService : IConversationService
         if (!string.IsNullOrEmpty(messageChunk))
         {
             isWaitingForLLM = true;
-            conversation!.Last().AddContent(messageChunk.Replace(StreamHelper.NewLineForStream, StreamHelper.WindowsNewLine));
+            messageChunk = messageChunk.Replace(StreamHelper.NewLineForStream, StreamHelper.WindowsNewLine);
+
+            if (messageChunk.Contains(StreamHelper.EraseAllStream))
+                conversation!.Last().ChangeContent(string.Empty);
+            else if (messageChunk.Contains(StreamHelper.EraseSinglePreviousChunk))
+                conversation!.Last().RemoveLastWord();
+            else
+                conversation!.Last().AddContent(messageChunk);
+
             OnConversationChanged?.Invoke();
         }
     }

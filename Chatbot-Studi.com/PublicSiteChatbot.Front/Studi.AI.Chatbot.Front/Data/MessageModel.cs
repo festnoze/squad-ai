@@ -72,6 +72,15 @@ public record MessageModel
         this.Content += contentToAdd;
     }
 
+    public void RemoveLastWord() 
+    {
+        var newEndIndex = this.Content.LastIndexOf(" ");
+        if (newEndIndex == -1)
+            this.Content = "";
+        else
+            this.Content = this.Content.Substring(0, newEndIndex);
+    }
+
     public string GetContentWithMarkdownAsHtml()
     {
         var input = Content.TrimEnd();

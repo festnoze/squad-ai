@@ -1,3 +1,4 @@
+import asyncio
 import json
 from langchain_core.prompts import ChatPromptTemplate
 from pydantic import BaseModel, Field
@@ -11,9 +12,15 @@ from langchain.schema.messages import HumanMessage, AIMessage, SystemMessage
 from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.helpers.execute_helper import Execute
 import inspect
-from typing import TypeVar, Union
+from typing import AsyncGenerator, TypeVar, Union
 
 class Llm:
+    # Constants 
+    new_line_for_stream_over_http = "\\/%*/\\" # use specific new line conversion over streaming, as new line is handled differently across platforms
+    generic_tag = "\\/%*TAG%*/\\" # use specific tag to erase previous stream content
+    erase_all_previous_stream_tag = generic_tag.replace('TAG', 'EraseAllPrevious')
+    erase_single_previous_stream_tag = generic_tag.replace('TAG', 'eraseSinglePreviousChunk')
+
     @staticmethod
     def get_content(response: any) -> str:
         if isinstance(response, str):
@@ -157,7 +164,6 @@ class Llm:
         res = await agent_executor.ainvoke({"input": input})
         return res["output"]
     
-    new_line_for_stream_over_http = "\\/%*/\\" # use specific new line conversion over streaming, as new line is handled differently across platforms
     @staticmethod
     async def invoke_as_async_stream(action_name:str, llm_or_chain: Runnable, input, display_console: bool = False, content_chunks:list[str] = None, does_stream_across_http: bool = False):
         if not content_chunks: content_chunks = []
@@ -276,3 +282,12 @@ class Llm:
         else:
             chunks = [chunk['text'] for chunk in chunks]
         return ''.join(chunks)
+    
+    @staticmethod
+    async def write_static_text_as_stream(text: str, interval_btw_words: float = 0.12) -> AsyncGenerator[str, None]:
+        words = text.split(" ")
+        if len(words) > 1:
+            for word in words[:-1]:
+                yield f"{word} "
+                await asyncio.sleep(interval_btw_words)
+        yield words[-1]
