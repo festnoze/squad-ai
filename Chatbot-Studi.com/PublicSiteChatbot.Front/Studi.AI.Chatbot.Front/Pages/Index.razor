@@ -1,0 +1,204 @@
+@page "/"
+
+@using Studi.AI.Chatbot.Front.Data
+@using Studi.AI.Chatbot.Front.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Html;
+@using Microsoft.AspNetCore.Mvc.ViewFeatures;
+
+@inject IJSRuntime JSRuntime
+@inject IConversationService conversationService
+@inject INavigationService navigationService
+@inject ISimpleAuthenticationStateProvider authenticationStateProvider
+
+<PageTitle>Chatbot Studi.com</PageTitle>
+
+<head>
+</head>
+
+<Modal @ref="modal" IsVisible="@isLoginModalVisible" IsVisibleChanged="@LoginModalIsVisibleChangedAsync">
+    <Login IsVisibleChanged="@LoginModalIsVisibleChangedAsync" />
+</Modal>
+
+<div id="chatbot-window" class="@popupClass">
+    <div class="chatbot-header">
+        <div class="header-left-panel">
+
+        </div>
+        <div class="header-title">
+            <span class="header-title-text">Votre conseiller en formation virtuel</span>
+        </div>
+        <div class="header-logo">
+            <img src="https://www.studi.com/sites/default/files/2021-08/Logo_color.svg" alt="Logo Studi" height="33" width="95">
+        </div>
+    </div>
+
+    <div id="chat-container" class="chat-container">
+        @if (conversation != null)
+        @foreach (var message in conversation)
+        {
+            <!-- Display all messages (but the last one if ongoing message under edition is handled in the bottom textarea) -->
+            @if (ShouldDisplayMessage(message))
+            {
+                @* Messages headers *@
+                <div class="@((message.IsFromAI ? "message-header-receiver" : "message-header-sender"))">
+                    @message.Role
+                    @if (message.DurationSeconds > 0)
+                    {
+                        <span class="duration-text">(@message.DurationSeconds s.)</span>
+                    }
+                </div>
+
+                @* Messages bubbles & contents *@
+                <div id="message-@message.Id"
+                    class="@($"markdown-content message-bubble {(message.IsFromAI ? "message-receiver" : "message-sender")}")"
+                    style="@((DisplayEditingButtons(message) ? "width: 80%;" : ""))">
+
+                    @* Display regular messages' content (as non-editable) *@
+                    @if (!IsEditableLastMessage(message) || showInputMessageAtBottom)
+                    {
+                        
+                        @(new MarkupString(message.GetContentWithMarkdownAsHtml()));
+                        @* @if (!message.IsStreaming)
+                        {
+                            @(new MarkupString(message.GetContentWithMarkdownAsHtml()));
+                        }
+                        else
+                        {
+                            @message.Content;
+                        } *@
+                    }
+                    else
+                    {
+                        @* Display last message under edition *@
+                        <textarea id="editingMessageTextarea"
+                                    @onblur="RetrieveInputTextAreaValueAsync"
+                                    @onkeydown="HandleEditMessageKeyDown"
+                                    class="message-editable"
+                                    style="margin-top: 10px;"
+                                    placeholder="Ecrivez votre question ici ...">
+                                        @newMessageContent
+                        </textarea>
+
+                        @* Display actions buttons *@
+                        @if (DisplayEditingButtons(message))
+                        {
+                            <div class="send-button-wrapper">
+                                <button id="sendEditingMessageButton" class="send-message-button" title="Valider la question" @onclick="() => SendMessage()">
+                                    <span class="oi oi-check"></span>
+                                </button>
+                            </div>
+                        }                        
+                    }
+                    @if (DisplayLoader(message))
+                    {
+                        <div class="loader">
+                            <div class="circle"></div>
+                            <div class="circle"></div>
+                            <div class="circle"></div>
+                        </div>
+                    }
+                </div>
+            }
+        }
+    </div> 
+
+    @* Display the user input textArea at the window bottom *@
+    @if (showInputMessageAtBottom)
+    {
+        <div class="input-area">
+            @* <div>
+                <button title="Options" @onclick="() => SendMessage()" class="send-message-button">
+                    <span class="oi oi-check"></span>
+                </button>
+            </div> *@
+            <textarea id="editingMessageTextarea"
+                        @onblur="RetrieveInputTextAreaValueAsync"
+                        @onkeydown="HandleEditMessageKeyDown"
+                        class="message-editable"
+                        placeholder="Ecrivez votre question ici ..."
+                        disabled="@(conversation!.Last().IsSavedMessage)">
+                @if (conversation!.Last().IsFromUser && !conversation!.Last().IsSavedMessage)
+                {
+                    @conversation!.Last().Content
+                }
+                else
+                {
+                }
+            </textarea>
+            <div class="send-button-wrapper">
+                <button id="sendEditingMessageButton" class="send-message-button" title="Valider la question" @onclick="() => SendMessage()">
+                    <span class="oi oi-check"></span> @* arrow-thick-right *@
+                </button>
+            </div>
+        </div>
+    }
+</div>
+@if (showMessageEmptyError)
+{
+    <div class="notification">
+        <span class="oi oi-task" aria-hidden="true"></span>
+        <span>Impossible d'envoyer un message vide</span>
+    </div>
+}
+@if (showApiCommunicationErrorNotification)
+{
+    <div class="api-communication-error">
+        <span class="oi oi-circle-x" aria-hidden="true"></span>
+        <span>Erreur de communication avec l'API du chatbot</span>
+        <span class="close-btn" @onclick="() => showApiCommunicationErrorNotification = false">&times;</span>
+    </div>
+}
+
+<body>
+</body>
+
+<script>
+    function getElementValue(elementId) {
+        var element = document.getElementById(elementId);
+        if (!element) {
+            console.error(`Element with id "${elementId}" were not found in DOM.`);
+            return "";
+        }
+        return element.value;
+    }
+    function setElementValue(elementId, value) {
+        const element = document.getElementById(elementId);
+        if (!element) {
+            console.error(`Element with id "${elementId}" were not found in DOM.`);
+            return;
+        }
+        element.value = value;
+    }
+    function setDisabledValueToElement(elementId, disabledValue) {
+        const element = document.getElementById(elementId);
+        if (!element) {
+            console.error(`Element with id "${elementId}" were not found in DOM.`);
+            return;
+        }
+        element.disabled = disabledValue;
+    }
+    function autoResizeTextarea(id) {
+        var textarea = document.getElementById(id);
+        if (textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = textarea.scrollHeight + 'px';
+            textarea.addEventListener('input', function () {
+                this.style.height = 'auto';
+                this.style.height = this.scrollHeight + 'px';
+            }, false);
+        }
+    }
+    function scrollChatContainerToBottom() {
+        const container = document.getElementById("chat-container");
+        container.scrollTop = container.scrollHeight;
+    }
+    window.blazorExtensions = {
+        WriteStorage: function (key, value) {
+            window.localStorage.setItem(key, value);
+        },
+        ReadStorage: function (key) {
+            return window.localStorage.getItem(key);
+        }
+    };
+</script>
