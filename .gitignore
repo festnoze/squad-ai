@@ -5,6 +5,7 @@ exchanges/
 outputs.save/
 outputs.old/
 chroma_db/
+*.db
 
 .env
 *.pyc

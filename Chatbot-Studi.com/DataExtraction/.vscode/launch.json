@@ -13,7 +13,8 @@
                 "api.startup:app", // The FastAPI app instance in main.py
                 "--host", "127.0.0.1", // Host to bind
                 "--port", "8000",      // Port to bind
-                "--reload"             // Enable auto-reload for development
+                "--reload",            // Enable auto-reload for development
+                "--log-level", "error" // Log level
             ],
             "env": {
                 "PYTHONPATH": "${workspaceFolder}\\src"

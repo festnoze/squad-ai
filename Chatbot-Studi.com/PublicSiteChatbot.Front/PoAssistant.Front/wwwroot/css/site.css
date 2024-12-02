@@ -138,7 +138,7 @@ html, body {
     margin-bottom: 5px;
     margin-left: 10px;
     margin-right: 10px;
-    padding: 10px 14px;
+    padding: 16px 12px;
     color: #333;
     border-radius: 10px;
     box-shadow: 0 12px 15px rgba(100, 100, 100, 0.3);
@@ -149,6 +149,7 @@ html, body {
 }
 
 .message-receiver {
+    max-width: 92%;
     background-color: #f0f7fb;
     align-self: flex-start;
 }
@@ -164,7 +165,6 @@ html, body {
     }
 
     .message-bubble {
-        max-width: 80%;
     }
 }
 
@@ -237,6 +237,10 @@ html, body {
         padding: 2px 12px;
         border: 1px double #47C239;
         box-shadow: 0 10px 40px 0 rgba(0, 0, 0, 0.24), 0 17px 50px 0 rgba(0, 0, 0, 0.22);
+    }
+
+    .send-message-button:disabled {
+        background-color: #ccc;
     }
 
 
