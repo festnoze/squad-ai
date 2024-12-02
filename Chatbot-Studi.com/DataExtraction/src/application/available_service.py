@@ -178,7 +178,7 @@ class AvailableService:
             yield chunk
         
         # Add a summary of the generated answer to conversation messages and save it
-        full_answer_str = txt.get_text_from_chunks(all_chunks_output)
+        full_answer_str = Llm.get_text_from_chunks(all_chunks_output)
         summarized_response = await AvailableService.get_summarized_answer_async(full_answer_str)
         conversation.add_new_message("assistant", summarized_response)
         assert await ConversationRepository().add_message_to_conversation_async(conversation.id, conversation.last_message)
@@ -282,7 +282,7 @@ class AvailableService:
             AvailableService.format_retrieved_docs_function, #format_retrieved_docs_function,
             None, #override_workflow_available_classes
         )
-        response = txt.get_text_from_chunks(sync_generator)
+        response = Llm.get_text_from_chunks(sync_generator)
         txt.stop_spinner_replace_text("Pipeline d'inférence exectué :")
         return response
     

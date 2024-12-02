@@ -111,3 +111,6 @@ class Conversation:
             }
             messages_json.append(message_json)   
         return messages_json #[::-1] #reverse messages' order
+    
+    def __repr__(self) -> str:
+        return f"Conv. with {self.user_name}: {len(self.messages)} messages"

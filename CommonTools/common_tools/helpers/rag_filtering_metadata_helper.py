@@ -130,7 +130,6 @@ class RagFilteringMetadataHelper:
                 translated_args = [translate(arg) for arg in filter_obj.arguments]
                 return Operation(operator=filter_obj.operator, arguments=translated_args)
             elif isinstance(filter_obj, Comparison):
-                # Directly translate Comparison
                 return filter_obj
             else:
                 raise ValueError(f"Unsupported filter type: {type(filter_obj)}")
@@ -140,9 +139,13 @@ class RagFilteringMetadataHelper:
         if translated_filters is None:
             return {}
         
+        # Encapsulate single Comparison filter into an Operation
+        if isinstance(translated_filters, Comparison):
+            translated_filters = Operation(operator="and", arguments=[translated_filters])
+
         # Use the translator to convert the validated filters into the target format
-        translated_filter = translator.visit_operation(translated_filters)
-        return translated_filter
+        result = translator.visit_operation(translated_filters)
+        return result
     
     @staticmethod
     def translate_langchain_metadata_filters_into_chroma_db_format(langchain_filters: Union[Comparison, Operation], metadata_infos: list[MetadataDescription] = None) -> dict:
