@@ -120,7 +120,7 @@ public class ConversationService : IConversationService
 
     public void AddStreamToLastMessage(string? messageChunk)
     {
-        // New lines are a specific pattern to allow spliting words and avoid win/mac issue over the streaming
+        // New lines have a specific pattern to allow spliting words and avoid win/mac issue over the streaming
         if (!string.IsNullOrEmpty(messageChunk))
         {
             isWaitingForLLM = true;

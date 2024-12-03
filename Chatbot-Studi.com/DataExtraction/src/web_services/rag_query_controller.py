@@ -34,16 +34,3 @@ async def create_new_conversation(user_name: str = None):
 async def rag_query_stream_async(user_query_request_model: UserQueryAskingRequestModel):
     response_generator = AvailableService.rag_query_stream_async(user_query_request_model)
     return StreamingResponse(response_generator, media_type="text/event-stream")
-
-
-# Launch the API with Uvicorn server:
-# if __name__ == "__rag_query_controller__":
-#     uvicorn.run(
-#         "web_services.rag_query_controller:app", 
-#         host="127.0.0.1", 
-#         port=8000, 
-#         timeout_keep_alive=180, 
-#         reload=True, 
-#         log_level="error",  # Set log level to error
-#         access_log=False    # Disable access logs
-#     )

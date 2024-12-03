@@ -75,13 +75,17 @@ public record MessageModel
     public void RemoveLastWord() 
     {
         var newEndIndex = this.Content.LastIndexOf(" ");
+        if (newEndIndex == this.Content.Length - 1)
+            this.Content = this.Content.Trim();
+            newEndIndex = this.Content.LastIndexOf(" ");
+        
         if (newEndIndex == -1)
             this.Content = "";
         else
             this.Content = this.Content.Substring(0, newEndIndex);
     }
 
-    public string GetContentWithMarkdownAsHtml()
+    public string GetMarkdownContentConvertedToHtml()
     {
         var input = Content.TrimEnd();
         if (string.IsNullOrEmpty(input))
@@ -89,27 +93,17 @@ public record MessageModel
 
         var document = Markdown.Parse(input, markdownPipeline);
 
-        // Add target="_blank" attribute to all links
+        // Make all links open up in a new tab by adding them a target="_blank" attribute
         foreach (var link in document.Descendants().OfType<LinkInline>())
-        {
             link.GetAttributes().AddPropertyIfNotExist("target", "_blank");
-        }
 
-        // Process tables: Add classes or custom logic for styling
+        // Add styling to display arrays
         foreach (var table in document.Descendants().OfType<Table>())
-        {
             table.GetAttributes().AddClass("generated-array-class");
 
-            //foreach (var row in table.Descendants().OfType<TableRow>())
-            //{
-            //    row.GetAttributes().AddClass("custom-row-class");
-            //}
-
-            //foreach (var cell in table.Descendants().OfType<TableCell>())
-            //{
-            //    cell.GetAttributes().AddClass("custom-cell-class");
-            //}
-        }
+        foreach (var heading in document.Descendants().OfType<HeadingBlock>())
+            if (heading.Level <= 3)
+                heading.Level = 4; // Change h1, h2 and h3 to: h4
 
         // Render the Markdown document into HTML
         var result = "";

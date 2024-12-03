@@ -32,8 +32,11 @@ class WorkflowExecutor:
         
         results = []
         for step in workflow_config:
-            results = await self.execute_step_async(step, previous_results, kwargs_values, workflow_config)
-            previous_results = results
+            try:
+                results = await self.execute_step_async(step, previous_results, kwargs_values, workflow_config)
+                previous_results = results
+            except EndPipelineException as epe:
+                raise epe
         return results
 
     def _determine_workflow_config(self, config_entry_point_name):

@@ -148,7 +148,7 @@ public partial class Index : ComponentBase
         disableConversationModification = true;
         conversation!.Last().ChangeContent(conversation!.Last().Content.Trim());
 
-        if (isLastMessageEditable && string.IsNullOrEmpty(conversation!.Last().Content))
+        if (isLastMessageEditable && string.IsNullOrWhiteSpace(conversation!.Last().Content))
         {
             ShowEmptyMessageError();
             return;

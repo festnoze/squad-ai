@@ -188,6 +188,7 @@ class AvailableService:
         waiting_message = "Merci de patienter un instant ... Je cherche les informations correspondant à votre question."
         async for chunk in Llm.write_static_text_as_stream(waiting_message):
             yield chunk
+
         try:
             analysed_query, retrieved_chunks = await AvailableService.rag_query_retrieval_but_augmented_generation_async(conversation_history)             
             pipeline_succeeded = True
@@ -195,12 +196,8 @@ class AvailableService:
             pipeline_succeeded = False
             pipeline_ended_response = ex.message
 
-        # Remove waiting message word by word
-        # words_count_to_remove = len(waiting_message.split(" "))
-        # remove_text = (Llm.erase_single_previous_stream_tag + ' ') * words_count_to_remove
-        # async for chunk in Llm.write_static_text_as_stream(remove_text[:-1]): # remove the last space!
-        #     yield chunk
-        yield Llm.erase_all_previous_stream_tag
+        async for chunk in Llm.remove_all_previous_stream_async(True, len(waiting_message.split(" "))):
+            yield chunk
 
         if pipeline_succeeded:
             augmented_generation_streaming = AvailableService.rag_query_augmented_generation_streaming_async(analysed_query, retrieved_chunks[0], is_stream_decoded, all_chunks_output)

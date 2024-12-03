@@ -286,8 +286,17 @@ class Llm:
     @staticmethod
     async def write_static_text_as_stream(text: str, interval_btw_words: float = 0.12) -> AsyncGenerator[str, None]:
         words = text.split(" ")
-        if len(words) > 1:
-            for word in words[:-1]:
-                yield f"{word} "
-                await asyncio.sleep(interval_btw_words)
-        yield words[-1]
+        for word in words:
+            yield f"{word} "
+            await asyncio.sleep(interval_btw_words)
+
+    @staticmethod    
+    async def remove_all_previous_stream_async(remove_word_byword: bool = True, words_count_to_remove: int = 20):        
+        if not remove_word_byword:
+            # Remove all previous text at once
+            yield Llm.erase_all_previous_stream_tag + ' '
+        else:
+            # Remove waiting message word by word
+            remove_text = (Llm.erase_single_previous_stream_tag + ' ') * words_count_to_remove
+            async for chunk in Llm.write_static_text_as_stream(remove_text[:-1]): # remove the last space!
+                yield chunk
