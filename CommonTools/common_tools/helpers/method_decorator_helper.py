@@ -43,8 +43,8 @@ class MethodDecorator:
                     after_invoke(function_name, param_value_message, start_time)
                     return result                
                 # Do not display pipeline ending exceptions, as they're not actual errors, but allow to exit the pipeline early
-                except EndPipelineException: 
-                    pass
+                except EndPipelineException as e: 
+                    raise e
                 except Exception as e:
                     fails_upon_invoke(function_name, param_value_message)
                     raise e
@@ -58,8 +58,8 @@ class MethodDecorator:
                     return result
                 
                 # Do not display pipeline ending exceptions, as they're not actual errors, but allow to exit the pipeline early
-                except EndPipelineException: 
-                    pass
+                except EndPipelineException as e: 
+                    raise e
                 except Exception as e:
                     fails_upon_invoke(function_name, param_value_message)
                     raise e
@@ -73,8 +73,8 @@ class MethodDecorator:
                     after_invoke(function_name, param_value_message, start_time)
 
                 # Do not display pipeline ending exceptions, as they're not actual errors, but allow to exit the pipeline early
-                except EndPipelineException: 
-                    pass
+                except EndPipelineException as e: 
+                    raise e
                 except Exception as e:
                     fails_upon_invoke(function_name, param_value_message)
                     raise e

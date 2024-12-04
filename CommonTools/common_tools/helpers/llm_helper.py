@@ -280,7 +280,7 @@ class Llm:
         if isBinary:
             chunks = [chunk.decode('utf-8').replace(Llm.new_line_for_stream_over_http, '\n') for chunk in chunks]
         else:
-            chunks = [chunk['text'] for chunk in chunks]
+            chunks = [chunk['text'] if 'text' in chunk else chunk for chunk in chunks]
         return ''.join(chunks)
     
     @staticmethod
