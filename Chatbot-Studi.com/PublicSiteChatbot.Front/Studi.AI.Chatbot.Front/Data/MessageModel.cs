@@ -45,6 +45,17 @@ public record MessageModel
     public void SetAsLastConversationMessage () => IsLastMessageOfConversation = true;
     public bool SetAsNotLastConversationMessage() => IsLastMessageOfConversation = false;
 
+    private string? _htmlContent = null;
+    public string HtmlContent 
+    {
+        get
+        {
+            if (_htmlContent == null)
+                _htmlContent = _getMarkdownContentConvertedToHtml();
+            return _htmlContent;
+        }
+    }
+
     public MessageModel(string source, string content, int durationSeconds, bool isSavedMessage = true, bool isStreaming = false)
     {
         Id = Guid.NewGuid();
@@ -65,11 +76,13 @@ public record MessageModel
     public void ChangeContent(string newContent)
     {
         this.Content = newContent;
+        this._htmlContent = null; // Force HTML regeneration
     }
 
     public void AddContent(string contentToAdd)
     {
         this.Content += contentToAdd;
+        this._htmlContent = null; // Force HTML regeneration
     }
 
     public void RemoveLastWord() 
@@ -85,7 +98,7 @@ public record MessageModel
             this.Content = this.Content.Substring(0, newEndIndex);
     }
 
-    public string GetMarkdownContentConvertedToHtml()
+    private string _getMarkdownContentConvertedToHtml()
     {
         var input = Content.TrimEnd();
         if (string.IsNullOrEmpty(input))
@@ -115,8 +128,10 @@ public record MessageModel
             result = writer.ToString();
         }
 
-        // Additional transformations
+        // Additional transformations        
+        result = result.Replace("</ul>", "</ul><br>");// Add an extra line break (or paragraph spacing) after each </li> in the ordered list
         result = result.TrimEnd().Replace("</p>\n", "</p><br>");
+
         return result;
     }
 

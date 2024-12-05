@@ -58,7 +58,7 @@
                     @if (!IsEditableLastMessage(message) || showInputMessageAtBottom)
                     {
                         
-                        @(new MarkupString(message.GetMarkdownContentConvertedToHtml()));
+                        @(new MarkupString(message.HtmlContent));
                         @* @if (!message.IsStreaming)
                         {
                             @(new MarkupString(message.GetContentWithMarkdownAsHtml()));

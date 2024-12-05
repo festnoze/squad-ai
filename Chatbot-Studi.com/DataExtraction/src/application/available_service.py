@@ -179,6 +179,11 @@ class AvailableService:
         
         # Add a summary of the generated answer to conversation messages and save it
         full_answer_str = Llm.get_text_from_chunks(all_chunks_output)
+        # Don't await, make summary generation of the answer as a background task
+        AvailableService.add_answer_summary_to_conversation_async(conversation, full_answer_str)
+
+    @staticmethod
+    async def add_answer_summary_to_conversation_async(conversation, full_answer_str):
         summarized_response = await AvailableService.get_summarized_answer_async(full_answer_str)
         conversation.add_new_message("assistant", summarized_response)
         assert await ConversationRepository().add_message_to_conversation_async(conversation.id, conversation.last_message)
