@@ -34,7 +34,6 @@ common_tools/models/logical_operator.py
 common_tools/models/message.py
 common_tools/project/import_listing.py
 common_tools/project/useless_code_analyser.py
-common_tools/rag/rag_filtering_metadata_helper.py
 common_tools/rag/rag_service.py
 common_tools/rag/rag_inference_pipeline/rag_answer_generation_tasks.py
 common_tools/rag/rag_inference_pipeline/rag_guardrails_tasks.py

@@ -1,5 +1,6 @@
 from collections import defaultdict
 from typing import Optional, Union
+from common_tools.models.vector_db_type import VectorDbType
 from common_tools.models.logical_operator import LogicalOperator
 from common_tools.models.metadata_description import MetadataDescription
 from common_tools.helpers.rag_bm25_retriever_helper import BM25RetrieverHelper
@@ -99,7 +100,7 @@ class RagFilteringMetadataHelper:
     @staticmethod
     def translate_langchain_metadata_filters_into_specified_db_type_format(
             langchain_filters: Union[Comparison, Operation],
-            vector_db_type: str = "chroma",
+            vector_db_type: VectorDbType = None,
             metadata_key: str = "metadata"
         ) -> dict:
         """
@@ -110,16 +111,17 @@ class RagFilteringMetadataHelper:
         :param metadata_key: The key under which metadata is stored (used by QdrantTranslator).
         :return: A dictionary representing the translated filter for the specified database.
         """
+        if not vector_db_type: raise ValueError("vector_db_type must be specified")
         if langchain_filters is None:
             return None
 
         # Initialize the appropriate translator based on the specified type
         translator: Visitor = None
-        if vector_db_type == "chroma":
+        if vector_db_type == VectorDbType.ChromaDB:
             translator = ChromaTranslator()
-        elif vector_db_type == "qdrant":
+        elif vector_db_type == VectorDbType.Qdrant:
             translator = QdrantTranslator(metadata_key=metadata_key)
-        elif vector_db_type == "pinecone":
+        elif vector_db_type == VectorDbType.Pinecone:
             translator = PineconeTranslator()
         else:
             raise ValueError(f"Unsupported translator type: {vector_db_type}")

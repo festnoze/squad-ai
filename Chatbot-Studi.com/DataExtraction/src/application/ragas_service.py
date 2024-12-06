@@ -14,6 +14,7 @@ from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.rag.rag_service import RagService
 from common_tools.langchains.langsmith_client import Langsmith
 from common_tools.langchains.langchain_factory import LangChainFactory
+from common_tools.helpers.env_helper import EnvHelper
 
 from langchain_community.document_loaders import DirectoryLoader
 from langchain_community.document_loaders import TextLoader
@@ -156,7 +157,7 @@ class RagasService:
         from ragas.testset.transforms import Transforms, apply_transforms, default_transforms
         
         load_dotenv()
-        openai_api_key = os.getenv("OPEN_API_KEY")        
+        openai_api_key = EnvHelper.get_openai_api_key()
         openai.api_key = openai_api_key
         os.environ["OPENAI_API_KEY"] = openai_api_key
 
@@ -193,7 +194,7 @@ class RagasService:
         from ragas.llms import LangchainLLMWrapper        
         load_dotenv()
         nest_asyncio.apply()        
-        openai_api_key = os.getenv("OPEN_API_KEY")        
+        openai_api_key = os.getenv("OPENAI_API_KEY")        
         openai.api_key = openai_api_key
         os.environ["OPENAI_API_KEY"] = openai_api_key
 
@@ -208,7 +209,7 @@ class RagasService:
     def generate_ground_truth_notebook1(llm_info: LlmInfo, langchain_documents: list[Document], test_size: int = 2):     
         # try from notebook tuto: https://github.com/langchain-ai/langsmith-cookbook/blob/main/testing-examples/ragas/ragas.ipynb
         load_dotenv()
-        openai_api_key = os.getenv("OPEN_API_KEY")        
+        openai_api_key = EnvHelper.get_openai_api_key()     
         openai.api_key = openai_api_key
         os.environ["OPENAI_API_KEY"] = openai_api_key
 
@@ -254,33 +255,12 @@ class RagasService:
         
         retriever = rag_service.vectorstore.as_retriever()
 
-        # path = "outputs/all/"
-        # loader = DirectoryLoader(path, glob="**/*.json")
-        # docs = loader.load()
-        
-        
-        # 
-        # os.environ["OPENAI_API_KEY"] = os.getenv("OPEN_API_KEY") # needed by ragas which use GPT-4o-mini
-        
-        # evaluator_llm = LangChainFactory.create_llm_from_info(llm_info) #AvailableService.rag_service.llm_1)
-        # embedding = EmbeddingModel.OpenAI_TextEmbedding3Small.create_instance()
-        
-        # generator = TestsetGenerator(
-        #     LangchainLLMWrapper(evaluator_llm),
-        #     #embedding
-        # )
-
-        # testset = generator.generate_with_langchain_docs(docs, testset_size=5)
-
-        # testset = testset.to_pandas()
-        # print(testset)
-
 
     @staticmethod
     def generate_ground_truth2(llm_info: LlmInfo, langchain_documents: list[Document], test_size: int = 2):
         nest_asyncio.apply()
         #Execute.activate_global_function_parameters_types_verification()
-        os.environ["OPENAI_API_KEY"] = os.getenv("OPEN_API_KEY") # needed by ragas which use GPT-4o-mini
+        os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY") # needed by ragas which use GPT-4o-mini
         
         evaluator_llm = LangChainFactory.create_llm_from_info(llm_info) #AvailableService.rag_service.llm_1)
         embedding = EmbeddingModel.OpenAI_TextEmbedding3Small.create_instance()

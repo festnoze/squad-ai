@@ -45,7 +45,6 @@ class RAGHybridRetrieval:
         
         if include_bm25_retrieval and include_semantic_retrieval:
             semantic_k_ratio = round(1 - bm25_ratio, 2)
-            bm25_ratio = round(1 - semantic_k_ratio, 2)
         else:
             semantic_k_ratio = 1 if include_semantic_retrieval else 0
             bm25_ratio = 1 if include_bm25_retrieval else 0

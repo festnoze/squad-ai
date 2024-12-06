@@ -15,6 +15,39 @@ public class ChatbotAPIClient
     }
 
     /// <summary>
+    /// Get a new conversation ID from the server.
+    /// </summary>
+    /// <param name="userName"></param>
+    /// <returns></returns>
+    /// <exception cref="Exception"></exception>
+    public async Task<Guid> GetNewConversationIdAsync(string? userName)
+    {
+        string endpoint = $"{_baseUrl}/rag/query/create";
+        string jsonPayload = JsonSerializer.Serialize(userName);
+        var request = new HttpRequestMessage(HttpMethod.Get, endpoint)
+        {
+            Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json")
+        };
+
+        using (HttpResponseMessage response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead))
+        {
+            response.EnsureSuccessStatusCode();
+
+            var result = await response.Content.ReadAsStringAsync();
+
+            // Deserialize the JSON object into a class
+            var conversationResponse = JsonSerializer.Deserialize<CreateConversationResponseModel>(result);
+
+            if (conversationResponse == null || conversationResponse.Id == Guid.Empty)
+            {
+                throw new Exception($"Invalid response from client to {nameof(GetNewConversationIdAsync)} endpoint.");
+            }
+
+            return conversationResponse.Id;
+        }
+    }
+
+    /// <summary>
     /// Ask a question to the chatbot and get the answer as streaming.
     /// </summary>
     /// <param name="userQueryAskingRequestModel"></param>
@@ -46,35 +79,29 @@ public class ChatbotAPIClient
     }
 
     /// <summary>
-    /// Get a new conversation ID from the server.
+    /// Create the vector database 
     /// </summary>
-    /// <param name="userName"></param>
     /// <returns></returns>
     /// <exception cref="Exception"></exception>
-    public async Task<Guid> GetNewConversationIdAsync(string? userName)
+    public async Task<bool> CreateVectorDatabaseAsync()
     {
-        string endpoint = $"{_baseUrl}/rag/query/create";
-        string jsonPayload = JsonSerializer.Serialize(userName);
-        var request = new HttpRequestMessage(HttpMethod.Get, endpoint)
+        string endpoint = $"{_baseUrl}/data/vector_db";
+
+        using (var request = new HttpRequestMessage(HttpMethod.Post, endpoint))
         {
-            Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json")
-        };
-
-        using (HttpResponseMessage response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead))
-        {
-            response.EnsureSuccessStatusCode();
-
-            var result = await response.Content.ReadAsStringAsync();
-
-            // Deserialize the JSON object into a class
-            var conversationResponse = JsonSerializer.Deserialize<CreateConversationResponseModel>(result);
-
-            if (conversationResponse == null || conversationResponse.Id == Guid.Empty)
+            using (HttpResponseMessage response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead))
             {
-                throw new Exception($"Invalid response from client to {nameof(GetNewConversationIdAsync)} endpoint.");
-            }
+                response.EnsureSuccessStatusCode();
 
-            return conversationResponse.Id;
+                var result = await response.Content.ReadAsStringAsync();
+
+                if (string.IsNullOrWhiteSpace(result) || !bool.TryParse(result, out var success))
+                {
+                    throw new Exception($"Invalid response from client to {nameof(CreateVectorDatabaseAsync)} endpoint.");
+                }
+
+                return success;
+            }
         }
     }
 }

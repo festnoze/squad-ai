@@ -7,9 +7,9 @@ public interface IConversationService : IDisposable
 
     event Action? ApiCommunicationErrorNotification;
     event Action? OnConversationChanged;
-
-    Task GetAnswerToUserLastQueryAsync();
+    
     void AddNewMessage(bool isSaved = false, bool isStreaming = true);
+    Task AnswerUserQueryAsync();
     void DeleteCurrentConversation();
     void AddStreamToLastMessage(string? messageChunk);
     void EndsMessageStream();
@@ -20,4 +20,6 @@ public interface IConversationService : IDisposable
     void MarkConversationAsLoaded();
     void SaveConversation();
     void SetCurrentUser(string userName);
+
+    Task CreateVectorDbAsync();
 }

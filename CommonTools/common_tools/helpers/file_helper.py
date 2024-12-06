@@ -69,8 +69,8 @@ class file:
         # Write the content to the file
         with open(filepath, 'w', encoding=encoding) as file_handler:
             if isinstance(content, dict) or isinstance(content, list):
-                if isinstance(content, list) and any(content) and not isinstance(content[0], dict):
-                    raise ValueError(f"Error in '{file.write_file.__name__}': Invalid content of type list. Items are of type: {type(content[0]).__name__}. Only 'dict' allowed in list.")
+                if isinstance(content, list) and any(content) and not (isinstance(content[0], dict) or isinstance(content[0], str)):
+                    raise ValueError(f"Error in '{file.write_file.__name__}': Invalid content of type list. Items are of type: {type(content[0]).__name__}. Only 'dict' and 'str' items are allowed in a list to be saved with 'file.write_file'.")
                 json.dump(content, file_handler, ensure_ascii=False, indent=4)
             elif isinstance(content, str):
                 file_handler.write(content)

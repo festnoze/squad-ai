@@ -154,9 +154,15 @@ public partial class Index : ComponentBase
             return;
         }
 
+        // TMP: special command to create vector DB
+        if (conversation!.Last().Content == "db")
+        {
+            await conversationService.CreateVectorDbAsync();
+        }
+
         isWaitingForLLM = true;
         await EmptyAndDisableInputTextAreaAsync();
-        await conversationService.GetAnswerToUserLastQueryAsync();
+        await conversationService.AnswerUserQueryAsync();
 
         await EnableInputTextAreaAsync();
         disableConversationModification = false;

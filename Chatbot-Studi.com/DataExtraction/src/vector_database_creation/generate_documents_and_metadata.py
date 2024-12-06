@@ -364,8 +364,14 @@ class GenerateDocumentsAndMetadata:
             return "Modalités"
         elif section == 'simulation':
             return "Simulation de formation"
+        elif section == 'accessibility':
+            return "Accessibilité"
+        elif section == 'accompaniment':
+            return "'Accompagnement"
+        elif section == 'certif':
+            return "'Certifications"
         else:
-            raise ValueError(f"Unhandled section name: {section} in get_french_section")
+            return section
     
     def get_list_with_items_as_str(self, lst: list):
         if not lst:

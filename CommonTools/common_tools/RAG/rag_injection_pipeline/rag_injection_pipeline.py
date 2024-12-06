@@ -17,28 +17,30 @@ from langchain_chroma import Chroma
 from langchain_community.query_constructors.chroma import ChromaTranslator
 from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient
+from langchain_pinecone import PineconeVectorStore
 from qdrant_client.http.models import Distance, VectorParams
 
 # common tools imports
 from common_tools.helpers.txt_helper import txt
 from common_tools.models.file_already_exists_policy import FileAlreadyExistsPolicy
-from common_tools.models.llm_info import LlmInfo
 from common_tools.helpers.file_helper import file
 from common_tools.rag.rag_service import RagService
+from common_tools.models.vector_db_type import VectorDbType
 
 class RagInjectionPipeline:
     def __init__(self, rag: RagService):
         self.rag_service: RagService = rag
 
-    def build_vectorstore_and_bm25_store(self, documents: list, chunk_size:int = 2000, children_chunk_size:int = 0, vector_db_type='qdrant', collection_name:str = 'main', delete_existing=True)-> int:
+    def build_vectorstore_and_bm25_store(self, documents: list, chunk_size:int = 2000, children_chunk_size:int = 0, vector_db_type: VectorDbType= None, collection_name:str = 'main', delete_existing=True)-> int:
         self.vectorstore = self._build_vectorstore(documents, chunk_size, vector_db_type, collection_name, delete_existing)
-        self._build_bm25_store(documents)
+        self._build_bm25_store_as_raw_json_file(documents)
 
-    def _build_vectorstore(self, documents: list, chunk_size:int = 1000, vector_db_type='qdrant', collection_name:str = 'main', delete_existing=True) -> any:
+    def _build_vectorstore(self, documents: list, chunk_size:int = 1000, vector_db_type: VectorDbType = None, collection_name:str = 'main', delete_existing=True) -> any:
+        if not vector_db_type: vector_db_type = VectorDbType('chroma')
         if not documents or len(documents) == 0: raise ValueError("No documents provided")
         if not hasattr(self.rag_service, 'embedding') or not self.rag_service.embedding: raise ValueError("Embedding model must be specified to build vector store")
         if delete_existing:
-            self.reset_vectorstore(vector_db_type)
+            self.reset_vectorstore()
         
         langchain_documents = []
         if chunk_size > 0:
@@ -58,12 +60,14 @@ class RagInjectionPipeline:
                     for doc in documents
                 ]
         txt.print_with_spinner(f"Start embedding of {len(langchain_documents)} chunks of documents...")
-        if vector_db_type == 'qdrant':
+        if vector_db_type == VectorDbType.Qdrant:
             db = self._add_documents_to_qdrant(documents= langchain_documents, embedding = self.rag_service.embedding, vector_db_path= self.rag_service.vector_db_path, collection_name=collection_name)
-        elif vector_db_type == 'chroma':
+        elif vector_db_type == VectorDbType.ChromaDB:
             db = self._add_documents_to_chroma(documents= langchain_documents, embedding = self.rag_service.embedding, vector_db_path= self.rag_service.vector_db_path, collection_name=collection_name)
+        elif vector_db_type == VectorDbType.Pinecone:
+            db = self._add_documents_to_pinecone(documents= langchain_documents, embedding = self.rag_service.embedding, vector_db_path= self.rag_service.vector_db_path, collection_name=collection_name)
         else:
-            raise ValueError("Invalid vector db type: " + vector_db_type)
+            raise ValueError("Invalid vector db type: " + vector_db_type.value)
         txt.stop_spinner_replace_text(f"Done. {len(langchain_documents)} documents' chunks embedded sucessfully!")
         return db
     
@@ -94,8 +98,12 @@ class RagInjectionPipeline:
         )
         db.add_documents(documents)
         return db
+     
+    def _add_documents_to_pinecone(self, documents:list[Document], embedding:Embeddings, vector_db_path: str = '', collection_name:str = 'main') -> PineconeVectorStore:
+        self.rag_service.vectorstore.add_documents(documents)
+        return self.rag_service.vectorstore
 
-    def _build_bm25_store(self, documents):
+    def _build_bm25_store_as_raw_json_file(self, documents:list):
         documents_dict = []
         for document in documents:
             if isinstance(document, Document):
@@ -109,24 +117,12 @@ class RagInjectionPipeline:
         file.write_file(json_data, self.rag_service.all_documents_json_file_path, file_exists_policy= FileAlreadyExistsPolicy.Override)
         
     # not in use
-    def build_vectorstore_from_folder_files(self, folder_path: str, perform_chunking = True):
+    def _build_bm25_store_as_sparse_vectors(self, folder_path: str, perform_chunking = True):
         txt_loader = TextLoader()
         documents = txt_loader.load(folder_path)
         return self._build_vectorstore(documents, perform_chunking)
 
-    # @staticmethod
-    # def _build_bm25_retriever(documents: list[Document], k: int = 20, metadata: dict = None) -> BM25Retriever:
-    #     if not documents or len(documents) == 0: 
-    #         return None
-        
-    #     if metadata:
-    #         bm25_retriever = BM25Retriever.from_texts([doc.page_content for doc in documents], metadata)
-    #     else:
-    #         bm25_retriever = BM25Retriever.from_documents(documents)
-    #     bm25_retriever.k = k
-    #     return bm25_retriever
-
-    def reset_vectorstore(self, vector_db_type):
+    def reset_vectorstore(self):
         if hasattr(self, 'vectorstore') and self.vectorstore:
             self.vectorstore.reset_collection()
             #self._delete_vectorstore_files()
@@ -170,12 +166,11 @@ class RagInjectionPipeline:
 
     def _get_text_splitter(self, chunk_size, chunk_overlap):
         txt_splitter = RecursiveCharacterTextSplitter(
-            separator="\n",
+            separators=["\n\n", "\r\n", "\n", " ", ""],
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
             length_function=len
-        )
-        
+        )        
         return txt_splitter
     
     def _split_text_with_overlap(self, content: str, chunk_size: int, chunk_overlap: int) -> list[str]:

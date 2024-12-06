@@ -55,7 +55,7 @@ public class ConversationService : IConversationService
 
     public bool IsWaitingForLLM() => isWaitingForLLM;
 
-    public async Task GetAnswerToUserLastQueryAsync()
+    public async Task AnswerUserQueryAsync()
     {
         if (!conversation?.Any() ?? true)
             return;
@@ -181,5 +181,10 @@ public class ConversationService : IConversationService
 
     public void Dispose()
     {
+    }
+
+    public async Task CreateVectorDbAsync()
+    {
+        await this._chatbotApiClient.CreateVectorDatabaseAsync();
     }
 }

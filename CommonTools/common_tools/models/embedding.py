@@ -58,7 +58,7 @@ class EmbeddingModel(Enum):
     def create_instance(self, api_key:str = None) -> Embeddings:
         if self.is_openai:
             if not api_key:
-                api_key= os.getenv("OPEN_API_KEY") 
+                api_key= os.getenv("OPENAI_API_KEY") 
                 if not api_key:
                     raise ValueError("Required OpenAI API key isn't provided, nor being found in the env.")
             return OpenAIEmbeddings(model=self.model_name, api_key=api_key)

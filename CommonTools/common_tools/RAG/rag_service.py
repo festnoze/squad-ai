@@ -1,4 +1,5 @@
 import os
+import time
 from typing import List, Optional, Union
 import json
 from collections import defaultdict
@@ -12,34 +13,40 @@ from langchain_community.retrievers import BM25Retriever
 #from rank_bm25 import BM25Okapi
 from langchain.retrievers.multi_query import MultiQueryRetriever
 from langchain.retrievers import EnsembleRetriever
+from langchain_core.embeddings import Embeddings
 from langchain_chroma import Chroma
 from langchain_qdrant import QdrantVectorStore
 from langchain_core.vectorstores import VectorStore
 from qdrant_client import QdrantClient
+import pinecone
+from pinecone import ServerlessSpec
 
 # common tools imports
 from common_tools.helpers.txt_helper import txt
 from common_tools.models.file_already_exists_policy import FileAlreadyExistsPolicy
 from common_tools.models.llm_info import LlmInfo
 from common_tools.helpers.file_helper import file
+from common_tools.helpers.env_helper import EnvHelper
 from common_tools.langchains.langchain_factory import LangChainFactory
 from common_tools.models.embedding import EmbeddingModel
+from common_tools.models.vector_db_type import VectorDbType
+from langchain_pinecone import PineconeVectorStore
 
 class RagService:
-    def __init__(self, llms_or_info: Optional[Union[LlmInfo, Runnable, list]], embedding_model:EmbeddingModel=None, vector_db_and_docs_path:str = './storage', vector_db_type:str = 'chroma', vector_db_name:str = 'main', documents_json_filename = "bm25_documents.json"):
+    def __init__(self, llms_or_info: Optional[Union[LlmInfo, Runnable, list]], embedding_model:EmbeddingModel=None, vector_db_and_docs_path:str = './storage', vector_db_type:VectorDbType = VectorDbType('chroma'), vector_db_name:str = 'main', documents_json_filename = "bm25_documents.json"):
         self.llm_1=None
         self.llm_2=None
         self.llm_3=None
         self.init_embedding(embedding_model)
         self.init_llms(llms_or_info) #todo: add fallbacks with specifying multiple llms or llms infos
         self.vector_db_name:str = vector_db_name
-        self.vector_db_type:str = vector_db_type
-        self.vector_db_path:str = os.path.join(os.path.join(os.path.abspath(vector_db_and_docs_path), self.embedding_model_name), vector_db_type)
+        self.vector_db_type:VectorDbType = vector_db_type
+        self.vector_db_path:str = os.path.join(os.path.join(os.path.abspath(vector_db_and_docs_path), self.embedding_model_name), vector_db_type.value)
         self.all_documents_json_file_path = os.path.abspath(os.path.join(vector_db_and_docs_path, documents_json_filename))
 
         self.langchain_documents:list[Document] = self._load_langchain_documents(self.all_documents_json_file_path)
         self.bm25_retriever = self._build_bm25_retriever(self.langchain_documents)
-        self.vectorstore:VectorStore = RagService._load_vectorstore(self.vector_db_path, self.embedding, self.vector_db_type, self.vector_db_name)
+        self.vectorstore:VectorStore = self._load_vectorstore(self.vector_db_path, self.embedding, self.vector_db_type, self.vector_db_name)
 
     def init_embedding(self, embedding_model:EmbeddingModel):
         self.embedding = embedding_model.create_instance()
@@ -103,23 +110,41 @@ class RagService:
         return docs
     
 
-    def _load_vectorstore(vector_db_path:str = None, embedding = None, vectorstore_type: str = 'chroma', collection_name:str = 'main') -> VectorStore:
+    def _load_vectorstore(self, vector_db_path:str = None, embedding: Embeddings = None, vectorstore_type: VectorDbType = VectorDbType('chroma'), vectorstore_name:str = 'main') -> VectorStore:
         try:
             vectorstore:VectorStore = None
             
-            if vectorstore_type == "chroma":
-                chroma_vector_db_path = os.path.join(vector_db_path, collection_name)
+            if vectorstore_type == VectorDbType.ChromaDB:
+                chroma_vector_db_path = os.path.join(vector_db_path, vectorstore_name)
                 if not file.file_exists(chroma_vector_db_path):
                     txt.print(f'>> Vectorstore not loaded, as path: "... {vector_db_path[-110:]}" is not found')
                 else:
                     vectorstore = Chroma(persist_directory= chroma_vector_db_path, embedding_function= embedding)
             
-            elif vectorstore_type == "qdrant":
+            elif vectorstore_type == VectorDbType.Qdrant:
                 if not file.file_exists(vector_db_path):
                     txt.print(f'>> Vectorstore not loaded, as path: "... {vector_db_path[-110:]}" is not found')
                 else:
                     qdrant_client = QdrantClient(path=vector_db_path)
-                    vectorstore = QdrantVectorStore(client=qdrant_client, collection_name=collection_name, embedding=embedding)
+                    vectorstore = QdrantVectorStore(client=qdrant_client, collection_name=vectorstore_name, embedding=embedding)
+            
+            elif vectorstore_type == VectorDbType.Pinecone:
+                pinecone_instance = pinecone.Pinecone(api_key= EnvHelper.get_pinecone_api_key()) #, environment= EnvHelper.get_pinecone_environment()                
+                if vectorstore_name not in pinecone_instance.list_indexes().names():
+                    pinecone_instance.create_index(
+                                        name= vectorstore_name, 
+                                        dimension=1536,
+                                        metric="cosine", 
+                                        spec=ServerlessSpec(
+                                                cloud='aws',
+                                                region='us-east-1'))
+                    
+                    while not pinecone_instance.describe_index(vectorstore_name).status['ready']:
+                        time.sleep(1)
+                    
+                pinecone_index = pinecone_instance.Index(name=vectorstore_name)
+                print(pinecone_index.describe_index_stats()) #TMP
+                vectorstore = PineconeVectorStore(index=pinecone_index, embedding=self.embedding)
             return vectorstore
         
         except Exception as e:

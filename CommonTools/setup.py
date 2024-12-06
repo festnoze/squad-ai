@@ -1,8 +1,12 @@
 from setuptools import setup, find_packages
 
-## To install/update the below listed dependencies globally, run the following command as admin in a python terminal:
+######################################################################
+## To install/update the below listed dependencies globally,
+#  run the following command as admin in a python terminal:
 # senv\Scripts\activate
 # pip install -e . --upgrade
+######################################################################
+
 setup(
     name='common_tools',
     version='0.4.0',
@@ -16,6 +20,7 @@ setup(
         'requests',
         'pandas',
         'pydantic',
+        'rank-bm25',
         'langchain>=0.3.3',
         'langchain-core>=0.3.12',
         'langchain-community>=0.3.2',
@@ -28,6 +33,9 @@ setup(
         'langchain-anthropic>=0.2.4',
         'langchain-qdrant>=0.1.0',
         'qdrant-client',
+        'pinecone-client==5.0.1',
+        'pinecone-plugin-inference==1.1.0',
+        'pinecone==5.0.1',
         'langgraph>=0.2.38',
         'langsmith>=0.1.136',
         'ragas>=0.2.5',
@@ -35,10 +43,11 @@ setup(
         'ollama',
         'groq',
         'pyyaml',
-        'lark',  # needed for langchain self-querying retriever
-        # 'prefect',  # Uncomment if needed prefect
-        # 'sentence-transformers>=3.2.0',  # Uncomment if add as new LLM models' provider
-        'rank-bm25',
+        'lark',  # needed for langchain 'self-querying' retriever
+        'scikit-learn',
+        'scipy',
+        # 'prefect',  # Uncomment if needed for advanced workflows management
+        # 'sentence-transformers>=3.2.0',  # Uncomment to add as new LLM models' provider
     ],
     classifiers=[
         'Programming Language :: Python :: 3',

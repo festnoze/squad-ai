@@ -5,8 +5,9 @@ from dotenv import load_dotenv
 from common_tools.models.embedding import EmbeddingModel
 from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.models.llm_info import LlmInfo
+from common_tools.models.vector_db_type import VectorDbType
 
-#load_dotenv() # Must be done beforehand in the main script
+# /!\ 'load_dotenv()'  Must be done beforehand in the main script!
 class ConfigHelper:
     @staticmethod
     def get_embedding_model_from_env():
@@ -19,11 +20,11 @@ class ConfigHelper:
             raise ValueError(f"Invalid EMBEDDING_MODEL: '{model_name}'")
     
     @staticmethod
-    def get_vector_db_type_from_env():
-        vector_db_type = os.getenv('VECTOR_DB_TYPE')
-        if not vector_db_type:
+    def get_vector_db_type_from_env() -> VectorDbType:
+        vector_db_type_str = os.getenv('VECTOR_DB_TYPE')
+        if not vector_db_type_str:
             raise ValueError("VECTOR_DB_TYPE is not set in the environment")
-        return vector_db_type
+        return VectorDbType(vector_db_type_str)
     
     @staticmethod
     def get_vector_db_name_from_env():

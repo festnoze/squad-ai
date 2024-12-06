@@ -38,11 +38,12 @@ from common_tools.models.embedding import EmbeddingModel, EmbeddingType
 from common_tools.models.conversation import Conversation, Message
 from common_tools.models.doc_w_summary_chunks_questions import DocWithSummaryChunksAndQuestions
 from common_tools.rag.rag_inference_pipeline.end_pipeline_exception import EndPipelineException
+from common_tools.models.vector_db_type import VectorDbType
 
 class AvailableService:
     inference: RagInferencePipeline = None
     rag_service: RagService = None
-    vector_db_type: str = None
+    vector_db_type: VectorDbType = None
     embedding_model: EmbeddingModel = None
     llms_infos: list[LlmInfo] = None
 
