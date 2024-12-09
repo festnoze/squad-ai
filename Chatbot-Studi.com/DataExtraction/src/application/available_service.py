@@ -18,6 +18,7 @@ from site_public_metadata_descriptions import MetadataDescriptionHelper
 from vector_database_creation.generate_documents_and_metadata import GenerateDocumentsAndMetadata
 from vector_database_creation.generate_summaries_chunks_questions_and_metadata import GenerateDocumentsSummariesChunksQuestionsAndMetadata
 from web_services.request_models.user_query_asking_request_model import UserQueryAskingRequestModel
+from api.task_handler import task_handler
 #
 from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.execute_helper import Execute
@@ -165,7 +166,7 @@ class AvailableService:
         return ConversationConverter.convert_conversation_entity_to_model(new_conv_entity)
 
     @staticmethod
-    async def rag_query_stream_async(user_query_request_model: UserQueryAskingRequestModel):
+    async def rag_query_stream_async(user_query_request_model: UserQueryAskingRequestModel, is_stream_decoded = False) -> AsyncGenerator:
         conversation = await ConversationRepository().get_conversation_by_id_async(user_query_request_model.conversation_id)
         if not conversation: 
             raise ValueError(f"Conversation with ID {user_query_request_model.conversation_id} not found in database.")
@@ -174,14 +175,18 @@ class AvailableService:
         
         # Stream the response
         all_chunks_output=[]
-        response_generator = AvailableService.rag_query_retrieval_and_augmented_generation_streaming_async(conversation, False, all_chunks_output)
+        response_generator = AvailableService.rag_query_retrieval_and_augmented_generation_streaming_async(conversation, user_query_request_model.display_waiting_message, is_stream_decoded, all_chunks_output)
         async for chunk in response_generator:
             yield chunk
         
         # Add a summary of the generated answer to conversation messages and save it
         full_answer_str = Llm.get_text_from_chunks(all_chunks_output)
         # Don't await, make summary generation of the answer as a background task
-        AvailableService.add_answer_summary_to_conversation_async(conversation, full_answer_str)
+        task_handler.add_task(
+            AvailableService.add_answer_summary_to_conversation_async, 
+            conversation, 
+            full_answer_str
+        )
 
     @staticmethod
     async def add_answer_summary_to_conversation_async(conversation, full_answer_str):
@@ -190,10 +195,11 @@ class AvailableService:
         assert await ConversationRepository().add_message_to_conversation_async(conversation.id, conversation.last_message)
     
     @staticmethod
-    async def rag_query_retrieval_and_augmented_generation_streaming_async(conversation_history:Conversation, is_stream_decoded = False, all_chunks_output: list[str] = []):
-        waiting_message = "Merci de patienter un instant ... Je cherche les informations correspondant à votre question."
-        async for chunk in Llm.write_static_text_as_stream(waiting_message):
-            yield chunk
+    async def rag_query_retrieval_and_augmented_generation_streaming_async(conversation_history:Conversation, display_waiting_message = True, is_stream_decoded = False, all_chunks_output: list[str] = []):
+        if display_waiting_message:
+            waiting_message = "Merci de patienter un instant ... Je cherche les informations correspondant à votre question."
+            async for chunk in Llm.write_static_text_as_stream(waiting_message):
+                yield chunk
 
         try:
             analysed_query, retrieved_chunks = await AvailableService.rag_query_retrieval_but_augmented_generation_async(conversation_history)             
@@ -202,8 +208,9 @@ class AvailableService:
             pipeline_succeeded = False
             pipeline_ended_response = ex.message
 
-        async for chunk in Llm.remove_all_previous_stream_async(True, len(waiting_message.split(" "))):
-            yield chunk
+        if display_waiting_message:
+            async for chunk in Llm.remove_all_previous_stream_async(True, len(waiting_message.split(" "))):
+                yield chunk
 
         if pipeline_succeeded:
             augmented_generation_streaming = AvailableService.rag_query_augmented_generation_streaming_async(analysed_query, retrieved_chunks[0], is_stream_decoded, all_chunks_output)

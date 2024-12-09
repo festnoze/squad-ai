@@ -32,11 +32,9 @@ class ChatbotApiClient:
         id_str = resp.json().get("id", "")
         return UUID(id_str)
 
-    def rag_query_stream(self, conversation_id:UUID, user_query:str) -> str:
-        user_query: UserQueryAskingRequestModel = UserQueryAskingRequestModel(conversation_id=conversation_id, user_query_content=user_query)
+    def rag_query_stream(self, conversation_id:UUID, user_query:str):
+        user_query: UserQueryAskingRequestModel = UserQueryAskingRequestModel(conversation_id=conversation_id, user_query_content=user_query, display_waiting_message=False)
         with requests.post(f"{self.inference_prefix}/query/stream", json=user_query.to_json(), stream=True) as r:
             r.raise_for_status()
-            response = []
             for chunk in r.iter_content(chunk_size=None, decode_unicode=True):
-                response.append(chunk)
-            return "".join(response)
+                yield chunk

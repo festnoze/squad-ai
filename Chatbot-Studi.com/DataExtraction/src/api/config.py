@@ -6,6 +6,7 @@ import logging
 from application.available_service import AvailableService
 from web_services.rag_ingestion_controller import ingestion_router
 from web_services.rag_inference_controller import inference_router
+from api.task_handler import task_handler
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -50,5 +51,17 @@ def create_app() -> FastAPI:
     async def validation_exception_handler(request: Request, exc: RequestValidationError):
         logger.error(f"Validation error: {exc.errors()}")
         return JSONResponse(status_code=422, content={"detail": exc.errors()})
+    
+    async def startup_event():
+        """Handle application startup."""
+        logger.info("Application startup: Task handler is running.")
+
+    async def shutdown_event():
+        """Handle application shutdown."""
+        logger.info("Shutting down: Stopping the task handler.")
+        task_handler.stop()
+    
+    app.add_event_handler("startup", startup_event)
+    app.add_event_handler("shutdown", shutdown_event)
 
     return app
