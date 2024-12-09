@@ -120,7 +120,6 @@ class AvailableService:
         start = time.time()
         summary_3_steps = await summary_builder.create_summary_and_questions_from_docs_in_three_steps_async([AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2], trainings_docs)
         summary_3_steps_elapsed_str = txt.get_elapsed_str(time.time() - start)
-
         
         txt.print("-"*70)
         summary_1_step.display_to_terminal()
@@ -183,10 +182,10 @@ class AvailableService:
         full_answer_str = Llm.get_text_from_chunks(all_chunks_output)
         # Don't await, make summary generation of the answer as a background task
         task_handler.add_task(
-            AvailableService.add_answer_summary_to_conversation_async, 
-            conversation, 
-            full_answer_str
-        )
+                        AvailableService.add_answer_summary_to_conversation_async, 
+                        conversation, 
+                        full_answer_str)
+        
 
     @staticmethod
     async def add_answer_summary_to_conversation_async(conversation, full_answer_str):

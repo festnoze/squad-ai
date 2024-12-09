@@ -22,7 +22,7 @@ public class ChatbotAPIClient
     /// <exception cref="Exception"></exception>
     public async Task<Guid> GetNewConversationIdAsync(string? userName)
     {
-        string endpoint = $"{_baseUrl}/rag/query/create";
+        string endpoint = $"{_baseUrl}/rag/inference/query/create";
         string jsonPayload = JsonSerializer.Serialize(userName);
         var request = new HttpRequestMessage(HttpMethod.Get, endpoint)
         {
@@ -54,7 +54,7 @@ public class ChatbotAPIClient
     /// <returns></returns>
     public async IAsyncEnumerable<string> GetQueryRagAnswerStreamingAsync(UserQueryAskingRequestModel userQueryAskingRequestModel)
     {
-        string endpoint = $"{_baseUrl}/rag/query/stream";
+        string endpoint = $"{_baseUrl}/rag/inference/query/stream";
         string jsonPayload = JsonSerializer.Serialize(userQueryAskingRequestModel);
         var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
         {

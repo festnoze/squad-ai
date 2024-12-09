@@ -9,4 +9,8 @@ public class UserQueryAskingRequestModel
 
     [JsonPropertyName("user_query_content")]
     public string UserQueryContent { get; set; } = "";
+
+    [JsonPropertyName("display_waiting_message")]
+    public bool DisplayWaitingMessage { get; set; } = true;
+
 }
