@@ -4,15 +4,15 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 #
-from database_conversations.datacontext import DataContextConversations
+from database_conversations.conversation_datacontext import ConversationDataContext
 from common_tools.models.conversation import Conversation, Message
-from database_conversations.models import ConversationEntity, MessageEntity
+from database_conversations.entities import ConversationEntity, MessageEntity
 from database_conversations.converter import ConversationConverter
 
 class ConversationRepository:
 
     def __init__(self):
-        self.data_context = DataContextConversations()
+        self.data_context = ConversationDataContext()
 
     async def create_new_conversation_async(self, conversation: Conversation) -> bool:
         """Create a new conversation."""
@@ -80,32 +80,3 @@ class ConversationRepository:
         except Exception as e:
             print(f"Failed to add message to conversation: {e}")
             return False
-        
-
-    #async def save_conversation_async(self, conversation: Conversation) -> bool:
-    #     """Save a user conversation. Create or update depending on existence."""
-    #     if await self.does_conversation_exists_async(conversation.id):
-    #         return await self.update_existing_conversation_async(conversation)
-    #     else:
-    #         return await self.create_new_conversation_async(conversation)
-        
-    # #Can't work this way, the entity should be compared with the model and apply all changes:
-    # # use add_message_to_conversation_async instead
-    # async def update_existing_conversation_async(self, conversation: Conversation) -> bool:
-    #     """Update an existing conversation."""
-    #     if not await self.does_conversation_exists_async(conversation.id):
-    #         raise ValueError(f"Conversation with ID {conversation.id} not found in database.")
-    #     try:
-    #         async with self.data_context.get_session_async() as session:
-    #             conversation_entity = await self._get_conversation_entity_by_id_async(conversation.id)
-    #             if not conversation_entity:
-    #                 raise ValueError(f"Conversation to update with ID {conversation.id} not found.")
-    #             # Update conversation's messages only
-    #             conversation_entity.messages = [
-    #                 ConversationConverter.convert_message_model_to_entity(message) for message in conversation.messages
-    #             ]
-    #             session.add(conversation_entity)
-    #         return True
-    #     except Exception as e:
-    #         print(f"Failed to update conversation: {e}")
-    #         return False

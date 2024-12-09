@@ -8,13 +8,13 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import sessionmaker
 from uuid import UUID
 
-from database_conversations.models import Base, ConversationEntity, MessageEntity  # Import SQLAlchemy database models
+from database_conversations.entities import Base, ConversationEntity, MessageEntity  # Import SQLAlchemy database models
 from common_tools.models.conversation import Conversation
 from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.file_helper import file
+from database_conversations.iconversation_datacontext import IConversationDataContext
 
-
-class DataContextConversations:
+class ConversationDataContext(IConversationDataContext):
     def __init__(self, db_path_or_url='database_conversations/conversation_database.db'):
         if ':' not in db_path_or_url:
             source_path = os.environ.get("PYTHONPATH").split(';')[-1]

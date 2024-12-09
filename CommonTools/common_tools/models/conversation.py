@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional, Union
 import uuid
 from uuid import UUID
@@ -6,14 +7,18 @@ from langchain.schema.messages import HumanMessage, AIMessage, SystemMessage
 from langchain.memory import ConversationBufferMemory
 from langchain_core.messages.base import BaseMessage, BaseMessageChunk
 
+from common_tools.models.user import User
+
 class Conversation:
     id: UUID
-    user_name: str
+    user: User
     messages: list[Message]
+    created_at: datetime
 
-    def __init__(self, user_name:str = None, messages: list = None, id:UUID = None) -> None:
-        self.id:UUID = id if id else uuid.uuid4()
-        self.user_name:str = user_name if user_name else 'default user'
+    def __init__(self, user: User, messages: list[Message] = None, created_at: datetime = None, id: UUID = None) -> None:
+        self.id = id if id else uuid.uuid4()
+        self.user = user
+        self.created_at = created_at if created_at else datetime.now(datetime.timezone.utc)
         self.messages:list[Message] = []
         if messages:
             for message in messages:
@@ -25,7 +30,7 @@ class Conversation:
                     self.add_message(Message(message.role, message.content))
                 else:
                     raise ValueError("Unable to instanciate Conversation from the provided parameters")
-
+        
     def add_message(self, message: Message) -> None:
         self.messages.append(message)
     
