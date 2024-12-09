@@ -1,0 +1,4 @@
+-e C:/Dev/squad-ai/CommonTools # local package to internal tooling
+fastapi
+uvicorn
+streamlit

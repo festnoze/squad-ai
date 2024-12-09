@@ -4,6 +4,8 @@ from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import logging
 from application.available_service import AvailableService
+from web_services.rag_ingestion_controller import ingestion_router
+from web_services.rag_inference_controller import inference_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -15,7 +17,16 @@ async def lifespan(app: FastAPI):
 
 # Configure the FastAPI app
 def create_app() -> FastAPI:
-    app = FastAPI(lifespan=lifespan)
+    app = FastAPI(
+        title="RAG API for Chatbot",
+        description="API for RAG augmented chatbot backend services",
+        version="1.0.0",
+        lifespan=lifespan
+    )
+    
+    # Include controllers as routers
+    app.include_router(ingestion_router)
+    app.include_router(inference_router)
 
     # Configure logging with reduced verbosity
     logging.basicConfig(level=logging.ERROR, format="%(message)s")
