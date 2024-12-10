@@ -4,15 +4,14 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 #
-from database_conversations.conversation_datacontext import ConversationDataContext
+from common_tools.database.generic_datacontext import GenericDataContext
 from common_tools.models.conversation import Conversation, Message
 from database_conversations.entities import ConversationEntity, MessageEntity
 from database_conversations.converter import ConversationConverter
 
 class ConversationRepository:
-
-    def __init__(self):
-        self.data_context = ConversationDataContext()
+    def __init__(self, db_path_or_url='database_conversations/conversation_database.db'):      
+        self.data_context = GenericDataContext(db_path_or_url)
 
     async def create_new_conversation_async(self, conversation: Conversation) -> bool:
         """Create a new conversation."""

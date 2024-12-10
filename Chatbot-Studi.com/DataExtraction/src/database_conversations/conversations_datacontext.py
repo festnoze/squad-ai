@@ -14,7 +14,7 @@ from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.file_helper import file
 from database_conversations.iconversation_datacontext import IConversationDataContext
 
-class ConversationDataContext(IConversationDataContext):
+class ConversationsDataContext(IConversationDataContext):
     def __init__(self, db_path_or_url='database_conversations/conversation_database.db'):
         if ':' not in db_path_or_url:
             source_path = os.environ.get("PYTHONPATH").split(';')[-1]
@@ -49,7 +49,16 @@ class ConversationDataContext(IConversationDataContext):
         finally:
             await session.close()
 
-    async def add_conversation_async(self, user_name: str, conversation_entity: ConversationEntity):
+    async def add_user_async(self, user_name: str, IP: str, device_info: str) -> UUID:
+        async with self.get_session_async() as session:
+            try:
+                user_entity = UserEntity(name=user_name, ip=IP, device_info=device_info)
+                session.add(user_entity)
+                return user_entity.id
+            except Exception as e:
+                txt.print(f"Failed to add user: {e}")
+
+    async def add_conversation_async(self, user_id: UUID, conversation_entity: ConversationEntity) -> UUID:
         async with self.get_session_async() as session:
             try:
                 # Add the conversation (with its related messages) to the session
@@ -59,7 +68,7 @@ class ConversationDataContext(IConversationDataContext):
                 txt.print(f"Failed to add conversation: {e}")
                 raise
 
-    async def get_conversation_by_id_async(self, conversation_id: UUID):
+    async def get_conversation_by_id_async(self, conversation_id: UUID) -> ConversationEntity:
         async with self.get_session_async() as session:
             try:
                 result = await session.execute(select(ConversationEntity).filter(ConversationEntity.id == conversation_id))
@@ -79,7 +88,7 @@ class ConversationDataContext(IConversationDataContext):
                 txt.print(f"Failed to retrieve conversations: {e}")
                 raise
 
-    async def update_conversation_async(self, conversation_id: UUID, user_name: str = None, new_messages: list[dict] = None):
+    async def update_conversation_async(self, conversation_id: UUID, new_messages: list[dict] = None):
         async with self.get_session_async() as session:
             try:
                 result = await session.execute(select(ConversationEntity).filter(ConversationEntity.id == conversation_id))
@@ -87,9 +96,6 @@ class ConversationDataContext(IConversationDataContext):
 
                 if not conversation:
                     raise ValueError("Conversation not found")
-
-                if user_name:
-                    conversation.user_name = user_name
 
                 if new_messages:
                     for msg in new_messages:
@@ -148,12 +154,9 @@ class ConversationDataContext(IConversationDataContext):
                 if not message:
                     raise ValueError("Message not found")
 
-                if new_role:
-                    message.role = new_role
-                if new_content:
-                    message.content = new_content
-                if new_elapsed_seconds is not None:
-                    message.elapsed_seconds = new_elapsed_seconds
+                if new_role: message.role = new_role
+                if new_content: message.content = new_content
+                if new_elapsed_seconds is not None: message.elapsed_seconds = new_elapsed_seconds
 
                 session.add(message)
             except Exception as e:

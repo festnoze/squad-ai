@@ -15,11 +15,15 @@ class IConversationDataContext(ABC):
         pass
 
     @abstractmethod
-    async def add_conversation_async(self, user_name: str, conversation_entity: any) -> UUID:
+    async def add_user_async(self, user_name: str, IP: str, device_info: str) -> UUID:
         pass
 
     @abstractmethod
-    async def get_conversation_by_id_async(self, conversation_id: UUID) -> any:
+    async def add_conversation_async(self, user_id: UUID, conversation_entity: any) -> UUID:
+        pass
+
+    @abstractmethod
+    async def get_conversation_by_id_async(self, conversation_id: UUID) -> ConversationEntity:
         pass
 
     @abstractmethod
@@ -27,7 +31,7 @@ class IConversationDataContext(ABC):
         pass
 
     @abstractmethod
-    async def update_conversation_async(self, conversation_id: UUID, user_name: str = None, new_messages: list[dict] = None) -> None:
+    async def update_conversation_async(self, conversation_id: UUID, new_messages: list[dict] = None) -> None:
         pass
 
     @abstractmethod

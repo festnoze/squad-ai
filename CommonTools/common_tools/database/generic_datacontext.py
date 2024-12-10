@@ -3,9 +3,6 @@ from contextlib import asynccontextmanager
 import os
 from uuid import UUID
 
-from common_tools.helpers.txt_helper import txt
-from common_tools.helpers.file_helper import file
-
 from sqlalchemy import create_engine, select
 from sqlalchemy import Column, String, Integer, ForeignKey, Table, DateTime
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
@@ -13,13 +10,17 @@ from sqlalchemy.orm import relationship, declarative_base
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 
+from common_tools.helpers.txt_helper import txt
+from common_tools.helpers.file_helper import file
+
 Base = declarative_base()
 
-class GenericRepository:
+class GenericDataContext:
     def __init__(self, db_path_or_url='database.db'):
         if ':' not in db_path_or_url:
             source_path = os.environ.get("PYTHONPATH").split(';')[-1]
             db_path_or_url = os.path.join(source_path, db_path_or_url)
+
         if 'http' not in db_path_or_url and not file.file_exists(db_path_or_url):
             txt.print(f"/!\\ Database file not found at path: {db_path_or_url}")
             self.create_database(db_path_or_url)
@@ -27,10 +28,9 @@ class GenericRepository:
         sqlite_db_path = f'sqlite+aiosqlite:///{db_path_or_url}'
         self.engine = create_async_engine(sqlite_db_path, echo=True)
         self.SessionLocal = sessionmaker(
-            bind=self.engine,
-            expire_on_commit=False,
-            class_=AsyncSession
-        )
+                                bind=self.engine,
+                                expire_on_commit=False,
+                                class_=AsyncSession)
 
     def create_database(self, db_path):
         sqlite_db_path_sync = f'sqlite:///{db_path}'
