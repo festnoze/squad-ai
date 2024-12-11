@@ -5,7 +5,7 @@ from uuid import UUID
 from typing import Optional, List
 
 from sqlalchemy.sql.expression import BinaryExpression
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, delete, select
 from sqlalchemy import Column, String, Integer, ForeignKey, Table, DateTime
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import relationship, declarative_base
@@ -20,24 +20,26 @@ class GenericDataContext:
         if ':' not in db_path_or_url:
             source_path = os.environ.get("PYTHONPATH").split(';')[-1]
             db_path_or_url = os.path.join(source_path.replace('/', '\\'), db_path_or_url.replace('/', '\\'))
+        
+        self.base_entities = base_entities
+        self.db_path_or_url = db_path_or_url
+        self.sqlite_sync_db_path = f'sqlite:///{db_path_or_url}'
+        self.sqlite_async_db_path = f'sqlite+aiosqlite:///{db_path_or_url}'
 
-        if 'http' not in db_path_or_url and not file.file_exists(db_path_or_url):
-            txt.print(f"/!\\ Database file not found at path: {db_path_or_url}")
-            self.create_database(base_entities, db_path_or_url)
+        if 'http' not in self.db_path_or_url and not file.file_exists(self.db_path_or_url):
+            txt.print(f"/!\\ Database file not found at path: {self.db_path_or_url}")
+            self.create_database()
 
-        sqlite_db_path = f'sqlite+aiosqlite:///{db_path_or_url}'
-        self.engine = create_async_engine(sqlite_db_path, echo=True)
+        self.engine = create_async_engine(self.sqlite_async_db_path, echo=True)
         self.SessionLocal = sessionmaker(
                                 bind=self.engine,
                                 expire_on_commit=False,
                                 class_=AsyncSession)
 
-    def create_database(self, base_entities, db_path):
-        sqlite_db_path_sync = f'sqlite:///{db_path}'
-        #tables = base_entities.metadata.tables
-        sync_engine = create_engine(sqlite_db_path_sync, echo=True)
+    def create_database(self):
+        sync_engine = create_engine(self.sqlite_sync_db_path, echo=True)
         with sync_engine.begin() as conn:
-            base_entities.metadata.create_all(bind=conn)
+            self.base_entities.metadata.create_all(bind=conn)
         txt.print(">>> Database and tables created successfully.")
 
     @asynccontextmanager
@@ -46,14 +48,23 @@ class GenericDataContext:
         try:
             yield transaction
             await transaction.commit()
-        except Exception as e:
+        except Exception:
             await transaction.rollback()
             raise
         finally:
             await transaction.close()
-
+    
     @asynccontextmanager
-    async def read_db(self):
+    async def read_db_async(self):
+        async with self.SessionLocal() as session:
+            try:
+                yield session
+            except Exception as e:
+                raise RuntimeError(f"Error during read operation: {e}")
+
+    # AVOID - As it doesn't automatically map ORM objects
+    @asynccontextmanager
+    async def low_level_db_async(self):
         async with self.engine.connect() as connection:
             try:
                 yield connection
@@ -81,10 +92,9 @@ class GenericDataContext:
         if to_join_list:
             query = query.options(*[joinedload(to_join) for to_join in to_join_list])
 
-        async with self.read_db() as connection:
+        async with self.read_db_async() as session:
             try:
-                results = await connection.execute(query)
-                #tmp = str(results.first())
+                results = await session.execute(query)
                 result = results.scalars().first()
                 if fails_if_not_found and not result:
                     raise ValueError(f"No entity found for '{entity_class.__name__}' with the specified filters.")
@@ -99,9 +109,9 @@ class GenericDataContext:
             for filter_condition in filters:
                 query = query.filter(filter_condition)
 
-        async with self.read_db() as connection:
+        async with self.read_db_async() as session:
             try:
-                results = await connection.execute(query)
+                results = await session.execute(query)
                 return results.scalars().all()
             except Exception as e:
                 txt.print(f"Failed to retrieve entities: {e}")
@@ -144,3 +154,9 @@ class GenericDataContext:
             except Exception as e:
                 txt.print(f"Failed to delete entity: {e}")
                 raise
+
+    async def empty_all_database_tables_async(self):
+        async with self.new_transaction_async() as transaction:
+            # Delete all tables records, tables in the reverse order to avoid foreign key integrity errors
+            for table in reversed(self.base_entities.metadata.sorted_tables):
+                await transaction.execute(delete(table))

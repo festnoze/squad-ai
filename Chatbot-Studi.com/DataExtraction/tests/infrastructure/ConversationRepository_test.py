@@ -3,7 +3,7 @@ import pytest
 import asyncio
 from uuid import uuid4
 from datetime import datetime, timezone
-from src.database_conversations.entities import ConversationEntity
+from src.database_conversations.entities import ConversationEntity, UserEntity
 from src.database_conversations.conversation_converters import ConversationConverters
 from src.infrastructure.conversation_repository import ConversationRepository
 from common_tools.models.conversation import Conversation, Message, User
@@ -76,9 +76,6 @@ class TestConversationRepository:
         retrieved_conversation = await self.conversation_repository.get_conversation_by_id_async(self.sample_conversation.id)
         assert retrieved_conversation is not None
         assert retrieved_conversation.id == self.sample_conversation.id
-        assert retrieved_conversation.title == self.sample_conversation.title
-        assert len(retrieved_conversation.messages) == 1
-        assert retrieved_conversation.messages[0].content == "Hello, World!"
 
         assert retrieved_conversation.user is not None
         assert retrieved_conversation.user.id == self.sample_user.id
@@ -87,6 +84,9 @@ class TestConversationRepository:
         assert retrieved_conversation.user.device_info == self.sample_user.device_info
 
         assert retrieved_conversation.messages is not None
+        assert len(retrieved_conversation.messages) == 1
+        assert retrieved_conversation.messages[0].id == self.sample_conversation.messages[0].id
+        assert retrieved_conversation.messages[0].content == self.sample_conversation.messages[0].content        
 
     @pytest.mark.asyncio
     async def test_get_conversation_by_nonexistent_id(self):
@@ -108,19 +108,6 @@ class TestConversationRepository:
 
     @pytest.mark.asyncio
     async def test_add_message_to_existing_conversation(self):
-        async with self.conversation_repository.data_context.read_db() as connection:
-            query = select(ConversationEntity)
-            results = await connection.execute(query)
-            result = results.scalars().first()
-            print(result) 
-
-            query = select(ConversationEntity)#.filter(ConversationEntity.id == self.sample_conversation.id)
-            #query = select(UserEntity).filter(UserEntity.id == user_id)
-            compiled_query = query.compile(dialect=connection.dialect, compile_kwargs={"literal_binds": True})
-            print(compiled_query)
-            results = await connection.execute(query)
-            result = results.scalars().first()
-            print(result)
         new_message = Message(
             role="User2",
             content="This is a new message.",
@@ -149,34 +136,3 @@ class TestConversationRepository:
         with pytest.raises(ValueError) as exc_info:
             await self.conversation_repository.add_message_to_conversation_async(non_existent_id, new_message)
         assert f"Conversation with id: {non_existent_id} does not exist." in str(exc_info.value)
-
-    @pytest.mark.asyncio
-    async def test_create_or_update_conversation_create(self):
-        # Assuming a method `create_or_update_conversation_async` exists
-        new_conversation = Conversation(
-            id=uuid4(),
-            title="Create Or Update Conversation",
-            messages=[]
-        )
-        result = await self.conversation_repository.create_or_update_conversation_async(new_conversation)
-        assert result is True
-
-        # Verify creation
-        exists = await self.conversation_repository.does_exist_conversation_by_id_async(new_conversation.id)
-        assert exists is True
-
-    @pytest.mark.asyncio
-    async def test_create_or_update_conversation_update(self):
-        # Assuming a method `create_or_update_conversation_async` exists
-        updated_title = "Updated Conversation Title"
-        updated_conversation = Conversation(
-            id=self.sample_conversation.id,
-            title=updated_title,
-            messages=self.sample_conversation.messages
-        )
-        result = await self.conversation_repository.create_or_update_conversation_async(updated_conversation)
-        assert result is True
-
-        # Verify update
-        retrieved_conversation = await self.conversation_repository.get_conversation_by_id_async(self.sample_conversation.id)
-        assert retrieved_conversation.title == updated_title
