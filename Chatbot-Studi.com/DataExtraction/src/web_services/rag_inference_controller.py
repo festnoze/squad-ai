@@ -44,9 +44,13 @@ async def create_new_conversation(user_name: str = None):
 
 @inference_router.post("/query/stream")
 async def rag_query_stream_async(user_query_request_model: QueryAskingRequestModel):
-    response_generator = AvailableService.rag_query_stream_async(
-                                user_query_request_model.conversation_id,
-                                user_query_request_model.user_query_content,
-                                user_query_request_model.display_waiting_message,
-                                False)
-    return StreamingResponse(response_generator, media_type="text/event-stream")
+    try:
+        response_generator = AvailableService.rag_query_stream_async(
+                                    user_query_request_model.conversation_id,
+                                    user_query_request_model.user_query_content,
+                                    user_query_request_model.display_waiting_message,
+                                    False)
+        return StreamingResponse(response_generator, media_type="text/event-stream")    
+    except Exception as e:
+        print(f"Failed to create conversation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

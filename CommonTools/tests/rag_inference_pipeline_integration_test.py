@@ -1,4 +1,3 @@
-import pytest
 from unittest.mock import patch, MagicMock
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
@@ -34,7 +33,6 @@ class TestRagInferencePipelineIntegration:
             #
             self.inference = RagInferencePipeline(self.rag_service)
 
-
     def test_inference_pipeline_run_dynamic_with_bm25_retrieval(self):
         # Define the query for the test
         query = "Quelle est la capitale de la Choupiland ?"
@@ -69,7 +67,6 @@ class TestRagInferencePipelineIntegration:
         # assert len(sources) > 0, "There should be at least one source retrieved"
         #assert [ "I found! " source for source in sources], f"The response should mention 'I found! ' added by the formatting function, but was: '{response}'"
         assert response.lower().__contains__("octopus") or response.lower().__contains__("pieuvre") or response.lower().__contains__("poulpe"), f"The response should mention 'octopus', but was: '{response}'"
-
 
     def test_inference_pipeline_run_static_with_bm25_retrieval(self):
         # Define the query for the test

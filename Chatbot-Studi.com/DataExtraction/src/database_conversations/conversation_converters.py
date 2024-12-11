@@ -69,7 +69,7 @@ class ConversationConverters:
     @staticmethod
     def convert_conversation_model_to_entity(conversation: Conversation) -> ConversationEntity:
         entity = ConversationEntity(
-            user_id=conversation.user.id,
+            user_id=conversation.user.id if conversation.user and conversation.user.id else None,
             created_at=conversation.created_at if conversation.created_at else datetime.now(timezone.utc),
         )
         if conversation.id:

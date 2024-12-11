@@ -40,6 +40,8 @@ class ConversationRepository:
             new_message_entity = ConversationConverters.convert_message_model_to_entity(message, conversation_id)
             res = await self.data_context.add_entity_async(new_message_entity)
             return True
+        except ValueError:
+            raise
         except Exception as e:
             print(f"Failed to add message to conversation: {e}")
             return False
