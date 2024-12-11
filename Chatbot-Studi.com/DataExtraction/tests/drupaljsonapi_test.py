@@ -1,7 +1,5 @@
-# test_drupal_client.py
-
 from unittest.mock import patch
-from drupal_json_api_client import DrupalJsonApiClient
+from src.data_retrieval.drupal_json_api_client import DrupalJsonApiClient
 
 class TestDrupalJsonApiClient:
     def setup_method(self):

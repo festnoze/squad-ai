@@ -15,10 +15,10 @@ class Conversation:
     messages: list[Message]
     created_at: datetime
 
-    def __init__(self, user: User, messages: list[Message] = None, created_at: datetime = None, id: UUID = None) -> None:
+    def __init__(self, user: User, messages: list[Message] = None, id: UUID = None, created_at: datetime = None) -> None:
         self.id = id if id else uuid.uuid4()
         self.user = user
-        self.created_at = created_at if created_at else datetime.now(datetime.timezone.utc)
+        self.created_at = created_at
         self.messages:list[Message] = []
         if messages:
             for message in messages:

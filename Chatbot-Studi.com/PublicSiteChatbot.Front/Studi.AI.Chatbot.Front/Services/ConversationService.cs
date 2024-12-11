@@ -68,7 +68,9 @@ public class ConversationService : IConversationService
 
         if (conversation!.Id is null)
         {
-            conversation!.Id = await this._chatbotApiClient.GetNewConversationIdAsync(userName);
+            // TODO : Get the IP and device infos from the client
+            var userId = await this._chatbotApiClient.GetUserIdAsync(new UserRequestModel { UserId = null, UserName = "default", IP = "127.0.0.1", DeviceInfo = "none" });
+            conversation!.Id = await this._chatbotApiClient.GetNewConversationIdAsync(userId);
         }
 
         conversation!.Last().IsSavedMessage = true;

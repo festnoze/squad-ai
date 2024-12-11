@@ -1,8 +1,8 @@
 -e C:/Dev/squad-ai/CommonTools # local package to internal tooling
 pytest
+pytest-asyncio
 numpy
-streamlit
-nltk
+#nltk
 ragas
 requests
 BeautifulSoup4

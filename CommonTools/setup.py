@@ -12,7 +12,7 @@ setup(
     version='0.4.0',
     description='Common tools for AI and generic needs on file, console, json, ...',
     author='Etienne Millerioux',
-    author_email='eemillerioux@gmail.com',  # Replace with your email
+    author_email='eemillerioux@gmail.com',
     url='https://github.com/festnoze/common_tools',
     packages=find_packages(),
     install_requires=[

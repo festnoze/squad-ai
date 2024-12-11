@@ -6,25 +6,21 @@ using Studi.AI.Chatbot.Front.Helpers;
 public class ChatbotAPIClient
 {
     private readonly HttpClient _httpClient;
-    private readonly string _baseUrl;
+    private readonly string _baseUri;
+    private readonly string _controller_subpath = "/rag/inference";
 
     public ChatbotAPIClient(string baseUrl)
     {
-        _baseUrl = baseUrl.TrimEnd('/');
+        _baseUri = baseUrl.TrimEnd('/');
         _httpClient = new HttpClient();
     }
 
-    /// <summary>
-    /// Get a new conversation ID from the server.
-    /// </summary>
-    /// <param name="userName"></param>
-    /// <returns></returns>
-    /// <exception cref="Exception"></exception>
-    public async Task<Guid> GetNewConversationIdAsync(string? userName)
+    public async Task<Guid> GetUserIdAsync(UserRequestModel userRequestModel)
     {
-        string endpoint = $"{_baseUrl}/rag/inference/query/create";
-        string jsonPayload = JsonSerializer.Serialize(userName);
-        var request = new HttpRequestMessage(HttpMethod.Get, endpoint)
+        string endpoint = $"{_baseUri}{_controller_subpath}/user/sync";
+        string jsonPayload = JsonSerializer.Serialize(userRequestModel);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
         {
             Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json")
         };
@@ -34,9 +30,38 @@ public class ChatbotAPIClient
             response.EnsureSuccessStatusCode();
 
             var result = await response.Content.ReadAsStringAsync();
+            var userResponse = JsonSerializer.Deserialize<OnlyIdResponseModel>(result);
 
-            // Deserialize the JSON object into a class
-            var conversationResponse = JsonSerializer.Deserialize<CreateConversationResponseModel>(result);
+            if (userResponse == null || userResponse.Id == Guid.Empty)
+            {
+                throw new Exception($"Invalid response from {nameof(GetUserIdAsync)} endpoint.");
+            }
+
+            return userResponse.Id;
+        }
+    }
+
+
+    /// <summary>
+    /// Get a new conversation ID from the server.
+    /// </summary>
+    /// <param name="userName"></param>
+    /// <returns></returns>
+    /// <exception cref="Exception"></exception>
+    public async Task<Guid> GetNewConversationIdAsync(Guid userId)
+    {
+        string endpoint = $"{_baseUri}{_controller_subpath}/query/create";
+        string jsonPayload = JsonSerializer.Serialize(userId);
+        var request = new HttpRequestMessage(HttpMethod.Get, endpoint)
+        {
+            Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json")
+        };
+
+        using (HttpResponseMessage response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead))
+        {
+            response.EnsureSuccessStatusCode();
+            var result = await response.Content.ReadAsStringAsync();
+            var conversationResponse = JsonSerializer.Deserialize<OnlyIdResponseModel>(result);
 
             if (conversationResponse == null || conversationResponse.Id == Guid.Empty)
             {
@@ -54,7 +79,7 @@ public class ChatbotAPIClient
     /// <returns></returns>
     public async IAsyncEnumerable<string> GetQueryRagAnswerStreamingAsync(UserQueryAskingRequestModel userQueryAskingRequestModel)
     {
-        string endpoint = $"{_baseUrl}/rag/inference/query/stream";
+        string endpoint = $"{_baseUri}{_controller_subpath}/query/stream";
         string jsonPayload = JsonSerializer.Serialize(userQueryAskingRequestModel);
         var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
         {
@@ -85,7 +110,7 @@ public class ChatbotAPIClient
     /// <exception cref="Exception"></exception>
     public async Task<bool> CreateVectorDatabaseAsync()
     {
-        string endpoint = $"{_baseUrl}/data/vector_db";
+        string endpoint = $"{_baseUri}/data/vector_db";
 
         using (var request = new HttpRequestMessage(HttpMethod.Post, endpoint))
         {

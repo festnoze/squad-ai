@@ -1,80 +1,45 @@
 from typing import Optional
 from uuid import UUID
-
-from sqlalchemy import select
-from sqlalchemy.orm import joinedload
-#
 from common_tools.database.generic_datacontext import GenericDataContext
 from common_tools.models.conversation import Conversation, Message
-from database_conversations.entities import ConversationEntity, MessageEntity
-from database_conversations.converter import ConversationConverter
+from src.database_conversations.entities import Base, ConversationEntity, MessageEntity
+from src.database_conversations.conversation_converters import ConversationConverters
 
 class ConversationRepository:
-    def __init__(self, db_path_or_url='database_conversations/conversation_database.db'):      
-        self.data_context = GenericDataContext(db_path_or_url)
+    def __init__(self, db_path_or_url='database_conversations/conversation_database.db'):
+        self.data_context = GenericDataContext(Base, db_path_or_url)
 
     async def create_new_conversation_async(self, conversation: Conversation) -> bool:
-        """Create a new conversation."""
-        if await self.does_conversation_exists_async(conversation.id):
-            raise ValueError(f"Conversation with ID {conversation.id} already exists in database.")
-        try:
-            conversation_entity = ConversationConverter.convert_conversation_model_to_entity(conversation)
-            async with self.data_context.get_session_async() as session:
-                session.add(conversation_entity)
-            if not await self.does_conversation_exists_async(conversation.id):
-                raise ValueError(f"Failed to retrieve created conversation with Id: {conversation.id}.")
+        if await self.does_exist_conversation_by_id_async(conversation.id):
+            raise ValueError(f"Failed to create conversation as the id: {conversation.id} already exists.")
+        try:            
+            conversation_entity = ConversationConverters.convert_conversation_model_to_entity(conversation)
+            await self.data_context.add_entity_async(conversation_entity)
             return True
         except Exception as e:
             print(f"Failed to create conversation: {e}")
             return False
 
-    async def get_conversation_by_id_async(self, conversation_id: UUID) -> Optional[Conversation]:
-        """Retrieve a conversation by its ID."""
-        try:
-            conversation_entity = await self._get_conversation_entity_by_id_async(conversation_id)
-            if conversation_entity: 
-                return ConversationConverter.convert_conversation_entity_to_model(conversation_entity)
-            else:
-                return None
-        except Exception as e:
-            print(f"Failed to retrieve conversation: {e}")
-            return None
-        
-    async def _get_conversation_entity_by_id_async(self, conversation_id: UUID) -> Optional[ConversationEntity]:
-        async with self.data_context.get_session_async() as session:
-            result = await session.execute(
-                select(ConversationEntity)
-                #.options(joinedload(ConversationEntity.messages)) # Useless as messages are setup to be join loaded by default
-                .where(ConversationEntity.id == conversation_id)
-            )
-            return result.scalars().first()
+    async def get_conversation_by_id_async(self, conversation_id: UUID, fails_if_not_found = True) -> Optional[Conversation]:
+        conversation_entity = await self.data_context.get_entity_by_id_async(
+                                            entity_class= ConversationEntity,
+                                            entity_id= conversation_id,
+                                            #to_join_list = [ConversationEntity.user, ConversationEntity.messages], 
+                                            fails_if_not_found= fails_if_not_found)
+        return ConversationConverters.convert_conversation_entity_to_model(conversation_entity)
 
-
-    async def does_conversation_exists_async(self, conversation_id: UUID) -> bool:
-        """Check if a conversation with the given ID exists."""
-        try:
-            async with self.data_context.get_session_async() as session:
-                result = await session.execute(
-                    select(ConversationEntity.id)
-                    .where(ConversationEntity.id == conversation_id)
-                )
-                return result.scalars().first() is not None
-        except Exception as e:
-            print(f"Failed to check conversation existence: {e}")
+    async def does_exist_conversation_by_id_async(self, conversation_id: Optional[UUID]) -> bool:
+        if conversation_id is None: 
             return False
+        return await self.data_context.does_exist_entity_by_id_async(ConversationEntity, conversation_id)
 
     async def add_message_to_conversation_async(self, conversation_id: UUID, message: Message) -> bool:
-        """Add a message to an existing conversation."""
+        if not await self.does_exist_conversation_by_id_async(conversation_id):
+            raise ValueError(f"Conversation with id: {conversation_id} does not exist.")
         try:
-            async with self.data_context.get_session_async() as session:
-                conversation_entity = await self._get_conversation_entity_by_id_async(conversation_id)
-                if not conversation_entity: 
-                    raise ValueError(f"Conversation with ID {conversation_id} not found in database.")
-                
-                new_message_entity = ConversationConverter.convert_message_model_to_entity(message)
-                conversation_entity.messages.append(new_message_entity)
-
-                session.add(conversation_entity)
+            new_message_entity = ConversationConverters.convert_message_model_to_entity(message, conversation_id)
+            new_message_entity.conversation = await self.get_conversation_by_id_async(conversation_id)
+            await self.data_context.add_entity_async(new_message_entity)
             return True
         except Exception as e:
             print(f"Failed to add message to conversation: {e}")

@@ -2,28 +2,28 @@ import asyncio
 from contextlib import asynccontextmanager
 import os
 from uuid import UUID
+from typing import Optional, List
 
+from sqlalchemy.sql.expression import BinaryExpression
 from sqlalchemy import create_engine, select
 from sqlalchemy import Column, String, Integer, ForeignKey, Table, DateTime
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import relationship, declarative_base
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, joinedload
 
 from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.file_helper import file
 
-Base = declarative_base()
-
 class GenericDataContext:
-    def __init__(self, db_path_or_url='database.db'):
+    def __init__(self, base_entities, db_path_or_url='database.db'):
         if ':' not in db_path_or_url:
             source_path = os.environ.get("PYTHONPATH").split(';')[-1]
-            db_path_or_url = os.path.join(source_path, db_path_or_url)
+            db_path_or_url = os.path.join(source_path.replace('/', '\\'), db_path_or_url.replace('/', '\\'))
 
         if 'http' not in db_path_or_url and not file.file_exists(db_path_or_url):
             txt.print(f"/!\\ Database file not found at path: {db_path_or_url}")
-            self.create_database(db_path_or_url)
+            self.create_database(base_entities, db_path_or_url)
 
         sqlite_db_path = f'sqlite+aiosqlite:///{db_path_or_url}'
         self.engine = create_async_engine(sqlite_db_path, echo=True)
@@ -32,75 +32,113 @@ class GenericDataContext:
                                 expire_on_commit=False,
                                 class_=AsyncSession)
 
-    def create_database(self, db_path):
+    def create_database(self, base_entities, db_path):
         sqlite_db_path_sync = f'sqlite:///{db_path}'
+        #tables = base_entities.metadata.tables
         sync_engine = create_engine(sqlite_db_path_sync, echo=True)
         with sync_engine.begin() as conn:
-            Base.metadata.create_all(bind=conn)
+            base_entities.metadata.create_all(bind=conn)
         txt.print(">>> Database and tables created successfully.")
 
     @asynccontextmanager
-    async def get_session_async(self):
-        session = self.SessionLocal()
+    async def new_transaction_async(self):
+        transaction = self.SessionLocal()
         try:
-            yield session
-            await session.commit()
+            yield transaction
+            await transaction.commit()
         except Exception as e:
-            await session.rollback()
+            await transaction.rollback()
             raise
         finally:
-            await session.close()
+            await transaction.close()
+
+    @asynccontextmanager
+    async def read_db(self):
+        async with self.engine.connect() as connection:
+            try:
+                yield connection
+            except Exception as e:
+                raise RuntimeError(f"Error during read operation: {e}")
+            
+    async def does_exist_entity_by_id_async(self, entity_class, entity_id) -> bool:
+        id_from_db = await self.get_first_entity_async(entity_class, 
+                                                filters=[entity_class.id == entity_id], 
+                                                selected_columns=[entity_class.id], 
+                                                fails_if_not_found=False) 
+        return id_from_db is not None
+
+    async def get_entity_by_id_async(self, entity_class, entity_id, selected_columns: Optional[List] = None, to_join_list: Optional[List] = None, fails_if_not_found=True):
+        filters = [entity_class.id == entity_id]
+        return await self.get_first_entity_async(entity_class=entity_class, filters=filters, selected_columns=selected_columns, to_join_list=to_join_list, fails_if_not_found=fails_if_not_found)
+    
+    async def get_first_entity_async(self, entity_class, filters: Optional[List[BinaryExpression]] = None, selected_columns: Optional[List] = None, to_join_list: Optional[List] = None, fails_if_not_found: bool = True):
+        query = select(*selected_columns) if selected_columns else select(entity_class)
+        
+        if filters:
+            for filter_condition in filters:
+                query = query.filter(filter_condition)
+
+        if to_join_list:
+            query = query.options(*[joinedload(to_join) for to_join in to_join_list])
+
+        async with self.read_db() as connection:
+            try:
+                results = await connection.execute(query)
+                #tmp = str(results.first())
+                result = results.scalars().first()
+                if fails_if_not_found and not result:
+                    raise ValueError(f"No entity found for '{entity_class.__name__}' with the specified filters.")
+                return result
+            except Exception as e:
+                txt.print(f"Failed retrieval: {e}")
+                raise
+
+    async def get_all_entities_async(self, entity_class, filters: Optional[List[BinaryExpression]] = None):
+        query = select(entity_class)
+        if filters:
+            for filter_condition in filters:
+                query = query.filter(filter_condition)
+
+        async with self.read_db() as connection:
+            try:
+                results = await connection.execute(query)
+                return results.scalars().all()
+            except Exception as e:
+                txt.print(f"Failed to retrieve entities: {e}")
+                raise   
 
     async def add_entity_async(self, entity):
-        async with self.get_session_async() as session:
+        async with self.new_transaction_async() as transaction:
             try:
-                session.add(entity)
+                transaction.add(entity)
             except Exception as e:
                 txt.print(f"Failed to add entity: {e}")
                 raise
 
-    async def get_entity_by_id_async(self, entity_class, entity_id):
-        async with self.get_session_async() as session:
-            try:
-                result = await session.execute(select(entity_class).filter(entity_class.id == entity_id))
-                return result.scalars().first()
-            except Exception as e:
-                txt.print(f"Failed to retrieve entity: {e}")
-                raise
-
-    async def get_all_entities_async(self, entity_class):
-        async with self.get_session_async() as session:
-            try:
-                result = await session.execute(select(entity_class))
-                return result.scalars().all()
-            except Exception as e:
-                txt.print(f"Failed to retrieve entities: {e}")
-                raise
-
     async def update_entity_async(self, entity_class, entity_id, **kwargs):
-        async with self.get_session_async() as session:
+        async with self.new_transaction_async() as transaction:
             try:
-                result = await session.execute(select(entity_class).filter(entity_class.id == entity_id))
+                result = await transaction.execute(select(entity_class).filter(entity_class.id == entity_id))
                 entity = result.scalars().first()
-                if not entity:
-                    raise ValueError(f"{entity_class.__name__} not found")
+                if not entity: 
+                    raise ValueError(f"{entity_class.__name__} with id: {str(entity_id)} not found")
 
                 for key, value in kwargs.items():
                     if hasattr(entity, key):
                         setattr(entity, key, value)
 
-                session.add(entity)
+                transaction.add(entity)
             except Exception as e:
                 txt.print(f"Failed to update entity: {e}")
                 raise
 
     async def delete_entity_async(self, entity_class, entity_id):
-        async with self.get_session_async() as session:
+        async with self.new_transaction_async() as transaction:
             try:
-                result = await session.execute(select(entity_class).filter(entity_class.id == entity_id))
+                result = await transaction.execute(select(entity_class).filter(entity_class.id == entity_id))
                 entity = result.scalars().first()
                 if entity:
-                    await session.delete(entity)
+                    await transaction.delete(entity)
                 else:
                     raise ValueError(f"{entity_class.__name__} not found")
             except Exception as e:

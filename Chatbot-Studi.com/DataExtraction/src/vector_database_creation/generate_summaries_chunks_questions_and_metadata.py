@@ -256,15 +256,6 @@ class GenerateDocumentsSummariesChunksQuestionsAndMetadata:
             content = json.loads(content_str)
             contents[content['title']] = content
         return contents
-        # idx = 0
-        # for key, sections in contents.items():
-        #     idx+=1
-        #     if idx > 5: break
-        #     for section_name, section_content in sections.items():
-        #         txt.print(f"## {section_name} ##")
-        #         txt.print(section_content)#f"{section_content[:500]} ...")
-        #         txt.print(f" ")
-        #     txt.print(f"---------------------")
 
     def process_certifiers(self, data: list[dict]) -> list[Document]:
         if not data:
@@ -574,3 +565,36 @@ class GenerateDocumentsSummariesChunksQuestionsAndMetadata:
         # Join all IDs into a single comma-separated string
         all_ids_str = ",".join(all_ids)
         return all_ids_str
+    
+    
+    
+    # Method to test the 3 ways of generating summaries, chunks and questions (use to be in available services)
+    # async def test_different_splitting_of_summarize_chunks_and_questions_creation_async(out_dir):
+    #     summary_builder = GenerateDocumentsSummariesChunksQuestionsAndMetadata()
+    #     trainings_docs = summary_builder._load_and_process_trainings(out_dir)
+
+    #     txt.print("-"*70)
+    #     start = time.time()
+    #     summary_1_step = await summary_builder.create_summary_and_questions_from_docs_single_step_async([AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2], trainings_docs)
+    #     summary_1_step_elapsed_str = txt.get_elapsed_str(time.time() - start)
+        
+    #     start = time.time()
+    #     summary_2_steps = await summary_builder.create_summary_and_questions_from_docs_in_two_steps_async([AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2], trainings_docs)
+    #     summary_2_steps_elapsed_str = txt.get_elapsed_str(time.time() - start)
+
+    #     start = time.time()
+    #     summary_3_steps = await summary_builder.create_summary_and_questions_from_docs_in_three_steps_async([AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2], trainings_docs)
+    #     summary_3_steps_elapsed_str = txt.get_elapsed_str(time.time() - start)
+        
+    #     txt.print("-"*70)
+    #     summary_1_step.display_to_terminal()
+    #     txt.print(f"Single step summary generation took {summary_1_step_elapsed_str}")
+    #     txt.print("-"*70)
+
+    #     summary_2_steps.display_to_terminal()
+    #     txt.print(f"Two steps summary generation took {summary_2_steps_elapsed_str}")
+    #     txt.print("-"*70)
+
+    #     summary_3_steps.display_to_terminal()
+    #     txt.print(f"Three steps summary generation took {summary_3_steps_elapsed_str}")
+    #     txt.print("-"*70)

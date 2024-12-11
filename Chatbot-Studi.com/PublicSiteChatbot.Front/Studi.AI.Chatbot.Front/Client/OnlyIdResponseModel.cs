@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-public class CreateConversationResponseModel
+public class OnlyIdResponseModel
 {
     [JsonPropertyName("id")]
     public Guid Id { get; set; }

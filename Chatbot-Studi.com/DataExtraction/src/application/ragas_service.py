@@ -33,6 +33,7 @@ from ragas.testset import Testset
 from ragas.testset.transforms import EmbeddingExtractor, KeyphrasesExtractor, TitleExtractor
 from ragas.integrations.langchain import EvaluatorChain
 from ragas.metrics import LLMContextRecall, Faithfulness, FactualCorrectness, SemanticSimilarity
+from ragas.testset.synthesizers import AbstractQuerySynthesizer, ComparativeAbstractQuerySynthesizer, SpecificQuerySynthesizer
 from ragas import evaluate
 
 class RagasService:    
@@ -213,7 +214,7 @@ class RagasService:
         openai.api_key = openai_api_key
         os.environ["OPENAI_API_KEY"] = openai_api_key
 
-        loader = TextLoader("./tests/test.txt")
+        loader = TextLoader("./tests/generate_ground_truth_ragas_test.txt")
         rag_service = RagService(llm_info, EmbeddingModel.OpenAI_TextEmbedding3Small) #EmbeddingModel.Ollama_AllMiniLM
         injection_pipeline = RagInjectionPipeline(rag_service)
         docs = loader.load_and_split(RecursiveCharacterTextSplitter(
@@ -232,15 +233,16 @@ class RagasService:
 
 
         # Wrap the RAGAS metrics to use in LangChain
+        evaluator_llm = rag_service.llm_1
+        evaluator_embedding = rag_service.embedding
         evaluators = [
             EvaluatorChain(metric)
             for metric in [
-                    faithfulness,
-                    answer_relevancy,
-                    context_precision,
-                    context_recall,
-                    answer_correctness,
-            ]
+            (LLMContextRecall(llm=evaluator_llm), 0.25),
+            (SemanticSimilarity(embeddings=evaluator_embedding), 0.25),
+            (Faithfulness(llm=evaluator_llm), 0.25),
+            (FactualCorrectness(llm=evaluator_llm), 0.25),
+        ]
         ]
         eval_config = RunEvalConfig(custom_evaluators=evaluators)
 
