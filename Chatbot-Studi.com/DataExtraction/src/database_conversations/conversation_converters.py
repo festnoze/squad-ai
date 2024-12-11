@@ -18,13 +18,15 @@ class ConversationConverters:
 
     @staticmethod
     def convert_user_model_to_entity(user: User) -> UserEntity:
-        return UserEntity(
+        entity = UserEntity(
             name=user.name,
             ip=user.ip,
             device_info=user.device_info,
-            id=user.id,
             created_at=user.created_at if user.created_at else datetime.now(timezone.utc)
         )
+        if user.id:
+            entity.id=user.id
+        return entity
 
     @staticmethod
     def convert_message_entity_to_model(message_entity: MessageEntity) -> Message:
@@ -38,14 +40,16 @@ class ConversationConverters:
 
     @staticmethod
     def convert_message_model_to_entity(message: Message, conversation_id: UUID) -> MessageEntity:
-        return MessageEntity(
+        entity = MessageEntity(
             conversation_id=conversation_id,
             role=message.role,
             content=message.content,
             elapsed_seconds=message.elapsed_seconds,
-            id=message.id,
             created_at=message.created_at if message.created_at else datetime.now(timezone.utc)
         )
+        if message.id:
+            entity.id=message.id
+        return entity
 
     @staticmethod
     def convert_conversation_entity_to_model(conversation_entity: ConversationEntity) -> Conversation:
@@ -65,10 +69,12 @@ class ConversationConverters:
     @staticmethod
     def convert_conversation_model_to_entity(conversation: Conversation) -> ConversationEntity:
         entity = ConversationEntity(
-            id=conversation.id,
             user_id=conversation.user.id,
             created_at=conversation.created_at if conversation.created_at else datetime.now(timezone.utc),
         )
+        if conversation.id:
+            entity.id=conversation.id
+
         entity.messages=[
                 ConversationConverters.convert_message_model_to_entity(message, conversation.id)
                 for message in conversation.messages

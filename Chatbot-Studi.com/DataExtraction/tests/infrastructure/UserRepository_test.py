@@ -44,6 +44,13 @@ class TestUserRepository:
         assert user == self.sample_user
 
     @pytest.mark.asyncio
+    async def test_get_all_users(self):
+        users = await self.user_repository.get_all_users_async()
+        assert users is not None
+        assert len(users) == 1
+        assert users.__contains__(self.sample_user)
+
+    @pytest.mark.asyncio
     async def test_does_exist_user_by_id(self):
         exists = await self.user_repository.does_exist_user_async(self.sample_user)
         assert exists is True

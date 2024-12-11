@@ -18,8 +18,8 @@ class UserEntity(Base):
 
     conversations = relationship("ConversationEntity", back_populates="user", cascade="all, delete-orphan", lazy="select")
 
-    def __init__(self, id: UUID, name: str, ip: str, device_info: str, created_at: datetime = None):
-        self.id = id or uuid.uuid4()
+    def __init__(self, name: str, ip: str, device_info: str, created_at: datetime = None):
+        self.id = uuid.uuid4()
         self.name = name
         self.ip = ip
         self.device_info = device_info
@@ -35,8 +35,8 @@ class ConversationEntity(Base):
     user = relationship("UserEntity", back_populates="conversations", lazy="select")
     messages = relationship("MessageEntity", back_populates="conversation", cascade="all, delete-orphan", lazy="select")
 
-    def __init__(self, id: UUID, user_id: UUID, created_at: datetime = None):
-        self.id = id or uuid.uuid4()
+    def __init__(self, user_id: UUID, created_at: datetime = None):
+        self.id = uuid.uuid4()
         self.user_id = user_id
         self.created_at = created_at or datetime.now(timezone.utc)
         self.messages = []
@@ -54,8 +54,8 @@ class MessageEntity(Base):
 
     conversation = relationship("ConversationEntity", back_populates="messages")
 
-    def __init__(self, id: UUID, conversation_id: UUID, role: str, content: str, elapsed_seconds: int = 0, created_at: datetime = None):
-        self.id = id or uuid.uuid4()
+    def __init__(self, conversation_id: UUID, role: str, content: str, elapsed_seconds: int = 0, created_at: datetime = None):
+        self.id = uuid.uuid4()
         self.conversation_id = conversation_id
         self.role = role
         self.content = content

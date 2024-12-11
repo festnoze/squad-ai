@@ -109,8 +109,12 @@ class TestConversationRepository:
     @pytest.mark.asyncio
     async def test_add_message_to_existing_conversation(self):
         async with self.conversation_repository.data_context.read_db() as connection:
-            query = select(ConversationEntity).filter(
-                ConversationEntity.id == self.sample_conversation.id)
+            query = select(ConversationEntity)
+            results = await connection.execute(query)
+            result = results.scalars().first()
+            print(result) 
+
+            query = select(ConversationEntity)#.filter(ConversationEntity.id == self.sample_conversation.id)
             #query = select(UserEntity).filter(UserEntity.id == user_id)
             compiled_query = query.compile(dialect=connection.dialect, compile_kwargs={"literal_binds": True})
             print(compiled_query)

@@ -22,6 +22,10 @@ class UserRepository:
             print(f"Failed to create user: {e}")
             raise e
 
+    async def get_all_users_async(self) -> list[User]:
+        user_entities = await self.data_context.get_all_entities_async(UserEntity)
+        return [ConversationConverters.convert_user_entity_to_model(user_entity) for user_entity in user_entities] 
+    
     async def get_user_by_id_async(self, user_id: UUID) -> Optional[User]:
         user_entity = await self.data_context.get_entity_by_id_async(UserEntity, user_id)
         return ConversationConverters.convert_user_entity_to_model(user_entity)
