@@ -2,23 +2,23 @@ from typing import Optional
 from uuid import UUID
 from common_tools.database.generic_datacontext import GenericDataContext
 from common_tools.models.conversation import Conversation, Message
-from src.database_conversations.entities import Base, ConversationEntity, MessageEntity
+from src.database_conversations.entities import Base, ConversationEntity, MessageEntity, UserEntity
 from src.database_conversations.conversation_converters import ConversationConverters
 
 class ConversationRepository:
     def __init__(self, db_path_or_url='database_conversations/conversation_database.db'):
         self.data_context = GenericDataContext(Base, db_path_or_url)
 
-    async def create_new_conversation_async(self, conversation: Conversation) -> bool:
-        if await self.does_exist_conversation_by_id_async(conversation.id):
-            raise ValueError(f"Failed to create conversation as the id: {conversation.id} already exists.")
-        try:            
-            conversation_entity = ConversationConverters.convert_conversation_model_to_entity(conversation)
-            await self.data_context.add_entity_async(conversation_entity)
-            return True
+    async def create_new_conversation_async(self, user_id:UUID) -> Optional[Conversation]:
+        try:
+            user_entity: UserEntity = await self.data_context.get_entity_by_id_async(UserEntity, user_id)
+            conversation_entity = ConversationEntity(user_id= user_entity.id, user = user_entity, messages=[])
+            conversation_entity = await self.data_context.add_entity_async(conversation_entity)
+            return ConversationConverters.convert_conversation_entity_to_model(conversation_entity)
+        
         except Exception as e:
             print(f"Failed to create conversation: {e}")
-            return False
+            return None
 
     async def get_conversation_by_id_async(self, conversation_id: UUID, fails_if_not_found = True) -> Optional[Conversation]:
         conversation_entity = await self.data_context.get_entity_by_id_async(

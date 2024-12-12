@@ -15,10 +15,49 @@ public class ChatbotAPIClient
         _httpClient = new HttpClient();
     }
 
-    public async Task<Guid> GetUserIdAsync(UserRequestModel userRequestModel)
+    /// <summary>
+    /// Create or update the user in the server.
+    /// </summary>
+    /// <param name="userRequestModel"></param>
+    /// <returns></returns>
+    /// <exception cref="Exception"></exception>
+    public async Task<Guid> CreateOrUpdateUserAsync(UserRequestModel userRequestModel)
     {
         string endpoint = $"{_baseUri}{_controller_subpath}/user/sync";
         string jsonPayload = JsonSerializer.Serialize(userRequestModel);
+
+        var request = new HttpRequestMessage(HttpMethod.Patch, endpoint)
+        {
+            Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json")
+        };
+
+        using (HttpResponseMessage response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead))
+        {
+            response.EnsureSuccessStatusCode();
+
+            var result = await response.Content.ReadAsStringAsync();
+            var userResponse = JsonSerializer.Deserialize<IdOnlyResponseModel>(result);
+
+            if (userResponse == null || userResponse.Id == Guid.Empty)
+            {
+                throw new Exception($"Invalid response from {nameof(CreateOrUpdateUserAsync)} endpoint.");
+            }
+
+            return userResponse.Id;
+        }
+    }
+
+    /// <summary>
+    /// Get a new conversation ID from the server.
+    /// </summary>
+    /// <param name="userName"></param>
+    /// <returns></returns>
+    /// <exception cref="Exception"></exception>
+    public async Task<Guid> CreateNewConversationAsync(Guid userId)
+    {
+        string endpoint = $"{_baseUri}{_controller_subpath}/query/create";
+        var createNewConversationRM = new CreateNewConversationRequestModel { UserId = userId };
+        string jsonPayload = JsonSerializer.Serialize(createNewConversationRM);
 
         var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
         {
@@ -28,44 +67,12 @@ public class ChatbotAPIClient
         using (HttpResponseMessage response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead))
         {
             response.EnsureSuccessStatusCode();
-
             var result = await response.Content.ReadAsStringAsync();
-            var userResponse = JsonSerializer.Deserialize<OnlyIdResponseModel>(result);
-
-            if (userResponse == null || userResponse.Id == Guid.Empty)
-            {
-                throw new Exception($"Invalid response from {nameof(GetUserIdAsync)} endpoint.");
-            }
-
-            return userResponse.Id;
-        }
-    }
-
-
-    /// <summary>
-    /// Get a new conversation ID from the server.
-    /// </summary>
-    /// <param name="userName"></param>
-    /// <returns></returns>
-    /// <exception cref="Exception"></exception>
-    public async Task<Guid> GetNewConversationIdAsync(Guid userId)
-    {
-        string endpoint = $"{_baseUri}{_controller_subpath}/query/create";
-        string jsonPayload = JsonSerializer.Serialize(userId);
-        var request = new HttpRequestMessage(HttpMethod.Get, endpoint)
-        {
-            Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json")
-        };
-
-        using (HttpResponseMessage response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead))
-        {
-            response.EnsureSuccessStatusCode();
-            var result = await response.Content.ReadAsStringAsync();
-            var conversationResponse = JsonSerializer.Deserialize<OnlyIdResponseModel>(result);
+            var conversationResponse = JsonSerializer.Deserialize<IdOnlyResponseModel>(result);
 
             if (conversationResponse == null || conversationResponse.Id == Guid.Empty)
             {
-                throw new Exception($"Invalid response from client to {nameof(GetNewConversationIdAsync)} endpoint.");
+                throw new Exception($"Invalid response from client to {nameof(CreateNewConversationAsync)} endpoint.");
             }
 
             return conversationResponse.Id;

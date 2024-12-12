@@ -1,5 +1,5 @@
+from uuid import UUID
 from pydantic import BaseModel
-from typing import List
 
 class MessageRequestModel(BaseModel):
     role: str
@@ -7,4 +7,5 @@ class MessageRequestModel(BaseModel):
     duration_seconds: float = 0.0
 
 class ConversationRequestModel(BaseModel):
-    messages: List[MessageRequestModel]
+    user_id: UUID
+    messages: list[MessageRequestModel]

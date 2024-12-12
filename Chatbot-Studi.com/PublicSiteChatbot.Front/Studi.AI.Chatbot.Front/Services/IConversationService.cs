@@ -10,15 +10,12 @@ public interface IConversationService : IDisposable
     
     void AddNewMessage(bool isSaved = false, bool isStreaming = true);
     Task AnswerUserQueryAsync();
-    void DeleteCurrentConversation();
     void AddStreamToLastMessage(string? messageChunk);
     void EndsMessageStream();
     ConversationModel GetConversation();
     bool IsLastMessageEditable();
     bool IsWaitingForLLM();
-    void LoadConversationByName(string exchangeNameTruncated, bool truncatedExchangeName = false);
     void MarkConversationAsLoaded();
-    void SaveConversation();
     void SetCurrentUser(string userName);
 
     Task CreateVectorDbAsync();

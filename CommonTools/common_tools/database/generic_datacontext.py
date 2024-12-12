@@ -117,10 +117,11 @@ class GenericDataContext:
                 txt.print(f"Failed to retrieve entities: {e}")
                 raise   
 
-    async def add_entity_async(self, entity):
+    async def add_entity_async(self, entity) -> any:
         async with self.new_transaction_async() as transaction:
             try:
                 transaction.add(entity)
+                return entity
             except Exception as e:
                 txt.print(f"Failed to add entity: {e}")
                 raise

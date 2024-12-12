@@ -1,7 +1,8 @@
+from uuid import UUID
 from fastapi import APIRouter, HTTPException
 from application.available_service import AvailableService
 from web_services.request_models.conversation_request_model import ConversationRequestModel
-from common_tools.models.conversation import Conversation
+from common_tools.models.conversation import Conversation, Message, User
 from fastapi.responses import JSONResponse, StreamingResponse, Response
 
 from web_services.request_models.query_asking_request_model import QueryAskingRequestModel
@@ -13,7 +14,7 @@ from web_services.request_models.user_request_model import UserRequestModel
 
 inference_router = APIRouter(prefix="/rag/inference", tags=["Inference"])
 
-@inference_router.post("/user/sync")
+@inference_router.patch("/user/sync")
 async def create_or_retrieve_user(user_request_model: UserRequestModel):
     try:
         user_id = await AvailableService.create_or_retrieve_user_async(
@@ -30,10 +31,11 @@ async def create_or_retrieve_user(user_request_model: UserRequestModel):
         print(f"Failed to create conversation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@inference_router.get("/query/create")
-async def create_new_conversation(user_name: str = None):
+@inference_router.post("/query/create")
+async def create_new_conversation(conversation: ConversationRequestModel):
     try:
-        new_conv = await AvailableService.create_new_conversation_async(user_name)
+        messages_model = [Message(message.role, message.content) for message in conversation.messages]
+        new_conv = await AvailableService.create_new_conversation_async(conversation.user_id, messages_model)
         return JSONResponse(
             content={"id": str(new_conv.id)},
             status_code=200

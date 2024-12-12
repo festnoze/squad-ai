@@ -69,12 +69,11 @@ public class ConversationService : IConversationService
         if (conversation!.Id is null)
         {
             // TODO : Get the IP and device infos from the client
-            var userId = await this._chatbotApiClient.GetUserIdAsync(new UserRequestModel { UserId = null, UserName = "default", IP = "127.0.0.1", DeviceInfo = "none" });
-            conversation!.Id = await this._chatbotApiClient.GetNewConversationIdAsync(userId);
+            var userId = await this._chatbotApiClient.CreateOrUpdateUserAsync(new UserRequestModel { UserId = null, UserName = "default", IP = "127.0.0.1", DeviceInfo = "none" });
+            conversation!.Id = await this._chatbotApiClient.CreateNewConversationAsync(userId);
         }
 
         conversation!.Last().IsSavedMessage = true;
-        //SaveConversation();
 
         try
         {
@@ -89,7 +88,8 @@ public class ConversationService : IConversationService
             }
             this.EndsMessageStream();
 
-            this.AddNewMessage(isSaved: false, isStreaming: false); // Add a new message for the next user query
+            // Add a new message for the next user query
+            this.AddNewMessage(isSaved: false, isStreaming: false); 
         }
         catch (Exception e)
         {
@@ -145,33 +145,6 @@ public class ConversationService : IConversationService
         conversation!.Last().IsSavedMessage = true;
     }
 
-    public void LoadConversationByName(string exchangeNameTruncated, bool truncatedExchangeName = false)
-    {
-        _isExchangesLoaded = false;
-        conversation = _exchangeRepository.LoadUserExchange(userName!, exchangeNameTruncated, truncatedExchangeName);
-        if (conversation is null)
-            throw new InvalidOperationException($"Cannot load the Conversation as the exchange is not found for user: {userName}");
-
-        OnConversationChanged?.Invoke();
-    }
-
-    public void SaveConversation()
-    {
-        if (userName is null)
-            userName = "defaultUser";
-
-        var newConversation = _exchangeRepository.SaveUserExchange(userName, conversation!);
-        if (newConversation)
-            _isExchangesLoaded = false;
-    }
-
-    public void DeleteCurrentConversation()
-    {
-        _isExchangesLoaded = false;
-        conversation = null;
-        InitializeConversation();
-        OnConversationChanged?.Invoke();
-    }
 
     private bool _isExchangesLoaded = false;
     public bool IsExchangesLoaded => _isExchangesLoaded;

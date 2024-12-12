@@ -52,12 +52,10 @@ class TestConversationRepository:
     @pytest.mark.asyncio
     async def test_create_new_conversation(self):
         new_conversation = Conversation(self.sample_user, [Message("role2", "content2", 1.2, uuid4(), None)], uuid4(), None)
-        result = await self.conversation_repository.create_new_conversation_async(new_conversation)
-        assert result is True
-
-        # Verify that the new conversation exists in the database
-        exists = await self.conversation_repository.does_exist_conversation_by_id_async(new_conversation.id)
-        assert exists is True
+        result = await self.conversation_repository.create_new_conversation_async(self.sample_user.id)
+        
+        assert result is not None
+        assert await self.conversation_repository.does_exist_conversation_by_id_async(new_conversation.id) is True
 
     @pytest.mark.asyncio
     async def test_create_new_conversation_existing_id(self):
@@ -69,7 +67,9 @@ class TestConversationRepository:
         )
         with pytest.raises(ValueError) as exc_info:
             await self.conversation_repository.create_new_conversation_async(duplicate_conversation)
+
         assert f"Failed to create conversation as the id: {duplicate_conversation.id} already exists." in str(exc_info.value)
+        assert await self.conversation_repository.does_exist_conversation_by_id_async(self.sample_conversation.id) is True
 
     @pytest.mark.asyncio
     async def test_get_conversation_by_id(self):

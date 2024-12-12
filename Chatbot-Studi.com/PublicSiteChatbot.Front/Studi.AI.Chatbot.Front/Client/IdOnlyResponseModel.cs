@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-public class OnlyIdResponseModel
+public class IdOnlyResponseModel
 {
     [JsonPropertyName("id")]
     public Guid Id { get; set; }

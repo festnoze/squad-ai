@@ -116,11 +116,14 @@ class AvailableService:
         return user_id
     
     @staticmethod
-    async def create_new_conversation_async(user_id: UUID):
-        new_conv_model = Conversation(user_id)
-        new_conv_entity = ConversationConverters.convert_conversation_model_to_entity(new_conv_model)
-        assert await ConversationRepository().create_new_conversation_async(new_conv_entity)
-        return ConversationConverters.convert_conversation_entity_to_model(new_conv_entity)
+    async def create_new_conversation_async(user_id: UUID, messages: list[Message] = None) -> Conversation:
+        new_conversation = await ConversationRepository().create_new_conversation_async(user_id)
+        new_conv = await ConversationRepository().get_conversation_by_id_async(new_conversation.id)
+        if messages and any(messages):
+            for message in messages:
+                new_conv.add_new_message(message.role, message.content)
+                assert await ConversationRepository().add_message_to_conversation_async(new_conv.id, new_conv.last_message)
+        return new_conv
 
     @staticmethod
     async def rag_query_stream_async(conversation_id:UUID, user_query_content:str, display_waiting_message: bool, is_stream_decoded :bool = False) -> AsyncGenerator:
