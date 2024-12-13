@@ -1,6 +1,6 @@
 @page "/"
 
-@using Studi.AI.Chatbot.Front.Data
+@using Studi.AI.Chatbot.Front.Models
 @using Studi.AI.Chatbot.Front.Services
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Html;
@@ -200,5 +200,13 @@
         ReadStorage: function (key) {
             return window.localStorage.getItem(key);
         }
+    };
+    window.getDeviceInfo = () => {
+        return {
+            userAgent: navigator.userAgent,
+            platform: navigator.platform,
+            appVersion: navigator.appVersion,
+            isMobile: /Mobi|Android/i.test(navigator.userAgent)
+        };
     };
 </script>

@@ -1,4 +1,4 @@
-namespace Studi.AI.Chatbot.Front.Data;
+namespace Studi.AI.Chatbot.Front.Models;
 
 using System.Text.Json.Serialization;
 using System.Collections.Generic;

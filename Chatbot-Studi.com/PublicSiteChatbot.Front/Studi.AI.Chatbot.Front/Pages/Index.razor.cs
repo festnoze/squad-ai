@@ -1,9 +1,9 @@
 ﻿using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
-using Studi.AI.Chatbot.Front.Data;
 using Microsoft.Extensions.Options;
 using Studi.AI.Chatbot.Front.Client;
+using Studi.AI.Chatbot.Front.Models;
 
 namespace Studi.AI.Chatbot.Front.Pages;
 

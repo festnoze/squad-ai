@@ -1,6 +1,6 @@
 using Microsoft.VisualBasic;
 
-namespace Studi.AI.Chatbot.Front.Data;
+namespace Studi.AI.Chatbot.Front.Models;
 
 public class ConversationModel : List<MessageModel>
 {
@@ -10,8 +10,8 @@ public class ConversationModel : List<MessageModel>
     }
 
     public Guid? Id { get; set; }
-    public void RemoveLastConversationMessageFlags() => this.ForEach(msg => msg.SetAsNotLastConversationMessage());
-    public void RemoveLastMessage() => this.RemoveAt(this.Count - 1);
+    public void RemoveLastConversationMessageFlags() => ForEach(msg => msg.SetAsNotLastConversationMessage());
+    public void RemoveLastMessage() => RemoveAt(Count - 1);
     public bool IsLastMessageFromUser => this.Last().IsFromUser;
     public bool IsFirstUserMessage => this.Count(m => m.IsFromAI) == 1;
 
@@ -22,7 +22,7 @@ public class ConversationModel : List<MessageModel>
 
     public void AddMessage(MessageModel newMessage)
     {
-        this.Add(newMessage);
+        Add(newMessage);
         RefreshLastMessageInConversation();
     }
 

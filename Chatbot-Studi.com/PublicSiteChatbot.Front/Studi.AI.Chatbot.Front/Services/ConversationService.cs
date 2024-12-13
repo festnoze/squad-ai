@@ -1,8 +1,8 @@
-using Studi.AI.Chatbot.Front.Data;
 using Studi.AI.Chatbot.Front.Helpers;
 using Studi.AI.Chatbot.Front.Infrastructure;
 using Studi.AI.Chatbot.Front.Client;
 using Microsoft.Extensions.Options;
+using Studi.AI.Chatbot.Front.Models;
 
 namespace Studi.AI.Chatbot.Front.Services;
 

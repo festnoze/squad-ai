@@ -1,5 +1,5 @@
-using Studi.AI.Chatbot.Front.Data;
 using Studi.AI.Chatbot.Front.Infrastructure;
+using Studi.AI.Chatbot.Front.Models;
 using Studi.AI.Chatbot.Front.Services;
 
 var builder = WebApplication.CreateBuilder(args);

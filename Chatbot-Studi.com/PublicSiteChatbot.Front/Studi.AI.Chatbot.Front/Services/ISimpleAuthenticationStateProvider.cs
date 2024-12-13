@@ -1,5 +1,5 @@
 ﻿using Microsoft.AspNetCore.Components.Authorization;
-using Studi.AI.Chatbot.Front.Data;
+using Studi.AI.Chatbot.Front.Models;
 
 namespace Studi.AI.Chatbot.Front.Services;
 public interface ISimpleAuthenticationStateProvider

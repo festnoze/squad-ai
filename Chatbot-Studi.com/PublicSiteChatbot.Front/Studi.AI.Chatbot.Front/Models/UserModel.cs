@@ -1,4 +1,4 @@
-﻿namespace Studi.AI.Chatbot.Front.Data;
+﻿namespace Studi.AI.Chatbot.Front.Models;
 
 public record User
 {

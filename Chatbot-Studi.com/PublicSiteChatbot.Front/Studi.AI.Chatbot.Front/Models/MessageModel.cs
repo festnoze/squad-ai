@@ -6,13 +6,13 @@ using Markdig.Renderers.Html;
 using Markdig.Renderers;
 using Markdig.Extensions.Tables;
 
-namespace Studi.AI.Chatbot.Front.Data;
+namespace Studi.AI.Chatbot.Front.Models;
 
 public record MessageModel
 {
     public static string UserRole = "Utilisateur";
     public static string AiRole = "Assistant";
-    private static MarkdownPipeline markdownPipeline = 
+    private static MarkdownPipeline markdownPipeline =
                     new MarkdownPipelineBuilder()
                     .UseSoftlineBreakAsHardlineBreak()
                     .UseAdvancedExtensions()
@@ -34,7 +34,7 @@ public record MessageModel
 
     public bool IsFromAI => Role == AiRole;
     public bool IsFromUser => Role == UserRole;
-    public bool IsEmpty => this.Content.Trim().Length == 0;
+    public bool IsEmpty => Content.Trim().Length == 0;
 
     public bool IsLastMessageOfConversation { get; private set; } = false;
 
@@ -42,11 +42,11 @@ public record MessageModel
 
     public bool IsSavedMessage { get; set; }
 
-    public void SetAsLastConversationMessage () => IsLastMessageOfConversation = true;
+    public void SetAsLastConversationMessage() => IsLastMessageOfConversation = true;
     public bool SetAsNotLastConversationMessage() => IsLastMessageOfConversation = false;
 
     private string? _htmlContent = null;
-    public string HtmlContent 
+    public string HtmlContent
     {
         get
         {
@@ -60,9 +60,9 @@ public record MessageModel
     {
         Id = Guid.NewGuid();
 
-        if (source == MessageModel.AiRole) 
+        if (source == AiRole)
             source = AiRole;
-        if (source == MessageModel.UserRole) 
+        if (source == UserRole)
             source = UserRole;
 
         Role = source;
@@ -75,27 +75,27 @@ public record MessageModel
 
     public void ChangeContent(string newContent)
     {
-        this.Content = newContent;
-        this._htmlContent = null; // Force HTML regeneration
+        Content = newContent;
+        _htmlContent = null; // Force HTML regeneration
     }
 
     public void AddContent(string contentToAdd)
     {
-        this.Content += contentToAdd;
-        this._htmlContent = null; // Force HTML regeneration
+        Content += contentToAdd;
+        _htmlContent = null; // Force HTML regeneration
     }
 
-    public void RemoveLastWord() 
+    public void RemoveLastWord()
     {
-        var newEndIndex = this.Content.LastIndexOf(" ");
-        if (newEndIndex == this.Content.Length - 1)
-            this.Content = this.Content.Trim();
-            newEndIndex = this.Content.LastIndexOf(" ");
-        
+        var newEndIndex = Content.LastIndexOf(" ");
+        if (newEndIndex == Content.Length - 1)
+            Content = Content.Trim();
+        newEndIndex = Content.LastIndexOf(" ");
+
         if (newEndIndex == -1)
-            this.Content = "";
+            Content = "";
         else
-            this.Content = this.Content.Substring(0, newEndIndex);
+            Content = Content.Substring(0, newEndIndex);
     }
 
     private string _getMarkdownContentConvertedToHtml()

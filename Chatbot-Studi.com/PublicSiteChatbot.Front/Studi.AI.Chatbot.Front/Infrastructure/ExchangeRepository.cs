@@ -1,5 +1,5 @@
 ﻿using Newtonsoft.Json;
-using Studi.AI.Chatbot.Front.Data;
+using Studi.AI.Chatbot.Front.Models;
 using System.Text.RegularExpressions;
 
 namespace Studi.AI.Chatbot.Front.Infrastructure;

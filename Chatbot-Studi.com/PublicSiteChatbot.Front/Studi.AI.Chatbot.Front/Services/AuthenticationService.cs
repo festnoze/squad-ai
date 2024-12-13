@@ -1,5 +1,5 @@
 ﻿using Microsoft.AspNetCore.Components.Authorization;
-using Studi.AI.Chatbot.Front.Data;
+using Studi.AI.Chatbot.Front.Models;
 using Studi.AI.Chatbot.Front.Infrastructure;
 using System.Security.Claims;
 
