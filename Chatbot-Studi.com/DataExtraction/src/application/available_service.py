@@ -31,8 +31,8 @@ from common_tools.helpers.config_helper import ConfigHelper
 from common_tools.langchains.langchain_factory import LangChainFactory
 from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.rag.rag_service import RagService
-from common_tools.rag.rag_inference_pipeline.rag_pre_treatment_tasks import RAGPreTreatment
 from common_tools.models.question_rewritting import QuestionRewritting, QuestionRewrittingPydantic
+from common_tools.rag.rag_inference_pipeline.rag_pre_treatment_tasks import RAGPreTreatment
 from common_tools.rag.rag_injection_pipeline.rag_injection_pipeline import RagInjectionPipeline
 from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
 from common_tools.rag.rag_inference_pipeline.rag_answer_generation_tasks import RAGAugmentedGeneration
@@ -117,7 +117,7 @@ class AvailableService:
     
     @staticmethod
     async def create_new_conversation_async(user_id: UUID, messages: list[Message] = None) -> Conversation:
-        new_conversation = await ConversationRepository().create_new_conversation_async(user_id)
+        new_conversation = await ConversationRepository().create_new_conversation_empty_async(user_id)
         new_conv = await ConversationRepository().get_conversation_by_id_async(new_conversation.id)
         if messages and any(messages):
             for message in messages:

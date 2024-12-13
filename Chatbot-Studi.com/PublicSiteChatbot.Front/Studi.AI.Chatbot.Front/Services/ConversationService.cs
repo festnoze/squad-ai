@@ -63,6 +63,7 @@ public class ConversationService : IConversationService
         conversation!.Last().ChangeContent(conversation!.Last().Content.Trim());
         if (string.IsNullOrWhiteSpace(conversation!.Last().Content))
             return;
+
         if (!conversation!.IsLastMessageFromUser)
             return;
 

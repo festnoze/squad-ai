@@ -230,10 +230,10 @@ html, body {
     transition: background-color 1.3s, box-shadow 0.3s;
 }
 
-    .send-message-button:hover {
+    .send-message-wrapper:hover:not(:disabled) {
         background-color: #6cd35f;
         font-size: 20px;
-        padding-top:4px;
+        padding-top: 4px;
         padding: 2px 12px;
         border: 1px double #47C239;
         box-shadow: 0 10px 40px 0 rgba(0, 0, 0, 0.24), 0 17px 50px 0 rgba(0, 0, 0, 0.22);

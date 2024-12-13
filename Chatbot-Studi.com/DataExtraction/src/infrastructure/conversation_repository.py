@@ -9,7 +9,7 @@ class ConversationRepository:
     def __init__(self, db_path_or_url='database_conversations/conversation_database.db'):
         self.data_context = GenericDataContext(Base, db_path_or_url)
 
-    async def create_new_conversation_async(self, user_id:UUID) -> Optional[Conversation]:
+    async def create_new_conversation_empty_async(self, user_id:UUID) -> Optional[Conversation]:
         try:
             user_entity: UserEntity = await self.data_context.get_entity_by_id_async(UserEntity, user_id)
             conversation_entity = ConversationEntity(user_id= user_entity.id, user = user_entity, messages=[])
@@ -19,7 +19,7 @@ class ConversationRepository:
         except Exception as e:
             print(f"Failed to create conversation: {e}")
             return None
-
+    
     async def get_conversation_by_id_async(self, conversation_id: UUID, fails_if_not_found = True) -> Optional[Conversation]:
         conversation_entity = await self.data_context.get_entity_by_id_async(
                                             entity_class= ConversationEntity,

@@ -9,6 +9,7 @@ BeautifulSoup4
 selenium
 sqlalchemy
 aiosqlite
+dependency-injector
 fastapi
 uvicorn
 # celery

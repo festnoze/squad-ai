@@ -50,26 +50,11 @@ class TestConversationRepository:
                 print(f"Error during teardown: {e}")
 
     @pytest.mark.asyncio
-    async def test_create_new_conversation(self):
-        new_conversation = Conversation(self.sample_user, [Message("role2", "content2", 1.2, uuid4(), None)], uuid4(), None)
-        result = await self.conversation_repository.create_new_conversation_async(self.sample_user.id)
-        
-        assert result is not None
+    async def test_create_new_empty_conversation(self):
+        new_conversation = await self.conversation_repository.create_new_conversation_empty_async(self.sample_user.id)
+
+        assert new_conversation is not None
         assert await self.conversation_repository.does_exist_conversation_by_id_async(new_conversation.id) is True
-
-    @pytest.mark.asyncio
-    async def test_create_new_conversation_existing_id(self):
-        # Attempt to create a conversation with an existing ID
-        duplicate_conversation = Conversation(
-            user=self.sample_user,
-            messages=[],
-            id=self.sample_conversation.id,            
-        )
-        with pytest.raises(ValueError) as exc_info:
-            await self.conversation_repository.create_new_conversation_async(duplicate_conversation)
-
-        assert f"Failed to create conversation as the id: {duplicate_conversation.id} already exists." in str(exc_info.value)
-        assert await self.conversation_repository.does_exist_conversation_by_id_async(self.sample_conversation.id) is True
 
     @pytest.mark.asyncio
     async def test_get_conversation_by_id(self):
