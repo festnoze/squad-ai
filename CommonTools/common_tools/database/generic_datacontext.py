@@ -5,7 +5,7 @@ from uuid import UUID
 from typing import Optional, List
 
 from sqlalchemy.sql.expression import BinaryExpression
-from sqlalchemy import create_engine, delete, select
+from sqlalchemy import create_engine, delete, func, select
 from sqlalchemy import Column, String, Integer, ForeignKey, Table, DateTime
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import relationship, declarative_base
@@ -100,7 +100,7 @@ class GenericDataContext:
                     raise ValueError(f"No entity found for '{entity_class.__name__}' with the specified filters.")
                 return result
             except Exception as e:
-                txt.print(f"Failed retrieval: {e}")
+                txt.print(f"/!\\ Fails to retrieve first entity: {e}")
                 raise
 
     async def get_all_entities_async(self, entity_class, filters: Optional[List[BinaryExpression]] = None):
@@ -114,8 +114,22 @@ class GenericDataContext:
                 results = await session.execute(query)
                 return results.scalars().all()
             except Exception as e:
-                txt.print(f"Failed to retrieve entities: {e}")
-                raise   
+                txt.print(f"/!\\ Fails to retrieve entities: {e}")
+                raise
+
+    async def count_entities_async(self, entity_class, filters: Optional[List[BinaryExpression]] = None):
+        query = select(func.count())
+        if filters:
+            for filter_condition in filters:
+                query = query.where(filter_condition)
+
+        async with self.read_db_async() as session:
+            try:
+                results = await session.execute(query)
+                return results.scalar()
+            except Exception as e:
+                txt.print(f"/!\\ Fails to count entities: {e}")
+                return 0
 
     async def add_entity_async(self, entity) -> any:
         results = await self.add_entities_async(entity)
@@ -129,7 +143,7 @@ class GenericDataContext:
                     transaction.add(entity)
                 return list(args)
             except Exception as e:
-                txt.print(f"Failed to add entities: {e}")
+                txt.print(f"/!\\ Fails to add entities: {e}")
                 raise
 
     async def update_entity_async(self, entity_class, entity_id, **kwargs):
@@ -146,7 +160,7 @@ class GenericDataContext:
 
                 transaction.add(entity)
             except Exception as e:
-                txt.print(f"Failed to update entity: {e}")
+                txt.print(f"/!\\ Fails to update entity: {e}")
                 raise
 
     async def delete_entity_async(self, entity_class, entity_id):
@@ -159,7 +173,7 @@ class GenericDataContext:
                 else:
                     raise ValueError(f"{entity_class.__name__} not found")
             except Exception as e:
-                txt.print(f"Failed to delete entity: {e}")
+                txt.print(f"/!\\ Fails to delete entity: {e}")
                 raise
 
     async def empty_all_database_tables_async(self):

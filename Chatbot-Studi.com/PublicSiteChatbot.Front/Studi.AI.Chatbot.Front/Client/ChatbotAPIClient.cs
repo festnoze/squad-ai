@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Net;
+using System.Text;
 using System.Text.Json;
 using Studi.AI.Chatbot.Front.Client;
 using Studi.AI.Chatbot.Front.Helpers;
@@ -67,16 +68,28 @@ public class ChatbotAPIClient
 
         using (HttpResponseMessage response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead))
         {
-            response.EnsureSuccessStatusCode();
-            var result = await response.Content.ReadAsStringAsync();
-            var conversationResponse = JsonSerializer.Deserialize<IdOnlyResponseModel>(result);
-
-            if (conversationResponse == null || conversationResponse.Id == Guid.Empty)
+            if (response.IsSuccessStatusCode)
             {
-                throw new Exception($"Invalid response from client to {nameof(CreateNewConversationAsync)} endpoint.");
+                var result = await response.Content.ReadAsStringAsync();
+                var conversationResponse = JsonSerializer.Deserialize<IdOnlyResponseModel>(result);
+
+                if (conversationResponse == null || conversationResponse.Id == Guid.Empty)
+                    throw new Exception($"Invalid response from client to {nameof(CreateNewConversationAsync)} endpoint.");
+
+                return conversationResponse.Id;
             }
 
-            return conversationResponse.Id;
+            else if (response.StatusCode == HttpStatusCode.TooManyRequests) // Handle Error code 429 specifically
+            {
+                //TODO: Implement special logic to display an error message (like when sending an empty message)
+                throw new HttpRequestException("Too many requests. Please try again later.");
+            }
+
+            else // == if (!response.IsSuccessStatusCode). Handle other non-success status codes
+            {                
+                var content = await response.Content.ReadAsStringAsync();
+                throw new HttpRequestException($"Request failed with status code {response.StatusCode}: {content}");
+            }
         }
     }
 

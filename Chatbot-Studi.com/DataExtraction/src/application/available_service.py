@@ -12,6 +12,7 @@ from langchain.chains.query_constructor.schema import AttributeInfo
 from langchain_core.runnables import Runnable, RunnablePassthrough
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.docstore.document import Document
+from application.service_exceptions import QuotaOverloadException
 from data_retrieval.drupal_data_retrieval import DrupalDataRetrieval
 from database_conversations.conversation_converters import ConversationConverters
 from infrastructure.conversation_repository import ConversationRepository
@@ -117,21 +118,27 @@ class AvailableService:
     
     @staticmethod
     async def create_new_conversation_async(user_id: UUID, messages: list[Message] = None) -> Conversation:
-        new_conversation = await ConversationRepository().create_new_conversation_empty_async(user_id)
-        new_conv = await ConversationRepository().get_conversation_by_id_async(new_conversation.id)
+        conv_repo = ConversationRepository()
+        recent_conversation_count = await conv_repo.get_recent_conversations_count_by_user_id_async(user_id)
+        if recent_conversation_count >= 2: raise QuotaOverloadException("You have reached the maximum number of conversations allowed per day.")
+        
+        new_conversation = await conv_repo.create_new_conversation_empty_async(user_id)
+        new_conv = await conv_repo.get_conversation_by_id_async(new_conversation.id)
         if messages and any(messages):
             for message in messages:
                 new_conv.add_new_message(message.role, message.content)
-                assert await ConversationRepository().add_message_to_conversation_async(new_conv.id, new_conv.last_message)
+                assert await conv_repo.add_message_to_existing_conversation_async(new_conv.id, new_conv.last_message)
         return new_conv
 
     @staticmethod
     async def rag_query_stream_async(conversation_id:UUID, user_query_content:str, display_waiting_message: bool, is_stream_decoded :bool = False) -> AsyncGenerator:
-        conversation = await ConversationRepository().get_conversation_by_id_async(conversation_id)
-        if not conversation: 
-            raise ValueError(f"Conversation with ID {conversation_id} not found in database.")
+        conv_repo = ConversationRepository()
+        conversation = await conv_repo.get_conversation_by_id_async(conversation_id)
+        if not conversation: raise ValueError(f"Conversation with ID {conversation_id} not found in database.")
+        if len(conversation.messages) > 2: raise QuotaOverloadException("You have reached the maximum number of messages allowed per conversation.")
+        
         conversation.add_new_message("user", user_query_content)
-        assert await ConversationRepository().add_message_to_conversation_async(conversation.id, conversation.last_message)
+        assert await conv_repo.add_message_to_existing_conversation_async(conversation.id, conversation.last_message)
         
         # Stream the response
         all_chunks_output=[]
@@ -147,11 +154,12 @@ class AvailableService:
                         conversation, 
                         full_answer_str)
 
+
     @staticmethod
     async def add_answer_summary_to_conversation_async(conversation, full_answer_str):
         summarized_response = await AvailableService.get_summarized_answer_async(full_answer_str)
         conversation.add_new_message("assistant", summarized_response)
-        assert await ConversationRepository().add_message_to_conversation_async(conversation.id, conversation.last_message)
+        assert await ConversationRepository().add_message_to_existing_conversation_async(conversation.id, conversation.last_message)
     
     @staticmethod
     async def rag_query_retrieval_and_augmented_generation_streaming_async(conversation_history:Conversation, display_waiting_message = True, is_stream_decoded = False, all_chunks_output: list[str] = []):

@@ -100,7 +100,7 @@ class TestConversationRepository:
             id=uuid4(),
             created_at=datetime.now(timezone.utc),
         )
-        result = await self.conversation_repository.add_message_to_conversation_async(self.sample_conversation.id, new_message)
+        result = await self.conversation_repository.add_message_to_existing_conversation_async(self.sample_conversation.id, new_message)
         assert result is True
 
         # Retrieve the conversation and verify the new message is added
@@ -119,5 +119,5 @@ class TestConversationRepository:
         )
         non_existent_id = uuid4()
         with pytest.raises(ValueError) as exc_info:
-            await self.conversation_repository.add_message_to_conversation_async(non_existent_id, new_message)
+            await self.conversation_repository.add_message_to_existing_conversation_async(non_existent_id, new_message)
         assert f"Conversation with id: {non_existent_id} does not exist." in str(exc_info.value)

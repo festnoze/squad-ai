@@ -29,7 +29,8 @@ public partial class Index : ComponentBase
     private bool isLastMessageEditable => conversationService.IsLastMessageEditable();
     private bool isMenuOpen = false;
     private bool showMessageEmptyError = false;
-    private bool showApiCommunicationErrorNotification = false;
+    private bool showApiErrorNotification = false;
+    private string apiErrorNotificationMessage = "Erreur de communication avec l'API du chatbot";
     private bool isLoginModalVisible { get; set; } = false;
     private Modal modal { get; set; } = new Modal();
     private DeviceInfoModel? deviceInfo = null;
@@ -213,11 +214,11 @@ public partial class Index : ComponentBase
 
     private void ShowApiCommunicationError()
     {
-        showApiCommunicationErrorNotification = true;
+        showApiErrorNotification = true;
         //await InvokeAsync(StateHasChanged);
         var task = Task.Delay(8000).ContinueWith(t =>
         {
-            showApiCommunicationErrorNotification = false;
+            showApiErrorNotification = false;
             InvokeAsync(StateHasChanged);
         });
     }

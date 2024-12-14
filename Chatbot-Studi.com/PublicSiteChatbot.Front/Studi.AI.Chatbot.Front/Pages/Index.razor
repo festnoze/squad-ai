@@ -142,12 +142,12 @@
         <span>Impossible d'envoyer un message vide</span>
     </div>
 }
-@if (showApiCommunicationErrorNotification)
+@if (showApiErrorNotification)
 {
     <div class="api-communication-error">
         <span class="oi oi-circle-x" aria-hidden="true"></span>
-        <span>Erreur de communication avec l'API du chatbot</span>
-        <span class="close-btn" @onclick="() => showApiCommunicationErrorNotification = false">&times;</span>
+        <span>@apiErrorNotificationMessage</span>
+        <span class="close-btn" @onclick="() => showApiErrorNotification = false">&times;</span>
     </div>
 }
 

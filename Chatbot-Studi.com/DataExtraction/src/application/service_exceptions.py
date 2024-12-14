@@ -1,0 +1,2 @@
+class QuotaOverloadException(Exception):
+    pass
