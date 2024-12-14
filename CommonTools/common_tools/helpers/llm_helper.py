@@ -284,7 +284,7 @@ class Llm:
         return ''.join(chunks)
     
     @staticmethod
-    async def write_static_text_as_stream(text: str, interval_btw_words: float = 0.12) -> AsyncGenerator[str, None]:
+    async def write_static_text_as_stream(text: str, interval_btw_words: float = 0.07) -> AsyncGenerator[str, None]:
         words = text.split(" ")
         for word in words:
             yield f"{word} "

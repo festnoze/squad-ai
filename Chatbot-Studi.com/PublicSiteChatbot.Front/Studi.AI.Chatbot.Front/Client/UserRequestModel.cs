@@ -1,7 +1,7 @@
-﻿namespace Studi.AI.Chatbot.Front.Client;
-
-using Studi.AI.Chatbot.Front.Models;
+﻿using Studi.AI.Chatbot.Front.Models;
 using System.Text.Json.Serialization;
+
+namespace Studi.AI.Chatbot.Front.Client;
 
 public class UserRequestModel
 {
@@ -17,7 +17,6 @@ public class UserRequestModel
     [JsonPropertyName("device_info")]
     public DeviceInfoRequestModel DeviceInfo { get; set; } = new();
 }
-
 
 public class DeviceInfoRequestModel
 {
@@ -39,8 +38,11 @@ public class DeviceInfoRequestModel
     [JsonPropertyName("is_mobile")]
     public bool IsMobile { get; set; } = false;
 
-    public static DeviceInfoRequestModel FromModel(DeviceInfoModel deviceInfoModel)
+    public static DeviceInfoRequestModel FromModel(DeviceInfoModel? deviceInfoModel)
     {
+        if (deviceInfoModel is null)
+            throw new ArgumentNullException(nameof(deviceInfoModel));
+
         return new DeviceInfoRequestModel
         {
             UserAgent = deviceInfoModel.UserAgent,

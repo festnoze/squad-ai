@@ -24,6 +24,7 @@ def create_app() -> FastAPI:
         version="1.0.0",
         lifespan=lifespan
     )
+    app.state.shutdown = lambda: None
     
     # Include controllers as routers
     app.include_router(ingestion_router)

@@ -9,12 +9,17 @@ namespace Studi.AI.Chatbot.Front.Services;
 public class ConversationService : IConversationService
 {
     private ChatbotAPIClient _chatbotApiClient;
+    private readonly string _apiHostUri;
     private string? userName = null;
     private ConversationModel? conversation = null;
     public event Action? OnConversationChanged = null;
     private bool isWaitingForLLM = false;
-    private readonly string _apiHostUri;
+    private DeviceInfoModel? deviceInfo = null;
+    private string IP = string.Empty;
+    private bool _isExchangesLoaded = false;
+    public bool IsExchangesLoaded => _isExchangesLoaded;
     private readonly IExchangeRepository _exchangeRepository;
+    public event Action? ApiCommunicationErrorNotification;
 
     public ConversationService(IExchangeRepository exchangesRepository, IOptions<ApiSettings> apiSettings)
     {
@@ -92,29 +97,20 @@ public class ConversationService : IConversationService
 
         conversation!.Last().IsSavedMessage = true;
 
-        try
+        var userQueryAskingRequestModel = conversation!.ToUserQueryAskingRequestModel();
+
+        var queryAnsweringStream = this._chatbotApiClient.GetQueryRagAnswerStreamingAsync(userQueryAskingRequestModel);
+        this.AddNewMessage(isSaved: false, isStreaming: true); // Add the new message where the answer will be streamed
+
+        await foreach (var chunk in queryAnsweringStream)
         {
-            var userQueryAskingRequestModel = conversation!.ToUserQueryAskingRequestModel();
-            this.AddNewMessage(isSaved: false, isStreaming: true); // Add a new message where the answer will be streamed
-
-            var queryAnsweringStream = this._chatbotApiClient.GetQueryRagAnswerStreamingAsync(userQueryAskingRequestModel);
-
-            await foreach (var chunk in queryAnsweringStream)
-            {
-                this.AddStreamToLastMessage(chunk);
-            }
-            this.EndsMessageStream();
-
-            // Add a new message for the next user query
-            this.AddNewMessage(isSaved: false, isStreaming: false); 
+            this.AddStreamToLastMessage(chunk);
         }
-        catch (Exception e)
-        {
-            this.NotifyForApiCommunicationError(e.Message);
-        }
+        this.EndsMessageStream();
+
+        // Add a new message for the next user query
+        this.AddNewMessage(isSaved: false, isStreaming: false); 
     }
-
-    public event Action? ApiCommunicationErrorNotification;
 
     protected virtual void NotifyForApiCommunicationError(string errorMessage)
     {
@@ -161,13 +157,6 @@ public class ConversationService : IConversationService
         conversation!.Last().IsStreaming = false;
         conversation!.Last().IsSavedMessage = true;
     }
-
-
-    private bool _isExchangesLoaded = false;
-    private DeviceInfoModel deviceInfo;
-    private string IP;
-
-    public bool IsExchangesLoaded => _isExchangesLoaded;
 
     public void MarkConversationAsLoaded()
     {

@@ -51,6 +51,8 @@ class AvailableService:
     vector_db_type: VectorDbType = None
     embedding_model: EmbeddingModel = None
     llms_infos: list[LlmInfo] = None
+    max_conversations_by_day = 25
+    max_messages_by_conversation = 1
 
     def init(activate_print = True):
         load_dotenv()
@@ -120,7 +122,8 @@ class AvailableService:
     async def create_new_conversation_async(user_id: UUID, messages: list[Message] = None) -> Conversation:
         conv_repo = ConversationRepository()
         recent_conversation_count = await conv_repo.get_recent_conversations_count_by_user_id_async(user_id)
-        if recent_conversation_count >= 2: raise QuotaOverloadException("You have reached the maximum number of conversations allowed per day.")
+        if recent_conversation_count > AvailableService.max_conversations_by_day: 
+            raise QuotaOverloadException("You have reached the maximum number of conversations allowed per day.")
         
         new_conversation = await conv_repo.create_new_conversation_empty_async(user_id)
         new_conv = await conv_repo.get_conversation_by_id_async(new_conversation.id)
@@ -133,9 +136,14 @@ class AvailableService:
     @staticmethod
     async def rag_query_stream_async(conversation_id:UUID, user_query_content:str, display_waiting_message: bool, is_stream_decoded :bool = False) -> AsyncGenerator:
         conv_repo = ConversationRepository()
+        # Wait for tasks on this conversation to be finished before adding a new message
+        while task_handler.is_task_ongoing(conversation_id):
+            await asyncio.sleep(0.5)
+
         conversation = await conv_repo.get_conversation_by_id_async(conversation_id)
         if not conversation: raise ValueError(f"Conversation with ID {conversation_id} not found in database.")
-        if len(conversation.messages) > 2: raise QuotaOverloadException("You have reached the maximum number of messages allowed per conversation.")
+        if len(conversation.messages) > AvailableService.max_messages_by_conversation: 
+            raise QuotaOverloadException("You have reached the maximum number of messages allowed per conversation.")
         
         conversation.add_new_message("user", user_query_content)
         assert await conv_repo.add_message_to_existing_conversation_async(conversation.id, conversation.last_message)
@@ -146,10 +154,11 @@ class AvailableService:
         async for chunk in response_generator:
             yield chunk
         
-        # Add a summary of the generated answer to conversation messages and save it
+        # Add a 'background job to generate a summary of the answer, add it to conversation messages, then save it
         full_answer_str = Llm.get_text_from_chunks(all_chunks_output)
         # Don't await, make summary generation of the answer as a background task
         task_handler.add_task(
+                        conversation.id, # set conversation id as task_id, so we can know if a task is ongoing for a specific conversation
                         AvailableService.add_answer_summary_to_conversation_async, 
                         conversation, 
                         full_answer_str)

@@ -177,7 +177,7 @@ public partial class Index : ComponentBase
             return;
         }
 
-        // TMP: special command to create vector DB
+        //TODO: to remove TMP: special command to create vector DB
         if (conversation!.Last().Content == "db")
         {
             await conversationService.CreateVectorDbAsync();
@@ -187,7 +187,31 @@ public partial class Index : ComponentBase
         await EmptyAndDisableInputTextAreaAsync();
 
         string? userName = "not defined";
-        await conversationService.AnswerUserQueryAsync(userName);
+                
+        try
+        {
+            await conversationService.AnswerUserQueryAsync(userName);
+        }
+        catch (NewConversationsQuotaOverloadException)
+        {
+            apiErrorNotificationMessage = "Limite de nouvelles conversations atteinte, veuillez réessayer plus tard.";
+            ShowApiCommunicationError();
+        }
+        catch (RequestsPerConversationQuotaOverloadException)
+        {
+            apiErrorNotificationMessage = "Vous avez atteind le nombre maximum d'échanges par conversation, vous pouvez recommencer une nouvelle conversation.";
+            ShowApiCommunicationError();
+        }
+        catch (HttpRequestException ex)
+        {
+            apiErrorNotificationMessage = $"Erreur HTTP '{ex.StatusCode?.ToString() ?? "N.C"}' lors de l'appel au service du chatbot";
+            ShowApiCommunicationError();
+        }
+        catch (Exception ex)
+        {
+            apiErrorNotificationMessage = $"Erreur lors de l'appel au service du chatbot: {ex.Message}";
+            ShowApiCommunicationError();
+        }
 
         await EnableInputTextAreaAsync();
         disableConversationModification = false;
@@ -215,10 +239,10 @@ public partial class Index : ComponentBase
     private void ShowApiCommunicationError()
     {
         showApiErrorNotification = true;
-        //await InvokeAsync(StateHasChanged);
         var task = Task.Delay(8000).ContinueWith(t =>
         {
             showApiErrorNotification = false;
+            apiErrorNotificationMessage = "";
             InvokeAsync(StateHasChanged);
         });
     }

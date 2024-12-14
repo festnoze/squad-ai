@@ -79,16 +79,15 @@ public class ChatbotAPIClient
                 return conversationResponse.Id;
             }
 
-            else if (response.StatusCode == HttpStatusCode.TooManyRequests) // Handle Error code 429 specifically
+            else if (response.StatusCode == HttpStatusCode.TooManyRequests) // Handle HTTP Error 429 specifically
             {
-                //TODO: Implement special logic to display an error message (like when sending an empty message)
-                throw new HttpRequestException("Too many requests. Please try again later.");
+                throw new NewConversationsQuotaOverloadException();
             }
 
             else // == if (!response.IsSuccessStatusCode). Handle other non-success status codes
             {                
                 var content = await response.Content.ReadAsStringAsync();
-                throw new HttpRequestException($"Request failed with status code {response.StatusCode}: {content}");
+                throw new HttpRequestException($"Create conversation request failed with status code {response.StatusCode}, with payload: {content!}", null, response.StatusCode);
             }
         }
     }
@@ -109,17 +108,31 @@ public class ChatbotAPIClient
 
         using (HttpResponseMessage response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead))
         {
-            response.EnsureSuccessStatusCode();
-
-            using (var stream = await response.Content.ReadAsStreamAsync())
-            using (var reader = new StreamReader(stream))
+            if (response.IsSuccessStatusCode)
             {
-                while (!reader.EndOfStream)
+
+                using (var stream = await response.Content.ReadAsStreamAsync())
+                using (var reader = new StreamReader(stream))
                 {
-                    var word = await reader.ReadWordAsync();
-                    if (!string.IsNullOrEmpty(word))
-                        yield return word;
+                    while (!reader.EndOfStream)
+                    {
+                        var word = await reader.ReadWordAsync();
+                        if (!string.IsNullOrEmpty(word))
+                            yield return word;
+                    }
                 }
+            }
+
+            else if (response.StatusCode == HttpStatusCode.TooManyRequests) // Handle HTTP Error 429 specifically
+            {
+                throw new RequestsPerConversationQuotaOverloadException();
+            }
+
+            else // == if (!response.IsSuccessStatusCode). Handle other non-success status codes
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                throw new HttpRequestException($"Answer user query request failed with status code {response.StatusCode}, with payload: {content!}", null, response.StatusCode);
+
             }
         }
     }
