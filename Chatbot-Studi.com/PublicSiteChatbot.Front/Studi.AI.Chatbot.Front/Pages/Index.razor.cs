@@ -194,12 +194,12 @@ public partial class Index : ComponentBase
         }
         catch (NewConversationsQuotaOverloadException)
         {
-            apiErrorNotificationMessage = "Limite de nouvelles conversations atteinte, veuillez réessayer plus tard.";
+            apiErrorNotificationMessage = "Vous avez atteind le nombre maximum de conversations quotidiennes. Veuillez attendre demain avec de réessayer.";
             ShowApiCommunicationError();
         }
         catch (RequestsPerConversationQuotaOverloadException)
         {
-            apiErrorNotificationMessage = "Vous avez atteind le nombre maximum d'échanges par conversation, vous pouvez recommencer une nouvelle conversation.";
+            apiErrorNotificationMessage = "Vous avez atteind le nombre maximum d'échanges par conversation.\nVous pouvez recommencer une nouvelle conversation.";
             ShowApiCommunicationError();
         }
         catch (HttpRequestException ex)

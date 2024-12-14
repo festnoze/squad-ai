@@ -45,30 +45,30 @@ async def create_new_conversation(conversation: ConversationRequestModel):
             content={"id": str(new_conv.id)},
             status_code=200
         )
-    
     except QuotaOverloadException as e:
         print(f"Failed to create conversation: {e}")
         raise HTTPException(status_code=429, detail=str(e))
-    
     except Exception as e:
         print(f"Failed to create conversation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     
 
-@inference_router.post("/conversation/message/stream")
+@inference_router.post("/conversation/ask-question/stream")
 async def rag_query_stream_async(user_query_request_model: QueryAskingRequestModel):
     try:
-        response_generator = AvailableService.rag_query_stream_async(
-                                    user_query_request_model.conversation_id,
-                                    user_query_request_model.user_query_content,
-                                    user_query_request_model.display_waiting_message,
-                                    False)
-        return StreamingResponse(response_generator, media_type="text/event-stream")  
-    
+        conversation = await AvailableService.prepare_conversation_for_user_query_answer_async(
+                                                    user_query_request_model.conversation_id,
+                                                    user_query_request_model.user_query_content
+                                                )        
+        response_generator = AvailableService.streaming_answer_to_user_query_with_RAG_async(
+                                                    conversation,
+                                                    user_query_request_model.display_waiting_message,
+                                                    False
+                                                )
+        return StreamingResponse(response_generator, media_type="text/event-stream")
+        
     except QuotaOverloadException as e:
-        print(f"Failed to create conversation: {e}")
         raise HTTPException(status_code=429, detail=str(e))
-      
     except Exception as e:
-        print(f"Failed to create conversation: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Failed to handle query stream: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")

@@ -1,5 +1,7 @@
 @page "/"
 
+@using Markdig
+@using Studi.AI.Chatbot.Front.Helpers
 @using Studi.AI.Chatbot.Front.Models
 @using Studi.AI.Chatbot.Front.Services
 @using Microsoft.AspNetCore.Components.Authorization
@@ -58,16 +60,7 @@
                     @* Display regular messages' content (as non-editable) *@
                     @if (!IsEditableLastMessage(message) || showInputMessageAtBottom)
                     {
-                        
                         @(new MarkupString(message.HtmlContent));
-                        @* @if (!message.IsStreaming)
-                        {
-                            @(new MarkupString(message.GetContentWithMarkdownAsHtml()));
-                        }
-                        else
-                        {
-                            @message.Content;
-                        } *@
                     }
                     else
                     {
@@ -146,7 +139,9 @@
 {
     <div class="api-communication-error">
         <span class="oi oi-circle-x" aria-hidden="true"></span>
-        <span>@apiErrorNotificationMessage</span>
+        <span>
+            @(new MarkupString(MarkdownHelper.GetMarkdownContentConvertedToHtml(apiErrorNotificationMessage)))
+        </span>
         <span class="close-btn" @onclick="() => showApiErrorNotification = false">&times;</span>
     </div>
 }

@@ -1,10 +1,5 @@
+using Studi.AI.Chatbot.Front.Helpers;
 using System.Text.Json.Serialization;
-using Markdig;
-using Markdig.Syntax.Inlines;
-using Markdig.Syntax;
-using Markdig.Renderers.Html;
-using Markdig.Renderers;
-using Markdig.Extensions.Tables;
 
 namespace Studi.AI.Chatbot.Front.Models;
 
@@ -12,11 +7,6 @@ public record MessageModel
 {
     public static string UserRole = "Utilisateur";
     public static string AiRole = "Assistant";
-    private static MarkdownPipeline markdownPipeline =
-                    new MarkdownPipelineBuilder()
-                    .UseSoftlineBreakAsHardlineBreak()
-                    .UseAdvancedExtensions()
-                    .Build();
 
     [JsonPropertyName("id")]
     public Guid Id { get; init; }
@@ -51,7 +41,7 @@ public record MessageModel
         get
         {
             if (_htmlContent == null)
-                _htmlContent = _getMarkdownContentConvertedToHtml();
+                _htmlContent = MarkdownHelper.GetMarkdownContentConvertedToHtml(this.Content);
             return _htmlContent;
         }
     }
@@ -96,43 +86,6 @@ public record MessageModel
             Content = "";
         else
             Content = Content.Substring(0, newEndIndex);
-    }
-
-    private string _getMarkdownContentConvertedToHtml()
-    {
-        var input = Content.TrimEnd();
-        if (string.IsNullOrEmpty(input))
-            return "";
-
-        var document = Markdown.Parse(input, markdownPipeline);
-
-        // Make all links open up in a new tab by adding them a target="_blank" attribute
-        foreach (var link in document.Descendants().OfType<LinkInline>())
-            link.GetAttributes().AddPropertyIfNotExist("target", "_blank");
-
-        // Add styling to display arrays
-        foreach (var table in document.Descendants().OfType<Table>())
-            table.GetAttributes().AddClass("generated-array-class");
-
-        foreach (var heading in document.Descendants().OfType<HeadingBlock>())
-            if (heading.Level <= 3)
-                heading.Level = 4; // Change h1, h2 and h3 to: h4
-
-        // Render the Markdown document into HTML
-        var result = "";
-        using (var writer = new StringWriter())
-        {
-            var renderer = new HtmlRenderer(writer);
-            markdownPipeline.Setup(renderer);
-            renderer.Render(document);
-            result = writer.ToString();
-        }
-
-        // Additional transformations        
-        result = result.Replace("</ul>", "</ul><br>");// Add an extra line break (or paragraph spacing) after each </li> in the ordered list
-        result = result.TrimEnd().Replace("</p>\n", "</p><br>");
-
-        return result;
     }
 
     private string PreprocessContentForMarkdown(string input)

@@ -99,7 +99,7 @@ public class ChatbotAPIClient
     /// <returns></returns>
     public async IAsyncEnumerable<string> GetQueryRagAnswerStreamingAsync(UserQueryAskingRequestModel userQueryAskingRequestModel)
     {
-        string endpoint = $"{_baseUri}{_controller_subpath}/conversation/message/stream";
+        string endpoint = $"{_baseUri}{_controller_subpath}/conversation/ask-question/stream";
         string jsonPayload = JsonSerializer.Serialize(userQueryAskingRequestModel);
         var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
         {

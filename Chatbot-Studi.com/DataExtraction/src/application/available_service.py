@@ -51,7 +51,7 @@ class AvailableService:
     vector_db_type: VectorDbType = None
     embedding_model: EmbeddingModel = None
     llms_infos: list[LlmInfo] = None
-    max_conversations_by_day = 25
+    max_conversations_by_day = 10
     max_messages_by_conversation = 1
 
     def init(activate_print = True):
@@ -132,14 +132,14 @@ class AvailableService:
                 new_conv.add_new_message(message.role, message.content)
                 assert await conv_repo.add_message_to_existing_conversation_async(new_conv.id, new_conv.last_message)
         return new_conv
-
+    
     @staticmethod
-    async def rag_query_stream_async(conversation_id:UUID, user_query_content:str, display_waiting_message: bool, is_stream_decoded :bool = False) -> AsyncGenerator:
-        conv_repo = ConversationRepository()
+    async def prepare_conversation_for_user_query_answer_async(conversation_id:UUID, user_query_content:str) -> Conversation:
         # Wait for tasks on this conversation to be finished before adding a new message
         while task_handler.is_task_ongoing(conversation_id):
             await asyncio.sleep(0.5)
-
+        
+        conv_repo = ConversationRepository()
         conversation = await conv_repo.get_conversation_by_id_async(conversation_id)
         if not conversation: raise ValueError(f"Conversation with ID {conversation_id} not found in database.")
         if len(conversation.messages) > AvailableService.max_messages_by_conversation: 
@@ -147,7 +147,10 @@ class AvailableService:
         
         conversation.add_new_message("user", user_query_content)
         assert await conv_repo.add_message_to_existing_conversation_async(conversation.id, conversation.last_message)
+        return conversation
         
+    @staticmethod
+    async def streaming_answer_to_user_query_with_RAG_async(conversation: Conversation, display_waiting_message: bool, is_stream_decoded: bool = False) -> AsyncGenerator:
         # Stream the response
         all_chunks_output=[]
         response_generator = AvailableService.rag_query_retrieval_and_augmented_generation_streaming_async(conversation, display_waiting_message, is_stream_decoded, all_chunks_output)
