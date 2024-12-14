@@ -11,6 +11,7 @@ builder.Services.Configure<ChatbotSettings>(builder.Configuration.GetSection("Ch
 // Add services to the container.
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
+builder.Services.AddHttpClient();
 
 builder.Services.AddControllers();
 
@@ -40,7 +41,7 @@ app.UseRouting();
 
 app.MapBlazorHub();
 
-app.UsePathBase("/MetierPoExchange");
+app.UsePathBase("/");
 app.MapFallbackToPage("/_Host");
 
 //app.MapControllers(); // Handle proxy API controllers

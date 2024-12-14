@@ -5,14 +5,21 @@ namespace Studi.AI.Chatbot.Front.Controller;
 
 [ApiController]
 [Route("[controller]")]
-public class FrontendProxyController : ControllerBase
+public class ProxyController : ControllerBase
 {
-    public FrontendProxyController(ConversationService ConversationService)
+    public ProxyController(ConversationService ConversationService)
     {
         _ConversationService = ConversationService;
     }
 
     private readonly ConversationService _ConversationService;
+
+    //[HttpGet("get-ip")]
+    //public IActionResult GetClientIp()
+    //{
+    //    var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+    //    return Ok(ipAddress);
+    //}
 
     [HttpGet("ping")]
     public string Ping()

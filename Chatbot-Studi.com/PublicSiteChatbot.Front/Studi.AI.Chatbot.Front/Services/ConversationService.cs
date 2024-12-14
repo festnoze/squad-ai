@@ -48,6 +48,16 @@ public class ConversationService : IConversationService
         this.userName = userName;
     }
 
+    public void SetDeviceInfo(DeviceInfoModel deviceInfo)
+    {
+        this.deviceInfo = deviceInfo;
+    }
+
+    public void SetIP(string ip)
+    {
+        this.IP = ip;
+    }
+
     public bool IsLastMessageEditable()
     {
         return conversation!.IsLastMessageFromUser && !conversation!.Last().IsSavedMessage;
@@ -55,7 +65,7 @@ public class ConversationService : IConversationService
 
     public bool IsWaitingForLLM() => isWaitingForLLM;
 
-    public async Task AnswerUserQueryAsync()
+    public async Task AnswerUserQueryAsync(string userName = "default")
     {
         if (!conversation?.Any() ?? true)
             return;
@@ -69,8 +79,14 @@ public class ConversationService : IConversationService
 
         if (conversation!.Id is null)
         {
-            // TODO : Get the IP and device infos from the client
-            var userId = await this._chatbotApiClient.CreateOrUpdateUserAsync(new UserRequestModel { UserId = null, UserName = "default", IP = "127.0.0.1", DeviceInfo = "none" });
+            // If conversation doesn't exist yet, create a new one and also a new user if needed
+            var userId = await this._chatbotApiClient.CreateOrUpdateUserAsync(new UserRequestModel 
+                                { 
+                                    UserId = null, 
+                                    UserName = userName, 
+                                    IP = this.IP, 
+                                    DeviceInfo = DeviceInfoRequestModel.FromModel(this.deviceInfo)
+            });
             conversation!.Id = await this._chatbotApiClient.CreateNewConversationAsync(userId);
         }
 
@@ -148,6 +164,9 @@ public class ConversationService : IConversationService
 
 
     private bool _isExchangesLoaded = false;
+    private DeviceInfoModel deviceInfo;
+    private string IP;
+
     public bool IsExchangesLoaded => _isExchangesLoaded;
 
     public void MarkConversationAsLoaded()

@@ -1,32 +1,60 @@
 from datetime import datetime, timezone
-from src.database_conversations.entities import ConversationEntity, MessageEntity, UserEntity
+from src.database_conversations.entities import ConversationEntity, MessageEntity, UserEntity, DeviceInfoEntity
 from common_tools.models.conversation import Conversation
 from common_tools.models.message import Message
 from common_tools.models.user import User
+from common_tools.models.device_info import DeviceInfo
 from uuid import UUID
 
 class ConversationConverters:
     @staticmethod
+    def convert_device_info_entity_to_model(device_info_entity: DeviceInfoEntity) -> DeviceInfo:
+        return DeviceInfo(
+            ip=device_info_entity.ip,
+            user_agent=device_info_entity.user_agent,
+            platform=device_info_entity.platform,
+            app_version=device_info_entity.app_version,
+            os=device_info_entity.os,
+            browser=device_info_entity.browser,
+            is_mobile=device_info_entity.is_mobile,
+            created_at=device_info_entity.created_at,
+            id=device_info_entity.id,
+        )
+
+    @staticmethod
+    def convert_device_info_model_to_entity(device_info: DeviceInfo) -> DeviceInfoEntity:
+        entity = DeviceInfoEntity(
+            ip=device_info.ip,
+            user_agent=device_info.user_agent,
+            platform=device_info.platform,
+            app_version=device_info.app_version,
+            os=device_info.os,
+            browser=device_info.browser,
+            is_mobile=device_info.is_mobile,
+            created_at=device_info.created_at if device_info.created_at else datetime.now(timezone.utc)
+        )
+        if device_info.id: entity.id = device_info.id
+        return entity
+    
+    @staticmethod
     def convert_user_entity_to_model(user_entity: UserEntity) -> User:
         return User(
             name=user_entity.name,
-            ip=user_entity.ip,
-            device_info=user_entity.device_info,
-            created_at=user_entity.created_at,
+            device_info=ConversationConverters.convert_device_info_entity_to_model(user_entity.device_infos[-1]) if user_entity.device_infos and any(user_entity.device_infos) else None,
             id=user_entity.id,
+            created_at=user_entity.created_at,
         )
 
     @staticmethod
     def convert_user_model_to_entity(user: User) -> UserEntity:
-        entity = UserEntity(
+        new_user_entity = UserEntity(
             name=user.name,
-            ip=user.ip,
-            device_info=user.device_info,
-            created_at=user.created_at if user.created_at else datetime.now(timezone.utc)
+            created_at=user.created_at if user.created_at else datetime.now(timezone.utc),
+            id=user.id,
         )
-        if user.id:
-            entity.id=user.id
-        return entity
+        if user.id: new_user_entity.id=user.id
+
+        return new_user_entity
 
     @staticmethod
     def convert_message_entity_to_model(message_entity: MessageEntity) -> Message:
@@ -47,8 +75,7 @@ class ConversationConverters:
             elapsed_seconds=message.elapsed_seconds,
             created_at=message.created_at if message.created_at else datetime.now(timezone.utc)
         )
-        if message.id:
-            entity.id=message.id
+        if message.id: entity.id=message.id
         return entity
 
     @staticmethod
@@ -72,8 +99,7 @@ class ConversationConverters:
             user_id=conversation.user.id if conversation.user and conversation.user.id else None,
             created_at=conversation.created_at if conversation.created_at else datetime.now(timezone.utc),
         )
-        if conversation.id:
-            entity.id=conversation.id
+        if conversation.id: entity.id=conversation.id
 
         entity.messages=[
                 ConversationConverters.convert_message_model_to_entity(message, conversation.id)

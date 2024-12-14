@@ -4,6 +4,7 @@ using Microsoft.JSInterop;
 using Microsoft.Extensions.Options;
 using Studi.AI.Chatbot.Front.Client;
 using Studi.AI.Chatbot.Front.Models;
+using System.Net;
 
 namespace Studi.AI.Chatbot.Front.Pages;
 
@@ -31,11 +32,15 @@ public partial class Index : ComponentBase
     private bool showApiCommunicationErrorNotification = false;
     private bool isLoginModalVisible { get; set; } = false;
     private Modal modal { get; set; } = new Modal();
+    private DeviceInfoModel? deviceInfo = null;
+    private string? IP = null;
+
 
     protected override async Task OnInitializedAsync()
     {
         conversation = conversationService.GetConversation();
         isWaitingForLLM = conversationService.IsWaitingForLLM();
+
         conversationService.OnConversationChanged += ReloadConversation;
         conversationService.ApiCommunicationErrorNotification += ShowApiCommunicationError;
     }
@@ -63,6 +68,21 @@ public partial class Index : ComponentBase
         if (!disableConversationModification)
         {
             conversation!.Last().ChangeContent(await JSRuntime.InvokeAsync<string>("getElementValue", "editingMessageTextarea"));
+        }
+    }
+
+    private async Task SetDeviceInfoAndIPAsync()
+    {
+        if (deviceInfo is null)
+        {
+            deviceInfo = await JSRuntime.InvokeAsync<DeviceInfoModel>("getDeviceInfo");
+            conversationService.SetDeviceInfo(deviceInfo);
+        }
+        if (IP is null)
+        {
+            //IP = await Http.GetFromJsonAsync<string>("proxy/get-ip");
+            IP = await JSRuntime.InvokeAsync<string>("getIp");
+            conversationService.SetIP(IP!);
         }
     }
 
@@ -110,7 +130,9 @@ public partial class Index : ComponentBase
         {
             //await JSRuntime.InvokeVoidAsync("autoResizeTextarea", "editingMessageTextarea");
             await JSRuntime.InvokeVoidAsync("scrollChatContainerToBottom");
+
         }
+        await SetDeviceInfoAndIPAsync();
 
         if (doLoginOnStartup && userName is null && !isLoginModalVisible)
         {
@@ -162,10 +184,13 @@ public partial class Index : ComponentBase
 
         isWaitingForLLM = true;
         await EmptyAndDisableInputTextAreaAsync();
-        await conversationService.AnswerUserQueryAsync();
+
+        string? userName = "not defined";
+        await conversationService.AnswerUserQueryAsync(userName);
 
         await EnableInputTextAreaAsync();
         disableConversationModification = false;
+
         await InvokeAsync(StateHasChanged);
     }
 

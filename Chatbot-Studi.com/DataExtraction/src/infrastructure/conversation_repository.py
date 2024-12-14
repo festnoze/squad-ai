@@ -2,7 +2,8 @@ from typing import Optional
 from uuid import UUID
 from common_tools.database.generic_datacontext import GenericDataContext
 from common_tools.models.conversation import Conversation, Message
-from src.database_conversations.entities import Base, ConversationEntity, MessageEntity, UserEntity
+from common_tools.models.device_info import DeviceInfo
+from src.database_conversations.entities import Base, ConversationEntity, MessageEntity, UserEntity, DeviceInfoEntity
 from src.database_conversations.conversation_converters import ConversationConverters
 
 class ConversationRepository:

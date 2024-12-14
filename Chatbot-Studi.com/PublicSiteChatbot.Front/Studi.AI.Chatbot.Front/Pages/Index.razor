@@ -7,6 +7,7 @@
 @using Microsoft.AspNetCore.Mvc.ViewFeatures;
 
 @inject IJSRuntime JSRuntime
+@inject HttpClient Http
 @inject IConversationService conversationService
 @inject INavigationService navigationService
 @inject ISimpleAuthenticationStateProvider authenticationStateProvider
@@ -201,12 +202,55 @@
             return window.localStorage.getItem(key);
         }
     };
-    window.getDeviceInfo = () => {
+    @* needs dectect.js to be installed (+ navigator is deprecated):
+        window.getDeviceInfo = () => {
         return {
             userAgent: navigator.userAgent,
             platform: navigator.platform,
             appVersion: navigator.appVersion,
+            os: detect.parse(navigator.userAgent).os.family,
+            browser: detect.parse(navigator.userAgent).browser.family,
             isMobile: /Mobi|Android/i.test(navigator.userAgent)
         };
+    }; *@
+    window.getDeviceInfo = () => {
+        const userAgent = navigator.userAgent;
+        const platform = navigator.platform;
+        const appVersion = navigator.appVersion;
+        const isMobile = /Mobi|Android/i.test(userAgent);
+
+        // Function to detect the operating system
+        const detectOS = () => {
+            if (/Windows NT/i.test(userAgent)) return 'Windows';
+            if (/Mac/i.test(userAgent)) return 'MacOS';
+            if (/Linux/i.test(userAgent)) return 'Linux';
+            if (/Android/i.test(userAgent)) return 'Android';
+            if (/iOS|iPhone|iPad|iPod/i.test(userAgent)) return 'iOS';
+            return 'Unknown';
+        };
+
+        // Function to detect the browser
+        const detectBrowser = () => {
+            if (/Chrome/i.test(userAgent)) return 'Chrome';
+            if (/Safari/i.test(userAgent)) return 'Safari';
+            if (/Firefox/i.test(userAgent)) return 'Firefox';
+            if (/MSIE|Trident/i.test(userAgent)) return 'Internet Explorer';
+            if (/Edge/i.test(userAgent)) return 'Edge';
+            return 'Unknown';
+        };
+
+        return {
+            userAgent,
+            platform,
+            appVersion,
+            os: detectOS(),
+            browser: detectBrowser(),
+            isMobile
+        };
     };
+    async function getIp() {
+        const response = await fetch('https://api.ipify.org?format=json');
+        const data = await response.json();
+        return data.ip;
+    }
 </script>

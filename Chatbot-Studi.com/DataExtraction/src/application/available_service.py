@@ -40,6 +40,7 @@ from common_tools.helpers.ressource_helper import Ressource
 from common_tools.models.embedding import EmbeddingModel, EmbeddingType
 from common_tools.models.conversation import Conversation, Message, User
 from common_tools.models.doc_w_summary_chunks_questions import DocWithSummaryChunksAndQuestions
+from common_tools.models.device_info import DeviceInfo
 from common_tools.rag.rag_inference_pipeline.end_pipeline_exception import EndPipelineException
 from common_tools.models.vector_db_type import VectorDbType
 
@@ -105,10 +106,9 @@ class AvailableService:
         return all_docs
 
     @staticmethod
-    async def create_or_retrieve_user_async(user_id: Optional[UUID], user_name: str, user_ip: str, user_device_info: str) -> UUID:
+    async def create_or_retrieve_user_async(user_id: Optional[UUID], user_name: str, user_device_info: DeviceInfo) -> UUID:
         user = User(
             name = user_name,
-            ip = user_ip,
             device_info = user_device_info,
             id = user_id,
         )

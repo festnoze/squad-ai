@@ -9,7 +9,7 @@ public interface IConversationService : IDisposable
     event Action? OnConversationChanged;
     
     void AddNewMessage(bool isSaved = false, bool isStreaming = true);
-    Task AnswerUserQueryAsync();
+    Task AnswerUserQueryAsync(string userName = "default");
     void AddStreamToLastMessage(string? messageChunk);
     void EndsMessageStream();
     ConversationModel GetConversation();
@@ -17,6 +17,7 @@ public interface IConversationService : IDisposable
     bool IsWaitingForLLM();
     void MarkConversationAsLoaded();
     void SetCurrentUser(string userName);
-
+    void SetDeviceInfo(DeviceInfoModel deviceInfo);
+    void SetIP(string ip);
     Task CreateVectorDbAsync();
 }

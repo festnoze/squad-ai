@@ -8,7 +8,7 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import sessionmaker
 from uuid import UUID
 
-from src.database_conversations.entities import Base, ConversationEntity, MessageEntity, UserEntity
+from src.database_conversations.entities import Base, ConversationEntity, MessageEntity, UserEntity, DeviceInfoEntity
 from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.file_helper import file
 

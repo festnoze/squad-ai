@@ -3,7 +3,7 @@ import pytest
 import asyncio
 from uuid import uuid4
 from datetime import datetime, timezone
-from src.database_conversations.entities import ConversationEntity, UserEntity
+from src.database_conversations.entities import ConversationEntity, UserEntity, MessageEntity, DeviceInfoEntity
 from src.database_conversations.conversation_converters import ConversationConverters
 from src.infrastructure.conversation_repository import ConversationRepository
 from common_tools.models.conversation import Conversation, Message, User
@@ -32,7 +32,7 @@ class TestConversationRepository:
 
         self.conversation_repository = ConversationRepository(db_path_or_url=self.db_path_or_url)
 
-        self.sample_user = User(id=uuid4(), name="First User", ip="192.168.1.1", device_info="browser")
+        self.sample_user = User(name="First User", device_info="browser", id=uuid4())
         asyncio.run(self.conversation_repository.data_context.add_entity_async(
                 ConversationConverters.convert_user_model_to_entity(self.sample_user)))
 

@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 from src.database_conversations.conversation_converters import ConversationConverters
-from src.database_conversations.entities import UserEntity
+from src.database_conversations.entities import UserEntity, DeviceInfoEntity
 from src.infrastructure.user_repository import UserRepository
 from common_tools.models.user import User
 
@@ -16,7 +16,7 @@ class TestUserRepository:
     db_path_or_url:str = "tests/infrastructure/conversations_test.db"
 
     def setup_method(self):
-        self.sample_user = User(id=uuid4(), name="First User", ip="192.168.1.1", device_info="browser")
+        self.sample_user = User(id=uuid4(), name="First User", device_info="browser")
         self.user_repository = UserRepository(db_path_or_url=self.db_path_or_url)        
         asyncio.run(self.user_repository.data_context.empty_all_database_tables_async())
         asyncio.run(self.user_repository.data_context.add_entity_async(ConversationConverters.convert_user_model_to_entity(self.sample_user)))
@@ -32,8 +32,8 @@ class TestUserRepository:
 
     @pytest.mark.asyncio
     async def test_create_new_user(self):
-        user_entity = User(id=uuid4(), name="First User", ip=str(uuid4()), device_info="browser")
-        await self.user_repository.create_new_user_async(user_entity)
+        user_entity = User(name="First User", device_info="browser", id=uuid4())
+        await self.user_repository.create_new_user_with_device_info_async(user_entity)
         assert await self.user_repository.data_context.does_exist_entity_by_id_async(UserEntity, user_entity.id) is True
 
     @pytest.mark.asyncio

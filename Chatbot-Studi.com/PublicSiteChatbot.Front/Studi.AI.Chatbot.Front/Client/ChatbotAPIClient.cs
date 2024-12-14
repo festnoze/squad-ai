@@ -2,6 +2,7 @@
 using System.Text.Json;
 using Studi.AI.Chatbot.Front.Client;
 using Studi.AI.Chatbot.Front.Helpers;
+using Studi.AI.Chatbot.Front.Models;
 
 public class ChatbotAPIClient
 {
@@ -55,8 +56,8 @@ public class ChatbotAPIClient
     /// <exception cref="Exception"></exception>
     public async Task<Guid> CreateNewConversationAsync(Guid userId)
     {
-        string endpoint = $"{_baseUri}{_controller_subpath}/query/create";
-        var createNewConversationRM = new CreateNewConversationRequestModel { UserId = userId };
+        string endpoint = $"{_baseUri}{_controller_subpath}/conversation/create";
+        var createNewConversationRM = new CreateNewConversationRequestModel { UserId = userId, Messages = [] };
         string jsonPayload = JsonSerializer.Serialize(createNewConversationRM);
 
         var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
@@ -86,7 +87,7 @@ public class ChatbotAPIClient
     /// <returns></returns>
     public async IAsyncEnumerable<string> GetQueryRagAnswerStreamingAsync(UserQueryAskingRequestModel userQueryAskingRequestModel)
     {
-        string endpoint = $"{_baseUri}{_controller_subpath}/query/stream";
+        string endpoint = $"{_baseUri}{_controller_subpath}/conversation/message/stream";
         string jsonPayload = JsonSerializer.Serialize(userQueryAskingRequestModel);
         var request = new HttpRequestMessage(HttpMethod.Post, endpoint)
         {

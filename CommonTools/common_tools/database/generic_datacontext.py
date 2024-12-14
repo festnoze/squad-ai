@@ -118,12 +118,18 @@ class GenericDataContext:
                 raise   
 
     async def add_entity_async(self, entity) -> any:
+        results = await self.add_entities_async(entity)
+        return results[0]
+    
+    async def add_entities_async(self, *args) -> list:
         async with self.new_transaction_async() as transaction:
             try:
-                transaction.add(entity)
-                return entity
+                # Add all entities provided in *args
+                for entity in args:
+                    transaction.add(entity)
+                return list(args)
             except Exception as e:
-                txt.print(f"Failed to add entity: {e}")
+                txt.print(f"Failed to add entities: {e}")
                 raise
 
     async def update_entity_async(self, entity_class, entity_id, **kwargs):
