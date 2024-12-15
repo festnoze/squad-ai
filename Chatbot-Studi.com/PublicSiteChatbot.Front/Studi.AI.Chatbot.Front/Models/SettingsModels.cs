@@ -11,4 +11,5 @@ public class ChatbotSettings
     public bool ShowOngoingMessageInConversation { get; set; } = false;
     public bool ShowEmptyOngoingMessageInConversation { get; set; } = false;
     public bool DoLoginOnStartup { get; set; } = false;
+    public int DisplayDurationInSecondsOfErrorNotification { get; set; } = 10;
 }

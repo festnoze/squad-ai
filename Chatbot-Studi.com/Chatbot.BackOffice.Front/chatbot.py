@@ -7,8 +7,11 @@ from typing import Generator
 from dotenv import load_dotenv
 import streamlit as st
 import streamlit.components.v1 as components
+from client_models.user_query_asking_request_model import UserQueryAskingRequestModel
+from client_models.user_request_model import UserRequestModel
 from common_tools.helpers.txt_helper import txt
 from common_tools.models.conversation import Conversation
+from common_tools.models.user import User
 from common_tools.rag.rag_inference_pipeline.end_pipeline_exception import EndPipelineException
 from chatbot_api_client import ChatbotApiClient
 
@@ -80,7 +83,8 @@ class ChatbotFront:
             with st.chat_message('assistant'):
                 start = time.time()
                 with st.spinner('Je réfléchis à votre question ...'):
-                    streaming_response = st.session_state.api_client.rag_query_stream(st.session_state.conv_id, user_query)
+                    request_model = UserQueryAskingRequestModel(conversation_id=st.session_state.conv_id, user_query_content=user_query)
+                    streaming_response = st.session_state.api_client.rag_query_stream(request_model)
                     st.write_stream(streaming_response)
                     full_response = streaming_response
 
@@ -92,18 +96,21 @@ class ChatbotFront:
 
     def start_new_conversation():
         ChatbotFront.init_session()    
-        st.session_state.messages = []
-        st.session_state.conversation = Conversation()
+        st.session_state.messages = []        
+        st.session_state.conversation = Conversation(st.session_state.user)
         st.session_state.conversation.add_new_message('assistant', ChatbotFront._start_caption())
         st.session_state.messages.append({
                             'role': st.session_state.conversation.last_message.role, 
                             'content': st.session_state.conversation.last_message.content})
-        st.session_state.conv_id = st.session_state.api_client.create_new_conversation('streamlit')
+        # Inform the API
+        st.session_state.user_id = st.session_state.api_client.create_or_update_user(UserRequestModel(user_id=None, user_name=st.session_state.user.name))
+        st.session_state.conv_id = st.session_state.api_client.create_new_conversation(st.session_state.user_id)
 
     def init_session():
-        if 'messages' not in st.session_state: 
+        if 'messages' not in st.session_state:            
+            st.session_state.user = User("fake user")
             st.session_state['messages'] = []
-            st.session_state['conversation'] = Conversation()
+            st.session_state['conversation'] = Conversation(st.session_state.user)
             st.session_state['conv_id'] = None
             load_dotenv()
             st.session_state.api_host_uri =  os.getenv("API_HOST_URI")

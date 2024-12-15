@@ -138,7 +138,7 @@
 @if (showApiErrorNotification)
 {
     <div class="api-communication-error">
-        <span class="oi oi-circle-x" aria-hidden="true"></span>
+        <span class="oi oi-circle-x notification-icon" aria-hidden="true"></span>
         <span>
             @(new MarkupString(MarkdownHelper.GetMarkdownContentConvertedToHtml(apiErrorNotificationMessage)))
         </span>

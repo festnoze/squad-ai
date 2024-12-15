@@ -25,15 +25,16 @@ class MethodDecorator:
 
                 param_value_message = f"'{display_param_value}'= '{param_value}'" if param_value is not None else ""
 
-                txt.print_with_spinner(f"> {function_name}({param_value_message}): Ongoing execution...")
+                print(f"> {function_name}({param_value_message}) [Ongoing execution]")
                 return function_name, param_value_message, time.time()
 
             def after_invoke(function_name, param_value_message, start_time):
                 elapsed_time = time.time() - start_time
-                txt.stop_spinner_replace_text(f"> {function_name}({param_value_message}): Execution done in {elapsed_time:.2f}s")
+                print(f"> {function_name}({param_value_message}) [Execution done in {elapsed_time:.2f}s.]")
 
-            def fails_upon_invoke(function_name, param_value_message):
-                txt.stop_spinner_replace_text(f"Failure upon execution of: {function_name}({param_value_message})")
+            def fails_upon_invoke(function_name, param_value_message, start_time):
+                elapsed_time = time.time() - start_time
+                print(f"{function_name}({param_value_message}) [Execution fails after {elapsed_time:.2f}s.]")
 
             @functools.wraps(func)
             def sync_wrapper(*args, **kwargs):
@@ -46,7 +47,7 @@ class MethodDecorator:
                 except EndPipelineException as e: 
                     raise e
                 except Exception as e:
-                    fails_upon_invoke(function_name, param_value_message)
+                    fails_upon_invoke(function_name, param_value_message, start_time)
                     raise e
 
             @functools.wraps(func)
@@ -61,7 +62,7 @@ class MethodDecorator:
                 except EndPipelineException as e: 
                     raise e
                 except Exception as e:
-                    fails_upon_invoke(function_name, param_value_message)
+                    fails_upon_invoke(function_name, param_value_message, start_time)
                     raise e
 
             @functools.wraps(func)
@@ -76,7 +77,7 @@ class MethodDecorator:
                 except EndPipelineException as e: 
                     raise e
                 except Exception as e:
-                    fails_upon_invoke(function_name, param_value_message)
+                    fails_upon_invoke(function_name, param_value_message, start_time)
                     raise e
 
             if inspect.iscoroutinefunction(func):

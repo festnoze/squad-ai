@@ -303,6 +303,11 @@ html, body {
     }
 }
 
+.notification-icon {
+    font-size: x-large;
+    padding-right: 15px;
+}
+
 .notification {
     position: fixed;
     right: 20px;
@@ -313,7 +318,7 @@ html, body {
     border-radius: 5px;
     z-index: 1000;
     box-shadow: 0px 0px 10px rgba(0,0,0,0.5);
-    display: flex; /
+    display: flex; 
     align-items: center; /* Centre verticalement l'icône et le texte */
 }
 
@@ -334,13 +339,13 @@ html, body {
     box-shadow: 0px 0px 10px rgba(0,0,0,0.5);
     display: flex;
     align-items: center;
-    /* Set the initial opacity and transition */
-    opacity: 1;
+    /* Set the initial opacity and transition to fade out after a while */
+    /*opacity: 1;
     transition: opacity 6s ease-out;
-    animation: autoFadeOut 6s ease-out forwards;
+    animation: autoFadeOut 6s ease-out forwards;*/
 }
 
-/* Keyframes to ensure it transitions automatically */
+ /*Keyframes to ensure it transitions automatically */
 @keyframes autoFadeOut {
     0% {
         opacity: 1;
@@ -352,8 +357,8 @@ html, body {
 
     .api-communication-error .oi {
         top: -1px;
-        margin-right: 10px; /* Ajoute un espace entre l'icône et le texte */
-        font-size: 1.3em; /* Ajuste la taille à 1.5 fois la taille normale */
+        margin-right: 10px;  
+        font-size: 1.3em;
     }
 
     .api-communication-error .close-btn {
@@ -362,15 +367,15 @@ html, body {
         top: 0px;
         right: 10px;
         cursor: pointer;
-        font-size: 20px; /* Taille de la croix */
+        font-size: 20px; 
     }
 
-        /* Optionnel : Ajouter un effet au survol pour la croix */
+         Optionnel : Ajouter un effet au survol pour la croix 
         .api-communication-error .close-btn:hover {
-            color: #ffffff; /* Changez la couleur au survol */
+            color: #ffffff;
         }
 
-/* Define the fade-out animation */
+ Define the fade-out animation 
 @keyframes fadeOut {
     from {
         opacity: 1;
@@ -381,7 +386,7 @@ html, body {
     }
 }
 
-/* Apply fade-out animation */
+ Apply fade-out animation 
 .fade-out {
     animation: fadeOut 4s ease-out forwards;
 }

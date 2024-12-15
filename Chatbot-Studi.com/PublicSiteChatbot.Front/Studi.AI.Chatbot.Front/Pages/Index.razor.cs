@@ -17,6 +17,7 @@ public partial class Index : ComponentBase
     private bool showOngoingMessageInConversation => ChatbotSettings.Value.ShowOngoingMessageInConversation;
     private bool showEmptyOngoingMessageInConversation => ChatbotSettings.Value.ShowEmptyOngoingMessageInConversation;
     private bool doLoginOnStartup => ChatbotSettings.Value.DoLoginOnStartup;
+    private int displayDurationInSecondsOfErrorNotification => ChatbotSettings.Value.DisplayDurationInSecondsOfErrorNotification;
 
     //
     private string? userName = null;
@@ -194,12 +195,12 @@ public partial class Index : ComponentBase
         }
         catch (NewConversationsQuotaOverloadException)
         {
-            apiErrorNotificationMessage = "Vous avez atteind le nombre maximum de conversations quotidiennes. Veuillez attendre demain avec de réessayer.";
+            apiErrorNotificationMessage = "Vous avez dépassé le nombre maximum de conversations quotidiennes autorisé.\nVeuillez attendre demain pour accéder à nouveau au service.";
             ShowApiCommunicationError();
         }
         catch (RequestsPerConversationQuotaOverloadException)
         {
-            apiErrorNotificationMessage = "Vous avez atteind le nombre maximum d'échanges par conversation.\nVous pouvez recommencer une nouvelle conversation.";
+            apiErrorNotificationMessage = "Vous avez dépassé le nombre maximum d'échanges autorisé pour une conversation.\nCommencer une nouvelle conversation afin de continuer à utiliser le service.";
             ShowApiCommunicationError();
         }
         catch (HttpRequestException ex)
@@ -209,7 +210,7 @@ public partial class Index : ComponentBase
         }
         catch (Exception ex)
         {
-            apiErrorNotificationMessage = $"Erreur lors de l'appel au service du chatbot: {ex.Message}";
+            apiErrorNotificationMessage = $"Erreur lors de l'appel au service du chatbot:\n{ex.Message}";
             ShowApiCommunicationError();
         }
 
@@ -229,7 +230,7 @@ public partial class Index : ComponentBase
     private void ShowEmptyMessageError()
     {
         showMessageEmptyError = true;
-        var task = Task.Delay(8000).ContinueWith(t =>
+        var task = Task.Delay(displayDurationInSecondsOfErrorNotification * 1000).ContinueWith(t =>
         {
             showMessageEmptyError = false;
             InvokeAsync(StateHasChanged);
@@ -239,7 +240,7 @@ public partial class Index : ComponentBase
     private void ShowApiCommunicationError()
     {
         showApiErrorNotification = true;
-        var task = Task.Delay(8000).ContinueWith(t =>
+        var task = Task.Delay(displayDurationInSecondsOfErrorNotification * 1000).ContinueWith(t =>
         {
             showApiErrorNotification = false;
             apiErrorNotificationMessage = "";
