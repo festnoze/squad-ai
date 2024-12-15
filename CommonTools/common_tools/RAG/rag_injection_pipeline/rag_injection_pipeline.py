@@ -24,6 +24,7 @@ from qdrant_client.http.models import Distance, VectorParams
 from common_tools.helpers.txt_helper import txt
 from common_tools.models.file_already_exists_policy import FileAlreadyExistsPolicy
 from common_tools.helpers.file_helper import file
+from common_tools.rag.rag_injection_pipeline.sparse_vector_embedding import SparseVectorEmbedding
 from common_tools.rag.rag_service import RagService
 from common_tools.models.vector_db_type import VectorDbType
 
@@ -195,5 +196,38 @@ class RagInjectionPipeline:
             start += chunk_size - chunk_overlap
 
         return chunks
+    
+    #TODO: to finish
+    def embed_and_store_documents_in_pinecone(self, documents: list[Document], pinecone_index, bm25_embedding_model):
+        """
+        Embeds documents with BM25 (sparse) and dense embeddings and stores them in Pinecone.
+        
+        Args:
+            documents (list[Document]): List of LangChain Document objects.
+            pinecone_index: Pinecone index instance.
+            bm25_embedding_model: Model or method to compute BM25 sparse vectors.
+            dense_embedding_model: Model or method to compute dense embeddings.
+        """
+        # Step 1: Compute Sparse Vectors (BM25)
+        bm25_vectors = SparseVectorEmbedding().embed_documents_as_sparse_vectors_for_BM25_initial(documents, bm25_embedding_model)
+
+        # Step 2: Compute Dense Vectors
+        dense_vectors = self.rag_service.embedding.embed_documents([doc.page_content for doc in documents])
+
+        # Step 3: Prepare Pinecone Entries
+        entries = []
+        for doc, bm25_vector, dense_vector in zip(documents, bm25_vectors, dense_vectors):
+            # Combine sparse and dense vectors into a single item
+            entry = {
+                "id": doc.metadata.get("id", f"doc-{hash(doc.page_content)}"),  # Ensure unique IDs
+                "values": dense_vector,  # Pinecone handles dense vectors in the 'values' field
+                "sparse_values": bm25_vector,  # BM25 sparse vector for hybrid search
+                "metadata": doc.metadata  # Add metadata for filtering
+            }
+            entries.append(entry)
+
+        # Step 4: Upsert to Pinecone
+        pinecone_index.upsert(entries)
+        #return Pinecone(index=pinecone_index, embedding=dense_embedding_model)
         
        
