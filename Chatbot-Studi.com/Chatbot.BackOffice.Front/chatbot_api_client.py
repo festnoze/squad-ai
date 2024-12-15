@@ -18,10 +18,10 @@ class ChatbotApiClient:
         requests.post(f"{self.ingestion_prefix}/website/scrape")
 
     def build_vectorstore(self) -> None:
-        requests.post(f"{self.ingestion_prefix}/vectorstore/create")
+        requests.post(f"{self.ingestion_prefix}/vectorstore/create/full")
 
     def build_summary_vectorstore(self) -> None:
-        requests.post(f"{self.ingestion_prefix}/vectorstore/summary/create")
+        requests.post(f"{self.ingestion_prefix}/vectorstore/create/from-summaries")
 
     def generate_ground_truth(self) -> None:
         requests.post(f"{self.ingestion_prefix}/groundtruth/generate")
