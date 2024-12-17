@@ -79,3 +79,11 @@ class SparseVectorEmbedding:
         # Construct sparse BM25 matrix
         bm25 = csr_matrix((bm25_data, (rows, cols)), shape=tf.shape)
         return bm25
+    
+    def csr_to_pinecone_dict(self, csr_matrix):
+        """Convert a CSR sparse matrix into Pinecone-compatible sparse_values format."""
+        coo = csr_matrix.tocoo()  # Convert to COO format
+        return {
+            "indices": coo.col.tolist(),  # Indices of non-zero values
+            "values": coo.data.tolist()   # Values of non-zero entries
+        }

@@ -90,19 +90,41 @@ class AvailableService:
         drupal = DrupalDataRetrieval(AvailableService.out_dir)
         drupal.retrieve_all_data()
 
-    def create_vector_db_from_generated_embeded_documents(out_dir):
-        all_docs = GenerateDocumentsAndMetadata().load_all_docs_as_json(out_dir)
+    def create_vector_after_chunking_and_embedding_documents(out_dir, BM25_storage_in_database_sparse_vectors:bool = True):
+        all_docs = GenerateDocumentsAndMetadata().load_all_docs_as_json(out_dir, write_all_lists=True)
         injection_pipeline = RagInjectionPipeline(AvailableService.rag_service)
-        injection_pipeline.build_vectorstore_and_bm25_store(all_docs, chunk_size= 2500, children_chunk_size= 0, vector_db_type=AvailableService.vector_db_type, collection_name= 'studi-public-full', delete_existing= True)
+        documents_chunks = injection_pipeline.chunk_documents(
+                                                    documents= all_docs,
+                                                    chunk_size= 2500,
+                                                    children_chunk_size= 0
+                                                )
+        injection_pipeline.build_vectorstore_from_chunked_docs(
+                            chunks= documents_chunks,
+                            vector_db_type=AvailableService.vector_db_type,
+                            collection_name= 'studi-public-full',
+                            BM25_storage_in_database_sparse_vectors=BM25_storage_in_database_sparse_vectors,
+                            delete_existing= True
+                        )
         AvailableService.re_init() # reload rag_service with the new vectorstore and langchain documents
 
-    def create_summary_vector_db_from_generated_embeded_documents(out_dir):
-        all_chunks = AvailableService._load_or_generate_summary_chunks_and_questions_for_docs(out_dir)
+    def create_vector_db_after_generating_chunking_and_embedding_summaries_and_questions_documents(out_dir, BM25_storage_in_database_sparse_vectors:bool = True):
+        all_summaries_and_questions_docs = AvailableService._load_or_generate_summaries_and_questions_docs(out_dir)
         injection_pipeline = RagInjectionPipeline(AvailableService.rag_service)
-        injection_pipeline.build_vectorstore_and_bm25_store(all_chunks, chunk_size= 2500, children_chunk_size= 0, vector_db_type=AvailableService.vector_db_type, collection_name='studi-public-summarized-chunks-w-questions', delete_existing= True) #, collection_name= 'studi-summarized-questions'
+        documents_chunks = injection_pipeline.chunk_documents(
+                                                    documents= all_summaries_and_questions_docs,
+                                                    chunk_size= 2500,
+                                                    children_chunk_size= 0
+                                                )
+        injection_pipeline.build_vectorstore_from_chunked_docs(
+                            chunks= documents_chunks,
+                            vector_db_type=AvailableService.vector_db_type,
+                            collection_name= 'studi-public-full',
+                            BM25_storage_in_database_sparse_vectors=BM25_storage_in_database_sparse_vectors,
+                            delete_existing= True
+                        )
         AvailableService.re_init() # reload rag_service with the new vectorstore and langchain documents
 
-    def _load_or_generate_summary_chunks_and_questions_for_docs(out_dir):
+    def _load_or_generate_summaries_and_questions_docs(out_dir):
         llm_and_fallback = [AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2, AvailableService.rag_service.llm_3]
         summary_builder = GenerateDocumentsSummariesChunksQuestionsAndMetadata()
         all_docs = summary_builder.load_or_generate_all_docs_from_summaries(out_dir, llm_and_fallback)

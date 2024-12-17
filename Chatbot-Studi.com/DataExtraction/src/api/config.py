@@ -4,6 +4,7 @@ from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 import logging
 from application.available_service import AvailableService
+from application.service_exceptions import QuotaOverloadException
 from web_services.rag_ingestion_controller import ingestion_router
 from web_services.rag_inference_controller import inference_router
 from api.task_handler import task_handler
@@ -34,24 +35,46 @@ def create_app() -> FastAPI:
     logging.basicConfig(level=logging.ERROR, format="%(message)s")
     logger = logging.getLogger(__name__)
 
+    # Middleware for centralized exception handling and response wrapping
     @app.middleware("http")
-    async def log_validation_errors(request: Request, call_next):
+    async def custom_middleware(request: Request, call_next):
         try:
-            return await call_next(request)
+            response = await call_next(request)
+
+            # If response body is empty, return 204 success
+            if response.body == b"" or response.status_code == 204:
+                return JSONResponse(content={"status": "success"}, status_code=204)
+
+            # Wrap successful responses
+            content = await response.body()
+            return JSONResponse(
+                content={"status": "success", "data": content.decode("utf-8")},
+                status_code=200
+            )
+
+        except RequestValidationError as ve:
+            # Validation errors (specific handling)
+            logger.error(f"Validation error: {ve.errors()}")
+            return JSONResponse(
+                status_code=422,
+                content={"status": "error", "detail": ve.errors()}
+            )
+        
+        except QuotaOverloadException as ve:
+            # Validation errors (specific handling)
+            logger.error(f"Validation error: {ve.errors()}")
+            return JSONResponse(
+                status_code=429,
+                content={"status": "error", "detail": ve.errors()}
+            )
+
         except Exception as exc:
-            logger.error(str(exc))
-            print(str(exc))
-            return JSONResponse(status_code=500, content={"detail": str(exc)})
-
-    @app.exception_handler(Exception)
-    async def custom_exception_handler(request: Request, exc: Exception):
-        logger.error(f"Unhandled exception: {str(exc)}")
-        return JSONResponse(status_code=500, content={"detail": str(exc)})
-
-    @app.exception_handler(RequestValidationError)
-    async def validation_exception_handler(request: Request, exc: RequestValidationError):
-        logger.error(f"Validation error: {exc.errors()}")
-        return JSONResponse(status_code=422, content={"detail": exc.errors()})
+            # General exception handling
+            logger.error(f"Unhandled exception: {str(exc)}")
+            return JSONResponse(
+                status_code=500,
+                content={"status": "error", "detail": str(exc)}
+            )
     
     async def startup_event():
         """Handle application startup."""

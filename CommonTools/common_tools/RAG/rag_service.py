@@ -99,7 +99,7 @@ class RagService:
     
     def _load_langchain_documents(self, filepath:str = None) -> List[Document]:
         if not file.file_exists(filepath):
-            txt.print(">>> No file found with langchain documents. Please provide a valid file path.")
+            txt.print(">>> No file found for loading langchain documents. Please generate them first or provide a valid file path.")
             return None
                         
         json_as_str = file.read_file(filepath)
@@ -143,7 +143,7 @@ class RagService:
                         time.sleep(1)
                     
                 pinecone_index = pinecone_instance.Index(name=vectorstore_name)
-                print(pinecone_index.describe_index_stats()) #TMP
+                print("Pinecone VectorStore infos: " + pinecone_index.describe_index_stats())
                 vectorstore = PineconeVectorStore(index=pinecone_index, embedding=self.embedding)
             return vectorstore
         
@@ -161,3 +161,14 @@ class RagService:
             bm25_retriever = BM25Retriever.from_documents(documents)
         bm25_retriever.k = k
         return bm25_retriever.with_config({"run_name": f"{action_name}"})
+    
+    def reset_vectorstore(self):
+        if self.vectorstore:
+            if self.vector_db_type != VectorDbType.Pinecone:
+                self.vectorstore.reset_collection()
+            elif self.vector_db_type == VectorDbType.Pinecone:
+                try:
+                    if self.vectorstore and self.vectorstore._index:
+                        self.vectorstore._index.delete(delete_all=True)
+                except Exception as e:
+                    txt.print(f"Deleting pinecone index '{self.vectorstore._index.__name__}' vectors fails with: {e}")

@@ -45,9 +45,6 @@ async def create_new_conversation(conversation: ConversationRequestModel):
             content={"id": str(new_conv.id)},
             status_code=200
         )
-    except QuotaOverloadException as e:
-        print(f"Failed to create conversation: {e}")
-        raise HTTPException(status_code=429, detail=str(e))
     except Exception as e:
         print(f"Failed to create conversation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
