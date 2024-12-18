@@ -88,7 +88,7 @@ class MetadataDescriptionHelper:
     def get_all_json(path, file_name):
         file_name = file_name + '.json'
         file_path = os.path.join(path, file_name)
-        if not file.file_exists(file_path): raise ValueError(f"File '{file_path}' does not exist")
+        if not file.exists(file_path): raise ValueError(f"File '{file_path}' does not exist")
         content = file.get_as_json(file_path)
         return content
     

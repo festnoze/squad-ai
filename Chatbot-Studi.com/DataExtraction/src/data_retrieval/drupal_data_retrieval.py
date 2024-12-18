@@ -25,7 +25,7 @@ class DrupalDataRetrieval:
 
     def retrieve_jobs(self):
         """ Retrieve all jobs from studi.com """
-        if file.file_exists(f"{self.out_dir}{"full/jobs"}.json"):
+        if file.exists(f"{self.out_dir}{"full/jobs"}.json"):
             full_data = file.get_as_json(f"{self.out_dir}{"full/jobs"}.json")
         else:
             full_data = self.studiClient.get_drupal_data_recursively('node/jobs')
@@ -38,7 +38,7 @@ class DrupalDataRetrieval:
 
     def retrieve_fundings(self):
         """ Retrieve all fundings from studi.com """
-        if file.file_exists(f"{self.out_dir}{"full/fundings"}.json"):
+        if file.exists(f"{self.out_dir}{"full/fundings"}.json"):
             full_data = file.get_as_json(f"{self.out_dir}{"full/fundings"}.json")
         else:
             full_data = self.studiClient.get_drupal_data_recursively('node/funding')
@@ -51,7 +51,7 @@ class DrupalDataRetrieval:
 
     def retrieve_trainings(self):
         """ Retrieve all trainings from studi.com """
-        if file.file_exists(f"{self.out_dir}{"full/trainings"}.json"):
+        if file.exists(f"{self.out_dir}{"full/trainings"}.json"):
             full_data = file.get_as_json(f"{self.out_dir}{"full/trainings"}.json")
         else:
             full_data = self.studiClient.get_drupal_data_recursively('node/training')
@@ -66,7 +66,7 @@ class DrupalDataRetrieval:
 
     def retrieve_diplomas(self):
         """ Retrieve all diplomas from studi.com """
-        if file.file_exists(f"{self.out_dir}{"full/diplomas"}.json"):
+        if file.exists(f"{self.out_dir}{"full/diplomas"}.json"):
             full_data = file.get_as_json(f"{self.out_dir}{"full/diplomas"}.json")
         else:
             full_data = self.studiClient.get_drupal_data_recursively('node/diploma')
@@ -79,7 +79,7 @@ class DrupalDataRetrieval:
 
     def retrieve_certifications(self):
         """ Retrieve all certifications from studi.com """
-        if file.file_exists(f"{self.out_dir}{"full/certifications"}.json"):
+        if file.exists(f"{self.out_dir}{"full/certifications"}.json"):
             full_data = file.get_as_json(f"{self.out_dir}{"full/certifications"}.json")
         else:
             full_data = self.studiClient.get_drupal_data_recursively('taxonomy_term/certification')
@@ -91,7 +91,7 @@ class DrupalDataRetrieval:
 
     def retrieve_domains_and_subdomains(self):
         """ Retrieve all domains from studi.com """
-        if file.file_exists(f"{self.out_dir}{"full/domains"}.json"):
+        if file.exists(f"{self.out_dir}{"full/domains"}.json"):
             full_data = file.get_as_json(f"{self.out_dir}{"full/domains"}.json")
         else:
             full_data = self.studiClient.get_drupal_data_recursively('taxonomy_term/domain')
@@ -114,7 +114,7 @@ class DrupalDataRetrieval:
 
     def retrieve_certifiers(self):
         """ Retrieve all certifications from studi.com """
-        if file.file_exists(f"{self.out_dir}{"full/certifiers"}.json"):
+        if file.exists(f"{self.out_dir}{"full/certifiers"}.json"):
             full_data = file.get_as_json(f"{self.out_dir}{"full/certifiers"}.json")
         else:
             full_data = self.studiClient.get_drupal_data_recursively('taxonomy_term/certifier')

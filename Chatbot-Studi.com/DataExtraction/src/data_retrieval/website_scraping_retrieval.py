@@ -35,7 +35,7 @@ class WebsiteScrapingRetrieval:
 
     def scrape_or_load_all_trainings_links(self, max_pagination, all_trainings_links_filename):
         all_trainings_urls = []
-        if file.file_exists(all_trainings_links_filename):
+        if file.exists(all_trainings_links_filename):
             links_str = file.read_file(all_trainings_links_filename)
             all_trainings_urls = json.loads(links_str)
             txt.stop_spinner_replace_text(f"Loaded {len(all_trainings_urls)} trainings links.")
@@ -124,7 +124,7 @@ class WebsiteScrapingRetrieval:
         if only_missing_webpages_to_scrape:
             links_to_process = [
                 link for link in pages_urls
-                if not file.file_exists(f"{out_dir}{link.split('/')[-1]}.json")
+                if not file.exists(f"{out_dir}{link.split('/')[-1]}.json")
             ]
         else:
             links_to_process = pages_urls

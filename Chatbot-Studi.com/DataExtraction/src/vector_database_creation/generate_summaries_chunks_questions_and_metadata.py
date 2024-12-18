@@ -199,7 +199,7 @@ class GenerateDocumentsSummariesChunksQuestionsAndMetadata:
         trainings_docs = self._load_and_process_trainings(out_dir, all_docs, add_full_details, add_full_doc)
         docs_with_summary_chunks_and_questions_file_path = os.path.join(out_dir, 'trainings_summaries_chunks_and_questions_objects.json')
 
-        if file.file_exists(docs_with_summary_chunks_and_questions_file_path):
+        if file.exists(docs_with_summary_chunks_and_questions_file_path):
             docs_with_summary_chunks_and_questions_json = file.get_as_json(docs_with_summary_chunks_and_questions_file_path)
             trainings_objects = [DocWithSummaryChunksAndQuestions(**doc) for doc in docs_with_summary_chunks_and_questions_json]
             txt.print(f">>> Loaded existing {len(trainings_objects)} docs with summary, chunks and questions from file at: {docs_with_summary_chunks_and_questions_file_path}")

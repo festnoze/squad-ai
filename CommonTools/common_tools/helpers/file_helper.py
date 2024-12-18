@@ -114,7 +114,7 @@ class file:
             data = file_handler.read()
         return data
     
-    def file_exists(filepath:str):
+    def exists(filepath:str):
         return os.path.exists(filepath)
     
     @staticmethod
@@ -125,7 +125,7 @@ class file:
     
     @staticmethod
     def delete_file(path_and_name:str):
-        if file.file_exists(path_and_name):
+        if file.exists(path_and_name):
             os.remove(path_and_name)
         
     @staticmethod
@@ -183,7 +183,7 @@ class file:
     def get_as_json(full_file_path:str):
         if not full_file_path.endswith('.json'):
             full_file_path += '.json'
-        if not file.file_exists(full_file_path):
+        if not file.exists(full_file_path):
             raise FileNotFoundError(f"File '{full_file_path}' does not exist.")
         data = file.get_as_str(full_file_path)
         if not data:

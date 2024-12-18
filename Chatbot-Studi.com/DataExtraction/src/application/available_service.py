@@ -34,7 +34,8 @@ from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.rag.rag_service import RagService
 from common_tools.models.question_rewritting import QuestionRewritting, QuestionRewrittingPydantic
 from common_tools.rag.rag_inference_pipeline.rag_pre_treatment_tasks import RAGPreTreatment
-from common_tools.rag.rag_injection_pipeline.rag_injection_pipeline import RagInjectionPipeline
+from common_tools.rag.rag_ingestion_pipeline.rag_ingestion_pipeline import RagIngestionPipeline
+from common_tools.rag.rag_ingestion_pipeline.rag_chunking import RagChunking
 from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
 from common_tools.rag.rag_inference_pipeline.rag_answer_generation_tasks import RAGAugmentedGeneration
 from common_tools.helpers.ressource_helper import Ressource
@@ -53,6 +54,7 @@ class AvailableService:
     llms_infos: list[LlmInfo] = None
     max_conversations_by_day = 10
     max_messages_by_conversation = 1
+    waiting_message = "Merci de patienter un instant ... Je cherche les informations correspondant à votre question."
 
     def init(activate_print = True):
         load_dotenv()
@@ -92,31 +94,35 @@ class AvailableService:
 
     def create_vector_after_chunking_and_embedding_documents(out_dir, BM25_storage_in_database_sparse_vectors:bool = True):
         all_docs = GenerateDocumentsAndMetadata().load_all_docs_as_json(out_dir, write_all_lists=True)
-        injection_pipeline = RagInjectionPipeline(AvailableService.rag_service)
-        documents_chunks = injection_pipeline.chunk_documents(
+        injection_pipeline = RagIngestionPipeline(AvailableService.rag_service)
+        txt.print_with_spinner("Chunking documents...")
+        documents_chunks = RagChunking.chunk_documents(
                                                     documents= all_docs,
                                                     chunk_size= 2500,
                                                     children_chunk_size= 0
                                                 )
-        injection_pipeline.build_vectorstore_from_chunked_docs(
-                            chunks= documents_chunks,
+        txt.stop_spinner_replace_text("Documents chunked")
+        txt.print_with_spinner("Inserting documents into vector database...")
+        AvailableService.rag_service.vectorstore = injection_pipeline.build_vectorstore_from_chunked_docs(
+                            docs_chunks= documents_chunks,
                             vector_db_type=AvailableService.vector_db_type,
                             collection_name= 'studi-public-full',
                             BM25_storage_in_database_sparse_vectors=BM25_storage_in_database_sparse_vectors,
                             delete_existing= True
                         )
+        txt.stop_spinner_replace_text("Vector database created")
         AvailableService.re_init() # reload rag_service with the new vectorstore and langchain documents
 
     def create_vector_db_after_generating_chunking_and_embedding_summaries_and_questions_documents(out_dir, BM25_storage_in_database_sparse_vectors:bool = True):
         all_summaries_and_questions_docs = AvailableService._load_or_generate_summaries_and_questions_docs(out_dir)
-        injection_pipeline = RagInjectionPipeline(AvailableService.rag_service)
+        injection_pipeline = RagIngestionPipeline(AvailableService.rag_service)
         documents_chunks = injection_pipeline.chunk_documents(
                                                     documents= all_summaries_and_questions_docs,
                                                     chunk_size= 2500,
                                                     children_chunk_size= 0
                                                 )
-        injection_pipeline.build_vectorstore_from_chunked_docs(
-                            chunks= documents_chunks,
+        AvailableService.rag_service.vectorstore = injection_pipeline.build_vectorstore_from_chunked_docs(
+                            docs_chunks= documents_chunks,
                             vector_db_type=AvailableService.vector_db_type,
                             collection_name= 'studi-public-full',
                             BM25_storage_in_database_sparse_vectors=BM25_storage_in_database_sparse_vectors,
@@ -198,8 +204,7 @@ class AvailableService:
     @staticmethod
     async def rag_query_retrieval_and_augmented_generation_streaming_async(conversation_history:Conversation, display_waiting_message = True, is_stream_decoded = False, all_chunks_output: list[str] = []):
         if display_waiting_message:
-            waiting_message = "Merci de patienter un instant ... Je cherche les informations correspondant à votre question."
-            async for chunk in Llm.write_static_text_as_stream(waiting_message):
+            async for chunk in Llm.write_static_text_as_stream(AvailableService.waiting_message):
                 yield chunk
         try:
             analysed_query, retrieved_chunks = await AvailableService.rag_query_retrieval_but_augmented_generation_async(conversation_history)             
@@ -209,7 +214,7 @@ class AvailableService:
             pipeline_ended_response = ex.message
 
         if display_waiting_message:
-            async for chunk in Llm.remove_all_previous_stream_async(True, len(waiting_message.split(" "))):
+            async for chunk in Llm.remove_all_previous_stream_async(True, len(AvailableService.waiting_message.split(" "))):
                 yield chunk
 
         if pipeline_succeeded:
@@ -239,7 +244,7 @@ class AvailableService:
     async def rag_query_dynamic_pipeline_streaming_async(conversation_history: Conversation, all_chunks_output = [], decoded_stream = False):
         if conversation_history.last_message.role != 'user':
             raise ValueError("Conversation history should end with a user message")
-        txt.print_with_spinner("Exécution du pipeline d'inférence ...")
+        txt.print_with_spinner("Executing inference pipeline...")
         
         async for stream_chunk in AvailableService.inference.run_pipeline_dynamic_async(
             conversation_history,
@@ -253,12 +258,12 @@ class AvailableService:
             else:
                 yield stream_chunk
 
-        txt.stop_spinner_replace_text("Pipeline d'inférence exécuté :")
+        txt.stop_spinner_replace_text("Executed inference pipeline:")
 
     def rag_query_full_pipeline_streaming_no_async(conversation_history: Conversation, all_chunks_output = [], use_dynamic_pipeline = True, special_streaming_chars = True):
         if conversation_history.last_message.role != 'user':
             raise ValueError("Conversation history should end with a user message")
-        txt.print_with_spinner("Exécution du pipeline d'inférence ...")
+        txt.print_with_spinner("Executing inference pipeline...")
         
         pipeline_method = None
         if use_dynamic_pipeline:
@@ -279,10 +284,10 @@ class AvailableService:
             else:
                 yield stream_chunk
 
-        txt.stop_spinner_replace_text("Pipeline d'inférence exécuté :")
+        txt.stop_spinner_replace_text("Executed inference pipeline:")
 
     def rag_query_full_pipeline_no_streaming_no_async(conversation_history:Conversation, use_dynamic_pipeline = True):        
-        txt.print_with_spinner("Execution du pipeline d'inférence ...")
+        txt.print_with_spinner("Executing inference pipeline...")
         if use_dynamic_pipeline:
             pipeline_method = AvailableService.inference.run_pipeline_dynamic_async
         else:
@@ -297,7 +302,7 @@ class AvailableService:
             None, #override_workflow_available_classes
         )
         response = Llm.get_text_from_chunks(sync_generator)
-        txt.stop_spinner_replace_text("Pipeline d'inférence exectué :")
+        txt.stop_spinner_replace_text("Executed inference pipeline:")
         return response
     
     async def get_summarized_answer_async(text):
@@ -315,7 +320,7 @@ class AvailableService:
     @staticmethod
     def format_retrieved_docs_function(retrieved_docs):
         if not any(retrieved_docs):
-            return 'not a single information were found. Don\'t answer the question.'
+            return 'Not a single relevant information were found. Can\'t answer the question.'
         
         total_size = sum([len(re.split(r'[ .,;:!?]', doc.page_content)) for doc in retrieved_docs])
         if total_size > 15000:

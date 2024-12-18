@@ -98,7 +98,7 @@ class RagService:
         return results
     
     def _load_langchain_documents(self, filepath:str = None) -> List[Document]:
-        if not file.file_exists(filepath):
+        if not file.exists(filepath):
             txt.print(">>> No file found for loading langchain documents. Please generate them first or provide a valid file path.")
             return None
                         
@@ -116,13 +116,13 @@ class RagService:
             
             if vectorstore_type == VectorDbType.ChromaDB:
                 chroma_vector_db_path = os.path.join(vector_db_path, vectorstore_name)
-                if not file.file_exists(chroma_vector_db_path):
+                if not file.exists(chroma_vector_db_path):
                     txt.print(f'>> Vectorstore not loaded, as path: "... {vector_db_path[-110:]}" is not found')
                 else:
                     vectorstore = Chroma(persist_directory= chroma_vector_db_path, embedding_function= embedding)
             
             elif vectorstore_type == VectorDbType.Qdrant:
-                if not file.file_exists(vector_db_path):
+                if not file.exists(vector_db_path):
                     txt.print(f'>> Vectorstore not loaded, as path: "... {vector_db_path[-110:]}" is not found')
                 else:
                     qdrant_client = QdrantClient(path=vector_db_path)
@@ -143,12 +143,12 @@ class RagService:
                         time.sleep(1)
                     
                 pinecone_index = pinecone_instance.Index(name=vectorstore_name)
-                print("Pinecone VectorStore infos: " + pinecone_index.describe_index_stats())
+                print("Pinecone VectorStore infos: " + str(pinecone_index.describe_index_stats()))
                 vectorstore = PineconeVectorStore(index=pinecone_index, embedding=self.embedding)
             return vectorstore
         
         except Exception as e:
-            txt.print(f"Loading vectorstore fails: {e}")
+            txt.print(f"/!\\ Loading vectorstore fails /!\\: {e}")
             return None
             
     def _build_bm25_retriever(self, documents: list[Document], k: int = 20, metadata: dict = None, action_name = 'RAG BM25 retrieval') -> BM25Retriever:
@@ -171,4 +171,4 @@ class RagService:
                     if self.vectorstore and self.vectorstore._index:
                         self.vectorstore._index.delete(delete_all=True)
                 except Exception as e:
-                    txt.print(f"Deleting pinecone index '{self.vectorstore._index.__name__}' vectors fails with: {e}")
+                    txt.print(f"Deleting pinecone index '{self.vectorstore._index._config.host}' vectors fails with: {e}")

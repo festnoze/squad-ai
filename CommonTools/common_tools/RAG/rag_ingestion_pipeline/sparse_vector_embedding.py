@@ -1,6 +1,7 @@
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from scipy.sparse import csr_matrix
+from langchain_core.documents import Document
 
 # common tools imports
 from common_tools.helpers.txt_helper import txt
@@ -23,13 +24,13 @@ class SparseVectorEmbedding:
         bm25_vectors = csr_matrix(sparse_vectors)  # Sparse matrix
         return bm25_vectors
 
-    def embed_documents_as_sparse_vectors_for_BM25_initial(self, documents):
+    def embed_documents_as_sparse_vectors_for_BM25_initial(self, documents_contents:list[str]):
         """
         Embeds a set of documents as BM25-compatible sparse vectors. 
         Learns vocabulary, IDF, and document statistics during this process.
         """
         # Learn vocabulary and IDF, calculate sparse TF matrix
-        tf = self.vectorizer.fit_transform(documents)  # Sparse term-frequency matrix
+        tf = self.vectorizer.fit_transform(documents_contents)  # Sparse term-frequency matrix
 
         # Compute average document length
         doc_lengths = np.array(tf.sum(axis=1)).flatten()  # Row-wise sum (document lengths)
@@ -53,7 +54,7 @@ class SparseVectorEmbedding:
         bm25 = csr_matrix((bm25_data, (rows, cols)), shape=tf.shape)
         return bm25
 
-    def embed_documents_as_sparse_vectors_for_BM25_upon_previous_vocabulary(self, new_documents):
+    def embed_documents_as_sparse_vectors_for_BM25_upon_previous_vocabulary(self, new_documents_contents:list[str]):
         """
         Embeds a new set of documents as BM25-compatible sparse vectors 
         using the vocabulary and statistics learned from the initial set of documents.
@@ -62,7 +63,7 @@ class SparseVectorEmbedding:
             raise ValueError("The vectorizer needs to embed the initial documents first (call embed_documents_as_sparse_vectors_for_BM25_initial).")
         
         # Transform using the existing vocabulary
-        tf = self.vectorizer.transform(new_documents)  # Sparse term-frequency matrix
+        tf = self.vectorizer.transform(new_documents_contents)  # Sparse term-frequency matrix
         doc_lengths = np.array(tf.sum(axis=1)).flatten()  # Row-wise sum (document lengths)
 
         # Apply BM25 weighting
