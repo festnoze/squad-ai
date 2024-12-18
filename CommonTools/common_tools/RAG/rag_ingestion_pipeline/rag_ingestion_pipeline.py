@@ -25,6 +25,7 @@ from common_tools.rag.rag_service import RagService
 from common_tools.models.vector_db_type import VectorDbType
 from common_tools.helpers.batch_helper import BatchHelper
 from common_tools.rag.rag_ingestion_pipeline.rag_chunking import RagChunking
+import uuid
 
 class RagIngestionPipeline:
     def __init__(self, rag: RagService):
@@ -142,7 +143,7 @@ class RagIngestionPipeline:
         """
         embeddings_filepath = os.path.join(self.rag_service.vector_db_path, "all_sparse_and_dense_embeddings_for_pinecone.json")
         if file.exists(embeddings_filepath):
-            all_entries = file.get_as_json(embeddings_filepath)
+             all_entries = file.get_as_json(embeddings_filepath)
         else:
             all_entries = self._create_joined_embeddings(documents, embedding_model)
 
@@ -168,9 +169,11 @@ class RagIngestionPipeline:
         all_entries = []
         for doc, bm25_vector, dense_vector in zip(documents, bm25_vectors, dense_vectors):            
             bm25_sparse_dict = sparse_vector_embedder.csr_to_pinecone_dict(bm25_vector) # Convert CSR matrix to Pinecone dictionary
-                # Combine sparse and dense vectors as two fields of a single item
+            doc.metadata["intern_id"] = doc.metadata.get("id", "")  # Add the original id into metadata if exists
+
+            # Combine sparse and dense vectors as two fields of a single item
             entry = {
-                    "id": doc.metadata.get("id", f"doc-{hash(doc.page_content)}"),  # Ensure unique IDs
+                    "id": str(uuid.uuid4()),  # Ensure unique IDs
                     "values": dense_vector,  # Pinecone handles dense vectors in the 'values' field
                     "sparse_values": bm25_sparse_dict,  # BM25 sparse vector for hybrid search
                     "metadata": doc.metadata  # Add metadata for filtering
