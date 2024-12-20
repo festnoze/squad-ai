@@ -113,12 +113,18 @@ class AvailableService:
         txt.stop_spinner_replace_text("Vector database created")
         AvailableService.re_init() # reload rag_service with the new vectorstore and langchain documents
 
-    def create_vector_db_after_generating_chunking_and_embedding_summaries_and_questions_documents(out_dir, BM25_storage_in_database_sparse_vectors:bool = True):
-        all_summaries_and_questions_docs = AvailableService._load_or_generate_summaries_and_questions_docs(out_dir)
+    def create_vector_db_after_generate_chunk_and_embed_documents_summaries_and_questions(out_dir, BM25_storage_in_database_sparse_vectors:bool = True):
+        llm_and_fallback = [AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2, AvailableService.rag_service.llm_3]
+        generate_summaries_and_questions_services = GenerateDocumentsSummariesChunksQuestionsAndMetadata()
+        all_summaries_and_questions_docs = generate_summaries_and_questions_services.load_or_generate_all_docs_from_summaries_and_questions(
+                                                path= out_dir,
+                                                llm_and_fallback= llm_and_fallback,
+                                                separate_chunks_and_questions=False)
+        
         injection_pipeline = RagIngestionPipeline(AvailableService.rag_service)
         documents_chunks = injection_pipeline.chunk_documents(
                                                     documents= all_summaries_and_questions_docs,
-                                                    chunk_size= 2500,
+                                                    chunk_size= 9000,
                                                     children_chunk_size= 0
                                                 )
         AvailableService.rag_service.vectorstore = injection_pipeline.build_vectorstore_from_chunked_docs(
@@ -129,12 +135,6 @@ class AvailableService:
                             delete_existing= True
                         )
         AvailableService.re_init() # reload rag_service with the new vectorstore and langchain documents
-
-    def _load_or_generate_summaries_and_questions_docs(out_dir):
-        llm_and_fallback = [AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2, AvailableService.rag_service.llm_3]
-        summary_builder = GenerateDocumentsSummariesChunksQuestionsAndMetadata()
-        all_docs = summary_builder.load_or_generate_all_docs_from_summaries(out_dir, llm_and_fallback)
-        return all_docs
 
     @staticmethod
     async def create_or_retrieve_user_async(user_id: Optional[UUID], user_name: str, user_device_info: DeviceInfo) -> UUID:

@@ -169,7 +169,7 @@ class RagIngestionPipeline:
         all_entries = []
         for doc, bm25_vector, dense_vector in zip(documents, bm25_vectors, dense_vectors):            
             bm25_sparse_dict = sparse_vector_embedder.csr_to_pinecone_dict(bm25_vector) # Convert CSR matrix to Pinecone dictionary
-            doc.metadata["intern_id"] = doc.metadata.get("id", "")  # Add the original id into metadata if exists
+            doc.metadata["parent_id"] = doc.metadata.get("id", "")  # Add the original id into metadata if exists
 
             # Combine sparse and dense vectors as two fields of a single item
             entry = {

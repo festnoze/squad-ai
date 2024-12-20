@@ -18,12 +18,14 @@ async def scrape_website():
 
 @ingestion_router.post("/vectorstore/create/full")
 async def create_vectorstore():
-    AvailableService.create_vector_after_chunking_and_embedding_documents(AvailableService.out_dir)
+    AvailableService.create_vector_after_chunking_and_embedding_documents(
+        AvailableService.out_dir,
+        BM25_storage_in_database_sparse_vectors=True)
     return {"message": "Full vector store created successfully"}
 
 @ingestion_router.post("/vectorstore/create/from-summaries")
 async def create_vectorstore_summary():
-    AvailableService.create_vector_db_after_generating_chunking_and_embedding_summaries_and_questions_documents(
+    AvailableService.create_vector_db_after_generate_chunk_and_embed_documents_summaries_and_questions(
         AvailableService.out_dir,
         BM25_storage_in_database_sparse_vectors=True
     )
