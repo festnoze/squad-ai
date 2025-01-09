@@ -33,7 +33,7 @@ from common_tools.models.vector_db_type import VectorDbType
 from langchain_pinecone import PineconeVectorStore
 
 class RagService:
-    def __init__(self, llms_or_info: Optional[Union[LlmInfo, Runnable, list]], embedding_model:EmbeddingModel=None, vector_db_and_docs_path:str = './storage', vector_db_type:VectorDbType = VectorDbType('chroma'), vector_db_name:str = 'main', documents_json_filename = "bm25_documents.json"):
+    def __init__(self, llms_or_info: Optional[Union[LlmInfo, Runnable, list]], embedding_model:EmbeddingModel=None, vector_db_base_path:str = './storage', vector_db_type:VectorDbType = VectorDbType('chroma'), vector_db_name:str = 'main', documents_json_filename = "bm25_documents.json"):
         self.llm_1=None
         self.llm_2=None
         self.llm_3=None
@@ -41,8 +41,9 @@ class RagService:
         self.init_llms(llms_or_info) #todo: add fallbacks with specifying multiple llms or llms infos
         self.vector_db_name:str = vector_db_name
         self.vector_db_type:VectorDbType = vector_db_type
-        self.vector_db_path:str = os.path.join(os.path.join(os.path.abspath(vector_db_and_docs_path), self.embedding_model_name), vector_db_type.value)
-        self.all_documents_json_file_path = os.path.abspath(os.path.join(vector_db_and_docs_path, documents_json_filename))
+        self.vector_db_base_path:str = vector_db_base_path
+        self.vector_db_path:str = os.path.join(os.path.join(os.path.abspath(vector_db_base_path), self.embedding_model_name), vector_db_type.value)
+        self.all_documents_json_file_path = os.path.abspath(os.path.join(vector_db_base_path, documents_json_filename))
 
         self.langchain_documents:list[Document] = self._load_langchain_documents(self.all_documents_json_file_path)
         self.bm25_retriever = self._build_bm25_retriever(self.langchain_documents)
@@ -106,7 +107,8 @@ class RagService:
         json_data = json.loads(json_as_str)
         docs = [
             Document(page_content=doc["page_content"], metadata=doc["metadata"]) 
-            for doc in json_data ]
+            for doc in json_data 
+        ]
         return docs
     
 
@@ -131,9 +133,10 @@ class RagService:
             elif vectorstore_type == VectorDbType.Pinecone:
                 pinecone_instance = pinecone.Pinecone(api_key= EnvHelper.get_pinecone_api_key()) #, environment= EnvHelper.get_pinecone_environment()                
                 if vectorstore_name not in pinecone_instance.list_indexes().names():
+                    embedding_vector_size = len(self.embedding.embed_query("test"))                    
                     pinecone_instance.create_index(
                                         name= vectorstore_name, 
-                                        dimension=1536,
+                                        dimension=embedding_vector_size,
                                         metric="cosine", 
                                         spec=ServerlessSpec(
                                                 cloud='aws',
@@ -170,5 +173,6 @@ class RagService:
                 try:
                     if self.vectorstore and self.vectorstore._index:
                         self.vectorstore._index.delete(delete_all=True)
+                        pinecone.delete_index(self.vector_db_name)
                 except Exception as e:
                     txt.print(f"Deleting pinecone index '{self.vectorstore._index._config.host}' vectors fails with: {e}")

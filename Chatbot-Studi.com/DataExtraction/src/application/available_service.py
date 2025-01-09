@@ -207,7 +207,7 @@ class AvailableService:
             async for chunk in Llm.write_static_text_as_stream(AvailableService.waiting_message):
                 yield chunk
         try:
-            analysed_query, retrieved_chunks = await AvailableService.rag_query_retrieval_but_augmented_generation_async(conversation_history)             
+            analysed_query, retrieved_chunks = await AvailableService.inference.run_pipeline_dynamic_but_augmented_generation_async(conversation_history, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
             pipeline_succeeded = True
         except EndPipelineException as ex:                        
             pipeline_succeeded = False
@@ -226,9 +226,6 @@ class AvailableService:
             all_chunks_output.append(pipeline_ended_response)
             async for chunk in static_text_streaming:
                 yield chunk
-
-    async def rag_query_retrieval_but_augmented_generation_async(conversation_history: Conversation):
-        return await AvailableService.inference.run_pipeline_dynamic_but_augmented_generation_async(conversation_history, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
 
     async def rag_query_augmented_generation_streaming_async(analysed_query: QuestionRewritting, retrieved_chunks: list[Document], is_stream_decoded = False, all_chunks_output: list[str] = []):
          async for chunk in RAGAugmentedGeneration.rag_augmented_answer_generation_streaming_async( 

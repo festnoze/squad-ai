@@ -20,17 +20,18 @@ class EmbeddingModel(Enum):
     OpenAI_TextEmbedding3Large = ("text-embedding-3-large", EmbeddingType.OpenAI)   # New model added
 
     # Ollama models
-    Ollama_AllMiniLM = ("all-minilM", EmbeddingType.Ollama)
+    Ollama_AllMiniLM = ("all-minilm", EmbeddingType.Ollama)
     Ollama_Llama3 = ("llama3", EmbeddingType.Ollama)
     Ollama_GPTJ = ("gpt-j-6b", EmbeddingType.Ollama)   
     Ollama_Mistral = ("mistral", EmbeddingType.Ollama)  
-    Ollama_E5Small = ("e5-small", EmbeddingType.Ollama)  
+    Ollama_E5_Small = ("e5-small", EmbeddingType.Ollama) 
+    Ollama_E5_Large_Multilingual_F16 = ("jeffh/intfloat-multilingual-e5-large:f16", EmbeddingType.Ollama)
 
     # SentenceTransformer models
-    SentenceTransformer_AllMiniML6 = ("all-MiniLM-L6-v2", EmbeddingType.SentenceTransformer)
+    SentenceTransformer_AllMiniML_L6 = ("all-MiniLM-L6-v2", EmbeddingType.SentenceTransformer)
     SentenceTransformer_MpNetBase = ("all-mpnet-base-v2", EmbeddingType.SentenceTransformer)
-    SentenceTransformer_AllMiniML12 = ("all-MiniLM-L12-v2", EmbeddingType.SentenceTransformer)
-    SentenceTransformer_AllMiniML12_paraphrase = ("paraphrase-multilingual-MiniLM-L12-v2", EmbeddingType.SentenceTransformer)
+    SentenceTransformer_AllMiniML_L12 = ("all-MiniLM-L12-v2", EmbeddingType.SentenceTransformer)
+    SentenceTransformer_MiniML_Paraphrase_Multilingual_L12 = ("paraphrase-multilingual-MiniLM-L12-v2", EmbeddingType.SentenceTransformer)
 
     @property
     def model_name(self):

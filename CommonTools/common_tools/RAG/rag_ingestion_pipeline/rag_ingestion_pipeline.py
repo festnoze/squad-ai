@@ -2,6 +2,7 @@ import os
 import re
 import json
 import sys
+import time
 from typing import Union
 # langchain related imports
 from langchain_core.runnables import Runnable
@@ -15,6 +16,7 @@ from pinecone import Pinecone
 from langchain_pinecone import PineconeVectorStore
 from qdrant_client.http.models import Distance, VectorParams
 from langchain_core.embeddings import Embeddings
+import numpy as np
 
 # common tools imports
 from common_tools.helpers.txt_helper import txt
@@ -74,6 +76,10 @@ class RagIngestionPipeline:
         
         txt.print_with_spinner(f"Start embedding of {len(docs_chunks)} chunks of documents...")
         
+        # Create Json file containing raw docs for BM25 retrieval
+        if not BM25_storage_in_database_sparse_vectors:
+            self._build_bm25_store_as_raw_json_file(docs_chunks)
+
         # Embed and store the chunks as dense vectors in database + create a Json file containing raw BM25 docs
         if not BM25_storage_in_database_sparse_vectors:
             if vector_db_type == VectorDbType.Qdrant:
@@ -84,8 +90,7 @@ class RagIngestionPipeline:
                 db = self._embed_and_store_documents_chunks_as_dense_vectors_into_pinecone_db(documents= docs_chunks, embedding = self.rag_service.embedding, vector_db_path= self.rag_service.vector_db_path, collection_name=collection_name)
             else:
                 raise ValueError("Invalid vector db type: " + vector_db_type.value)
-            #
-            self._build_bm25_store_as_raw_json_file(docs_chunks)
+           
         
         # Embed and store the chunks as dense & sparse vectors in vector database - allow to perform both semantic and BM25 retrieving from the same database
         if BM25_storage_in_database_sparse_vectors:
@@ -141,37 +146,50 @@ class RagIngestionPipeline:
             bm25_embedding_model: Model or method to compute BM25 sparse vectors.
             dense_embedding_model: Model or method to compute dense embeddings.
         """
-        embeddings_filepath = os.path.join(self.rag_service.vector_db_path, "all_sparse_and_dense_embeddings_for_pinecone.json")
-        if file.exists(embeddings_filepath):
-             all_entries = file.get_as_json(embeddings_filepath)
-        else:
-            all_entries = self._create_joined_embeddings(documents, embedding_model)
+        all_entries = self._embed_as_both_sparse_and_dense_vectors(documents, embedding_model, True, 2000)
 
-        # Step 4: Insert the joined embeddings into Pinecone vector database
+        # Insert the joined embeddings into Pinecone vector database
         insertion_batches = BatchHelper.batch_split_by_size_in_kilo_bytes(all_entries, batch_mega_bytes * 1024)
         for i, batch_entries in enumerate(insertion_batches):
             txt.replace_text_continue_spinner(f"Batch {i+1}/{len(insertion_batches)}: {len(batch_entries)} documents uploaded to Pinecone...")
             pinecone_index.upsert(batch_entries)
+
         txt.replace_text_continue_spinner(f"All documents sucessfully uploaded to Pinecone...")
         return Pinecone(index=pinecone_index, embedding=embedding_model)
 
-    def _create_joined_embeddings(self, documents, embedding_model):
+    def _embed_as_both_sparse_and_dense_vectors(self, documents:list[Document], embedding_model:Embeddings, load_embeddings_if_already_exists:bool = True, batch_embedding_size:int = 2000, wait_seconds_btw_batches:float = None) -> list[dict]:
+        joined_embeddings_filepath = os.path.join(self.rag_service.vector_db_base_path, "joined_sparse_and_dense_embeddings_adapted_to_pinecone.json")
+        if load_embeddings_if_already_exists and file.exists(joined_embeddings_filepath):
+            return file.get_as_json(joined_embeddings_filepath)
+        
         sparse_vector_embedder = SparseVectorEmbedding()
         all_docs_contents = [doc.page_content for doc in documents]
             
-            # Step 1: Compute Sparse Vectors (BM25)
+        # Step 1: Compute Sparse Vectors (BM25)
         bm25_vectors = sparse_vector_embedder.embed_documents_as_sparse_vectors_for_BM25_initial(all_docs_contents)
 
-            # Step 2: Compute Dense Vectors
-        dense_vectors = embedding_model.embed_documents(all_docs_contents)
+        # Step 2: Compute Dense Vectors
+        dense_vectors_filepath = os.path.join(self.rag_service.vector_db_base_path, "dense_vectors.npy")
+        dense_vectors = []
+        if not file.exists(dense_vectors_filepath):
+            for documents_batch in BatchHelper.batch_split_by_count(all_docs_contents, batch_embedding_size):
+                dense_vectors_for_batch = embedding_model.embed_documents(documents_batch)
+                dense_vectors.extend(dense_vectors_for_batch)
+                if wait_seconds_btw_batches: 
+                    time.sleep(wait_seconds_btw_batches)
+            dense_vectors_array = np.array(dense_vectors)
+            np.save(dense_vectors_filepath, dense_vectors_array)
+        else:            
+            dense_vectors_array = np.load(dense_vectors_filepath)
+            dense_vectors = dense_vectors_array.tolist()        
 
-            # Step 3: Prepare Pinecone Entries (also adding metadata from the original documents)
+        # Step 3: Prepare joined sparse and dense embedding dict (compatible with Pinecone Entries) - also inc. metadata from the original documents
         all_entries = []
         for doc, bm25_vector, dense_vector in zip(documents, bm25_vectors, dense_vectors):            
             bm25_sparse_dict = sparse_vector_embedder.csr_to_pinecone_dict(bm25_vector) # Convert CSR matrix to Pinecone dictionary
             doc.metadata["parent_id"] = doc.metadata.get("id", "")  # Add the original id into metadata if exists
 
-            # Combine sparse and dense vectors as two fields of a single item
+            # Combine sparse and dense vectors as two fields of a single entry (correspond to Pinecone's structure)
             entry = {
                     "id": str(uuid.uuid4()),  # Ensure unique IDs
                     "values": dense_vector,  # Pinecone handles dense vectors in the 'values' field
@@ -180,10 +198,9 @@ class RagIngestionPipeline:
                 }
             all_entries.append(entry)
             
-            # Save it as file 
+        # Save joined embeddings as file 
         all_entries_json = json.dumps(all_entries, ensure_ascii=False, indent=4)
-        embeddings_filepath = os.path.join(self.rag_service.vector_db_path, "all_sparse_and_dense_embeddings_for_pinecone.json")
-        file.write_file(all_entries_json, embeddings_filepath, FileAlreadyExistsPolicy.Override)
+        file.write_file(all_entries_json, joined_embeddings_filepath, FileAlreadyExistsPolicy.Override)
         return all_entries
 
     def _build_bm25_store_as_raw_json_file(self, documents:list):
