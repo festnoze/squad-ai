@@ -1,6 +1,7 @@
 from fastapi.exceptions import RequestValidationError
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, StreamingResponse, Response
+from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import Response as StarletteResponse
 from contextlib import asynccontextmanager
 import logging
@@ -34,13 +35,23 @@ def create_app() -> FastAPI:
     app.include_router(ingestion_router)
     app.include_router(inference_router)
 
+    # All CORS settings are enabled for development purposes
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
     # Configure logging with reduced verbosity
-    logging.basicConfig(level=logging.ERROR, format="%(message)s")
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     logger = logging.getLogger(__name__)
     
     def handle_error(request: Request, error_msg: str):
-        txt.stop_spinner_replace_text(f"Call to endpoint: '{request.url.components.path}' fails with error: {error_msg}")
-        logger.error(f"Error: {error_msg}")
+        if txt.waiting_spinner_thread:
+            txt.stop_spinner_replace_text(f"Call to endpoint: '{request.url.components.path}' fails with error: {error_msg}")
+        logger.error(f"Logged Error: {error_msg}")
 
     # Middleware for centralized exception handling and response wrapping
     @app.middleware("http")

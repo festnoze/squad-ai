@@ -1,21 +1,37 @@
+import os
 import numpy as np
+import pickle
 from sklearn.feature_extraction.text import TfidfVectorizer
 from scipy.sparse import csr_matrix
 from langchain_core.documents import Document
-
-# common tools imports
+#
+from common_tools.helpers.file_helper import file
 from common_tools.helpers.txt_helper import txt
 
 class SparseVectorEmbedding:
+
+    vectorizer: TfidfVectorizer = None
+    file_base_path:str = None
+    sparse_vectorizer_filename:str = "sparse_vectorizer.pkl"
+
+    @staticmethod
+    def set_path(path:str):
+        if not SparseVectorEmbedding.file_base_path:
+            SparseVectorEmbedding.file_base_path = path
+
     def __init__(self, k1=1.5, b=0.75):
         self.k1 = k1
         self.b = b
-        self.vectorizer = TfidfVectorizer(norm=None, smooth_idf=False, use_idf=True)
+        SparseVectorEmbedding.load_or_create_vectorizer()
         self.avg_doc_length = None  # Stores the average document length after initial embedding
 
-    def embed_documents_as_sparse_vectors_for_TF_IDF(self, docs: list[str]) -> csr_matrix:
+    def encode_queries(self, query:str):
+        csr_matrix = self.embed_documents_as_csr_matrix_sparse_vectors_for_TF_IDF([query])
+        return self.csr_to_pinecone_sparse_format(csr_matrix)
+    
+    def embed_documents_as_csr_matrix_sparse_vectors_for_TF_IDF(self, docs: list[str]) -> csr_matrix:
         # Vectorizing documents into sparse vectors with TfidfVectorizer
-        sparse_vectors = self.vectorizer.fit_transform(docs)  # Sparse matrix
+        sparse_vectors = SparseVectorEmbedding.vectorizer.fit_transform(docs)  # Sparse matrix
         txt.print(f"Shape of the sparse vectors: {sparse_vectors.shape}")
         vocabulary_size = len(self.vectorizer.get_feature_names_out())  # Total unique tokens
         txt.print(f"Size of the sparse vectors: {vocabulary_size}")
@@ -23,21 +39,21 @@ class SparseVectorEmbedding:
         # Conversion of TF-IDF vectors to BM25-compatible format (normalizes and adjusts weights)
         bm25_vectors = csr_matrix(sparse_vectors)  # Sparse matrix
         return bm25_vectors
-
+    
     def embed_documents_as_sparse_vectors_for_BM25_initial(self, documents_contents:list[str]):
         """
         Embeds a set of documents as BM25-compatible sparse vectors. 
         Learns vocabulary, IDF, and document statistics during this process.
         """
         # Learn vocabulary and IDF, calculate sparse TF matrix
-        tf = self.vectorizer.fit_transform(documents_contents)  # Sparse term-frequency matrix
+        tf = SparseVectorEmbedding.vectorizer.fit_transform(documents_contents)  # Sparse term-frequency matrix
 
         # Compute average document length
         doc_lengths = np.array(tf.sum(axis=1)).flatten()  # Row-wise sum (document lengths)
         self.avg_doc_length = np.mean(doc_lengths)
 
         # Compute IDF values
-        idf = self.vectorizer.idf_
+        idf = SparseVectorEmbedding.vectorizer.idf_
 
         # Apply BM25 weighting
         rows, cols = tf.nonzero()
@@ -63,7 +79,7 @@ class SparseVectorEmbedding:
             raise ValueError("The vectorizer needs to embed the initial documents first (call embed_documents_as_sparse_vectors_for_BM25_initial).")
         
         # Transform using the existing vocabulary
-        tf = self.vectorizer.transform(new_documents_contents)  # Sparse term-frequency matrix
+        tf = SparseVectorEmbedding.vectorizer.transform(new_documents_contents)  # Sparse term-frequency matrix
         doc_lengths = np.array(tf.sum(axis=1)).flatten()  # Row-wise sum (document lengths)
 
         # Apply BM25 weighting
@@ -81,10 +97,30 @@ class SparseVectorEmbedding:
         bm25 = csr_matrix((bm25_data, (rows, cols)), shape=tf.shape)
         return bm25
     
-    def csr_to_pinecone_dict(self, csr_matrix):
+    def csr_to_pinecone_sparse_format(self, csr_matrix):
         """Convert a CSR sparse matrix into Pinecone-compatible sparse_values format."""
         coo = csr_matrix.tocoo()  # Convert to COO format
         return {
             "indices": coo.col.tolist(),  # Indices of non-zero values
             "values": coo.data.tolist()   # Values of non-zero entries
         }
+    
+    @staticmethod
+    def save_vectorizer():
+        if not SparseVectorEmbedding.file_base_path: 
+            raise ValueError("SparseVectorEmbedding.file_base_path is not set. Please set it before saving the vectorizer.")
+        filepath = os.path.join(SparseVectorEmbedding.file_base_path, SparseVectorEmbedding.sparse_vectorizer_filename)
+        with open(filepath, 'wb') as f:
+            pickle.dump(SparseVectorEmbedding.vectorizer, f)
+
+    @staticmethod
+    def load_or_create_vectorizer():
+        if not SparseVectorEmbedding.file_base_path: 
+            raise ValueError("SparseVectorEmbedding.file_base_path is not set. Please set it before loading the vectorizer.")   
+        filepath = os.path.join(SparseVectorEmbedding.file_base_path, SparseVectorEmbedding.sparse_vectorizer_filename)      
+        if not SparseVectorEmbedding.vectorizer:
+            if file.exists(filepath):
+                with open(filepath, 'rb') as f:
+                    SparseVectorEmbedding.vectorizer = pickle.load(f)
+            else:
+                SparseVectorEmbedding.vectorizer = TfidfVectorizer(norm=None, smooth_idf=False, use_idf=True)

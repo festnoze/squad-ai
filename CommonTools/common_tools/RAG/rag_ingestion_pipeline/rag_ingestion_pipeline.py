@@ -72,7 +72,7 @@ class RagIngestionPipeline:
         if not docs_chunks or len(docs_chunks) == 0: raise ValueError("No documents provided")
         if not hasattr(self.rag_service, 'embedding') or not self.rag_service.embedding: raise ValueError("Embedding model must be specified to build vector store")
         if delete_existing:
-            self.rag_service.reset_vectorstore()        
+            self._reset_vectorstore(self.rag_service)        
         
         txt.print_with_spinner(f"Start embedding of {len(docs_chunks)} chunks of documents...")
         
@@ -163,10 +163,12 @@ class RagIngestionPipeline:
             return file.get_as_json(joined_embeddings_filepath)
         
         sparse_vector_embedder = SparseVectorEmbedding()
+        SparseVectorEmbedding.set_path(self.rag_service.vector_db_base_path)
         all_docs_contents = [doc.page_content for doc in documents]
             
         # Step 1: Compute Sparse Vectors (BM25)
         bm25_vectors = sparse_vector_embedder.embed_documents_as_sparse_vectors_for_BM25_initial(all_docs_contents)
+        SparseVectorEmbedding.save_vectorizer()
 
         # Step 2: Compute Dense Vectors
         dense_vectors_filepath = os.path.join(self.rag_service.vector_db_base_path, "dense_vectors.npy")
@@ -179,7 +181,7 @@ class RagIngestionPipeline:
                     time.sleep(wait_seconds_btw_batches)
             dense_vectors_array = np.array(dense_vectors)
             np.save(dense_vectors_filepath, dense_vectors_array)
-        else:            
+        else:       
             dense_vectors_array = np.load(dense_vectors_filepath)
             dense_vectors = dense_vectors_array.tolist()        
 
@@ -215,7 +217,19 @@ class RagIngestionPipeline:
         
         json_data = json.dumps(documents_dict, ensure_ascii=False, indent=4)
         file.write_file(json_data, self.rag_service.all_documents_json_file_path, file_exists_policy= FileAlreadyExistsPolicy.Override)
-    
+
+    def _reset_vectorstore(self, rag: RagService = None):
+        if rag.vectorstore:
+            if rag.vector_db_type != VectorDbType.Pinecone:
+                rag.vectorstore.reset_collection()
+            elif rag.vector_db_type == VectorDbType.Pinecone:
+                try:
+                    if rag.vectorstore and rag.vectorstore._index:
+                        rag.vectorstore._index.delete(delete_all=True)
+                        Pinecone.delete_index(rag.vector_db_name)
+                except Exception as e:
+                    txt.print(f"Deleting pinecone index '{rag.vectorstore._index._config.host}' vectors fails with: {e}")
+
     def _get_doc_min_size(self, documents: list[Document]) -> int:
         return min(len(re.split(r'[ .,;:!?]', doc.page_content)) for doc in documents)
     

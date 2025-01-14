@@ -53,7 +53,7 @@ class AvailableService:
     embedding_model: EmbeddingModel = None
     llms_infos: list[LlmInfo] = None
     max_conversations_by_day = 10
-    max_messages_by_conversation = 1
+    max_messages_by_conversation = 10
     waiting_message = "Merci de patienter un instant ... Je cherche les informations correspondant à votre question."
 
     def init(activate_print = True):

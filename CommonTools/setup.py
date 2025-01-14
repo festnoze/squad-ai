@@ -36,6 +36,7 @@ setup(
         'pinecone-client==5.0.1',
         'pinecone-plugin-inference==1.1.0',
         'pinecone==5.0.1',
+        'pinecone-text=0.9.0',
         'langgraph>=0.2.38',
         'langsmith>=0.1.136',
         'ragas>=0.2.5',

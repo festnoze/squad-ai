@@ -29,7 +29,6 @@ class TestRagInferencePipelineIntegration:
             self.rag_service.init_inference_llm(llms_infos)
             self.rag_service.langchain_documents = docs
             self.rag_service.vectorstore = Chroma.from_documents(documents= docs, embedding = self.rag_service.embedding)
-            self.rag_service.bm25_retriever = self.rag_service._build_bm25_retriever(docs)
             #
             self.inference = RagInferencePipeline(self.rag_service)
 
