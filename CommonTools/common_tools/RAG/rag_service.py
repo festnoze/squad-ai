@@ -93,20 +93,16 @@ class RagService:
     def load_vectorstore(self, vector_db_path:str = None, embedding: Embeddings = None, vectorstore_type: VectorDbType = VectorDbType('chroma'), vectorstore_name:str = 'main') -> VectorStore:
         try:
             vectorstore:VectorStore = None
+            vector_db_path = os.path.join(vector_db_path, vectorstore_name)
+            if not file.exists(vector_db_path):
+                txt.print(f'>> Vectorstore not loaded, as path: "... {vector_db_path[-110:]}" is not found')
             
             if vectorstore_type == VectorDbType.ChromaDB:
-                chroma_vector_db_path = os.path.join(vector_db_path, vectorstore_name)
-                if not file.exists(chroma_vector_db_path):
-                    txt.print(f'>> Vectorstore not loaded, as path: "... {vector_db_path[-110:]}" is not found')
-                else:
-                    vectorstore = Chroma(persist_directory= chroma_vector_db_path, embedding_function= embedding)
+                vectorstore = Chroma(persist_directory= vector_db_path, embedding_function= embedding)
             
             elif vectorstore_type == VectorDbType.Qdrant:
-                if not file.exists(vector_db_path):
-                    txt.print(f'>> Vectorstore not loaded, as path: "... {vector_db_path[-110:]}" is not found')
-                else:
-                    qdrant_client = QdrantClient(path=vector_db_path)
-                    vectorstore = QdrantVectorStore(client=qdrant_client, collection_name=vectorstore_name, embedding=embedding)
+                qdrant_client = QdrantClient(path=vector_db_path)
+                vectorstore = QdrantVectorStore(client=qdrant_client, collection_name=vectorstore_name, embedding=embedding)
             
             elif vectorstore_type == VectorDbType.Pinecone:
                 pinecone_native_hybrid_search = True #TODO: to add to env variables for parameterization
