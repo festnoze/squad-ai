@@ -7,11 +7,11 @@ from common_tools.models.llm_info import LlmInfo
 from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
 #from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline_with_prefect import RagInferencePipelineWithPrefect
 from common_tools.rag.rag_service import RagService
-from common_tools.rag.rag_filtering_metadata_helper import RagFilteringMetadataHelper
-
+from common_tools.rag.rag_service_factory import RagServiceFactory
+from common_tools.helpers.rag_filtering_metadata_helper import RagFilteringMetadataHelper
+from common_tools.helpers.env_helper import EnvHelper
 # internal import
 from services.available_actions import AvailableActions
-from startup import Startup
 
 class ChatbotFront:
     ongoing_action = None
@@ -87,10 +87,8 @@ class ChatbotFront:
 
     def initialize():
         txt.activate_print = True
-        if not ChatbotFront.llms_infos:
-            ChatbotFront.llms_infos = Startup.initialize()
         if not ChatbotFront.rag:
-            ChatbotFront.rag = AvailableActions.init_rag_service(ChatbotFront.llms_infos)
+            ChatbotFront.rag = RagServiceFactory.build_from_env_config()
         if not ChatbotFront.inference_pipeline:
             if ChatbotFront.use_prefect:
                 pass#ChatbotFront.inference_pipeline = RagInferencePipelineWithPrefect(ChatbotFront.rag, None)            

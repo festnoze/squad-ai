@@ -32,7 +32,7 @@ class RAGPreTreatment:
     @staticmethod
     def rag_static_pre_treatment(rag:RagService, query:Union[str, Conversation], default_filters:dict = {}) -> tuple[QuestionTranslation, dict]:
         question_analysis, extracted_implicit_metadata, extracted_explicit_metadata = Execute.run_several_functions_as_concurrent_async_tasks(
-            (RAGPreTreatment.query_rewritting_async, (rag, query)),
+            (RAGPreTreatment.query_rewritting_for_studi_com_chatbot_async, (rag, query)),
             (RAGPreTreatment.analyse_query_for_metadata_async, (rag, query)),
             (RAGPreTreatment.extract_explicit_metadata, (query)),
         )
@@ -106,7 +106,7 @@ class RAGPreTreatment:
     #TODO: /!\ WARNING /!\ the query rewritting is domain specific and its prompt too (for studi.com). Thus, it shouldn't be in common_tools
     @staticmethod
     @workflow_output('analysed_query')
-    async def query_rewritting_async(rag:RagService, analysed_query:QuestionRewritting) -> str:        
+    async def query_rewritting_for_studi_com_chatbot_async(rag:RagService, analysed_query:QuestionRewritting) -> str:        
         query_rewritting_prompt = RAGPreTreatment._query_rewritting_prompt_replace_all_categories(analysed_query.question_with_context)
 
         response = await Llm.invoke_chain_with_input_async('Query rewritting', rag.llm_1, query_rewritting_prompt)
@@ -115,10 +115,16 @@ class RAGPreTreatment:
         analysed_query.modified_question = content['modified_question']
         print(f'> Rewritten query: "{analysed_query.modified_question}"')
         return analysed_query
+    
+    @staticmethod
+    @workflow_output('analysed_query')
+    async def bypassed_query_rewritting_async(rag:RagService, analysed_query:QuestionRewritting) -> str:        
+        analysed_query.modified_question = analysed_query.question_with_context
+        return analysed_query
 
     @staticmethod
     def _query_rewritting_prompt_replace_all_categories(prompt):
-        out_dir = "./outputs/" #todo: not generic enough
+        out_dir = "./outputs/" #TODO: shouldn't be in common_tools
         diploms_names = ', '.join([f"'{value}'" for value in file.get_as_json(out_dir + 'all/all_diplomas_names.json')])
         certifications_names = ', '.join([f"'{value}'" for value in file.get_as_json(out_dir + 'all/all_certifications_names.json')])
         domains_list = ', '.join([f"'{value}'" for value in file.get_as_json(out_dir + 'all/all_domains_names.json')])

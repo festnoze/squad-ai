@@ -47,10 +47,10 @@ class RagInferencePipeline:
             self.tool_executor = ToolExecutor(all_tools)
     
     #todo: return the retireved chunks via an extra parameter
-    async def run_pipeline_dynamic_async(self, query: Union[str, Conversation], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None, override_workflow_available_classes:dict = None, all_chunks_output = []):
+    async def run_pipeline_dynamic_async(self, query: Union[str, Conversation], include_bm25_retrieval: bool = False, give_score=True, pipeline_config_file_path: str = 'rag_pipeline_default_config_full_no_streaming.yaml', format_retrieved_docs_function = None, override_workflow_available_classes:dict = None, all_chunks_output = []):
         """Run the full rag inference pipeline: use dynamic pipeline until augmented generation which is streamed async"""
         try:
-            analysed_query, retrieved_chunks = await self.run_pipeline_dynamic_but_augmented_generation_async(query, include_bm25_retrieval, give_score, format_retrieved_docs_function, override_workflow_available_classes)
+            analysed_query, retrieved_chunks = await self.run_pipeline_dynamic_but_augmented_generation_async(query, include_bm25_retrieval, give_score, pipeline_config_file_path, format_retrieved_docs_function, override_workflow_available_classes)
         except EndPipelineException as ex:
             yield ex.message
             return
@@ -64,8 +64,8 @@ class RagInferencePipeline:
             all_chunks_output.append(chunk)
             yield chunk
             
-    async def run_pipeline_dynamic_but_augmented_generation_async(self, query: Union[str, Conversation], include_bm25_retrieval: bool = False, give_score=True, format_retrieved_docs_function = None, override_workflow_available_classes:dict = None):
-        config = Ressource.get_rag_pipeline_default_config_wo_AG_for_streaming()
+    async def run_pipeline_dynamic_but_augmented_generation_async(self, query: Union[str, Conversation], include_bm25_retrieval: bool = False, give_score=True, pipeline_config_file_path: str = 'rag_pipeline_default_config_full_no_streaming.yaml', format_retrieved_docs_function = None, override_workflow_available_classes:dict = None):
+        config = Ressource.load_ressource_file(pipeline_config_file_path, Ressource.rag_configs_package_name)
         workflow_available_classes = self.get_available_classes(override_workflow_available_classes)
         
         workflow_executor = WorkflowExecutor(config, workflow_available_classes)
@@ -149,30 +149,32 @@ class RagInferencePipeline:
                             query: Union[str, Conversation],
                             include_bm25_retrieval: bool = False,
                             give_score: bool = True,
+                            pipeline_config_file_path: str = 'rag_pipeline_default_config_full_no_streaming.yaml',
                             format_retrieved_docs_function=None,
                             override_workflow_available_classes: dict[str, any] = None) -> tuple:
 
-        sync_generator = Execute.get_sync_generator_from_async(
+        sync_generator = Execute.async_generator_wrapper_to_sync(
             self.run_pipeline_dynamic_async,
             query,
             include_bm25_retrieval,
             give_score,
+            pipeline_config_file_path,
             format_retrieved_docs_function,
             override_workflow_available_classes
         )
-        return ''.join(chunk.decode('utf-8') for chunk in sync_generator)
+        return ''.join(chunk for chunk in sync_generator)
     
     def run_pipeline_static(self,
                             query: Union[str, Conversation],
                             include_bm25_retrieval: bool = False,
                             give_score: bool = True,
                             format_retrieved_docs_function=None) -> tuple:
-        sync_generator = Execute.get_sync_generator_from_async(
+        sync_generator = Execute.async_generator_wrapper_to_sync(
             self.run_pipeline_static_async,
             query,
             include_bm25_retrieval,
             give_score,
             format_retrieved_docs_function
         )
-        return ''.join(chunk.decode('utf-8') for chunk in sync_generator)
+        return ''.join(chunk for chunk in sync_generator)
     

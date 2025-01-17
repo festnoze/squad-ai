@@ -5,7 +5,7 @@ from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagIn
 from common_tools.rag.rag_service import RagService
 from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.models.llm_info import LlmInfo
-from common_tools.models.embedding import EmbeddingModel
+from common_tools.models.embedding_type import EmbeddingModel
 
 class TestRagInferencePipelineIntegration:
 

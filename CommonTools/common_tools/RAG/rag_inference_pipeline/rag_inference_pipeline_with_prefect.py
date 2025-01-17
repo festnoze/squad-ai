@@ -14,7 +14,7 @@
 # from common_tools.helpers.ressource_helper import Ressource
 # from common_tools.models.logical_operator import LogicalOperator
 # from common_tools.models.question_analysis import QuestionAnalysis, QuestionAnalysisPydantic
-# from common_tools.rag.rag_filtering_metadata_helper import RagFilteringMetadataHelper
+# from common_tools.helpers.rag_filtering_metadata_helper import RagFilteringMetadataHelper
 # from common_tools.rag.rag_service import RagService
 # from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
 # from langchain_core.documents import Document

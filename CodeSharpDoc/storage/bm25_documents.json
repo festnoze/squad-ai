@@ -1,4 +1,4 @@
-﻿[
+[
     {
         "page_content": "This class 'EventParcoursMatieresListV3ViewModelComparer' provides methods to compare objects based on specific properties like 'ParcoursId', 'ParcoursCode', 'Name', 'Matieres', and 'PromotionsIds'.",
         "metadata": {

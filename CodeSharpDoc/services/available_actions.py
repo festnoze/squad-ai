@@ -1,26 +1,29 @@
 import json
 from typing import List
 #
-from common_tools.rag.rag_injection_pipeline.rag_injection_pipeline import RagInjectionPipeline
 from common_tools.helpers.file_helper import file
 from common_tools.helpers.txt_helper import txt
 from common_tools.models.llm_info import LlmInfo
-from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
+from common_tools.helpers.env_helper import EnvHelper
+from common_tools.langchains.langchain_factory import LangChainFactory
 from common_tools.rag.rag_service import RagService
-from common_tools.models.embedding import EmbeddingModel
+from common_tools.rag.rag_service_factory import RagServiceFactory
+from common_tools.models.embedding_model import EmbeddingModel
+from common_tools.rag.rag_ingestion_pipeline.rag_ingestion_pipeline import RagIngestionPipeline
+from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
+from common_tools.rag.rag_ingestion_pipeline.rag_chunking import RagChunking
 #
 from services.analysed_structures_handling import AnalysedStructuresHandling
 from services.summary_generation_service import SummaryGenerationService
 
 class AvailableActions:
-
     local_path = "C:/Dev/squad-ai/CodeSharpDoc"
     # target_code_path = "C:/Dev/studi.api.lms.user/src"
     # target_code_path = "C:/Dev/LMS/lms-api"
     # target_code_path = f"{project_path}/inputs/code_files_generated"
     struct_desc_folder_subpath = "outputs/structures_descriptions"
     struct_desc_folder_path = f"{local_path}/{struct_desc_folder_subpath}"
-    rag_service: RagService = None
+    rag_service: RagService = RagServiceFactory.build_from_env_config(vector_db_base_path=None)
 
     @staticmethod
     def display_menu() -> None:
@@ -33,11 +36,6 @@ class AvailableActions:
         print("4. Query rag service on vector database")
         print("5. Help: Display this menu again")
         print("6. Exit")
-
-    def init_rag_service(llms_infos) -> RagService:
-        if not AvailableActions.rag_service:
-            AvailableActions.rag_service = RagService(llms_infos, EmbeddingModel.OpenAI_TextEmbedding3Large)
-        return AvailableActions.rag_service
 
     @staticmethod
     def display_menu_and_actions(llms_infos: List[LlmInfo], default_first_action: int = None):
@@ -65,12 +63,12 @@ class AvailableActions:
 
             # Build vector database
             elif choice == '3' or choice == 'b':            
-                AvailableActions.rebuild_vectorstore(llms_infos)        
+                AvailableActions.rebuild_vectorstore()        
                 continue
 
             # Query the rag service on methods summaries vector database
             elif choice == '4' or choice == 'q':            
-                AvailableActions.rag_querying_from_console(RagInferencePipeline(RagService(llms_infos)))
+                AvailableActions.rag_querying_from_console(RagInferencePipeline(AvailableActions.rag_service))
                 continue
             
             elif choice == '5' or choice == 'h':
@@ -87,7 +85,7 @@ class AvailableActions:
                 continue
 
     @staticmethod
-    def rag_querying_from_console(inference_pipeline):
+    def rag_querying_from_console(inference_pipeline:RagInferencePipeline):
         query = input("What are you looking for? ")
         additionnal_context = file.get_as_str("prompts/rag_query_code_additionnal_instructions.txt")
 
@@ -102,7 +100,7 @@ class AvailableActions:
             query = input("What next are you looking for? - (empty to quit) - ")
 
     @staticmethod
-    def rag_querying_from_sl_chatbot(inference_pipeline, query: str, st, include_bm25_retrieval:bool = False):
+    def rag_querying_from_sl_chatbot(inference_pipeline:RagInferencePipeline, query: str, st, include_bm25_retrieval:bool = False):
         txt.print_with_spinner("Querying rag service.")
         
         answer = inference_pipeline.run_pipeline_dynamic(query=query, include_bm25_retrieval= include_bm25_retrieval, give_score= True, format_retrieved_docs_function = AvailableActions.format_retrieved_docs_function)
@@ -135,12 +133,27 @@ class AvailableActions:
     
     @staticmethod
     def rebuild_vectorstore(llms_infos: List[LlmInfo]):
-        AvailableActions.init_rag_service(llms_infos)
-        AvailableActions.rag_service.reset_vectorstore() # delete or empty DB first
+        #TODO: check if useful passing llms_infos and recreate rag_service, and if llms_infos are specific and diff. from the env. defined ones, else remove rag_service re-instanciation too.
+        AvailableActions.rag_service = RagServiceFactory.build_from_env_config(vector_db_base_path=None)
+        
         docs = AvailableActions.get_documents_to_vectorize_from_loaded_analysed_structures(AvailableActions.struct_desc_folder_path)
-        injection_pipeline = RagInjectionPipeline(AvailableActions.rag_service)
-        count = injection_pipeline.build_vectorstore_and_bm25_store(docs, chunk_size=0, children_chunk_size=0, delete_existing=True)
-        print(f"Vector store built with {count} items")
+        ingestion_pipeline = RagIngestionPipeline(AvailableActions.rag_service)
+        txt.print_with_spinner("Chunking documents...")
+        documents_chunks = ingestion_pipeline.chunk_documents(
+                                                    documents= docs,
+                                                    chunk_size= 2500,
+                                                    children_chunk_size= 0
+                                                )
+        txt.stop_spinner_replace_text("Documents chunked")
+        txt.print_with_spinner("Inserting documents into vector database...")
+        AvailableActions.rag_service.vectorstore = ingestion_pipeline.build_vectorstore_from_chunked_docs(
+                            docs_chunks= documents_chunks,
+                            vector_db_type=AvailableActions.rag_service.vector_db_type,
+                            collection_name= 'code_docs',
+                            BM25_storage_in_database_sparse_vectors=False,
+                            delete_existing= True
+                        )
+        print(f"Vector store built with {len(documents_chunks)} items")
 
     @staticmethod
     def analyse_files_code_structures(files_batch_size: int, code_folder_path: str):

@@ -24,7 +24,6 @@ common_tools/langchains/langchain_factory.py
 common_tools/langchains/langsmith_client.py
 common_tools/models/base_desc.py
 common_tools/models/conversation.py
-common_tools/models/embedding.py
 common_tools/models/enum_desc.py
 common_tools/models/file_already_exists_policy.py
 common_tools/models/langchain_adapter_type.py

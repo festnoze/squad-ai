@@ -20,10 +20,8 @@ class LangChainFactory():
     @staticmethod
     def set_openai_apikey():
         if not 'OPENAI_API_KEY' in os.environ:
-            load_dotenv()
             openai_api_key = EnvHelper.get_openai_api_key()     
             openai.api_key = openai_api_key
-            os.environ['OPENAI_API_KEY'] = openai_api_key
 
     @staticmethod
     def create_llms_from_infos(llms_infos: list[LlmInfo]) -> list[Runnable]:

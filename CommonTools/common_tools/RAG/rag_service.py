@@ -21,17 +21,21 @@ from common_tools.models.llm_info import LlmInfo
 from common_tools.helpers.file_helper import file
 from common_tools.helpers.env_helper import EnvHelper
 from common_tools.langchains.langchain_factory import LangChainFactory
-from common_tools.models.embedding import EmbeddingModel
+from common_tools.models.embedding_model import EmbeddingModel
+from common_tools.models.embedding_model_factory import EmbeddingModelFactory
 from common_tools.models.vector_db_type import VectorDbType
 from langchain_pinecone import PineconeVectorStore
 
 class RagService:
-    def __init__(self, llms_or_info: Optional[Union[LlmInfo, Runnable, list]], embedding_model:EmbeddingModel=None, vector_db_base_path:str = './storage', vector_db_type:VectorDbType = VectorDbType('chroma'), vector_db_name:str = 'main', documents_json_filename = "bm25_documents.json"):
+    def __init__(self, llms_or_info: Optional[Union[LlmInfo, Runnable, list]], embedding_model:EmbeddingModel= None, vector_db_base_path:str = None, vector_db_type:VectorDbType = VectorDbType('chroma'), vector_db_name:str = 'main', documents_json_filename:str = None):
+        # Init default parameters values if not setted
+        if not vector_db_base_path: vector_db_base_path = './storage'
+        if not documents_json_filename: documents_json_filename = 'bm25_documents.json'
         self.llm_1=None
         self.llm_2=None
         self.llm_3=None
-        self.init_embedding(embedding_model)
-        self.init_llms(llms_or_info) #todo: add fallbacks with specifying multiple llms or llms infos
+        self.instanciate_embedding(embedding_model)
+        self.instanciate_llms(llms_or_info)
         self.vector_db_name:str = vector_db_name
         self.vector_db_type:VectorDbType = vector_db_type
         self.vector_db_base_path:str = vector_db_base_path
@@ -41,11 +45,11 @@ class RagService:
         self.langchain_documents:list[Document] = self.load_raw_langchain_documents(self.all_documents_json_file_path)
         self.vectorstore:VectorStore = self.load_vectorstore(self.vector_db_path, self.embedding, self.vector_db_type, self.vector_db_name)
 
-    def init_embedding(self, embedding_model:EmbeddingModel):
-        self.embedding = embedding_model.create_instance()
+    def instanciate_embedding(self, embedding_model:EmbeddingModel):
+        self.embedding = EmbeddingModelFactory.create_instance(embedding_model)
         self.embedding_model_name = embedding_model.model_name
         
-    def init_llms(self, llm_or_infos: Optional[Union[LlmInfo, Runnable, list]]):        
+    def instanciate_llms(self, llm_or_infos: Optional[Union[LlmInfo, Runnable, list]]):        
         if isinstance(llm_or_infos, list):
             index = 1
             for llm_or_info in llm_or_infos:

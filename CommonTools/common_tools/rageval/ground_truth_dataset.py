@@ -1,6 +1,6 @@
 from common_tools.helpers.txt_helper import txt
 from common_tools.langchains.langchain_factory import LangChainFactory
-from common_tools.models.embedding import EmbeddingModel
+from common_tools.models.embedding_type import EmbeddingModel
 from common_tools.models.llm_info import LlmInfo
 from langchain_core.documents import Document
 from ragas.testset.synthesizers.generate import TestsetGenerator

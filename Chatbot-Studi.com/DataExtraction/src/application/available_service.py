@@ -22,16 +22,16 @@ from vector_database_creation.generate_documents_and_metadata import GenerateDoc
 from vector_database_creation.generate_summaries_chunks_questions_and_metadata import GenerateDocumentsSummariesChunksQuestionsAndMetadata
 from web_services.request_models.query_asking_request_model import QueryAskingRequestModel
 from api.task_handler import task_handler
-#
+
+# Internal tools imports
 from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.execute_helper import Execute
 from common_tools.models.llm_info import LlmInfo
 from common_tools.helpers.llm_helper import Llm
-from common_tools.helpers.file_helper import file
-from common_tools.helpers.config_helper import ConfigHelper
+from common_tools.helpers.env_helper import EnvHelper
 from common_tools.langchains.langchain_factory import LangChainFactory
 from common_tools.models.langchain_adapter_type import LangChainAdapterType
-from common_tools.rag.rag_service import RagService
+from common_tools.rag.rag_service import RagService, RagServiceFactory
 from common_tools.models.question_rewritting import QuestionRewritting, QuestionRewrittingPydantic
 from common_tools.rag.rag_inference_pipeline.rag_pre_treatment_tasks import RAGPreTreatment
 from common_tools.rag.rag_ingestion_pipeline.rag_ingestion_pipeline import RagIngestionPipeline
@@ -63,19 +63,7 @@ class AvailableService:
         AvailableService.current_dir = os.getcwd()
         AvailableService.out_dir = os.path.join(AvailableService.current_dir, 'outputs')
         
-        if not AvailableService.vector_db_type:
-            AvailableService.vector_db_type = ConfigHelper.get_vector_db_type_from_env()
-        if not AvailableService.llms_infos:
-            LangChainFactory.set_openai_apikey()
-            AvailableService.llms_infos = ConfigHelper.get_llms_from_env()
-        if not AvailableService.rag_service:
-            if not AvailableService.embedding_model:
-                AvailableService.embedding_model = ConfigHelper.get_embedding_model_from_env()
-            AvailableService.rag_service = RagService(
-                                            llms_or_info=AvailableService.llms_infos, 
-                                            embedding_model=AvailableService.embedding_model, 
-                                            vector_db_type=AvailableService.vector_db_type,
-                                            vector_db_name=ConfigHelper.get_vector_db_name_from_env())
+        AvailableService.rag_service = RagServiceFactory.build_from_env(specific_vector_db_base_path=None)
 
         if not AvailableService.inference:
             default_filters = {}
@@ -96,7 +84,7 @@ class AvailableService:
         all_docs = GenerateDocumentsAndMetadata().load_all_docs_as_json(out_dir, write_all_lists=True)
         injection_pipeline = RagIngestionPipeline(AvailableService.rag_service)
         txt.print_with_spinner("Chunking documents...")
-        documents_chunks = RagChunking.chunk_documents(
+        documents_chunks = injection_pipeline.chunk_documents(
                                                     documents= all_docs,
                                                     chunk_size= 2500,
                                                     children_chunk_size= 0
@@ -207,7 +195,7 @@ class AvailableService:
             async for chunk in Llm.write_static_text_as_stream(AvailableService.waiting_message):
                 yield chunk
         try:
-            analysed_query, retrieved_chunks = await AvailableService.inference.run_pipeline_dynamic_but_augmented_generation_async(conversation_history, include_bm25_retrieval= True, give_score=True, format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
+            analysed_query, retrieved_chunks = await AvailableService.inference.run_pipeline_dynamic_but_augmented_generation_async(conversation_history, include_bm25_retrieval= True, give_score=True, pipeline_config_file_path = 'studi_com_chatbot_rag_pipeline_default_config_wo_AG_for_streaming.yaml', format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
             pipeline_succeeded = True
         except EndPipelineException as ex:                        
             pipeline_succeeded = False
@@ -247,6 +235,7 @@ class AvailableService:
             conversation_history,
             include_bm25_retrieval=True,
             give_score=True,
+            pipeline_config_file_path = 'studi_com_chatbot_rag_pipeline_default_config_wo_AG_for_streaming.yaml',
             format_retrieved_docs_function=AvailableService.format_retrieved_docs_function,
             all_chunks_output=all_chunks_output
         ):
@@ -273,6 +262,7 @@ class AvailableService:
             conversation_history,
             include_bm25_retrieval=True,
             give_score=True,
+            pipeline_config_file_path = 'studi_com_chatbot_rag_pipeline_default_config_wo_AG_for_streaming.yaml',
             format_retrieved_docs_function=AvailableService.format_retrieved_docs_function,
             all_chunks_output=all_chunks_output
         ):

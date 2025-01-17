@@ -1,4 +1,4 @@
-Metadata-Version: 2.1
+Metadata-Version: 2.2
 Name: common_tools
 Version: 0.4.0
 Summary: Common tools for AI and generic needs on file, console, json, ...
@@ -26,10 +26,12 @@ Requires-Dist: langchain-chroma>=0.1.4
 Requires-Dist: langchain-ollama>=0.1.0
 Requires-Dist: langchain-anthropic>=0.2.4
 Requires-Dist: langchain-qdrant>=0.1.0
+Requires-Dist: langchain-pinecone>=0.1.0
 Requires-Dist: qdrant-client
 Requires-Dist: pinecone-client==5.0.1
 Requires-Dist: pinecone-plugin-inference==1.1.0
 Requires-Dist: pinecone==5.0.1
+Requires-Dist: pinecone-text==0.9.0
 Requires-Dist: langgraph>=0.2.38
 Requires-Dist: langsmith>=0.1.136
 Requires-Dist: ragas>=0.2.5
@@ -40,3 +42,10 @@ Requires-Dist: pyyaml
 Requires-Dist: lark
 Requires-Dist: scikit-learn
 Requires-Dist: scipy
+Dynamic: author
+Dynamic: author-email
+Dynamic: classifier
+Dynamic: home-page
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
