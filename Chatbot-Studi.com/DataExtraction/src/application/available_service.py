@@ -31,7 +31,8 @@ from common_tools.helpers.llm_helper import Llm
 from common_tools.helpers.env_helper import EnvHelper
 from common_tools.langchains.langchain_factory import LangChainFactory
 from common_tools.models.langchain_adapter_type import LangChainAdapterType
-from common_tools.rag.rag_service import RagService, RagServiceFactory
+from common_tools.rag.rag_service import RagService
+from common_tools.rag.rag_service_factory import RagServiceFactory
 from common_tools.models.question_rewritting import QuestionRewritting, QuestionRewrittingPydantic
 from common_tools.rag.rag_inference_pipeline.rag_pre_treatment_tasks import RAGPreTreatment
 from common_tools.rag.rag_ingestion_pipeline.rag_ingestion_pipeline import RagIngestionPipeline
@@ -39,7 +40,9 @@ from common_tools.rag.rag_ingestion_pipeline.rag_chunking import RagChunking
 from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
 from common_tools.rag.rag_inference_pipeline.rag_answer_generation_tasks import RAGAugmentedGeneration
 from common_tools.helpers.ressource_helper import Ressource
-from common_tools.models.embedding import EmbeddingModel, EmbeddingType
+from common_tools.models.embedding_model import EmbeddingModel
+from common_tools.models.embedding_type import EmbeddingType
+from common_tools.models.embedding_model_factory import EmbeddingModelFactory
 from common_tools.models.conversation import Conversation, Message, User
 from common_tools.models.doc_w_summary_chunks_questions import DocWithSummaryChunksAndQuestions
 from common_tools.models.device_info import DeviceInfo
@@ -49,9 +52,6 @@ from common_tools.models.vector_db_type import VectorDbType
 class AvailableService:
     inference: RagInferencePipeline = None
     rag_service: RagService = None
-    vector_db_type: VectorDbType = None
-    embedding_model: EmbeddingModel = None
-    llms_infos: list[LlmInfo] = None
     max_conversations_by_day = 10
     max_messages_by_conversation = 10
     waiting_message = "Merci de patienter un instant ... Je cherche les informations correspondant à votre question."
@@ -61,9 +61,8 @@ class AvailableService:
         load_dotenv(dotenv_path=".rag_config.env")
         txt.activate_print = activate_print
         AvailableService.current_dir = os.getcwd()
-        AvailableService.out_dir = os.path.join(AvailableService.current_dir, 'outputs')
-        
-        AvailableService.rag_service = RagServiceFactory.build_from_env(specific_vector_db_base_path=None)
+        AvailableService.out_dir = os.path.join(AvailableService.current_dir, 'outputs')        
+        AvailableService.rag_service = RagServiceFactory.build_from_env_config(vector_db_base_path=None)
 
         if not AvailableService.inference:
             default_filters = {}
@@ -93,7 +92,7 @@ class AvailableService:
         txt.print_with_spinner("Inserting documents into vector database...")
         AvailableService.rag_service.vectorstore = injection_pipeline.build_vectorstore_from_chunked_docs(
                             docs_chunks= documents_chunks,
-                            vector_db_type=AvailableService.vector_db_type,
+                            vector_db_type=AvailableService.rag_service.vector_db_type,
                             collection_name= 'studi-public-full',
                             BM25_storage_in_database_sparse_vectors=BM25_storage_in_database_sparse_vectors,
                             delete_existing= True
@@ -300,8 +299,8 @@ class AvailableService:
         return Llm.get_content(result)
 
     def generate_ground_truth():
-        #asyncio.run(RagasService.generate_ground_truth_async(AvailableService.llms_infos[0], AvailableService.rag_service.langchain_documents, 1))
-        RagasService.generate_ground_truth(AvailableService.llms_infos[0], AvailableService.rag_service.langchain_documents, 1)
+        #asyncio.run(RagasService.generate_ground_truth_async(AvailableService.rag_service.llms_infos[0], AvailableService.rag_service.langchain_documents, 1))
+        RagasService.generate_ground_truth(AvailableService.rag_service.llms_infos[0], AvailableService.rag_service.langchain_documents, 1)
 
     #todo: to delete or write to add metadata to context
     @staticmethod

@@ -1,7 +1,8 @@
 import importlib.resources
 import re
 import yaml
-from common_tools.helpers.txt_helper import txt  # Assuming txt.remove_commented_lines is defined here
+from common_tools.helpers.txt_helper import txt
+from common_tools.helpers.file_helper import file
 
 class Ressource:    
     prompts_package_name = 'common_tools.prompts'
@@ -15,12 +16,15 @@ class Ressource:
     @staticmethod
     def load_ressource_file(file_name: str, package_name: str = None, remove_comments=True) -> str:
         """The generic method to get the content of a file in prompts package"""
-        if not package_name: package_name = Ressource.prompts_package_name
-        with importlib.resources.open_text(package_name, file_name) as file_reader:
-            content = file_reader.read()
-            if remove_comments:
-                content = txt.remove_commented_lines(content)
-            return content
+        if not package_name: 
+            package_name = Ressource.prompts_package_name
+
+        file_path = str(importlib.resources.files(package_name) / file_name)
+        if package_name == Ressource.rag_configs_package_name:
+            content = file.get_as_yaml(file_path)
+        else:
+            content = file.get_as_str(file_path, remove_comments=remove_comments)
+        return content
         
     @staticmethod
     def replace_variables(prompt: str, variables: dict) -> str:

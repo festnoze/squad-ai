@@ -10,7 +10,7 @@ inference_pipeline_but_generation:
   - pre_treatment
   - data_retrieval
 
-pre_treatment:  
+pre_treatment:
   - RAGPreTreatment.query_standalone_from_history_async
   - RAGPreTreatment.query_rewritting_for_studi_com_chatbot_async
   #- RAGPreTreatment.query_standalone_rewritten_from_history_async

@@ -56,6 +56,16 @@ class EnvHelper:
     @staticmethod
     def get_vector_db_name():
         return EnvHelper.generic_get_env_variable_value_by_name('VECTOR_DB_NAME')
+    
+    @staticmethod
+    def get_pinecone_native_hybrid_search() -> bool:
+        pinecone_native_hybrid_search_str = EnvHelper.generic_get_env_variable_value_by_name('PINECONE_NATIVE_HYBRID_SEARCH')
+        if pinecone_native_hybrid_search_str.lower() == 'false':
+            return False
+        elif pinecone_native_hybrid_search_str.lower() == 'true':
+            return True
+        else:
+            raise ValueError(f"Invalid value for 'PINECONE_NATIVE_HYBRID_SEARCH': '{pinecone_native_hybrid_search_str}' (cannot be converted to a boolean)")
 
     @staticmethod
     def get_built_llms_infos() -> list[LlmInfo]:

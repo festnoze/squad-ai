@@ -31,6 +31,7 @@ class RagService:
         # Init default parameters values if not setted
         if not vector_db_base_path: vector_db_base_path = './storage'
         if not documents_json_filename: documents_json_filename = 'bm25_documents.json'
+        self.llms_infos: list[LlmInfo] = None
         self.llm_1=None
         self.llm_2=None
         self.llm_3=None
@@ -51,6 +52,8 @@ class RagService:
         
     def instanciate_llms(self, llm_or_infos: Optional[Union[LlmInfo, Runnable, list]]):        
         if isinstance(llm_or_infos, list):
+            if any(llm_or_infos) and isinstance(llm_or_infos[0], LlmInfo):
+                self.llms_infos = llm_or_infos
             index = 1
             for llm_or_info in llm_or_infos:
                 if index == 1:
@@ -105,18 +108,22 @@ class RagService:
                 vectorstore = QdrantVectorStore(client=qdrant_client, collection_name=vectorstore_name, embedding=embedding)
             
             elif vectorstore_type == VectorDbType.Pinecone:
-                pinecone_native_hybrid_search = True #TODO: to add to env variables for parameterization
                 pinecone_instance = pinecone.Pinecone(api_key= EnvHelper.get_pinecone_api_key()) #, environment= EnvHelper.get_pinecone_environment()                
+                
+                # Create the DB (Pinecone's index) if it doesn't exist yet
                 if vectorstore_name not in pinecone_instance.list_indexes().names():
+                    pinecone_native_hybrid_search = EnvHelper.get_pinecone_native_hybrid_search()
                     embedding_vector_size = len(self.embedding.embed_query("test"))                    
                     pinecone_instance.create_index(
                                         name= vectorstore_name, 
                                         dimension=embedding_vector_size,
-                                        metric= "dotproduct", #if pinecone_native_hybrid_search else "cosine",
+                                        metric= "dotproduct" if pinecone_native_hybrid_search else "cosine",
                                         pod_type="s1",
                                         spec=ServerlessSpec(
                                                 cloud='aws',
-                                                region='us-east-1'))
+                                                region='us-east-1'
+                                        )
+                    )
                     
                     while not pinecone_instance.describe_index(vectorstore_name).status['ready']:
                         time.sleep(1)

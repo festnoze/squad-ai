@@ -13,7 +13,7 @@ from .txt_helper import txt
 class file:
 
     @staticmethod
-    def get_as_str(filename, encoding='utf-8-sig', remove_comments= False):
+    def get_as_str(filename:str, encoding='utf-8-sig', remove_comments= False):
         """
         Get the specified file content as string (removing '//' or '#' commented lines)
 

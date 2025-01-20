@@ -1,14 +1,6 @@
 from typing import Optional, Union
 
-from common_tools.helpers.txt_helper import txt
-from common_tools.helpers.execute_helper import Execute
-from common_tools.models.conversation import Conversation
-from common_tools.helpers.rag_filtering_metadata_helper import RagFilteringMetadataHelper
-from common_tools.models.question_analysis_base import QuestionAnalysisBase
-from common_tools.rag.rag_service import RagService
-from common_tools.models.vector_db_type import VectorDbType
-from common_tools.rag.rag_ingestion_pipeline.sparse_vector_embedding import SparseVectorEmbedding
-#
+# langchain related imports
 from langchain_core.documents import Document
 from langchain.retrievers import EnsembleRetriever
 from langchain_community.retrievers import BM25Retriever
@@ -24,6 +16,17 @@ from langchain_core.structured_query import (
         StructuredQuery,
         Visitor,
 )
+
+# internal common tools imports
+from common_tools.helpers.txt_helper import txt
+from common_tools.helpers.execute_helper import Execute
+from common_tools.models.conversation import Conversation
+from common_tools.helpers.rag_filtering_metadata_helper import RagFilteringMetadataHelper
+from common_tools.models.question_analysis_base import QuestionAnalysisBase
+from common_tools.rag.rag_service import RagService
+from common_tools.models.vector_db_type import VectorDbType
+from common_tools.rag.rag_ingestion_pipeline.sparse_vector_embedding import SparseVectorEmbedding
+from common_tools.helpers.env_helper import EnvHelper
 
 #from langchain_community.retrievers import PineconeHybridSearchRetriever
 # ... is replaced by our own because the actual langchain code doesn't implement async _aget_relevant_documents method
@@ -54,8 +57,8 @@ class RAGHybridRetrieval:
             semantic_k_ratio = 1 if include_semantic_retrieval else 0
             bm25_ratio = 1 if include_bm25_retrieval else 0
 
-        if rag.vector_db_type == VectorDbType.Pinecone:
-            metadata_filters_in_pinecone_format = RagFilteringMetadataHelper.translate_langchain_metadata_filters_into_specified_db_type_format(metadata_filters, rag.vector_db_type)
+        if rag.vector_db_type == VectorDbType.Pinecone and EnvHelper.get_pinecone_native_hybrid_search():
+            #metadata_filters_in_pinecone_format = RagFilteringMetadataHelper.translate_langchain_metadata_filters_into_specified_db_type_format(metadata_filters, rag.vector_db_type)
             hybrid_retriever = await RAGHybridRetrieval.rag_pinecone_hybrid_retrieval_langchain_async(rag, max_retrived_count, semantic_k_ratio)
             retrieved_chunks = await hybrid_retriever.ainvoke(QuestionAnalysisBase.get_modified_question(analysed_query))#, filter= metadata_filters_in_pinecone_format)
             for doc in retrieved_chunks: doc.metadata.pop("rel_ids", None)
@@ -141,7 +144,7 @@ class RAGHybridRetrieval:
             retrieved_chunks = rag.vectorstore.similarity_search(question_w_history, k=max_retrieved_count, filter=metadata_filters)
         return retrieved_chunks
 
-    @staticmethod    
+    @staticmethod
     def build_bm25_retriever(documents: list[Document], k: int = 20, metadata: dict = None, action_name = 'RAG BM25 retrieval') -> BM25Retriever:
         if not documents or len(documents) == 0: 
             return None
@@ -153,7 +156,7 @@ class RAGHybridRetrieval:
         bm25_retriever.k = k
         return bm25_retriever.with_config({"run_name": f"{action_name}"})
     
-    @staticmethod    
+    @staticmethod
     def bm25_retrieval(rag: RagService, query:Union[str, Conversation], metadata_filters: dict, give_score: bool, k = 3):
         if metadata_filters and any(metadata_filters):
             filtered_docs = [doc for doc in rag.langchain_documents if RagFilteringMetadataHelper.metadata_filtering_predicate_ChromaDb(doc, metadata_filters)]

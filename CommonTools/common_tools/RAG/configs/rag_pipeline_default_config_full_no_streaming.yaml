@@ -14,10 +14,9 @@ inference_pipeline:
 
 pre_treatment:  
   - parallel_async:
-  # - RAGPreTreatment.query_translation_async
+    - RAGPreTreatment.query_standalone_from_history_async
     - RAGPreTreatment.bypassed_query_translation_async
-
-  # - RAGPreTreatment.bypassed_analyse_query_for_metadata_async
+    - RAGPreTreatment.bypassed_query_rewritting_async
     - RAGPreTreatment.analyse_query_for_metadata_async
     - RAGPreTreatment.extract_explicit_metadata_async
   - RAGPreTreatment.metadata_filters_validation_and_correction_async
