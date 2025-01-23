@@ -109,16 +109,18 @@ class RagService:
             
             elif vectorstore_type == VectorDbType.Pinecone:
                 pinecone_instance = pinecone.Pinecone(api_key= EnvHelper.get_pinecone_api_key()) #, environment= EnvHelper.get_pinecone_environment()                
+                is_native_hybrid_search = EnvHelper.get_pinecone_native_hybrid_search()
+                if is_native_hybrid_search:
+                    vectorstore_name += "-hy" # make the index name specific in case of native hybrid search (sparse + dense vectors inc.)
                 
                 # Create the DB (Pinecone's index) if it doesn't exist yet
                 if vectorstore_name not in pinecone_instance.list_indexes().names():
-                    pinecone_native_hybrid_search = EnvHelper.get_pinecone_native_hybrid_search()
                     embedding_vector_size = len(self.embedding.embed_query("test"))                    
                     pinecone_instance.create_index(
                                         name= vectorstore_name, 
                                         dimension=embedding_vector_size,
-                                        metric= "dotproduct" if pinecone_native_hybrid_search else "cosine",
-                                        pod_type="s1",
+                                        metric= "dotproduct" if is_native_hybrid_search else "cosine",
+                                        #pod_type="s1",
                                         spec=ServerlessSpec(
                                                 cloud='aws',
                                                 region='us-east-1'

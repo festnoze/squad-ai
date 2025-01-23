@@ -87,7 +87,7 @@ class RagIngestionPipeline:
             elif vector_db_type == VectorDbType.ChromaDB:
                 db = self._embed_and_store_documents_chunks_as_dense_vectors_into_chroma_db(documents= docs_chunks, embedding = self.rag_service.embedding, vector_db_path= self.rag_service.vector_db_path, collection_name=collection_name)
             elif vector_db_type == VectorDbType.Pinecone:
-                db = self._embed_and_store_documents_chunks_as_dense_vectors_into_pinecone_db(documents= docs_chunks, embedding = self.rag_service.embedding, vector_db_path= self.rag_service.vector_db_path, collection_name=collection_name)
+                db = self._embed_and_store_documents_chunks_as_dense_vectors_into_pinecone_db(documents= docs_chunks)
             else:
                 raise ValueError("Invalid vector db type: " + vector_db_type.value)
            
@@ -131,7 +131,7 @@ class RagIngestionPipeline:
             db.add_documents(batch)
         return db
      
-    def _embed_and_store_documents_chunks_as_dense_vectors_into_pinecone_db(self, documents:list[Document], embedding:Embeddings, vector_db_path: str = '', collection_name:str = 'main', batch_size:int = 2000) -> PineconeVectorStore:
+    def _embed_and_store_documents_chunks_as_dense_vectors_into_pinecone_db(self, documents:list[Document], batch_size:int = 2000) -> PineconeVectorStore:
         for batch in BatchHelper.batch_split_by_count(documents, batch_size):
             self.rag_service.vectorstore.add_documents(batch)
         return self.rag_service.vectorstore

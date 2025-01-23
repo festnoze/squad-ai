@@ -129,8 +129,8 @@ class EnvHelper:
         if not variable_name in os.environ:
             EnvHelper._init_load_env()
             variable_value: str = os.getenv(variable_name)
-            os.environ[variable_name] = variable_value
             if not variable_value:
-                raise ValueError(f'Variable named: "{variable_name}" is not set in the environment')            
+                raise ValueError(f'Variable named: "{variable_name}" is not set in the environment')
+            os.environ[variable_name] = variable_value            
         return os.environ[variable_name]
     

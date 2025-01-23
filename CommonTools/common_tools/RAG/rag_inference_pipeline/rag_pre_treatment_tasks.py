@@ -118,8 +118,13 @@ class RAGPreTreatment:
     
     @staticmethod
     @workflow_output('analysed_query')
-    async def bypassed_query_rewritting_async(rag:RagService, analysed_query:QuestionRewritting) -> str:        
-        analysed_query.modified_question = analysed_query.question_with_context
+    async def bypassed_query_rewritting_async(rag:RagService, analysed_query:QuestionAnalysisBase) -> str:
+        #TODO: to generalize for step to handle all cases: chat or not, translation or not
+        if isinstance(analysed_query, QuestionTranslation):  
+            analysed_query.modified_question = analysed_query.modified_question
+        elif isinstance(analysed_query, QuestionRewritting):  
+            analysed_query.modified_question = analysed_query.question_with_context
+        
         return analysed_query
 
     @staticmethod
