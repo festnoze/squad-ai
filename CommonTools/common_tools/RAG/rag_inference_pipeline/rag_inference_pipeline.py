@@ -1,5 +1,5 @@
 import asyncio
-from typing import Optional, Union
+from typing import Union, Generator
 from langgraph.prebuilt.tool_executor import ToolExecutor
 from langchain.tools.render import format_tool_to_openai_function
 from langchain.agents import Tool
@@ -173,9 +173,9 @@ class RagInferencePipeline:
                             query: Union[str, Conversation],
                             include_bm25_retrieval: bool = False,
                             give_score: bool = True,
-                            pipeline_config_file_path: str = 'rag_pipeline_default_config_full_no_streaming.yaml',
-                            format_retrieved_docs_function=None) -> tuple:
-        all_chunks_output = []
+                            pipeline_config_file_path: str = 'rag_pipeline_default_config_wo_AG_for_streaming.yaml',
+                            format_retrieved_docs_function=None,
+                            all_chunks_output:list = []) -> Generator:
         sync_generator = Execute.async_generator_wrapper_to_sync(
             self.run_pipeline_dynamic_streaming_async,
             query,
@@ -186,9 +186,7 @@ class RagInferencePipeline:
             all_chunks_output
         )
         for chunk in sync_generator:
-            pass
-        
-        return ''.join(chunk for chunk in Llm.get_text_from_chunks(all_chunks_output))
+            yield chunk
     
     def run_pipeline_static(self,
                             query: Union[str, Conversation],

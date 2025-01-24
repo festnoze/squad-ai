@@ -101,13 +101,25 @@ class AvailableActions:
     def rag_querying_from_sl_chatbot(inference_pipeline:RagInferencePipeline, query: str, st, include_bm25_retrieval:bool = False):
         txt.print_with_spinner("Querying rag service.")
         
-        answers = inference_pipeline.run_pipeline_dynamic_no_streaming_sync(query=query, include_bm25_retrieval= include_bm25_retrieval, give_score= True, format_retrieved_docs_function = AvailableActions.format_retrieved_docs_function)
-        txt.stop_spinner_replace_text("rag retieval done")
-        if not isinstance(answers, list) or not any(answers):
-            st.session_state.messages.append({"role": "assistant", "content": "No answer found. Don't answer the question."})
-        answer = txt.remove_markdown(answers[-1])
-        st.session_state.messages.append({"role": "assistant", "content": answer})
-        st.chat_message("assistant").write(answer)
+        do_streaming_answer = True
+        if do_streaming_answer:
+            all_chunks:list = []
+            answer_generator = inference_pipeline.run_pipeline_dynamic_streaming_sync(query=query, include_bm25_retrieval= include_bm25_retrieval, give_score= True, format_retrieved_docs_function= AvailableActions.format_retrieved_docs_function, all_chunks_output= all_chunks)
+            st.chat_message("assistant").write_stream(answer_generator)
+            answer = ''.join(all_chunks)
+            answer = txt.remove_markdown(answer)
+            st.session_state.messages.append({"role": "assistant", "content": answer})
+        
+        else:            
+            answers = inference_pipeline.run_pipeline_dynamic_no_streaming_sync(query=query, include_bm25_retrieval= include_bm25_retrieval, give_score= True, format_retrieved_docs_function = AvailableActions.format_retrieved_docs_function)
+            txt.stop_spinner_replace_text("rag retieval done")
+            if not isinstance(answers, list) or not any(answers):
+                st.session_state.messages.append({"role": "assistant", "content": "No answer found. Don't answer the question."})
+            answer = answers[-1]
+            answer = txt.remove_markdown(answer)
+            st.chat_message("assistant").write(answer)
+            st.session_state.messages.append({"role": "assistant", "content": answer})
+        
 
     @staticmethod
     def format_retrieved_docs_function(retrieved_docs):
