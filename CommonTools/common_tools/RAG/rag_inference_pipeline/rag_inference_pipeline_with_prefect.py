@@ -64,7 +64,7 @@
 #         retrieved_chunks = self.rag_hybrid_retrieval(analysed_query, metadata, include_bm25_retrieval, give_score)
 
 #         # Augmented Answer Generation subflow
-#         response = self.rag_augmented_answer_generation(retrieved_chunks, analysed_query)
+#         response = self.rag_augmented_answer_generation_no_streaming_sync(retrieved_chunks, analysed_query)
 
 #         # Post-treatment subflow
 #         final_response = self.rag_post_treatment(response)
@@ -205,7 +205,7 @@
     
 #     # Augmented answer generation subflow
 #     @flow(name="rag answer generation")
-#     def rag_augmented_answer_generation(self, retrieved_chunks: list, questionAnalysis: QuestionAnalysis):
+#     def rag_augmented_answer_generation_no_streaming_sync(self, retrieved_chunks: list, questionAnalysis: QuestionAnalysis):
 #         return self.rag_response_generation(retrieved_chunks, questionAnalysis)
 
 #     @task

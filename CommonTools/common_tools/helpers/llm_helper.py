@@ -276,7 +276,7 @@ class Llm:
     @staticmethod
     def get_text_from_chunks(chunks: list) -> str:
         """Concatenate a list of text chunks into a single string."""
-        isBinary = isinstance(chunks[0], bytes)
+        isBinary = any(chunks) and isinstance(chunks[0], bytes)
         if isBinary:
             chunks = [chunk.decode('utf-8').replace(Llm.new_line_for_stream_over_http, '\n') for chunk in chunks]
         else:

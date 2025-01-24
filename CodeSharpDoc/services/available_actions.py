@@ -87,8 +87,6 @@ class AvailableActions:
     @staticmethod
     def rag_querying_from_console(inference_pipeline:RagInferencePipeline):
         query = input("What are you looking for? ")
-        additionnal_context = file.get_as_str("prompts/rag_query_code_additionnal_instructions.txt")
-
         while query != '':
             answer, sources = inference_pipeline(query=query, include_bm25_retieval= False, give_score= True)
             print(answer)
@@ -103,15 +101,13 @@ class AvailableActions:
     def rag_querying_from_sl_chatbot(inference_pipeline:RagInferencePipeline, query: str, st, include_bm25_retrieval:bool = False):
         txt.print_with_spinner("Querying rag service.")
         
-        answer = inference_pipeline.run_pipeline_dynamic(query=query, include_bm25_retrieval= include_bm25_retrieval, give_score= True, format_retrieved_docs_function = AvailableActions.format_retrieved_docs_function)
+        answers = inference_pipeline.run_pipeline_dynamic_no_streaming_sync(query=query, include_bm25_retrieval= include_bm25_retrieval, give_score= True, format_retrieved_docs_function = AvailableActions.format_retrieved_docs_function)
         txt.stop_spinner_replace_text("rag retieval done")
-        answer = txt.remove_markdown(answer)
+        if not isinstance(answers, list) or not any(answers):
+            st.session_state.messages.append({"role": "assistant", "content": "No answer found. Don't answer the question."})
+        answer = txt.remove_markdown(answers[-1])
         st.session_state.messages.append({"role": "assistant", "content": answer})
         st.chat_message("assistant").write(answer)
-
-        #sources = "Sources : \n" + langchain_rag.get_str_from_rag_retrieved_docs (sources)
-        #st.session_state.messages.append({"role": "assistant", "content": txt.remove_markdown(sources)})
-        #st.text(sources)
 
     @staticmethod
     def format_retrieved_docs_function(retrieved_docs):

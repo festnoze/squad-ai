@@ -14,38 +14,41 @@ from common_tools.helpers.method_decorator_helper import MethodDecorator
 
 class RAGAugmentedGeneration:
     augmented_generation_prompt:str = None
+    
     @staticmethod
-    def rag_augmented_answer_generation(
+    def rag_augmented_answer_generation_no_streaming_sync(
         rag: RagService, 
         query: Union[str, Conversation], 
         retrieved_chunks: list, 
         analysed_query: QuestionAnalysisBase, 
         format_retrieved_docs_function=None
     ):
-        async def run_async():
-            chunks = []
-            # Collect results from the async generator
-            await RAGAugmentedGeneration.rag_augmented_answer_generation_streaming_async(
-                rag, query, retrieved_chunks, analysed_query, True, chunks, format_retrieved_docs_function)
+        all_chunks = []
+        sync_generator = Execute.async_generator_wrapper_to_sync(RAGAugmentedGeneration.rag_augmented_answer_generation_streaming_async, rag, query, retrieved_chunks, analysed_query, True, all_chunks, format_retrieved_docs_function)
+        for chunk in sync_generator:
+            pass
+        return ''.join(chunk for chunk in Llm.get_text_from_chunks(all_chunks))
+
+    @staticmethod
+    async def rag_augmented_answer_generation_no_streaming_async(
+            rag: RagService,
+            query: Union[str, Conversation],
+            retrieved_chunks: list,
+            analysed_query: QuestionAnalysisBase,
+            format_retrieved_docs_function: any = None
+        ) -> any:
+            chunks: list[str] = []
+            async for output in RAGAugmentedGeneration.rag_augmented_answer_generation_streaming_async(
+                rag,
+                query,
+                retrieved_chunks,
+                analysed_query,
+                True,
+                chunks,
+                format_retrieved_docs_function
+            ):
+                pass
             return ''.join(chunks)
-
-        #TODO: to replace with: Execute.async_generator_wrapper_to_sync
-
-        # Ensure an event loop is available in the current thread
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            # If no event loop is present, create a new one
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-        # Run the async function using the event loop
-        if loop.is_running():
-            # If the loop is already running, use it to run the coroutine
-            return loop.run_until_complete(run_async())
-        else:
-            # If the loop is not running, start it and run the coroutine
-            return loop.run_until_complete(run_async())
 
     @staticmethod
     @MethodDecorator.print_func_execution_infos()

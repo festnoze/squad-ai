@@ -13,11 +13,12 @@ from langchain_core.runnables import Runnable, RunnablePassthrough
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.docstore.document import Document
 from application.service_exceptions import QuotaOverloadException
+from application.studi_public_website_rag_specific_config import StudiPublicWebsiteRagSpecificConfig
 from data_retrieval.drupal_data_retrieval import DrupalDataRetrieval
 from database_conversations.conversation_converters import ConversationConverters
 from infrastructure.conversation_repository import ConversationRepository
 from infrastructure.user_repository import UserRepository
-from site_public_metadata_descriptions import MetadataDescriptionHelper
+from studi_public_website_metadata_descriptions import MetadataDescriptionHelper
 from vector_database_creation.generate_documents_and_metadata import GenerateDocumentsAndMetadata
 from vector_database_creation.generate_summaries_chunks_questions_and_metadata import GenerateDocumentsSummariesChunksQuestionsAndMetadata
 from web_services.request_models.query_asking_request_model import QueryAskingRequestModel
@@ -38,7 +39,7 @@ from common_tools.rag.rag_inference_pipeline.rag_pre_treatment_tasks import RAGP
 from common_tools.rag.rag_ingestion_pipeline.rag_ingestion_pipeline import RagIngestionPipeline
 from common_tools.rag.rag_ingestion_pipeline.rag_chunking import RagChunking
 from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
-from common_tools.rag.rag_inference_pipeline.rag_answer_generation_tasks import RAGAugmentedGeneration
+from common_tools.rag.rag_inference_pipeline.rag_augmented_generation_tasks import RAGAugmentedGeneration
 from common_tools.helpers.ressource_helper import Ressource
 from common_tools.models.embedding_model import EmbeddingModel
 from common_tools.models.embedding_type import EmbeddingType
@@ -67,8 +68,9 @@ class AvailableService:
         if not AvailableService.inference:
             default_filters = {}
             metadata_descriptions_for_studi_public_site = MetadataDescriptionHelper.get_metadata_descriptions_for_studi_public_site(AvailableService.out_dir)
-            AvailableService.inference = RagInferencePipeline(AvailableService.rag_service, default_filters, metadata_descriptions_for_studi_public_site, None)
             RAGAugmentedGeneration.augmented_generation_prompt = Ressource.get_rag_augmented_generation_prompt_on_studi()
+            RAGPreTreatment.domain_specific_metadata_filters_validation_and_correction_async_method = StudiPublicWebsiteRagSpecificConfig.get_domain_specific_metadata_filters_validation_and_correction_async_method
+            AvailableService.inference = RagInferencePipeline(rag= AvailableService.rag_service, default_filters= StudiPublicWebsiteRagSpecificConfig.get_domain_specific_default_filters(), metadata_descriptions= metadata_descriptions_for_studi_public_site, tools= None)
 
     def re_init():
         AvailableService.rag_service = None
@@ -173,14 +175,12 @@ class AvailableService:
             yield chunk
         
         # Add a 'background job to generate a summary of the answer, add it to conversation messages, then save it
-        full_answer_str = Llm.get_text_from_chunks(all_chunks_output)
-        # Don't await, make summary generation of the answer as a background task
+        full_answer_str = ''.join(chunk for chunk in Llm.get_text_from_chunks(all_chunks_output))
         task_handler.add_task(
                         conversation.id, # set conversation id as task_id, so we can know if a task is ongoing for a specific conversation
                         AvailableService.add_answer_summary_to_conversation_async, 
                         conversation, 
                         full_answer_str)
-
 
     @staticmethod
     async def add_answer_summary_to_conversation_async(conversation, full_answer_str):
@@ -230,8 +230,8 @@ class AvailableService:
             raise ValueError("Conversation history should end with a user message")
         txt.print_with_spinner("Executing inference pipeline...")
         
-        async for stream_chunk in AvailableService.inference.run_pipeline_dynamic_async(
-            conversation_history,
+        async for stream_chunk in AvailableService.inference.run_pipeline_dynamic_streaming_async(
+            query=conversation_history,
             include_bm25_retrieval=True,
             give_score=True,
             pipeline_config_file_path = 'studi_com_chatbot_rag_pipeline_default_config_wo_AG_for_streaming.yaml',
@@ -252,13 +252,13 @@ class AvailableService:
         
         pipeline_method = None
         if use_dynamic_pipeline:
-            pipeline_method = AvailableService.inference.run_pipeline_dynamic_async
+            pipeline_method = AvailableService.inference.run_pipeline_dynamic_streaming_async
         else:
-            pipeline_method = AvailableService.inference.run_pipeline_static_async
+            pipeline_method = AvailableService.inference.run_pipeline_static_streaming_async
 
         for stream_chunk in Execute.async_generator_wrapper_to_sync(
             pipeline_method,
-            conversation_history,
+            query=conversation_history,
             include_bm25_retrieval=True,
             give_score=True,
             pipeline_config_file_path = 'studi_com_chatbot_rag_pipeline_default_config_wo_AG_for_streaming.yaml',
@@ -275,19 +275,25 @@ class AvailableService:
     def rag_query_full_pipeline_no_streaming_no_async(conversation_history:Conversation, use_dynamic_pipeline = True):        
         txt.print_with_spinner("Executing inference pipeline...")
         if use_dynamic_pipeline:
-            pipeline_method = AvailableService.inference.run_pipeline_dynamic_async
+            pipeline_method = AvailableService.inference.run_pipeline_dynamic_streaming_async
         else:
-            pipeline_method = AvailableService.inference.run_pipeline_static_async
+            pipeline_method = AvailableService.inference.run_pipeline_static_streaming_async
 
+        all_chunks_output = []
         sync_generator = Execute.async_generator_wrapper_to_sync(
             pipeline_method,
-            conversation_history,
-            True, #include_bm25_retrieval
-            True, #give_score
-            AvailableService.format_retrieved_docs_function, #format_retrieved_docs_function,
-            None, #override_workflow_available_classes
+            query=conversation_history,
+            include_bm25_retrieval=True,
+            give_score=True,
+            pipeline_config_file_path = 'studi_com_chatbot_rag_pipeline_default_config_wo_AG_for_streaming.yaml',
+            format_retrieved_docs_function=AvailableService.format_retrieved_docs_function,
+            all_chunks_output=all_chunks_output
         )
-        response = Llm.get_text_from_chunks(sync_generator)
+        for chunk in sync_generator:
+            pass
+        sync_generator.close()
+
+        response = Llm.get_text_from_chunks(all_chunks_output)
         txt.stop_spinner_replace_text("Executed inference pipeline:")
         return response
     

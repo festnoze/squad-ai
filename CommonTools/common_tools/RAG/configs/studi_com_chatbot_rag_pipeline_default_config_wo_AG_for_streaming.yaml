@@ -18,4 +18,4 @@ pre_treatment:
   - RAGPreTreatment.metadata_filters_validation_and_correction_async
 
 data_retrieval:
-  - RAGHybridRetrieval.rag_hybrid_retrieval_langchain_async
+  - RagRetrieval.rag_hybrid_retrieval_langchain_async

@@ -223,19 +223,38 @@ class WorkflowExecutor:
 
     def _is_value_matching_annotation(self, value, annotation):
         """
-        Check if a value matches an annotation. Supports Optional and Union types.
+        Check if a value matches an annotation. Supports Optional, Union, and parameterized types like list[str].
         """
-        origin = get_origin(annotation)
+        origin = get_origin(annotation)  # Get the base type (e.g., list for list[str])
+        args = get_args(annotation)  # Get the type arguments (e.g., [str] for list[str])
+
         if origin is Union:
-            # Get all types within Union
-            possible_types = get_args(annotation)
-            # Check if NoneType is allowed (Optional)
+            possible_types = args
             if type(None) in possible_types and value is None:
                 return True
-            # Check if value matches any other type in Union
-            return any(isinstance(value, t) for t in possible_types if t is not type(None))
+            return any(self._is_value_matching_annotation(value, t) for t in possible_types if t is not type(None))
+
+        if origin in {list, set, tuple}:
+            if not isinstance(value, origin):
+                return False
+            if args:
+                # If type arguments are provided, check all elements
+                return all(self._is_value_matching_annotation(item, args[0]) for item in value)
+            return True  # If no type argument, just check it's a list/set/tuple
+
+        if origin is dict:
+            if not isinstance(value, dict):
+                return False
+            key_type, value_type = args if args else (None, None)
+            return all(
+                self._is_value_matching_annotation(k, key_type) and self._is_value_matching_annotation(v, value_type)
+                for k, v in value.items()
+            )
+
         if value is None and annotation == Optional:
             return True
+
+        # Default check for non-parameterized types
         return isinstance(value, annotation)
 
     def _get_function_output_names(self, func):

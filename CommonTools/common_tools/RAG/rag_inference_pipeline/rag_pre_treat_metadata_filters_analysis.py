@@ -12,17 +12,20 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 #
 from common_tools.models.metadata_description import MetadataDescription
+from common_tools.models.vector_db_type import VectorDbType
 
 class RagPreTreatMetadataFiltersAnalysis:
-    def build_self_querying_retriever_langchain(vectorstore, vector_db_type:str, llm, metadata_description: list[MetadataDescription] = None, create_custom_query_constructor:bool = False) -> SelfQueryRetriever :
+    def get_self_querying_retriever_langchain(vectorstore, vector_db_type:VectorDbType, llm, metadata_description: list[MetadataDescription] = None, create_custom_query_constructor:bool = False) -> SelfQueryRetriever :
         document_description = "Description of the document"
 
         if create_custom_query_constructor:
             # Get query translator adapted to the vectorstore type
-            if vector_db_type == "qdrant":
+            if vector_db_type == VectorDbType.Qdrant:
                 translator = QdrantTranslator('metadata')
-            elif vector_db_type == "chroma":
+            elif vector_db_type == VectorDbType.ChromaDB:
                 translator = ChromaTranslator()
+            elif vector_db_type == VectorDbType.Pinecone:
+                translator = PineconeTranslator()
             else:
                 raise ValueError(f"Unsupported vectorstore type: {vector_db_type}")
             
@@ -53,20 +56,20 @@ class RagPreTreatMetadataFiltersAnalysis:
     def get_query_constructor_custom(llm, metadata_descriptions: list[MetadataDescription] = None):
         document_description = "Description of the document"
         metadata_descriptions_pydantic = [metadata_description.to_pydantic() for metadata_description in metadata_descriptions]
-        prompt = RagPreTreatMetadataFiltersAnalysis.get_query_constructor_prompt_custom(document_description, metadata_descriptions_pydantic)
+        prompt = RagPreTreatMetadataFiltersAnalysis._get_query_constructor_prompt_custom(document_description, metadata_descriptions_pydantic)
         output_parser = StructuredQueryOutputParser.from_components()
         promptlate = ChatPromptTemplate.from_template(prompt)
         query_constructor = prompt | llm | output_parser | RunnablePassthrough()
         return query_constructor    
     
-    def get_query_constructor_prompt_custom(
+    def _get_query_constructor_prompt_custom(
             document_description: str,
             metadata_descriptions: Union[list[MetadataDescription], list[AttributeInfo]],
             examples: Optional[list[dict]] = None
         ) -> str:
         """
-        Generates a prompt for the LLM to parse user queries into structured filters.
-
+        Generates a LLM prompt to parse user query for metadata filters (self-querying).
+        WARNING: The filters format is compatible with Chroma and Pinecone vector stores only.
         Args:
             document_description: A description of the document.
             metadata_descriptions: A list of MetadataDescription objects.
