@@ -57,11 +57,17 @@ class RagRetrieval:
             semantic_k_ratio = 1 if include_semantic_retrieval else 0
             bm25_ratio = 1 if include_bm25_retrieval else 0
 
-        if rag.vector_db_type == VectorDbType.Pinecone and EnvHelper.get_pinecone_native_hybrid_search():
+        if rag.vector_db_type == VectorDbType.Pinecone and EnvHelper.get_BM25_storage_as_db_sparse_vectors() and EnvHelper.get_is_common_db_for_sparse_and_dense_vectors():
             #metadata_filters_in_pinecone_format = RagFilteringMetadataHelper.translate_langchain_metadata_filters_into_specified_db_type_format(metadata_filters, rag.vector_db_type)
             hybrid_retriever = await RagRetrieval.rag_pinecone_hybrid_retrieval_langchain_async(rag, max_retrived_count, semantic_k_ratio)
-            retrieved_chunks = await hybrid_retriever.ainvoke(QuestionAnalysisBase.get_modified_question(analysed_query))#, filter= metadata_filters_in_pinecone_format)
-            for doc in retrieved_chunks: doc.metadata.pop("rel_ids", None)
+            try:
+                retrieved_chunks = hybrid_retriever.invoke(QuestionAnalysisBase.get_modified_question(analysed_query))#, filter= metadata_filters_in_pinecone_format)
+            except Exception as e:
+                print(f"Error in Pinecone Hybrid Retrieval: {e}")
+                retrieved_chunks = []
+            for doc in retrieved_chunks: 
+                if "rel_ids" in doc.metadata:
+                    doc.metadata.pop("rel_ids", None)
             return retrieved_chunks
         
         retrievers = []
@@ -71,22 +77,23 @@ class RagRetrieval:
             retrievers.append(vector_retriever)
         
         if include_bm25_retrieval:
-            # Filter documents matching metadata filters
-            if metadata_filters:
-                if RagFilteringMetadataHelper.does_contain_filter(metadata_filters, 'domaine','url'):
-                    max_retrived_count = 100
-                metadata_filters_chroma = RagFilteringMetadataHelper.translate_langchain_metadata_filters_into_chroma_db_format(metadata_filters)
-                filtered_docs = [
-                    doc for doc in rag.langchain_documents 
-                    if RagFilteringMetadataHelper.metadata_filtering_predicate_ChromaDb(doc, metadata_filters_chroma)
-                ]
-                print(f">> docs count corresponding to metadata: {len(filtered_docs)}/{len(rag.langchain_documents)}")
+            if EnvHelper.get_BM25_storage_as_db_sparse_vectors():
+                raise NotImplementedError("BM25 storage as db sparse vectors is not yet implemented for langchain retrieval.")
             else:
-                filtered_docs = rag.langchain_documents
-
-            # Build BM25 retriever on filtered documents
-            bm25_retriever = RagRetrieval.build_bm25_retriever(filtered_docs, k = int(max_retrived_count * bm25_ratio))
-            retrievers.append(bm25_retriever)
+                # Build BM25 retriever on raw documents filtered by metadata
+                if metadata_filters:
+                    if RagFilteringMetadataHelper.does_contain_filter(metadata_filters, 'domaine','url'): #TODO: extract: domain specific 
+                        max_retrived_count = 100
+                    metadata_filters_chroma = RagFilteringMetadataHelper.translate_langchain_metadata_filters_into_chroma_db_format(metadata_filters)
+                    filtered_docs = [
+                        doc for doc in rag.langchain_documents 
+                        if RagFilteringMetadataHelper.metadata_filtering_predicate_ChromaDb(doc, metadata_filters_chroma)
+                    ]
+                    print(f">> docs count corresponding to metadata: {len(filtered_docs)}/{len(rag.langchain_documents)}")
+                else:
+                    filtered_docs = rag.langchain_documents
+                bm25_retriever = RagRetrieval.build_bm25_retriever(filtered_docs, k = int(max_retrived_count * bm25_ratio))
+                retrievers.append(bm25_retriever)
 
         if not any(retrievers): 
             raise ValueError(f"No retriever has been defined in '{RagRetrieval.rag_hybrid_retrieval_langchain_async.__name__}'.")
@@ -118,13 +125,14 @@ class RagRetrieval:
     
     @staticmethod    
     async def rag_pinecone_hybrid_retrieval_langchain_async(rag: RagService, max_retrived_count: int = 20, semantic_k_ratio: float = 0.2):
-        SparseVectorEmbedding.set_path(rag.vector_db_base_path)
         retriever = PineconeHybridSearchRetriever(
             embeddings=rag.embedding,
-            sparse_encoder=SparseVectorEmbedding(), #TODO: use our custom sparse encoder, think to extend
+            sparse_encoder=SparseVectorEmbedding(rag.vector_db_base_path), #TODO: use our custom sparse encoder, think to extend
             index=rag.vectorstore._index,
             top_k=max_retrived_count,  # Number of documents to retrieve
             alpha=semantic_k_ratio,  # Balance between dense and sparse vector retrieval
+            namespace=rag.vectorstore._namespace,
+            text_content_key="text",  # Key in the metadata that contains the text
         )
         return retriever
 

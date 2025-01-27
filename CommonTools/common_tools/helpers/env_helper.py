@@ -58,14 +58,24 @@ class EnvHelper:
         return EnvHelper.generic_get_env_variable_value_by_name('VECTOR_DB_NAME')
     
     @staticmethod
-    def get_pinecone_native_hybrid_search() -> bool:
-        pinecone_native_hybrid_search_str = EnvHelper.generic_get_env_variable_value_by_name('PINECONE_NATIVE_HYBRID_SEARCH')
-        if pinecone_native_hybrid_search_str.lower() == 'false':
+    def get_BM25_storage_as_db_sparse_vectors() -> bool:
+        BM25_storage_as_db_sparse_vectors_str = EnvHelper.generic_get_env_variable_value_by_name('BM25_STORAGE_AS_DB_SPARSE_VECTORS')
+        if BM25_storage_as_db_sparse_vectors_str.lower() == 'false':
             return False
-        elif pinecone_native_hybrid_search_str.lower() == 'true':
+        elif BM25_storage_as_db_sparse_vectors_str.lower() == 'true':
             return True
         else:
-            raise ValueError(f"Invalid value for 'PINECONE_NATIVE_HYBRID_SEARCH': '{pinecone_native_hybrid_search_str}' (cannot be converted to a boolean)")
+            raise ValueError(f"Invalid value for 'BM25_STORAGE_AS_DB_SPARSE_VECTORS': '{BM25_storage_as_db_sparse_vectors_str}' (cannot be converted to a boolean)")
+
+    @staticmethod
+    def get_is_common_db_for_sparse_and_dense_vectors() -> bool:
+        is_common_db_for_sparse_and_dense_vectors_str = EnvHelper.generic_get_env_variable_value_by_name('IS_COMMON_DB_FOR_SPARSE_AND_DENSE_VECTORS')
+        if is_common_db_for_sparse_and_dense_vectors_str.lower() == 'false':
+            return False
+        elif is_common_db_for_sparse_and_dense_vectors_str.lower() == 'true':
+            return True
+        else:
+            raise ValueError(f"Invalid value for 'IS_COMMON_DB_FOR_SPARSE_AND_DENSE_VECTORS': '{is_common_db_for_sparse_and_dense_vectors_str}' (cannot be converted to a boolean)")
 
     @staticmethod
     def get_built_llms_infos() -> list[LlmInfo]:

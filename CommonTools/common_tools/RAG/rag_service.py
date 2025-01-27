@@ -109,9 +109,9 @@ class RagService:
             
             elif vectorstore_type == VectorDbType.Pinecone:
                 pinecone_instance = pinecone.Pinecone(api_key= EnvHelper.get_pinecone_api_key()) #, environment= EnvHelper.get_pinecone_environment()                
-                is_native_hybrid_search = EnvHelper.get_pinecone_native_hybrid_search()
+                is_native_hybrid_search = EnvHelper.get_is_common_db_for_sparse_and_dense_vectors()
                 if is_native_hybrid_search:
-                    vectorstore_name += "-hy" # make the index name specific in case of native hybrid search (sparse + dense vectors inc.)
+                    vectorstore_name += '-hybrid' # make the index name specific in case of native hybrid search (both sparse & dense vectors in the same record)
                 
                 # Create the DB (Pinecone's index) if it doesn't exist yet
                 if vectorstore_name not in pinecone_instance.list_indexes().names():

@@ -25,13 +25,14 @@ def hash_text(text: str) -> str:
 
 
 def create_index(
-    contexts: List[str],
+    text_contents: List[str],
     index: Any,
     embeddings: Embeddings,
     sparse_encoder: Any,
     ids: Optional[List[str]] = None,
     metadatas: Optional[List[dict]] = None,
     namespace: Optional[str] = None,
+    text_key: str = "text",
 ) -> None:
     """Create an index from a list of contexts.
 
@@ -47,7 +48,7 @@ def create_index(
         namespace: Namespace value for index partition.
     """
     batch_size = 32
-    _iterator = range(0, len(contexts), batch_size)
+    _iterator = range(0, len(text_contents), batch_size)
     try:
         from tqdm.auto import tqdm
 
@@ -57,27 +58,27 @@ def create_index(
 
     if ids is None:
         # create unique ids using hash of the text
-        ids = [hash_text(context) for context in contexts]
+        ids = [hash_text(text_content) for text_content in text_contents]
 
     for i in _iterator:
         # find end of batch
-        i_end = min(i + batch_size, len(contexts))
+        i_end = min(i + batch_size, len(text_contents))
         # extract batch
-        context_batch = contexts[i:i_end]
+        text_contents_batch = text_contents[i:i_end]
         batch_ids = ids[i:i_end]
         metadata_batch = (
-            metadatas[i:i_end] if metadatas else [{} for _ in context_batch]
+            metadatas[i:i_end] if metadatas else [{} for _ in text_contents_batch]
         )
         # add context passages as metadata
         meta = [
-            {"context": context, **metadata}
-            for context, metadata in zip(context_batch, metadata_batch)
+            {text_key: doc_content, **metadata}
+            for doc_content, metadata in zip(text_contents_batch, metadata_batch)
         ]
 
         # create dense vectors
-        dense_embeds = embeddings.embed_documents(context_batch)
+        dense_embeds = embeddings.embed_documents(text_contents_batch)
         # create sparse vectors
-        sparse_embeds = sparse_encoder.encode_documents(context_batch)
+        sparse_embeds = sparse_encoder.encode_documents(text_contents_batch)
         for s in sparse_embeds:
             s["values"] = [float(s1) for s1 in s["values"]]
 
@@ -115,6 +116,9 @@ class PineconeHybridSearchRetriever(BaseRetriever):
     """Alpha value for hybrid search."""
     namespace: Optional[str] = None
     """Namespace value for index partition."""
+    text_content_key: str = "text"
+    """Key to use for text content in the metadata. 
+    Original PineconeHybridSearchRetriever class uses 'context' as the key for content in the metadata rather than 'text' key which is more in use."""
 
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
@@ -175,7 +179,7 @@ class PineconeHybridSearchRetriever(BaseRetriever):
         )
         final_result = []
         for res in result["matches"]:
-            context = res["metadata"].pop("context")
+            context = res["metadata"].pop(self.text_content_key)
             metadata = res["metadata"]
             if "score" not in metadata and "score" in res:
                 metadata["score"] = res["score"]
@@ -212,7 +216,7 @@ class PineconeHybridSearchRetriever(BaseRetriever):
         )
         final_result = []
         for res in result["matches"]:
-            context = res["metadata"].pop("context")
+            context = res["metadata"].pop(self.text_content_key)
             metadata = res["metadata"]
             if "score" not in metadata and "score" in res:
                 metadata["score"] = res["score"]

@@ -14,20 +14,17 @@ class SparseVectorEmbedding:
     file_base_path:str = None
     sparse_vectorizer_filename:str = "sparse_vectorizer.pkl"
 
-    @staticmethod
-    def set_path(path:str):
+    def __init__(self, file_base_path, k1=1.5, b=0.75):
         if not SparseVectorEmbedding.file_base_path:
-            SparseVectorEmbedding.file_base_path = path
-
-    def __init__(self, k1=1.5, b=0.75):
+            SparseVectorEmbedding.file_base_path = file_base_path
         self.k1 = k1
         self.b = b
-        SparseVectorEmbedding.load_or_create_vectorizer()
+        self.load_or_create_vectorizer()
         self.avg_doc_length = None  # Stores the average document length after initial embedding
 
     def encode_queries(self, query:str):
         csr_matrix = self.embed_documents_as_csr_matrix_sparse_vectors_for_TF_IDF([query])
-        return self.csr_to_pinecone_sparse_format(csr_matrix)
+        return self.csr_to_pinecone_sparse_vector_dict(csr_matrix)
     
     def embed_documents_as_csr_matrix_sparse_vectors_for_TF_IDF(self, docs: list[str]) -> csr_matrix:
         # Vectorizing documents into sparse vectors with TfidfVectorizer
@@ -97,7 +94,7 @@ class SparseVectorEmbedding:
         bm25 = csr_matrix((bm25_data, (rows, cols)), shape=tf.shape)
         return bm25
     
-    def csr_to_pinecone_sparse_format(self, csr_matrix):
+    def csr_to_pinecone_sparse_vector_dict(self, csr_matrix):
         """Convert a CSR sparse matrix into Pinecone-compatible sparse_values format."""
         coo = csr_matrix.tocoo()  # Convert to COO format
         return {
@@ -105,16 +102,14 @@ class SparseVectorEmbedding:
             "values": coo.data.tolist()   # Values of non-zero entries
         }
     
-    @staticmethod
-    def save_vectorizer():
+    def save_vectorizer(self):
         if not SparseVectorEmbedding.file_base_path: 
             raise ValueError("SparseVectorEmbedding.file_base_path is not set. Please set it before saving the vectorizer.")
         filepath = os.path.join(SparseVectorEmbedding.file_base_path, SparseVectorEmbedding.sparse_vectorizer_filename)
         with open(filepath, 'wb') as f:
             pickle.dump(SparseVectorEmbedding.vectorizer, f)
 
-    @staticmethod
-    def load_or_create_vectorizer():
+    def load_or_create_vectorizer(self):
         if not SparseVectorEmbedding.file_base_path: 
             raise ValueError("SparseVectorEmbedding.file_base_path is not set. Please set it before loading the vectorizer.")   
         filepath = os.path.join(SparseVectorEmbedding.file_base_path, SparseVectorEmbedding.sparse_vectorizer_filename)      
