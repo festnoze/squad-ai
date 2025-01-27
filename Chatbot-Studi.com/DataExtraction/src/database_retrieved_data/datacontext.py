@@ -21,7 +21,7 @@ class DataContextRetrievedData:
         self.engine = create_engine(f'sqlite:///{db_path_or_url}', echo=True)
 
         # Create the database if it does not exist
-        if 'http' not in db_path_or_url and not file.file_exists(db_path_or_url):
+        if 'http' not in db_path_or_url and not file.exists(db_path_or_url):
             txt.print(f"/!\\ Conversations Database file not found at path: {db_path_or_url}")
             self.create_database(db_path_or_url)
         

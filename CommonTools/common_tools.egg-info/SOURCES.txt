@@ -24,7 +24,6 @@ common_tools/langchains/langchain_factory.py
 common_tools/langchains/langsmith_client.py
 common_tools/models/base_desc.py
 common_tools/models/conversation.py
-common_tools/models/embedding.py
 common_tools/models/enum_desc.py
 common_tools/models/file_already_exists_policy.py
 common_tools/models/langchain_adapter_type.py
@@ -42,4 +41,4 @@ common_tools/rag/rag_inference_pipeline/rag_inference_pipeline.py
 common_tools/rag/rag_inference_pipeline/rag_inference_pipeline_with_prefect.py
 common_tools/rag/rag_inference_pipeline/rag_post_treatment_tasks.py
 common_tools/rag/rag_inference_pipeline/rag_pre_treatment_tasks.py
-common_tools/rag/rag_injection_pipeline/rag_injection_pipeline.py
+common_tools/rag/rag_ingestion_pipeline/rag_ingestion_pipeline.py

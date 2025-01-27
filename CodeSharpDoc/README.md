@@ -16,11 +16,11 @@ Include: python, langchain, langgraph and C# code.
 
 It's helps you take back control over your (legacy-ish) .NET C# code: 
 
-- *Retro-engeenering*: Automatically generating methods and structures summaries for a whole C# projects with a single click!
+- *Retro-engeenering*: Automatically generating methods and structures summaries for a whole C# projects on a single click!
 
 - *Documentation*: Create an always up-to-date technical documentations of your C# projects structures & summaries!
 
-- *Querying*: Build a vector database out of your code summaries and relationship. Then ask questions to search your codebase. It helps developers to keep the code factorized, and think DRY: reuse existing methods rather than reinventing the wheel! But even in case of code duplication, it helps you to spot those duplicate implementations when a feature have to be maintained or evolved.
+- *Querying*: Ask functionnal questions to search your codebase. It helps developers to keep the code factorized, and think DRY: reuse existing methods rather than reinventing the wheel! But even in case of code duplication, it helps you to spot those duplicate implementations when a feature have to be maintained or evolved. Work from a vector database of your code summaries and their relationships.
 
 ### What comes next ...
 

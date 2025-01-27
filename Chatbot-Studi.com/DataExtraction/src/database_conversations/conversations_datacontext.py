@@ -17,7 +17,7 @@ class ConversationsDataContext:
         if ':' not in db_path_or_url:
             source_path = os.environ.get("PYTHONPATH").split(';')[-1]
             db_path_or_url = os.path.join(source_path, db_path_or_url)
-        if 'http' not in db_path_or_url and not file.file_exists(db_path_or_url):
+        if 'http' not in db_path_or_url and not file.exists(db_path_or_url):
             txt.print(f"/!\\ Conversations Database file not found at path: {db_path_or_url}")
             self.create_database(db_path_or_url)
 

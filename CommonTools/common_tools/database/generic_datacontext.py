@@ -26,7 +26,7 @@ class GenericDataContext:
         self.sqlite_sync_db_path = f'sqlite:///{db_path_or_url}'
         self.sqlite_async_db_path = f'sqlite+aiosqlite:///{db_path_or_url}'
 
-        if 'http' not in self.db_path_or_url and not file.file_exists(self.db_path_or_url):
+        if 'http' not in self.db_path_or_url and not file.exists(self.db_path_or_url):
             txt.print(f"/!\\ Database file not found at path: {self.db_path_or_url}")
             self.create_database()
 

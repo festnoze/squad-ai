@@ -193,6 +193,17 @@ class txt:
             sys.stdout.write(f'\r{empty}')
             sys.stdout.write(f'\r{text}\r\n')
             return elapsed_sec if elapsed_sec else 0
+        
+    @staticmethod
+    def replace_text_continue_spinner(text=None):
+        if not txt.activate_print:
+            return None
+        #txt.stop_spinner()
+        empty = 120 * ' '
+        sys.stdout.write(f'\r{empty}')
+        if text:
+            sys.stdout.write(f'\r{text}\r\n')
+        #txt.start_spinner()
     
     @staticmethod    
     def remove_markdown(text):

@@ -5,14 +5,15 @@ import glob
 import csv
 from typing import Any, Union
 import yaml
-
+#
 from common_tools.models.file_already_exists_policy import FileAlreadyExistsPolicy
 
 from .txt_helper import txt
 
 class file:
+
     @staticmethod
-    def get_as_str(filename, encoding='utf-8-sig', remove_comments= False):
+    def get_as_str(filename:str, encoding='utf-8-sig', remove_comments= False):
         """
         Get the specified file content as string (removing '//' or '#' commented lines)
 
@@ -79,15 +80,6 @@ class file:
     
     @staticmethod
     def _get_unique_filename(filepath: str) -> str:
-        """
-        Generate a unique filename by appending a number if the file already exists.
-        
-        Args:
-            filepath (str): The original filepath to check for uniqueness.
-        
-        Returns:
-            str: A new unique filepath.
-        """
         base, extension = os.path.splitext(filepath)
         counter = 1
         new_filepath = f"{base}_{counter}{extension}"
@@ -96,6 +88,7 @@ class file:
             new_filepath = f"{base}_{counter}{extension}"
         return new_filepath
 
+    @staticmethod
     def write_csv(filepath:str, data:Any):
         with open(filepath, 'w', newline='\r\n', encoding='utf-8-sig') as file_handler:
             writer = csv.writer(file_handler)
@@ -103,19 +96,26 @@ class file:
             for line in data:
                 writer.writerow([line])
 
+    @staticmethod
     def read_csv(filepath:str):
         with open(filepath, 'r', newline='\r\n', encoding='utf-8-sig') as file_handler:
             reader = csv.reader(file_handler)
             data = list(reader)
         return data
     
+    @staticmethod
     def read_file(filepath:str):
         with open(filepath, 'r', encoding='utf-8-sig') as file_handler:
             data = file_handler.read()
         return data
     
-    def file_exists(filepath:str):
+    @staticmethod
+    def exists(filepath:str)-> bool:
         return os.path.exists(filepath)
+    
+    @staticmethod
+    def dir_exists(dir_path:str) -> bool:
+        return os.path.isdir(dir_path)
     
     @staticmethod
     def delete_all_files_with_extension(extension_to_delete:str, folder_path:str):
@@ -125,7 +125,7 @@ class file:
     
     @staticmethod
     def delete_file(path_and_name:str):
-        if file.file_exists(path_and_name):
+        if file.exists(path_and_name):
             os.remove(path_and_name)
         
     @staticmethod
@@ -155,6 +155,7 @@ class file:
                     all_files.append(os.path.join(root, file))        
         return all_files
     
+    @staticmethod
     def copy_folder_files_and_folders_to_folder(source_folder:str, destination_folder:str):
         if not os.path.exists(destination_folder):
             os.makedirs(destination_folder)
@@ -183,7 +184,7 @@ class file:
     def get_as_json(full_file_path:str):
         if not full_file_path.endswith('.json'):
             full_file_path += '.json'
-        if not file.file_exists(full_file_path):
+        if not file.exists(full_file_path):
             raise FileNotFoundError(f"File '{full_file_path}' does not exist.")
         data = file.get_as_str(full_file_path)
         if not data:

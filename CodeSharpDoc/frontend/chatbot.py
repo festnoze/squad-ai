@@ -7,11 +7,11 @@ from common_tools.models.llm_info import LlmInfo
 from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
 #from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline_with_prefect import RagInferencePipelineWithPrefect
 from common_tools.rag.rag_service import RagService
-from common_tools.rag.rag_filtering_metadata_helper import RagFilteringMetadataHelper
-
+from common_tools.rag.rag_service_factory import RagServiceFactory
+from common_tools.helpers.rag_filtering_metadata_helper import RagFilteringMetadataHelper
+from common_tools.helpers.env_helper import EnvHelper
 # internal import
 from services.available_actions import AvailableActions
-from startup import Startup
 
 class ChatbotFront:
     ongoing_action = None
@@ -79,28 +79,26 @@ class ChatbotFront:
             while ChatbotFront.is_waiting == True:
                 time.sleep(1)
             
-        if prompt := st.chat_input():
+        if user_query := st.chat_input():
+            if not user_query.strip(): user_query = "quels sont les endpoints pour récupérer le fil d'actualité en V3 ?"
             with st.spinner("Recherche de réponses en cours ..."):
-                st.session_state.messages.append({"role": "user", "content": txt.remove_markdown(prompt)})
-                st.chat_message("user").write(prompt)
-                AvailableActions.rag_querying_from_sl_chatbot(ChatbotFront.inference_pipeline, prompt, st, ChatbotFront.include_bm25_retrieval)
+                st.session_state.messages.append({"role": "user", "content": txt.remove_markdown(user_query)})
+                st.chat_message("user").write(user_query)
+                AvailableActions.rag_querying_from_sl_chatbot(ChatbotFront.inference_pipeline, user_query, st, ChatbotFront.include_bm25_retrieval)
 
     def initialize():
         txt.activate_print = True
-        if not ChatbotFront.llms_infos:
-            ChatbotFront.llms_infos = Startup.initialize()
         if not ChatbotFront.rag:
-            ChatbotFront.rag = AvailableActions.init_rag_service(ChatbotFront.llms_infos)
+            ChatbotFront.rag = RagServiceFactory.build_from_env_config()
         if not ChatbotFront.inference_pipeline:
-            if ChatbotFront.use_prefect:
-                pass#ChatbotFront.inference_pipeline = RagInferencePipelineWithPrefect(ChatbotFront.rag, None)            
-            else:
-                default_filters = ChatbotFront.get_CodeSharpDoc_default_filters()
-                ChatbotFront.inference_pipeline = RagInferencePipeline(ChatbotFront.rag, default_filters, None)
+            # if ChatbotFront.use_prefect:
+            #     ChatbotFront.inference_pipeline = RagInferencePipelineWithPrefect(ChatbotFront.rag, None)            
+            # else:
+                ChatbotFront.inference_pipeline = RagInferencePipeline(rag= ChatbotFront.rag, default_filters= ChatbotFront.get_CodeSharpDoc_default_metadata_filters(), metadata_descriptions= None, tools= None)
 
       
     @staticmethod
-    def get_CodeSharpDoc_default_filters() -> dict:
+    def get_CodeSharpDoc_default_metadata_filters() -> dict:
         return {
                 "$and": [
                     {"functional_type": "Controller"},

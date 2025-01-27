@@ -1,3 +1,4 @@
+-e C:/Dev/squad-ai/CommonTools # local package to internal tooling
 python-dotenv
 openai
 requests
@@ -20,4 +21,3 @@ streamlit
 langgraph
 langchain-experimental
 lark
--e C:/Dev/squad-ai/CommonTools # local package to internal tooling

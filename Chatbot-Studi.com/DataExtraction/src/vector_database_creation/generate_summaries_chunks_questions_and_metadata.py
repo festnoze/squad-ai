@@ -134,7 +134,7 @@ class GenerateDocumentsSummariesChunksQuestionsAndMetadata:
             docs.append(DocWithSummaryChunksAndQuestions(doc_content= trainings_docs[i].page_content, doc_summary=docs_summaries[i], doc_chunks=doc_chunks))
         return docs
     
-    def load_or_generate_all_docs_from_summaries(
+    def load_or_generate_all_docs_from_summaries_and_questions(
                                         self, 
                                         path: str, 
                                         llm_and_fallback, 
@@ -180,7 +180,7 @@ class GenerateDocumentsSummariesChunksQuestionsAndMetadata:
         all_docs.extend(jobs_docs)
 
         # Process trainings (generate summaries, chunks and questions if needed)
-        trainings_objects = self.load_or_generate_trainings_to_process(path, all_docs, llm_and_fallback, add_trainings_full_details, add_trainings_full_doc)
+        trainings_objects = self.load_or_generate_trainings_summaries_chunks_and_questions_to_process(path, all_docs, llm_and_fallback, add_trainings_full_details, add_trainings_full_doc)
         
         # Create all chunks (docs chunks with questions)
         docs_chunks_and_questions = []
@@ -195,11 +195,11 @@ class GenerateDocumentsSummariesChunksQuestionsAndMetadata:
     
         return all_docs
 
-    def load_or_generate_trainings_to_process(self, out_dir: str, all_docs:list, llm_and_fallback, add_full_details = False, add_full_doc = True) -> list[Document]:       
+    def load_or_generate_trainings_summaries_chunks_and_questions_to_process(self, out_dir: str, all_docs:list, llm_and_fallback, add_full_details = False, add_full_doc = True) -> list[Document]:       
         trainings_docs = self._load_and_process_trainings(out_dir, all_docs, add_full_details, add_full_doc)
         docs_with_summary_chunks_and_questions_file_path = os.path.join(out_dir, 'trainings_summaries_chunks_and_questions_objects.json')
 
-        if file.file_exists(docs_with_summary_chunks_and_questions_file_path):
+        if file.exists(docs_with_summary_chunks_and_questions_file_path):
             docs_with_summary_chunks_and_questions_json = file.get_as_json(docs_with_summary_chunks_and_questions_file_path)
             trainings_objects = [DocWithSummaryChunksAndQuestions(**doc) for doc in docs_with_summary_chunks_and_questions_json]
             txt.print(f">>> Loaded existing {len(trainings_objects)} docs with summary, chunks and questions from file at: {docs_with_summary_chunks_and_questions_file_path}")

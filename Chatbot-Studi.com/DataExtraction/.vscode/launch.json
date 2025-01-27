@@ -12,14 +12,15 @@
             "args": [
                 "api.startup:app", // The FastAPI app instance in main.py
                 "--host", "127.0.0.1", // Host to bind
-                "--port", "8000",      // Port to bind
-                //"--reload"    // Enable/disable auto-reload on code change (for development)
-                //"--log-level", "error" // Log level
+                "--port", "8281",      // Port to bind
+                "--log-level", "error", // Corrected log-level argument
+                "--reload",    // Enable/disable auto-reload on code change (for development)
             ],
             "env": {
                 "PYTHONPATH": "${workspaceFolder}\\src"
             },
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+            //"preLaunchTask": "Clear Terminal"
         }
     ]
 }

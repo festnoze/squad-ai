@@ -134,9 +134,3 @@ class ChatbotFront:
         for word in words:
             yield word + " "
             time.sleep(interval_btw_words)
-
-    
-    @staticmethod
-    def _write_stream(generator) -> Generator[str, None, None]:
-        for chunk_stream in generator:
-            yield chunk_stream

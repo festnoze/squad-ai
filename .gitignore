@@ -2,8 +2,8 @@ inputs/
 outputs/
 storage/
 exchanges/
-outputs.save/
-outputs.old/
+*.save/
+*.old/
 chroma_db/
 *.db
 

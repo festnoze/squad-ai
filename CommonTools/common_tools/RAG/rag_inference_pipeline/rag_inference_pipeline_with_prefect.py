@@ -14,7 +14,7 @@
 # from common_tools.helpers.ressource_helper import Ressource
 # from common_tools.models.logical_operator import LogicalOperator
 # from common_tools.models.question_analysis import QuestionAnalysis, QuestionAnalysisPydantic
-# from common_tools.rag.rag_filtering_metadata_helper import RagFilteringMetadataHelper
+# from common_tools.helpers.rag_filtering_metadata_helper import RagFilteringMetadataHelper
 # from common_tools.rag.rag_service import RagService
 # from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
 # from langchain_core.documents import Document
@@ -64,7 +64,7 @@
 #         retrieved_chunks = self.rag_hybrid_retrieval(analysed_query, metadata, include_bm25_retrieval, give_score)
 
 #         # Augmented Answer Generation subflow
-#         response = self.rag_augmented_answer_generation(retrieved_chunks, analysed_query)
+#         response = self.rag_augmented_answer_generation_no_streaming_sync(retrieved_chunks, analysed_query)
 
 #         # Post-treatment subflow
 #         final_response = self.rag_post_treatment(response)
@@ -205,7 +205,7 @@
     
 #     # Augmented answer generation subflow
 #     @flow(name="rag answer generation")
-#     def rag_augmented_answer_generation(self, retrieved_chunks: list, questionAnalysis: QuestionAnalysis):
+#     def rag_augmented_answer_generation_no_streaming_sync(self, retrieved_chunks: list, questionAnalysis: QuestionAnalysis):
 #         return self.rag_response_generation(retrieved_chunks, questionAnalysis)
 
 #     @task

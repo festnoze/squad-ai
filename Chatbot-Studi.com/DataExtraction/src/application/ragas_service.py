@@ -5,10 +5,12 @@ import nest_asyncio
 import pandas as panda
 
 from common_tools.langchains.langchain_factory import LangChainFactory
-from common_tools.models.embedding import EmbeddingModel
+from common_tools.models.embedding_model import EmbeddingModel
+from common_tools.models.embedding_type import EmbeddingType
+from common_tools.models.embedding_model_factory import EmbeddingModelFactory
 from common_tools.models.llm_info import LlmInfo
 from common_tools.helpers.execute_helper import Execute
-from common_tools.rag.rag_injection_pipeline.rag_injection_pipeline import RagInjectionPipeline
+from common_tools.rag.rag_ingestion_pipeline.rag_ingestion_pipeline import RagIngestionPipeline
 from common_tools.models.llm_info import LlmInfo
 from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.rag.rag_service import RagService
@@ -216,7 +218,7 @@ class RagasService:
 
         loader = TextLoader("./tests/generate_ground_truth_ragas_test.txt")
         rag_service = RagService(llm_info, EmbeddingModel.OpenAI_TextEmbedding3Small) #EmbeddingModel.Ollama_AllMiniLM
-        injection_pipeline = RagInjectionPipeline(rag_service)
+        injection_pipeline = RagIngestionPipeline(rag_service)
         docs = loader.load_and_split(RecursiveCharacterTextSplitter(
             separators=["\n"],
             chunk_size=200,
@@ -265,7 +267,7 @@ class RagasService:
         os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY") # needed by ragas which use GPT-4o-mini
         
         evaluator_llm = LangChainFactory.create_llm_from_info(llm_info) #AvailableService.rag_service.llm_1)
-        embedding = EmbeddingModel.OpenAI_TextEmbedding3Small.create_instance()
+        embedding = EmbeddingModelFactory.create_instance(EmbeddingModel.OpenAI_TextEmbedding3Small)
         
         generator = TestsetGenerator.from_langchain(
             LangchainLLMWrapper(evaluator_llm),
