@@ -127,15 +127,18 @@ class AvailableService:
     @staticmethod    
     async def test_all_llms_from_env_config_async():
         models_names = []
+        # Test all LLMs including the commented ones
         llms_infos = EnvHelper.get_llms_infos_from_env_config(skip_commented_lines=False)
         llms = LangChainFactory.create_llms_from_infos(llms_infos)
         for llm in llms:
             llm_sync_test = Llm.test_llm_inference(llm)
             llm_async_test = await Llm.test_llm_inference_streaming_async(llm)
+            model_name = llm.model_name if hasattr(llm, 'model_name') else llm.model if hasattr(llm, 'model') else llm.__class__.__name__
+
             if llm_sync_test and llm_async_test:
-                models_names.append(f"SUCCESS: Testing model: '{llm.model}' as sync: {llm_sync_test:2f}s. and as async streaming: {llm_async_test:2f}s.")
+                models_names.append(f"SUCCESS: '{model_name}'. Sync: {llm_sync_test:2f}s. Async streaming: {llm_async_test:2f}s.")
             else:
-                models_names.append(f"FAILURE: Testing model: '{llm.model}' as sync: {'fails' if llm_sync_test==0.0 else 'succeed'}, and as async streaming: {'fails' if llm_async_test==0.0 else 'succeed'}.")
+                models_names.append(f"FAILURE: '{model_name}'. Sync: {'fails' if llm_sync_test==0.0 else 'succeed'}. Async streaming: {'fails' if llm_async_test==0.0 else 'succeed'}.")
         return models_names
 
 

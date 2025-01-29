@@ -66,7 +66,7 @@ class ChatbotFront:
 
             st.subheader("✒️ Paramétrage du pipeline d'ingestion")
             st.button("🔄 Re-démarrage de l'API RAG",               on_click=lambda: st.session_state.api_client.re_init_api())
-            st.button("🧪 Tester tous les modèles d'inférence",   on_click=lambda: st.session_state.api_client.test_all_inference_models())
+            st.button("🧪 Tester tous les modèles d'inférence",   on_click=lambda: ChatbotFront.test_all_inference_models())
             st.button('📥 Récupérer données Drupal par json-api',   on_click=lambda: st.session_state.api_client.retrieve_all_data())
             st.button('🌐 Scraping des pages web des formations',   on_click=lambda: st.session_state.api_client.scrape_website_pages())
             st.button('🗂️ Construction de la base vectorielle',     on_click=lambda: st.session_state.api_client.build_vectorstore())
@@ -118,6 +118,13 @@ class ChatbotFront:
             st.session_state.api_host_uri =  os.getenv("API_HOST_URI")
             st.session_state.api_client = ChatbotApiClient(st.session_state.api_host_uri)
             ChatbotFront.start_new_conversation()
+
+    def test_all_inference_models():
+        tests_results = st.session_state.api_client.test_all_inference_models()
+        result_msg = "Tous les modèles d'inférence configurés ont été testés avec les résultats suivants: \n\n"
+        for result in tests_results['models_tests_results']:
+            result_msg += f"- {result}\n"            
+        st.write(result_msg)
 
     @staticmethod
     def _start_caption():

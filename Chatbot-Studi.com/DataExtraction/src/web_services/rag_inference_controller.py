@@ -31,13 +31,11 @@ def reinitialize():
 async def test_all_models():
     try:
         models_tests_results:list[str] = await AvailableService.test_all_llms_from_env_config_async()
-        if all(['SUCCESS' in model_test_result for model_test_result in models_tests_results]):
-            return JSONResponse(content={"models_tests_results": models_tests_results}, status_code=200)
-        else:
-            return JSONResponse(content={"models_tests_results": models_tests_results}, status_code=500)
-            
+        success = all(['SUCCESS' in model_test_result for model_test_result in models_tests_results])
+        return JSONResponse(content={"models_tests_results": models_tests_results}, status_code= 200 if success else 500)
+
     except Exception as e:
-        print(f"Failed to create conversation: {e}")
+        print(f"Failed to test all models. Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     
 @inference_router.patch("/user/sync")

@@ -77,8 +77,7 @@ class RagService:
         if isinstance(llm_or_info, LlmInfo) or (isinstance(llm_or_info, list) and any(llm_or_info) and isinstance(llm_or_info[0], LlmInfo)):            
             llm = LangChainFactory.create_llms_from_infos(llm_or_info)[0]
             if test_inference:
-                if not Llm.test_llm_inference(llm):
-                    
+                if not Llm.test_llm_inference(llm):                    
                     model_name = llm.model_name if hasattr(llm, 'model_name') else llm.model if hasattr(llm, 'model') else llm.__class__.__name__
                     raise ValueError(f"Inference test failed for model: '{model_name}'.")
             return llm

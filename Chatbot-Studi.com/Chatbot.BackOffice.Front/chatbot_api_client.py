@@ -36,9 +36,7 @@ class ChatbotApiClient:
     
     def test_all_inference_models(self):
         resp = requests.get(f"{self.inference_prefix}/test-all-models")
-        if not resp.ok:
-            raise requests.exceptions.HTTPError(
-                f"Testing of all inference models fails: {resp.status_code}, with: {resp.text}")
+        return resp.json()
         
     def create_or_update_user(self, user_request_model: UserRequestModel) -> UUID:
         url = f"{self.inference_prefix}/user/sync"
