@@ -37,7 +37,7 @@ class RagService:
         self.llm_2=None
         self.llm_3=None
         self.instanciate_embedding(embedding_model)
-        self.instanciate_llms(llms_or_info, test_inference=False)
+        self.instanciate_llms(llms_or_info, test_llms_inference=False)
         self.vector_db_name:str = vector_db_name
         self.vector_db_type:VectorDbType = vector_db_type
         self.vector_db_base_path:str = vector_db_base_path
@@ -51,18 +51,18 @@ class RagService:
         self.embedding = EmbeddingModelFactory.create_instance(embedding_model)
         self.embedding_model_name = embedding_model.model_name
         
-    def instanciate_llms(self, llm_or_infos: Optional[Union[LlmInfo, Runnable, list]], test_inference:bool = False):        
+    def instanciate_llms(self, llm_or_infos: Optional[Union[LlmInfo, Runnable, list]], test_llms_inference:bool = False):        
         if isinstance(llm_or_infos, list):
             if any(llm_or_infos) and isinstance(llm_or_infos[0], LlmInfo):
                 self.llms_infos = llm_or_infos
             index = 1
             for llm_or_info in llm_or_infos:
                 if index == 1:
-                    self.llm_1 = self.init_llm(llm_or_info, test_inference)
+                    self.llm_1 = self.init_llm(llm_or_info, test_llms_inference)
                 elif index == 2:
-                    self.llm_2 = self.init_llm(llm_or_info, test_inference)
+                    self.llm_2 = self.init_llm(llm_or_info, test_llms_inference)
                 elif index == 3:
-                    self.llm_3 = self.init_llm(llm_or_info, test_inference)
+                    self.llm_3 = self.init_llm(llm_or_info, test_llms_inference)
                 else:
                     raise ValueError("Only 4 llms are supported")
                 index += 1

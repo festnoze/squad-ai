@@ -110,24 +110,7 @@ class EnvHelper:
         try:
             llms_infos = []
             for llm_dict in ordered_llms_list:
-                model = llm_dict['model']
-                timeout = llm_dict['timeout']
-                inference_provider_name = None
-                if ' ' in llm_dict['type']:
-                    llm_type_str = llm_dict['type'].split(' ')[0]
-                    inference_provider_name = llm_dict['type'].split(' ')[1]
-                    llm_type_enum = LangChainAdapterType[llm_type_str]
-                    llm_type_enum.set_default_inference_provider_name(inference_provider_name)
-                else:
-                    llm_type_str = llm_dict['type']
-                    llm_type_enum = LangChainAdapterType[llm_type_str]
-
-                llm_info = LlmInfo(
-                                type=llm_type_enum, 
-                                model=model, 
-                                timeout=timeout, 
-                                temperature=llms_temp
-                            )
+                llm_info = LlmInfo.factory_from_dict(llm_dict, llms_temp)
                 llms_infos.append(llm_info)
             return llms_infos
         

@@ -16,13 +16,12 @@ from web_services.request_models.user_request_model import UserRequestModel
 
 inference_router = APIRouter(prefix="/rag/inference", tags=["Inference"])
 
-@inference_router.post("/reinitialize")
+@inference_router.post("/reinitialize", response_class=Response)
 def reinitialize():
     try:
         AvailableService.re_init()
-        return JSONResponse(
-            status_code=204
-        )
+        return Response(status_code=204)
+    
     except Exception as e:
         print(f"Failed to create conversation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -65,8 +64,8 @@ async def create_new_conversation(conversation: ConversationRequestModel):
         new_conv = await AvailableService.create_new_conversation_async(conversation.user_id, messages_model)
         return JSONResponse(
             content={"id": str(new_conv.id)},
-            status_code=200
-        )
+            status_code=200)
+    
     except Exception as e:
         print(f"Failed to create conversation: {e}")
         raise HTTPException(status_code=500, detail=str(e))

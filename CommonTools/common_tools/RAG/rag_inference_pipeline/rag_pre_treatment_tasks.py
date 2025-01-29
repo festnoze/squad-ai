@@ -114,7 +114,7 @@ class RAGPreTreatment:
 
         response = await Llm.invoke_chain_with_input_async('Query rewritting', rag.llm_1, query_rewritting_prompt)
         
-        content =  Llm.extract_json_from_llm_response(Llm.get_content(response))
+        content = Llm.extract_json_from_llm_response(Llm.get_content(response))
         analysed_query.modified_question = content['modified_question']
         print(f'> Rewritten query: "{analysed_query.modified_question}"')
         return analysed_query

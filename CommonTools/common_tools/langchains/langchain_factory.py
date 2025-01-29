@@ -40,7 +40,7 @@ class LangChainFactory():
             llms.append(llm)
             
         txt.activate_print = activate_print_status
-        txt.stop_spinner_replace_text('LLMs models loaded successfully.')
+        txt.stop_spinner_replace_text('Loaded LLM model(s): ' + ', '.join([llm_info.model for llm_info in llms_infos]))
         return llms
     
     @staticmethod

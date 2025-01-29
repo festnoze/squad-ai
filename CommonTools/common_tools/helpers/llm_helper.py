@@ -226,7 +226,11 @@ class Llm:
             raise Exception("No JSON content found in response")
         
         content = content[start_index:end_index]
-        return json.loads(content)
+        try:
+            result = json.loads(content)
+            return result
+        except Exception as e:
+            raise Exception(f"Error extracting JSON from content: '{content[:200]}...'.\nError: {e}")
     
     TPydanticModel = TypeVar('TPydanticModel', bound=BaseModel)    
     TOutputModel = TypeVar('TOutputModel')
