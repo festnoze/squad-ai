@@ -16,6 +16,30 @@ from web_services.request_models.user_request_model import UserRequestModel
 
 inference_router = APIRouter(prefix="/rag/inference", tags=["Inference"])
 
+@inference_router.post("/reinitialize")
+def reinitialize():
+    try:
+        AvailableService.re_init()
+        return JSONResponse(
+            status_code=204
+        )
+    except Exception as e:
+        print(f"Failed to create conversation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
+@inference_router.get("/test-all-models")
+async def test_all_models():
+    try:
+        models_tests_results:list[str] = await AvailableService.test_all_llms_from_env_config_async()
+        if all(['SUCCESS' in model_test_result for model_test_result in models_tests_results]):
+            return JSONResponse(content={"models_tests_results": models_tests_results}, status_code=200)
+        else:
+            return JSONResponse(content={"models_tests_results": models_tests_results}, status_code=500)
+            
+    except Exception as e:
+        print(f"Failed to create conversation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    
 @inference_router.patch("/user/sync")
 async def create_or_retrieve_user(user_request_model: UserRequestModel):
     try:        

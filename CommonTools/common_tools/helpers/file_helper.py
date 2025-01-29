@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import shutil
 import glob
 import csv
@@ -193,11 +194,27 @@ class file:
         return json_
     
     @staticmethod
-    def get_as_yaml(file_path:str):
+    def get_as_yaml(file_path:str, skip_commented_lines:bool = True):
         """Load the specified YAML file."""
         if not file_path.endswith('.yaml') and not file_path.endswith('.yml'):
             file_path += '.yaml'
         if not os.path.exists(file_path):
             return None
-        with open(file_path, 'r') as file:
-            return yaml.safe_load(file)
+        
+        if skip_commented_lines:
+            with open(file_path, 'r') as file:
+                return yaml.safe_load(file)
+        else:
+            lines = []
+            with open(file_path, 'r') as file:
+                lines = file.readlines()
+
+            uncommented_lines = []
+            for line in lines:
+                if line.lstrip().startswith('#'):
+                    line = line[:line.index('#')] + line[line.index('#')+1:]
+                    uncommented_lines.append(line)
+                else:
+                    uncommented_lines.append(line)
+            result = ''.join(uncommented_lines)
+            return yaml.safe_load(result)

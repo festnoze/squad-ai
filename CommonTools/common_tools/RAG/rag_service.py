@@ -17,6 +17,7 @@ from pinecone import ServerlessSpec
 
 # common tools imports
 from common_tools.helpers.txt_helper import txt
+from common_tools.helpers.llm_helper import Llm
 from common_tools.models.llm_info import LlmInfo
 from common_tools.helpers.file_helper import file
 from common_tools.helpers.env_helper import EnvHelper
@@ -36,7 +37,7 @@ class RagService:
         self.llm_2=None
         self.llm_3=None
         self.instanciate_embedding(embedding_model)
-        self.instanciate_llms(llms_or_info)
+        self.instanciate_llms(llms_or_info, test_inference=False)
         self.vector_db_name:str = vector_db_name
         self.vector_db_type:VectorDbType = vector_db_type
         self.vector_db_base_path:str = vector_db_base_path
@@ -50,18 +51,18 @@ class RagService:
         self.embedding = EmbeddingModelFactory.create_instance(embedding_model)
         self.embedding_model_name = embedding_model.model_name
         
-    def instanciate_llms(self, llm_or_infos: Optional[Union[LlmInfo, Runnable, list]]):        
+    def instanciate_llms(self, llm_or_infos: Optional[Union[LlmInfo, Runnable, list]], test_inference:bool = False):        
         if isinstance(llm_or_infos, list):
             if any(llm_or_infos) and isinstance(llm_or_infos[0], LlmInfo):
                 self.llms_infos = llm_or_infos
             index = 1
             for llm_or_info in llm_or_infos:
                 if index == 1:
-                    self.llm_1 = self.init_llm(llm_or_info)
+                    self.llm_1 = self.init_llm(llm_or_info, test_inference)
                 elif index == 2:
-                    self.llm_2 = self.init_llm(llm_or_info)
+                    self.llm_2 = self.init_llm(llm_or_info, test_inference)
                 elif index == 3:
-                    self.llm_3 = self.init_llm(llm_or_info)
+                    self.llm_3 = self.init_llm(llm_or_info, test_inference)
                 else:
                     raise ValueError("Only 4 llms are supported")
                 index += 1
@@ -72,9 +73,15 @@ class RagService:
         if not self.llm_2: self.llm_2 = self.llm_1
         if not self.llm_3: self.llm_3 = self.llm_2
     
-    def init_llm(self, llm_or_info: Optional[Union[LlmInfo, Runnable]]):
+    def init_llm(self, llm_or_info: Optional[Union[LlmInfo, Runnable]], test_inference:bool = False) -> Runnable:
         if isinstance(llm_or_info, LlmInfo) or (isinstance(llm_or_info, list) and any(llm_or_info) and isinstance(llm_or_info[0], LlmInfo)):            
-            return LangChainFactory.create_llms_from_infos(llm_or_info)[0]
+            llm = LangChainFactory.create_llms_from_infos(llm_or_info)[0]
+            if test_inference:
+                if not Llm.test_llm_inference(llm):
+                    
+                    model_name = llm.model_name if hasattr(llm, 'model_name') else llm.model if hasattr(llm, 'model') else llm.__class__.__name__
+                    raise ValueError(f"Inference test failed for model: '{model_name}'.")
+            return llm
         elif isinstance(llm_or_info, Runnable):
             return llm_or_info
         else:
@@ -95,13 +102,16 @@ class RagService:
     
     def load_vectorstore(self, vector_db_path:str = None, embedding: Embeddings = None, vectorstore_type: VectorDbType = VectorDbType('chroma'), vectorstore_name:str = 'main') -> VectorStore:
         try:
+            is_cloud_hosted_db = vectorstore_type == VectorDbType.Pinecone # TODO: to generalize
             vectorstore:VectorStore = None
-            vector_db_path = os.path.join(vector_db_path, vectorstore_name)
-            if not file.exists(vector_db_path):
-                txt.print(f'>> Vectorstore not loaded, as path: "... {vector_db_path[-110:]}" is not found')
+
+            if not is_cloud_hosted_db:
+                vector_db_path = os.path.join(vector_db_path, vectorstore_name)
+                if not file.exists(vector_db_path): 
+                    txt.print(f'>> Vectorstore not loaded, as path: "... {vector_db_path[-110:]}" is not found')
             
             if vectorstore_type == VectorDbType.ChromaDB:
-                vectorstore = Chroma(persist_directory= vector_db_path, embedding_function= embedding)
+                    vectorstore = Chroma(persist_directory= vector_db_path, embedding_function= embedding)
             
             elif vectorstore_type == VectorDbType.Qdrant:
                 qdrant_client = QdrantClient(path=vector_db_path)

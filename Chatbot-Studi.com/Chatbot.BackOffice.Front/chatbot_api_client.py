@@ -11,6 +11,7 @@ class ChatbotApiClient:
         self.ingestion_prefix = f"{self.host_uri}/rag/ingestion"
         self.inference_prefix = f"{self.host_uri}/rag/inference"
 
+    ### Ingestion endpoints ###
     def retrieve_all_data(self) -> None:
         requests.post(f"{self.ingestion_prefix}/drupal/data/retrieve")
 
@@ -26,6 +27,19 @@ class ChatbotApiClient:
     def generate_ground_truth(self) -> None:
         requests.post(f"{self.ingestion_prefix}/groundtruth/generate")
 
+    ### Inference endpoints ###
+    def re_init_api(self):
+        resp = requests.post( f"{self.inference_prefix}/reinitialize")
+        if resp.status_code != 204 or not resp.ok:
+            raise requests.exceptions.HTTPError(
+                f"API re-initialization fails with status code {resp.status_code}, payload: {resp.text}")
+    
+    def test_all_inference_models(self):
+        resp = requests.get(f"{self.inference_prefix}/test-all-models")
+        if not resp.ok:
+            raise requests.exceptions.HTTPError(
+                f"Testing of all inference models fails: {resp.status_code}, with: {resp.text}")
+        
     def create_or_update_user(self, user_request_model: UserRequestModel) -> UUID:
         url = f"{self.inference_prefix}/user/sync"
         headers = {"Content-Type": "application/json"}

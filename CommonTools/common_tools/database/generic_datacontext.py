@@ -16,7 +16,7 @@ from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.file_helper import file
 
 class GenericDataContext:
-    def __init__(self, base_entities, db_path_or_url='database.db'):
+    def __init__(self, base_entities, db_path_or_url='database.db', log_queries_to_terminal=False):
         if ':' not in db_path_or_url:
             source_path = os.environ.get("PYTHONPATH").split(';')[-1]
             db_path_or_url = os.path.join(source_path.replace('/', '\\'), db_path_or_url.replace('/', '\\'))
@@ -30,7 +30,7 @@ class GenericDataContext:
             txt.print(f"/!\\ Database file not found at path: {self.db_path_or_url}")
             self.create_database()
 
-        self.engine = create_async_engine(self.sqlite_async_db_path, echo=True)
+        self.engine = create_async_engine(self.sqlite_async_db_path, echo=log_queries_to_terminal)
         self.SessionLocal = sessionmaker(
                                 bind=self.engine,
                                 expire_on_commit=False,

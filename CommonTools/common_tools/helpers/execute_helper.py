@@ -29,30 +29,31 @@ class Execute:
     #     except StopAsyncIteration:
     #         loop.close()
 
-    
-    # TODO: WARNING - It have issues with the event loop
     @staticmethod
     def async_wrapper_to_sync(function_to_call: Callable[..., Any], *args: Any, **kwargs: Any) -> Any:
         """
-        Encapsulate an asynchronous function into a synchronous function.
-        Ensures compatibility with existing event loops or creates a new one as needed.
+        Encapsulate an asynchronous function execution into a synchronous function.
+        Ensures compatibility with existing event loops - or creates a new one as needed.
         """
         try:
             # Attempt to get the current event loop
             loop = asyncio.get_event_loop()
             if loop.is_running():
-                # If an event loop is already running, use a temporary loop
-                # because `run_until_complete` cannot be used in a running loop
-                return asyncio.run(function_to_call(*args, **kwargs))
+                if asyncio.iscoroutine(function_to_call):  
+                    future = asyncio.ensure_future(function_to_call)
+                elif asyncio.iscoroutinefunction(function_to_call):  
+                    coroutine = function_to_call(*args, **kwargs)
+                    future = asyncio.ensure_future(coroutine)
+                else:
+                    raise TypeError(f"Expected async function or coroutine object, got {type(function_to_call)}")
+
+                return loop.run_until_complete(future)
             elif loop.is_closed():
                 raise RuntimeError("Event loop is closed")
         except RuntimeError:
-            # Create a new event loop if none exists or the current one is closed
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-
-        # Run the async function on the identified loop
-        return loop.run_until_complete(function_to_call(*args, **kwargs))
+            return loop.run_until_complete(function_to_call(*args, **kwargs))
    
     # TODO: WARNING - It have issues with the event loop
     @staticmethod

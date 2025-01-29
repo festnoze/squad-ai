@@ -1,6 +1,7 @@
 import asyncio
 import json
-from langchain_core.prompts import ChatPromptTemplate
+import time
+from langchain_core.language_models.chat_models import BaseChatModel
 from pydantic import BaseModel, Field
 from langchain_core.output_parsers import StrOutputParser, ListOutputParser, MarkdownListOutputParser, JsonOutputParser, BaseTransformOutputParser
 from langchain_core.runnables import Runnable, RunnableParallel, RunnableSequence
@@ -9,6 +10,7 @@ from langchain.agents import AgentExecutor, create_tool_calling_agent, create_js
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_community.callbacks import get_openai_callback, OpenAICallbackHandler
 from langchain.schema.messages import HumanMessage, AIMessage, SystemMessage
+from common_tools.helpers.txt_helper import txt
 from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.helpers.execute_helper import Execute
 import inspect
@@ -300,3 +302,35 @@ class Llm:
             remove_text = (Llm.erase_single_previous_stream_tag + ' ') * words_count_to_remove
             async for chunk in Llm.write_static_text_as_stream(remove_text[:-1]): # remove the last space!
                 yield chunk
+
+    @staticmethod       
+    def test_llm_inference(llm:BaseChatModel) -> float:
+        model_name = llm.model_name if hasattr(llm, 'model_name') else llm.model if hasattr(llm, 'model') else llm.__class__.__name__
+        txt.print(f"> Testing inference for model: {model_name} LLM")
+        start_time = time.time()
+        try:
+            answer = llm.invoke("quelles étaient les capitales de la CEE ?")
+        except Exception as e:
+            txt.print(f"/!\\ Inference test failed for model: '{model_name}'/!\\: {e}")
+            return 0.0
+        
+        elapsed_time = time.time() - start_time
+        txt.print(f"- Inference test succeed for model: '{model_name}' in {elapsed_time:.2f}s. \nModel response: '{Llm.get_content(answer)[:200]}...'.")
+        return elapsed_time
+
+    @staticmethod        
+    async def test_llm_inference_streaming_async(llm:BaseChatModel) -> float:
+        model_name = llm.model_name if hasattr(llm, 'model_name') else llm.model if hasattr(llm, 'model') else llm.__class__.__name__
+        txt.print(f"> Testing inference as async streaming for model: {model_name}")
+        start_time = time.time()
+        try:
+            answer = ''
+            async for chunk in llm.astream("quelles sont les capitales de la CEE ?"):
+                answer += chunk.content
+        except Exception as e:
+            txt.print(f"/!\\ Inference test failed for model: '{model_name}'/!\\: {e}")
+            return 0.0
+        
+        elapsed_time = time.time() - start_time
+        txt.print(f"- Streaming async inference test succeed for model: '{model_name}' in {elapsed_time:.2f}s. \nModel response: '{Llm.get_content(answer)[:200]}...'.")
+        return elapsed_time

@@ -63,13 +63,16 @@ class ChatbotFront:
             st.button("Utilisez le chatbot à droite pour tester le pipeline d'inférence ➺", disabled=True)
             st.button('🧽 Effacer la conversation du chatbot', on_click=ChatbotFront.start_new_conversation)
             st.divider()
+
             st.subheader("✒️ Paramétrage du pipeline d'ingestion")
-            st.button('📥 Récupérer données Drupal par json-api', on_click=lambda: st.session_state.api_client.retrieve_all_data())
-            st.button('🌐 Scraping des pages web des formations', on_click=lambda: st.session_state.api_client.scrape_website_pages())
-            st.button('🗂️ Construction de la base vectorielle', on_click=lambda: st.session_state.api_client.build_vectorstore())
-            st.button('🚀 Construction de la base vectorielle avec questions et contenu généré', on_click=lambda: st.session_state.api_client.build_summary_vectorstore())
+            st.button("🔄 Re-démarrage de l'API RAG",               on_click=lambda: st.session_state.api_client.re_init_api())
+            st.button("🧪 Tester tous les modèles d'inférence",   on_click=lambda: st.session_state.api_client.test_all_inference_models())
+            st.button('📥 Récupérer données Drupal par json-api',   on_click=lambda: st.session_state.api_client.retrieve_all_data())
+            st.button('🌐 Scraping des pages web des formations',   on_click=lambda: st.session_state.api_client.scrape_website_pages())
+            st.button('🗂️ Construction de la base vectorielle',     on_click=lambda: st.session_state.api_client.build_vectorstore())
+            st.button('🚀 Construction de la base vectorielle synthétique avec questions', on_click=lambda: st.session_state.api_client.build_summary_vectorstore())
             st.divider()
-            st.button('✨ Générer RAGAS Ground Truth dataset', on_click=lambda: st.session_state.api_client.generate_ground_truth())
+            st.button('✨ Générer RAGAS Ground Truth dataset',      on_click=lambda: st.session_state.api_client.generate_ground_truth())
 
         for msg in st.session_state.messages:
             st.chat_message(msg['role']).write(msg['content'])
@@ -94,8 +97,7 @@ class ChatbotFront:
                 elapsed_time = time.time() - start
                 txt.print(f"RAG full pipeline duration {txt.get_elapsed_str(elapsed_time)}")
 
-    def start_new_conversation():
-        ChatbotFront.init_session()    
+    def start_new_conversation(): 
         st.session_state.messages = []        
         st.session_state.conversation = Conversation(st.session_state.user)
         st.session_state.conversation.add_new_message('assistant', ChatbotFront._start_caption())

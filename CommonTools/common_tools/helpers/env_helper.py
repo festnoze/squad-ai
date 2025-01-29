@@ -2,11 +2,12 @@
 import json
 import os
 from dotenv import load_dotenv
-
-from common_tools.models.langchain_adapter_type import LangChainAdapterType
+#
+from common_tools.helpers.file_helper import file
 from common_tools.models.llm_info import LlmInfo
 from common_tools.models.vector_db_type import VectorDbType
 from common_tools.models.embedding_model import EmbeddingModel
+from common_tools.models.langchain_adapter_type import LangChainAdapterType
 
 class EnvHelper:
     is_env_loaded = False
@@ -34,6 +35,14 @@ class EnvHelper:
     @staticmethod
     def get_pinecone_environment():
         return EnvHelper.generic_get_env_variable_value_by_name('PINECONE_ENVIRONMENT')
+    
+    @staticmethod
+    def get_openrouter_api_key():
+        return EnvHelper.generic_get_env_variable_value_by_name('OPENROUTER_API_KEY')
+
+    @staticmethod
+    def get_openrouter_base_url():
+        return EnvHelper.generic_get_env_variable_value_by_name('OPENROUTER_BASE_URL')
     
     @staticmethod
     def get_embedding_model() -> EmbeddingModel:
@@ -78,36 +87,56 @@ class EnvHelper:
             raise ValueError(f"Invalid value for 'IS_COMMON_DB_FOR_SPARSE_AND_DENSE_VECTORS': '{is_common_db_for_sparse_and_dense_vectors_str}' (cannot be converted to a boolean)")
 
     @staticmethod
-    def get_built_llms_infos() -> list[LlmInfo]:
-        llms_list_json = EnvHelper._get_llms_json()
-        temperature = EnvHelper._get_llms_temperature()
+    def get_llms_infos_from_env_config(skip_commented_lines:bool = True) -> list[LlmInfo]:
+        yaml_env_variables = EnvHelper._get_llm_env_variables(skip_commented_lines)
+        if not 'Llms_Temperature' in yaml_env_variables:
+            raise ValueError("Missing 'Llms_Temperature' key in the yaml environment file")
+        llms_temp = yaml_env_variables['Llms_Temperature']
+        if not 'Llm_infos' in yaml_env_variables:
+            raise ValueError("Missing 'Llm_infos' key in the yaml environment file")
+        llms_list = yaml_env_variables['Llm_infos']
+        if not 'Llms_order' in yaml_env_variables:
+            raise ValueError("Missing 'Llms_order' key in the yaml environment file")
+        llms_order = yaml_env_variables['Llms_order']
+
+        # Re-order llms based on specified order
+        try:
+            ordered_llms_list = [llms_list[i - 1] for i in llms_order]
+            if len(llms_list) > len(ordered_llms_list):
+                ordered_llms_list.extend([llm for llm in llms_list if llm not in ordered_llms_list])
+        except IndexError:
+            raise ValueError("The 'Llms_order' env variable list contains invalid indices.")
 
         try:
-            llms_list_json = llms_list_json.strip('\'"') # Remove surrounding single quotes
-            llms_list = json.loads(llms_list_json)
-            llms = []
-            for llm_dict in llms_list:
-                llm_type_str = llm_dict['type']
+            llms_infos = []
+            for llm_dict in ordered_llms_list:
                 model = llm_dict['model']
                 timeout = llm_dict['timeout']
-                llm_type_enum = LangChainAdapterType[llm_type_str]
-                llm_info = LlmInfo(type=llm_type_enum, model=model, timeout=timeout, temperature=temperature)
-                llms.append(llm_info)
-            return llms
+                inference_provider_name = None
+                if ' ' in llm_dict['type']:
+                    llm_type_str = llm_dict['type'].split(' ')[0]
+                    inference_provider_name = llm_dict['type'].split(' ')[1]
+                    llm_type_enum = LangChainAdapterType[llm_type_str]
+                    llm_type_enum.set_default_inference_provider_name(inference_provider_name)
+                else:
+                    llm_type_str = llm_dict['type']
+                    llm_type_enum = LangChainAdapterType[llm_type_str]
+
+                llm_info = LlmInfo(
+                                type=llm_type_enum, 
+                                model=model, 
+                                timeout=timeout, 
+                                temperature=llms_temp
+                            )
+                llms_infos.append(llm_info)
+            return llms_infos
         
         except json.JSONDecodeError as e:
-            raise ValueError(f"Error parsing LLMS_JSON value: {e}")
+            raise ValueError(f"Error parsing Llm_infos value: {e}")
         except KeyError as e:
-            raise ValueError(f"Missing key in LLMS_JSON: {e}")
-    
-    @staticmethod
-    def _get_llms_temperature() -> float:
-        temperature_str = EnvHelper.generic_get_env_variable_value_by_name('LLMS_TEMPERATURE')
-        try:
-            temperature = float(temperature_str)
-        except ValueError:
-            raise ValueError("'LLMS_TEMPERATURE' was found in the environment, but its value is not a valid float")
-        return temperature
+            raise ValueError(f"Missing key in Llm_infos: {e}")
+        except Exception as e:
+            raise ValueError(f"Error parsing Llm_infos value: {e}")
 
     @staticmethod
     def _get_llms_json() -> str:
@@ -128,7 +157,7 @@ class EnvHelper:
         if not custom_env_files:
             return 
         
-        custom_env_filenames = [file.strip() for file in custom_env_files.split(",")]
+        custom_env_filenames = [filename.strip() for filename in custom_env_files.split(",")]
         for custom_env_filename in custom_env_filenames:
             if not os.path.exists(custom_env_filename):
                 raise FileNotFoundError(f"/!\\ Environment file: '{custom_env_filename}' was not found at the project root.")
@@ -143,4 +172,7 @@ class EnvHelper:
                 raise ValueError(f'Variable named: "{variable_name}" is not set in the environment')
             os.environ[variable_name] = variable_value            
         return os.environ[variable_name]
+    
+    def _get_llm_env_variables(skip_commented_lines:bool = True):
+        return file.get_as_yaml('.llm.env.yaml', skip_commented_lines)
     

@@ -65,9 +65,12 @@ class RagRetrieval:
             except Exception as e:
                 print(f"Error in Pinecone Hybrid Retrieval: {e}")
                 retrieved_chunks = []
-            for doc in retrieved_chunks: 
-                if "rel_ids" in doc.metadata:
-                    doc.metadata.pop("rel_ids", None)
+            
+            # Remove related ids if present in metadata
+            if any(retrieved_chunks) and "rel_ids" in retrieved_chunks[0].metadata: 
+                for retrieved_chunk in retrieved_chunks:
+                    if "rel_ids" in retrieved_chunk.metadata:
+                        retrieved_chunk.metadata.pop("rel_ids", None)
             return retrieved_chunks
         
         retrievers = []
@@ -120,7 +123,7 @@ class RagRetrieval:
             return await RagRetrieval.rag_hybrid_retrieval_langchain_async(rag, analysed_query, None, include_bm25_retrieval, include_contextual_compression, include_semantic_retrieval, give_score, max_retrived_count, bm25_ratio)
 
         # Remove 'rel_ids' from metadata: useless for augmented generation and limit token usage
-        for doc in retrieved_chunks: doc.metadata.pop("rel_ids", None)
+        for retrieved_chunk in retrieved_chunks: retrieved_chunk.metadata.pop("rel_ids", None)
         return retrieved_chunks
     
     @staticmethod    
