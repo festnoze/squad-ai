@@ -140,7 +140,7 @@ class RagService:
                         time.sleep(1)
                     
                 pinecone_index = pinecone_instance.Index(name=vectorstore_name)
-                print("Pinecone VectorStore of " + str(pinecone_index.describe_index_stats()['total_vector_count']) + " vectors loaded.")
+                print(f"Loaded Pinecone vectorstore: '{vectorstore_name}' index, containing " + str(pinecone_index.describe_index_stats()['total_vector_count']) + " vectors total.")
                 vectorstore = PineconeVectorStore(index=pinecone_index, embedding=self.embedding)
             return vectorstore
         

@@ -25,5 +25,5 @@ async def create_vectorstore():
 
 @ingestion_router.post("/vectorstore/create/from-summaries")
 async def create_vectorstore_summary():
-    AvailableService.create_vector_db_after_generate_chunk_and_embed_documents_summaries_and_questions(AvailableService.out_dir)
+    await AvailableService.create_vector_db_after_generate_chunk_and_embed_documents_summaries_and_questions_async(AvailableService.out_dir)
     return {"message": "Vector store created successfully from summaries"}

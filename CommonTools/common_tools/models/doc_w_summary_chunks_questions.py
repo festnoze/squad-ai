@@ -40,17 +40,12 @@ class DocWithSummaryChunksAndQuestions:
         max_chunk_sum_questions_words_count = max([sum([len(question.text.split(' ')) for question in chunk.questions]) for chunk in self.doc_chunks])
         return f"Summary: {summary_words_count} words, {len(self.doc_chunks)} chunks (max. {chunk_max_words_count} words), and {sum([len(chunk.questions) for chunk in self.doc_chunks])} questions (max. words in all questions in chunk: {max_chunk_sum_questions_words_count})."
     
-    def tmp(self):
-        return max([sum([len(question.text.split(' ')) for question in chunk.questions]) for chunk in self.doc_chunks])
-    
     def to_dict(self, include_full_doc=True) -> dict:
         doc_dict = {
-            "doc_content": "",
-            "doc_summary": self.doc_summary,
-            "doc_chunks": [chunk.to_dict() for chunk in self.doc_chunks]
+            'doc_content': self.doc_content if include_full_doc else None,
+            'doc_summary': self.doc_summary,
+            'doc_chunks': [chunk.to_dict() for chunk in self.doc_chunks]
         }
-        if include_full_doc:
-            doc_dict["doc_content"] = self.doc_content
         return doc_dict
     
     def to_langchain_document(self, include_full_training_text=False, include_summary=True) -> Document:
@@ -90,7 +85,7 @@ class DocWithSummaryChunksAndQuestions:
                     elif isinstance(question, dict) and 'text' in question:
                         question_list.append(Question(question['text']))
                     else:
-                        raise ValueError(f"Invalid question format: {question}")
+                        raise ValueError(f'Invalid question format: {question}')
                 
             doc_chunk = DocChunk(chunk_with_questions['text'], question_list)
             chunks_with_questions_typed.append(doc_chunk)      
@@ -104,7 +99,7 @@ class DocWithSummaryChunksAndQuestions:
             row = [chunk.text] + [q.text for q in chunk.questions]
             data.append(row)
             max_questions = max(max_questions, len(chunk.questions))
-        columns = ["Chunk Text"] + [f"Question n°{i+1}" for i in range(max_questions)]
+        columns = ['Chunk Text'] + [f'Question n°{i+1}' for i in range(max_questions)]
         df = pd.DataFrame(data, columns=columns)
         df = df.fillna('')
         print(df.to_string(index=False))
@@ -131,9 +126,11 @@ class DocWithSummaryChunksAndQuestions:
         txt.print(f'Average: {total_questions/total_chunks:.1f} questions by chunk')
         txt.print(f'All chunks size: {sum([len(chunk.text.split(' ')) for chunk in self.doc_chunks])} words.')
 
-#################
-# Pydantic models
-#################
+
+###################
+# Pydantic models #
+###################
+
 class QuestionPydantic(BaseModel):
     text: str = Field(description="Une question atomique et complète portant sur une partie du chunk du document.")
 

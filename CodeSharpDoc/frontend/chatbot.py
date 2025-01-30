@@ -30,7 +30,7 @@ class ChatbotFront:
         ChatbotFront.initialize()
 
         st.set_page_config(
-            page_title="DRY C# Chatbot",
+            page_title="Chatbot DRY C#",
             page_icon="🧩",
             layout="centered",
             initial_sidebar_state="collapsed",
@@ -51,7 +51,7 @@ class ChatbotFront:
         st.markdown(hide_streamlit_style, unsafe_allow_html=True)
         
         with st.sidebar:
-            st.button("🔍 Utilisez le chatbot pour Rechercher  ➺", disabled=True)
+            st.button("🔍 Utilisez le chatbot pour Chercher du code ➺", disabled=True)
             st.button("🧽 Effacer la conversation du chatbot", on_click=ChatbotFront.clear_conversation)
             st.sidebar.markdown("---")
             st.subheader("🚀 Autres actions :")

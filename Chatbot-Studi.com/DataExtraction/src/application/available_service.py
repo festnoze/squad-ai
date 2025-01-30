@@ -20,7 +20,7 @@ from infrastructure.conversation_repository import ConversationRepository
 from infrastructure.user_repository import UserRepository
 from studi_public_website_metadata_descriptions import MetadataDescriptionHelper
 from vector_database_creation.generate_documents_and_metadata import GenerateDocumentsAndMetadata
-from vector_database_creation.generate_summaries_chunks_questions_and_metadata import GenerateDocumentsSummariesChunksQuestionsAndMetadata
+from vector_database_creation.summary_chunks_with_questions_documents import SummaryWithQuestionsByChunkDocumentsService
 from web_services.request_models.query_asking_request_model import QueryAskingRequestModel
 from api.task_handler import task_handler
 
@@ -71,7 +71,7 @@ class AvailableService:
             RAGAugmentedGeneration.augmented_generation_prompt = Ressource.get_rag_augmented_generation_prompt_on_studi()
             RAGPreTreatment.domain_specific_metadata_filters_validation_and_correction_async_method = StudiPublicWebsiteRagSpecificConfig.get_domain_specific_metadata_filters_validation_and_correction_async_method
             AvailableService.inference = RagInferencePipeline(rag= AvailableService.rag_service, default_filters= StudiPublicWebsiteRagSpecificConfig.get_domain_specific_default_filters(), metadata_descriptions= metadata_descriptions_for_studi_public_site, tools= None)
-            
+
     def re_init():
         AvailableService.rag_service = None
         AvailableService.inference = None
@@ -102,10 +102,10 @@ class AvailableService:
         txt.stop_spinner_replace_text("Vector database created")
         AvailableService.re_init() # reload rag_service with the new vectorstore and langchain documents
 
-    def create_vector_db_after_generate_chunk_and_embed_documents_summaries_and_questions(out_dir):
+    async def create_vector_db_after_generate_chunk_and_embed_documents_summaries_and_questions_async(out_dir):
         llm_and_fallback = [AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2, AvailableService.rag_service.llm_3]
-        generate_summaries_and_questions_services = GenerateDocumentsSummariesChunksQuestionsAndMetadata()
-        all_summaries_and_questions_docs = generate_summaries_and_questions_services.load_or_generate_all_docs_from_summaries_and_questions(
+        generate_summaries_and_questions_services = SummaryWithQuestionsByChunkDocumentsService()
+        all_summaries_and_questions_docs = await generate_summaries_and_questions_services.get_all_summaries_with_questions_documents_async(
                                                 path= out_dir,
                                                 llm_and_fallback= llm_and_fallback,
                                                 separate_chunks_and_questions=False)
@@ -124,7 +124,7 @@ class AvailableService:
                         )
         AvailableService.re_init() # reload rag_service with the new vectorstore and langchain documents
 
-    @staticmethod    
+    @staticmethod
     async def test_all_llms_from_env_config_async():
         models_names = []
         # Test all LLMs including the commented ones
@@ -324,8 +324,8 @@ class AvailableService:
     #def generate_ground_truth():
         #RagasService.generate_ground_truth(AvailableService.rag_service.llms_infos[0], AvailableService.rag_service.langchain_documents, 1)
     
-    def generate_ground_truth():
-        RagasService.get_ground_truth_dataset()
+    async def generate_ground_truth_async():
+        await RagasService.get_ground_truth_dataset_async()
 
     #todo: to delete or write to add metadata to context
     @staticmethod

@@ -10,11 +10,11 @@
             "request": "launch",
             "module": "uvicorn",
             "args": [
-                "api.startup:app", // The FastAPI app instance in main.py
+                "api.startup:app", // The FastAPI app instance (in: api/startup.py)
                 "--host", "127.0.0.1", // Host to bind
                 "--port", "8281",      // Port to bind
-                "--log-level", "error", // Corrected log-level argument
-                "--reload",    // Enable/disable auto-reload on code change (for development)
+                "--log-level", "warning" //"error", // Corrected log-level argument
+                //"--reload",    // Enable/disable auto-reload on code change (for development)
             ],
             "env": {
                 "PYTHONPATH": "${workspaceFolder}\\src"

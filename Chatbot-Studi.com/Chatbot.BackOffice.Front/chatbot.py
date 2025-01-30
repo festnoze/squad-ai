@@ -60,7 +60,7 @@ class ChatbotFront:
         components.html(focus_script, height=0)
         
         with st.sidebar:
-            st.button("Utilisez le chatbot à droite pour tester le pipeline d'inférence ➺", disabled=True)
+            st.button("Utilisez le chatbot du site public Studi.com à droite ➺", disabled=True)
             st.button('🧽 Effacer la conversation du chatbot', on_click=ChatbotFront.start_new_conversation)
             st.divider()
 

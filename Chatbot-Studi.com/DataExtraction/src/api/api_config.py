@@ -1,3 +1,4 @@
+import time
 from fastapi.exceptions import RequestValidationError
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, StreamingResponse, Response
@@ -16,8 +17,11 @@ from common_tools.helpers.txt_helper import txt
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
-        AvailableService.init(activate_print=True)
-        print("  ------------------------------\n  | - RAG API up and running - |\n  ------------------------------")
+        #started_at = time.time()
+        AvailableService.init(activate_print=True)        
+        # startup_duration = time.time() - started_at
+        # print(f"API Startup duration: {startup_duration:.2f}s.")
+        print("\n  ------------------------------\n  | - RAG API up and running - |\n  ------------------------------\n")
         yield
     finally:
         if app:

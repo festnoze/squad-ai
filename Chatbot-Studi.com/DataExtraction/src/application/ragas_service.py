@@ -3,6 +3,7 @@ import os
 from dotenv import load_dotenv
 import nest_asyncio
 import pandas as panda
+import openai
 
 from common_tools.langchains.langchain_factory import LangChainFactory
 from common_tools.models.embedding_model import EmbeddingModel
@@ -25,9 +26,8 @@ from langchain.indexes import VectorstoreIndexCreator
 from langchain.chains import RetrievalQA
 from langchain_openai import ChatOpenAI
 from langchain.text_splitter import CharacterTextSplitter, RecursiveCharacterTextSplitter
-import openai
-
 from langchain.smith import RunEvalConfig
+
 from ragas.testset.synthesizers.generate import TestsetGenerator
 from ragas.llms.base import LangchainLLMWrapper
 from ragas.embeddings.base import LangchainEmbeddingsWrapper
@@ -38,13 +38,29 @@ from ragas.metrics import LLMContextRecall, Faithfulness, FactualCorrectness, Se
 #from ragas.testset.synthesizers import AbstractQuerySynthesizer, ComparativeAbstractQuerySynthesizer, SpecificQuerySynthesizer
 from ragas import evaluate
 
-from vector_database_creation.generate_summaries_chunks_questions_and_metadata import GenerateDocumentsSummariesChunksQuestionsAndMetadata
+from vector_database_creation.summary_chunks_with_questions_documents import SummaryWithQuestionsByChunkDocumentsService
 
 class RagasService:    
-    def get_ground_truth_dataset(out_dir:str = './outputs', llm_and_fallback: list[LlmInfo] = None):
-        summaries_and_questions_generation_service = GenerateDocumentsSummariesChunksQuestionsAndMetadata()
-        questions_with_answers = summaries_and_questions_generation_service.load_or_generate_all_docs_from_summaries_and_questions(
-                                                path= out_dir,
-                                                llm_and_fallback= None,
-                                                separate_chunks_and_questions=True)
-        return questions_with_answers
+    async def get_ground_truth_dataset_async(files_path:str = './outputs', llm_and_fallback: list[LlmInfo] = None):
+        summaries_and_questions_generation_service = SummaryWithQuestionsByChunkDocumentsService()
+        trainings_docs = summaries_and_questions_generation_service.build_trainings_docs(files_path, False, True)
+        trainings_objects = await summaries_and_questions_generation_service.build_trainings_objects_with_summaries_and_chunks_by_questions_async(files_path, trainings_docs)
+        
+        # Build the ground truth dataset
+        dataset = []
+        for training_obj in trainings_objects:
+            for chunk in training_obj.doc_chunks:
+                for question in chunk.questions:
+                    dataset.append(
+                        {
+                            'user_input': question.text,
+                            'reference': training_obj.doc_summary,
+                            'reference_full': training_obj.doc_content,
+                            'ref_id': training_obj.metadata['id'],
+                            'ref_type': training_obj.metadata['type'],
+                            'ref_name': training_obj.metadata['name'],
+                        }
+                    )
+        return dataset
+
+        

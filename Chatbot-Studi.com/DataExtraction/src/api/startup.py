@@ -1,3 +1,3 @@
-from api.config import create_app
+from api.api_config import create_app
 
 app = create_app()

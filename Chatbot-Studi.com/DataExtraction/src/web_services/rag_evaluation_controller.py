@@ -7,5 +7,5 @@ evaluation_router = APIRouter(prefix="/rag/evaluation", tags=["Evaluation"])
 
 @evaluation_router.post("/groundtruth/generate")
 async def generate_ground_truth():
-    AvailableService.generate_ground_truth()
+    await AvailableService.generate_ground_truth_async()
     return {"message": "Ground truth generated successfully"}
