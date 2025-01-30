@@ -8,8 +8,9 @@ from client_models.user_request_model import UserRequestModel
 class ChatbotApiClient:
     def __init__(self, host_uri: str) -> None:
         self.host_uri = host_uri
-        self.ingestion_prefix = f"{self.host_uri}/rag/ingestion"
         self.inference_prefix = f"{self.host_uri}/rag/inference"
+        self.ingestion_prefix = f"{self.host_uri}/rag/ingestion"
+        self.evaluation_prefix = f"{self.host_uri}/rag/evaluation"
 
     ### Ingestion endpoints ###
     def retrieve_all_data(self) -> None:
@@ -25,7 +26,7 @@ class ChatbotApiClient:
         requests.post(f"{self.ingestion_prefix}/vectorstore/create/from-summaries")
 
     def generate_ground_truth(self) -> None:
-        requests.post(f"{self.ingestion_prefix}/groundtruth/generate")
+        requests.post(f"{self.evaluation_prefix}/groundtruth/generate")
 
     ### Inference endpoints ###
     def re_init_api(self):

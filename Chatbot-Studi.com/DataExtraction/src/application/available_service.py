@@ -71,7 +71,7 @@ class AvailableService:
             RAGAugmentedGeneration.augmented_generation_prompt = Ressource.get_rag_augmented_generation_prompt_on_studi()
             RAGPreTreatment.domain_specific_metadata_filters_validation_and_correction_async_method = StudiPublicWebsiteRagSpecificConfig.get_domain_specific_metadata_filters_validation_and_correction_async_method
             AvailableService.inference = RagInferencePipeline(rag= AvailableService.rag_service, default_filters= StudiPublicWebsiteRagSpecificConfig.get_domain_specific_default_filters(), metadata_descriptions= metadata_descriptions_for_studi_public_site, tools= None)
-
+            
     def re_init():
         AvailableService.rag_service = None
         AvailableService.inference = None
@@ -321,9 +321,11 @@ class AvailableService:
         result = await Llm.invoke_chain_with_input_async('Answer summarization', chain, text)
         return Llm.get_content(result)
 
+    #def generate_ground_truth():
+        #RagasService.generate_ground_truth(AvailableService.rag_service.llms_infos[0], AvailableService.rag_service.langchain_documents, 1)
+    
     def generate_ground_truth():
-        #asyncio.run(RagasService.generate_ground_truth_async(AvailableService.rag_service.llms_infos[0], AvailableService.rag_service.langchain_documents, 1))
-        RagasService.generate_ground_truth(AvailableService.rag_service.llms_infos[0], AvailableService.rag_service.langchain_documents, 1)
+        RagasService.get_ground_truth_dataset()
 
     #todo: to delete or write to add metadata to context
     @staticmethod

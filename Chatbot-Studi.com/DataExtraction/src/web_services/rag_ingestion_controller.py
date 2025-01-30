@@ -27,8 +27,3 @@ async def create_vectorstore():
 async def create_vectorstore_summary():
     AvailableService.create_vector_db_after_generate_chunk_and_embed_documents_summaries_and_questions(AvailableService.out_dir)
     return {"message": "Vector store created successfully from summaries"}
-
-@ingestion_router.post("/groundtruth/generate")
-async def generate_ground_truth():
-    AvailableService.generate_ground_truth()
-    return {"message": "Ground truth generated successfully"}

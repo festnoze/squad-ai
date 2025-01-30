@@ -9,6 +9,7 @@ from application.available_service import AvailableService
 from application.service_exceptions import QuotaOverloadException
 from web_services.rag_ingestion_controller import ingestion_router
 from web_services.rag_inference_controller import inference_router
+from web_services.rag_evaluation_controller import evaluation_router
 from api.task_handler import task_handler
 from common_tools.helpers.txt_helper import txt
 
@@ -16,6 +17,7 @@ from common_tools.helpers.txt_helper import txt
 async def lifespan(app: FastAPI):
     try:
         AvailableService.init(activate_print=True)
+        print("  ------------------------------\n  | - RAG API up and running - |\n  ------------------------------")
         yield
     finally:
         if app:
@@ -34,6 +36,7 @@ def create_app() -> FastAPI:
     # Include controllers as routers
     app.include_router(ingestion_router)
     app.include_router(inference_router)
+    app.include_router(evaluation_router)
 
     # All CORS settings are enabled for development purposes
     app.add_middleware(
