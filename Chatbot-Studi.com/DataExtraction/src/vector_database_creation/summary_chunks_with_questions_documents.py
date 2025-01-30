@@ -13,6 +13,8 @@ from common_tools.models.doc_w_summary_chunks_questions import Question, DocChun
 from common_tools.helpers.ressource_helper import Ressource
 from common_tools.helpers.execute_helper import Execute
 
+from common_tools.rag.rag_service import RagService
+
 class SummaryWithQuestionsByChunkDocumentsService:
     def __init__(self) -> None:
         pass
@@ -534,32 +536,32 @@ class SummaryWithQuestionsByChunkDocumentsService:
     
         
     # Method to test the 3 ways of generating summaries, chunks and questions (use to be in 'available services')
-    # async def test_different_splitting_of_summarize_chunks_and_questions_creation_async(files_path):
-    #     summary_builder = GenerateDocumentsSummariesChunksQuestionsAndMetadata()
-    #     trainings_docs = summary_builder._load_and_process_trainings(files_path)
+    async def test_different_splitting_of_summarize_chunks_and_questions_creation_async(rag_service:RagService, files_path):
+        summary_w_questions_service = SummaryWithQuestionsByChunkDocumentsService()
+        trainings_docs = summary_w_questions_service.load_trainings_details_as_json(files_path)
 
-    #     txt.print("-"*70)
-    #     start = time.time()
-    #     summary_1_step = await summary_builder.create_summary_and_questions_from_docs_single_step_async([AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2], trainings_docs)
-    #     summary_1_step_elapsed_str = txt.get_elapsed_str(time.time() - start)
+        txt.print("-"*70)
+        start = time.time()
+        summary_1_step = await summary_w_questions_service.create_summary_and_questions_from_docs_single_step_async([rag_service.llm_1, rag_service.llm_2], trainings_docs)
+        summary_1_step_elapsed_str = txt.get_elapsed_str(time.time() - start)
         
-    #     start = time.time()
-    #     summary_2_steps = await summary_builder.create_summary_and_questions_from_docs_in_two_steps_async([AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2], trainings_docs)
-    #     summary_2_steps_elapsed_str = txt.get_elapsed_str(time.time() - start)
+        start = time.time()
+        summary_2_steps = await summary_w_questions_service.create_summary_and_questions_from_docs_in_two_steps_async([rag_service.llm_1, rag_service.llm_2], trainings_docs)
+        summary_2_steps_elapsed_str = txt.get_elapsed_str(time.time() - start)
 
-    #     start = time.time()
-    #     summary_3_steps = await summary_builder.create_summary_and_questions_from_docs_in_three_steps_async([AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2], trainings_docs)
-    #     summary_3_steps_elapsed_str = txt.get_elapsed_str(time.time() - start)
+        start = time.time()
+        summary_3_steps = await summary_w_questions_service.create_summary_and_questions_from_docs_in_three_steps_async([rag_service.llm_1, rag_service.llm_2], trainings_docs)
+        summary_3_steps_elapsed_str = txt.get_elapsed_str(time.time() - start)
         
-    #     txt.print("-"*70)
-    #     summary_1_step.display_to_terminal()
-    #     txt.print(f"Single step summary generation took {summary_1_step_elapsed_str}")
-    #     txt.print("-"*70)
+        txt.print("-"*70)
+        summary_1_step.display_to_terminal()
+        txt.print(f"Single step summary generation took {summary_1_step_elapsed_str}")
+        txt.print("-"*70)
 
-    #     summary_2_steps.display_to_terminal()
-    #     txt.print(f"Two steps summary generation took {summary_2_steps_elapsed_str}")
-    #     txt.print("-"*70)
+        summary_2_steps.display_to_terminal()
+        txt.print(f"Two steps summary generation took {summary_2_steps_elapsed_str}")
+        txt.print("-"*70)
 
-    #     summary_3_steps.display_to_terminal()
-    #     txt.print(f"Three steps summary generation took {summary_3_steps_elapsed_str}")
-    #     txt.print("-"*70)
+        summary_3_steps[0].display_to_terminal()
+        txt.print(f"Three steps summary generation took {summary_3_steps_elapsed_str}")
+        txt.print("-"*70)

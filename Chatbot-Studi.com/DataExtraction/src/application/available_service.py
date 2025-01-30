@@ -1,27 +1,21 @@
 import asyncio
 import os
 import re
-from textwrap import dedent
-import time
 from typing import AsyncGenerator, Optional
 from uuid import UUID
-from dotenv import find_dotenv, load_dotenv
-from application.ragas_service import RagasService
+from dotenv import load_dotenv
 #
-from langchain.chains.query_constructor.schema import AttributeInfo
 from langchain_core.runnables import Runnable, RunnablePassthrough
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.docstore.document import Document
 from application.service_exceptions import QuotaOverloadException
 from application.studi_public_website_rag_specific_config import StudiPublicWebsiteRagSpecificConfig
 from data_retrieval.drupal_data_retrieval import DrupalDataRetrieval
-from database_conversations.conversation_converters import ConversationConverters
 from infrastructure.conversation_repository import ConversationRepository
 from infrastructure.user_repository import UserRepository
 from studi_public_website_metadata_descriptions import MetadataDescriptionHelper
 from vector_database_creation.generate_documents_and_metadata import GenerateDocumentsAndMetadata
 from vector_database_creation.summary_chunks_with_questions_documents import SummaryWithQuestionsByChunkDocumentsService
-from web_services.request_models.query_asking_request_model import QueryAskingRequestModel
 from api.task_handler import task_handler
 
 # Internal tools imports
@@ -37,11 +31,7 @@ from common_tools.rag.rag_ingestion_pipeline.rag_chunking import RagChunking
 from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
 from common_tools.rag.rag_inference_pipeline.rag_augmented_generation_tasks import RAGAugmentedGeneration
 from common_tools.helpers.ressource_helper import Ressource
-from common_tools.models.embedding_model import EmbeddingModel
-from common_tools.models.embedding_type import EmbeddingType
-from common_tools.models.embedding_model_factory import EmbeddingModelFactory
 from common_tools.models.conversation import Conversation, Message, User
-from common_tools.models.doc_w_summary_chunks_questions import DocWithSummaryChunksAndQuestions
 from common_tools.models.device_info import DeviceInfo
 from common_tools.rag.rag_inference_pipeline.end_pipeline_exception import EndPipelineException
 from common_tools.models.vector_db_type import VectorDbType
@@ -322,9 +312,11 @@ class AvailableService:
         return Llm.get_content(result)
 
     #def generate_ground_truth():
+        #from application.ragas_service import RagasService
         #RagasService.generate_ground_truth(AvailableService.rag_service.llms_infos[0], AvailableService.rag_service.langchain_documents, 1)
     
     async def generate_ground_truth_async():
+        from application.ragas_service import RagasService
         await RagasService.get_ground_truth_dataset_async()
 
     #todo: to delete or write to add metadata to context
