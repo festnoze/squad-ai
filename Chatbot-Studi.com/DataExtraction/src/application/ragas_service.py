@@ -48,6 +48,7 @@ from common_tools.helpers.env_helper import EnvHelper
 from common_tools.rag.rag_service import RagService
 from common_tools.rag.rag_service_factory import RagServiceFactory
 from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
+from common_tools.helpers.file_helper import file
 from studi_public_website_metadata_descriptions import MetadataDescriptionHelper
 from application.available_service import AvailableService
 from application.studi_public_website_rag_specific_config import StudiPublicWebsiteRagSpecificConfig
@@ -59,39 +60,7 @@ from ragas.llms import LangchainLLMWrapper
 from ragas.metrics import LLMContextRecall, Faithfulness, FactualCorrectness
 
 class RagasService:    
-    async def get_ground_truth_dataset_async(files_path:str = './outputs'):
-        trainings_objects = await RagasService.get_trainings_objects_or_docs_async(files_path)
-        
-        # Build the ground truth dataset
-        dataset = []
-        for training_obj in trainings_objects:
-            for chunk in training_obj.doc_chunks:
-                for question in chunk.questions:
-                    dataset.append(
-                        {
-                            'user_input': question.text,
-                            'reference': chunk.text,
-                            'reference_full': training_obj.doc_summary, #training_obj.doc_content,
-                            'reference_id': training_obj.metadata['id'],
-                            'reference_type': training_obj.metadata['type'],
-                            'reference_name': training_obj.metadata['name'],
-                        }
-                    )
-        return dataset
-
-    async def get_trainings_objects_or_docs_async(files_path, return_trainings_docs=False):
-        summaries_and_questions_generation_service = SummaryWithQuestionsByChunkDocumentsService()
-        trainings_docs = summaries_and_questions_generation_service.build_trainings_docs(files_path, False, True)
-        trainings_objects = await summaries_and_questions_generation_service.build_trainings_objects_with_summaries_and_chunks_by_questions_async(files_path, trainings_docs)
-        
-        if return_trainings_docs:
-            #TODO: see if it worth the same than the previous trainings_docs above
-            trainings_docs = summaries_and_questions_generation_service.build_trainings_docs_from_objs(False, trainings_objects)
-            return trainings_docs
-        else:
-            return trainings_objects
-        
-    async def run_model_on_ground_truth_dataset_async(llm_or_chain: Runnable, samples_count:int = 10):
+    async def run_eval_on_ground_truth_dataset_async(llm_or_chain: Runnable, samples_count:int = 10):
         ragas_token = EnvHelper.generic_get_env_variable_value_by_name('RAGAS_APP_TOKEN')
         os.environ['RAGAS_APP_TOKEN'] = ragas_token
         
@@ -132,31 +101,68 @@ class RagasService:
                 )
         link = result.upload()
         return result
+    
+    async def get_ground_truth_dataset_async(files_path:str = './outputs'):
+        trainings_objects = await RagasService.get_trainings_objects_or_docs_async(files_path)
+        
+        # Build the ground truth dataset
+        dataset = []
+        for training_obj in trainings_objects:
+            for chunk in training_obj.doc_chunks:
+                for question in chunk.questions:
+                    dataset.append(
+                        {
+                            'user_input': question.text,
+                            'reference': chunk.text,
+                            'reference_full': training_obj.doc_summary, #training_obj.doc_content,
+                            'reference_id': training_obj.metadata['id'],
+                            'reference_type': training_obj.metadata['type'],
+                            'reference_name': training_obj.metadata['name'],
+                        }
+                    )
+        return dataset
 
-    def generate_test_dataset_from_documents_generic(docs: list, generator_llm: Runnable, generator_embeddings: EmbeddingModel, samples_count:int = 10):
+    async def get_trainings_objects_or_docs_async(files_path, return_trainings_docs=False):
+        summaries_and_questions_generation_service = SummaryWithQuestionsByChunkDocumentsService()
+        trainings_docs = summaries_and_questions_generation_service.build_trainings_docs(files_path, False, True)
+        trainings_objects = await summaries_and_questions_generation_service.build_trainings_objects_with_summaries_and_chunks_by_questions_async(files_path, trainings_docs)
+        
+        if return_trainings_docs:
+            #TODO: see if it worth the same than the previous trainings_docs above
+            trainings_docs = summaries_and_questions_generation_service.build_trainings_docs_from_objs(False, trainings_objects)
+            return trainings_docs
+        else:
+            return trainings_objects
+        
+
+    def generate_test_dataset_from_documents_generic(docs: list, generator_llm: Runnable, generator_embedding: EmbeddingModel, samples_count:int = 10, saved_knowledge_graph_file_path = './outputs/ragas_kg.json'):
         from ragas.testset.graph import KnowledgeGraph
         from ragas.testset.graph import Node, NodeType
         from ragas.testset.transforms import default_transforms, apply_transforms
         from ragas.testset import TestsetGenerator
         from ragas.testset.synthesizers import default_query_distribution, SingleHopSpecificQuerySynthesizer, MultiHopAbstractQuerySynthesizer, MultiHopSpecificQuerySynthesizer
         #
-        kg = KnowledgeGraph()
-        for doc in docs:
-            kg.nodes.append(
-                Node(
-                    type=NodeType.DOCUMENT,
-                    properties={"page_content": doc.page_content, "document_metadata": doc.metadata}
+        
+        if file.exists(saved_knowledge_graph_file_path):
+            ragas_kg = KnowledgeGraph.load(saved_knowledge_graph_file_path)
+        else:
+            kg = KnowledgeGraph()
+            for doc in docs:
+                kg.nodes.append(
+                    Node(
+                        type=NodeType.DOCUMENT,
+                        properties={"page_content": doc.page_content, "document_metadata": doc.metadata}
+                    )
                 )
-            )
 
-        default_transforms = default_transforms(documents=docs, llm=generator_llm, embedding_model=generator_embeddings)
-        apply_transforms(kg, default_transforms)
+            default_transforms = default_transforms(documents=docs, llm=generator_llm, embedding_model=generator_embedding)
+            apply_transforms(kg, default_transforms)
 
-        # Save and load RAGAS knowledge graph
-        kg.save("ragas_kg.json")
-        ragas_kg = KnowledgeGraph.load("ragas_kg.json")
+            # Save RAGAS knowledge graph
+            kg.save(saved_knowledge_graph_file_path)
 
-        generator = TestsetGenerator(llm=generator_llm, embedding_model=generator_embeddings, knowledge_graph=ragas_kg)
+        # Run evaluations on the generated testset
+        generator = TestsetGenerator(llm=generator_llm, embedding_model=generator_embedding, knowledge_graph=ragas_kg)
 
         query_distribution = [
                 (SingleHopSpecificQuerySynthesizer(llm=generator_llm), 0.5),
@@ -167,16 +173,15 @@ class RagasService:
         #testset.to_pandas()
         return testset
     
-    async def generate_test_dataset_from_documents_langchain_async(generator_llm: Runnable = None, generator_embeddings: EmbeddingModel = None, files_path:str = './outputs', samples_count:int = 10):
+    async def generate_test_dataset_from_documents_langchain_async(docs: list, generator_llm: Runnable = None, generator_embeddings: EmbeddingModel = None, files_path:str = './outputs', samples_count:int = 10):
         from ragas.testset import TestsetGenerator
-        #        
+        #
         rag_service: RagService = RagServiceFactory.build_from_env_config()
-        trainings_docs = await RagasService.get_trainings_objects_or_docs_async(files_path, True)
         generator_llm = rag_service.llm_1 if not generator_llm else generator_llm
         generator_embeddings = rag_service.embedding if not generator_embeddings else generator_embeddings
-
+        
         generator = TestsetGenerator(llm=generator_llm, embedding_model=generator_embeddings)
-        dataset = generator.generate_with_langchain_docs(trainings_docs, testset_size=samples_count)
+        dataset = generator.generate_with_langchain_docs(docs, testset_size=samples_count)
         #dataset.to_pandas()
         return dataset
 
