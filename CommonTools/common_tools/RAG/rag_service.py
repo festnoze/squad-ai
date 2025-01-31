@@ -8,12 +8,7 @@ from collections import defaultdict
 from langchain_core.runnables import Runnable
 from langchain_core.documents import Document
 from langchain_core.embeddings import Embeddings
-from langchain_chroma import Chroma
-from langchain_qdrant import QdrantVectorStore
 from langchain_core.vectorstores import VectorStore
-from qdrant_client import QdrantClient
-import pinecone
-from pinecone import ServerlessSpec
 
 # common tools imports
 from common_tools.helpers.txt_helper import txt
@@ -25,7 +20,6 @@ from common_tools.langchains.langchain_factory import LangChainFactory
 from common_tools.models.embedding_model import EmbeddingModel
 from common_tools.models.embedding_model_factory import EmbeddingModelFactory
 from common_tools.models.vector_db_type import VectorDbType
-from langchain_pinecone import PineconeVectorStore
 
 class RagService:
     def __init__(self, llms_or_info: Optional[Union[LlmInfo, Runnable, list]], embedding_model:EmbeddingModel= None, vector_db_base_path:str = None, vector_db_type:VectorDbType = VectorDbType('chroma'), vector_db_name:str = 'main', documents_json_filename:str = None):
@@ -110,13 +104,22 @@ class RagService:
                     txt.print(f'>> Vectorstore not loaded, as path: "... {vector_db_path[-110:]}" is not found')
             
             if vectorstore_type == VectorDbType.ChromaDB:
-                    vectorstore = Chroma(persist_directory= vector_db_path, embedding_function= embedding)
+                from langchain_chroma import Chroma
+                #
+                vectorstore = Chroma(persist_directory= vector_db_path, embedding_function= embedding)
             
             elif vectorstore_type == VectorDbType.Qdrant:
+                from qdrant_client import QdrantClient
+                from langchain_qdrant import QdrantVectorStore
+                #
                 qdrant_client = QdrantClient(path=vector_db_path)
                 vectorstore = QdrantVectorStore(client=qdrant_client, collection_name=vectorstore_name, embedding=embedding)
             
             elif vectorstore_type == VectorDbType.Pinecone:
+                import pinecone
+                from pinecone import ServerlessSpec
+                from langchain_pinecone import PineconeVectorStore
+                #
                 pinecone_instance = pinecone.Pinecone(api_key= EnvHelper.get_pinecone_api_key()) #, environment= EnvHelper.get_pinecone_environment()                
                 is_native_hybrid_search = EnvHelper.get_is_common_db_for_sparse_and_dense_vectors()
                 if is_native_hybrid_search:

@@ -11,7 +11,6 @@ from common_tools.helpers.json_helper import JsonHelper
 from common_tools.helpers.llm_helper import Llm
 from common_tools.models.doc_w_summary_chunks_questions import Question, DocChunk, DocWithSummaryChunksAndQuestions, DocWithSummaryChunksAndQuestionsPydantic, DocQuestionsByChunkPydantic
 from common_tools.helpers.ressource_helper import Ressource
-from common_tools.helpers.execute_helper import Execute
 
 from common_tools.rag.rag_service import RagService
 
@@ -440,6 +439,12 @@ class SummaryWithQuestionsByChunkDocumentsService:
 
         trainings_objects = await self.build_trainings_objects_with_summaries_and_chunks_by_questions_async(files_path, trainings_docs, llm_and_fallback)
                 
+        trainings_chunks_and_questions_documents = self.build_trainings_docs_from_objs(separate_chunks_and_questions, trainings_objects)
+        all_documents.extend(trainings_chunks_and_questions_documents)
+        
+        return all_documents
+
+    def build_trainings_docs_from_objs(self, separate_chunks_and_questions, trainings_objects):
         trainings_chunks_and_questions_documents = []
         for training_object in trainings_objects:
             if separate_chunks_and_questions:
@@ -447,8 +452,7 @@ class SummaryWithQuestionsByChunkDocumentsService:
                 trainings_chunks_and_questions_documents.extend(training_object.to_langchain_documents_chunked_summary_and_questions(False, True))
             else:
                 trainings_chunks_and_questions_documents.extend(training_object.to_langchain_documents_chunked_summary_and_questions(True, True))
-        all_documents.extend(trainings_chunks_and_questions_documents)
-        return all_documents
+        return trainings_chunks_and_questions_documents
     
 
     section_to_french:dict = None # Singleton prop. containing the static mapping of section names to their french equivalent.

@@ -25,14 +25,21 @@ class DurationHelper:
         duration = time.time() - start
         return duration
 
-    def print_all_imports_duration_for_file(file_path: str, print_threshold: float = 0.7) -> None:
+    def print_all_imports_duration_for_file(file_path: str, include_inner_import = False, print_threshold: float = 0.7) -> None:
         txt.stop_spinner()
-        txt.print(f"\r## Analyzing duration for all imports from file: '{file_path}' ##")
+        start = time.time()
+        last_slash_index = max(file_path.rfind('/'), file_path.rfind('\\'))
+        last_dot_index = file_path.rfind('.')
+        if last_dot_index == -1: last_dot_index = len(file_path)
+
+        txt.print(f"\r\r\n## Analyzing duration for all imports from file: '{file_path[last_slash_index + 1:last_dot_index]}' ##")
+        
         file_content = file.read_file(file_path)
         file_lines = file_content.splitlines()
         for file_line in file_lines:
-            file_line = file_line.strip()
-            if not file_line or file_line.startswith("#"):
+            if include_inner_import:
+                file_line = file_line.strip()
+            if not file_line or file_line.startswith("#") or not (file_line.startswith("import ") or file_line.startswith("from ")):
                 continue
 
             # Match lines starting with "import"
@@ -61,3 +68,6 @@ class DurationHelper:
                         import_desc = f"{submod} (from {base_module})"
                         DurationHelper.print_import_duration(import_statement, import_desc, print_threshold)
                 # If the line doesn't match the pattern precisely, skip or handle advanced cases
+        
+        duration = time.time() - start
+        txt.print(f"\r\n## Total imports duration for file: '{file_path[last_slash_index + 1:last_dot_index]}' {duration:.2f}s ##")

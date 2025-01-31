@@ -60,18 +60,20 @@ class ChatbotFront:
         components.html(focus_script, height=0)
         
         with st.sidebar:
-            st.button("Utilisez le chatbot du site public Studi.com à droite ➺", disabled=True)
+            st.button("🚀 Chatbot du site public Studi.com à droite ➺", disabled=True)
             st.button('🧽 Effacer la conversation du chatbot', on_click=ChatbotFront.start_new_conversation)
             st.divider()
 
-            st.subheader("✒️ Paramétrage du pipeline d'ingestion")
+            st.subheader("💫 Paramétrage du pipeline d'ingestion")
             st.button("🔄 Re-démarrage de l'API RAG",               on_click=lambda: st.session_state.api_client.re_init_api())
             st.button("🧪 Tester tous les modèles d'inférence",   on_click=lambda: ChatbotFront.test_all_inference_models())
             st.button('📥 Récupérer données Drupal par json-api',   on_click=lambda: st.session_state.api_client.retrieve_all_data())
             st.button('🌐 Scraping des pages web des formations',   on_click=lambda: st.session_state.api_client.scrape_website_pages())
             st.button('🗂️ Construction de la base vectorielle',     on_click=lambda: st.session_state.api_client.build_vectorstore())
-            st.button('🚀 Construction de la base vectorielle synthétique avec questions', on_click=lambda: st.session_state.api_client.build_summary_vectorstore())
+            st.button('🗃️ Construction base vectorielle synthétique + questions', on_click=lambda: st.session_state.api_client.build_summary_vectorstore())
             st.divider()
+            
+            st.subheader("💫 Evaluation du pipeline d'inference")
             st.button('✨ Générer RAGAS Ground Truth dataset',      on_click=lambda: st.session_state.api_client.generate_ground_truth())
 
         for msg in st.session_state.messages:

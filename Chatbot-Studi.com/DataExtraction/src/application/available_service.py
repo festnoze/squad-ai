@@ -15,7 +15,6 @@ from infrastructure.conversation_repository import ConversationRepository
 from infrastructure.user_repository import UserRepository
 from studi_public_website_metadata_descriptions import MetadataDescriptionHelper
 from vector_database_creation.generate_documents_and_metadata import GenerateDocumentsAndMetadata
-from vector_database_creation.summary_chunks_with_questions_documents import SummaryWithQuestionsByChunkDocumentsService
 from api.task_handler import task_handler
 
 # Internal tools imports
@@ -26,7 +25,6 @@ from common_tools.rag.rag_service import RagService
 from common_tools.rag.rag_service_factory import RagServiceFactory
 from common_tools.models.question_rewritting import QuestionRewritting, QuestionRewrittingPydantic
 from common_tools.rag.rag_inference_pipeline.rag_pre_treatment_tasks import RAGPreTreatment
-from common_tools.rag.rag_ingestion_pipeline.rag_ingestion_pipeline import RagIngestionPipeline
 from common_tools.rag.rag_ingestion_pipeline.rag_chunking import RagChunking
 from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
 from common_tools.rag.rag_inference_pipeline.rag_augmented_generation_tasks import RAGAugmentedGeneration
@@ -61,7 +59,8 @@ class AvailableService:
             RAGAugmentedGeneration.augmented_generation_prompt = Ressource.get_rag_augmented_generation_prompt_on_studi()
             RAGPreTreatment.domain_specific_metadata_filters_validation_and_correction_async_method = StudiPublicWebsiteRagSpecificConfig.get_domain_specific_metadata_filters_validation_and_correction_async_method
             AvailableService.inference = RagInferencePipeline(rag= AvailableService.rag_service, default_filters= StudiPublicWebsiteRagSpecificConfig.get_domain_specific_default_filters(), metadata_descriptions= metadata_descriptions_for_studi_public_site, tools= None)
-
+        print("\n  ------------------------------\n  | - RAG API up and running - |\n  ------------------------------\n")
+            
     def re_init():
         AvailableService.rag_service = None
         AvailableService.inference = None
@@ -72,6 +71,8 @@ class AvailableService:
         drupal.retrieve_all_data()
 
     def create_vector_after_chunking_and_embedding_documents(out_dir, BM25_storage_in_database_sparse_vectors:bool = True):
+        from common_tools.rag.rag_ingestion_pipeline.rag_ingestion_pipeline import RagIngestionPipeline
+        #
         all_docs = GenerateDocumentsAndMetadata().load_all_docs_as_json(out_dir, write_all_lists=True)
         injection_pipeline = RagIngestionPipeline(AvailableService.rag_service)
         txt.print_with_spinner("Chunking documents...")
@@ -93,6 +94,9 @@ class AvailableService:
         AvailableService.re_init() # reload rag_service with the new vectorstore and langchain documents
 
     async def create_vector_db_after_generate_chunk_and_embed_documents_summaries_and_questions_async(out_dir):
+        from vector_database_creation.summary_chunks_with_questions_documents import SummaryWithQuestionsByChunkDocumentsService
+        from common_tools.rag.rag_ingestion_pipeline.rag_ingestion_pipeline import RagIngestionPipeline
+        #
         llm_and_fallback = [AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2, AvailableService.rag_service.llm_3]
         generate_summaries_and_questions_services = SummaryWithQuestionsByChunkDocumentsService()
         all_summaries_and_questions_docs = await generate_summaries_and_questions_services.get_all_summaries_with_questions_documents_async(
@@ -310,15 +314,7 @@ class AvailableService:
         chain = promptlate | AvailableService.rag_service.llm_1 | RunnablePassthrough()
         result = await Llm.invoke_chain_with_input_async('Answer summarization', chain, text)
         return Llm.get_content(result)
-
-    #def generate_ground_truth():
-        #from application.ragas_service import RagasService
-        #RagasService.generate_ground_truth(AvailableService.rag_service.llms_infos[0], AvailableService.rag_service.langchain_documents, 1)
-    
-    async def generate_ground_truth_async():
-        from application.ragas_service import RagasService
-        await RagasService.get_ground_truth_dataset_async()
-
+        
     #todo: to delete or write to add metadata to context
     @staticmethod
     def format_retrieved_docs_function(retrieved_docs):
