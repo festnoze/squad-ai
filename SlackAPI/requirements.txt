@@ -1,0 +1,5 @@
+requests
+python-dotenv
+slack-sdk
+fastapi
+uvicorn
