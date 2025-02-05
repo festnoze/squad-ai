@@ -6,6 +6,8 @@ from slack_sdk.signature import SignatureVerifier
 from slack_sdk.errors import SlackApiError
 from dotenv import load_dotenv, find_dotenv
 
+from helper import Helper
+
 class SlackService:
     def __init__(self):       
         load_dotenv(find_dotenv())
@@ -34,7 +36,7 @@ class SlackService:
         result = self.client.chat_postMessage(channel= channel, text= message, mrkdwn= mrkdwn)
         return result['ts']
     
-    def post_response_to_query_from_external_api(self, channel, query):
+    def post_no_stream_response_to_query_from_external_api(self, channel, query):
         url = self.EXTERNAL_API_HOST 
         if self.EXTERNAL_API_PORT:
             url += ':' + self.EXTERNAL_API_PORT
@@ -45,28 +47,35 @@ class SlackService:
         response.raise_for_status()
         answer = response.json()
     
-        result = self.client.chat_postMessage(channel=channel, text= SlackService.convert_markdown(answer), mrkdwn=True)
+        result = self.client.chat_postMessage(channel=channel, text= Helper.convert_markdown(answer), mrkdwn=True)
         return result['ts']
     
-    @staticmethod
-    def convert_markdown(text):
-        # Remplacer les doubles astérisques par des simples
-        text = re.sub(r'\*\*(.*?)\*\*', r'*\1*', text)
-        # Remplacer les doubles underscores par des simples
-        text = re.sub(r'__(.*?)__', r'_\1_', text)
-        return text
-    
-    def get_message_as_markdown_blocks(self, markdown_text):
-        blocks = [
-            {
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": markdown_text
-                }
-            }
-        ]
-        return blocks
+    new_line_for_stream_over_http = "\\/%*/\\" # use specific new line conversion over streaming, as new line is handled differently across platforms
+
+    def post_streaming_response_to_query_from_external_api(self, channel, query, waiting_msg_id):
+        url = self.EXTERNAL_API_HOST 
+        if self.EXTERNAL_API_PORT:
+            url += ':' + self.EXTERNAL_API_PORT
+        url += self.EXTERNAL_API_STREAMING_QUERY_ENDPOINT_URL        
+        body = {'query': query, 'type': 'slack', 'user_name': channel}
+        
+        response: requests.Response = requests.post(url, json=body, stream=True)
+        response.raise_for_status()
+        
+        msg_response = self.client.chat_postMessage(channel=channel, text="...", mrkdwn=True)
+        
+        msg_ts: str = msg_response["ts"]
+        full_response: str = ""
+        
+        for chunk in Helper.iter_words(response, decode_unicode=True):
+            if chunk:
+                if waiting_msg_id: 
+                    self.delete_message(channel, waiting_msg_id)
+                    waiting_msg_id = None
+                full_response += chunk.replace(SlackService.new_line_for_stream_over_http, '\r\n')
+                self.client.chat_update(channel=channel, ts=msg_ts, text=Helper.convert_markdown(full_response), mrkdwn=True)
+        return msg_ts
+            
     
     def delete_message(self, channel: str, timestamp: str) -> None:
         try:

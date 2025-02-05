@@ -109,3 +109,22 @@ async def rag_query_no_conversation_async(user_query_request_model: QueryNoConve
     except Exception as e:
         print(f"Failed to handle query: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
+    
+@inference_router.post("/no-conversation/ask-question/stream")
+async def rag_query_no_conversation_streaming_async(user_query_request_model: QueryNoConversationRequestModel):
+    try:
+        device_info = DeviceInfo(platform=user_query_request_model.type, ip="0.0.0.0", user_agent='', app_version='', os='', browser='', is_mobile=False)
+        
+        user_id = await AvailableService.create_or_retrieve_user_async(user_id= None, user_name= user_query_request_model.user_name, user_device_info= device_info)
+        
+        conversation = await AvailableService.add_message_to_user_last_conversation_or_create_one_async(user_id, user_query_request_model.query)
+        
+        response_generator = AvailableService.streaming_answer_to_user_query_with_RAG_async(conversation, False, False)
+        
+        return StreamingResponse(response_generator, media_type="text/event-stream")
+        
+    except QuotaOverloadException as e:
+        raise HTTPException(status_code=429, detail=str(e))
+    except Exception as e:
+        print(f"Failed to handle query stream: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
