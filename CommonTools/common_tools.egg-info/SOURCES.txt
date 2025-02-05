@@ -34,9 +34,7 @@ common_tools/models/message.py
 common_tools/project/import_listing.py
 common_tools/project/useless_code_analyser.py
 common_tools/rag/rag_service.py
-common_tools/rag/rag_inference_pipeline/rag_answer_generation_tasks.py
 common_tools/rag/rag_inference_pipeline/rag_guardrails_tasks.py
-common_tools/rag/rag_inference_pipeline/rag_hybrid_retrieval_tasks.py
 common_tools/rag/rag_inference_pipeline/rag_inference_pipeline.py
 common_tools/rag/rag_inference_pipeline/rag_inference_pipeline_with_prefect.py
 common_tools/rag/rag_inference_pipeline/rag_post_treatment_tasks.py

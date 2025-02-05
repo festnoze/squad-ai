@@ -12,6 +12,7 @@ chroma_db/
 *.exe
 *.bin
 *.sqlite3
+*.tar.gz
 
 /Include
 /Lib

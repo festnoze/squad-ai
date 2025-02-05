@@ -1,0 +1,10 @@
+#.env
+senv/
+*.log
+.git
+.vscode/
+__pycache__/
+*.log
+*.pyc
+*.pyo
+*.pyd

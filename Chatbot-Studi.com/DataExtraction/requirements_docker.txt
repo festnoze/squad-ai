@@ -1,3 +1,2 @@
-#-e C:/Dev/squad-ai/CommonTools # local package to internal tooling
 file:wheels/common_tools-0.4.0-py3-none-any.whl
 -r requirements_common.txt
