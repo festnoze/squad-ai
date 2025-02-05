@@ -86,7 +86,7 @@ class RagasService:
             data['retrieved_contexts'] = [retrieved_doc.page_content for retrieved_doc in retrieved_docs[0]] #TODO: why retrieved_chunks is an array of array?
 
             all_chunks_output = []
-            augmented_generation_function = inference_pipeline.workflow_concrete_classes['RAGAugmentedGeneration'].augmented_answer_generation_streaming_async
+            augmented_generation_function = inference_pipeline.workflow_concrete_classes['RAGAugmentedGeneration'].rag_augmented_answer_generation_streaming_async
             async for chunk in augmented_generation_function(llm_or_chain, query, retrieved_docs[0], analysed_query, AvailableService.format_retrieved_docs_function):
                 all_chunks_output.append(chunk)
 

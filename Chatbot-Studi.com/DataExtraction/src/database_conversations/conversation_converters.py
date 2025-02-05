@@ -4,6 +4,7 @@ from common_tools.models.conversation import Conversation
 from common_tools.models.message import Message
 from common_tools.models.user import User
 from common_tools.models.device_info import DeviceInfo
+import uuid
 from uuid import UUID
 
 class ConversationConverters:
@@ -47,6 +48,8 @@ class ConversationConverters:
 
     @staticmethod
     def convert_user_model_to_entity(user: User) -> UserEntity:
+        if user.id is None: user.id = uuid.uuid4()
+
         new_user_entity = UserEntity(
             name=user.name,
             created_at=user.created_at if user.created_at else datetime.now(timezone.utc),

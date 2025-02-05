@@ -19,6 +19,10 @@ class UserRepository:
     async def get_user_by_id_async(self, user_id: UUID) -> Optional[User]:
         user_entity = await self.data_context.get_entity_by_id_async(UserEntity, user_id)
         return ConversationConverters.convert_user_entity_to_model(user_entity)
+    
+    async def get_user_by_name_async(self, user_name: str) -> Optional[User]:
+        user_entity = await self.data_context.get_first_entity_async(UserEntity, filters=[UserEntity.name == user_name])
+        return ConversationConverters.convert_user_entity_to_model(user_entity)
 
     async def does_exist_user_async(self, user: User) -> bool:
         return await self.get_user_id_if_exists_async(user) is not None
@@ -33,6 +37,20 @@ class UserRepository:
         if user.device_info and user.device_info.ip:
             user_id_with_IP = await self.get_device_info_by_IP_async(user.device_info.ip, [DeviceInfoEntity.user_id])
             return user_id_with_IP
+        
+        # Search user by name & device info's platform
+        if user.name and user.device_info and user.device_info.user_agent:
+            user_entity = await self.data_context.get_first_entity_async(
+                UserEntity,
+                filters=[
+                    UserEntity.name == user.name,
+                    DeviceInfoEntity.platform == user.device_info.platform
+                ],
+                selected_columns=[UserEntity.id],
+                fails_if_not_found=False
+            )
+            if user_entity:
+                return user_entity.id
         
         return None
     

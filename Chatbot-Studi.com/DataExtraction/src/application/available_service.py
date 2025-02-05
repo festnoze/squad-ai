@@ -162,6 +162,20 @@ class AvailableService:
         return new_conv
     
     @staticmethod
+    async def add_message_to_user_last_conversation_or_create_one_async(user_id:UUID, new_message:str) -> Conversation:
+        conv_repo = ConversationRepository() # TODO: do IoC for repositories instanciation
+        conversations = await conv_repo.get_all_user_conversations_async(user_id)
+        if any(conversations):
+            conversation = conversations[-1]
+        else:
+            conversation = await AvailableService.create_new_conversation_async(user_id)
+
+        if new_message:
+            conversation.add_new_message("user", new_message)
+            assert await conv_repo.add_message_to_existing_conversation_async(conversation.id, conversation.last_message)
+        return conversation
+    
+    @staticmethod
     async def prepare_conversation_for_user_query_answer_async(conversation_id:UUID, user_query_content:str) -> Conversation:
         # Wait for tasks on this conversation to be finished before adding a new message
         while task_handler.is_task_ongoing(conversation_id):
@@ -192,6 +206,23 @@ class AvailableService:
                         AvailableService.add_answer_summary_to_conversation_async, 
                         conversation, 
                         full_answer_str)
+        
+    @staticmethod
+    async def answer_to_user_query_with_RAG_no_streaming_async(conversation: Conversation, display_waiting_message: bool, is_stream_decoded: bool = False) -> str:
+        # Stream the response
+        all_chunks_output=[]
+        response_generator = AvailableService.rag_query_retrieval_and_augmented_generation_streaming_async(conversation, display_waiting_message, is_stream_decoded, all_chunks_output)
+        async for chunk in response_generator:
+            pass
+        
+        # Add a 'background job to generate a summary of the answer, add it to conversation messages, then save it
+        full_answer_str = ''.join(chunk for chunk in Llm.get_text_from_chunks(all_chunks_output))
+        task_handler.add_task(
+                        conversation.id, # set conversation id as task_id, so we can know if a task is ongoing for a specific conversation
+                        AvailableService.add_answer_summary_to_conversation_async, 
+                        conversation, 
+                        full_answer_str)
+        return full_answer_str
 
     @staticmethod
     async def add_answer_summary_to_conversation_async(conversation, full_answer_str):

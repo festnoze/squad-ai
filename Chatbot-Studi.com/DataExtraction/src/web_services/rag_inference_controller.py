@@ -7,7 +7,7 @@ from common_tools.models.conversation import Conversation, Message, User
 from common_tools.models.device_info import DeviceInfo
 from fastapi.responses import JSONResponse, StreamingResponse, Response
 
-from web_services.request_models.query_asking_request_model import QueryAskingRequestModel
+from web_services.request_models.query_asking_request_model import QueryAskingRequestModel, QueryNoConversationRequestModel
 from web_services.request_models.user_request_model import UserRequestModel
 
 ##########################
@@ -89,4 +89,23 @@ async def rag_query_stream_async(user_query_request_model: QueryAskingRequestMod
         raise HTTPException(status_code=429, detail=str(e))
     except Exception as e:
         print(f"Failed to handle query stream: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+    
+@inference_router.post("/no-conversation/ask-question")
+async def rag_query_no_conversation_async(user_query_request_model: QueryNoConversationRequestModel):
+    try:
+        device_info = DeviceInfo(platform=user_query_request_model.type, ip="0.0.0.0", user_agent='', app_version='', os='', browser='', is_mobile=False)
+        
+        user_id = await AvailableService.create_or_retrieve_user_async(user_id= None, user_name= user_query_request_model.user_name, user_device_info= device_info)
+        
+        conversation = await AvailableService.add_message_to_user_last_conversation_or_create_one_async(user_id, user_query_request_model.query)
+        
+        response = await AvailableService.answer_to_user_query_with_RAG_no_streaming_async(conversation, False, True)
+        
+        return JSONResponse(content=response, status_code=200)
+    
+    except QuotaOverloadException as e:
+        raise HTTPException(status_code=429, detail=str(e))
+    except Exception as e:
+        print(f"Failed to handle query: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")

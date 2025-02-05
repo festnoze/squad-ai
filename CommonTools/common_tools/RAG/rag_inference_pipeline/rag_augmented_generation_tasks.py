@@ -54,11 +54,11 @@ class RAGAugmentedGeneration:
     @MethodDecorator.print_func_execution_infos()
     async def rag_augmented_answer_generation_streaming_async(rag: RagService, query:Union[str, Conversation], retrieved_chunks: list, analysed_query: QuestionAnalysisBase, is_stream_decoded = False, all_chunks_output: list[str] = [], function_for_specific_formating_retrieved_docs = None):
         # Select the smallest llm for the augmented generation task, as it takes lots of tokens
-        async for chunk in RagService.augmented_answer_generation_streaming_async(rag.llm_1, query, retrieved_chunks, analysed_query, is_stream_decoded, all_chunks_output, function_for_specific_formating_retrieved_docs):
+        async for chunk in RAGAugmentedGeneration.augmented_answer_generation_from_llm_streaming_async(rag.llm_1, query, retrieved_chunks, analysed_query, is_stream_decoded, all_chunks_output, function_for_specific_formating_retrieved_docs):
             yield chunk
 
     @staticmethod
-    async def augmented_answer_generation_streaming_async(llm_or_chain: Runnable, query:Union[str, Conversation], retrieved_chunks: list, analysed_query: QuestionAnalysisBase, is_stream_decoded = False, all_chunks_output: list[str] = [], function_for_specific_formating_retrieved_docs = None):
+    async def augmented_answer_generation_from_llm_streaming_async(llm_or_chain: Runnable, query:Union[str, Conversation], retrieved_chunks: list, analysed_query: QuestionAnalysisBase, is_stream_decoded = False, all_chunks_output: list[str] = [], function_for_specific_formating_retrieved_docs = None):
         if retrieved_chunks and any(retrieved_chunks) and isinstance(retrieved_chunks[0], tuple): 
             retrieved_chunks = [doc[0] for doc in retrieved_chunks] # Remove scores if present
 

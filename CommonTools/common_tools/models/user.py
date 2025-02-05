@@ -14,4 +14,4 @@ class User:
         self.name = name
         self.device_info = device_info
         self.created_at = created_at
-        self.id = id if id is not None else uuid.uuid4()
+        self.id = id #if id is not None else uuid.uuid4()

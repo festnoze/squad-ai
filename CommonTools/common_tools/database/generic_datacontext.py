@@ -112,11 +112,11 @@ class GenericDataContext:
         async with self.read_db_async() as session:
             try:
                 results = await session.execute(query)
-                return results.scalars().all()
+                return results.unique().scalars().all()
             except Exception as e:
                 txt.print(f"/!\\ Fails to retrieve entities: {e}")
                 raise
-
+            
     async def count_entities_async(self, entity_class, filters: Optional[List[BinaryExpression]] = None):
         query = select(func.count())
         if filters:
