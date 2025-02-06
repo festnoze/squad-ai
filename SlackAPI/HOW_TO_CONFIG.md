@@ -48,12 +48,12 @@ Votre backend doit exposer un endpoint `/slack/events` pour recevoir et traiter 
 
 Si vous développez en local, utilisez un outil comme [ngrok](https://ngrok.com/) pour exposer votre serveur local sur Internet :
 
-1. Démarrez votre serveur backend sur le port 5000.
+1. Démarrez votre serveur backend sur le port 8301.
 
-2. Dans un nouveau terminal, exécutez :
+2. Dans une nouvelle fenêtre de commande, exécutez :
    
    ```bash
-   ngrok http 5000
+   ngrok http --url=slack1-studi.ngrok.io 8301
    ```
 
 ---

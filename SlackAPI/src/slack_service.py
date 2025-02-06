@@ -83,3 +83,12 @@ class SlackService:
             print("Message supprimé avec succès :", response)
         except SlackApiError as e:
             print(f"Erreur lors de la suppression du message : {e.response['error']}")
+
+    def ping_external_api(self)-> str:
+        url = self.EXTERNAL_API_HOST 
+        if self.EXTERNAL_API_PORT:
+            url += ':' + self.EXTERNAL_API_PORT
+        url += "/ping"
+        response: requests.Response = requests.get(url)
+        response.raise_for_status()
+        return response.text

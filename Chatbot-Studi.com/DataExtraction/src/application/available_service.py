@@ -21,9 +21,9 @@ from api.task_handler import task_handler
 from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.execute_helper import Execute
 from common_tools.helpers.llm_helper import Llm
+from common_tools.models.question_rewritting import QuestionRewritting, QuestionRewrittingPydantic
 from common_tools.rag.rag_service import RagService
 from common_tools.rag.rag_service_factory import RagServiceFactory
-from common_tools.models.question_rewritting import QuestionRewritting, QuestionRewrittingPydantic
 from common_tools.rag.rag_inference_pipeline.rag_pre_treatment_tasks import RAGPreTreatment
 from common_tools.rag.rag_ingestion_pipeline.rag_chunking import RagChunking
 from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline

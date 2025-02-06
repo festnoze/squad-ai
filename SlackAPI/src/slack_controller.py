@@ -53,5 +53,10 @@ async def get_bot_user_id() -> dict:
         raise HTTPException(status_code=500, detail=f"Error: {e}")
     
 @app.get("/ping")
-async def ping() -> dict:
-    return {"ping": "pong"}
+async def ping() -> str:
+    return "pong"
+
+@app.get("/ping-api")
+async def ping() -> str:
+    return slack_service.ping_external_api()
+    

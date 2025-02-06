@@ -35,16 +35,17 @@ Suivez pas à pas la procédure ci-après :
 5. **Lancer les images docker "slack_api" et de votre "API RAG"** . Attention à spécifier explicitement les ports à exposer lors du run, tel que : 8301 et 8281.
 
 6. **Créer un tunnel ngrok** pour rendre l'API Slack visible depuis le web : 
-   -si besoin, authentification sur ngrok (remplacer `<ngrok-token>`): 
+   Dans une nouvelle fenêtre de commande, comme powershell:
+   - authentification sur ngrok, si nécessaire (remplacer `<ngrok-token>` par votre token ngrok): 
    
    ```bash
    ngrok config add-authtoken <ngrok-token>
    ```
    
-   -puis lancement de ngrok (par défaut l'API Slack est sur le port 8301) :
+   -lancement de ngrok (par défaut l'API Slack est sur le port 8301) :
    
    ```bash
-   ngrok http 8301
+   ngrok http --url=slack1-studi.ngrok.io 8301
    ```
    
    <u>Nota :</u> commandes à executer depuis le dossier où est installé ngrok si besoin (actuellement inutile car ngrok.exe est dans `C:\Windows\System32`, qui est dans le PATH).

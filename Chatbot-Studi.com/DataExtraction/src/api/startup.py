@@ -7,9 +7,9 @@ txt.activate_print = True
 txt.print("\r\n")
 
 files_paths_to_test_for_import = [
-    # "C:/Dev/squad-ai/CommonTools/common_tools/rag/rag_service.py",
-    # "C:/Dev/squad-ai/CommonTools/common_tools/rag/rag_ingestion_pipeline/rag_ingestion_pipeline.py",
-    # "C:/Dev/squad-ai/CommonTools/common_tools/rag/rag_inference_pipeline/rag_inference_pipeline.py",
+    # "C:/Dev/IA/CommonTools/common_tools/rag/rag_service.py",
+    # "C:/Dev/IA/CommonTools/common_tools/rag/rag_ingestion_pipeline/rag_ingestion_pipeline.py",
+    # "C:/Dev/IA/CommonTools/common_tools/rag/rag_inference_pipeline/rag_inference_pipeline.py",
     # "src/application/available_service.py",
     # "src/api/api_config.py",
 ]

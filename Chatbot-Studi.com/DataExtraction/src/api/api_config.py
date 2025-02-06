@@ -123,7 +123,11 @@ class ApiConfig:
                     status_code=500,
                     content={"status": "error", "detail": str(exc)}
                 )    
-        
+                
+        @app.get("/ping")
+        async def ping() -> str:
+            return "pong"
+                
         async def startup_event():
             """Handle application startup."""
             logger.error("Application startup: Task handler is running.")

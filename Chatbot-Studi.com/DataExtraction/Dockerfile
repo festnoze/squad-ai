@@ -1,12 +1,11 @@
 FROM python:3.12.1-slim
 
 WORKDIR /
-COPY wheels/ wheels/
-COPY requirements.txt .
-COPY requirements_docker.txt .
+COPY wheels/ /wheels/
 COPY requirements_common.txt .
-#RUN pip install --no-cache-dir requests python-dotenv uvicorn fastapi slack-sdk
-RUN pip install --no-cache-dir -r requirements_docker.txt
+
+RUN pip install /wheels/*.whl
+RUN pip install --no-cache-dir -r requirements_common.txt
 
 COPY . .
 
