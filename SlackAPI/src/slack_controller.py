@@ -51,3 +51,7 @@ async def get_bot_user_id() -> dict:
         return {"user_id": user_id}
     except SlackApiError as e:
         raise HTTPException(status_code=500, detail=f"Error: {e}")
+    
+@app.get("/ping")
+async def ping() -> dict:
+    return {"ping": "pong"}
