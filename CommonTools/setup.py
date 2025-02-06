@@ -9,7 +9,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='common_tools',
-    version='0.4.0',
+    version='0.4.1',
     description='Common tools for AI and generic needs on file, console, json, ...',
     author='Etienne Millerioux',
     author_email='eemillerioux@gmail.com',
