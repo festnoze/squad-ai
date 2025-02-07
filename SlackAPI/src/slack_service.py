@@ -67,7 +67,7 @@ class SlackService:
         msg_ts: str = msg_response["ts"]
         full_response: str = ""
         
-        for chunk in Helper.iter_words(response, decode_unicode=True):
+        for chunk in Helper.iter_words_then_lines(response, switch_to_line_chunk_after_words_count=15, decode_unicode=True):
             if chunk:
                 if waiting_msg_id: 
                     self.delete_message(channel, waiting_msg_id)
