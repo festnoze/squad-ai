@@ -14,6 +14,7 @@ class SlackService:
         self.SLACK_BOT_TOKEN: str = os.environ["SLACK_BOT_TOKEN"]
         self.SLACK_SIGNING_SECRET: str = os.environ["SLACK_SIGNING_SECRET"]
         self.SLACK_BOT_USER_ID: str = os.environ["SLACK_BOT_USER_ID"]
+        self.HTTP_SCHEMA: str = os.environ["HTTP_SCHEMA"]
         self.EXTERNAL_API_HOST: str = os.environ["EXTERNAL_API_HOST"]
         self.EXTERNAL_API_PORT: str = os.environ["EXTERNAL_API_PORT"]
         self.EXTERNAL_API_QUERY_ENDPOINT_URL: str = os.environ["EXTERNAL_API_QUERY_ENDPOINT_URL"]
@@ -37,7 +38,7 @@ class SlackService:
         return result['ts']
     
     def post_no_stream_response_to_query_from_external_api(self, channel, query):
-        url = self.EXTERNAL_API_HOST 
+        url = self.HTTP_SCHEMA + "://" + self.EXTERNAL_API_HOST 
         if self.EXTERNAL_API_PORT:
             url += ':' + self.EXTERNAL_API_PORT
         url += self.EXTERNAL_API_QUERY_ENDPOINT_URL
@@ -53,7 +54,7 @@ class SlackService:
     new_line_for_stream_over_http = "\\/%*/\\" # use specific new line conversion over streaming, as new line is handled differently across platforms
 
     def post_streaming_response_to_query_from_external_api(self, channel, query, waiting_msg_id):
-        url = self.EXTERNAL_API_HOST 
+        url = self.HTTP_SCHEMA + "://" + self.EXTERNAL_API_HOST 
         if self.EXTERNAL_API_PORT:
             url += ':' + self.EXTERNAL_API_PORT
         url += self.EXTERNAL_API_STREAMING_QUERY_ENDPOINT_URL        
@@ -85,7 +86,7 @@ class SlackService:
             print(f"Erreur lors de la suppression du message : {e.response['error']}")
 
     def ping_external_api(self)-> str:
-        url = self.EXTERNAL_API_HOST 
+        url = self.HTTP_SCHEMA + "://" + self.EXTERNAL_API_HOST 
         if self.EXTERNAL_API_PORT:
             url += ':' + self.EXTERNAL_API_PORT
         url += "/ping"

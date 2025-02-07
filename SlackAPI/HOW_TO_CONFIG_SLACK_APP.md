@@ -1,6 +1,6 @@
 # Comment Configurer une Application Slack avec Bot et abonnements aux événements
 
-Ce guide explique, étape par étape, comment créer une application Slack, ajouter un bot utilisateur et configurer les abonnements aux événements (généré par IA). 
+Ce guide (généré par IA) explique, étape par étape, comment créer une application Slack, ajouter un bot utilisateur et configurer les abonnements aux événements. 
 
 Vous pouvez aussi directement suivre toutes les étapes depuis la vidéo : https://youtu.be/3jFXRNn2Bu8?si=UP6R-TT-btbHUbh-
 
@@ -48,17 +48,17 @@ Votre backend doit exposer un endpoint `/slack/events` pour recevoir et traiter 
 
 Si vous développez en local, utilisez un outil comme [ngrok](https://ngrok.com/) pour exposer votre serveur local sur Internet :
 
-1. Démarrez votre serveur backend sur le port 8301.
+1. Démarrez votre serveur backend sur le port XXX.
 
 2. Dans une nouvelle fenêtre de commande, exécutez :
    
    ```bash
-   ngrok http --url=slack1-studi.ngrok.io 8301
+   ngrok http --url=slack1-studi.ngrok.io XXX
    ```
 
 ---
 
 ## 4. Renseigner Slack de l'URL abonnée aux évenements
 
-Renseigner l'URL externe ngrok affichée lors du lancement de ngrok sur la page: https://api.slack.com/apps/A08AYTSF9QF/event-subscriptions (où : A08AYTSF9QF l'id de l'app. slack).
-Cette URL ressemble à : "https://c07236f31f9e.ngrok.app/slack/events" (où "c07236f31f9e" est le sous-host généré par ngrok).
+Renseigner l'URL externe ngrok affichée lors du lancement de ngrok sur la page: https://api.slack.com/apps/YYY/event-subscriptions (où : YYY est l'id de l'app. slack).
+Cette URL ressemble à : "https://slack1-studi.ngrok.io/slack/events" (où "slack1-studi" est le sous-host généré par ngrok).
