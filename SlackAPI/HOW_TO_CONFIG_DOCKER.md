@@ -103,6 +103,6 @@ EXTERNAL_API_PORT="8281"
    
    <u>Nota :</u> commandes à executer depuis le dossier où est installé ngrok si besoin (actuellement inutile car ngrok.exe est dans `C:\Windows\System32`, qui est dans le PATH).
 
-7. **Prévenir Slack de l'URL à informer** en cas d'évenements
+7. **Prévenir Slack de l'URL à informer** en cas d'évenements (si changement de URL ngrok)
    Renseigner l'URL externe ngrok affichée lors du lancement de ngrok sur la page: https://api.slack.com/apps/A08AYTSF9QF/event-subscriptions (où : A08AYTSF9QF l'id de l'app. slack).
    Cette URL ressemble à : "https://c07236f31f9e.ngrok.app/slack/events" (où "c07236f31f9e" est le sous-host généré par ngrok).

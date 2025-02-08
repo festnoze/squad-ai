@@ -8,6 +8,7 @@ from client_models.user_request_model import UserRequestModel
 class ChatbotApiClient:
     def __init__(self, host_uri: str) -> None:
         self.host_uri = host_uri
+        self.test_prefix = f"{self.host_uri}/tests"
         self.inference_prefix = f"{self.host_uri}/rag/inference"
         self.ingestion_prefix = f"{self.host_uri}/rag/ingestion"
         self.evaluation_prefix = f"{self.host_uri}/rag/evaluation"
@@ -36,7 +37,7 @@ class ChatbotApiClient:
                 f"API re-initialization fails with status code {resp.status_code}, payload: {resp.text}")
     
     def test_all_inference_models(self):
-        resp = requests.get(f"{self.inference_prefix}/test-all-models")
+        resp = requests.get(f"{self.test_prefix}/models/all")
         return resp.json()
         
     def create_or_update_user(self, user_request_model: UserRequestModel) -> UUID:

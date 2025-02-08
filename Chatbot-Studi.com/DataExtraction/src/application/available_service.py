@@ -125,15 +125,25 @@ class AvailableService:
         llms_infos = EnvHelper.get_llms_infos_from_env_config(skip_commented_lines=False)
         llms = LangChainFactory.create_llms_from_infos(llms_infos)
         for llm in llms:
-            llm_sync_test = Llm.test_llm_inference(llm)
-            llm_async_test = await Llm.test_llm_inference_streaming_async(llm)
-            model_name = llm.model_name if hasattr(llm, 'model_name') else llm.model if hasattr(llm, 'model') else llm.__class__.__name__
+            llm_sync_test, llm_async_test, model_name = await AvailableService.test_single_llm_for_sync_and_async_streaming_async(llm)
 
             if llm_sync_test and llm_async_test:
                 models_names.append(f"SUCCESS: '{model_name}'. Sync: {llm_sync_test:2f}s. Async streaming: {llm_async_test:2f}s.")
             else:
                 models_names.append(f"FAILURE: '{model_name}'. Sync: {'fails' if llm_sync_test==0.0 else 'succeed'}. Async streaming: {'fails' if llm_async_test==0.0 else 'succeed'}.")
         return models_names
+
+    async def test_single_llm_from_env_config_async(llm_index_from_config: int):
+        llms_infos = EnvHelper.get_llms_infos_from_env_config(skip_commented_lines=False)
+        llm = LangChainFactory.create_llms_from_infos(llms_infos)[llm_index_from_config]
+        return await AvailableService.test_single_llm_for_sync_and_async_streaming_async(llm)
+    
+    @staticmethod
+    async def test_single_llm_for_sync_and_async_streaming_async(llm):
+        llm_sync_test = Llm.test_llm_inference(llm)
+        llm_async_test = await Llm.test_llm_inference_streaming_async(llm)
+        model_name = llm.model_name if hasattr(llm, 'model_name') else llm.model if hasattr(llm, 'model') else llm.__class__.__name__
+        return llm_sync_test,llm_async_test,model_name
 
 
     @staticmethod
@@ -148,7 +158,7 @@ class AvailableService:
     
     @staticmethod
     async def create_new_conversation_async(user_id: UUID, messages: list[Message] = None) -> Conversation:
-        conv_repo = ConversationRepository()
+        conv_repo = ConversationRepository() # TODO: do IoC for repositories instanciation
         recent_conversation_count = await conv_repo.get_recent_conversations_count_by_user_id_async(user_id)
         if recent_conversation_count > AvailableService.max_conversations_by_day: 
             raise QuotaOverloadException("You have reached the maximum number of conversations allowed per day.")
@@ -181,7 +191,7 @@ class AvailableService:
         while task_handler.is_task_ongoing(conversation_id):
             await asyncio.sleep(0.5)
         
-        conv_repo = ConversationRepository()
+        conv_repo = ConversationRepository() # TODO: do IoC for repositories instanciation
         conversation = await conv_repo.get_conversation_by_id_async(conversation_id)
         if not conversation: raise ValueError(f"Conversation with ID {conversation_id} not found in database.")
         if len(conversation.messages) > AvailableService.max_messages_by_conversation: 
@@ -228,7 +238,9 @@ class AvailableService:
     async def add_answer_summary_to_conversation_async(conversation, full_answer_str):
         summarized_response = await AvailableService.get_summarized_answer_async(full_answer_str)
         conversation.add_new_message("assistant", summarized_response)
-        assert await ConversationRepository().add_message_to_existing_conversation_async(conversation.id, conversation.last_message)
+        
+        conv_repo = ConversationRepository() # TODO: do IoC for repositories instanciation
+        assert await conv_repo.add_message_to_existing_conversation_async(conversation.id, conversation.last_message)
     
     @staticmethod
     async def rag_query_retrieval_and_augmented_generation_streaming_async(conversation_history:Conversation, display_waiting_message = True, is_stream_decoded = False, all_chunks_output: list[str] = []):

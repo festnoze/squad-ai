@@ -34,12 +34,12 @@ class UserRepository:
                 return user.id
         
         # Search user by IP
-        if user.device_info and user.device_info.ip:
+        if user.device_info and isinstance(user.device_info, DeviceInfo) and user.device_info.ip:
             user_id_with_IP = await self.get_device_info_by_IP_async(user.device_info.ip, [DeviceInfoEntity.user_id])
             return user_id_with_IP
         
         # Search user by name & device info's platform
-        if user.name and user.device_info and user.device_info.user_agent:
+        if user.name and isinstance(user.device_info, DeviceInfo) and user.device_info and user.device_info.user_agent:
             user_entity = await self.data_context.get_first_entity_async(
                 UserEntity,
                 filters=[
@@ -106,7 +106,7 @@ class UserRepository:
             
             # Update user if user infos are different from the existing ones
             if (user_entity.name != user.name):
-                await self.data_context.update_entity_async(UserEntity, user_entity.id, name = user_entity.name)
+                await self.data_context.update_entity_async(UserEntity, user_entity.id, name = user.name)
 
             return user_id_to_update
         

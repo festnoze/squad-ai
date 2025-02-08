@@ -26,17 +26,6 @@ def reinitialize():
         print(f"Failed to create conversation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     
-@inference_router.get("/test-all-models")
-async def test_all_models():
-    try:
-        models_tests_results:list[str] = await AvailableService.test_all_llms_from_env_config_async()
-        success = all(['SUCCESS' in model_test_result for model_test_result in models_tests_results])
-        return JSONResponse(content={"models_tests_results": models_tests_results}, status_code= 200 if success else 500)
-
-    except Exception as e:
-        print(f"Failed to test all models. Error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-    
 @inference_router.patch("/user/sync")
 async def create_or_retrieve_user(user_request_model: UserRequestModel):
     try:        

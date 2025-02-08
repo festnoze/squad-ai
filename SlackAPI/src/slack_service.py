@@ -9,16 +9,29 @@ from dotenv import load_dotenv, find_dotenv
 from helper import Helper
 
 class SlackService:
-    def __init__(self):       
-        load_dotenv(find_dotenv())
-        self.SLACK_BOT_TOKEN: str = os.environ["SLACK_BOT_TOKEN"]
-        self.SLACK_SIGNING_SECRET: str = os.environ["SLACK_SIGNING_SECRET"]
-        self.SLACK_BOT_USER_ID: str = os.environ["SLACK_BOT_USER_ID"]
-        self.HTTP_SCHEMA: str = os.environ["HTTP_SCHEMA"]
-        self.EXTERNAL_API_HOST: str = os.environ["EXTERNAL_API_HOST"]
-        self.EXTERNAL_API_PORT: str = os.environ["EXTERNAL_API_PORT"]
-        self.EXTERNAL_API_QUERY_ENDPOINT_URL: str = os.environ["EXTERNAL_API_QUERY_ENDPOINT_URL"]
-        self.EXTERNAL_API_STREAMING_QUERY_ENDPOINT_URL: str = os.environ["EXTERNAL_API_STREAMING_QUERY_ENDPOINT_URL"]
+    SLACK_BOT_TOKEN: str = None
+    SLACK_SIGNING_SECRET: str = None
+    SLACK_BOT_USER_ID: str = None
+    HTTP_SCHEMA: str = None
+    EXTERNAL_API_HOST: str = None
+    EXTERNAL_API_PORT: str = None
+    EXTERNAL_API_QUERY_ENDPOINT_URL: str = None
+    EXTERNAL_API_STREAMING_QUERY_ENDPOINT_URL: str = None
+    STREAMING_RESPONSE: str = None     
+    new_line_for_stream_over_http = "\\/%*/\\" # use specific new line conversion over streaming, as new line is handled differently across platforms
+
+    def __init__(self):
+        if SlackService.SLACK_BOT_TOKEN is None:   
+            load_dotenv(find_dotenv())
+            SlackService.SLACK_BOT_TOKEN = os.environ["SLACK_BOT_TOKEN"]
+            SlackService.SLACK_SIGNING_SECRET = os.environ["SLACK_SIGNING_SECRET"]
+            SlackService.SLACK_BOT_USER_ID = os.environ["SLACK_BOT_USER_ID"]
+            SlackService.HTTP_SCHEMA = os.environ["HTTP_SCHEMA"]
+            SlackService.EXTERNAL_API_HOST = os.environ["EXTERNAL_API_HOST"]
+            SlackService.EXTERNAL_API_PORT = os.environ["EXTERNAL_API_PORT"]
+            SlackService.EXTERNAL_API_QUERY_ENDPOINT_URL = os.environ["EXTERNAL_API_QUERY_ENDPOINT_URL"]
+            SlackService.EXTERNAL_API_STREAMING_QUERY_ENDPOINT_URL = os.environ["EXTERNAL_API_STREAMING_QUERY_ENDPOINT_URL"]
+            SlackService.STREAMING_RESPONSE = os.environ["STREAMING_RESPONSE"].lower() == 'true'
 
         self.signature_verifier: SignatureVerifier = SignatureVerifier(self.SLACK_SIGNING_SECRET)
         self.client: WebClient = WebClient(token=self.SLACK_BOT_TOKEN)
@@ -36,8 +49,15 @@ class SlackService:
     def post_message(self, channel, message, mrkdwn=False):
         result = self.client.chat_postMessage(channel= channel, text= message, mrkdwn= mrkdwn)
         return result['ts']
-    
-    def post_no_stream_response_to_query_from_external_api(self, channel, query):
+
+    # Handle both streaming and non streaming answer to user query provided by the external API    
+    def post_response_to_query_from_external_api(self, channel, query, waiting_msg_to_delete_ts):
+        if not SlackService.STREAMING_RESPONSE:
+            return self.post_no_stream_response_to_query_from_external_api(channel, query, waiting_msg_to_delete_ts)
+        else:
+            return self.post_streaming_response_to_query_from_external_api(channel, query, waiting_msg_to_delete_ts)
+
+    def post_no_stream_response_to_query_from_external_api(self, channel, query, waiting_msg_to_delete_ts):
         url = self.HTTP_SCHEMA + "://" + self.EXTERNAL_API_HOST 
         if self.EXTERNAL_API_PORT:
             url += ':' + self.EXTERNAL_API_PORT
@@ -49,11 +69,13 @@ class SlackService:
         answer = response.json()
     
         result = self.client.chat_postMessage(channel=channel, text= Helper.convert_markdown(answer), mrkdwn=True)
+        
+        if waiting_msg_to_delete_ts: 
+            self.delete_message(channel, waiting_msg_to_delete_ts)
+            waiting_msg_to_delete_ts = None
         return result['ts']
-    
-    new_line_for_stream_over_http = "\\/%*/\\" # use specific new line conversion over streaming, as new line is handled differently across platforms
-
-    def post_streaming_response_to_query_from_external_api(self, channel, query, waiting_msg_id):
+   
+    def post_streaming_response_to_query_from_external_api(self, channel, query, waiting_msg_to_delete_ts):
         url = self.HTTP_SCHEMA + "://" + self.EXTERNAL_API_HOST 
         if self.EXTERNAL_API_PORT:
             url += ':' + self.EXTERNAL_API_PORT
@@ -70,13 +92,12 @@ class SlackService:
         
         for chunk in Helper.iter_words_then_lines(response, switch_to_line_chunk_after_words_count=15, decode_unicode=True):
             if chunk:
-                if waiting_msg_id: 
-                    self.delete_message(channel, waiting_msg_id)
-                    waiting_msg_id = None
+                if waiting_msg_to_delete_ts: 
+                    self.delete_message(channel, waiting_msg_to_delete_ts)
+                    waiting_msg_to_delete_ts = None
                 full_response += chunk.replace(SlackService.new_line_for_stream_over_http, '\r\n')
                 self.client.chat_update(channel=channel, ts=msg_ts, text=Helper.convert_markdown(full_response), mrkdwn=True)
         return msg_ts
-            
     
     def delete_message(self, channel: str, timestamp: str) -> None:
         try:

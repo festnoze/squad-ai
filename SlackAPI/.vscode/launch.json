@@ -10,10 +10,10 @@
             "request": "launch",
             "module": "uvicorn",
             "args": [
-                "src.slack_controller:app", // The FastAPI app instance (in: api/startup.py)
+                "src.api.startup:app", // The FastAPI app instance (in: src/api/startup.py)
                 "--host", "127.0.0.1", // Host to bind
                 "--port", "8301",      // Port to bind
-                "--log-level", "error"//"warning" //"info", // Corrected log-level argument
+                "--log-level", "info"//"warning" //"error", // Corrected log-level argument
                 //"--reload",    // Enable/disable auto-reload on code change (for development)
             ],
             "env": {

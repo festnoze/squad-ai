@@ -7,16 +7,16 @@ from src.database_conversations.entities import ConversationEntity, UserEntity, 
 from src.database_conversations.conversation_converters import ConversationConverters
 from src.infrastructure.conversation_repository import ConversationRepository
 from common_tools.models.conversation import Conversation, Message, User
+from common_tools.models.device_info import DeviceInfo
 
 #TMP
-
-from sqlalchemy.sql.expression import BinaryExpression
-from sqlalchemy import create_engine, select
-from sqlalchemy import Column, String, Integer, ForeignKey, Table, DateTime
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import relationship, declarative_base, joinedload
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import sessionmaker
+# from sqlalchemy.sql.expression import BinaryExpression
+# from sqlalchemy import create_engine, select
+# from sqlalchemy import Column, String, Integer, ForeignKey, Table, DateTime
+# from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+# from sqlalchemy.orm import relationship, declarative_base, joinedload
+# from sqlalchemy.exc import SQLAlchemyError
+# from sqlalchemy.orm import sessionmaker
 
 pytest_plugins = ["pytest_asyncio"]
 
@@ -32,7 +32,8 @@ class TestConversationRepository:
 
         self.conversation_repository = ConversationRepository(db_path_or_url=self.db_path_or_url)
 
-        self.sample_user = User(name="First User", device_info="browser", id=uuid4())
+        self.sample_device_info = DeviceInfo(ip="1.2.3.4", user_agent="Mozilla/5.0", platform="Windows", app_version="1.0", os="Windows", browser="Chrome", is_mobile=False)
+        self.sample_user = User(id= uuid4(), name= "First User", device_info= self.sample_device_info)
         asyncio.run(self.conversation_repository.data_context.add_entity_async(
                 ConversationConverters.convert_user_model_to_entity(self.sample_user)))
 
@@ -65,8 +66,16 @@ class TestConversationRepository:
         assert retrieved_conversation.user is not None
         assert retrieved_conversation.user.id == self.sample_user.id
         assert retrieved_conversation.user.name == self.sample_user.name
-        assert retrieved_conversation.user.ip == self.sample_user.ip
-        assert retrieved_conversation.user.device_info == self.sample_user.device_info
+        
+        # user's device_info shouldn't be loaded
+        assert retrieved_conversation.user.device_info is None
+        # assert retrieved_conversation.user.device_info.ip == self.sample_user.device_info.ip
+        # assert retrieved_conversation.user.device_info.user_agent == self.sample_user.device_info.user_agent
+        # assert retrieved_conversation.user.device_info.platform == self.sample_user.device_info.platform
+        # assert retrieved_conversation.user.device_info.app_version == self.sample_user.device_info.app_version
+        # assert retrieved_conversation.user.device_info.os == self.sample_user.device_info.os
+        # assert retrieved_conversation.user.device_info.browser == self.sample_user.device_info.browser
+        # assert retrieved_conversation.user.device_info.is_mobile == self.sample_user.device_info.is_mobile
 
         assert retrieved_conversation.messages is not None
         assert len(retrieved_conversation.messages) == 1

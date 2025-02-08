@@ -11,7 +11,7 @@ class StudiPublicWebsiteClient:
         response.raise_for_status()
 
     def test_all_models(self) -> dict[str, any]:
-        url: str = f"{self.base_url}/rag/inference/test-all-models"
+        url: str = f"{self.base_url}/tests/models/all"
         response: requests.Response = requests.get(url)
         response.raise_for_status()
         return response.json()

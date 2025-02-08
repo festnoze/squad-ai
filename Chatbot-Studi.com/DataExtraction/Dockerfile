@@ -8,6 +8,8 @@ RUN pip install /wheels/*.whl
 RUN pip install --no-cache-dir -r requirements_common.txt
 
 COPY . .
+RUN chmod 777 src/database_conversations/conversation_database.db
+RUN rm -rf /outputs/logs/{*,.*}
 
 ENV PYTHONPATH=/src
 ENV PORT=8281

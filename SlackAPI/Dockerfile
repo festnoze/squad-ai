@@ -14,4 +14,4 @@ ENV HOST_URI=0.0.0.0
 
 EXPOSE $PORT
 
-CMD ["sh", "-c", "python -m uvicorn src.slack_controller:app --host $HOST_URI --port $PORT --log-level error"]
+CMD ["sh", "-c", "python -m uvicorn src.api.startup:app --host $HOST_URI --port $PORT --log-level error"]
