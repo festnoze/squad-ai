@@ -37,10 +37,10 @@ python -m build CommonTools
    
    Veillez que la variable 'repo_prefix' ait bien le nom de l'API concernée - Idem pour l'API Slack si besoin.
 
-5. **Lancer les images docker "slack_api" et de votre "API RAG"** .
+5. **Créer vos containers à partir des images docker des APIs Slack et RAG** .
    Attention les 2 containers  doivent être sur le <u>même network</u> (interne à docker) pour pouvoir communiquer entre eux, et les ports à exposer lors de la création des containers doivent être spécifiés explicitement, tel que : 8301 et 8281.
    
-   Pour ce faire, ne pas passer par Docker Desktop pour créer vos containers à partir des images docker, mais lancer pluôt ces commandes directement : 
+   Pour ce faire, ne pas passer par Docker Desktop. Créer vos containers à partir des images en lançant directement les commandes (en <u>mode administrateur</u>) : 
    
    5.1. Créer un <u>network </u>commun (inutile si le network a déjà été créé au préalable)
    
@@ -51,7 +51,7 @@ python -m build CommonTools
    5.2. Créer le <u>container pour l'API Slack</u>
    
    ```bash
-   docker run -d --name slack-api --network my_network -p 8301:8301 slack_api_0.14
+   docker run -d --name slack-api --network my_network -p 8301:8301 slack_api_0.10
    ```
    
       Où : 

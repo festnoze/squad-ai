@@ -19,6 +19,7 @@ class SlackService:
     EXTERNAL_API_STREAMING_QUERY_ENDPOINT_URL: str = None
     STREAMING_RESPONSE: str = None     
     new_line_for_stream_over_http = "\\/%*/\\" # use specific new line conversion over streaming, as new line is handled differently across platforms
+    default_error_message = "Impossible de contacter le chatbot pour le moment.\nMerci de réessayer plus tard."
 
     def __init__(self):
         if SlackService.SLACK_BOT_TOKEN is None:   
@@ -61,13 +62,17 @@ class SlackService:
         url = self.HTTP_SCHEMA + "://" + self.EXTERNAL_API_HOST 
         if self.EXTERNAL_API_PORT:
             url += ':' + self.EXTERNAL_API_PORT
-        url += self.EXTERNAL_API_QUERY_ENDPOINT_URL
-        
+        url += self.EXTERNAL_API_QUERY_ENDPOINT_URL        
         body = {'query': query, 'type': 'slack', 'user_name': channel}
+        
         response: requests.Response = requests.post(url, json=body)
-        response.raise_for_status()
-        answer = response.json()
-    
+        
+        if not response.ok:
+            self.delete_message(channel, waiting_msg_to_delete_ts)
+            err_resp = self.client.chat_postMessage(channel=channel, text= self.default_error_message, mrkdwn=True)
+            return err_resp["ts"]
+        
+        answer = response.json()    
         result = self.client.chat_postMessage(channel=channel, text= Helper.convert_markdown(answer), mrkdwn=True)
         
         if waiting_msg_to_delete_ts: 
@@ -83,7 +88,11 @@ class SlackService:
         body = {'query': query, 'type': 'slack', 'user_name': channel}
         
         response: requests.Response = requests.post(url, json=body, stream=True)
-        response.raise_for_status()
+        
+        if not response.ok:
+            self.delete_message(channel, waiting_msg_to_delete_ts)
+            err_resp = self.client.chat_postMessage(channel=channel, text= self.default_error_message, mrkdwn=True)
+            return err_resp["ts"]
         
         msg_response = self.client.chat_postMessage(channel=channel, text="...", mrkdwn=True)
         

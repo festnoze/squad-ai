@@ -23,28 +23,36 @@ class Helper:
         return blocks
     
     @staticmethod
-    def iter_words_then_lines(response, line_delimiters=['.', ',', ':', ';', '!', '?', '\t', '\n'], switch_to_line_chunk_after_words_count = 0, decode_unicode=True, buffer_size=1024):
+    def iter_words_then_lines(response, line_delimiters=['.', ',', ':', ';', '!', '?', '\t', '\n'], switch_to_line_chunk_after_words_count=0, decode_unicode=True, buffer_size=1024):
         word_delimiters = line_delimiters + [' ']
         word_pattern = re.compile(r"[{}]".format(''.join(map(re.escape, word_delimiters))))
         line_pattern = re.compile(r"[{}]".format(''.join(map(re.escape, line_delimiters))))     
         buffer = ""
         chunk_count = 0
         use_line_chunk = False
+        min_chars = 20
+        
         for chunk in response.iter_content(chunk_size=buffer_size, decode_unicode=decode_unicode):
             if chunk:
                 buffer += chunk                
-                while True:# Process the buffer as long as a delimiter is found.
+                while True:
                     if use_line_chunk:
-                        match = line_pattern.search(buffer)
+                        matches = list(line_pattern.finditer(buffer))
                     else:
-                        match = word_pattern.search(buffer)
-                    if not match:
+                        matches = list(word_pattern.finditer(buffer))
+                    
+                    if not matches:
                         break
+                    
+                    last_match = matches[-1]  # Prendre le dernier match
                     chunk_count += 1
                     if not use_line_chunk and switch_to_line_chunk_after_words_count != 0 and chunk_count >= switch_to_line_chunk_after_words_count:
                         use_line_chunk = True
-                    yield buffer[:match.end()] # Yield the data until the delimiter.
-                    buffer = buffer[match.end():] # Remove the yielded part with the delimiter from the buffer.
-        if buffer:
+                    
+                    if not use_line_chunk or len(buffer[:last_match.end()]) > min_chars:
+                        yield buffer[:last_match.end()]
+                    buffer = buffer[last_match.end():]
+        
+        if buffer and (not use_line_chunk or len(buffer) > min_chars):
             yield buffer
     
