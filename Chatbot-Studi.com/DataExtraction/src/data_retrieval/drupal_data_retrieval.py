@@ -3,7 +3,7 @@ from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.file_helper import file
 from common_tools.helpers.json_helper import json
 from common_tools.models.file_already_exists_policy import FileAlreadyExistsPolicy
-from helpers.unicode_helper import UnicodeHelper
+from common_tools.helpers.unicode_helper import UnicodeHelper
 from textwrap import dedent
 
 class DrupalDataRetrieval:

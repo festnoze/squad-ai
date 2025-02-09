@@ -20,7 +20,7 @@ class TestUserRepository:
     def setup_method(self):
         self.sample_device_info = DeviceInfo(ip="1.2.3.4", user_agent="Mozilla/5.0", platform="Windows", app_version="1.0", os="Windows", browser="Chrome", is_mobile=False)
         self.sample_user = User(id= uuid4(), name= "First User", device_info= self.sample_device_info)
-        self.user_repository = UserRepository(db_path_or_url=self.db_path_or_url)        
+        self.user_repository = UserRepository(db_path_or_url=self.db_path_or_url)
         asyncio.run(self.user_repository.data_context.empty_all_database_tables_async())
         asyncio.run(self.user_repository.data_context.add_entity_async(ConversationConverters.convert_user_model_to_entity(self.sample_user)))
 

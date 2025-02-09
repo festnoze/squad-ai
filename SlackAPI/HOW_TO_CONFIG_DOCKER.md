@@ -7,15 +7,20 @@ Suivez pas à pas la procédure ci-après :
 
 2. **Créer le package "common_tools"** : (*préalable : pip install setuptools wheel build*)
    
-   ```bash
-   python -m build CommonTools
-   ```
-   
-   ou :
-   
-   ```bash
-   python setup.py bdist_wheel
-   ```
+   Incrémenter la version du package en modifiant la valeur de **version** dans le fichier  **setup.py** .
+
+   Puis lancer la commande :
+
+```bash
+.\libs_build.bat
+```
+
+   ou (plus directement) :
+
+```bash
+rmdir /s /q common_tools.egg-info
+python -m build CommonTools
+```
 
 3. **Copier le package "common_tools"** :
    
@@ -33,9 +38,11 @@ Suivez pas à pas la procédure ci-après :
    Veillez que la variable 'repo_prefix' ait bien le nom de l'API concernée - Idem pour l'API Slack si besoin.
 
 5. **Lancer les images docker "slack_api" et de votre "API RAG"** .
-   Attention les 2 containers  doivent être sur le même network (interne à docker) pour pouvoir communiquer entre eux, et les ports à exposer lors de la création des containers doivent être spécifiés explicitement, tel que : 8301 et 8281.
+   Attention les 2 containers  doivent être sur le <u>même network</u> (interne à docker) pour pouvoir communiquer entre eux, et les ports à exposer lors de la création des containers doivent être spécifiés explicitement, tel que : 8301 et 8281.
    
-   5.1. Créer un <u>network </u>commun
+   Pour ce faire, ne pas passer par Docker Desktop pour créer vos containers à partir des images docker, mais lancer pluôt ces commandes directement : 
+   
+   5.1. Créer un <u>network </u>commun (inutile si le network a déjà été créé au préalable)
    
    ```bash
    docker network create my_network
@@ -73,9 +80,9 @@ docker run -d --name studi-website-rag-api --network my_network -p 8281:8281 rag
 
 - 'rag_studi_public_website_api_0.10' est le nom de l'image docker à partir de laquelle créer le container.
   
-   5.4. Configuer l'URL à cibler dans l'API Slack
+   5.4. Configuer l'URL de l'API RAG à cibler par l'API Slack
   
-      Dans le fichier '.env', définir le nom 'docker' du container de l'API RAG et son port, comme :
+      Dans le fichier 'Dockerfile', définir le nom 'docker' du container de l'API RAG et son port, comme :
 
 ```bash
 EXTERNAL_API_HOST="studi-website-rag-api"

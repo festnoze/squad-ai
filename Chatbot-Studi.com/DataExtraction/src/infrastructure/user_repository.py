@@ -120,3 +120,18 @@ class UserRepository:
         else:            
             user_id = await self.create_new_user_with_device_info_async(user)
         return user_id
+    
+    async def delete_user_by_id_async(self, user_id: UUID) -> None:
+        user_entity = await self.data_context.get_entity_by_id_async(UserEntity, user_id)
+        if not user_entity:
+            raise ValueError(f"User with id {user_id} not found.")
+        device_info_entities = getattr(user_entity, "device_infos", None)
+        
+        # Manually remove device infos first (Don't rely on cascading delete)
+        if device_info_entities:
+            for device_info_entity in device_info_entities:
+                await self.data_context.delete_entity_async(device_info_entity)
+        # If must done manually, we must delete all conversations (and theirs messages) related to the user first too!
+
+        # Remove user
+        await self.data_context.delete_entity_async(user_entity)

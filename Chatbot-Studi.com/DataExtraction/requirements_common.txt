@@ -1,7 +1,6 @@
 pytest
 pytest-asyncio
 numpy
-#nltk
 ragas
 requests
 BeautifulSoup4
@@ -11,5 +10,6 @@ aiosqlite
 dependency-injector
 fastapi
 uvicorn
+# nltk
 # celery
 # redis
