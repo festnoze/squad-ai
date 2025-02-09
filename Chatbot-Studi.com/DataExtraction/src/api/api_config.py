@@ -11,9 +11,11 @@ from application.service_exceptions import QuotaOverloadException
 from application.available_service import AvailableService
 from api.task_handler import task_handler
 
+import os
 import logging
 from datetime import datetime
 from common_tools.helpers.txt_helper import txt
+from common_tools.helpers.file_helper import file
 
 from web_services.test_controller import test_router
 from web_services.rag_ingestion_controller import ingestion_router
@@ -64,12 +66,14 @@ class ApiConfig:
         # Configure logging with reduced verbosity
         # logging.basicConfig(level=logging.INFO, format="%(message)s")
         # logger = logging.getLogger(__name__)
-
+        if not file.dir_exists("outputs/logs"):
+            os.makedirs("outputs/logs")
+            
         logging.basicConfig(
             level=logging.INFO,
             format="Log: %(asctime)s - %(levelname)s - %(message)s",
             handlers=[
-                logging.FileHandler(f"outputs\\logs\\app.{datetime.now().strftime("%Y-%m-%d.%H%M%S")}.log"),
+                logging.FileHandler(f"outputs/logs/app.{datetime.now().strftime("%Y-%m-%d.%H%M%S")}.log"),
                 logging.StreamHandler()  # Also print logs to the terminal
             ]
         )

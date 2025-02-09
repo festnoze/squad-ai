@@ -8,7 +8,7 @@ Suivez pas à pas la procédure ci-après :
 2. **Créer le package "common_tools"** : (*préalable : pip install setuptools wheel build*)
    
    Incrémenter la version du package en modifiant la valeur de **version** dans le fichier  **setup.py** .
-
+   
    Puis lancer la commande :
 
 ```bash
@@ -51,7 +51,7 @@ python -m build CommonTools
    5.2. Créer le <u>container pour l'API Slack</u>
    
    ```bash
-   docker run -d --name slack-api --network my_network -p 8301:8301 slack_api_0.10
+   docker run -d --name slack-api --network my_network -p 8301:8301 -e EXTERNAL_API_HOST="studi-website-rag-api" slack_api_0.10
    ```
    
       Où : 
@@ -62,6 +62,8 @@ python -m build CommonTools
    
    - '8301:8301' sont les ports d'entrée/sortie, 
    
+   - *EXTERNAL_API_HOST* : affecte l'API cible (nom du container docker) comme valeur à la variable d'environnement correspondante (utile pour override la valeur specifiée dans *Dockerfile* et *.env*)
+   
    - 'slack_api_0.14' est le nom de l'image docker à partir de laquelle créer le container.
    
    5.3. Créer le <u>container pour l'API RAG</u>
@@ -70,7 +72,7 @@ python -m build CommonTools
 docker run -d --name studi-website-rag-api --network my_network -p 8281:8281 rag_studi_public_website_api_0.10
 ```
 
-      Où : 
+Où : 
 
 - 'studi-website-rag-api' est le nom du container à créer, 
 
