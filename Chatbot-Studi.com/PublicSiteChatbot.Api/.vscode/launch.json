@@ -1,0 +1,26 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: Uvicorn Server",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "uvicorn",
+            "args": [
+                "api.startup:app", // The FastAPI app instance (in: api/startup.py)
+                "--host", "127.0.0.1", // Host to bind
+                "--port", "8281",      // Port to bind
+                "--log-level", "error"//"warning" //"info", // Corrected log-level argument
+                //"--reload",    // Enable/disable auto-reload on code change (for development)
+            ],
+            "env": {
+                "PYTHONPATH": "C:/Dev/IA/CommonTools;${workspaceFolder}/src"
+            },
+            "console": "integratedTerminal",
+            //"preLaunchTask": "Clear Terminal"
+        }
+    ]
+}

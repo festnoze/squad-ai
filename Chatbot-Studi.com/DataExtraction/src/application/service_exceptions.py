@@ -1,2 +1,0 @@
-class QuotaOverloadException(Exception):
-    pass

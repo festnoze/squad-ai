@@ -1,0 +1,368 @@
+[
+    {
+        "id": "56688577-548a-4666-84b5-72e3f9fb060c",
+        "type": "node--funding",
+        "title": "Compte Personnel de Formation (CPF)",
+        "changed": "2024-07-30T15:23:38+00:00",
+        "attributes": {
+            "body": "Le CPF est un droit individuel qui permet \u00e0 toute personne, salari\u00e9e ou demandeur d\u2019emploi, de cumuler un cr\u00e9dit en euros et de suivre une action de formation, utilisable tout au long de sa vie active.\r\nLe CPF est un droit individuel qui permet \u00e0 toute personne, salari\u00e9e ou demandeur d\u2019emploi, de cumuler un cr\u00e9dit en euros et de suivre une action de formation, utilisable tout au long de sa vie active."
+        },
+        "related_url": {
+            "paragraph": "https://www.studi.com/fr/jsonapi/node/funding/56688577-548a-4666-84b5-72e3f9fb060c/field_paragraph?resourceVersion=id%3A787"
+        },
+        "related_infos": {
+            "paragraph": [
+                "Le Compte personnel de formation (CPF) est un dispositif de financement public de formation continue, permettant aux actifs (y compris en p\u00e9riode de ch\u00f4mage) d\u2019acqu\u00e9rir des droits \u00e0 la formation tout au long de la vie professionnelle. \r\n\r\nLes personnes actives, d\u00e8s leur entr\u00e9e sur le march\u00e9 du travail et jusqu\u2019\u00e0 leur d\u00e9part \u00e0 la retraite, peuvent acqu\u00e9rir des droits \u00e0 la formation mobilisables tout au long de leur carri\u00e8re, pour suivre des formations qualifiantes ou certifiantes. \r\n\r\nLe Compte Personnel de Formation n\u2019est pas attach\u00e9 \u00e0 un contrat de travail. Les droits restent acquis m\u00eame lorsque l\u2019on change d'employeur ou que l\u2019on perd son emploi. Le compte n\u2019est plus utilisable lorsque les b\u00e9n\u00e9ficiaires font valoir l\u2019ensemble de leurs droits \u00e0 la retraite. En revanche, il est r\u00e9activ\u00e9 dans le cas d\u2019un cumul emploi-retraite.\r\n\r\nLe CPF est accessible sur le t\u00e9l\u00e9service \u00ab Mon Compte Formation \u00bb. Il est \u00e9galement possible de t\u00e9l\u00e9charger sur t\u00e9l\u00e9phone mobile l'application \u00ab Mon compte formation \u00bb (via AppleStore ou PlayStore).\r\n\r\nBon \u00e0 savoir<nbsp> </nbsp>: il n'est pas possible de c\u00e9der \u00e0 un tiers tout ou partie des sommes d'argent issues du CPF."
+            ]
+        }
+    },
+    {
+        "id": "9c02b63a-866d-4775-a583-0e9ed706d8df",
+        "type": "node--funding",
+        "title": "CPF de transition professionnelle",
+        "changed": "2023-03-14T16:01:58+00:00",
+        "attributes": {
+            "body": "Le Projet de Transition Professionnelle est une modalit\u00e9 particuli\u00e8re de mobilisation du CPF (Compte personnel de formation), permettant aux salari\u00e9s souhaitant changer de m\u00e9tier ou de profession de financer des formations certifiantes en lien avec leur projet.\r\nLe Projet de Transition Professionnelle est une modalit\u00e9 particuli\u00e8re de mobilisation du CPF (Compte personnel de formation), permettant aux salari\u00e9s souhaitant changer de m\u00e9tier ou de profession de financer des formations certifiantes en lien avec leur projet."
+        },
+        "related_url": {
+            "paragraph": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df/field_paragraph?resourceVersion=id%3A794"
+        },
+        "related_infos": {
+            "paragraph": [
+                "Mis en place depuis le 1er janvier 2019, le projet de Transition Professionnelle est un dispositif qui permet aux salari\u00e9s de changer de m\u00e9tier ou de profession, gr\u00e2ce au financement d\u2019une formation certifiante \u00e9ligible au CPF et en lien avec leur projet.\r\nCe dispositif, qui se substitue \u00e0 l\u2019ancien dispositif du CIF, permet \u00e0 chaque salari\u00e9 de b\u00e9n\u00e9ficier d\u2019un cong\u00e9 sp\u00e9cifique, la formation choisie \u00e9tant effectu\u00e9e durant le temps de travail (totalement ou partiellement).\r\n\r\nLe projet de Transition Professionnelle est donc une solution id\u00e9ale pour les salari\u00e9s qui souhaitent se reconvertir professionnellement ! \r\n\r\nDans ce cadre, le salari\u00e9 b\u00e9n\u00e9ficie d\u2019un droit \u00e0 cong\u00e9 et d\u2019un maintien de sa r\u00e9mun\u00e9ration pendant la dur\u00e9e de la formation.\r\n\r\nBon \u00e0 savoir : Le minist\u00e8re du Travail a mis en application un mod\u00e8le de Certificat de r\u00e9alisation des actions de formation, bilans de comp\u00e9tences, actions VAE et actions de formation par apprentissage, applicable \u00e0 compter du 1er juin 2020 par les associations \u00ab Transitions Pro \u00bb (ATpro). Ce certificat permettra d\u2019harmoniser les pratiques avec les op\u00e9rateurs de comp\u00e9tences (OPCO), les entreprises, organismes de formation et centres de formation d\u2019apprentis (CFA).\r\n \r\n\r\n \r\n\r\nEn savoir plus"
+            ]
+        }
+    },
+    {
+        "id": "97540098-109b-4efb-bcea-00fd02b0387d",
+        "type": "node--funding",
+        "title": "Plan de d\u00e9veloppement des comp\u00e9tences (PDC)",
+        "changed": "2023-03-07T13:53:21+00:00",
+        "attributes": {
+            "body": "Le plan de d\u00e9veloppement des comp\u00e9tences est un document qui rassemble l\u2019ensemble des actions de formation retenues par l\u2019employeur pour ses salari\u00e9s.\r\nLe plan de d\u00c3\u00a9veloppement des comp\u00c3\u00a9tences est un document qui rassemble l\u00e2\u0080\u0099ensemble des actions de formation retenues par l\u00e2\u0080\u0099employeur pour ses salari\u00c3\u00a9s.\u00c2"
+        },
+        "related_url": {
+            "paragraph": "https://www.studi.com/fr/jsonapi/node/funding/97540098-109b-4efb-bcea-00fd02b0387d/field_paragraph?resourceVersion=id%3A795"
+        },
+        "related_infos": {
+            "paragraph": [
+                "Depuis le 1er janvier 2019 le plan de d\u00e9veloppement des comp\u00e9tences, cr\u00e9\u00e9 par la Loi Avenir professionnel du 5 septembre 2018, remplace le plan de formation. \r\n\r\nLe plan de d\u00e9veloppement des comp\u00e9tences est un document qui rassemble l\u2019ensemble des actions de formation retenues par l\u2019employeur pour ses salari\u00e9s. \r\n\r\nIl permet aux salari\u00e9s de suivre des actions de formation mises en place par leur employeur, dont certaines sont obligatoires en application d\u2019une convention internationale ou de dispositions l\u00e9gales et r\u00e9glementaires (article L 6321-2 du code du travail).\r\n\r\nLe PDC, \u00e0 l\u2019initiative de l\u2019employeur, vient en opposition des formations que les salari\u00e9s peuvent suivre de leur propre initiative gr\u00e2ce \u00e0 leur compte personnel de formation (CPF). \r\n\r\nL\u2019employeur n\u2019a pas d\u2019obligation \u00e0 mettre en place un plan de d\u00e9veloppement des comp\u00e9tences, mais il y est fortement incit\u00e9. Par ailleurs, en mati\u00e8re de formation professionnelle, l\u2019employeur a toujours l\u2019obligation d\u2019assurer l\u2019adaptation des salari\u00e9s \u00e0 leur poste de travail et de veiller au maintien de leur capacit\u00e9 \u00e0 occuper un emploi."
+            ]
+        }
+    },
+    {
+        "id": "f94d49d6-65ec-4fa7-9421-f86d827c2224",
+        "type": "node--funding",
+        "title": "Transitions collectives",
+        "changed": "2024-03-12T15:34:57+00:00",
+        "attributes": {
+            "body": "Transitions collectives, dispositif co-construit avec les partenaires sociaux dans le cadre du plan France Relance, permet aux employeurs d\u2019anticiper les mutations \u00e9conomiques de leur secteur et aux salari\u00e9s d\u2019\u00eatre accompagn\u00e9s pour se reconvertir dans le but d\u2019acc\u00e9der \u00e0 un m\u00e9tier porteur dans le m\u00eame bassin de vie.\r\nTransitions collectives, dispositif co-construit avec les partenaires sociaux dans le cadre du plan France Relance, permet aux employeurs d\u2019anticiper les mutations \u00e9conomiques de leur secteur et aux salari\u00e9s d\u2019\u00eatre accompagn\u00e9s pour se reconvertir dans le but d\u2019acc\u00e9der \u00e0 un m\u00e9tier porteur dans le m\u00eame bassin de vie."
+        },
+        "related_url": {
+            "paragraph": "https://www.studi.com/fr/jsonapi/node/funding/f94d49d6-65ec-4fa7-9421-f86d827c2224/field_paragraph?resourceVersion=id%3A797"
+        },
+        "related_infos": {
+            "paragraph": [
+                "Qu\u2019est-ce-que \u00ab Transitions Collectives \u00bb ?\r\n\r\nA la suite des \u00e9changes avec les partenaires sociaux en Octobre 2020, l'Ex\u00e9cutif a annonc\u00e9 la cr\u00e9ation d\u2019un nouveau dispositif, permettant de faciliter la reconversion professionnelle des salari\u00e9s dont les emplois sont menac\u00e9s.\r\n\r\nCe dispositif vient en compl\u00e9ment du CPF de transition professionnelle."
+            ]
+        }
+    },
+    {
+        "id": "14196e83-afdd-4d83-a2a5-7dd1f0957bb7",
+        "type": "node--funding",
+        "title": "Contrat d'apprentissage",
+        "changed": "2024-01-05T16:14:38+00:00",
+        "attributes": {
+            "body": "Le contrat d'apprentissage permet \u00e0 l'apprenti de suivre une formation en alternance en entreprise sous la responsabilit\u00e9 d'un ma\u00eetre d'apprentissage et en centre de formation des apprentis (CFA) pendant 6 mois \u00e0 3 ans.\r\nLe contrat d'apprentissage permet \u00e0 l'apprenti de suivre une formation en alternance en entreprise sous la responsabilit\u00e9 d'un ma\u00eetre d'apprentissage et en centre de formation des apprentis (CFA) pendant 6 mois \u00e0 3 ans."
+        },
+        "related_url": {
+            "paragraph": "https://www.studi.com/fr/jsonapi/node/funding/14196e83-afdd-4d83-a2a5-7dd1f0957bb7/field_paragraph?resourceVersion=id%3A798"
+        },
+        "related_infos": {
+            "paragraph": [
+                "Qu\u2019est-ce-que le contrat d\u2019apprentissage ?\r\n\r\nLe contrat d\u2019apprentissage est un contrat de travail conclu entre un employeur et un salari\u00e9. Il vise l\u2019acquisition d\u2019une qualification professionnelle reconnue :\r\n\r\n\r\n\tUn dipl\u00f4me d\u2019Etat (CAP, BAC, BTS, Licence, Master, etc.).\r\n\tUn Titre certifi\u00e9 inscrit dans le R\u00e9pertoire national des certifications professionnelles (RNCP).\r\n\r\n\r\nL\u2019apprentissage repose sur le principe de l\u2019alternance entre enseignement th\u00e9orique en centre de formation d\u2019apprentis (CFA) ou en organisme de formation et enseignement du m\u00e9tier chez l\u2019employeur avec lequel l\u2019apprenti a conclu son contrat.\r\n\r\n \r\n\r\nJe m'informe !"
+            ]
+        }
+    },
+    {
+        "id": "e4c88ffe-ab4f-4f1d-83e1-1ef1adc64f9b",
+        "type": "node--funding",
+        "title": "Contrat de professionnalisation",
+        "changed": "2023-03-03T11:05:54+00:00",
+        "attributes": {
+            "body": "Le contrat de professionnalisation vise l\u2019insertion ou le retour \u00e0 l\u2019emploi des jeunes et des adultes et permet l\u2019acquisition \u2013 dans le cadre de la formation continue \u2013 d\u2019une qualification professionnelle reconnue par l\u2019\u00c9tat et/ou la branche professionnelle.\r\nLe contrat de professionnalisation vise l\u00e2\u0080\u0099insertion ou le retour \u00c3\u00a0 l\u00e2\u0080\u0099emploi des jeunes et des adultes et permet l\u00e2\u0080\u0099acquisition \u00e2\u0080\u0093 dans le cadre de la formation continue \u00e2\u0080\u0093 d\u00e2\u0080\u0099une qualification professionnelle reconnue par l\u00e2\u0080\u0099\u00c3\u0089tat et/ou la branche professionnelle.\u00c2"
+        },
+        "related_url": {
+            "paragraph": "https://www.studi.com/fr/jsonapi/node/funding/e4c88ffe-ab4f-4f1d-83e1-1ef1adc64f9b/field_paragraph?resourceVersion=id%3A800"
+        },
+        "related_infos": {
+            "paragraph": [
+                "Qu\u2019est-ce que le contrat de professionnalisation ?\r\n\r\nLe contrat de professionnalisation est un contrat de travail conclu entre un employeur et un salari\u00e9. Il vise l\u2019acquisition d\u2019une qualification professionnelle reconnue :\r\n\r\n\r\n\tdipl\u00f4me ou titre professionnel enregistr\u00e9 dans le R\u00e9pertoire national des certifications professionnelles (RNCP)\r\n\tcertificat de qualification professionnelle (CQP) de branche ou interbranche\r\n\tqualification reconnue dans les classifications d\u2019une convention collective nationale.\r\n\r\n\r\nL\u2019objectif est l\u2019insertion ou le retour \u00e0 l\u2019emploi des jeunes et des adultes.\r\n\r\nLe contrat de professionnalisation repose sur le principe de l\u2019alternance entre enseignement th\u00e9orique en centre de formation d\u2019apprentis (CFA) ou en organisme de formation et enseignement du m\u00e9tier chez l\u2019employeur avec lequel l\u2019apprenti a conclu son contrat.\r\n\r\n \r\n\r\nJe m'informe !"
+            ]
+        }
+    },
+    {
+        "id": "21261f47-37ff-40d0-a269-623d69823799",
+        "type": "node--funding",
+        "title": "Aide individuelle \u00e0 la formation (AIF)",
+        "changed": "2024-09-20T14:16:06+00:00",
+        "attributes": {
+            "body": "L\u2019Aide individuelle \u00e0 la formation (AIF) permet de (co)financer, dans certaines situations sp\u00e9cifiques, tout ou partie des frais p\u00e9dagogiques d\u2019une formation en vue d\u2019un retour durable \u00e0 l'emploi.\r\nL\u2019Aide individuelle \u00e0 la formation (AIF) permet de (co)financer, dans certaines situations sp\u00e9cifiques, tout ou partie des frais p\u00e9dagogiques d\u2019une formation en vue d\u2019un retour durable \u00e0 l'emploi."
+        },
+        "related_url": {
+            "paragraph": "https://www.studi.com/fr/jsonapi/node/funding/21261f47-37ff-40d0-a269-623d69823799/field_paragraph?resourceVersion=id%3A801"
+        },
+        "related_infos": {
+            "paragraph": [
+                "L\u2019AIF est un dispositif de France Travail permettant de financer l\u2019int\u00e9gralit\u00e9 d\u2019une formation (ou seulement une partie).\r\nCe dispositif peut par exemple venir en compl\u00e9ment du CPF si le montant cumul\u00e9 de vos droits ne couvre pas l\u2019int\u00e9gralit\u00e9 des frais de la formation."
+            ]
+        }
+    },
+    {
+        "id": "90eb3e3a-1feb-463a-b627-702f2c1ebdfc",
+        "type": "node--funding",
+        "title": "Validation des acquis de l'exp\u00e9rience",
+        "changed": "2024-09-20T14:00:56+00:00",
+        "attributes": {
+            "body": "La VAE permet d\u2019obtenir un dipl\u00f4me correspondant \u00e0 son exp\u00e9rience professionnelle. Les comp\u00e9tences acquises au fil des ann\u00e9es sont ainsi valoris\u00e9es au m\u00eame titre que si vous les aviez acquises par une formation \u00e9quivalente.\r\nLa VAE permet d\u2019obtenir un dipl\u00f4me correspondant \u00e0 son exp\u00e9rience professionnelle. Les comp\u00e9tences acquises au fil des ann\u00e9es sont ainsi valoris\u00e9es au m\u00eame titre que si vous les aviez acquises par une formation \u00e9quivalente."
+        },
+        "related_url": {
+            "paragraph": "https://www.studi.com/fr/jsonapi/node/funding/90eb3e3a-1feb-463a-b627-702f2c1ebdfc/field_paragraph?resourceVersion=id%3A803"
+        },
+        "related_infos": {
+            "paragraph": [
+                "Qu\u2019est-ce-que la VAE ?\r\n\r\nLa validation des acquis de l'exp\u00e9rience est une mesure qui permet \u00e0 toute personne (salari\u00e9s, non-salari\u00e9s, b\u00e9n\u00e9voles, travailleurs ind\u00e9pendants, fonctionnaires, demandeurs d\u2019emploi) quels que soient son \u00e2ge, son niveau d'\u00e9tudes ou son statut, de faire valider les acquis de son exp\u00e9rience pour obtenir une certification professionnelle enregistr\u00e9e au R\u00e9pertoire national des certifications professionnelles (RNCP).\r\nIl est n\u00e9anmoins n\u00e9cessaire de justifier d\u2019au moins une ann\u00e9e d\u2019exp\u00e9rience en rapport avec le contenu de la certification vis\u00e9e."
+            ]
+        }
+    },
+    {
+        "id": "995b7bca-9440-41b0-a652-37846bde7654",
+        "type": "node--funding",
+        "title": "Dispositif d\u00e9missionnaire",
+        "changed": "2024-09-20T14:26:51+00:00",
+        "attributes": {
+            "body": "Ce dispositif vous offre la possibilit\u00e9 de d\u00e9missionner afin de mettre en \u0153uvre votre projet professionnel et percevoir l\u2019allocation ch\u00f4mage. Le projet professionnel peut \u00eatre soit un projet de reconversion professionnelle n\u00e9cessitant le suivi d\u2019une formation, soit un projet de cr\u00e9ation d\u2019entreprise ou une reprise d\u2019entreprise.\r\nCe dispositif vous offre la possibilit\u00e9 de d\u00e9missionner afin de mettre en \u0153uvre votre projet professionnel et percevoir l\u2019allocation ch\u00f4mage. Le projet professionnel peut \u00eatre soit un projet de reconversion professionnelle n\u00e9cessitant le suivi d\u2019une formation, soit un projet de cr\u00e9ation d\u2019entreprise ou une reprise d\u2019entreprise."
+        },
+        "related_url": {
+            "paragraph": "https://www.studi.com/fr/jsonapi/node/funding/995b7bca-9440-41b0-a652-37846bde7654/field_paragraph?resourceVersion=id%3A804"
+        },
+        "related_infos": {
+            "paragraph": [
+                "Qu\u2019est-ce-que Le Dispositif \u00ab D\u00e9missionnaires \u00bb ?\r\n\r\nDepuis le 1 er novembre 2019, tous les salari\u00e9s en CDI depuis au moins 5 ans (dans une ou plusieurs entreprises), ont droit \u00e0 l\u2019assurance ch\u00f4mage quand ils d\u00e9missionnent pour r\u00e9aliser :\r\n\r\n\r\n\tSoit un projet de reconversion professionnelle n\u00e9cessitant le suivi d\u2019une formation\r\n\tSoit un projet de cr\u00e9ation d\u2019entreprise ou une reprise d\u2019entreprise."
+            ]
+        }
+    },
+    {
+        "id": "d22423ea-0229-41d6-8cd3-dfd3f24bcdd3",
+        "type": "node--funding",
+        "title": "Contrat de s\u00e9curisation professionnelle",
+        "changed": "2024-09-20T14:08:25+00:00",
+        "attributes": {
+            "body": "Le contrat de s\u00e9curisation professionnelle (CSP) est un dispositif d'accompagnement renforc\u00e9, sous forme de suivi individualis\u00e9, en cas de licenciement pour motif \u00e9conomique du salari\u00e9, qui pr\u00e9voit l'organisation et le d\u00e9roulement d'un parcours de retour \u00e0 l'emploi.\r\nLe contrat de s\u00e9curisation professionnelle (CSP) est un dispositif d'accompagnement renforc\u00e9, sous forme de suivi individualis\u00e9, en cas de licenciement pour motif \u00e9conomique du salari\u00e9, qui pr\u00e9voit l'organisation et le d\u00e9roulement d'un parcours de retour \u00e0 l'emploi."
+        },
+        "related_url": {
+            "paragraph": "https://www.studi.com/fr/jsonapi/node/funding/d22423ea-0229-41d6-8cd3-dfd3f24bcdd3/field_paragraph?resourceVersion=id%3A805"
+        },
+        "related_infos": {
+            "paragraph": [
+                "Qu\u2019est-ce-que le CSP ?\r\n\r\nLe contrat de s\u00e9curisation professionnelle (CSP) est un dispositif d\u2019un an destin\u00e9 aux personnes licenci\u00e9es pour motif \u00e9conomique.\r\nSeules les entreprises en redressement ou en liquidation judiciaire, ou de moins de 1000 salari\u00e9s, engag\u00e9es dans une proc\u00e9dure de licenciement \u00e9conomique, peuvent proposer un contrat de s\u00e9curisation professionnelle \u00e0 leurs collaborateurs.\r\nCe dispositif vise le retour rapide \u00e0 l\u2019emploi et permet ainsi d\u2019assurer aux salari\u00e9s un ensemble de mesures leur permettant de retrouver du travail au plus vite.\r\n\r\nDans le cadre du CSP, le salari\u00e9 peut :\r\n\r\n\r\n\t\u00catre accompagn\u00e9 dans ses recherches d\u2019emploi\r\n\tSe former pour se perfectionner, acqu\u00e9rir des comp\u00e9tences suppl\u00e9mentaires, apprendre un nouveau m\u00e9tier qui recrute.\r\n\tSe faire accompagner pour la cr\u00e9ation ou la reprise d\u2019une entreprise.\r\n\tFaire reconna\u00eetre ses comp\u00e9tences par une d\u00e9marche de Validation des acquis professionnels (VAE)."
+            ]
+        }
+    },
+    {
+        "id": "bf562a9a-717f-48d9-9e6e-5d066ae4c067",
+        "type": "node--funding",
+        "title": "Pr\u00e9paration op\u00e9rationnelle \u00e0 l\u2019emploi Collective",
+        "changed": "2024-09-20T14:24:44+00:00",
+        "attributes": {
+            "body": "La Pr\u00e9paration Op\u00e9rationnelle \u00e0 l\u2019Emploi Collective (POEC) est une action de formation permettant \u00e0 plusieurs demandeurs d\u2019emploi d\u2019acqu\u00e9rir les comp\u00e9tences requises pour occuper des emplois correspondant \u00e0 des besoins identifi\u00e9s par une branche professionnelle\r\nLa Pr\u00e9paration Op\u00e9rationnelle \u00e0 l\u2019Emploi Collective (POEC) est une action de formation permettant \u00e0 plusieurs demandeurs d\u2019emploi d\u2019acqu\u00e9rir les comp\u00e9tences requises pour occuper des emplois correspondant \u00e0 des besoins identifi\u00e9s par une branche professionnelle"
+        },
+        "related_url": {
+            "paragraph": "https://www.studi.com/fr/jsonapi/node/funding/bf562a9a-717f-48d9-9e6e-5d066ae4c067/field_paragraph?resourceVersion=id%3A806"
+        },
+        "related_infos": {
+            "paragraph": [
+                "Qu\u2019est-ce-que la POEC ?\r\n\r\nLa Pr\u00e9paration Op\u00e9rationnelle \u00e0 l\u2019Emploi collective (POEC) est une action de formation permettant \u00e0 plusieurs demandeurs d\u2019emploi, d\u2019acqu\u00e9rir les comp\u00e9tences requises pour occuper des postes correspondant \u00e0 des besoins identifi\u00e9s par une branche professionnelle ou, par le conseil d\u2019administration d\u2019un OPCO (op\u00e9rateur de comp\u00e9tences).\r\n\r\nPour les demandeurs d\u2019emploi\r\n\r\nLa POEC vise l\u2019acc\u00e8s rapide \u00e0 un emploi durable. Reconnue pour son efficacit\u00e9 dans l\u2019insertion professionnelle des demandeurs d\u2019emploi, elle a une dur\u00e9e de 400 heures maximum \u00e0 temps plein ou \u00e0 temps partiel, comprenant un temps d\u2019immersion en entreprise ne pouvant pas d\u00e9passer 1/3 de la dur\u00e9e de la POEC.\r\n\r\nLe dispositif \u00e9tant initi\u00e9 par les OPCO, les branches professionnelles et les entreprises, il d\u00e9bouche sur des m\u00e9tiers dont les besoins en recrutement sont forts.\r\n\r\nPour les employeurs\r\n\r\nPour les employeurs, la POEC permet de s\u00e9curiser les recrutements en offrant au demandeur d\u2019emploi une phase d\u2019int\u00e9gration progressive dans l\u2019entreprise."
+            ]
+        }
+    },
+    {
+        "id": "9cb2fce6-c5bd-4341-bffe-8f2d6f4bf6fc",
+        "type": "node--funding",
+        "title": "Pr\u00e9paration Op\u00e9rationnelle \u00e0 l\u2019Emploi  individuelle",
+        "changed": "2024-09-20T13:39:25+00:00",
+        "attributes": {
+            "title": "Pr\u00e9paration Op\u00e9rationnelle \u00e0 l\u2019Emploi  individuelle",
+            "body": "La Pr\u00e9paration Op\u00e9rationnelle \u00e0 l'Emploi individuelle (POEI) permet de former un futur collaborateur avant son embauche par l\u2019interm\u00e9diaire de France Travail.\r\nLa Pr\u00e9paration Op\u00e9rationnelle \u00e0 l'Emploi individuelle (POEI) permet de former un futur collaborateur avant son embauche par l\u2019interm\u00e9diaire de France Travail."
+        },
+        "related_url": {
+            "paragraph": "https://www.studi.com/fr/jsonapi/node/funding/9cb2fce6-c5bd-4341-bffe-8f2d6f4bf6fc/field_paragraph?resourceVersion=id%3A5130"
+        },
+        "related_infos": {
+            "paragraph": [
+                "La Pr\u00e9paration Op\u00e9rationnelle \u00e0 l\u2019Emploi individuelle (POEI)\r\n\r\n \r\n\r\nQu\u2019est-ce-que La Pr\u00e9paration Op\u00e9rationnelle \u00e0 l\u2019Emploi individuelle (POE I) ?\r\n\r\nLa pr\u00e9paration op\u00e9rationnelle \u00e0 l\u2019emploi individuelle (POEI) est une formation permettant d\u2019acqu\u00e9rir ou de d\u00e9velopper les comp\u00e9tences professionnelles n\u00e9cessaires \u00e0 la satisfaction d\u2019un besoin de recrutement. \r\n\r\nLa Pr\u00e9paration op\u00e9rationnelle \u00e0 l\u2019emploi individuelle est un dispositif qui a pour objectif de mettre \u00e0 niveau des profils en recherche d\u2019emploi, pour qu\u2019ils correspondent au poste propos\u00e9 par une entreprise. Ce dispositif permet ainsi aux employeurs de former un futur collaborateur avant son embauche, par l\u2019interm\u00e9diaire de France Travail (anciennement France Travail). \r\n\r\nEn d\u2019autres termes, la POEI consiste \u00e0 monter une session de formation \u00ab sur-mesure \u00bb destin\u00e9e \u00e0 un demandeur d\u2019emploi, pour qu\u2019il puisse acqu\u00e9rir les comp\u00e9tences n\u00e9cessaires \u00e0 sa future embauche.\r\n\r\nCe dispositif pr\u00e9sente de nombreux avantages \u00e0 la fois pour les individus et pour les entreprises. \r\n\r\nPour les individus\r\n\r\n\r\n\tFormation int\u00e9gralement prise en charge et immersion en entreprise\r\n\tAcquisition de comp\u00e9tences indispensables pour exercer un emploi en particulier (ou un m\u00e9tier en tension)\r\n\tRetour rapide \u00e0 l\u2019emploi sur un m\u00e9tier recherch\u00e9 au sein d\u2019une branche professionnelle \r\n\r\n\r\nPour les entreprises\r\n\r\n\r\n\tAccompagnement dans la mise en place d\u2019une formation selon les crit\u00e8res de recrutement\r\n\tAide dans la prise en charge financi\u00e8re de la formation\r\n\tEmbauche du stagiaire apr\u00e8s sa formation en POEI via un contrat de professionnalisation pour poursuivre sa mont\u00e9e en comp\u00e9tences\r\n\tRecrutement d\u2019un candidat imm\u00e9diatement op\u00e9rationnel sur le poste de travail propos\u00e9"
+            ]
+        }
+    },
+    {
+        "id": "50c10921-75b4-48b6-a9b6-71fca5bdb480",
+        "type": "node--funding",
+        "title": "Action de Formation Pr\u00e9alable au Recrutement",
+        "changed": "2024-09-20T14:38:43+00:00",
+        "attributes": {
+            "body": "L'Action de Formation Pr\u00e9alable au Recrutement (AFPR) est destin\u00e9e \u00e0 combler l'\u00e9cart entre les comp\u00e9tences que vous d\u00e9tenez et celles que requiert l'emploi que vous visez. Ce dispositif s'applique \u00e0 toute personne inscrite \u00e0 France Travail.\r\nL'Action de Formation Pr\u00e9alable au Recrutement (AFPR) est destin\u00e9e \u00e0 combler l'\u00e9cart entre les comp\u00e9tences que vous d\u00e9tenez et celles que requiert l'emploi que vous visez. Ce dispositif s'applique \u00e0 toute personne inscrite \u00e0 France Travail."
+        },
+        "related_url": {
+            "paragraph": "https://www.studi.com/fr/jsonapi/node/funding/50c10921-75b4-48b6-a9b6-71fca5bdb480/field_paragraph?resourceVersion=id%3A5131"
+        },
+        "related_infos": {
+            "paragraph": [
+                "Action de Formation Pr\u00e9alable au Recrutement (AFPR)\r\n\r\n\r\nQu\u2019est-ce-que l\u2019Action de Formation Pr\u00e9alable au Recrutement (AFPR)\r\n\r\nL'Action de Formation Pr\u00e9alable au Recrutement (AFPR) est un dispositif r\u00e9serv\u00e9 \u00e0 toutes les personnes inscrites \u00e0 France Travail, permettant de b\u00e9n\u00e9ficier d\u2019une formation pour d\u00e9velopper des comp\u00e9tences dans l\u2019objectif de postuler \u00e0 une offre d\u2019emploi.\r\n\r\nAinsi, l'AFPR est une aide financi\u00e8re permettant au demandeur d'emploi de se former pour r\u00e9pondre \u00e0 une offre d'emploi pour laquelle il lui manque des comp\u00e9tences professionnelles. Cette aide, financ\u00e9e par France Travail, peut \u00eatre attribu\u00e9e \u00e0 un employeur qui rencontre des difficult\u00e9s de recrutement, et qui s'engage \u00e0 former un demandeur d'emploi ou un salari\u00e9 en contrat d'insertion, et \u00e0 le recruter en fin de formation. Cette formation permet d\u2019acqu\u00e9rir de nouvelles connaissances et comp\u00e9tences, mais \u00e9galement de se familiariser avec l'entreprise ou de nouveaux outils.\r\n\r\nIl existe 2 aides : la pr\u00e9paration op\u00e9rationnelle \u00e0 l'emploi individuelle (POEI) et l'action de formation pr\u00e9alable au recrutement (AFPR). Selon la dur\u00e9e du contrat en CDD, de l\u2019int\u00e9rim ou du contrat de professionnalisation, le demandeur d\u2019emploi peut pr\u00e9tendre \u00e0 l\u2019une de ces deux aides.\r\n\r\nLe contrat de travail doit \u00eatre l'un des contrats suivants :\r\n\r\n\r\n\tContrat \u00e0 dur\u00e9e d\u00e9termin\u00e9e (CDD) de 6 \u00e0 12 mois maximum\r\n\tInt\u00e9rim pendant au moins 6 mois au cours des 9 mois suivant la formation\r\n\tContrat de professionnalisation de moins de 12 mois\r\n\r\n\r\nPar ailleurs, si le contrat de travail est \u00e0 temps partiel, la dur\u00e9e hebdomadaire de travail doit \u00eatre au moins \u00e9gale \u00e0 20 heures.\r\n\r\nL'employeur peut b\u00e9n\u00e9ficier de l'AFPR s'il a d\u00e9pos\u00e9 une offre d'emploi aupr\u00e8s de France Travail et s'il s'engage \u00e0 embaucher le demandeur d'emploi apr\u00e8s la formation.\r\n\r\nEnfin, l'inscription AFPR est mentionn\u00e9e sur les offres lorsque l'employeur accepte d'embaucher un demandeur d'emploi apr\u00e8s une formation pr\u00e9alable."
+            ]
+        }
+    },
+    {
+        "id": "5a9e7666-2a53-47da-9eee-9561c1ffbc23",
+        "type": "node--funding",
+        "title": "Cong\u00e9 de formation professionnelle",
+        "changed": "2024-03-11T10:08:45+00:00",
+        "attributes": {
+            "body": "L'agent de la fonction publique d\u2019\u00c9tat qui souhaite se former pour satisfaire un projet professionnel ou personnel peut b\u00e9n\u00e9ficier d'un cong\u00e9 de formation professionnelle d'une dur\u00e9e maximale de 3 ans est r\u00e9mun\u00e9r\u00e9 pendant 12 mois.\r\nL'agent de la fonction publique d\u2019\u00c9tat qui souhaite se former pour satisfaire un projet professionnel ou personnel peut b\u00e9n\u00e9ficier d'un cong\u00e9 de formation professionnelle d'une dur\u00e9e maximale de 3 ans est r\u00e9mun\u00e9r\u00e9 pendant 12 mois."
+        },
+        "related_url": {
+            "paragraph": "https://www.studi.com/fr/jsonapi/node/funding/5a9e7666-2a53-47da-9eee-9561c1ffbc23/field_paragraph?resourceVersion=id%3A5132"
+        },
+        "related_infos": {
+            "paragraph": [
+                "Le cong\u00e9 de formation professionnelle (CFP)\r\n\r\n \r\n\r\nQu\u2019est-ce-que Le cong\u00e9 de formation professionnelle (CFP) ?\r\n\r\nLe cong\u00e9 de Formation Professionnelle (CFP) permet aux fonctionnaires et agents non titulaires, \u00e0 leur initiative et \u00e0 titre personnel, sous certaines conditions, de suivre des actions de formation g\u00e9n\u00e9ralement de longue dur\u00e9e. \r\n\r\nLe CFP permet au demandeur de suivre des actions de formation et de pr\u00e9paration aux concours et examens professionnels afin d\u2019obtenir un dipl\u00f4me (CAP, BTS, etc.). \r\n\r\nCe cong\u00e9 est comparable au Cong\u00e9 Individuel de Formation (CIF) qui est accord\u00e9 dans le secteur priv\u00e9.\r\n\r\nAinsi les agents peuvent compl\u00e9ter leur formation par le biais de stages de formation qui ne leur sont pas propos\u00e9s par l'administration, ou pour des actions organis\u00e9es par l'administration en vue de la pr\u00e9paration aux concours administratifs."
+            ]
+        }
+    },
+    {
+        "id": "a5e66e74-b379-494d-b0e0-f540ce5d6439",
+        "type": "node--funding",
+        "title": "Action de Formation Conventionn\u00e9e par France Travail (AFC)",
+        "changed": "2024-09-20T13:35:09+00:00",
+        "attributes": {
+            "title": "Action de Formation Conventionn\u00e9e par France Travail (AFC)",
+            "body": "L'Action de Formation Conventionn\u00e9e par France Travail (AFC) vise \u00e0 faciliter le retour rapide \u00e0 l'emploi. Sa mise en \u0153uvre permet de combler un \u00e9cart entre les comp\u00e9tences d\u00e9tenues par le demandeur d'emploi et les exigences du march\u00e9 du travail.\r\nL'Action de Formation Conventionn\u00e9e par France Travail (AFC) vise \u00e0 faciliter le retour rapide \u00e0 l'emploi. Sa mise en \u0153uvre permet de combler un \u00e9cart entre les comp\u00e9tences d\u00e9tenues par le demandeur d'emploi et les exigences du march\u00e9 du travail."
+        },
+        "related_url": {
+            "paragraph": "https://www.studi.com/fr/jsonapi/node/funding/a5e66e74-b379-494d-b0e0-f540ce5d6439/field_paragraph?resourceVersion=id%3A5133"
+        },
+        "related_infos": {
+            "paragraph": [
+                "Action de Formation Conventionn\u00e9e par France Travail (AFC)\r\n\r\nQu\u2019est-ce-que l\u2019Action de Formation Conventionn\u00e9e par France Travail (AFC) ?\r\n\r\nFrance Travail ach\u00e8te r\u00e9guli\u00e8rement des places de formations dans diff\u00e9rents organismes de formation. Il s\u2019agit d\u2019actions conventionn\u00e9es par France Travail.\r\n\r\nL\u2019AFC ou Action de formation conventionn\u00e9e vise \u00e0 faciliter le retour rapide \u00e0 l\u2019emploi en comblant un \u00e9cart entre les comp\u00e9tences d\u2019un demandeur d\u2019emploi et les exigences r\u00e9elles du march\u00e9 du travail. Cela permet d\u2019offrir rapidement une qualification aux demandeurs d\u2019emploi qui le souhaitent.\r\n\r\nCe dispositif de financement est con\u00e7u principalement pour que la r\u00e9insertion professionnelle des demandeurs d\u2019emploi se fasse au plus vite, soit via un organisme de formation, soit via l\u2019obtention de certificats n\u00e9cessaires \u00e0 l\u2019emploi vis\u00e9 (permis de conduire, certificat d\u2019\u00e9valuation des comp\u00e9tences en langue \u00e9trang\u00e8re, etc.)"
+            ]
+        }
+    },
+    {
+        "id": "eb59b2b3-1cf2-4420-a87f-13e4c675cb63",
+        "type": "node--funding",
+        "title": "FAF",
+        "changed": "2023-03-07T13:14:30+00:00",
+        "attributes": {
+            "body": "En contrepartie de la contribution \u00e0 la formation professionnelle (CFP), \u00e0 laquelle ils sont soumis, les travailleurs ind\u00e9pendants peuvent b\u00e9n\u00e9ficier du financement total ou partiel de leurs formations.\r\nEn contrepartie de la contribution \u00e0 la formation professionnelle (CFP), \u00e0 laquelle ils sont soumis, les travailleurs ind\u00e9pendants peuvent b\u00e9n\u00e9ficier du financement total ou partiel de leurs formations."
+        },
+        "related_url": {
+            "paragraph": "https://www.studi.com/fr/jsonapi/node/funding/eb59b2b3-1cf2-4420-a87f-13e4c675cb63/field_paragraph?resourceVersion=id%3A5134"
+        },
+        "related_infos": {
+            "paragraph": [
+                "FAF (Fond d\u2019Assurance Formation)\r\n\r\nQu\u2019est-ce-que le FAF ?\r\n\r\nLes travailleurs ind\u00e9pendants peuvent, sous certaines conditions, b\u00e9n\u00e9ficier du financement total ou partiel de leurs formations, en contrepartie de la contribution \u00e0 la formation professionnelle (CFP), \u00e0 laquelle ils sont soumis. Ainsi, le travailleur ind\u00e9pendant qui a pay\u00e9 la CFP peut b\u00e9n\u00e9ficier d'une aide pour financer une formation.\r\n\r\nCette aide est g\u00e9r\u00e9e par un fonds d'assurance formation (FAF) qui diff\u00e8re selon la nature de son activit\u00e9, c'est-\u00e0-dire en fonction de son code NAF (ou code APE). Par exemple, un auto-entrepreneur qui exerce une activit\u00e9 lib\u00e9rale est rattach\u00e9 au FAF des professions lib\u00e9rales : le FIF-PL .\r\n\r\nA noter : le conjoint collaborateur en b\u00e9n\u00e9ficie \u00e9galement si la CFP-conjoint collaborateur a \u00e9t\u00e9 pay\u00e9e.\r\n\r\nVoici les fonds d\u2019assurance formation correspondants aux diff\u00e9rentes activit\u00e9s :\r\n\r\n\r\n\tProfession lib\u00e9rale : fonds interprofessionnel de formation des professionnels lib\u00e9raux (FIF-PL).\r\n\tProfession lib\u00e9rale m\u00e9dicale : fonds d'assurance formation de la profession m\u00e9dicale (FAF-PM).\r\n\tCommer\u00e7ant et dirigeant non salari\u00e9 du commerce, de l'industrie et des services : Association de gestion du financement de la formation des chefs d'entreprise (Agefice). En cas de double immatriculation au RCS et au RM, c'est le FAFCEA ou la chambre r\u00e9gionale des m\u00e9tiers qui est en charge du financement, et non l'Agefice.\r\n\tArtiste auteur : Fonds d'assurance formation des secteurs de la culture, de la communication et des loisirs (AFDAS).\r\n\tArtisan, chef d'entreprise inscrit au r\u00e9pertoire des m\u00e9tiers (RM) et auto-entrepreneur artisan non inscrit au RM : Fonds d'assurance formation des chefs d'entreprises artisanales (FAFCEA).\r\n\tExploitant agricole et chef d'exploitation foresti\u00e8re : Fonds pour la formation des entrepreneurs du vivant (Viv\u00e9a). \r\n\tProfessionnel de la p\u00eache (conchyliculteur, chef d'entreprise de cultures marines) : FAF PCM (Fonds d\u2019assurance Formation Paritaire P\u00eache et Cultures Marines) pour la formation des professionnels des secteurs de la p\u00eache, de la conchyliculture et des \u00e9levages marins. \r\n\r\n\r\nA noter : depuis juin 2014, un auto-entrepreneur dont le chiffre d'affaires est nul (0 \u20ac) sur une dur\u00e9e de 12 mois cons\u00e9cutifs ne b\u00e9n\u00e9ficie pas de la prise en charge de ses formations."
+            ]
+        }
+    },
+    {
+        "id": "67a2abdb-fa66-4162-ab72-797049272c89",
+        "type": "node--funding",
+        "title": "CDI-Apprentissage",
+        "changed": "2024-03-11T09:29:20+00:00",
+        "attributes": {
+            "body": "L\u2019article L. 6222-13 du code du travail permet au salari\u00e9 d\u00e9j\u00e0 titulaire d\u2019un CDI dans une entreprise, de suspendre son CDI, en plein accord avec son employeur, pour conclure un contrat d\u2019apprentissage avec ce m\u00eame employeur.\r\nL\u2019article L. 6222-13 du code du travail permet au salari\u00e9 d\u00e9j\u00e0 titulaire d\u2019un CDI dans une entreprise, de suspendre son CDI, en plein accord avec son employeur, pour conclure un contrat d\u2019apprentissage avec ce m\u00eame employeur.",
+            "metatag": "La solution CDI \u2013 Apprentissage de Studi, permet de pr\u00e9parer \u00e0 l'obtention d'un Dipl\u00f4me d'Etat, d'un Titre Professionnel ou d'un Titre RNCP\r\n[node:title] | [site:name]"
+        },
+        "related_url": {
+            "paragraph": "https://www.studi.com/fr/jsonapi/node/funding/67a2abdb-fa66-4162-ab72-797049272c89/field_paragraph?resourceVersion=id%3A14137"
+        },
+        "related_infos": {
+            "paragraph": [
+                "L\u2019article L. 6222-13 du code du travail permet au salari\u00e9 d\u00e9j\u00e0 titulaire d\u2019un CDI dans une entreprise,\r\nde suspendre son CDI, en plein accord avec son employeur, pour conclure un contrat\r\nd\u2019apprentissage avec ce m\u00eame employeur.\r\n \r\nLe CDI \u2013 Apprentissage permet aux salari\u00e9s de transformer leur CDI en contrat d\u2019apprentissage pour se former sur leur temps de travail, de mani\u00e8re flexible et en toute s\u00e9curit\u00e9. Les contrats d\u2019apprentissage peuvent \u00eatre conclus pour une dur\u00e9e limit\u00e9e entre 12 et 36 mois. \r\n\r\nCette solution 100% gagnante pour les salari\u00e9s et les entreprises, permet d\u2019accompagner le changement et l\u2019\u00e9volution des talents en toute s\u00e9curit\u00e9. \r\n\r\nLes apprentis ont la possibilit\u00e9 de d\u00e9crocher un dipl\u00f4me prestigieux \u00e0 l\u2019issue de leur formation en ligne, prise en charge par les OPCO."
+            ]
+        }
+    },
+    {
+        "id": "408813da-452c-4281-8335-b74c3bd318a7",
+        "type": "node--funding",
+        "title": "Les formations 100% financ\u00e9es \u00e0 destination des demandeurs d'emploi en R\u00e9gion Ile-de-France",
+        "changed": "2024-09-20T14:52:24+00:00",
+        "attributes": {
+            "title": "Les formations 100% financ\u00e9es \u00e0 destination des demandeurs d'emploi en R\u00e9gion Ile-de-France",
+            "body": "Vous r\u00e9sidez en \u00cele-de-France et recherchez un emploi? La R\u00e9gion Ile-de-France vous propose une formation dipl\u00f4mante pour vous pr\u00e9parer aux m\u00e9tiers les plus recherch\u00e9s par les recruteurs. Formez-vous \u00e0 un m\u00e9tier d'avenir gr\u00e2ce \u00e0 des formations 100% financ\u00e9es !\r\nVous r\u00e9sidez en \u00cele-de-France et recherchez un emploi? La R\u00e9gion Ile-de-France vous propose une formation dipl\u00f4mante pour vous pr\u00e9parer aux m\u00e9tiers les\u00a0plus recherch\u00e9s par les recruteurs. Formez-vous \u00e0 un m\u00e9tier d'avenir\u00a0gr\u00e2ce \u00e0 des formations 100% financ\u00e9es !"
+        },
+        "related_url": {
+            "paragraph": "https://www.studi.com/fr/jsonapi/node/funding/408813da-452c-4281-8335-b74c3bd318a7/field_paragraph?resourceVersion=id%3A20653"
+        },
+        "related_infos": {
+            "paragraph": [
+                "Vous r\u00e9sidez en \u00cele-de-France et recherchez un emploi? La R\u00e9gion IDF vous propose une formation dipl\u00f4mante !\r\n\r\nStudi et la R\u00e9gion Ile-de-France s'associent pour vous aider \u00e0 acc\u00e9l\u00e9rer votre carri\u00e8re professionnelle en vous formant aux m\u00e9tiers les plus recherch\u00e9s par les recruteurs.\r\n\r\nFormez-vous \u00e0 un m\u00e9tier d\u2019avenir !\r\n\r\nFaites votre choix parmi notre choix de formations et obtenez un dipl\u00f4me reconnu par l'Etat ! Attention, places limit\u00e9es !\r\n\r\nVoir le d\u00e9tail des formations 100% financ\u00e9es"
+            ]
+        }
+    },
+    {
+        "id": "faaf2567-d175-4cf7-86a0-b26e9fdc8933",
+        "type": "node--funding",
+        "title": "Les formations 100% financ\u00e9es \u00e0 destination des demandeurs d'emploi partout en France",
+        "changed": "2024-09-30T09:28:55+00:00",
+        "attributes": {
+            "title": "Les formations 100% financ\u00e9es \u00e0 destination des demandeurs d'emploi partout en France",
+            "body": "Vous \u00eates demandeur d'emploi ? France Travail et Studi vous forment aux m\u00e9tiers qui recrutent !\r\nVous \u00c3\u00aates demandeur d'emploi ? France Travail et Studi vous forment aux m\u00c3\u00a9tiers qui recrutent !\u00c2"
+        },
+        "related_url": {
+            "paragraph": "https://www.studi.com/fr/jsonapi/node/funding/faaf2567-d175-4cf7-86a0-b26e9fdc8933/field_paragraph?resourceVersion=id%3A20654"
+        },
+        "related_infos": {
+            "paragraph": [
+                "France Travail et Studi vous forment aux m\u00e9tiers qui recrutent !\r\n\r\nVous \u00eates demandeur d'emploi ? Studi et France Travail s'associent pour vous aider \u00e0 acc\u00e9l\u00e9rer votre carri\u00e8re professionnelle en vous formant aux m\u00e9tiers les plus recherch\u00e9s par les recruteurs.\r\n\r\nFormez-vous \u00e0 un m\u00e9tier d'avenir dans des secteurs qui recrutent avec des formations 100% fianc\u00e9es !\r\n\r\nAttention, les places sont limit\u00e9es !\r\n\r\nVoir le d\u00e9tail des formations 100% financ\u00e9es"
+            ]
+        }
+    },
+    {
+        "id": "0d46c57c-84c2-437a-badf-fa4f96bb7fdf",
+        "type": "node--funding",
+        "title": "Financement personnel",
+        "changed": "2024-09-27T10:17:56+00:00",
+        "attributes": {
+            "body": "Ma\u00eetrisez votre budget formation sur un \u00e9chelonnement possible de 10, 12, 24 ou 36 mois sans frais (0% d'int\u00e9r\u00eat). \r\nD\u00e9marrez votre formation \u00e0 partir de seulement 69\u20ac/mois.\r\nMa\u00c3\u00aetrisez votre budget formation sur un \u00c3\u00a9chelonnement possible de 10, 12, 24 ou 36 mois sans frais (0% d'int\u00c3\u00a9r\u00c3\u00aat).\u00c2\u00a0\nD\u00c3\u00a9marrez votre formation \u00c3\u00a0 partir de seulement 69\u00e2\u0082\u00ac/mois.\u00c2"
+        },
+        "related_url": {
+            "paragraph": "https://www.studi.com/fr/jsonapi/node/funding/0d46c57c-84c2-437a-badf-fa4f96bb7fdf/field_paragraph?resourceVersion=id%3A116760"
+        },
+        "related_infos": {
+            "paragraph": [
+                "Si votre formation n\u2019est pas financ\u00e9e \u00e0 100 %, Studi vous offre la possibilit\u00e9 de payer en plusieurs fois sans frais : \r\n\r\n\r\n\tTarifs \u00e0 partir de 69\u20ac/mois\r\n\tPaiement flexible \u00e9chelonn\u00e9 sur 10, 12, 24 ou 36 mois\r\n\tSans frais (0% d'int\u00e9r\u00eat)\r\n\r\n\r\nContactez-nous pour un devis personnalis\u00e9 et d\u00e9couvrez nos offres les plus avantageuses."
+            ]
+        }
+    },
+    {
+        "id": "fbd2ce8f-4f6a-48c1-a358-f0a5b799939f",
+        "type": "node--funding",
+        "title": "Votre formation 100% financ\u00e9e par France Travail",
+        "changed": "2024-09-30T13:33:51+00:00",
+        "attributes": {
+            "metatag": "[node:title] | [site:name]\r\n[node:summary]"
+        },
+        "related_url": {
+            "paragraph": "https://www.studi.com/fr/jsonapi/node/funding/fbd2ce8f-4f6a-48c1-a358-f0a5b799939f/field_paragraph?resourceVersion=id%3A116891"
+        },
+        "related_infos": {
+            "paragraph": [
+                "Studi et France Travail s'associent pour vous aider \u00e0 acc\u00e9l\u00e9rer votre retour \u00e0 l\u2019emploi en vous formant aux m\u00e9tiers les plus recherch\u00e9s par les recruteurs.\r\n\r\nFormez-vous \u00e0 un m\u00e9tier d'avenir dans des secteurs qui recrutent !\r\n\r\nAttention, les places sont limit\u00e9es !",
+                "Nos formations 100% financ\u00e9es par France Travail\r\n\r\n4 secteurs qui recrutent : Comptabilit\u00e9 et Gestion, Education et P\u00e9dagogie, Syst\u00e8mes et R\u00e9seaux, Vente et Commerce",
+                "Notre objectif : vous offrir la meilleure exp\u00e9rience p\u00e9dagogique pour faire de votre formation un succ\u00e8s et de votre future carri\u00e8re une r\u00e9ussite\r\n\r\n1. Des contenus disponibles \u00e0 tout moment\r\n\r\nSuivez et \u00e9tudiez vos cours \u00e0 votre rythme et \u00e0 tout moment de la journ\u00e9e, accessibles 24h/24 et 7j/7 via web ou application mobile.\r\n\r\n\r\n2. Des contenus en direct\r\n\r\nParticipez \u00e0 des classes virtuelles en direct avec formateurs, \u00e9quipe p\u00e9dagogique et votre groupe d\u2019apprenants pour interagir en direct",
+                "3. Un accompagnement personnalis\u00e9\r\n\r\n\r\n\t\r\n\tVotre charg\u00e9 de suivi apprenant s\u2019assure que votre formation se d\u00e9roule conform\u00e9ment \u00e0 vos objectifs, disponible \u00e0 la demande il est \u00e0 votre \u00e9coute tout au long de votre parcours.\r\n\t\r\n\t\r\n\tVotre responsable p\u00e9dagogique est votre contact privil\u00e9gi\u00e9 sur tous les aspects p\u00e9dagogiques de votre parcours de votre entr\u00e9e en formation jusqu\u2019au passage de vos examens.\r\n\t\r\n\t\r\n\tVotre formateur r\u00e9f\u00e9rent est expert du domaine de votre formation, il r\u00e9pondra \u00e0 toutes vos questions sp\u00e9cifiques aux notions de votre parcours.\r\n\t \r\n\t\r\n\r\n\r\nJe suis int\u00e9ress\u00e9(e)",
+                "*Sous condition d'\u00eatre indemnis\u00e9 au titre de l'ARE (Allocation d'aide au retour \u00e0 l'emploi) pendant toute la dur\u00e9e de la formation."
+            ]
+        }
+    }
+]

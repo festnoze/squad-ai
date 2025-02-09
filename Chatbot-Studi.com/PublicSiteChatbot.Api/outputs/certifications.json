@@ -1,0 +1,118 @@
+[
+    {
+        "id": "f3ca5a7d-d507-49ec-9d45-1104cc252a61",
+        "type": "taxonomy_term--certification",
+        "name": "Bloc - Certification professionnelle (RNCP)",
+        "changed": "2022-12-01T08:07:27+00:00",
+        "related_url": {}
+    },
+    {
+        "id": "9fdf1170-3434-4c78-b796-2e415050ae59",
+        "type": "taxonomy_term--certification",
+        "name": "Bloc de comp\u00e9tences",
+        "changed": "2022-12-01T08:07:31+00:00",
+        "related_url": {}
+    },
+    {
+        "id": "f697d6c1-fbab-4a85-b5cf-d9eb9f3ec0d5",
+        "type": "taxonomy_term--certification",
+        "name": "Bloc de comp\u00e9tences RNCP",
+        "changed": "2022-12-01T08:07:34+00:00",
+        "related_url": {}
+    },
+    {
+        "id": "1e009a5e-de2c-49a3-b31e-b5ed487aa445",
+        "type": "taxonomy_term--certification",
+        "name": "Certificat R\u00e9pertoire Sp\u00e9cifique",
+        "changed": "2022-12-01T08:07:39+00:00",
+        "related_url": {}
+    },
+    {
+        "id": "92f9db85-ae1e-4a15-8942-0f4f0abf761e",
+        "type": "taxonomy_term--certification",
+        "name": "Certificat Studi (FM)",
+        "changed": "2022-12-01T08:07:43+00:00",
+        "related_url": {}
+    },
+    {
+        "id": "8016d1f6-af8a-4c71-90c7-b2691e1860de",
+        "type": "taxonomy_term--certification",
+        "name": "Certification compl\u00e9mentaire (R\u00e9pertoire Sp\u00e9cifique)",
+        "changed": "2022-12-01T08:07:46+00:00",
+        "attributes": {
+            "name": "Certification compl\u00e9mentaire (R\u00e9pertoire Sp\u00e9cifique)"
+        },
+        "related_url": {}
+    },
+    {
+        "id": "ef9c437c-804d-4c22-b1cd-b756c3ae790f",
+        "type": "taxonomy_term--certification",
+        "name": "Dipl\u00f4me d'Etat",
+        "description": "R\u00e9sultats cumul\u00e9s de nos apprenants qui ont obtenu leur dipl\u00f4me (total des apprenants en formation entre juin 2010 et juin 2022 ayant d\u00e9clar\u00e9 avoir pass\u00e9 leur examen lors de notre enqu\u00eate Audirep r\u00e9alis\u00e9e en juillet 2021 et notre enqu\u00eate Studi r\u00e9alis\u00e9e en Mars 2023)",
+        "changed": "2023-10-02T22:20:16+00:00",
+        "attributes": {
+            "description": "R\u00e9sultats cumul\u00e9s de nos apprenants qui ont obtenu leur dipl\u00f4me (total des apprenants en formation entre juin 2010 et juin 2022 ayant d\u00e9clar\u00e9 avoir pass\u00e9 leur examen lors de notre enqu\u00eate Audirep r\u00e9alis\u00e9e en juillet 2021 et notre enqu\u00eate Studi r\u00e9alis\u00e9e en Mars 2023)\r\nR\u00e9sultats cumul\u00e9s de nos apprenants qui ont obtenu leur dipl\u00f4me (total des apprenants en formation entre juin 2010 et juin 2022 ayant d\u00e9clar\u00e9 avoir pass\u00e9 leur examen lors de notre enqu\u00eate Audirep r\u00e9alis\u00e9e en juillet 2021 et notre enqu\u00eate Studi r\u00e9alis\u00e9e en Mars 2023)"
+        },
+        "related_url": {}
+    },
+    {
+        "id": "c9d0aef9-6e3e-4a56-9a78-15763b8c406d",
+        "type": "taxonomy_term--certification",
+        "name": "Dipl\u00f4me d'Etat (DE)",
+        "description": "R\u00e9sultats cumul\u00e9s de nos apprenants qui ont obtenu leur dipl\u00f4me (total des apprenants en formation entre juin 2010 et juin 2021 ayant d\u00e9clar\u00e9 avoir pass\u00e9 leur examen lors de notre enqu\u00eate Audirep r\u00e9alis\u00e9e en juillet 2021)",
+        "changed": "2022-11-16T00:16:33+00:00",
+        "attributes": {
+            "description": "R\u00e9sultats cumul\u00e9s de nos apprenants qui ont obtenu leur dipl\u00f4me (total des apprenants en formation entre juin 2010 et juin 2021 ayant d\u00e9clar\u00e9 avoir pass\u00e9 leur examen lors de notre enqu\u00eate Audirep r\u00e9alis\u00e9e en juillet 2021)\r\nR\u00e9sultats cumul\u00e9s de nos apprenants qui ont obtenu leur dipl\u00f4me (total des apprenants en formation entre juin 2010 et juin 2021 ayant d\u00e9clar\u00e9 avoir pass\u00e9 leur examen lors de notre enqu\u00eate Audirep r\u00e9alis\u00e9e en juillet 2021)"
+        },
+        "related_url": {}
+    },
+    {
+        "id": "f2be6533-fc65-4ad1-81f3-fc49e596803c",
+        "type": "taxonomy_term--certification",
+        "name": "Formation M\u00e9tier (FM)",
+        "changed": "2021-08-19T00:00:12+00:00",
+        "related_url": {}
+    },
+    {
+        "id": "187c83fb-3108-4252-a54d-8eebb3711c4c",
+        "type": "taxonomy_term--certification",
+        "name": "Formation M\u00e9tier (FM)",
+        "changed": "2022-12-01T08:07:54+00:00",
+        "related_url": {}
+    },
+    {
+        "id": "47007ecf-aa04-4f14-844d-75821983da14",
+        "type": "taxonomy_term--certification",
+        "name": "Formation qualifiante",
+        "changed": "2022-12-01T08:07:58+00:00",
+        "related_url": {}
+    },
+    {
+        "id": "9eec00d9-1ab9-489e-81f2-cbf22e06055f",
+        "type": "taxonomy_term--certification",
+        "name": "Pr\u00e9paration Concours",
+        "changed": "2022-12-01T08:08:02+00:00",
+        "related_url": {}
+    },
+    {
+        "id": "f8bfb84a-4517-412b-a997-b758ba4ec81f",
+        "type": "taxonomy_term--certification",
+        "name": "Titre - Certification professionnelle (RNCP)",
+        "changed": "2022-12-01T08:08:05+00:00",
+        "related_url": {}
+    },
+    {
+        "id": "61dc3a88-c8fd-479b-9590-9ee8ca332ade",
+        "type": "taxonomy_term--certification",
+        "name": "Titre Professionnel",
+        "changed": "2022-12-01T08:08:09+00:00",
+        "related_url": {}
+    },
+    {
+        "id": "454b3add-b95f-4607-91df-5176f4719884",
+        "type": "taxonomy_term--certification",
+        "name": "Titre RNCP",
+        "changed": "2022-12-01T08:08:13+00:00",
+        "related_url": {}
+    }
+]

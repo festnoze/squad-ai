@@ -1,1 +1,0 @@
-pip install -r requirements_docker.txt --upgrade

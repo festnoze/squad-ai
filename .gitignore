@@ -1,13 +1,14 @@
 inputs/
-outputs/
 storage/
 exchanges/
 *.save/
 *.old/
 chroma_db/
-*.db
+scraped*/
+structures_descriptions*/
 
 .env
+*.db
 *.pyc
 *.exe
 *.bin
