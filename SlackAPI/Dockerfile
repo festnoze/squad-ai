@@ -15,8 +15,8 @@ ENV PORT=8301
 ENV HTTP_SCHEMA="http"
 ENV EXTERNAL_API_HOST="studi-website-rag-api"
 ENV EXTERNAL_API_PORT="8281"
-ENV EXTERNAL_API_QUERY_ENDPOINT_URL="/rag/inference/no-conversation/ask-question"
-ENV EXTERNAL_API_STREAMING_QUERY_ENDPOINT_URL="/rag/inference/no-conversation/ask-question/stream"
+ENV QUERY_EXTERNAL_ENDPOINT_URL="/rag/inference/no-conversation/ask-question"
+ENV QUERY_EXTERNAL_ENDPOINT_URL_STREAMING="/rag/inference/no-conversation/ask-question/stream"
 ENV STREAMING_RESPONSE=True
 
 # Copy the dependencies file and install them

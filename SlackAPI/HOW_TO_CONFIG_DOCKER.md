@@ -42,19 +42,27 @@ python -m build CommonTools
    
    Pour ce faire, ne pas passer par Docker Desktop. Créer vos containers à partir des images en lançant directement les commandes (en <u>mode administrateur</u>) : 
    
-   5.1. Créer un <u>network </u>commun (inutile si le network a déjà été créé au préalable)
+   **5.1. Créer un <u>network</u> commun (inutile si le network a déjà été créé au préalable)**
    
    ```bash
    docker network create my_network
    ```
    
-   5.2. Créer le <u>container pour l'API Slack</u>
+   **5.2. Créer le <u>container pour l'API Slack</u>**
+   
+   - Ciblant **"studi-website-rag-api"** :
    
    ```bash
-   docker run -d --name slack-api --network my_network -p 8301:8301 -e EXTERNAL_API_HOST="studi-website-rag-api" slack_api_0.10
+   docker run -d --name slack-api-studi-website --network my_network -p 8301:8301 -e EXTERNAL_API_HOST="studi-website-rag-api" -e EXTERNAL_API_PORT="8281" -e QUERY_EXTERNAL_ENDPOINT_URL_STREAMING="/rag/inference/no-conversation/ask-question/stream" -e STREAMING_RESPONSE=true slack_api_0.10
    ```
    
-      Où : 
+   - Ou ciblant **"code-doc-api"** :
+   
+   ```bash
+   docker run -d --name slack-api-code-doc --network my_network -p 8301:8301 -e EXTERNAL_API_HOST="code-doc-api" -e EXTERNAL_API_PORT="8282" -e QUERY_EXTERNAL_ENDPOINT_URL_STREAMING="/rag/query/stream" -e STREAMING_RESPONSE=true slack_api_0.10
+   ```
+   
+   Avec les paramètres suivants :
    
    - 'slack-api' est le nom du container à créer, 
    
@@ -62,17 +70,32 @@ python -m build CommonTools
    
    - '8301:8301' sont les ports d'entrée/sortie, 
    
-   - *EXTERNAL_API_HOST* : affecte l'API cible (nom du container docker) comme valeur à la variable d'environnement correspondante (utile pour override la valeur specifiée dans *Dockerfile* et *.env*)
+   - *EXTERNAL_API_HOST* :  le nom du container docker de l'API a ciblé pour sous-traiter les évenements reçus. Définit la variable d'environnement correspondante (override la valeur specifiée dans *Dockerfile* et *.env*).
    
-   - 'slack_api_0.14' est le nom de l'image docker à partir de laquelle créer le container.
+   - *EXTERNAL_API_PORT* : le port du container docker de l'API a ciblé pour sous-traiter les évenements reçus (override la valeur specifiée *Dockerfile* et *.env*).
    
-   5.3. Créer le <u>container pour l'API RAG</u>
+   - *QUERY_EXTERNAL_ENDPOINT_URL* : définit le endpoint de l'API RAG à appeller pour répondre à une demande provenant de slack, sans streaming de la réponse.
+   
+   - *QUERY_EXTERNAL_ENDPOINT_URL_STREAMING* : définit le endpoint de l'API RAG à appeller pour répondre à une demande provenant de slack, en streamant la réponse.
+   
+   - *STREAMING_RESPONSE* : définit si la réponse doit être ou non en streaming (vrai par défaut).
+   
+   - 'slack_api_0.10' est le nom de l'image docker à partir de laquelle créer le container.
+   
+   : définit si la réponse doit être ou non en streaming (vrai par défaut).   **5.3. Créer les <u>containers pour des API RAG</u>**
+   Pour l'API **"studi website"** :
 
 ```bash
 docker run -d --name studi-website-rag-api --network my_network -p 8281:8281 rag_studi_public_website_api_0.10
 ```
 
-Où : 
+        Pour l'API **"code doc"** :
+
+```bash
+docker run -d --name code-doc-api --network my_network -p 8282:8282 code_doc_api_0.10
+```
+
+Où :
 
 - 'studi-website-rag-api' est le nom du container à créer, 
 
@@ -82,20 +105,20 @@ Où :
 
 - 'rag_studi_public_website_api_0.10' est le nom de l'image docker à partir de laquelle créer le container.
   
-   5.4. Configuer l'URL de l'API RAG à cibler par l'API Slack
+  **5.4. Configuer l'URL de l'API RAG à cibler par l'API Slack**
   
-      Dans le fichier 'Dockerfile', définir le nom 'docker' du container de l'API RAG et son port, comme :
+  Dans le fichier '*Dockerfile*', définir le nom 'docker' du container de l'API RAG et son port, comme :
 
 ```bash
 EXTERNAL_API_HOST="studi-website-rag-api"
 EXTERNAL_API_PORT="8281"
 ```
 
-   5.5. <u>Tester</u> le bon fonctionnement
+   **5.5. <u>Tester</u> le bon fonctionnement**
       Chaque API expose un endpoint "/ping" qui permet de test son bon fonctionnement, et renvoie "pong" en cas de réussite.
       De plus, l'API Slack expose un endpoint "/ping-api" qui appelle le endpoint "/ping" de l'API RAG, permettant de tester la chaine, et le bon fonctionnement de la communication entre containers des deux containters docker.
 
-6. **Créer un tunnel ngrok** pour rendre l'API Slack visible depuis le web : 
+6. **Créer un tunnel ngrok pour rendre l'API Slack visible depuis le web :** 
    Dans une nouvelle fenêtre de commande, comme powershell:
    
    - authentification sur ngrok, si nécessaire (remplacer `<ngrok-token>` par votre token ngrok): 
@@ -112,6 +135,6 @@ EXTERNAL_API_PORT="8281"
    
    <u>Nota :</u> commandes à executer depuis le dossier où est installé ngrok si besoin (actuellement inutile car ngrok.exe est dans `C:\Windows\System32`, qui est dans le PATH).
 
-7. **Prévenir Slack de l'URL à informer** en cas d'évenements (si changement de URL ngrok)
+7. **Prévenir Slack de l'URL à informer en cas d'évenements** (si changement de URL ngrok)
    Renseigner l'URL externe ngrok affichée lors du lancement de ngrok sur la page: https://api.slack.com/apps/A08AYTSF9QF/event-subscriptions (où : A08AYTSF9QF l'id de l'app. slack).
    Cette URL ressemble à : "https://c07236f31f9e.ngrok.app/slack/events" (où "c07236f31f9e" est le sous-host généré par ngrok).

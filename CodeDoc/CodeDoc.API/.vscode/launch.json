@@ -2,8 +2,9 @@
     // Use IntelliSense to learn about possible attributes.
     // Hover to view descriptions of existing attributes.
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
-    "version": "0.2.0",
+    "version": "0.1.0",
     "configurations": [
+    
         {
             "name": "Python Debugger: Uvicorn Server",
             "type": "debugpy",
@@ -12,7 +13,7 @@
             "args": [
                 "api.startup:app", // The FastAPI app instance (in: api/startup.py)
                 "--host", "127.0.0.1", // Host to bind
-                "--port", "8281",      // Port to bind
+                "--port", "8282",      // Port to bind
                 "--log-level", "info"//"warning" //"error", // Corrected log-level argument
                 //"--reload",    // Enable/disable auto-reload on code change (for development)
             ],

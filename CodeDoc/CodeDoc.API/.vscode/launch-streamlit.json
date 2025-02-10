@@ -1,0 +1,18 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Streamlit: Run frontend/chatbot.py",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/senv/Scripts/streamlit.exe",
+            "args": [
+               "run", "frontend/chatbot.py"
+            ],
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            },
+            "console": "integratedTerminal"
+        }
+    ]
+}

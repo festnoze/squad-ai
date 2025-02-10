@@ -15,11 +15,11 @@ class SlackService:
     HTTP_SCHEMA: str = None
     EXTERNAL_API_HOST: str = None
     EXTERNAL_API_PORT: str = None
-    EXTERNAL_API_QUERY_ENDPOINT_URL: str = None
-    EXTERNAL_API_STREAMING_QUERY_ENDPOINT_URL: str = None
+    QUERY_EXTERNAL_ENDPOINT_URL: str = None
+    QUERY_EXTERNAL_ENDPOINT_URL_STREAMING: str = None
     STREAMING_RESPONSE: str = None     
     new_line_for_stream_over_http = "\\/%*/\\" # use specific new line conversion over streaming, as new line is handled differently across platforms
-    default_error_message = "Impossible de contacter le chatbot pour le moment.\nMerci de réessayer plus tard."
+    default_error_message = "Impossible de contacter le chatbot pour le moment.\nMerci de réessayer plus tard"
 
     def __init__(self):
         if SlackService.SLACK_BOT_TOKEN is None:   
@@ -30,8 +30,8 @@ class SlackService:
             SlackService.HTTP_SCHEMA = os.environ["HTTP_SCHEMA"]
             SlackService.EXTERNAL_API_HOST = os.environ["EXTERNAL_API_HOST"]
             SlackService.EXTERNAL_API_PORT = os.environ["EXTERNAL_API_PORT"]
-            SlackService.EXTERNAL_API_QUERY_ENDPOINT_URL = os.environ["EXTERNAL_API_QUERY_ENDPOINT_URL"]
-            SlackService.EXTERNAL_API_STREAMING_QUERY_ENDPOINT_URL = os.environ["EXTERNAL_API_STREAMING_QUERY_ENDPOINT_URL"]
+            SlackService.QUERY_EXTERNAL_ENDPOINT_URL = os.environ["QUERY_EXTERNAL_ENDPOINT_URL"]
+            SlackService.QUERY_EXTERNAL_ENDPOINT_URL_STREAMING = os.environ["QUERY_EXTERNAL_ENDPOINT_URL_STREAMING"]
             SlackService.STREAMING_RESPONSE = os.environ["STREAMING_RESPONSE"].lower() == 'true'
 
         self.signature_verifier: SignatureVerifier = SignatureVerifier(self.SLACK_SIGNING_SECRET)
@@ -62,14 +62,15 @@ class SlackService:
         url = self.HTTP_SCHEMA + "://" + self.EXTERNAL_API_HOST 
         if self.EXTERNAL_API_PORT:
             url += ':' + self.EXTERNAL_API_PORT
-        url += self.EXTERNAL_API_QUERY_ENDPOINT_URL        
+        url += self.QUERY_EXTERNAL_ENDPOINT_URL        
         body = {'query': query, 'type': 'slack', 'user_name': channel}
         
         response: requests.Response = requests.post(url, json=body)
         
         if not response.ok:
             self.delete_message(channel, waiting_msg_to_delete_ts)
-            err_resp = self.client.chat_postMessage(channel=channel, text= self.default_error_message, mrkdwn=True)
+            err_msg = f"{self.default_error_message}. HTTP code: {response.status_code}. Response content: {response.text}."
+            err_resp = self.client.chat_postMessage(channel=channel, text=err_msg, mrkdwn=True)
             return err_resp["ts"]
         
         answer = response.json()    
@@ -84,14 +85,15 @@ class SlackService:
         url = self.HTTP_SCHEMA + "://" + self.EXTERNAL_API_HOST 
         if self.EXTERNAL_API_PORT:
             url += ':' + self.EXTERNAL_API_PORT
-        url += self.EXTERNAL_API_STREAMING_QUERY_ENDPOINT_URL        
+        url += self.QUERY_EXTERNAL_ENDPOINT_URL_STREAMING        
         body = {'query': query, 'type': 'slack', 'user_name': channel}
         
         response: requests.Response = requests.post(url, json=body, stream=True)
         
         if not response.ok:
-            self.delete_message(channel, waiting_msg_to_delete_ts)
-            err_resp = self.client.chat_postMessage(channel=channel, text= self.default_error_message, mrkdwn=True)
+            self.delete_message(channel, waiting_msg_to_delete_ts)            
+            err_msg = f"{self.default_error_message}. HTTP code: {response.status_code}. Response content: {response.text}."
+            err_resp = self.client.chat_postMessage(channel=channel, text= err_msg, mrkdwn=True)
             return err_resp["ts"]
         
         msg_response = self.client.chat_postMessage(channel=channel, text="...", mrkdwn=True)
@@ -115,11 +117,14 @@ class SlackService:
         except SlackApiError as e:
             print(f"Erreur lors de la suppression du message : {e.response['error']}")
 
-    def ping_external_api(self)-> str:
-        url = self.HTTP_SCHEMA + "://" + self.EXTERNAL_API_HOST 
+    def ping_external_api(self) -> str:
+        url = f"{self.HTTP_SCHEMA}://{self.EXTERNAL_API_HOST}"
         if self.EXTERNAL_API_PORT:
-            url += ':' + self.EXTERNAL_API_PORT
+            url += f":{self.EXTERNAL_API_PORT}"
         url += "/ping"
-        response: requests.Response = requests.get(url)
-        response.raise_for_status()
-        return response.text
+        try:
+            response: requests.Response = requests.get(url)
+            response.raise_for_status()
+            return response.text
+        except requests.exceptions.RequestException as e:
+            return f"While fetching '{url}', occurs error: {e}"

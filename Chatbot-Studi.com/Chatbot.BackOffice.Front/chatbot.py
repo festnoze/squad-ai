@@ -1,10 +1,8 @@
-# Modified streamlit code using ChatbotApiClient
-
 import os
 import sys
 import time
-from typing import Generator
 from dotenv import load_dotenv
+from typing import Generator
 import streamlit as st
 import streamlit.components.v1 as components
 from client_models.user_query_asking_request_model import UserQueryAskingRequestModel
