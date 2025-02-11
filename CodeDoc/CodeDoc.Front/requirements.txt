@@ -1,2 +1,4 @@
 #-e C:/Dev/IA/CommonTools # local package to internal tooling
 streamlit
+streamlit-modal
+

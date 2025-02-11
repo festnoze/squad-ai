@@ -19,7 +19,7 @@ from api_client import APIClient
 
 class ChatbotFront:
     ongoing_action = None
-    folder_path: str = "C:/Dev/studi.api.lms.messenger/src/Studi.Api.Lms.Messenger/Controllers" #"C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated"
+    folder_path: str = "C:/Dev/LMS/lms-api" #"C:/Dev/studi.*" #"C:/Dev/studi.api.lms.messenger/src/Studi.Api.Lms.Messenger/Controllers" #"C:/Dev/LMS/lms-api" #"C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated"
     files_batch_size: int = 100
     llm_batch_size: int = 100
     is_waiting: bool = False

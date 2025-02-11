@@ -48,3 +48,7 @@ class APIClient:
                         yield chunk
             except Exception as e:
                 raise RuntimeError("Error processing streaming response.") from e
+            
+    def ping(self) -> str:
+        response = requests.get(f"{self.base_url}/ping")
+        return response

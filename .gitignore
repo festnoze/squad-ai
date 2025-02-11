@@ -7,7 +7,7 @@ chroma_db/
 scraped*/
 structures_descriptions*/
 
-.env
+.env*
 *.db
 *.pyc
 *.exe

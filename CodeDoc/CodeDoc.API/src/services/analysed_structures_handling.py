@@ -66,4 +66,4 @@ class AnalysedStructuresHandling:
     def save_analysed_structures_as_json_file(struct: StructureDesc, file_path: str, file_name: str):
             file_full_path = os.path.join(file_path, file_name + ".json")
             json_struct = struct.to_json()
-            file.write_file(json_struct, file_full_path, FileAlreadyExistsPolicy.AutoRename)
+            file.write_file(json_struct, file_full_path, FileAlreadyExistsPolicy.Override)
