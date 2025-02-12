@@ -75,7 +75,7 @@ class AvailableActions:
         return context
     
     @staticmethod
-    def rebuild_vectorstore():
+    def add_analysed_docs_from_files_to_vectorstore(delete_existing:bool = True):
         docs = AvailableActions.get_documents_to_vectorize_from_loaded_analysed_structures(AvailableActions.struct_desc_folder_path)
         ingestion_pipeline = RagIngestionPipeline(AvailableActions.rag_service)
         txt.print_with_spinner("Chunking documents...")
@@ -86,22 +86,22 @@ class AvailableActions:
                                                 )
         txt.stop_spinner_replace_text("Documents chunked")
         txt.print_with_spinner("Inserting documents into vector database...")
-        AvailableActions.rag_service.vectorstore = ingestion_pipeline.build_vectorstore_from_chunked_docs(
+        AvailableActions.rag_service.vectorstore = ingestion_pipeline.add_chunked_docs_to_vectorstore(
                             docs_chunks= documents_chunks,
                             vector_db_type=AvailableActions.rag_service.vector_db_type,
                             collection_name= 'code_docs',
-                            delete_existing= True
+                            delete_existing= delete_existing
                         )
         print(f"Vector store built with {len(documents_chunks)} items")
 
     @staticmethod
-    def analyse_files_code_structures(files_batch_size: int, code_folder_path: str):
-        existing_structs_analysis = AnalysedStructuresHandling.load_all_structures_descriptions_files(AvailableActions.struct_desc_folder_path)
+    def analyse_files_code_structures(files_batch_size: int, code_folder_path: str, delete_loaded_files:bool = False):
+        existing_structs_analysis = AnalysedStructuresHandling.load_all_structures_descriptions_files(AvailableActions.struct_desc_folder_path, delete_loaded_files)
         AnalysedStructuresHandling.analyse_code_structures_of_folder_and_save(code_folder_path, AvailableActions.struct_desc_folder_path, files_batch_size, existing_structs_analysis)
 
     @staticmethod
     def generate_all_summaries(files_batch_size: int, llm_batch_size: int, code_folder_path: str):
-        existing_structs_analysis = AnalysedStructuresHandling.load_all_structures_descriptions_files(AvailableActions.struct_desc_folder_path)
+        existing_structs_analysis = AnalysedStructuresHandling.load_all_structures_descriptions_files(AvailableActions.struct_desc_folder_path, delete_loaded_files = True)
         SummaryGenerationService.generate_and_save_all_summaries_all_csharp_files_from_folder(code_folder_path, files_batch_size, llm_batch_size, existing_structs_analysis, AvailableActions.rag_service.llms_infos)
 
 

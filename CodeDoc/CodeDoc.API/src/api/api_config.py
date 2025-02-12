@@ -68,6 +68,7 @@ class ApiConfig:
         )
         logger = logging.getLogger(__name__)
         txt.logger = logger
+        txt.activate_print = True
         
         def handle_error(request: Request, error_msg: str):
             if txt.waiting_spinner_thread:

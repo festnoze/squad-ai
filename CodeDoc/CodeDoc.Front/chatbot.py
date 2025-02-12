@@ -19,7 +19,7 @@ from api_client import APIClient
 
 class ChatbotFront:
     ongoing_action = None
-    folder_path: str = "C:/Dev/LMS/lms-api" #"C:/Dev/studi.*" #"C:/Dev/studi.api.lms.messenger/src/Studi.Api.Lms.Messenger/Controllers" #"C:/Dev/LMS/lms-api" #"C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated"
+    folder_path: str = "C:/Dev/studi.*" #"C:/Dev/LMS/lms-api" #"C:/Dev/studi.api.lms.messenger/src/Studi.Api.Lms.Messenger/Controllers" #"C:/Dev/LMS/lms-api" #"C:/Dev/squad-ai/CodeSharpDoc/inputs/code_files_generated"
     files_batch_size: int = 100
     llm_batch_size: int = 100
     is_waiting: bool = False
@@ -140,9 +140,19 @@ class ChatbotFront:
         ChatbotFront.ongoing_action = "analyse_files_code"
         prompt: str = f"Analyse de structure de tous les fichiers C# du dossier : '{ChatbotFront.folder_path}'"
         with st.spinner("En cours ... " + prompt):
-            st.session_state.api_client.analyse_files_code_structures(ChatbotFront.files_batch_size, ChatbotFront.folder_path)
+            for folder_path in ChatbotFront.resolve_path(ChatbotFront.folder_path):
+                st.session_state.api_client.analyse_files_code_structures(ChatbotFront.files_batch_size, folder_path)
+        
         st.session_state.messages.append({"role": "assistant", "content": "Terminé avec succès : " + prompt})
 
+    @staticmethod
+    def resolve_path(path: str) -> list[str]:
+        from glob import glob
+        import os
+        if not path.endswith("*"):
+            return [path]
+        return [f.replace('\\', '/') for f in glob(path) if os.path.isdir(f)]
+    
     @staticmethod
     def vectorize_summaries() -> None:
         ChatbotFront.ongoing_action = "vectorize_summaries"

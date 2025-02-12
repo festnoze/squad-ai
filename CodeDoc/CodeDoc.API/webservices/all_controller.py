@@ -17,14 +17,15 @@ async def rag_query_streaming_endpoint(rag_query: RagQueryRequestModel) -> Strea
     response_generator = AvailableActions.rag_query_streaming_async(rag_query.query, rag_query.include_bm25_retrieval)
     return StreamingResponse(response_generator, media_type="text/event-stream")
 
+@all_router.post("/add-analysed-docs-from-files-to-vectorstore")
 @all_router.post("/rebuild_vectorstore")
 async def rebuild_vectorstore_endpoint() -> dict:
-    AvailableActions.rebuild_vectorstore()
+    AvailableActions.add_analysed_docs_from_files_to_vectorstore(delete_existing = False)
     return {"status": "vectorstore rebuilt"}
 
 @all_router.post("/analyse_files")
 async def analyse_files_endpoint(analyse_files: AnalyseFilesRequestModel) -> dict:
-    AvailableActions.analyse_files_code_structures(analyse_files.files_batch_size, analyse_files.code_folder_path)
+    AvailableActions.analyse_files_code_structures(analyse_files.files_batch_size, analyse_files.code_folder_path, delete_loaded_files = False)
     return {"status": "analysis done"}
 
 @all_router.post("/generate_all_summaries")

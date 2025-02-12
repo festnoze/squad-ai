@@ -41,9 +41,9 @@ class AnalysedStructuresHandling:
             
         txt.print("\nAll codes files successfully analysed.")
     
-    def load_all_structures_descriptions_files(folder_path: str, remove_if_already_exist:bool = False):
+    def load_all_structures_descriptions_files(folder_path: str, delete_loaded_files:bool = True):
         existing_structs_desc, json_files = AnalysedStructuresHandling._load_json_structs_desc_from_folder(folder_path)
-        if existing_structs_desc or remove_if_already_exist:
+        if existing_structs_desc and delete_loaded_files:
             for json_file in json_files:
                 file.delete_file(json_file)
             existing_structs_desc = []
