@@ -1,0 +1,6 @@
+#-e C:/Dev/IA/CommonTools # local package with all internal tooling
+streamlit
+selenium
+BeautifulSoup4
+markdown-it-py
+pdfminer.six

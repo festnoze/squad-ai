@@ -90,7 +90,7 @@ class ChatbotFront:
                     streaming_response = st.session_state.api_client.rag_query_stream(request_model)
                     st.write_stream(streaming_response)
                     full_response = streaming_response
-
+                    
                 st.session_state.conversation.add_new_message('assistant', full_response)
                 st.session_state.messages.append({'role': 'assistant', 'content': full_response})
 
