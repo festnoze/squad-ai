@@ -7,11 +7,13 @@ from typing import Generator
 import streamlit as st
 import streamlit.components.v1 as components
 
+from course_content_querying_service import CourseContentQueryingService
 from models.course_content_models import CourseContent
 from course_content_scraping_service import CourseContentScrapingService
 class ChatbotFront:
     parcour_composition_file_path: str = ""
     analysed_parcour_file_path: str = ""
+    loaded_course_content_filename: str = ""
     opale_course_url: str = "https://ressources.studi.fr/contenus/opale/f5f86ccfd1194e12ef4d1e1556cc5ce83c73bbce"
     start_caption = "Bonjour, je suis StudIA, votre tuteur personnel. Comment puis-je vous aider ?"
 
@@ -96,8 +98,30 @@ class ChatbotFront:
             st.subheader("💫 Récupération du contenu d'un cours unique")
             ChatbotFront.opale_course_url = st.text_input("URL du cours Opale", value=ChatbotFront.opale_course_url)
             st.button("🔄 Récupérer le cours depuis l'URL fournie", on_click=lambda: ChatbotFront.scrape_and_save_opale_course_from_url(ChatbotFront.opale_course_url))
+            
             st.divider()
-
+            
+            st.subheader("💫 Sélection du cours à interroger dans le chat")
+            outputs_folders = [d for d in os.listdir("outputs/") if os.path.isdir(os.path.join("outputs/", d))]
+            ChatbotFront.parcour_content_path = ["-"] + outputs_folders
+            ChatbotFront.selected_parcour_content_dir = st.selectbox("Sélection du parcours (dossier depuis 'outputs')", options=ChatbotFront.parcour_content_path, index=ChatbotFront.analysed_parcour_index)
+ 
+            selected_parcour_path = "outputs/" + ChatbotFront.selected_parcour_content_dir
+            if os.path.exists(selected_parcour_path):
+                ChatbotFront.parcour_courses_files = ["-"] + [f for f in os.listdir(selected_parcour_path) if os.path.isfile(os.path.join(selected_parcour_path, f)) and f.endswith(".md")]
+                ChatbotFront.parcour_courses_files_index = 0
+                if ChatbotFront.loaded_course_content_filename in ChatbotFront.parcour_courses_files:
+                    ChatbotFront.parcour_courses_files_index = ChatbotFront.output_json_files.index(ChatbotFront.loaded_course_content_filename)
+            else:
+                ChatbotFront.parcour_courses_files = ["-"]
+                ChatbotFront.parcour_courses_files_index = 0
+                ChatbotFront.loaded_course_content_filename = "-"
+            ChatbotFront.new_loaded_course_content_filename = st.selectbox("Sélection fichier du cours à questionner ('*.md' depuis 'outputs/parcours')", options=ChatbotFront.parcour_courses_files, index=ChatbotFront.parcour_courses_files_index)
+            if ChatbotFront.new_loaded_course_content_filename != ChatbotFront.loaded_course_content_filename:
+                ChatbotFront.loaded_course_content_filename = ChatbotFront.new_loaded_course_content_filename
+                ChatbotFront.load_course_content_from_file(selected_parcour_path + "/" + ChatbotFront.loaded_course_content_filename)
+            st.button("🔄 Sélectionner ce cours à questionner", on_click=lambda: ChatbotFront.select_course_to_query(ChatbotFront.course_content_file_path))
+            
             
             # st.subheader("💫 Evaluation du pipeline d'inference")
             # st.button('✨ Générer RAGAS Ground Truth dataset',      on_click=lambda: st.session_state.api_client.generate_ground_truth())
@@ -106,21 +130,20 @@ class ChatbotFront:
             st.chat_message(msg['role']).write(msg['content'])
         
         if user_query := st.chat_input(placeholder= 'Ecrivez votre question ici ...'):
-            if not user_query.strip(): user_query = 'quels bts en rh ?'
+            if not user_query.strip(): user_query = 'comment créer un tableau ?'
             st.chat_message('user').write_stream(ChatbotFront._write_text_as_stream(user_query))
             st.session_state.messages.append({'role': 'user', 'content': user_query})
-            st.session_state.conversation.add_new_message('user', user_query)
+            #st.session_state.conversation.add_new_message('user', user_query)
 
             with st.chat_message('assistant'):
                 start = time.time()
-                # with st.spinner('Je réfléchis à votre question ...'):
-                #     request_model = UserQueryAskingRequestModel(conversation_id=st.session_state.conv_id, user_query_content=user_query)
-                #     streaming_response = st.session_state.api_client.rag_query_stream(request_model)
-                #     st.write_stream(streaming_response)
-                #     full_response = streaming_response
+                with st.spinner('Je réfléchis à votre question ...'):
+                    streaming_response = answer_query_stream(user_query)
+                    st.write_stream(streaming_response)
+                    full_response = streaming_response
                     
-                # st.session_state.conversation.add_new_message('assistant', full_response)
-                # st.session_state.messages.append({'role': 'assistant', 'content': full_response})
+                #st.session_state.conversation.add_new_message('assistant', full_response)
+                st.session_state.messages.append({'role': 'assistant', 'content': full_response})
 
 
     def start_new_conversation(): 
@@ -152,6 +175,21 @@ class ChatbotFront:
     
     @staticmethod
     def scrape_parcour_all_courses_opale():
-        CourseContentScrapingService.scrape_parcour_all_courses_opale(ChatbotFront.analysed_parcour_file_path)
-        st.chat_message('assistant').write(f"Le contenu du cours en PDF est extrait depuis l'adresse suivante: {ChatbotFront.parcour_composition_file_path}")
+        course_scraping_fails_count = CourseContentScrapingService.scrape_parcour_all_courses_opale(ChatbotFront.analysed_parcour_file_path)
+        st.chat_message('assistant').write(f"Le contenu de tous les cours PDF du parcours: {ChatbotFront.parcour_composition_file_path} ont été extraits.")
+        if course_scraping_fails_count > 0:
+            st.chat_message('assistant').write(f"Nombre de cours non extraits: {course_scraping_fails_count}. Relancer le scraping du parcours pour les extraire.")
+
+    def answer_query_stream(user_query: str) -> Generator[str, None, None]:
+        answer = CourseContentQueryingService.answer_user_query_on_specified_course(user_query, ChatbotFront.opale_course_url)
+
+
+    def select_course_to_query(course_content_file_path:str):
+        st.chat_message('assistant').write(f"Le cours suivant à été sélectionné pour être questionné: {course_content_file_path}")
+        st.chat_message('assistant').write('Vous pouvez maintenant poser vos questions sur ce cours.')
+
+    def load_course_content_from_file(course_content_file_path:str):
+        ChatbotFront.course_content = CourseContentQueryingService.load_course_content(course_content_file_path)
+        st.chat_message('assistant').write(f"Le cours suivant à été chargé pour être questionné: {course_content_file_path}")
+        st.chat_message('assistant').write('Vous pouvez maintenant poser vos questions sur ce cours.')
         

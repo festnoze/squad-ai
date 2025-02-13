@@ -79,6 +79,7 @@ class CourseContentScrapingService:
 
         # Scrape and save course content for each opale course in the parcours (no parallelism)
         print(f"> Start scraping all opale courses of parcours: '{analysed_course_content.name}' for its content:")
+        course_scraping_fails_count = 0
         for ressource in analysed_course_content.ressource_objects:
             if ressource.type == "opale":
                 valid_course_content_filename = CourseContentScrapingService.build_valid_filename(ressource.name)
@@ -86,9 +87,14 @@ class CourseContentScrapingService:
                     print(f"Course content already exists for: {ressource.name}")
                     continue
                 else:
-                    CourseContentScrapingService.scrape_and_save_course_content_from_url(ressource.url, valid_course_content_filename, f"outputs/{valid_parcour_filename}/")
-                    print(f"  - Course content scraped & saved for: '{ressource.name}'")
+                    try:
+                        CourseContentScrapingService.scrape_and_save_course_content_from_url(ressource.url, valid_course_content_filename, f"outputs/{valid_parcour_filename}/")
+                        print(f"  - Course content scraped & saved for: '{ressource.name}'")
+                    except Exception as e:
+                        course_scraping_fails_count += 1
+                        print(f"  - Failed to scrape course content for: '{ressource.name}': {e}")
         print(f"> Finished scraping all opale courses of parcours: '{analysed_course_content.name}'")
+        return course_scraping_fails_count
 
 
     #TODO: could be moved to common_tools in file_helper
