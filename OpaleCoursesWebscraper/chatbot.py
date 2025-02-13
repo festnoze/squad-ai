@@ -7,10 +7,13 @@ from typing import Generator
 import streamlit as st
 import streamlit.components.v1 as components
 
-from course_content_models import CourseContent
+from models.course_content_models import CourseContent
+from course_content_scraping_service import CourseContentScrapingService
 class ChatbotFront:
-    course_file_path: str = "bachelor-developpeur-python.json"#"api-v3-courses-parcours.json"
-    url: str = "https://ressources.studi.fr/contenus/opale/f5f86ccfd1194e12ef4d1e1556cc5ce83c73bbce"
+    parcour_composition_file_path: str = ""
+    analysed_parcour_file_path: str = ""
+    opale_course_url: str = "https://ressources.studi.fr/contenus/opale/f5f86ccfd1194e12ef4d1e1556cc5ce83c73bbce"
+    start_caption = "Bonjour, je suis StudIA, votre tuteur personnel. Comment puis-je vous aider ?"
 
     def run():
         ChatbotFront.init_session()
@@ -32,7 +35,7 @@ class ChatbotFront:
                 padding-bottom: 1rem !important;
             }
             .stSidebar {
-                width: 362px !important;
+                width: 482px !important;
             }
             .rounded-frame {
                 border: 2px solid #3498db;
@@ -62,18 +65,39 @@ class ChatbotFront:
             st.button('🧽 Effacer la conversation du chatbot', on_click=ChatbotFront.start_new_conversation)
             st.divider()
 
-            st.subheader("💫 Scraption des cours")
+            st.subheader("💫 Gestion du contenu d'un parcours")         
+            #ChatbotFront.parcour_composition_file_path = st.text_input("Fichier de composition du parcours ('*.json' depuis 'inputs')", value=ChatbotFront.parcour_composition_file_path)
+            ChatbotFront.input_folder = "inputs/"
+            ChatbotFront.input_json_files = ["-"] + [f for f in os.listdir(ChatbotFront.input_folder) if f.endswith(".json")]
+            ChatbotFront.parcour_composition_index = 0
+            if ChatbotFront.parcour_composition_file_path in ChatbotFront.input_json_files:
+                ChatbotFront.parcour_composition_index = ChatbotFront.input_json_files.index(ChatbotFront.parcour_composition_file_path)
             
-            ChatbotFront.course_file_path = st.text_input("Json dans dossier 'inputs' du contenu de parcours", value=ChatbotFront.course_file_path)
-            st.button("🧪 Analyser le contenu du parcours",   on_click=lambda: ChatbotFront.parse_course_content())
-            ChatbotFront.url = st.text_input("URL du cours Opale", value=ChatbotFront.url)
-            st.button("🔄 Récupérer le cours depuis l'URL fournie", on_click=lambda: ChatbotFront.scrape_url_for_opale_course())
-            # st.button("🧪 Tester tous les modèles d'inférence",   on_click=lambda: ChatbotFront.test_all_inference_models())
-            # st.button('📥 Récupérer données Drupal par json-api',   on_click=lambda: st.session_state.api_client.retrieve_all_data())
-            # st.button('🌐 Scraping des pages web des formations',   on_click=lambda: st.session_state.api_client.scrape_website_pages())
-            # st.button('🗂️ Construction de la base vectorielle',     on_click=lambda: st.session_state.api_client.build_vectorstore())
-            # st.button('🗃️ Construction base vectorielle synthétique + questions', on_click=lambda: st.session_state.api_client.build_summary_vectorstore())
+            ChatbotFront.parcour_composition_file_path = st.selectbox("Sélection fichier de composition du parcours ('*.json' depuis 'inputs')", options=ChatbotFront.input_json_files, index=ChatbotFront.parcour_composition_index)
+            
+            st.button("🧪 1. Analyser la composition du parcours",  on_click=lambda: ChatbotFront.analyse_parcour_composition())   
+            
             st.divider()
+            
+            #st.subheader("💫 Récupération du contenu de tous les cours d'un parcours")
+            #ChatbotFront.analysed_course_file_path = st.text_input("Fichier d'analyse du parcours ('*.json' depuis 'ouputs')", value=ChatbotFront.analysed_course_file_path)
+            ChatbotFront.output_folder = "outputs/"
+            ChatbotFront.output_json_files = ["-"] + [f for f in os.listdir(ChatbotFront.output_folder) if f.endswith(".json")]
+            ChatbotFront.analysed_parcour_index = 0
+            if ChatbotFront.analysed_parcour_file_path in ChatbotFront.output_json_files:
+                ChatbotFront.analysed_parcour_index = ChatbotFront.output_json_files.index(ChatbotFront.analysed_parcour_file_path)
+
+            ChatbotFront.analysed_parcour_file_path = st.selectbox("Sélection fichier d'analyse de parcours ('*.json' depuis 'outputs')", options=ChatbotFront.output_json_files, index=ChatbotFront.analysed_parcour_index)
+ 
+            st.button("🔄 2. Récupérer le contenu de TOUS les cours du parcours", on_click=lambda: ChatbotFront.scrape_parcour_all_courses_opale())
+           
+            st.divider()
+
+            st.subheader("💫 Récupération du contenu d'un cours unique")
+            ChatbotFront.opale_course_url = st.text_input("URL du cours Opale", value=ChatbotFront.opale_course_url)
+            st.button("🔄 Récupérer le cours depuis l'URL fournie", on_click=lambda: ChatbotFront.scrape_and_save_opale_course_from_url(ChatbotFront.opale_course_url))
+            st.divider()
+
             
             # st.subheader("💫 Evaluation du pipeline d'inference")
             # st.button('✨ Générer RAGAS Ground Truth dataset',      on_click=lambda: st.session_state.api_client.generate_ground_truth())
@@ -100,60 +124,34 @@ class ChatbotFront:
 
 
     def start_new_conversation(): 
-        st.session_state.messages = []        
-        # st.session_state.conversation = Conversation(st.session_state.user)
-        # st.session_state.conversation.add_new_message('assistant', ChatbotFront._start_caption())
-        # st.session_state.messages.append({
-        #                     'role': st.session_state.conversation.last_message.role, 
-        #                     'content': st.session_state.conversation.last_message.content})
-        # # Inform the API
-        # st.session_state.user_id = st.session_state.api_client.create_or_update_user(UserRequestModel(user_id=None, user_name=st.session_state.user.name))
-        # st.session_state.conv_id = st.session_state.api_client.create_new_conversation(st.session_state.user_id)
+        st.session_state.messages = []   
+        st.session_state.messages.append({'role': 'assistant', 'content': ChatbotFront.start_caption})
 
     def init_session():
         if 'messages' not in st.session_state:
             st.session_state['messages'] = []
-            # st.session_state['conversation'] = Conversation(st.session_state.user)
-            # st.session_state['conv_id'] = None
-            # load_dotenv()
-            # st.session_state.api_host_uri =  os.getenv("API_HOST_URI")
-            # ChatbotFront.start_new_conversation()
 
-    def scrape_url_for_opale_course(ressource_name:str = "pdf_document", relative_path:str = "outputs/"):
-        from generic_web_scraper import GenericWebScraper
-        use_selenium = True
-        scraper = GenericWebScraper()
-        content_url = scraper.extract_single_href_from_url(ChatbotFront.url, "Commencer le cours", use_selenium=use_selenium)
-        st.chat_message('assistant').write(f"Le contenu du cours est disponible à l'adresse suivante: {content_url}")
-        #
-        pdf_url = scraper.extract_single_href_from_url(content_url, "Imprimer", use_selenium=use_selenium)
-        course_content_text, course_content_html  = scraper.get_pdf_as_markdown_from_url(pdf_url)
+    @staticmethod
+    def scrape_and_save_opale_course_from_url(opale_course_url:str):
+        course_content_as_pdf_url, _, _ = CourseContentScrapingService.scrape_and_save_course_content_from_url(opale_course_url)   
+        st.chat_message('assistant').write(f"Le contenu du cours en PDF est extrait depuis l'adresse suivante: {course_content_as_pdf_url}")
         
-        st.chat_message('assistant').write(f"Le contenu du cours en PDF est disponible à l'adresse suivante: {pdf_url}")
-
-        with open(f"{relative_path}{ressource_name}.md", "w", encoding="utf-8") as text_file:
-            text_file.write(course_content_text)
-        with open(f"{relative_path}{ressource_name}.html", "w", encoding="utf-8") as html_file:
-            html_file.write(course_content_html)
-
     @staticmethod
-    def _start_caption():
-        return "Bonjour, je suis StudIA, votre tuteur personnel. Comment puis-je vous aider ?"
-
+    def analyse_parcour_composition() -> CourseContent:
+        analysed_parcour_filename, _ = CourseContentScrapingService.analyse_parcour_composition(ChatbotFront.parcour_composition_file_path)
+        
+        st.chat_message('assistant').write(f'Le contenu du parcours suivant à été analysé à partir du fichier de description: "{ChatbotFront.parcour_composition_file_path}"')
+        st.chat_message('assistant').write(f'Le fichier analysé à été enregistré dans les "outputs" sous le nom: "{analysed_parcour_filename}".')
+        st.chat_message('assistant').write('Le nom du fichier analysé à été mis dans le champ de sélection de fichier analysé pour le scraping du contenu de tous les cours du parcours.')
+        
+        # Refresh the list of analysed parcours and select the newly created one
+        ChatbotFront.output_json_files = ["-"] + [f for f in os.listdir(ChatbotFront.output_folder) if f.endswith(".json")]
+        if not ChatbotFront.analysed_parcour_file_path in ChatbotFront.output_json_files:
+            st.chat_message('assistant').write("/!\\ Le fichier d'analyse du parcours n\'a pas été trouvé dans le dossier 'outputs' /!\\")
+        ChatbotFront.analysed_parcour_index = ChatbotFront.output_json_files.index(ChatbotFront.analysed_parcour_file_path)
+    
     @staticmethod
-    def parse_course_content(save_parsed_course: bool = True, load_parsed_course_instead_if_exist: bool = True) -> CourseContent:
-        if load_parsed_course_instead_if_exist and os.path.exists('outputs/analysed_' + ChatbotFront.course_file_path):
-            with open('outputs/analysed_' + ChatbotFront.course_file_path, "r", encoding="utf-8") as read_json_file:
-                loaded_data = json.load(read_json_file)
-                course_content = CourseContent.from_dict(loaded_data)
-        else:            
-            from course_content_parser import CourseContentParser
-            with open("inputs/" + ChatbotFront.course_file_path, "r", encoding="utf-8") as read_json_file:
-                json_data = json.load(read_json_file)
-                course_content = CourseContentParser.parse_course_content(json_data)
-                if save_parsed_course:
-                    serialized_data = course_content.to_dict()
-                    with open('outputs/analysed_' + ChatbotFront.course_file_path, 'w') as write_analysed_file:
-                        json.dump(serialized_data, write_analysed_file, indent=4)
-
-        return course_content
+    def scrape_parcour_all_courses_opale():
+        CourseContentScrapingService.scrape_parcour_all_courses_opale(ChatbotFront.analysed_parcour_file_path)
+        st.chat_message('assistant').write(f"Le contenu du cours en PDF est extrait depuis l'adresse suivante: {ChatbotFront.parcour_composition_file_path}")
+        

@@ -62,12 +62,17 @@ class GenericWebScraper:
     texts_to_remove = ["Tous droits réservés à STUDI - Reproduction interdite"]
     def get_pdf_as_markdown_from_url(self, pdf_url: str) -> str:  
         #
-        response: requests.Response = requests.get(pdf_url)
-        response.raise_for_status()
-        pdf_bytes: BytesIO = BytesIO(response.content)
-        text: str = extract_text(pdf_bytes)
+        try:
+            response: requests.Response = requests.get(pdf_url)
+            response.raise_for_status()
+            pdf_bytes: BytesIO = BytesIO(response.content)
+            text: str = extract_text(pdf_bytes)
 
-        for text_to_remove in self.texts_to_remove:
-            text = text.replace(text_to_remove, "")
-        html_doc = self.markdown_it.render(text)
+            for text_to_remove in self.texts_to_remove:
+                text = text.replace(text_to_remove, "")
+            html_doc = self.markdown_it.render(text)
+        except Exception as e:
+            print(f"Failed to extract PDF content from {pdf_url}")
+            return None, None
+        
         return text, html_doc

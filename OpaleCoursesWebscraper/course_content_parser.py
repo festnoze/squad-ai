@@ -1,4 +1,9 @@
-from course_content_models import Matiere, Module, CourseContent, Ressource, RessourceObject, RessourceObjectHierarchy, Theme
+from models.course_content_models import CourseContent
+from models.matiere_content_model import Matiere
+from models.module_content_model import Module
+from models.theme_content_model import Theme
+from models.ressource_content_model import Ressource
+from models.ressource_object_content_model import RessourceObject, RessourceObjectHierarchy
 
 class CourseContentParser:
 

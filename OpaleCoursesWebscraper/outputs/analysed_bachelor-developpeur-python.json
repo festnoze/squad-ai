@@ -812,48 +812,12 @@
             ]
         },
         {
-            "theme_id": 125312,
-            "name": "M\u00e9thodologie du Dossier Professionnel",
-            "code": "THMethodologieDuDossierProfessionnelPGAC20244",
-            "module_id": 70321,
-            "ressources": [
-                102935
-            ]
-        },
-        {
-            "theme_id": 124178,
-            "name": "Guide de la certification Studi de bloc",
-            "code": "THGuideDeLaCertificationStudiDeBloc",
-            "module_id": 70394,
-            "ressources": [
-                100183
-            ]
-        },
-        {
             "theme_id": 128359,
             "name": "Guide des \u00e9preuves du CCP \"Pr\u00e9parer le d\u00e9ploiement d\u2019une application s\u00e9curis\u00e9e\"",
             "code": "THGuidedesepreuvesduCCPPreparerledeploiementduneapplicationsecuriseeBDF23296",
             "module_id": 70323,
             "ressources": [
                 107717
-            ]
-        },
-        {
-            "theme_id": 125312,
-            "name": "M\u00e9thodologie du Dossier Professionnel",
-            "code": "THMethodologieDuDossierProfessionnelPGAC20244",
-            "module_id": 70323,
-            "ressources": [
-                102935
-            ]
-        },
-        {
-            "theme_id": 124178,
-            "name": "Guide de la certification Studi de bloc",
-            "code": "THGuideDeLaCertificationStudiDeBloc",
-            "module_id": 70395,
-            "ressources": [
-                100183
             ]
         },
         {
@@ -3245,48 +3209,12 @@
             ]
         },
         {
-            "ressource_id": 102935,
-            "name": "M\u00e9thodologie du dossier professionnel",
-            "code": "REMethodologieDuDossierProfessionnelPGAC20244",
-            "theme_id": 125312,
-            "ressource_objects": [
-                112416
-            ]
-        },
-        {
-            "ressource_id": 100183,
-            "name": "Guide de la certification Studi de bloc",
-            "code": "REGuideDeLaCertificationStudiDeBloc",
-            "theme_id": 124178,
-            "ressource_objects": [
-                117724
-            ]
-        },
-        {
             "ressource_id": 107717,
             "name": "Guide des \u00e9preuves du CCP \"Pr\u00e9parer le d\u00e9ploiement d\u2019une application s\u00e9curis\u00e9e\"",
             "code": "REGuidedesepreuvesduCCPPreparerledeploiementduneapplicationsecuriseeBDF23296",
             "theme_id": 128359,
             "ressource_objects": [
                 112265
-            ]
-        },
-        {
-            "ressource_id": 102935,
-            "name": "M\u00e9thodologie du dossier professionnel",
-            "code": "REMethodologieDuDossierProfessionnelPGAC20244",
-            "theme_id": 125312,
-            "ressource_objects": [
-                112416
-            ]
-        },
-        {
-            "ressource_id": 100183,
-            "name": "Guide de la certification Studi de bloc",
-            "code": "REGuideDeLaCertificationStudiDeBloc",
-            "theme_id": 124178,
-            "ressource_objects": [
-                117724
             ]
         },
         {
@@ -5603,30 +5531,6 @@
             }
         },
         {
-            "ressource_object_id": 112416,
-            "name": "M\u00e9thodologie du dossier professionnel",
-            "type": "opale",
-            "url": "https://ressources.studi.fr/contenus/opale/42c2fd36036cc45496078fc1605b1e0b0cf3cb4d/",
-            "hierarchy": {
-                "ressource_id": 102935,
-                "theme_id": 125312,
-                "module_id": 70321,
-                "matiere_id": 49540
-            }
-        },
-        {
-            "ressource_object_id": 117724,
-            "name": "Guide de la certification Studi de bloc",
-            "type": "opale",
-            "url": "https://ressources.studi.fr/contenus/opale/2acda00b8bdd858c7eed97ac65b7c394a3e23626/",
-            "hierarchy": {
-                "ressource_id": 100183,
-                "theme_id": 124178,
-                "module_id": 70394,
-                "matiere_id": 49541
-            }
-        },
-        {
             "ressource_object_id": 112265,
             "name": "Guide des \u00e9preuves du CCP \"Pr\u00e9parer le d\u00e9ploiement d\u2019une application s\u00e9curis\u00e9e\"",
             "type": "opale",
@@ -5636,30 +5540,6 @@
                 "theme_id": 128359,
                 "module_id": 70323,
                 "matiere_id": 49542
-            }
-        },
-        {
-            "ressource_object_id": 112416,
-            "name": "M\u00e9thodologie du dossier professionnel",
-            "type": "opale",
-            "url": "https://ressources.studi.fr/contenus/opale/42c2fd36036cc45496078fc1605b1e0b0cf3cb4d/",
-            "hierarchy": {
-                "ressource_id": 102935,
-                "theme_id": 125312,
-                "module_id": 70323,
-                "matiere_id": 49542
-            }
-        },
-        {
-            "ressource_object_id": 117724,
-            "name": "Guide de la certification Studi de bloc",
-            "type": "opale",
-            "url": "https://ressources.studi.fr/contenus/opale/2acda00b8bdd858c7eed97ac65b7c394a3e23626/",
-            "hierarchy": {
-                "ressource_id": 100183,
-                "theme_id": 124178,
-                "module_id": 70395,
-                "matiere_id": 49543
             }
         },
         {
