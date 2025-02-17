@@ -10,7 +10,7 @@
                "run", "startup.py"
             ],
             "env": {
-                "PYTHONPATH": "C:/Dev/IA/CommonTools;${workspaceFolder}"
+                "PYTHONPATH": "C:/Dev/IA/CommonTools/;${workspaceFolder}"
             },
             "console": "integratedTerminal"
         }

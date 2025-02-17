@@ -2,5 +2,6 @@
 streamlit
 selenium
 BeautifulSoup4
-markdown-it-py
+#markdown-it-py
+markdownify
 pdfminer.six

@@ -1,9 +1,7 @@
-
 import json
 import os
 import uuid
 from models.course_content_models import CourseContent
-
 
 class CourseContentScrapingService:
     @staticmethod
@@ -15,8 +13,10 @@ class CourseContentScrapingService:
         content_url = scraper.extract_single_href_from_url(opale_course_url, "Commencer le cours", use_selenium=use_selenium)
         
         pdf_url = scraper.extract_single_href_from_url(content_url, "Imprimer", use_selenium=use_selenium)
-        scraped_opale_course_content_text, scraped_opale_course_content_html = scraper.get_pdf_as_markdown_from_url(pdf_url)
-        return pdf_url, scraped_opale_course_content_text, scraped_opale_course_content_html
+        #scraped_opale_course_content_md, scraped_opale_course_content_html = scraper.get_pdf_as_markdown_from_url(pdf_url)
+        scraped_opale_course_content_html = scraper.get_pdf_as_html_from_url(pdf_url)
+        scraped_opale_course_content_md = scraper.convert_html_to_markdown(scraped_opale_course_content_html)
+        return pdf_url, scraped_opale_course_content_md, scraped_opale_course_content_html
 
     @staticmethod    
     def save_course_content(course_content_text:str, course_content_html:str, filename_wo_extension:str = None, relative_path:str = "outputs/", save_as_md:bool = True, save_as_html:bool = True):
@@ -95,7 +95,6 @@ class CourseContentScrapingService:
                         print(f"  - Failed to scrape course content for: '{ressource.name}': {e}")
         print(f"> Finished scraping all opale courses of parcours: '{analysed_course_content.name}'")
         return course_scraping_fails_count
-
 
     #TODO: could be moved to common_tools in file_helper
     @staticmethod

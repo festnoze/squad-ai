@@ -10,7 +10,7 @@
                "run", "src/chatbot.py"
             ],
             "env": {
-                "PYTHONPATH": "${workspaceFolder}/src"
+                "PYTHONPATH": "C:/Dev/IA/CommonTools;${workspaceFolder}/src"
             },
             "console": "integratedTerminal"
         }

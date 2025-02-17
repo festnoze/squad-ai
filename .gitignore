@@ -16,6 +16,8 @@ structures_descriptions*/
 *.sqlite3
 *.tar.gz
 
+.qodo/
+
 /Include
 /Lib
 Lib/

@@ -6,11 +6,18 @@ from selenium import webdriver
 import requests
 from io import BytesIO
 from pdfminer.high_level import extract_text
-from markdown_it import MarkdownIt
+from pdfminer.high_level import extract_text_to_fp
+from pdfminer.layout import LAParams
+import markdownify
+#from markdown_it import MarkdownIt
 
 class GenericWebScraper:
+    
+    texts_to_remove = ["Tous droits réservés à STUDI - Reproduction interdite"]
+
     def __init__(self) -> None:
-        self.markdown_it = MarkdownIt()
+        #self.markdown_it = MarkdownIt()
+        pass
 
     def retrieve_page_content_requests(self, url: str) -> str:
         response: requests.Response = requests.get(url)
@@ -59,20 +66,39 @@ class GenericWebScraper:
                 url = response_text[start_index:end_index]
                 return url
         return ""  
-    texts_to_remove = ["Tous droits réservés à STUDI - Reproduction interdite"]
-    def get_pdf_as_markdown_from_url(self, pdf_url: str) -> str:  
-        #
-        try:
-            response: requests.Response = requests.get(pdf_url)
-            response.raise_for_status()
-            pdf_bytes: BytesIO = BytesIO(response.content)
-            text: str = extract_text(pdf_bytes)
+    
+    # def get_pdf_as_markdown_from_url(self, pdf_url: str) -> str:  
+    #     #
+    #     try:
+    #         response: requests.Response = requests.get(pdf_url)
+    #         response.raise_for_status()
+    #         pdf_bytes: BytesIO = BytesIO(response.content)
+    #         text: str = extract_text(pdf_bytes)
 
-            for text_to_remove in self.texts_to_remove:
-                text = text.replace(text_to_remove, "")
-            html_doc = self.markdown_it.render(text)
-        except Exception as e:
-            print(f"Failed to extract PDF content from {pdf_url}")
-            return None, None
+    #         for text_to_remove in self.texts_to_remove:
+    #             text = text.replace(text_to_remove, "")
+
+    #         html_doc = self.markdown_it.render(text)
+    #     except Exception as e:
+    #         print(f"Failed to extract PDF content from {pdf_url}")
+    #         return None, None
         
-        return text, html_doc
+    #     return text, html_doc
+    
+    def get_pdf_as_html_from_url(self, pdf_url: str) -> str:
+        try:
+            response = requests.get(pdf_url)
+            response.raise_for_status()
+            pdf_bytes = BytesIO(response.content)
+            output_html = BytesIO()
+            laparams = LAParams()
+            extract_text_to_fp(pdf_bytes, output_html, laparams=laparams, output_type='html', codec='utf-8')
+            html_content = output_html.getvalue().decode('utf-8') 
+            return html_content
+        except Exception as e:
+            print(f"Failed to extract PDF content from {pdf_url}: {e}")
+            return None
+
+    def convert_html_to_markdown(self, html_content: str) -> str:
+        markdown_text = markdownify.markdownify(html_content, heading_style="ATX")
+        return markdown_text
