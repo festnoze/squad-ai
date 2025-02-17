@@ -10,8 +10,13 @@ import markdown
 from course_content_querying_service import CourseContentQueryingService
 from models.course_content_models import CourseContent
 from course_content_scraping_service import CourseContentScrapingService
+#
+from common_tools.helpers.env_helper import EnvHelper
+from common_tools.langchains.langchain_factory import LangChainFactory
+from common_tools.helpers.file_helper import file
 
 class ChatbotFront:
+    llm = None
     parcour_composition_file_path: str = ""
     analysed_parcour_file_path: str = ""
     loaded_course_content_filename: str = ""
@@ -227,9 +232,15 @@ class ChatbotFront:
     def answer_query_stream(user_query: str) -> Generator[str, None, None]:
         if not ChatbotFront.loaded_course_content_md:
             st.session_state.messages.append({'role': 'assistant', 'content': "Sélectionner d'abord un cours à charger (section 4. menu à gauche)."})
-        else:
-            answer = CourseContentQueryingService.answer_user_query_on_specified_course(user_query, ChatbotFront.loaded_course_content_md)
-            st.session_state.messages.append({'role': 'assistant', 'content': answer})
+            return
+        
+        if not ChatbotFront.llm:
+            llms_infos = EnvHelper.get_llms_infos_from_env_config(skip_commented_lines=True)
+            ChatbotFront.llm = LangChainFactory.create_llms_from_infos(llms_infos)[-1]
+            st.session_state.messages.append({'role': 'assistant', 'content': "Modèle de langage initialisé avec succès."})
+        
+        answer_generator = CourseContentQueryingService.answer_user_query_on_specified_course_sync_streaming(ChatbotFront.llm, user_query, ChatbotFront.selected_parcour_content_dir, '',  ChatbotFront.loaded_course_content_md, True)
+        st.write_stream(answer_generator)
 
     def load_course_content_from_file(course_content_path:str, selected_course_content_filename_wo_extension:str):
         if ChatbotFront.loaded_course_content_filename == selected_course_content_filename_wo_extension and ChatbotFront.loaded_course_content_md:
@@ -262,7 +273,7 @@ class ChatbotFront:
                 return ""
         for ressource in analysed_course_content.ressource_objects:
             if ressource.type == "opale":
-                course_content_filename = CourseContentScrapingService.build_valid_filename(ressource.name)
+                course_content_filename = file.build_valid_filename(ressource.name)
                 if course_content_filename == ChatbotFront.loaded_course_content_filename:
                     return ressource.url
         if fails_if_not_found:

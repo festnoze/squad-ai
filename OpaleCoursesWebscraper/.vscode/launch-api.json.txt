@@ -14,7 +14,7 @@
                 //"--reload",    // Enable/disable auto-reload on code change (for development)
             ],
             "env": {
-                "PYTHONPATH": "${workspaceFolder}"
+                "PYTHONPATH": "C:/Dev/IA/CommonTools;${workspaceFolder}"
             },
             "console": "integratedTerminal",
             //"preLaunchTask": "Clear Terminal"

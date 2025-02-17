@@ -1,7 +1,9 @@
 import json
 import os
 import uuid
+#
 from models.course_content_models import CourseContent
+from common_tools.helpers.file_helper import file
 
 class CourseContentScrapingService:
     @staticmethod
@@ -73,7 +75,7 @@ class CourseContentScrapingService:
             raise Exception(f"Failed to load analysed course content from file: {analysed_course_file_path}")
         
         # Create a folder for the courses contents of the parcours
-        valid_parcour_filename = CourseContentScrapingService.build_valid_filename(analysed_course_content.name)
+        valid_parcour_filename = file.build_valid_filename(analysed_course_content.name)
         if not os.path.exists(f"outputs/{valid_parcour_filename}"):
             os.makedirs(f"outputs/{valid_parcour_filename}")
 
@@ -82,7 +84,7 @@ class CourseContentScrapingService:
         course_scraping_fails_count = 0
         for ressource in analysed_course_content.ressource_objects:
             if ressource.type == "opale":
-                valid_course_content_filename = CourseContentScrapingService.build_valid_filename(ressource.name)
+                valid_course_content_filename = file.build_valid_filename(ressource.name)
                 if os.path.exists(f"outputs/{valid_parcour_filename}/{valid_course_content_filename}.md"):
                     print(f"Course content already exists for: {ressource.name}")
                     continue
@@ -97,38 +99,3 @@ class CourseContentScrapingService:
         return course_scraping_fails_count
 
     #TODO: could be moved to common_tools in file_helper
-    @staticmethod
-    def build_valid_filename(text_to_filename: str) -> str:
-        """
-        Transforms a string into a Windows-compatible filename.
-        
-        - Removes characters not allowed in Windows filenames: <>:"/\\|?*
-        - Removes control characters (ASCII 0-31)
-        - Strips trailing dots and spaces
-        - If the result is a reserved name (CON, PRN, AUX, NUL, COM1-9, LPT1-9), appends an underscore.
-        - If the result is empty, returns a default name.
-        """
-        import re
-        # Remove invalid characters: < > : " / \ | ? *
-        sanitized_filename = re.sub(r'[<>:"/\\|?*]', '', text_to_filename)
-        
-        # Remove control characters (ASCII 0-31)
-        sanitized_filename = re.sub(r'[\x00-\x1f]', '', sanitized_filename)
-        
-        # Strip trailing periods and spaces
-        sanitized_filename = sanitized_filename.rstrip('. ')
-        
-        # If the sanitized string is empty, set a default filename
-        if not sanitized_filename:
-            sanitized_filename = "default_filename"
-        
-        # Reserved names in Windows (case insensitive)
-        reserved = {"CON", "PRN", "AUX", "NUL"}
-        reserved |= {f"COM{i}" for i in range(1, 10)}
-        reserved |= {f"LPT{i}" for i in range(1, 10)}
-        
-        # If the sanitized name matches a reserved name, append an underscore.
-        if sanitized_filename.upper() in reserved:
-            sanitized_filename += "_"
-        
-        return sanitized_filename
