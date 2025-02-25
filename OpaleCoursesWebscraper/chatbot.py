@@ -20,6 +20,7 @@ class ChatbotFront:
     parcour_composition_file_path: str = ""
     analysed_parcour_file_path: str = ""
     loaded_course_content_filename: str = ""
+    previous_selected_course: str = ""
     selected_course_content_filename_wo_extension: str = ""
     loaded_course_content_md: str = ""
     loaded_course_content_html: str = ""
@@ -135,15 +136,15 @@ class ChatbotFront:
                 st.button("🔄 Récupérer le cours depuis l'URL fournie", on_click=lambda: ChatbotFront.scrape_and_save_opale_course_from_url(ChatbotFront.opale_course_url))
             
             with st.expander("💫 4. Sélection du cours à interroger dans le chat", expanded=True):
-                outputs_folders = [d for d in os.listdir("outputs/") if os.path.isdir(os.path.join("outputs/", d))]
+                outputs_folders: list = [d for d in os.listdir("outputs/") if os.path.isdir(os.path.join("outputs/", d))]
                 ChatbotFront.parcour_content_path = ["-"] + outputs_folders
                 if ChatbotFront.parcour_content_index == 0 and len(ChatbotFront.parcour_content_path) >= 2:
                     ChatbotFront.parcour_content_index = 1
                 if ChatbotFront.selected_parcour_content_dir in ChatbotFront.parcour_content_path:
                     ChatbotFront.parcour_content_index = ChatbotFront.parcour_content_path.index(ChatbotFront.selected_parcour_content_dir)
                 ChatbotFront.selected_parcour_content_dir = st.selectbox("Sélection du parcours (dossier depuis 'outputs')", options=ChatbotFront.parcour_content_path, index=ChatbotFront.parcour_content_index)
-    
-                selected_parcour_path = "outputs/" + ChatbotFront.selected_parcour_content_dir
+                
+                selected_parcour_path: str = "outputs/" + ChatbotFront.selected_parcour_content_dir
                 if os.path.exists(selected_parcour_path):
                     ChatbotFront.parcour_courses_files = ["-"] + [f.split('.')[0] for f in os.listdir(selected_parcour_path) if os.path.isfile(os.path.join(selected_parcour_path, f)) and f.endswith(".md")]
                     if ChatbotFront.parcour_courses_files_index == 0 and len(ChatbotFront.parcour_courses_files) >= 2:
@@ -155,9 +156,11 @@ class ChatbotFront:
                     ChatbotFront.parcour_courses_files_index = 0
                     ChatbotFront.loaded_course_content_filename = "-"
                 
-                ChatbotFront.loaded_course_content_filename = st.selectbox("Sélection fichier du cours à questionner ('*.md' depuis 'outputs/parcours')", options=ChatbotFront.parcour_courses_files, index=ChatbotFront.parcour_courses_files_index)
-                    
-                st.button("🔄 Charger le contenu de ce cours", on_click=lambda: ChatbotFront.load_course_content_from_file(selected_parcour_path, ChatbotFront.loaded_course_content_filename))           
+                selected_course: str = st.selectbox("Sélection fichier du cours à questionner ('*.md' depuis 'outputs/parcours')", options=ChatbotFront.parcour_courses_files, index=ChatbotFront.parcour_courses_files_index)
+                
+                if ChatbotFront.previous_selected_course is None or selected_course != ChatbotFront.previous_selected_course:
+                    ChatbotFront.load_course_content_from_file(selected_parcour_path, selected_course)
+                    ChatbotFront.previous_selected_course = selected_course
         # End of Sidebar        
 
         # Main window

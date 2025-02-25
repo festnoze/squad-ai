@@ -1,6 +1,6 @@
 
 from typing import List
-from langchain.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 
 class Coding_Guidelines_Rule_Model:
     """Defines a rule to be respected by all code reviewed during the code review process."""

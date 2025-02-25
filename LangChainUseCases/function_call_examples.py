@@ -1,7 +1,7 @@
 from common_tools.helpers.llm_helper import Llm
 from common_tools.helpers.tools_helpers import MathToolBox, RandomToolBox, WordsToolBox
 from common_tools.langchains.langchain_factory import LangChainFactory
-from common_tools.langchains.langgraph_agent_state import AgentState
+from common_tools.models.langgraph_agent_state import AgentState
 #
 from helpers.langgraph_llm_generated_code_execution import LangGraphLlmGeneratedCodeExecution
 from helpers.langgraph_tools_supervisor import LangGraphToolsSupervisor
@@ -26,18 +26,18 @@ class FunctionCallExamples:
         print('👁 Direct LLM resolution:')
         print(FunctionCallExamples.prompt)
         result = llm.invoke(FunctionCallExamples.prompt) 
-        print(Llm.get_llm_answer_content(result))
+        print(Llm.get_content(result))
         print('-----------------------------------')
         exit()
 
     @staticmethod
-    def resolve_using_agent_executor_with_tools(llms_infos):
+    async def resolve_using_agent_executor_with_tools_async(llms_infos):
         llm = LangChainFactory.create_llms_from_infos(llms_infos)[0]
         print('👁 LLM resolution with AgentExecutor and tools:') 
         print(FunctionCallExamples.prompt)
-        WordsToolBox.llm = llm # set the llm to be used by the tools
-        result = Llm.invoke_llm_with_tools(llm, FunctionCallExamples.tools, FunctionCallExamples.prompt)    
-        print(Llm.get_llm_answer_content(result))
+        WordsToolBox.llm_or_chain = llm # set the llm to be used by the tools
+        result = await Llm.invoke_llm_with_tools_async(llm, FunctionCallExamples.tools, FunctionCallExamples.prompt)    
+        print(Llm.get_content(result))
         print('-----------------------------------')
         exit()
 
@@ -49,7 +49,7 @@ class FunctionCallExamples:
         graph_test = LangGraphToolsSupervisor(llm, FunctionCallExamples.tools)
         graph = graph_test.build_graph()
         agentState: AgentState = graph.invoke({"messages": [FunctionCallExamples.prompt]})
-        print(Llm.get_llm_answer_content(agentState['messages'][-1]))
+        print(Llm.get_content(agentState['messages'][-1]))
         print('-----------------------------------')
         exit()
         
@@ -61,6 +61,6 @@ class FunctionCallExamples:
         graph_code_execution = LangGraphLlmGeneratedCodeExecution(llm, [])
         graph = graph_code_execution.build_graph()
         agentState: AgentState = graph.invoke({"messages": [FunctionCallExamples.prompt]})
-        print(Llm.get_llm_answer_content(agentState['messages'][-1]))
+        print(Llm.get_content(agentState['messages'][-1]))
         print('-----------------------------------')
         exit()

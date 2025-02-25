@@ -1,0 +1,10 @@
+python-dotenv
+openai
+requests
+langchain
+langchain_community
+langchain_core
+langchain_openai
+langchain_groq
+langsmith
+-e C:/Dev/IA/CommonTools # local package to internal tooling

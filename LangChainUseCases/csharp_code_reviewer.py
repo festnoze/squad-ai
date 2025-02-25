@@ -50,7 +50,7 @@ class CSharpCodeReviewer:
         }
 
         response = Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks("code_review", self.llms, JsonOutputParser(pydantic_object=Coding_Guidelines_BrokenRules_ModelPydantic), None, inputs, prompt)
-        answer = Llm.get_llm_answer_content(response[0])
+        answer = Llm.get_content(response[0])
         broken_rules = Coding_Guidelines_BrokenRules_Model(**answer)
         return broken_rules
     

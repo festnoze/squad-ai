@@ -1,1 +1,1 @@
-pip install -r requirements_docker.txt --upgrade
+uv pip install -r requirements_docker.txt --upgrade

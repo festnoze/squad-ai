@@ -1,5 +1,5 @@
 
-from langchain.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 from langchain.tools import BaseTool, StructuredTool, tool
 from models.param_doc import ParameterDocumentation
 from models.coding_guidelines_broken_rules_model import MethodParametersDocumentation

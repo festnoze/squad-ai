@@ -11,9 +11,9 @@ from langchain.tools.render import format_tool_to_openai_function
 from common_tools.helpers.llm_helper import Llm
 from common_tools.helpers.tools_helpers import MathToolBox, RandomToolBox, WordsToolBox
 from common_tools.helpers.txt_helper import txt
-from common_tools.langchains.langchain_adapter_type import LangChainAdapterType
+from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.langchains.langchain_factory import LangChainFactory
-from common_tools.langchains.langgraph_agent_state import AgentState
+from common_tools.models.langgraph_agent_state import AgentState
 from common_tools.models.llm_info import LlmInfo
 
 class LangGraphToolsSupervisor:
@@ -22,7 +22,7 @@ class LangGraphToolsSupervisor:
         self.tool_executor = ToolExecutor(tools)
         functions = [format_tool_to_openai_function(t) for t in tools]
         self.llm = self.llm.bind_functions(functions)
-        WordsToolBox.llm = self.llm
+        WordsToolBox.llm_or_chain = self.llm
 
     # Define the function that calls the model
     def call_model(self, state):

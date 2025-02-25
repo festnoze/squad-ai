@@ -1,6 +1,6 @@
 
 from typing import List
-from langchain.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 from models.coding_guidelines_rule_model import Coding_Guidelines_Rule_Model, Coding_Guidelines_Rule_ModelPydantic
 
 class Coding_Guidelines_BrokenRule_Model(Coding_Guidelines_Rule_Model):

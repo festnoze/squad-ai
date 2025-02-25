@@ -1,0 +1,6 @@
+Demande à l'utilisateur dans une phrase simple et fluide en français de fournir l'information suivante :
+<field_name>
+Cette question a pour description : <field_desc>
+
+Voici la liste des contraintes de ce champ (chaque contrainte doit être traduite en français, y compris une description de la contrainte regex, si besoin):
+<field_infos>

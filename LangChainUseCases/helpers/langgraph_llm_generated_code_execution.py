@@ -14,9 +14,9 @@ from common_tools.helpers.file_helper import file
 from common_tools.helpers.llm_helper import Llm
 from common_tools.helpers.tools_helpers import MathToolBox, RandomToolBox, WordsToolBox
 from common_tools.helpers.txt_helper import txt
-from common_tools.langchains.langchain_adapter_type import LangChainAdapterType
+from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.langchains.langchain_factory import LangChainFactory
-from common_tools.langchains.langgraph_agent_state import AgentState
+from common_tools.models.langgraph_agent_state import AgentState
 from common_tools.models.llm_info import LlmInfo
 
 class LangGraphLlmGeneratedCodeExecution:
@@ -38,7 +38,7 @@ class LangGraphLlmGeneratedCodeExecution:
         all_tools.extend(additionnal_tools)
         self.llm = self.llm.bind_functions(all_tools)
         self.tool_executor = ToolExecutor(all_tools)
-        WordsToolBox.llm = self.llm
+        WordsToolBox.llm_or_chain = self.llm
 
     # Define the function that calls the model
     def llm_agent_code_generator(self, state):
