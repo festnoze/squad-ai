@@ -46,10 +46,10 @@ class LlmService:
         print(group_question)
         answer_text = input()
         fields_values = await self.get_group_values_from_text_async(group, answer_text)
-        if isinstance(fields_values, dict) and fields_values:
+        if fields_values and isinstance(fields_values, dict):
             inner_key = next(iter(fields_values))
-            if isinstance(inner_key, list) and any(inner_key):
-                fields_values = inner_key        
+            if isinstance(fields_values[inner_key], list) and any(fields_values[inner_key]):
+                fields_values = fields_values[inner_key]        
         group.set_values(fields_values)
     
     async def get_question_for_group_values_async(self, group: Group):
@@ -77,7 +77,7 @@ class LlmService:
         field.value = answer
 
     async def get_question_to_fix_field_value_async(self, field: Field):
-        query_field_prompt = file.get_as_str("src/prompts/query_field_prompt.txt")
+        query_field_prompt = file.get_as_str("src/prompts/query_fixing_single_field_prompt.txt")
         query_field_prompt = query_field_prompt.replace("{field_name}", field.name)
         query_field_prompt = query_field_prompt.replace("{field_desc}", field.description)
         query_field_prompt = query_field_prompt.replace("{field_previous_value}", field.value if field.value else "null")

@@ -9,9 +9,10 @@ async def main_async():
     llm_service = LlmService()
     filled_form = await llm_service.query_user_to_fill_form_async(form)
     filled_form.save_form_instance_as_json("filled_form.json")
+    filled_form.save_form_instance_as_flat_fields_json("filled_form_flat.json")
 
-    print("Fulfilled form:")
-    print(filled_form)
+    # print("Fulfilled form:")
+    # print(filled_form)
 
 
 def print_form_struct(form):
