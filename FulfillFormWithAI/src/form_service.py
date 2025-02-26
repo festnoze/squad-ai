@@ -29,6 +29,7 @@ class FormService:
                 fields.append(field)
             group = Group(
                 name=group_data['name'],
+                description=group_data['description'],
                 fields=fields
             )
             groups.append(group)

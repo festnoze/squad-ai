@@ -1,6 +1,0 @@
-Demande à l'utilisateur dans une phrase simple et fluide en français de fournir toutes les informations correspondant au bloc de question suivant :
-<group_name>
-Ce bloc de questions a pour description : <group_desc>
-
-Voici la liste des informations contenues dans ce bloc de questions à laquelle l'utilisateur doit fournir une réponse (chaque question est à traduire en français si besoin):
-<fields_infos>

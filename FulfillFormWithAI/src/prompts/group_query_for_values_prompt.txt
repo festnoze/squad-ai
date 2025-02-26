@@ -1,0 +1,19 @@
+<contexte>
+Il s'agit de la demande de fourniture de valeurs à un groupe de questions.
+Un groupe de question est composé de une ou plusieurs questions, appellés : 'champ', pour lesquelles une valeur doit être fournie par l'utilisateur. 
+</contexte>
+<contexte>
+Le groupe de questions concerné se nomme : '{group_name}'
+Ce groupe de questions a pour description : '{group_desc}'.
+</contexte>
+<contexte>
+Voici la liste des champs contenus dans ce groupe de questions à laquelle l'utilisateur doit fournir une réponse (chaque question est à traduire en français si besoin):
+{fields_infos}
+</contexte>
+
+<objectifs>
+Demande à l'utilisateur dans une question unique la plus minimaliste possible, de fournir, en français, en listant tous les champs compris dans le groupe de questions indiqué.
+</objectifs>
+
+
+

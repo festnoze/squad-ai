@@ -2,6 +2,7 @@ form:
   name: "example_form"
   groups:
     - name: "personal_info"
+      description: "Personal Information"
       fields:
         - name: "civility"
           description: "User civility"
@@ -22,6 +23,7 @@ form:
           max_size_or_value: 50
           optional: false
     - name: "contact"
+      description: "Contact Information"
       fields:
         - name: "email"
           description: "User email address"
@@ -38,6 +40,7 @@ form:
           regex: "^\\d{10}$"
           optional: false
     - name: "postal_address"
+      description: "Postal Address"
       fields:
         - name: "address_1"
           description: "Address line 1"
@@ -69,6 +72,7 @@ form:
           max_size_or_value: 50
           optional: false
     - name: "training_preference"
+      description: "Training Preference"
       fields:
         - name: "field_of_study"
           description: "Field of study"
