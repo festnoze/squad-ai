@@ -9,7 +9,7 @@ class Message: #obsolete: moved to common _tools lib.
         self.content: str = content
         self.elapsed_seconds: int = elapsed_seconds
 
-class Conversation: #obsolete: moved to common _tools lib.
+class Conversation: #obsolete: moved to common_tools lib.
     def __init__(self) -> None:
         self.messages: List[Message] = []
 

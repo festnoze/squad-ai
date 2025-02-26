@@ -12,7 +12,7 @@ Voici la liste des champs contenus dans ce groupe de questions à laquelle l'uti
 </contexte>
 
 <objectifs>
-Demande à l'utilisateur dans une question unique la plus minimaliste possible, de fournir, en français, en listant tous les champs compris dans le groupe de questions indiqué.
+Demande, en français, dans une question unique et la plus minimaliste possible, de fournir les valeurs pour tous les champs compris dans le groupe de questions indiqué.
 </objectifs>
 
 

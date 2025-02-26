@@ -1,5 +1,5 @@
 
-from typing import List
+import re
 from common_tools.langchains.langchain_factory import LangChainFactory
 from common_tools.helpers.file_helper import file
 from common_tools.helpers.txt_helper import txt
@@ -7,13 +7,15 @@ from common_tools.helpers.llm_helper import Llm
 from common_tools.models.llm_info import LlmInfo
 from common_tools.helpers.env_helper import EnvHelper
 from common_tools.langchains.langchain_factory import LangChainFactory
-from models.field import Field
-from models.form import Form
 #
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
-
+from langchain.schema.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.messages.base import BaseMessage
+#
+from models.form import Form
 from models.group import Group
+from models.field import Field
 from models.str_list_pydantic import StringsListPydantic
 
 class LlmService:
@@ -62,7 +64,12 @@ class LlmService:
         query_group_prompt = query_group_prompt.replace("{group_name}", group.name)
         query_group_prompt = query_group_prompt.replace("{group_desc}", group.description)
         query_group_prompt = query_group_prompt.replace("{fields_infos}", fields_infos_str)
-        promptlate = ChatPromptTemplate.from_template(query_group_prompt)
+
+        lmessages = self.extract_langchain_messages_from_tagged_prompt(query_group_prompt, ['objectifs'])
+        promptlate =  ChatPromptTemplate.from_messages(lmessages)
+        # Or version w/o separating prompt's tags into separate messages
+        # promptlate = ChatPromptTemplate.from_template(query_group_prompt)
+
         chain = promptlate | self.llm | RunnablePassthrough()
         question = await Llm.invoke_chain_with_input_async("query form group", chain)
         return Llm.get_content(question)
@@ -77,17 +84,22 @@ class LlmService:
         field.value = answer
 
     async def get_question_to_fix_field_value_async(self, field: Field):
+        field_validation = field.validate()
+        if field_validation.is_valid:
+            raise ValueError("Field is validated and cannot be fixed")
+        
         query_field_prompt = file.get_as_str("src/prompts/query_fixing_single_field_prompt.txt")
         query_field_prompt = query_field_prompt.replace("{field_name}", field.name)
         query_field_prompt = query_field_prompt.replace("{field_desc}", field.description)
         query_field_prompt = query_field_prompt.replace("{field_previous_value}", field.value if field.value else "null")
-        field_validation = field.validate()
-        if field_validation.is_valid:
-            raise ValueError("Field is validated and cannot be fixed")
         query_field_prompt = query_field_prompt.replace("{field_previous_value_error_message}", field_validation.errors[0].message if field_validation.errors and any(field_validation.errors) else "<no error message>")
         query_field_prompt = query_field_prompt.replace("{field_infos}", str(field))
 
-        promptlate = ChatPromptTemplate.from_template(query_field_prompt)
+        lc_messages = self.extract_langchain_messages_from_tagged_prompt(query_field_prompt, ['objectifs'])
+        promptlate =  ChatPromptTemplate.from_messages(lc_messages)
+        # Or version w/o separating prompt's tags into separate messages
+        # promptlate = ChatPromptTemplate.from_template(query_field_prompt)
+
         chain = promptlate | self.llm | RunnablePassthrough()
         response = await Llm.invoke_chain_with_input_async("query form field", chain)
         return Llm.get_content(response)
@@ -103,7 +115,12 @@ class LlmService:
         group_get_values_prompt = group_get_values_prompt.replace("{group_desc}", group.description)
         group_get_values_prompt = group_get_values_prompt.replace("{fields_infos}", fields_infos_str)
         group_get_values_prompt = group_get_values_prompt.replace("{text_answer}", text)
-        promptlate = ChatPromptTemplate.from_template(group_get_values_prompt)
+
+        lc_messages = self.extract_langchain_messages_from_tagged_prompt(group_get_values_prompt, ['objectifs'])
+        promptlate =  ChatPromptTemplate.from_messages(lc_messages)
+        # Or version w/o separating prompt's tags into separate messages
+        #promptlate = ChatPromptTemplate.from_template(group_get_values_prompt)
+        
         chain = promptlate | self.llm | RunnablePassthrough()
         response = await Llm.invoke_chain_with_input_async("get json group values from user answer", chain)
         values_list = Llm.extract_json_from_llm_response(response)
@@ -113,7 +130,19 @@ class LlmService:
             prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(
                 group_get_values_prompt,
                 StringsListPydantic,
-                List[str])
+                list[str])
             values_list = await Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks_async("get output parsed group values from user answer", self.llms, output_parser, 5, prompt_for_output_parser)
         
         return values_list
+    
+    def extract_langchain_messages_from_tagged_prompt(self, prompt: str, tags_human_messages: list[str] = []) -> list[BaseMessage]:
+        messages: list[BaseMessage] = []
+        pattern = re.compile(r'<(?P<tag>\w+)>(?P<content>.*?)</(?P=tag)>', re.DOTALL)
+        for match in pattern.finditer(prompt):
+            tag: str = match.group("tag").strip()
+            content: str = match.group("content").strip()
+            if tag in tags_human_messages:
+                messages.append(HumanMessage(content=content))
+            else:
+                messages.append(SystemMessage(content=content))
+        return messages

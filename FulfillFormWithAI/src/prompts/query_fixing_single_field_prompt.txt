@@ -17,6 +17,6 @@ Mais cette valeur n'est pas valide pour la ou les raisons suivantes : '{field_pr
 Procède étape par étape :
 1- Analyse les raisons pour lesquelles la valeur précédemment fournie n'est pas valide.
 2- Décris le champ avec son nom en français, ainsi les contraintes auxquelles doit répondre la valeur du champ, dans un français simple et compréhensible, y compris pour la règle regex spécifiée, e cas échéent.
-3- Explique à l'utilisateur, en une phrase simple, pourquoi la valeur qu'il avait fournie n'est pas valide.
-4- Puis demande à l'utilisateur de fournir une valeur valide pour le champ spécifié.
+3- Explique pourquoi la valeur fournie n'est pas valide, en une phrase simple.
+4- Puis demande de fournir une valeur valide pour le champ en question.
 </objectifs>

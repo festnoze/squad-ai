@@ -1,0 +1,24 @@
+
+<contexte>
+Il s'agit d'analyser des champs dont la valeur n'a pas été fournie :
+Nom du champ : '{field_name}'.
+Description du champ : '{field_desc}'.
+</contexte>
+<contexte>
+Voici la liste des contraintes que doit respecter ce champ :
+{field_infos}
+</contexte>
+<contexte>
+L'utilisateur a précédemment fourni la valeur suivante pour ce champ : '{field_previous_value}'.
+Mais cette valeur n'est pas valide pour la ou les raisons suivantes : '{field_previous_value_error_message}'
+</contexte>
+
+<objectifs>
+Procède étape par étape :
+1- Analyse le formulaire joint, qui est composé de groupes, chaqu'un d'entre eux composé de champs.
+2- Analyse la conversation existante fourni pour en déduire les champs pour lesquelles une valeur a déjà été fournie par l'utilisateur.
+3- Déduis-en la liste des champs pour lesquels aucune valeur n'a été fournies dans la conversation jointe.
+Renvoie la précédente liste, au format json, avec le format suivant :
+TODO
+
+</objectifs>
