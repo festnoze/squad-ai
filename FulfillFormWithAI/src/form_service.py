@@ -24,6 +24,7 @@ class FormService:
                     max_size_or_value=field_data.get('max_size_or_value'),
                     regex=field_data.get('regex'),
                     optional=field_data.get('optional'),
+                    default_value=field_data.get('default_value'),
                     validation_func_name= field_data.get('validation_func_name')
                 )
                 fields.append(field)

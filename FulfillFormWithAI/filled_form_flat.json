@@ -1,14 +1,14 @@
 {
-    "civility": "M.",
-    "last_name": "dupont",
-    "first_name": "emile",
+    "civility": "Mr",
+    "last_name": "RODO",
+    "first_name": "eti",
     "email": "erezr@efze.com",
     "phone_number": "0606060606",
     "address_1": "622, avenue des roses",
-    "address_2": "",
+    "address_2": null,
     "postal_code": "34000",
     "city": "MONS",
-    "country": "france",
-    "field_of_study": "dans les RH",
-    "training_name": "bachelor conseiller en formation"
+    "country": "France",
+    "field_of_study": "IT",
+    "training_name": "bachelor dev python"
 }

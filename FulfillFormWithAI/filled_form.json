@@ -6,15 +6,15 @@
             "fields": [
                 {
                     "name": "civility",
-                    "value": "M."
+                    "value": "Mr"
                 },
                 {
                     "name": "last_name",
-                    "value": "dupont"
+                    "value": "RODO"
                 },
                 {
                     "name": "first_name",
-                    "value": "emile"
+                    "value": "eti"
                 }
             ]
         },
@@ -40,7 +40,7 @@
                 },
                 {
                     "name": "address_2",
-                    "value": ""
+                    "value": null
                 },
                 {
                     "name": "postal_code",
@@ -52,7 +52,7 @@
                 },
                 {
                     "name": "country",
-                    "value": "france"
+                    "value": "France"
                 }
             ]
         },
@@ -61,11 +61,11 @@
             "fields": [
                 {
                     "name": "field_of_study",
-                    "value": "dans les RH"
+                    "value": "developpeur python"
                 },
                 {
                     "name": "training_name",
-                    "value": "bachelor conseiller en formation"
+                    "value": "bachelor dev python"
                 }
             ]
         }

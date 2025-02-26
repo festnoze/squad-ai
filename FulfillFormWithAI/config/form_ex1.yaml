@@ -70,7 +70,8 @@ form:
           type: "string"
           min_size_or_value: 2
           max_size_or_value: 50
-          optional: false
+          optional: true
+          default_value: "France"
     - name: "training_preference"
       description: "Training Preference"
       fields:

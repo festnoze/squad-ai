@@ -13,7 +13,7 @@ class FieldType(Enum):
 class Field:
     def __init__(self, name: str, description: str, type: str,
             min_size_or_value: Any = None, max_size_or_value: Any = None, regex: str = None, 
-            optional: bool = False, validation_func_name: str = None, default_value: str = "") -> None:
+            optional: bool = False, validation_func_name: str = None, default_value: str = None) -> None:
         self._value: Any = None
         self.is_validated: Union[bool, None] = None
         self.name: str = name
@@ -83,6 +83,8 @@ class Field:
         if self.regex:
             constraints.append(f"regex='{self.regex}'")
         constraints.append("optional=True" if self.optional else "optional=False")
+        if self.default_value:
+            constraints.append(f"default_value='{self.default_value}'")
         if self.validation_func_name:
             constraints.append(f"validation_func='{self.validation_func_name}'")
         constraints_str: str = f"{', '.join(constraints)}" if constraints else ""
