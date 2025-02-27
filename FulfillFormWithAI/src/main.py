@@ -18,7 +18,7 @@ async def main_async():
 
     form = FormService.create_form_from_yaml_file("config/form_ex1.yaml")
     print("Loaded form:")
-    print(filled_form)
+    print(form)
     
     llm_service = LlmService()
     filled_form = await llm_service.query_user_to_fill_form_async(form)
