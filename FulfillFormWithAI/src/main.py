@@ -15,8 +15,8 @@ async def main_async():
 
     from form_service import FormService
     from llm_service import LlmService
-
-    form = FormService.create_form_from_yaml_file("config/form_ex1.yaml")
+    form_filename = 'user_and_training_info_form'
+    form = FormService.create_form_from_yaml_file(f"config/{form_filename}.yaml")
     print("Loaded form:")
     print(form)
     
