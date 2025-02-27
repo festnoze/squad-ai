@@ -21,12 +21,13 @@ async def main_async():
     print(form)
     
     llm_service = LlmService()
+    out_dir = "outputs/"
     filled_form = await llm_service.query_user_to_fill_form_async(form)
-    filled_form.save_form_instance_as_json("filled_form.json")
-    filled_form.save_form_instance_as_flat_fields_json("filled_form_flat.json")
+    filled_form.save_form_instance_as_json(out_dir + "filled_form.json")
+    filled_form.save_form_instance_as_flat_fields_json(out_dir + "filled_form_flat.json")
 
-    # print("Fulfilled form:")
-    # print(filled_form)
+    print("Fulfilled form:")
+    print(filled_form)
 
 
 def print_form_struct(form):

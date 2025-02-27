@@ -23,6 +23,7 @@ class FormService:
                     min_size_or_value=field_data.get('min_size_or_value'),
                     max_size_or_value=field_data.get('max_size_or_value'),
                     regex=field_data.get('regex'),
+                    regex_description=field_data.get('regex_description'),
                     optional=field_data.get('optional'),
                     default_value=field_data.get('default_value'),
                     allowed_values=field_data.get('allowed_values'),
