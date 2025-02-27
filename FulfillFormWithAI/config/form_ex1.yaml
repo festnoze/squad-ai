@@ -10,6 +10,7 @@ form:
           min_size_or_value: 1
           max_size_or_value: 10
           optional: false
+          allowed_values: [["M.", "Monsieur", "Mr"], ["Mme", "Madame", "Mrs"], ["Dr", "Docteur"], "N.C"]
         - name: "last_name"
           description: "User last name"
           type: "string"

@@ -25,7 +25,8 @@ class FormService:
                     regex=field_data.get('regex'),
                     optional=field_data.get('optional'),
                     default_value=field_data.get('default_value'),
-                    validation_func_name= field_data.get('validation_func_name')
+                    allowed_values=field_data.get('allowed_values'),
+                    validation_func_name= field_data.get('validation_func_name'),
                 )
                 fields.append(field)
             group = Group(

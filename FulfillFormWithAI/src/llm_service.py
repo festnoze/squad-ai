@@ -34,9 +34,9 @@ class LlmService:
                     # Ask user for the whole group values
                     await self.query_user_to_fill_group_fields_async(group)                    
                     invalid_fields = [field for field in group.fields if not field.is_validated]
-                    
+                       
+                    # Re-ask user for fields with invalid value only
                     if any(invalid_fields) and len(invalid_fields) != len(group.fields):
-                        # Re-ask user for fields with invalid value only
                         for invalid_field in invalid_fields:
                             while not invalid_field.validate().is_valid:
                                 await self.query_user_to_fill_field_value_async(invalid_field)
@@ -46,7 +46,7 @@ class LlmService:
         group_question = await self.get_question_for_group_values_async(group)
         print("\nQuestion groupée :")
         print(group_question)
-        answer_text = input()
+        answer_text = input('> ')
         fields_values = await self.get_group_values_from_text_async(group, answer_text)
         if fields_values and isinstance(fields_values, dict):
             inner_key = next(iter(fields_values))
@@ -80,7 +80,7 @@ class LlmService:
         print("\nQuestion simple :")
         field_question = await self.get_question_to_fix_field_value_async(field)
         print(field_question)
-        answer = input()
+        answer = input('> ')
         field.value = answer
 
     async def get_question_to_fix_field_value_async(self, field: Field):

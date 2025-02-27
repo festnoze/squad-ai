@@ -6,15 +6,15 @@
             "fields": [
                 {
                     "name": "civility",
-                    "value": "Mr"
+                    "value": "M."
                 },
                 {
                     "name": "last_name",
-                    "value": "RODO"
+                    "value": "Martin"
                 },
                 {
                     "name": "first_name",
-                    "value": "eti"
+                    "value": "Etienne"
                 }
             ]
         },
@@ -61,11 +61,11 @@
             "fields": [
                 {
                     "name": "field_of_study",
-                    "value": "developpeur python"
+                    "value": "RH"
                 },
                 {
                     "name": "training_name",
-                    "value": "bachelor dev python"
+                    "value": "bachelor conseiller en formation"
                 }
             ]
         }
