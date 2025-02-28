@@ -1,8 +1,9 @@
-import time
-from common_tools.helpers.import_helper import ImportHelper
-from common_tools.helpers.txt_helper import txt
 
 async def main_async():
+    import time
+    from common_tools.helpers.import_helper import ImportHelper
+    from common_tools.helpers.txt_helper import txt
+
     # files_paths_to_test_for_import = [
     #     # "C:/Dev/IA/CommonTools/common_tools/rag/rag_service.py",
     #     # "C:/Dev/IA/CommonTools/common_tools/rag/rag_ingestion_pipeline/rag_ingestion_pipeline.py",
@@ -35,8 +36,16 @@ def print_form_struct(form):
     print(form)
     print("---------------------------------------------------------------------\n")
 
+# if __name__ == "__main__":
+#     import asyncio
+#     print("\nServer starting!\n")
+#     asyncio.run(main_async())
+
 if __name__ == "__main__":
-    import asyncio
-    print("\nServer starting!\n")
-    asyncio.run(main_async())
+    from agents_graph import LangGraphFormSupervisor
+    print("🔄 Construction du LangGraph pour le remplissage de formulaire...")
+    supervisor = LangGraphFormSupervisor(None)
+    workflow = supervisor.build_graph()
+    print("✅ Graphe LangGraph compilé et exécution lancé !")
+    workflow.run()
 
