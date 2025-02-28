@@ -16,6 +16,7 @@ from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.models.langgraph_agent_state import AgentState
 from common_tools.langchains.langsmith_client import Langsmith
 from common_tools.models.llm_info import LlmInfo
+from common_tools.helpers.env_helper import EnvHelper
 
 # external imports
 import json
@@ -54,36 +55,22 @@ async def main_async():
     langsmith = Langsmith()
     langsmith.create_project()
 
-    # Select the LLM to be used
-    llms_infos = []
-    #llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "phi3", timeout= 80, temperature = 0.5, api_key= None))
-    #llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "llama2",  timeout= 200, temperature = 0.5, api_key= None))
-    #llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "llama3", timeout= 200, temperature = 0.5, api_key= None))
-    #llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "mistral",  timeout= 200, temperature = 0.5, api_key= None))
-    #llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "mixtral",  timeout= 500, temperature = 0.5, api_key= None))
-    #llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "dolphin-mixtral",  timeout= 400, temperature = 0.5, api_key= None))
-    #llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "nous-hermes2", timeout= 200, temperature = 0.5, api_key= None))
-    #llms_infos.append(LlmInfo(type= LangChainAdapterType.Ollama, model= "openhermes", timeout= 200, temperature = 0.5, api_key= None))
-
-    #llms_infos.append(LlmInfo(type= LangChainAdapterType.Groq, model= "mixtral-8x7b-32768",  timeout= 20, temperature = 0.5, api_key= groq_api_key))
-    #llms_infos.append(LlmInfo(type= LangChainAdapterType.Groq, model= "llama3-8b-8192",  timeout= 10, temperature = 0.5, api_key= groq_api_key))
-    #llms_infos.append(LlmInfo(type= LangChainAdapterType.Groq, model= "llama3-70b-8192",  timeout= 20, temperature = 0.5, api_key= groq_api_key))
-
-    #llms_infos.append(LlmInfo(type= LangChainAdapterType.Google, model= "gemini-pro",  timeout= 60, temperature = 0.5, api_key= google_api_key))
-
-    #llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-2",  timeout= 60, temperature = 0.5, api_key= anthropic_api_key))
-    #llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-haiku-20240307",  timeout= 60, temperature = 0.5, api_key= anthropic_api_key))
-    #llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-sonnet-20240229",  timeout= 60, temperature = 0.5, api_key= anthropic_api_key))
-    #llms_infos.append(LlmInfo(type= LangChainAdapterType.Anthropic, model= "claude-3-opus-20240229",  timeout= 60, temperature = 0.5, api_key= anthropic_api_key))
-
-    #llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo-0125",  timeout= 60, temperature = 0.5, api_key= openai_api_key))
-    #llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-3.5-turbo",  timeout= 60, temperature = 0.5, api_key= openai_api_key))
-    #llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4-turbo",  timeout= 120, temperature = 0.5, api_key= openai_api_key))
-    llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout= 60, temperature = 1, api_key= openai_api_key))
-    llms_infos.append(LlmInfo(type= LangChainAdapterType.OpenAI, model= "gpt-4o",  timeout= 80, temperature = 0.1, api_key= openai_api_key))
-
     txt.activate_print = True
+    llms_infos = EnvHelper.get_llms_infos_from_env_config()
 
+    #Examples of resolution with agent and tools or code generation
+    #FunctionCallExamples.resolve_using_llm_direct(llms_infos)
+    #await FunctionCallExamples.resolve_using_agent_executor_with_tools_async(llms_infos)
+    await FunctionCallExamples.resolve_using_native_single_tool_call_async(llms_infos)
+    # FunctionCallExamples.resolve_using_agent_with_manual_tool_call_in_graph(llms_infos)
+    # FunctionCallExamples.resolve_using_langchain_tool_call(llms_infos)
+
+    # FunctionCallExamples.resolve_using_codeact_code_execution(llms_infos)
+
+    # Use tools through agent executor
+    llm = LangChainFactory.create_llms_from_infos(llms_infos)[0]
+    test_agent_executor_with_tools(llm)
+    
     # # Test BM25 retriever
     # rag_structs_summaries_csv = "outputs/rag_structs_summaries.csv"
     # documents = file.read_csv(rag_structs_summaries_csv)
@@ -96,17 +83,10 @@ async def main_async():
     # for result in results:
     #     print(result.page_content)
     #     print("----")
+    # exit()
 
-    # Examples of resolution with agent and tools or code generation
-    #FunctionCallExamples.resolve_using_llm_direct(llms_infos)
-    await FunctionCallExamples.resolve_using_agent_executor_with_tools_async(llms_infos)
-    #FunctionCallExamples.resolve_using_agent_with_tools(llms_infos)
-
-    #FunctionCallExamples.resolve_using_codeact_code_execution(llms_infos)
-
-
-    # Test Groq through its own client (no langchain)
-    #GroqHelper.test_query(llms_infos[0])
+    # #Test Groq through its own client (no langchain)
+    # GroqHelper.test_query(llms_infos[0])
 
     # # Test code review
     # llms = LangChainFactory.create_llms_from_infos(llms_infos)
@@ -135,10 +115,8 @@ async def main_async():
     # res = web_search.run("what's Obama's first name?")
     # print(res)
 
-    # ## Use tools through agent executor
-    # test_agent_executor_with_tools(llm)
-
     # # Summarize short text
+    # llm = LangChainFactory.create_llms_from_infos(llms_infos)[0]
     # text = file.get_as_str("short-text.txt")
     # res = Summarize.summarize_short_text(llm, text)
 

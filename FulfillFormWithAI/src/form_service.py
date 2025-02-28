@@ -42,7 +42,3 @@ class FormService:
             groups=groups
         )
         return form
-
-# Exemple d'utilisation :
-# yaml_data = yaml.safe_load(open('formulaire.yaml'))
-# form = create_form_from_yaml(yaml_data)
