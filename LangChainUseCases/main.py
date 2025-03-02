@@ -62,7 +62,7 @@ async def main_async():
     #FunctionCallExamples.resolve_using_llm_direct(llms_infos)
     #await FunctionCallExamples.resolve_using_agent_executor_with_tools_async(llms_infos)
     await FunctionCallExamples.resolve_using_native_single_tool_call_async(llms_infos)
-    # FunctionCallExamples.resolve_using_agent_with_manual_tool_call_in_graph(llms_infos)
+    FunctionCallExamples.resolve_using_agent_with_manual_tool_call_in_graph(llms_infos)
     # FunctionCallExamples.resolve_using_langchain_tool_call(llms_infos)
 
     # FunctionCallExamples.resolve_using_codeact_code_execution(llms_infos)

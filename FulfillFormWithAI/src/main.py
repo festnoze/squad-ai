@@ -1,4 +1,7 @@
 
+from models.form_agent_state import FormAgentState
+
+
 async def main_async():
     import time
     from common_tools.helpers.import_helper import ImportHelper
@@ -30,7 +33,6 @@ async def main_async():
     print("Fulfilled form:")
     print(filled_form)
 
-
 def print_form_struct(form):
     print("\nDescription de la structure du formulaire :\n")
     print(form)
@@ -43,9 +45,17 @@ def print_form_struct(form):
 
 if __name__ == "__main__":
     from agents_graph import LangGraphFormSupervisor
+    from common_tools.helpers.env_helper import EnvHelper
+    from common_tools.langchains.langchain_factory import LangChainFactory
+
     print("🔄 Construction du LangGraph pour le remplissage de formulaire...")
-    supervisor = LangGraphFormSupervisor(None)
+    yaml_path = "config/user_and_training_info_form.yaml"
+    llms_infos = EnvHelper.get_llms_infos_from_env_config(skip_commented_lines=True)
+    llms = LangChainFactory.create_llms_from_infos(llms_infos)
+    llm = llms[0]
+    supervisor = LangGraphFormSupervisor(llm)
     workflow = supervisor.build_graph()
-    print("✅ Graphe LangGraph compilé et exécution lancé !")
-    workflow.run()
+    print("✅ Graphe LangGraph compilé et l'exécution lancé !")
+    conversation = "Je m'appelle John Doe et je suis un développeur Python."
+    workflow.invoke(FormAgentState(conversation=conversation, form=None, form_info_file_path=yaml_path))
 
