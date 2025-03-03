@@ -5,8 +5,10 @@ class Group:
         def __init__(self, name: str, description: str, fields: list[Field], validation_func: str = None) -> None:
                 self.name: str = name
                 self.description: str = description
-                self.fields: list[Field] = fields
                 self.validation_func: any = validation_func
+                self.fields: list[Field] = fields
+                for field in self.fields:
+                    field.group_name = self.name
 
         def validate(self) -> ValidationResult:
                 errors: list = []
@@ -34,3 +36,11 @@ class Group:
         def __str__(self) -> str:
                 fields_str: str = "\n    " + "\n    ".join(str(field) for field in self.fields)
                 return f"  • Group: '{self.name}' ({self.description}).{fields_str}"
+        
+        def to_dict(self) -> dict:
+            return {
+                'name': self.name,
+                'description': self.description,
+                'fields': [field.to_dict() for field in self.fields],
+                'validation_func': self.validation_func
+            }

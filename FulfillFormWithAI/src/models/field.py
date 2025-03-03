@@ -27,6 +27,7 @@ class Field:
         #
         self._value: any = None
         self.is_validated: Union[bool, None] = None
+        self.group_name: str = None
 
     @property
     def value(self) -> any:
@@ -122,3 +123,9 @@ class Field:
         constraints_str: str = f"{', '.join(constraints)}" if constraints else ""
         return f"◦ Field: {self.name} <{self.type.value}>{f" = '{self.value}'" if self.value else ""} with constraints: {constraints_str}."
     
+    def to_dict(self) -> dict:
+        return {
+            'name': self.name,
+            'value': self.value,
+            'is_validated': self.is_validated
+        }
