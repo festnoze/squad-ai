@@ -3,26 +3,31 @@ from form_workflow_graph import FormWorkflowGraph
 from common_tools.helpers.env_helper import EnvHelper 
 from agent_tools import FormTools   
 from langchain.globals import set_verbose
+import asyncio
 
-async def main_async():
+def init_and_build_graph():
     #set_verbose(True)
-
-    yaml_path = "config/user_and_training_info_form.yaml"
-    conversation = "Je m'appelle John Smith et je suis un développeur Python."
-
     llms_infos = EnvHelper.get_llms_infos_from_env_config()
     FormTools.init(llms_infos)
     workflow_graph = FormWorkflowGraph()
-    workflow = await workflow_graph.run_async(yaml_path, conversation)
+    return workflow_graph.build_graph()
+
+async def main_async(workflow_graph: FormWorkflowGraph = None):        
+    yaml_path = "config/user_and_training_info_form.yaml"
+    conversation = "Je m'appelle John Smith et je suis un développeur Python. J'habote à Paris, au 16, rue de la biche 75016 en Angleterre."
+    
+    if not workflow_graph: workflow_graph = init_and_build_graph()
+    await workflow_graph.run_async(yaml_path, conversation)
 
 def print_form_struct(form):
     print("\nDescription de la structure du formulaire :\n")
     print(form)
     print("---------------------------------------------------------------------\n")
 
+graph = init_and_build_graph()
+
 if __name__ == "__main__":
-    import asyncio
     print("\nServer starting!\n")
-    asyncio.run(main_async())
+    asyncio.run(main_async(graph))
    
 

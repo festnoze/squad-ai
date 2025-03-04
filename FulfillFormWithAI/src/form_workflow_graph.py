@@ -1,5 +1,6 @@
 import json
 from typing import Optional
+from langchain.schema.messages import HumanMessage
 from langchain_core.language_models import BaseChatModel
 from langgraph.graph import StateGraph, END
 from models.form_agent_state import FormAgentState
@@ -46,7 +47,7 @@ class FormWorkflowGraph:
         print("✅ Graphe LangGraph consruit !")
         
         print("🔄 Workflow en cours d'execution ...")
-        result = await workflow.ainvoke(FormAgentState(conversation=conversation, form_info_file_path=yaml_path, missing_fields=None, chat_history=[]), {"recursion_limit": 50})
+        result = await workflow.ainvoke(FormAgentState(chat_history= [HumanMessage(conversation)] if conversation else [], form_info_file_path= yaml_path, missing_fields= None), {"recursion_limit": 50})
 
         print("\n✅ Formulaire completé !")
         file.write_file(result["form"].to_dict(), "outputs/form_filled.json")

@@ -2,11 +2,13 @@ inputs/
 outputs/
 storage/
 exchanges/
+*.egg-info/
 *.save/
 *.old/
 chroma_db/
 scraped*/
 structures_descriptions*/
+.langgraph_api/
 
 .env*
 *.db

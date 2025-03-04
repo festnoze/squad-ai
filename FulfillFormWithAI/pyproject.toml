@@ -1,0 +1,39 @@
+[project]
+name = "FulfillFormWithAI"
+version = "0.1.0"
+description = "Un projet de remplissage de formulaire via un graphe d'agents LLM"
+authors = [
+  { name = "Etienne MILLERIOUX", email = "eemillerioux@gmail.com" }
+]
+readme = "README.md"
+requires-python = ">=3.12"
+
+# Liste des dépendances principales
+dependencies = [
+  "uv",
+  "python-dotenv",
+  "openai",
+  "requests",
+  "langchain",
+  "langchain_community",
+  "langchain_core",
+  "langchain_openai",
+  "langchain_groq",
+  "langsmith",
+  "langgraph-cli[inmem]",
+  "common_tools @ file:///C:/Dev/IA/CommonTools"
+]
+
+# Dépendances optionnelles (exemple)
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.0"
+]
+
+[build-system]
+# Indique qu'on utilise 'setuptools' et 'wheel'
+requires = [
+  "setuptools>=62.0",
+  "wheel"
+]
+build-backend = "setuptools.build_meta"
