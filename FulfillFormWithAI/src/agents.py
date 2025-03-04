@@ -52,6 +52,17 @@ class AgentSupervisor:
     
 
 class AgentHIL:    
+    default_answers = [
+        "je m'appelle Etienne",
+        "Monsieur",
+        "Bouvier",
+        "+33606060606",
+        "erezr@efze.com",
+        "622, avenue des roses 34000",
+        "MONS",
+        "dans les RH, bachelor conseiller en formation",
+    ]
+
     async def build_question_async(self, state: dict[str, any]):
         """Create a question to ask the user (Human In the Loop)."""
         if len(state["missing_fields"]) == 0:
@@ -67,12 +78,19 @@ class AgentHIL:
         state["chat_history"].append(AIMessage(question))
         return state
     
-    def ask_question(self, state: dict[str, any]):
+    def ask_question(self, state: dict[str, any], ask_user = False):
         """Ask the user to answer question (Human In the Loop)."""
         if not isinstance(state["chat_history"][-1], AIMessage):
             raise ValueError("Last message in chat history should be an AIMessage.")
         print(f"🤖 Question : {state["chat_history"][-1].content}")
-        user_answer: str = input("> ")
+        
+        if ask_user:
+            user_answer: str = input("> ")
+        else:
+            user_answer = self.default_answers.pop(0)
+        
+        print(f"👤 Réponse : {user_answer}")
+
         state["chat_history"].append(HumanMessage(user_answer))
         return state
     

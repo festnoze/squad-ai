@@ -24,24 +24,14 @@ class Form:
         groups_str: str = "\n\n".join(str(group) for group in self.groups)
         return f"Form name: '{self.name}'.\n\n{groups_str}"
     
-    def save_form_instance_as_json(self, file_path: str) -> None:
-        content: dict = {
-            "name": self.name,
-            "groups": [
-                {
-                    "name": group.name,
-                    "fields": [
-                        {"name": field.name, "value": field.value}
-                        for field in group.fields
-                    ]
-                }
-                for group in self.groups
-            ]
-        }
-        file.write_file(content, file_path)
+    def to_flatten_fields(self) -> dict:
+        return {field.name: field.value for group in self.groups for field in group.fields} 
 
-    def save_form_instance_as_flat_fields_json(self, file_path: str):
-        content: dict = {field.name: field.value for group in self.groups for field in group.fields}
-        file.write_file(content, file_path)
+    def to_dict(self) -> dict:
+        return {
+            'name': self.name,
+            'groups': [group.to_dict() for group in self.groups],
+            'validation_func': self.validation_func
+        }
 
            
