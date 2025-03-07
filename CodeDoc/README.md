@@ -1,6 +1,6 @@
 <img src="./CodeSharpDoc-logo.png" title="" alt="logo" data-align="center">
 
-<H1 style="text-align: center;">Welcome to CodeSharpDoc</H1>
+<H1 style="text-align: center;">Welcome to CodeDoc</H1>
 
 ### What is it?
 

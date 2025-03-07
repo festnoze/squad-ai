@@ -83,9 +83,9 @@ class SlackService:
    
     def post_streaming_response_to_query_from_external_api(self, channel, query, waiting_msg_to_delete_ts):
         url = self.HTTP_SCHEMA + "://" + self.EXTERNAL_API_HOST 
-        if self.EXTERNAL_API_PORT:
-            url += ':' + self.EXTERNAL_API_PORT
-        url += self.QUERY_EXTERNAL_ENDPOINT_URL_STREAMING        
+        if self.EXTERNAL_API_PORT: url += ':' + self.EXTERNAL_API_PORT
+        url += self.QUERY_EXTERNAL_ENDPOINT_URL_STREAMING   
+
         body = {'query': query, 'type': 'slack', 'user_name': channel}
         
         response: requests.Response = requests.post(url, json=body, stream=True)
