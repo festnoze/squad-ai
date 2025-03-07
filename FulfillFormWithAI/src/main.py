@@ -1,27 +1,18 @@
 
-from form_workflow_graph import FormWorkflowGraph
+from graph_workflow_form import GraphWorkflowForm
 from common_tools.helpers.env_helper import EnvHelper 
 from agent_tools import FormTools   
 from langchain.globals import set_verbose
 import asyncio
 
-from llm_workflow_agent import LLMWorkflowAgent
-
-# def init_graph():
-#     #set_verbose(True)
-#     llms_infos = EnvHelper.get_llms_infos_from_env_config()
-#     FormTools.init(llms_infos)
-#     workflow_graph = FormWorkflowGraph()
-#     return workflow_graph
-
 def init_graph():
     #set_verbose(True)
     llms_infos = EnvHelper.get_llms_infos_from_env_config()
     FormTools.init(llms_infos)
-    workflow_graph = LLMWorkflowAgent()
+    workflow_graph = GraphWorkflowForm()
     return workflow_graph
 
-async def main_async(workflow_graph: FormWorkflowGraph = None):        
+async def main_async(workflow_graph: GraphWorkflowForm = None):        
     yaml_path = "config/user_and_training_info_form.yaml"
     conversation = "Je m'appelle John Smith et je suis un développeur Python. J'habote à Paris, au 16, rue de la biche 75016 en Angleterre."
     

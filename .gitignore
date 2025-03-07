@@ -17,6 +17,7 @@ structures_descriptions*/
 *.bin
 *.sqlite3
 *.tar.gz
+*.whl
 
 .qodo/
 

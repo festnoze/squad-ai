@@ -1,7 +1,7 @@
 
 # ================== Définition des Agents ================== #
 
-from langgraph.types import Command
+from langgraph.types import interrupt, Command
 from agent_tools import FormTools
 from models.form import Form
 from langchain.schema.messages import HumanMessage, AIMessage, SystemMessage
@@ -40,7 +40,7 @@ class AgentSupervisor:
 
         # Extract values from conversation if not already injected
         if 'chat_history' in state:
-            print("🔍 Extracting values from conversation...")
+            print("🔍 Extracting values from conversation...\n")
             extracted_values = FormTools.extract_values_from_conversation(state['chat_history'], state["form"])
             if len(extracted_values) > 0:
                 state["form"] = FormTools.fill_form_func(state["form"], extracted_values)
@@ -52,16 +52,7 @@ class AgentSupervisor:
     
 
 class AgentHIL:    
-    default_answers = [
-        "je m'appelle Etienne",
-        "Monsieur",
-        "Bouvier",
-        "+33606060606",
-        "erezr@efze.com",
-        "622, avenue des roses 34000",
-        "MONS",
-        "dans les RH, bachelor conseiller en formation",
-    ]
+    static_answers: list = [] 
 
     async def build_question_async(self, state: dict[str, any]):
         """Create a question to ask the user (Human In the Loop)."""
@@ -78,16 +69,16 @@ class AgentHIL:
         state["chat_history"].append(AIMessage(question))
         return state
     
-    def ask_question(self, state: dict[str, any], ask_user = False):
+    def ask_question(self, state: dict[str, any]):
         """Ask the user to answer question (Human In the Loop)."""
         if not isinstance(state["chat_history"][-1], AIMessage):
             raise ValueError("Last message in chat history should be an AIMessage.")
         print(f"🤖 Question : {state["chat_history"][-1].content}")
         
-        if ask_user:
+        if not any(self.static_answers):
             user_answer: str = input("> ")
         else:
-            user_answer = self.default_answers.pop(0)
+            user_answer = self.static_answers.pop(0)
         
         print(f"👤 Réponse : {user_answer}")
 

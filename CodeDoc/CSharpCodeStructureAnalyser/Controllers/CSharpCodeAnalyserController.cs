@@ -26,4 +26,12 @@ public class CSharpCodeAnalyserController : ControllerBase
     {
         CodeEditionService.ReplaceExistingSummariesWithNewProvidedSummariesIntoCodeFiles(structuresSummaries);
     }
+
+    [HttpGet]
+    [ActionName("Ping")]
+    [Route("ping")]
+    public string Ping()
+    {
+        return "pong";
+    }
 }

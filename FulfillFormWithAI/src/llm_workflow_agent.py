@@ -2,23 +2,7 @@ from langchain.schema.messages import HumanMessage, AIMessage
 from agent_tools import FormTools
 from models.form_agent_state import FormAgentState
 
-class LLMWorkflowAgent:
-    async def run_async(self, yaml_path: str, conversation: Optional[str] = None) -> dict:
-        """Runs the workflow with an optional conversation for pre-filling the form."""
-        print("🔄 Construction du graphe LangGraph ...")
-        workflow = self.build_graph()
-        print("✅ Graphe LangGraph consruit !")
-        
-        print("🔄 Workflow en cours d'execution ...")
-        form_agent_state = FormAgentState(chat_history= [HumanMessage(conversation)] if conversation else [], form_info_file_path= yaml_path, missing_fields= None)
-        result = await workflow.ainvoke(form_agent_state, {"recursion_limit": 50})
-
-        print("\n✅ Formulaire completé !")
-        file.write_file(result["form"].to_dict(), "outputs/form_filled.json")
-        file.write_file(result["form"].to_flatten_fields(), "outputs/form_filled_flatten.json")
-
-        return result["form"].to_dict()
-    
+class LLMWorkflowAgent:    
     async def run_workflow(self, state: dict[str, any]) -> dict[str, any]:
         if "form" not in state or not state["form"]:
             state = self.load_form_tool(state)
