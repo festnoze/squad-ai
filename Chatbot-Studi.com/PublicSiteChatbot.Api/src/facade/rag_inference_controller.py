@@ -2,13 +2,13 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException
 from application.available_service import AvailableService
 from application.service_exceptions import QuotaOverloadException
-from web_services.request_models.conversation_request_model import ConversationRequestModel
+from facade.request_models.conversation_request_model import ConversationRequestModel
 from common_tools.models.conversation import Conversation, Message, User
 from common_tools.models.device_info import DeviceInfo
 from fastapi.responses import JSONResponse, StreamingResponse, Response
 
-from web_services.request_models.query_asking_request_model import QueryAskingRequestModel, QueryNoConversationRequestModel
-from web_services.request_models.user_request_model import UserRequestModel
+from facade.request_models.query_asking_request_model import QueryAskingRequestModel, QueryNoConversationRequestModel
+from facade.request_models.user_request_model import UserRequestModel
 
 ##########################
 #      API Endpoints     #

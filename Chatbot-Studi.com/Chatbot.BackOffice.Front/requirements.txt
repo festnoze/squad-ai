@@ -1,2 +1,2 @@
--e C:/Dev/IA/CommonTools # local package to internal tooling
-streamlit
+-e C:/Dev/IA/CommonTools # dynamic local package to internal tooling
+-r requirements_common.txt

@@ -7,11 +7,11 @@ from src.infrastructure.user_repository import UserRepository
 from application.service_exceptions import QuotaOverloadException
 from common_tools.rag.rag_service import RagService
 from common_tools.rag.rag_service_factory import RagServiceFactory
-from web_services.request_models.conversation_request_model import ConversationRequestModel
+from facade.request_models.conversation_request_model import ConversationRequestModel
 from fastapi.responses import JSONResponse, StreamingResponse, Response
 
-from web_services.request_models.query_asking_request_model import QueryAskingRequestModel, QueryNoConversationRequestModel
-from web_services.request_models.user_request_model import UserRequestModel
+from facade.request_models.query_asking_request_model import QueryAskingRequestModel, QueryNoConversationRequestModel
+from facade.request_models.user_request_model import UserRequestModel
 
 from common_tools.models.conversation import Conversation, Message, User
 from common_tools.models.device_info import DeviceInfo

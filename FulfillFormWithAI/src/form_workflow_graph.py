@@ -47,7 +47,8 @@ class FormWorkflowGraph:
         print("✅ Graphe LangGraph consruit !")
         
         print("🔄 Workflow en cours d'execution ...")
-        result = await workflow.ainvoke(FormAgentState(chat_history= [HumanMessage(conversation)] if conversation else [], form_info_file_path= yaml_path, missing_fields= None), {"recursion_limit": 50})
+        form_agent_state = FormAgentState(chat_history= [HumanMessage(conversation)] if conversation else [], form_info_file_path= yaml_path, missing_fields= None)
+        result = await workflow.ainvoke(form_agent_state, {"recursion_limit": 50})
 
         print("\n✅ Formulaire completé !")
         file.write_file(result["form"].to_dict(), "outputs/form_filled.json")

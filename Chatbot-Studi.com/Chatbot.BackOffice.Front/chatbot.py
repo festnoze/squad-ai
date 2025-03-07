@@ -115,7 +115,7 @@ class ChatbotFront:
             st.session_state['conversation'] = Conversation(st.session_state.user)
             st.session_state['conv_id'] = None
             load_dotenv()
-            st.session_state.api_host_uri =  os.getenv("API_HOST_URI")
+            st.session_state.api_host_uri =  os.getenv("HTTP_SCHEMA") + '://' + os.getenv("EXTERNAL_API_HOST") + ':' + os.getenv("EXTERNAL_API_PORT")
             st.session_state.api_client = ChatbotApiClient(st.session_state.api_host_uri)
             ChatbotFront.start_new_conversation()
 

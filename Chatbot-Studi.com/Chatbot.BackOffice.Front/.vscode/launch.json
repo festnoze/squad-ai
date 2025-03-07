@@ -10,7 +10,7 @@
             "request": "launch",
             "program": "${workspaceFolder}/senv/Scripts/streamlit.exe",
             "args": [
-               "run", "startup.py"
+               "run", "startup.py", "--server.port", "8280"
             ],
             "env": {
                 "PYTHONPATH": "C:/Dev/IA/CommonTools;${workspaceFolder}"

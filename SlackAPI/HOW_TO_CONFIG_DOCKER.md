@@ -29,10 +29,13 @@ python -m build CommonTools
    - Vérifier dans `requirements_docker.txt` que la bonne version du package est spécifiée.
 
 4. **Créer l'image docker de l'API RAG** :
-   En admin., à la racine du projet, lancer le script:
+   
+   A la racine du projet, créer et configurer le fichier : **Dockerfile** et copier : **docker_create.bat** et **requirements_docker.txt** (avec la version correspondante de common_tools dans 'wheels'). Nota : aussi créer un **requirements_common.txt** et faire que **requirements.txt** appele ce dernier.
+   
+   Puis, en admin., à la racine du projet, lancer le script:
    
    ```bash
-   .\create_docker.bat
+   .\docker_create.bat
    ```
    
    Veillez que la variable 'repo_prefix' ait bien le nom de l'API concernée - Idem pour l'API Slack si besoin.
@@ -48,7 +51,7 @@ python -m build CommonTools
    docker network create my_network
    ```
    
-   **5.2. Créer le <u>container pour l'API Slack</u>**
+   **5.2. Créer le <u>container pour le connecteur Slack spécifique pour l'API cible</u>**
    
    Via un fichier de configuration des variables variables d'environnement, spécifique au projet cible :
    
@@ -77,20 +80,25 @@ python -m build CommonTools
    - 'slack_api_0.10' est le nom de l'image docker à partir de laquelle créer le container.
      
      ---
-
+   
    <u>Nota</u> : Alternativement, il est possible de specifier chaque valeur de variable d'environnement directement dans la commande de création du container, plutôt que spécifier un fichier contenant la configuration spécifique pour l'API cible.
    ATTENTION : les valeurs pour SLACK_BOT_TOKEN et SLACK_SIGNING_SECRET sont ici absentes, et doivent être renseignées avant de lancer la commande.
-
-- Pour cibler **"studi-website-rag-api"** :
+- Pour cibler **"code-doc-api"** :
   
   ```bash
   docker run -d --name slack-api-code-doc --network my_network -p 8301:8301 -e EXTERNAL_API_HOST="code-doc-api" -e EXTERNAL_API_PORT="8282" -e QUERY_EXTERNAL_ENDPOINT_URL_STREAMING="/rag/query/stream" -e STREAMING_RESPONSE=true -e SLACK_BOT_USER_ID="A08AYTSF9QF" -e SLACK_BOT_TOKEN="" -e SLACK_SIGNING_SECRET="" slack_api_0.10
   ```
 
-- Pour cibler **"code-doc-api"** :
+- Pour cibler **"studi-website-rag-api"** :
   
   ```bash
   docker run -d --name slack-api-studi-website --network my_network -p 8302:8301 -e EXTERNAL_API_HOST="studi-website-rag-api" -e EXTERNAL_API_PORT="8281" -e QUERY_EXTERNAL_ENDPOINT_URL_STREAMING="/rag/inference/no-conversation/ask-question/stream" -e STREAMING_RESPONSE=true -e SLACK_BOT_USER_ID="A08D1DE3GN5" -e SLACK_BOT_TOKEN="" -e SLACK_SIGNING_SECRET="" slack_api_0.10
+  ```
+
+- Pour cibler **"studi-website-rag-backoffice-frontend"** :
+  
+  ```bash
+  docker run -d --name slack-api-studi-website --network my_network -p 8302:8301 -e EXTERNAL_API_HOST="studi-website-rag-backoffice-frontend" -e EXTERNAL_API_PORT="8280" -e QUERY_EXTERNAL_ENDPOINT_URL_STREAMING="/rag/inference/no-conversation/ask-question/stream" -e STREAMING_RESPONSE=true -e SLACK_BOT_USER_ID="A08D1DE3GN5" -e SLACK_BOT_TOKEN="" -e SLACK_SIGNING_SECRET="" slack_api_0.10
   ```
   
   Avec les paramètres suivants :   
@@ -122,12 +130,18 @@ python -m build CommonTools
 - 'slack_api_0.10' est le nom de l'image docker à partir de laquelle créer le container.
   
   ---
-
-   **5.3. Créer les <u>containers pour des API RAG</u>**
-   Pour l'API **"studi website"** :
+  
+   **5.3. Créer les <u>containers pour des API cibles</u>**
+   Pour l'API **"studi website chatbot"** :
 
 ```bash
 docker run -d --name studi-website-rag-api --network my_network -p 8281:8281 rag_studi_public_website_api_0.10
+```
+
+   Pour le frontend du backoffice de **"studi website chatbot"** :
+
+```bash
+docker run -d --name studi-website-rag-backoffice-frontend --network my_network -p 8280:8280 rag_studi_public_website_backoffice_frontend_0.10
 ```
 
         Pour l'API **"code doc"** :
@@ -147,9 +161,9 @@ Où :
 - 'rag_studi_public_website_api_0.10' est le nom de l'image docker à partir de laquelle créer le container.
   
   ---
-
+  
   **5.4. Configuer l'URL de l'API RAG à cibler par l'API Slack**
-
+  
   Dans le fichier '*Dockerfile*', définir le nom 'docker' du container de l'API RAG et son port, comme :
 
 ```bash

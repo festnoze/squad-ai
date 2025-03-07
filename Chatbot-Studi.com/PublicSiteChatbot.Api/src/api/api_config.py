@@ -17,10 +17,10 @@ from datetime import datetime
 from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.file_helper import file
 
-from web_services.test_controller import test_router
-from web_services.rag_ingestion_controller import ingestion_router
-from web_services.rag_inference_controller import inference_router
-from web_services.rag_evaluation_controller import evaluation_router
+from facade.test_controller import test_router
+from facade.rag_ingestion_controller import ingestion_router
+from facade.rag_inference_controller import inference_router
+from facade.rag_evaluation_controller import evaluation_router
 
 class ApiConfig:
     @asynccontextmanager
@@ -83,6 +83,8 @@ class ApiConfig:
         def handle_error(request: Request, error_msg: str):
             if txt.waiting_spinner_thread:
                 txt.stop_spinner_replace_text(f"Call to endpoint: '{request.url.components.path}' fails with error: {error_msg}")
+            else:
+                txt.print(f"Call to endpoint: '{request.url.components.path}' fails with error: {error_msg}")
             logger.error(f"Log Error: {error_msg}")
 
         # Middleware for centralized exception handling and response wrapping
