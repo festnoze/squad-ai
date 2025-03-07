@@ -81,11 +81,14 @@ class ApiConfig:
         txt.logger = logger
         
         def handle_error(request: Request, error_msg: str):
+            err_msg_txt = f"/!\\ ERROR: Call to endpoint: '{request.url.components.path}' fails with error: {error_msg}"
+            
             if txt.waiting_spinner_thread:
-                txt.stop_spinner_replace_text(f"Call to endpoint: '{request.url.components.path}' fails with error: {error_msg}")
+                txt.stop_spinner_replace_text(err_msg_txt)
             else:
-                txt.print(f"Call to endpoint: '{request.url.components.path}' fails with error: {error_msg}")
-            logger.error(f"Log Error: {error_msg}")
+                txt.print(err_msg_txt)
+
+            logger.error(err_msg_txt)
 
         # Middleware for centralized exception handling and response wrapping
         @app.middleware("http")

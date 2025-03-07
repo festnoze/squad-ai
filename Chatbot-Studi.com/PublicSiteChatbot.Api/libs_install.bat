@@ -1,4 +1,3 @@
-senv\Scripts\activate
 python -m uv pip install -r requirements.txt --upgrade
 
 @echo off

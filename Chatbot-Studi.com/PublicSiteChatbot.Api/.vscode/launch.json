@@ -13,7 +13,7 @@
                 "api.startup:app", // The FastAPI app instance (in: api/startup.py)
                 "--host", "127.0.0.1", // Host to bind
                 "--port", "8281",      // Port to bind
-                "--log-level", "info"//"warning" //"error", // Corrected log-level argument
+                "--log-level", "error"//"warning" //"info", // Corrected log-level argument
                 //"--reload",    // Enable/disable auto-reload on code change (for development)
             ],
             "env": {

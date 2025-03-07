@@ -248,7 +248,12 @@ class AvailableService:
             async for chunk in Llm.write_static_text_as_stream(AvailableService.waiting_message):
                 yield chunk
         try:
-            analysed_query, retrieved_chunks = await AvailableService.inference.run_pipeline_dynamic_but_augmented_generation_async(conversation_history, include_bm25_retrieval= True, give_score=True, pipeline_config_file_path = 'studi_com_chatbot_rag_pipeline_default_config_wo_AG_for_streaming.yaml', format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
+            analysed_query, retrieved_chunks = await AvailableService.inference.run_pipeline_dynamic_but_augmented_generation_async(
+                                                                    conversation_history, 
+                                                                    include_bm25_retrieval= True,
+                                                                    give_score=True, 
+                                                                    pipeline_config_file_path = 'studi_com_chatbot_rag_pipeline_default_config_wo_AG_for_streaming.yaml', 
+                                                                    format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
             pipeline_succeeded = True
         except EndPipelineException as ex:                        
             pipeline_succeeded = False
