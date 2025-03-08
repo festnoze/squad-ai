@@ -2,14 +2,11 @@
 # ================== Définition des Outils ================== #
 
 #from langchain.tools import tool
-from llm_service import LlmService
 from models.form import Form
 from models.group import Group
 from models.field import Field
-from common_tools.helpers.file_helper import file
 from common_tools.models.llm_info import LlmInfo
-from common_tools.helpers.llm_helper import Llm
-from common_tools.langchains.langchain_factory import LangChainFactory
+from llm_service import LlmService
 
 class FormTools:
     llm_service:LlmService
@@ -17,33 +14,6 @@ class FormTools:
     def init(llms_infos: list[LlmInfo]):
         FormTools.llm_service = LlmService(llms_infos)
 
-    def load_form_from_yaml(file_path: str) -> Form:
-        """Load a form from a YAML file."""
-        yaml_data = file.get_as_yaml(file_path)
-        return FormTools.create_form_from_yaml(yaml_data)
-
-    def create_form_from_yaml(yaml_data: dict[str, any]) -> Form:
-        """Create a Form object from YAML data."""
-        groups = [
-            Group(
-                name=group_data["name"],
-                description=group_data["description"],
-                fields=[
-                    Field(
-                        name=field_data["name"],
-                        description=field_data["description"],
-                        type=field_data["type"],
-                        optional=field_data.get("optional"),
-                        default_value=field_data.get("default_value"),
-                        allowed_values=field_data.get("allowed_values"),
-                    )
-                    for field_data in group_data["fields"]
-                ],
-            )
-            for group_data in yaml_data["form"]["groups"]
-        ]
-        return Form(name=yaml_data["form"]["name"], groups=groups)
-    
     def extract_values_from_conversation(conversation: str, form: Form) -> dict[str, any]:
         """Analyze the conversation and extract values corresponding to form fields."""
         extracted_values = {}
@@ -64,7 +34,7 @@ class FormTools:
                             return field
         return None
     
-    def get_missing_groups_and_fields(form: any) -> list[dict[str, any]]:
+    def get_missing_groups_and_fields(form: Form) -> list[dict[str, any]]:
         missing_groups_and_fields: list[dict[str, any]] = []
         for group in form.groups:
             if all(not field.is_validated for field in group.fields):
@@ -106,17 +76,18 @@ class FormTools:
         return linked_values
 
     
-    def fill_form_func(form: Form, extracted_values: list[dict]) -> Form:
-        extracted_values_count = len(extracted_values)
+    def fill_form_with_provided_values(form: Form, fields_values_to_integrate: list[dict]) -> Form:
+        """Fill the form with the provided values."""
+        extracted_values_count = len(fields_values_to_integrate)
         setted_values_count = 0        
         if extracted_values_count == 0: return form
-        extracted_values_keys = [list(d.keys())[0] for d in extracted_values]
+        extracted_values_keys = [list(d.keys())[0] for d in fields_values_to_integrate]
         for group in form.groups:
             for field in group.fields:
                 extracted_value_key = f'{group.name}.{field.name}'
                 if extracted_value_key in extracted_values_keys:
                     value = None
-                    for extracted_value in extracted_values:
+                    for extracted_value in fields_values_to_integrate:
                         if extracted_value_key in extracted_value:
                             value = extracted_value[extracted_value_key]
                             break

@@ -1,8 +1,12 @@
 from langchain.schema.messages import HumanMessage, AIMessage
 from agent_tools import FormTools
-from models.form_agent_state import FormAgentState
+from models.form import Form
+from common_tools.helpers.file_helper import file
 
-class LLMWorkflowAgent:    
+# Obsolete: 1st version (working).
+# Static workflow for form fulfillment. 
+# Simply call: StaticWorkflowForm.run_workflow(state)
+class StaticWorkflowForm:    
     async def run_workflow(self, state: dict[str, any]) -> dict[str, any]:
         if "form" not in state or not state["form"]:
             state = self.load_form_tool(state)
@@ -18,11 +22,11 @@ class LLMWorkflowAgent:
         return state
 
     def load_form_tool(self, state: dict[str, any]) -> dict[str, any]:
-        state["form"] = FormTools.load_form_from_yaml(state["form_info_file_path"])
+        state["form"] = Form.from_dict(file.get_as_yaml(state["form_info_file_path"]))
         if "chat_history" in state:
             extracted_values: any = FormTools.extract_values_from_conversation(state["chat_history"], state["form"])
             if extracted_values:
-                state["form"] = FormTools.fill_form_func(state["form"], extracted_values)
+                state["form"] = FormTools.fill_form_with_provided_values(state["form"], extracted_values)
         return state
 
     def get_missing_fields_tool(self, state: dict[str, any]) -> list:
@@ -56,5 +60,5 @@ class LLMWorkflowAgent:
         return state
 
     def fill_form_tool(self, state: dict[str, any]) -> dict[str, any]:
-        state["form"] = FormTools.fill_form_func(state["form"], state["extracted_values"])
+        state["form"] = FormTools.fill_form_with_provided_values(state["form"], state["extracted_values"])
         return state

@@ -36,15 +36,13 @@ class Field:
     @value.setter
     def value(self, new_value: any) -> None:
         if (new_value is None or new_value == "null"):
-            if self.optional:
-                self._value = self.default_value
-            else:
-                raise ValueError("Value is required as the field isn't optional")
+            if not self.optional: 
+                raise ValueError("Value is required because the field is flagged as not-optional")
+            self._value = self.default_value
         else:
             self._value = self.normalize_value(new_value)
 
-        result: ValidationResult = self.validate()
-        self.is_validated = result.is_valid
+        self.is_validated = self.validate().is_valid
         
     def validate(self) -> ValidationResult:
         errors: list = []
@@ -125,7 +123,38 @@ class Field:
     
     def to_dict(self) -> dict:
         return {
-            'name': self.name,
-            'value': self.value,
-            'is_validated': self.is_validated
+            "name": self.name,
+            "description": self.description,
+            "optional": self.optional,
+            "type": self.type.value,
+            "group_name": self.group_name,
+            "regex": self.regex,
+            "regex_description": self.regex_description,
+            "min_size_or_value": self.min_size_or_value,
+            "max_size_or_value": self.max_size_or_value,
+            "validation_func_name": self.validation_func_name,
+            "default_value": self.default_value,
+            "allowed_values": self.allowed_values,
+            "value": self._value,
+            "is_validated": self.is_validated,
         }
+    
+    @staticmethod
+    def from_dict(field_dict: dict) -> 'Field':
+        field = Field(
+            name=field_dict['name'],
+            description=field_dict.get('description'),
+            type=field_dict['type'],
+            min_size_or_value=field_dict.get('min_size_or_value'),
+            max_size_or_value=field_dict.get('max_size_or_value'),
+            regex=field_dict.get('regex'),
+            regex_description=field_dict.get('regex_description'),
+            optional=field_dict.get('optional'),
+            default_value=field_dict.get('default_value'),
+            allowed_values=field_dict.get('allowed_values'),
+            validation_func_name= field_dict.get('validation_func_name'),
+        )
+        field.group_name = field_dict.get("group_name")
+        field._value = field_dict.get("value")
+        field.is_validated = field_dict.get("is_validated")
+        return field

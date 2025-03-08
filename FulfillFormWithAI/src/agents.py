@@ -1,10 +1,11 @@
 
 # ================== Définition des Agents ================== #
 
-from langgraph.types import interrupt, Command
 from agent_tools import FormTools
 from models.form import Form
 from langchain.schema.messages import HumanMessage, AIMessage, SystemMessage
+from langgraph.types import interrupt, Command
+from common_tools.helpers.file_helper import file
 
 class AgentSupervisor:
     """Supervises the workflow, loads the YAML file, and orchestrates actions."""
@@ -19,7 +20,7 @@ class AgentSupervisor:
             return state
                 
         # Identify missing groups or fields
-        missing_fields = FormTools.get_missing_groups_and_fields(state["form"])
+        missing_fields = FormTools.get_missing_groups_and_fields(Form.from_dict(state["form"]))
         state['missing_fields'] = missing_fields
         return state
 
@@ -36,19 +37,24 @@ class AgentSupervisor:
     def initialize(self, state):
         # Load the form from yaml file
         print("🔄 Loading form from YAML...")
-        state['form'] = FormTools.load_form_from_yaml(state['form_info_file_path'])
+        state['form'] = file.get_as_yaml(state['form_info_file_path'])
 
         # Extract values from conversation if not already injected
         if 'chat_history' in state:
             print("🔍 Extracting values from conversation...\n")
-            extracted_values = FormTools.extract_values_from_conversation(state['chat_history'], state["form"])
+            extracted_values = FormTools.extract_values_from_conversation(state['chat_history'], Form.from_dict(state["form"]))
             if len(extracted_values) > 0:
-                state["form"] = FormTools.fill_form_func(state["form"], extracted_values)
+                filled_form = FormTools.fill_form_with_provided_values(Form.from_dict(state["form"]), extracted_values)
+                state["form"] = filled_form.to_dict()
         self.initialized = True
         
     def is_form_validated(self, state: dict[str, any]) -> bool:
         """Validate the form."""
-        return state["form"].validate().is_valid
+        is_valid = False
+        if "form" in state:
+            form = Form.from_dict(state["form"])
+            is_valid = form.validate().is_valid
+        return is_valid
     
 
 class AgentHIL:    
@@ -59,7 +65,7 @@ class AgentHIL:
         if len(state["missing_fields"]) == 0:
             return
         next_item = state["missing_fields"][0]
-        form_item_to_query = FormTools.find_form_item(state['form'], next_item)
+        form_item_to_query = FormTools.find_form_item(Form.from_dict(state['form']), next_item)
 
         if next_item["field"] is None:
             question = await FormTools.generate_question_for_group_async(form_item_to_query)
@@ -95,7 +101,7 @@ class AgentInterpretation:
            
         next_item = state["missing_fields"][0]
         user_answer = state["chat_history"][-1].content
-        targeted_form_item = FormTools.find_form_item(state['form'], next_item)
+        targeted_form_item = FormTools.find_form_item(Form.from_dict(state['form']), next_item)
         interpreted_user_answer = await FormTools.interpret_user_response_async(targeted_form_item, user_answer)
         linked_fields_and_values = FormTools.link_values_with_fields(interpreted_user_answer, targeted_form_item)
         state["extracted_values"] = linked_fields_and_values
@@ -103,6 +109,7 @@ class AgentInterpretation:
     
     def fill_form(self, state: dict[str, any]) -> Form:
         """Fill the form with extracted values."""
-        state['form'] = FormTools.fill_form_func(state['form'], state['extracted_values'])
+        filled_form = FormTools.fill_form_with_provided_values(Form.from_dict(state['form']), state['extracted_values'])
+        state['form'] = filled_form.to_dict()
         return state
 
