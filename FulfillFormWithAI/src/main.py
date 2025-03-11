@@ -26,13 +26,14 @@ def print_form_struct(form):
     print(form)
     print("---------------------------------------------------------------------\n")
 
-graph = get_init_graph_and_env()
+graph_class = get_init_graph_and_env()
+graph = graph_class.graph
 
 if __name__ == "__main__":
     print("\nServeur demarré !\n")
     
     # Propose to auto-fill the form
-    input_auto_fill = input(">>> Tapez 'Entrée' pour procéder au remplissage automatique du formulaire, sinon tapez 'm' pour le remplir manuellement.\n")
+    input_auto_fill = 'autofill' # = input(">>> Tapez 'Entrée' pour procéder au remplissage automatique du formulaire, sinon tapez 'm' pour le remplir manuellement.\n")
     if input_auto_fill != 'm':
         AgentHIL.static_answers = [
             "je m'appelle Etienne",
@@ -47,6 +48,6 @@ if __name__ == "__main__":
         print(f"🤖 The questions will be automatically answered with the following static answers: \n{' / '.join(AgentHIL.static_answers)}.")
         print("\n>>> Début du remplissage automatique du formulaire <<<\n")
 
-    asyncio.run(main_async(graph))
+    asyncio.run(main_async(graph_class))
    
 

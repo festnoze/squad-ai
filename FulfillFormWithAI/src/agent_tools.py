@@ -14,16 +14,12 @@ class FormTools:
     def init(llms_infos: list[LlmInfo]):
         FormTools.llm_service = LlmService(llms_infos)
 
-    def extract_values_from_conversation(conversation: str, form: Form) -> dict[str, any]:
+    async def extract_values_from_conversation_async(conversation: str, form: Form) -> dict[str, any]:
         """Analyze the conversation and extract values corresponding to form fields."""
-        extracted_values = {}
-        for group in form.groups:
-            for field in group.fields:
-                if field.name in conversation:
-                    extracted_values[field.name] = f"Extracted value for {field.name}"
-        return extracted_values
+        results = await FormTools.llm_service.get_form_values_from_conversation_async(conversation, form)
+        return results
     
-    def find_form_item(form: Form, item_to_find_dict: dict[str, any]) -> any:
+    def get_group_or_field(form: Form, item_to_find_dict: dict[str, any]) -> any:
         for group in form.groups:
             if group.name == item_to_find_dict["group"]:
                 if item_to_find_dict["field"] is None:

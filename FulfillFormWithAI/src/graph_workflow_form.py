@@ -25,25 +25,27 @@ class GraphWorkflowForm:
         # Init. Graph
         self.graph = StateGraph(FormAgentState)
 
-        # Set Agents & Tools        
-        self.graph.add_node("supervisor", self.supervisor.analyse_missing_form_fields)
-        self.graph.add_node("hil", self.HIL.build_question_async)
-        self.graph.add_node("ask", self.HIL.ask_question)
-        self.graph.add_node("interpretation", self.interpretation.interpret_user_response_async)
+        # Set Agents & Tools
+        self.graph.add_node("initialize", self.supervisor.initialize_async)      
+        self.graph.add_node("analyse_missing_fields", self.supervisor.analyse_missing_form_fields)
+        self.graph.add_node("build_question", self.HIL.build_question_async)
+        self.graph.add_node("ask_question", self.HIL.ask_question)
+        self.graph.add_node("answer_interpretation", self.interpretation.interpret_user_response_async)
         self.graph.add_node("fill_form", self.interpretation.fill_form)
 
         # Set conditionnal and static edges
-        self.graph.set_entry_point("supervisor")
-        self.graph.add_conditional_edges("supervisor", self.supervisor.decide_next_step, 
+        self.graph.set_entry_point("initialize")
+        self.graph.add_edge("initialize", "analyse_missing_fields")
+        self.graph.add_conditional_edges("analyse_missing_fields", self.supervisor.decide_next_step, 
         {
-            "supervisor": "supervisor",
-            "hil": "hil",
+            "analyse_missing_fields": "analyse_missing_fields",
+            "build_question": "build_question",
             "end": END
         })
-        self.graph.add_edge("hil", "ask")
-        self.graph.add_edge("ask", "interpretation")
-        self.graph.add_edge("interpretation", "fill_form")
-        self.graph.add_edge("fill_form", "supervisor")
+        self.graph.add_edge("build_question", "ask_question")
+        self.graph.add_edge("ask_question", "answer_interpretation")
+        self.graph.add_edge("answer_interpretation", "fill_form")
+        self.graph.add_edge("fill_form", "analyse_missing_fields")
 
         print("🔄 Construction du graphe LangGraph ...")        
         memory_saver = MemorySaver()

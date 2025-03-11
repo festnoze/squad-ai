@@ -175,29 +175,44 @@ EXTERNAL_API_PORT="8281"
       Chaque API expose un endpoint "/ping" qui permet de test son bon fonctionnement, et renvoie "pong" en cas de réussite.
       De plus, l'API Slack expose un endpoint "/ping-api" qui appelle le endpoint "/ping" de l'API RAG, permettant de tester la chaine, et le bon fonctionnement de la communication entre containers des deux containters docker.
 
+
+
 6. **Créer un tunnel ngrok pour rendre l'API Slack visible depuis le web :** 
-   Dans une nouvelle fenêtre de commande, comme powershell:
    
-   - authentification sur ngrok, si nécessaire (remplacer `<ngrok-token>` par votre token ngrok): 
+   
+   => Soit <u>automatiquement</u>, si le fichier **ngrok.yml** dans "`C:\Users\aze\AppData\Local\ngrok`" definit déjà l'authentification, ainsi que les tunnels à ouvrir. Il vous suffit alors de lancer la commande :
+   
+   ```bash
+   ngrok start --all
+   ```
+   
+   => Soit <u>manuellement</u>, vous pouvez procéder à l'authentification, puis à l'ouverture des tunnels ngrok souhaités:
+   
+   Dans une nouvelle fenêtre de commande (comme powershell) :
+   
+   - Authentification à ngrok (si nécessaire) : 
    
    ```bash
    ngrok config add-authtoken <ngrok-token>
    ```
    
-   -lancement de ngrok :
-   Pour **CodeDoc** :
+           *remplacer `<ngrok-token>` par votre token ngrok*
+   
+   
+   
+   - Ouverture d'un tunnel ngrok pour **CodeDoc** :
    
    ```bash
    ngrok http --url=code-doc.slack.studi.ngrok.app 8301
    ```
    
-   Pour **StudiPublicWebsite** : 
+   - Ouverture d'un tunnel ngrok pour**StudiPublicWebsite** : 
 
 ```bash
 ngrok http --url=public-website.slack.studi.ngrok.app 8302
 ```
 
-   <u>Nota :</u> commandes à executer depuis le dossier où est installé ngrok si besoin (actuellement inutile car ngrok.exe est dans `C:\Windows\System32`, qui est dans le PATH).
+   <u>Nota</u> : Commandes à executer depuis un dossier où ngrok est accessible (actuellement ok car *ngrok.exe* est dans `C:\Windows\System32`, qui est dans le PATH).
 
 7. **Prévenir Slack de l'URL à informer en cas d'évenements** (si changement de URL ngrok)
    Renseigner l'URL externe ngrok affichée lors du lancement de ngrok sur la page: https://api.slack.com/apps/A08AYTSF9QF/event-subscriptions (où : A08AYTSF9QF l'id de l'app. slack).

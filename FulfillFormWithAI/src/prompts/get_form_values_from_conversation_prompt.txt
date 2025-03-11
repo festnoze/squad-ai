@@ -1,0 +1,26 @@
+<contexte>
+Voici la description complète du formulaire, avec la liste des champs qu'il contient, regroupés par groupe :
+{full_form_description}
+</contexte>
+
+<conversation>
+Voici ci-après le contenu complet de la conversation ayant préalablement eu lieu :
+{conversation}
+</conversation>
+
+<objectifs>
+1- Identifie dans la conversation toutes les valeurs fournies et extrait les,
+2- Cherche, pour chaque valeur identifiée, si il y a une correspondance avec l'un champ du formulaire.
+3- Renvoie le résultat, sous forme d'un tableau json, avec uniquement les champs ayant une valeur identifiée.
+Respecte le format suivant pour chaque champ :
+{"nom du groupe.nom du champ": "valeur identifiée"}
+
+Exemple : 
+Pour un formulaire avec un groupe "utilisateur" comprenant les champs : "civilité", "nom" et "prénom".
+Avec la conversation suivante : "je m'appelle M. Jean BON".
+On attend en réponse le json suivant :
+[{"utilisateur.civilité": "M."}, {"utilisateur.nom": "Jean"}, {"utilisateur.prénom": "BON"},]
+</objectifs>
+
+
+

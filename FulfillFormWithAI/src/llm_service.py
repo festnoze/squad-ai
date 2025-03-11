@@ -16,7 +16,7 @@ from langchain_core.messages.base import BaseMessage
 from models.form import Form
 from models.group import Group
 from models.field import Field
-from models.str_list_pydantic import StringsListPydantic
+from models.generic_pydantic_structs import DictListPydantic, StringsListPydantic
 
 class LlmService:
     def __init__(self, llms_infos: list[LlmInfo] = None):
@@ -65,7 +65,7 @@ class LlmService:
         query_group_prompt = query_group_prompt.replace("{group_desc}", group.description)
         query_group_prompt = query_group_prompt.replace("{fields_infos}", fields_infos_str)
 
-        lmessages = self.extract_langchain_messages_from_tagged_prompt(query_group_prompt, ['objectifs'])
+        lmessages = self.get_langchain_messages_from_html_tags_in_prompt(query_group_prompt, ['objectifs'])
         promptlate =  ChatPromptTemplate.from_messages(lmessages)
         # Or version w/o separating prompt's tags into separate messages
         # promptlate = ChatPromptTemplate.from_template(query_group_prompt)
@@ -95,7 +95,7 @@ class LlmService:
         query_field_prompt = query_field_prompt.replace("{field_previous_value_error_message}", field_validation.errors[0].message if field_validation.errors and any(field_validation.errors) else "<no error message>")
         query_field_prompt = query_field_prompt.replace("{field_infos}", str(field))
 
-        lc_messages = self.extract_langchain_messages_from_tagged_prompt(query_field_prompt, ['objectifs'])
+        lc_messages = self.get_langchain_messages_from_html_tags_in_prompt(query_field_prompt, ['objectifs'])
         promptlate =  ChatPromptTemplate.from_messages(lc_messages)
         # Or version w/o separating prompt's tags into separate messages
         # promptlate = ChatPromptTemplate.from_template(query_field_prompt)
@@ -105,7 +105,7 @@ class LlmService:
         return Llm.get_content(response)
     
     async def get_group_values_from_text_async(self, group: Group, text: str):
-        group_get_values_prompt = file.get_as_str("src/prompts/group_get_values_from_text_answer_prompt.txt")
+        group_get_values_prompt = file.get_as_str("src/prompts/get_group_values_from_text_answer_prompt.txt")
         fields_infos = []
         for field in group.fields:
             fields_infos.append(f"{field.name}: {field.description}")
@@ -116,7 +116,7 @@ class LlmService:
         group_get_values_prompt = group_get_values_prompt.replace("{fields_infos}", fields_infos_str)
         group_get_values_prompt = group_get_values_prompt.replace("{text_answer}", text)
 
-        lc_messages = self.extract_langchain_messages_from_tagged_prompt(group_get_values_prompt, ['objectifs'])
+        lc_messages = self.get_langchain_messages_from_html_tags_in_prompt(group_get_values_prompt, ['objectifs'])
         promptlate =  ChatPromptTemplate.from_messages(lc_messages)
         # Or version w/o separating prompt's tags into separate messages
         #promptlate = ChatPromptTemplate.from_template(group_get_values_prompt)
@@ -135,7 +135,41 @@ class LlmService:
         
         return values_list
     
-    def extract_langchain_messages_from_tagged_prompt(self, prompt: str, tags_human_messages: list[str] = []) -> list[BaseMessage]:
+    async def get_form_values_from_conversation_async(self, conversation: list[BaseMessage], form: Form):
+        group_get_values_prompt = file.get_as_str("src/prompts/get_form_values_from_conversation_prompt.txt")
+        full_form_description = []
+        full_form_description.append(f'Nom du formulaire: "{form.name}"')
+        for group in form.groups:
+            full_form_description.append(f'- Groupe "{group.name}" ({group.description}) :')
+            for field in group.fields:
+                full_form_description.append(f'  - Champ "{field.name}" ({field.description}),')
+
+        full_form_description_str = "\n ".join(full_form_description)
+        group_get_values_prompt = group_get_values_prompt.replace("{full_form_description}", full_form_description_str)
+        conversation_str = '\n\n'.join([f'{msg.content}' for msg in conversation])
+        group_get_values_prompt = group_get_values_prompt.replace("{conversation}", conversation_str)
+
+        lc_messages = self.get_langchain_messages_from_html_tags_in_prompt(group_get_values_prompt, ['objectifs', 'conversation'])
+        promptlate =  ChatPromptTemplate.from_messages(lc_messages)
+        # Or version w/o separating prompt's tags into separate messages
+        #promptlate = ChatPromptTemplate.from_template(group_get_values_prompt)
+        
+        chain = promptlate | self.llm | RunnablePassthrough()
+        response = await Llm.invoke_chain_with_input_async("get form values from conversation", chain)
+        values_list = Llm.extract_json_from_llm_response(response)
+        
+        # In case of failure, fallback with output parser
+        if values_list is None:
+            prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(
+                group_get_values_prompt,
+                DictListPydantic,
+                list[dict[str, str]])
+            values_list = await Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks_async("get output parsed group values from user answer", self.llms, output_parser, 5, prompt_for_output_parser)
+        
+        return values_list
+    
+    def get_langchain_messages_from_html_tags_in_prompt(self, prompt: str, tags_human_messages: list[str] = []) -> list[BaseMessage]:
+        """Get Langchain messages extracted from HTML tags in the provided prompt."""
         messages: list[BaseMessage] = []
         pattern = re.compile(r'<(?P<tag>\w+)>(?P<content>.*?)</(?P=tag)>', re.DOTALL)
         for match in pattern.finditer(prompt):
