@@ -38,7 +38,7 @@ class GraphWorkflowForm:
         self.graph.add_edge("initialize", "analyse_missing_fields")
         self.graph.add_conditional_edges("analyse_missing_fields", self.supervisor.decide_next_step, 
         {
-            "analyse_missing_fields": "analyse_missing_fields",
+            #"analyse_missing_fields": "analyse_missing_fields",
             "build_question": "build_question",
             "end": END
         })

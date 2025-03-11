@@ -28,17 +28,17 @@ class LlmService:
         self.llm = self.llms[0]
 
     async def query_user_to_fill_form_async(self, form: Form):
-        while not form.validate().is_valid:
+        while not form.validation_result.is_valid:
             for group in form.groups:
-                while not group.validate().is_valid:                    
+                while not group.perform_validation().is_valid:                    
                     # Ask user for the whole group values
                     await self.query_user_to_fill_group_fields_async(group)                    
-                    invalid_fields = [field for field in group.fields if not field.is_validated]
+                    invalid_fields = [field for field in group.fields if not field.is_valid]
                        
                     # Re-ask user for fields with invalid value only
                     if any(invalid_fields) and len(invalid_fields) != len(group.fields):
                         for invalid_field in invalid_fields:
-                            while not invalid_field.validate().is_valid:
+                            while not invalid_field._perform_validation().is_valid:
                                 await self.query_user_to_fill_field_value_async(invalid_field)
         return form
 
@@ -75,7 +75,7 @@ class LlmService:
         return Llm.get_content(question)
     
     async def query_user_to_fill_field_value_async(self, field: Field):
-        if field.is_validated:
+        if field.is_valid:
             return
         print("\nQuestion simple :")
         field_question = await self.get_question_to_fix_field_value_async(field)
@@ -84,15 +84,14 @@ class LlmService:
         field.value = answer
 
     async def get_question_to_fix_field_value_async(self, field: Field):
-        field_validation = field.validate()
-        if field_validation.is_valid:
-            raise ValueError("Field is validated and cannot be fixed")
+        if field.is_valid:
+            raise ValueError("Field value is already valid and don't need to be fixed")
         
         query_field_prompt = file.get_as_str("src/prompts/query_fixing_single_field_prompt.txt")
         query_field_prompt = query_field_prompt.replace("{field_name}", field.name)
         query_field_prompt = query_field_prompt.replace("{field_desc}", field.description)
         query_field_prompt = query_field_prompt.replace("{field_previous_value}", field.value if field.value else "null")
-        query_field_prompt = query_field_prompt.replace("{field_previous_value_error_message}", field_validation.errors[0].message if field_validation.errors and any(field_validation.errors) else "<no error message>")
+        query_field_prompt = query_field_prompt.replace("{field_previous_value_error_message}", field.validation_result.errors[0].message if any(field.validation_result.errors) else "<no error message>")
         query_field_prompt = query_field_prompt.replace("{field_infos}", str(field))
 
         lc_messages = self.get_langchain_messages_from_html_tags_in_prompt(query_field_prompt, ['objectifs'])

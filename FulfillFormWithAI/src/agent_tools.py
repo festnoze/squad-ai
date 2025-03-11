@@ -33,11 +33,11 @@ class FormTools:
     def get_missing_groups_and_fields(form: Form) -> list[dict[str, any]]:
         missing_groups_and_fields: list[dict[str, any]] = []
         for group in form.groups:
-            if all(not field.is_validated for field in group.fields):
+            if all(not field.is_valid for field in group.fields):
                 missing_groups_and_fields.append({'group': group.name, 'field': None, 'value': None})
             else:
                 for field in group.fields:
-                    if not field.is_validated:
+                    if not field.is_valid and not field.optional:
                         missing_groups_and_fields.append({'group': group.name, 'field': field.name, 'value': field.value if field.value else None})
         return missing_groups_and_fields
 
@@ -68,7 +68,7 @@ class FormTools:
                 linked_values.append({ f'{form_item.name}.{field.name}': values[i] })
                 i += 1
         if isinstance(form_item, Field):
-            linked_values = [{ f'{form_item.group_name}.{form_item.name}': values[0] }] #TODO: cannot work, because form_item isn't the group name, need to be fixed
+            linked_values = [{ f'{form_item.group.name}.{form_item.name}': values[0] }] #TODO: cannot work, because form_item isn't the group name, need to be fixed
         return linked_values
 
     
@@ -96,5 +96,5 @@ class FormTools:
         return form
     
     def validate_form(form: Form) -> str:
-        """Validate the form and return 'ok' or 'error'."""
-        return "ok" if form.validate().is_valid else "error"
+        """return 'ok' if form is valide else 'error'."""
+        return "ok" if form.is_valid else "error"

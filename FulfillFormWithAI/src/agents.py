@@ -11,7 +11,7 @@ class AgentSupervisor:
     """Supervises the workflow, loads the YAML file, and orchestrates actions."""
 
     def __init__(self):
-        self.initialized = False
+        pass
 
     async def initialize_async(self, state):
         """Initialize the workflow: load form + fields values extraction from conversation."""        
@@ -30,35 +30,26 @@ class AgentSupervisor:
         return state
 
     def analyse_missing_form_fields(self, state):
-        """Analyse form fields missing values."""
-        if not self.initialized: 
-            self.load_form_and_fill_from_conversation(state)
-            return state
-                
-        # Identify missing groups or fields
+        """Analyse form's missing fields values."""
         missing_fields = FormTools.get_missing_groups_and_fields(Form.from_dict(state["form"]))
         state['missing_fields'] = missing_fields
         return state
 
     def decide_next_step(self, state):
         """determines next action."""
-        if not 'missing_fields' in state or state['missing_fields'] is None:
-            return "analyse_missing_fields"
-        if state["missing_fields"] and any(state["missing_fields"]):
+        # if not 'missing_fields' in state or state['missing_fields'] is None:
+        #     return "analyse_missing_fields"
+        if any(state["missing_fields"]):
             return "build_question"
-        if state["missing_fields"] and not any(state["missing_fields"]) and self.is_form_validated(state):
+        if not any(state["missing_fields"]) and self.is_form_validated(state):
             return "end"
-        return "initialize"
+        return "analyse_missing_fields"
         
     def is_form_validated(self, state: dict[str, any]) -> bool:
         """Validate the form."""
-        is_valid = False
-        if "form" in state:
-            form = Form.from_dict(state["form"])
-            is_valid = form.validate().is_valid
-        return is_valid
+        return "form" in state and Form.from_dict(state["form"]).is_valid
     
-
+    
 class AgentHIL:    
     static_answers: list = [] 
 

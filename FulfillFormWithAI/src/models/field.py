@@ -11,8 +11,9 @@ class FieldType(Enum):
     BOOL = 'bool'
 
 class Field:
-    def __init__(self, name: str, description: str, type: str, min_size_or_value: any = None, max_size_or_value: any = None, regex: str = None,
+    def __init__(self, group, name: str, description: str, type: str, min_size_or_value: any = None, max_size_or_value: any = None, regex: str = None,
             regex_description: str = None, optional: bool = False, default_value: str = None, allowed_values: list[str] = None, validation_func_name: str = None) -> None:      
+        self.group = group
         self.name: str = name
         self.description: str = description
         self.optional: bool = optional
@@ -23,12 +24,16 @@ class Field:
         self.max_size_or_value: Union[int, float] = max_size_or_value
         self.validation_func_name: any = validation_func_name
         self.default_value: str = default_value
-        self.allowed_values: list[Union[str|list[str]]] = allowed_values
-        #
+        self.allowed_values: list[Union[str|list[str]]] = allowed_values     
+        self.validation_result: ValidationResult = ValidationResult([ValidationError('not_validate','no validation has been performed yet')])
         self._value: any = None
-        self.is_validated: Union[bool, None] = None
-        self.group_name: str = None
-
+        #
+        self._perform_validation() 
+    
+    @property
+    def is_valid(self) -> bool:
+        return self.validation_result.is_valid
+    
     @property
     def value(self) -> any:
         return self._value
@@ -38,18 +43,21 @@ class Field:
         if (new_value is None or new_value == "null"):
             if not self.optional: 
                 raise ValueError("Value is required because the field is flagged as not-optional")
-            self._value = self.default_value
+            self._value = None
         else:
             self._value = self.normalize_value(new_value)
-
-        self.is_validated = self.validate().is_valid
+        self._perform_validation()
         
-    def validate(self) -> ValidationResult:
-        errors: list = []
+    def _perform_validation(self):        
+        if not self.group:
+            self.validation_result = ValidationResult([ValidationError("no_group", "Field is not linked to a group")])
+            return
         
+        errors: list = []        
         if not self.value and not self.optional:
             errors.append(ValidationError("value_missing", "Value is required"))
 
+        # Validate 'value' for: type, min/max value or size, regex, and allowed values
         if self.value:
             valid_values = [item[0] if isinstance(item, list) else item for item in self.allowed_values] if self.allowed_values else None
             
@@ -84,11 +92,16 @@ class Field:
             elif self.type == FieldType.BOOL:
                 if not isinstance(self.value, bool):
                     errors.append(ValidationError("invalid_type", "Expected type bool"))
-        
-        result: ValidationResult = ValidationResult(len(errors) == 0, errors)
-        self.is_validated = result.is_valid
-        return result
 
+            # Validate 'value' using the custom validation function
+            if self.validation_func_name:
+                validation_func = getattr(self.group, self.validation_func_name, None)
+                if validation_func and not validation_func(self):
+                    errors.append(ValidationError("custom_validation", f"Custom validation '{self.validation_func_name}' failed"))
+        
+        self.validation_result = ValidationResult(errors)
+        self.group.perform_validation()
+    
     def normalize_value(self, input_value: any) -> any:
         "if allowed_values is defined, return the first value that matches the input_value"
         if self.allowed_values:
@@ -123,11 +136,11 @@ class Field:
     
     def to_dict(self) -> dict:
         return {
+            "group_name": self.group.name,
             "name": self.name,
             "description": self.description,
             "optional": self.optional,
             "type": self.type.value,
-            "group_name": self.group_name,
             "regex": self.regex,
             "regex_description": self.regex_description,
             "min_size_or_value": self.min_size_or_value,
@@ -136,12 +149,13 @@ class Field:
             "default_value": self.default_value,
             "allowed_values": self.allowed_values,
             "value": self._value,
-            "is_validated": self.is_validated,
+            "is_valid": self.is_valid,
         }
     
     @staticmethod
     def from_dict(field_dict: dict) -> 'Field':
         field = Field(
+            group=None,
             name=field_dict['name'],
             description=field_dict.get('description'),
             type=field_dict['type'],
@@ -154,7 +168,6 @@ class Field:
             allowed_values=field_dict.get('allowed_values'),
             validation_func_name= field_dict.get('validation_func_name'),
         )
-        field.group_name = field_dict.get("group_name")
+
         field._value = field_dict.get("value")
-        field.is_validated = field_dict.get("is_validated")
         return field

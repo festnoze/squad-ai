@@ -5,6 +5,6 @@ class ValidationError:
          self.details: dict = details if details is not None else {}
 
 class ValidationResult:
-    def __init__(self, is_valid: bool, errors: list) -> None:
-         self.is_valid: bool = is_valid
+    def __init__(self, errors: list) -> None:
+         self.is_valid: bool = not any(errors)
          self.errors: list = errors
