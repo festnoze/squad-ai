@@ -42,7 +42,7 @@ class StudiPublicWebsiteRagSpecificConfig:
                     if filter_by_type_value == "formation":
                         all_trainings_names = file.get_as_json(all_dir + "all_trainings_names")
                         if filter_obj.value not in all_trainings_names:
-                            retrieved_value, retrieval_score = await BM25RetrieverHelper.find_best_match_bm25_async(all_trainings_names, filter_obj.value)
+                            retrieved_value, retrieval_score = BM25RetrieverHelper.find_best_match_bm25(all_trainings_names, filter_obj.value)
                             if retrieval_score > 0.5:
                                 print(
                                     f"No match found for metadata value: '{filter_obj.value}' in all trainings names. "
@@ -58,7 +58,7 @@ class StudiPublicWebsiteRagSpecificConfig:
                     elif filter_by_type_value == "metier":
                         all_jobs_names = file.get_as_json(all_dir + "all_jobs_names")
                         if filter_obj.value not in all_jobs_names:
-                            retrieved_value, retrieval_score = await BM25RetrieverHelper.find_best_match_bm25_async(all_jobs_names, filter_obj.value)
+                            retrieved_value, retrieval_score = BM25RetrieverHelper.find_best_match_bm25(all_jobs_names, filter_obj.value)
                             if retrieval_score > 0.5:
                                 print(
                                     f"No match found for metadata value: '{filter_obj.value}' in all jobs names. "
