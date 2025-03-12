@@ -1,5 +1,6 @@
 
 import re
+from typing import Union
 from common_tools.langchains.langchain_factory import LangChainFactory
 from common_tools.helpers.file_helper import file
 from common_tools.helpers.txt_helper import txt
@@ -13,6 +14,7 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain.schema.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_core.messages.base import BaseMessage
 #
+from helper import Helper
 from models.form import Form
 from models.group import Group
 from models.field import Field
@@ -38,7 +40,7 @@ class LlmService:
                     # Re-ask user for fields with invalid value only
                     if any(invalid_fields) and len(invalid_fields) != len(group.fields):
                         for invalid_field in invalid_fields:
-                            while not invalid_field._perform_validation().is_valid:
+                            while not invalid_field.perform_validation().is_valid:
                                 await self.query_user_to_fill_field_value_async(invalid_field)
         return form
 
@@ -55,7 +57,7 @@ class LlmService:
         group.set_values(fields_values)
     
     async def get_question_for_group_values_async(self, group: Group):
-        query_group_prompt = file.get_as_str("src/prompts/group_query_for_values_prompt.txt")
+        query_group_prompt = file.get_as_str("src/prompts/get_query_for_group_values_prompt.txt")
         fields_infos = []
         for field in group.fields:
             fields_infos.append(f"{field.name}: {field.description}")
@@ -65,7 +67,7 @@ class LlmService:
         query_group_prompt = query_group_prompt.replace("{group_desc}", group.description)
         query_group_prompt = query_group_prompt.replace("{fields_infos}", fields_infos_str)
 
-        lmessages = self.get_langchain_messages_from_html_tags_in_prompt(query_group_prompt, ['objectifs'])
+        lmessages = self.get_langchain_messages_from_html_tags_in_prompt(query_group_prompt, ['user_query'])
         promptlate =  ChatPromptTemplate.from_messages(lmessages)
         # Or version w/o separating prompt's tags into separate messages
         # promptlate = ChatPromptTemplate.from_template(query_group_prompt)
@@ -87,14 +89,14 @@ class LlmService:
         if field.is_valid:
             raise ValueError("Field value is already valid and don't need to be fixed")
         
-        query_field_prompt = file.get_as_str("src/prompts/query_fixing_single_field_prompt.txt")
+        query_field_prompt = file.get_as_str("src/prompts/get_query_to_fix_single_field_prompt.txt")
         query_field_prompt = query_field_prompt.replace("{field_name}", field.name)
         query_field_prompt = query_field_prompt.replace("{field_desc}", field.description)
         query_field_prompt = query_field_prompt.replace("{field_previous_value}", field.value if field.value else "null")
         query_field_prompt = query_field_prompt.replace("{field_previous_value_error_message}", field.validation_result.errors[0].message if any(field.validation_result.errors) else "<no error message>")
         query_field_prompt = query_field_prompt.replace("{field_infos}", str(field))
 
-        lc_messages = self.get_langchain_messages_from_html_tags_in_prompt(query_field_prompt, ['objectifs'])
+        lc_messages = self.get_langchain_messages_from_html_tags_in_prompt(query_field_prompt, ['user_answer'])
         promptlate =  ChatPromptTemplate.from_messages(lc_messages)
         # Or version w/o separating prompt's tags into separate messages
         # promptlate = ChatPromptTemplate.from_template(query_field_prompt)
@@ -115,7 +117,7 @@ class LlmService:
         group_get_values_prompt = group_get_values_prompt.replace("{fields_infos}", fields_infos_str)
         group_get_values_prompt = group_get_values_prompt.replace("{text_answer}", text)
 
-        lc_messages = self.get_langchain_messages_from_html_tags_in_prompt(group_get_values_prompt, ['objectifs'])
+        lc_messages = self.get_langchain_messages_from_html_tags_in_prompt(group_get_values_prompt, ['user_answer'])
         promptlate =  ChatPromptTemplate.from_messages(lc_messages)
         # Or version w/o separating prompt's tags into separate messages
         #promptlate = ChatPromptTemplate.from_template(group_get_values_prompt)
@@ -134,24 +136,29 @@ class LlmService:
         
         return values_list
     
-    async def get_form_values_from_conversation_async(self, conversation: list[BaseMessage], form: Form):
+    async def get_form_values_from_conversation_async(self, conversation: Union[list[BaseMessage], str], form: Form):
         group_get_values_prompt = file.get_as_str("src/prompts/get_form_values_from_conversation_prompt.txt")
         full_form_description = []
         full_form_description.append(f'Nom du formulaire: "{form.name}"')
         for group in form.groups:
             full_form_description.append(f'- Groupe "{group.name}" ({group.description}) :')
             for field in group.fields:
-                full_form_description.append(f'  - Champ "{field.name}" ({field.description}),')
+                if not field.allowed_values or not any(field.allowed_values):
+                    allowed_values_str = ""
+                else:
+                    allowed_values_str = ", Valeurs autorisées (ou valeur approchante) : " + ', '.join(Helper.flatten_inner_lists(field.allowed_values)) 
+                full_form_description.append(f'  - Champ "{field.name}"{f", Description : {field.description}" if field.description else ""}{allowed_values_str},')
 
         full_form_description_str = "\n ".join(full_form_description)
         group_get_values_prompt = group_get_values_prompt.replace("{full_form_description}", full_form_description_str)
-        conversation_str = '\n\n'.join([f'{msg.content}' for msg in conversation])
+        if isinstance(conversation, list):
+            conversation_str = '\n\n'.join([f'{msg.content}' for msg in conversation])
+        else:
+            conversation_str = conversation
         group_get_values_prompt = group_get_values_prompt.replace("{conversation}", conversation_str)
 
-        lc_messages = self.get_langchain_messages_from_html_tags_in_prompt(group_get_values_prompt, ['objectifs', 'conversation'])
+        lc_messages = self.get_langchain_messages_from_html_tags_in_prompt(group_get_values_prompt, ['conversation'])
         promptlate =  ChatPromptTemplate.from_messages(lc_messages)
-        # Or version w/o separating prompt's tags into separate messages
-        #promptlate = ChatPromptTemplate.from_template(group_get_values_prompt)
         
         chain = promptlate | self.llm | RunnablePassthrough()
         response = await Llm.invoke_chain_with_input_async("get form values from conversation", chain)
@@ -163,8 +170,7 @@ class LlmService:
                 group_get_values_prompt,
                 DictListPydantic,
                 list[dict[str, str]])
-            values_list = await Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks_async("get output parsed group values from user answer", self.llms, output_parser, 5, prompt_for_output_parser)
-        
+            values_list = await Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks_async("get output parsed group values from user answer", self.llms, output_parser, 5, prompt_for_output_parser)      
         return values_list
     
     def get_langchain_messages_from_html_tags_in_prompt(self, prompt: str, tags_human_messages: list[str] = []) -> list[BaseMessage]:

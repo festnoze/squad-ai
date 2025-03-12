@@ -26,7 +26,8 @@ class GraphWorkflowForm:
         self.graph = StateGraph(FormAgentState)
 
         # Set Agents & Tools
-        self.graph.add_node("initialize", self.supervisor.initialize_async)      
+        self.graph.add_node("initialize", self.supervisor.initialize)   
+        self.graph.add_node("extract_values_from_conversation", self.supervisor.extract_values_from_conversation_async)     
         self.graph.add_node("analyse_missing_fields", self.supervisor.analyse_missing_form_fields)
         self.graph.add_node("build_question", self.HIL.build_question_async)
         self.graph.add_node("ask_question", self.HIL.ask_question)
@@ -35,10 +36,10 @@ class GraphWorkflowForm:
 
         # Set conditionnal and static edges
         self.graph.set_entry_point("initialize")
-        self.graph.add_edge("initialize", "analyse_missing_fields")
+        self.graph.add_edge("initialize", "extract_values_from_conversation")
+        self.graph.add_edge("extract_values_from_conversation", "analyse_missing_fields")
         self.graph.add_conditional_edges("analyse_missing_fields", self.supervisor.decide_next_step, 
         {
-            #"analyse_missing_fields": "analyse_missing_fields",
             "build_question": "build_question",
             "end": END
         })
@@ -60,5 +61,5 @@ class GraphWorkflowForm:
 
         print("\n✅ Formulaire completé !")
         file.write_file(result["form"], "outputs/filled_form.json", FileAlreadyExistsPolicy.AutoRename)
-        file.write_file(Form.from_dict(result["form"]).get_flatten_fields_values(), "outputs/filled_form_flatten_fields_values.json", FileAlreadyExistsPolicy.AutoRename)
+        file.write_file(Form.from_dict(result["form"]).get_all_fields_values(), "outputs/filled_form_flatten_fields_values.json", FileAlreadyExistsPolicy.AutoRename)
         return result["form"]

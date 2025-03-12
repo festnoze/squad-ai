@@ -1,12 +1,7 @@
 <contexte>
-Voici la description complète du formulaire, avec la liste des champs qu'il contient, regroupés par groupe :
+Description complète du formulaire, avec la liste des champs qu'il contient, regroupés par groupe :
 {full_form_description}
 </contexte>
-
-<conversation>
-Voici ci-après le contenu complet de la conversation ayant préalablement eu lieu :
-{conversation}
-</conversation>
 
 <objectifs>
 1- Identifie dans la conversation toutes les valeurs fournies et extrait les,
@@ -14,13 +9,18 @@ Voici ci-après le contenu complet de la conversation ayant préalablement eu li
 3- Renvoie le résultat, sous forme d'un tableau json, avec uniquement les champs ayant une valeur identifiée.
 Respecte le format suivant pour chaque champ :
 {"nom du groupe.nom du champ": "valeur identifiée"}
+</objectifs>
 
-Exemple : 
-Pour un formulaire avec un groupe "utilisateur" comprenant les champs : "civilité", "nom" et "prénom".
+<examples>
+Par exemple, pour un formulaire avec un groupe nommé : "utilisateur" comprenant des champs nommés : "civilité", "nom" et "prénom".
 Avec la conversation suivante : "je m'appelle M. Jean BON".
 On attend en réponse le json suivant :
 [{"utilisateur.civilité": "M."}, {"utilisateur.nom": "Jean"}, {"utilisateur.prénom": "BON"},]
-</objectifs>
+</examples>
 
+<conversation>
+Voici le contenu complet de la conversation ayant préalablement eu lieu, de laquelle il s'agit extraire les valeurs pertinentes pour le remplissage du formulaire :
+{conversation}
+</conversation>
 
 

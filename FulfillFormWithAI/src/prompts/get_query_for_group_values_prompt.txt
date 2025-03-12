@@ -11,9 +11,9 @@ Voici la liste des champs contenus dans ce groupe de questions à laquelle l'uti
 {fields_infos}
 </contexte>
 
-<objectifs>
+<user_query>
 Demande, en français, dans une question unique et la plus minimaliste possible, de fournir les valeurs pour tous les champs compris dans le groupe de questions indiqué.
-</objectifs>
+</user_query>
 
 
 

@@ -10,7 +10,7 @@ form:
           min_size_or_value: 1
           max_size_or_value: 10
           optional: false
-          allowed_values: [["M.", "Monsieur", "Mr"], ["Mme", "Madame", "Mrs"], ["Dr", "Docteur"], "N.C"]
+          allowed_values: [["M.", "Monsieur", "Mr", "homme"], ["Mme", "Madame", "Mrs", "femme"], ["Dr", "docteur"], "autre"]
         - name: "last_name"
           description: "User last name"
           type: "string"
@@ -85,6 +85,7 @@ form:
           min_size_or_value: 2
           max_size_or_value: 100
           optional: false
+          allowed_values: ["IT", "RH", "Comptabilité", "Marketing", "Vente", "Communication", "Management", "Finance", "Logistique", "Autre"]
         - name: "training_name"
           description: "Selected training name"
           type: "string"

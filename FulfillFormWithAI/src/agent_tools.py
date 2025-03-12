@@ -73,7 +73,7 @@ class FormTools:
 
     
     def fill_form_with_provided_values(form: Form, fields_values_to_integrate: list[dict]) -> Form:
-        """Fill the form with the provided values."""
+        """Fill the form with the provided values (with keys like: 'group_name.field_name')."""
         extracted_values_count = len(fields_values_to_integrate)
         setted_values_count = 0        
         if extracted_values_count == 0: return form

@@ -21,7 +21,7 @@ class Form:
             groups = [Group.from_dict(group_data) for group_data in form_dict['form'].get('groups')],
             validation_func=form_dict['form'].get('validation_func')
         )
-        form.perform_full_validation()
+        #await form.perform_full_validation_async()
         return form
 
     def perform_validation(self):
@@ -40,16 +40,16 @@ class Form:
 
         self.validation_result = ValidationResult(errors)
 
-    def perform_full_validation(self):
+    async def perform_full_validation_async(self):
         for group in self.groups:
             for field in group.fields:
-                field._perform_validation()
+                await field.perform_validation()
 
     def __str__(self) -> str:
         groups_str: str = "\n\n".join(str(group) for group in self.groups)
         return f"Form name: '{self.name}'.\n\n{groups_str}"
     
-    def get_flatten_fields_values(self) -> dict:
+    def get_all_fields_values(self) -> dict:
         return {field.name: field.value for group in self.groups for field in group.fields} 
 
     def to_dict(self) -> dict:

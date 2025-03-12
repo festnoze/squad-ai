@@ -1,0 +1,254 @@
+form:
+  name: "LID_form"
+  groups:
+    - name: "personal_info"
+      description: "Informations personnelles"
+      fields:
+        - name: "nom"
+          description: "Nom"
+          type: "string"
+          min_size_or_value: 1
+          max_size_or_value: 100
+          optional: false
+        - name: "prenom"
+          description: "Prénom"
+          type: "string"
+          min_size_or_value: 1
+          max_size_or_value: 100
+          optional: false
+        - name: "gender"
+          description: "Civilité"
+          type: "string"
+          min_size_or_value: 2
+          max_size_or_value: 5
+          optional: true
+          allowed_values: [["M.", "Monsieur", "Mr", "homme"], ["Mme", "Madame", "Mrs", "femme"], ["Dr", "docteur"], "autre"]
+        - name: "birthdate"
+          description: "Date de naissance, format DD/MM/YYYY"
+          type: "date"
+          optional: true
+          regex: "^\\d{2}/\\d{2}/\\d{4}$"
+          regex_description: "Doit être au format DD/MM/YYYY"
+        - name: "birthyear"
+          description: "Année de naissance"
+          type: "integer"
+          min_size_or_value: 1900
+          max_size_or_value: 2100
+          optional: true
+        - name: "professional_situation"
+          description: "Situation professionnelle"
+          type: "string"
+          min_size_or_value: 1
+          max_size_or_value: 100
+          optional: true
+        - name: "diploma_level"
+          description: "Niveau de diplôme"
+          type: "string"
+          min_size_or_value: 1
+          max_size_or_value: 100
+          optional: true
+        - name: "diploma_name"
+          description: "Nom du diplôme"
+          type: "string"
+          min_size_or_value: 1
+          max_size_or_value: 100
+          optional: true
+    - name: "contact_info"
+      description: "Informations de contact"
+      fields:
+        - name: "email"
+          description: "Adresse email, doit contenir '@' et '.'"
+          type: "string"
+          min_size_or_value: 5
+          max_size_or_value: 100
+          optional: false
+          regex: "^[\\w\\.-]+@[\\w\\.-]+\\.[a-zA-Z]{2,}$"
+          regex_description: "Format email valide"
+        - name: "telephone"
+          description: "Numéro de téléphone avec indicatif internationnal - format E.164 (ex: +336...)"
+          type: "string"
+          min_size_or_value: 8
+          max_size_or_value: 20
+          optional: false
+          regex: "^\\+\\d{8,15}$"
+          regex_description: "Doit être en format E.164"
+        - name: "url"
+          description: "URL complète de la page de conversion"
+          type: "string"
+          min_size_or_value: 5
+          max_size_or_value: 200
+          optional: false
+          regex: "^(https?://).+"
+          regex_description: "Doit commencer par http:// ou https://"
+        - name: "ip_address"
+          description: "Adresse IP"
+          type: "string"
+          min_size_or_value: 7
+          max_size_or_value: 15
+          optional: true
+        - name: "device"
+          description: "Type d'appareil, ex: ordinateur, téléphone, tablette"
+          type: "string"
+          min_size_or_value: 1
+          max_size_or_value: 50
+          optional: true
+          allowed_values: ["CORE_PKL_Computer", "CORE_PKL_Phone", "CORE_PKL_Tablet"]
+        - name: "first_visit"
+          description: "Date et heure de la première visite (timestamp)"
+          type: "datetime"
+          optional: true
+        - name: "first_page"
+          description: "Première page visitée"
+          type: "string"
+          min_size_or_value: 1
+          max_size_or_value: 200
+          optional: true
+    - name: "utm"
+      description: "Informations UTM"
+      fields:
+        - name: "utm_source"
+          description: "Nom du partenaire (défini avec Studi en amont)"
+          type: "string"
+          min_size_or_value: 1
+          max_size_or_value: 100
+          optional: false
+        - name: "utm_medium"
+          description: "Médium de la campagne"
+          type: "string"
+          min_size_or_value: 3
+          max_size_or_value: 50
+          optional: false
+          allowed_values: "@file:utm_medium_allowed_values.yaml"
+        - name: "utm_campaign"
+          description: "Campagne UTM (défini avec Studi en amont)"
+          type: "string"
+          min_size_or_value: 1
+          max_size_or_value: 100
+          optional: true
+        - name: "utm_content"
+          description: "Contenu UTM (défini avec Studi en amont)"
+          type: "string"
+          min_size_or_value: 1
+          max_size_or_value: 100
+          optional: true
+        - name: "utm_term"
+          description: "Terme UTM (défini avec Studi en amont)"
+          type: "string"
+          min_size_or_value: 1
+          max_size_or_value: 100
+          optional: true
+    - name: "address"
+      description: "Adresse postale"
+      fields:
+        - name: "street"
+          description: "Adresse (rue, numéro)"
+          type: "string"
+          min_size_or_value: 1
+          max_size_or_value: 200
+        - name: "postal_code"
+          description: "Code postal"
+          type: "string"
+          min_size_or_value: 4
+          max_size_or_value: 10
+        - name: "city"
+          description: "Ville"
+          type: "string"
+          min_size_or_value: 1
+          max_size_or_value: 100
+        - name: "pays"
+          description: "Nom du pays (ou code ISO 3166-1 alpha-2)"
+          type: "string"
+          min_size_or_value: 2
+          max_size_or_value: 20
+          optional: false
+          allowed_values: "@file:country_allowed_values.yaml"
+          default_value: "FR"
+    - name: "additional"
+      description: "Informations complémentaires"
+      fields:
+        - name: "thematique"
+          description: "Thématique (texte libre basé sur des valeurs recommandées)"
+          type: "string"
+          min_size_or_value: 0
+          max_size_or_value: 100
+          optional: true
+        - name: "formulaire"
+          description: "Nom de la formation ou description courte du projet du prospect"
+          type: "string"
+          min_size_or_value: 1
+          max_size_or_value: 100
+          optional: false
+        - name: "consentement"
+          description: "Texte de consentement du formulaire accepté par l'utilisateur"
+          type: "string"
+          min_size_or_value: 1
+          max_size_or_value: 500
+          optional: true
+        - name: "document_url"
+          description: "URL du document"
+          type: "string"
+          min_size_or_value: 5
+          max_size_or_value: 200
+          optional: true
+          regex: "^(https?://).+"
+          regex_description: "Doit commencer par http:// ou https://"
+        - name: "funding"
+          description: "Type de financement"
+          type: "string"
+          min_size_or_value: 1
+          max_size_or_value: 50
+          optional: true
+          allowed_values: ["CORE_PKL_Contrat_individuel", "CORE_PKL_CPF", "CORE_PKL_CPF_abonde", "STUDI_PKL_CPF_Public", "CORE_PKL_CPF_de_transition", "CORE_PKL_AIF", "CORE_PKL_SAS_Apprentissage", "CORE_PKL_AO_Pole_emploi", "CORE_PKL_SAFIR_IDF", "CORE_PKL_FNE_Chomage", "CORE_PKL_Contrat_de_professionnalisation", "CORE_PKL_Contrat_de_securisation_pro", "CORE_PKL_ProA", "CORE_PKL_Apprentissage", "CORE_PKL_Plan_de_Developpement_des_Competences", "CORE_PKL_Contrat_de_reclassement", "STUDI_PKL_AIRE2", "STUDI_PKL_PRF_IDF"]
+        - name: "capture_channel"
+          description: "Canal de capture"
+          type: "string"
+          min_size_or_value: 1
+          max_size_or_value: 50
+          optional: true
+          allowed_values: ["CORE_PKL_Phone_call", "CORE_PKL_Application_Online", "CORE_PKL_Web_form"]
+        - name: "form_type"
+          description: "Type de formulaire"
+          type: "string"
+          min_size_or_value: 1
+          max_size_or_value: 50
+          optional: true
+          allowed_values: ["CORE_PKL_Online_Shop", "CORE_PKL_Application_file", "CORE_PKL_Application_online", "CORE_PKL_Examination", "CORE_PKL_Contact", "CORE_PKL_Booking_appointment", "CORE_PKL_Preparation_Day_Mock_Competition", "CORE_PKL_Funding", "CORE_PKL_Registration", "CORE_PKL_Open_day", "CORE_PKL_Call_back", "CORE_PKL_Fairs", "CORE_PKL_Admission_session", "CORE_PKL_Surqualification", "CORE_PKL_Virtual_open_day", "CORE_PKL_Webinar", "CORE_PKL_Scholarship", "CORE_PKL_Trial_Period", "CORE_PKL_Sponsorship"]
+        - name: "form_area"
+          description: "Zone du formulaire"
+          type: "string"
+          min_size_or_value: 1
+          max_size_or_value: 50
+          optional: true
+          allowed_values: ["CORE_PKL_Bottom_of_page", "CORE_PKL_Thank_you_page", "CORE_PKL_Content", "CORE_PKL_Embeded", "CORE_PKL_Footer", "CORE_PKL_Header", "CORE_PKL_Interstitial", "CORE_PKL_Page", "CORE_PKL_Sidebar"]
+        - name: "form_more_information"
+          description: "Informations complémentaires sur le formulaire"
+          type: "string"
+          min_size_or_value: 0
+          max_size_or_value: 500
+          optional: true
+        - name: "comments"
+          description: "Commentaires"
+          type: "string"
+          min_size_or_value: 0
+          max_size_or_value: 500
+          optional: true
+        - name: "training_course_id"
+          description: "ID unique smartsheet du cours de formation"
+          type: "string"
+          min_size_or_value: 1
+          max_size_or_value: 100
+          optional: true
+        - name: "alternance"
+          description: "Indique si le candidat est en alternance"
+          type: "boolean"
+          optional: true
+        - name: "tech_source"
+          description: "Source technique (form, make, ...)"
+          type: "string"
+          min_size_or_value: 1
+          max_size_or_value: 100
+          optional: true
+        - name: "cv"
+          description: "CV du candidat sous forme d'URL ou contenu en base64"
+          type: "file"
+          optional: true

@@ -13,21 +13,59 @@ class AgentSupervisor:
     def __init__(self):
         pass
 
-    async def initialize_async(self, state):
+    def initialize(self, state):
         """Initialize the workflow: load form + fields values extraction from conversation."""        
         # Load form from yaml file
         print("🔄 Loading form from YAML...")
-        state['form'] = file.get_as_yaml(state['form_info_file_path'])
+        form_dict = file.get_as_yaml(state['form_info_file_path'])
+        state['form'] = self.resolve_file_references(form_dict, 'config/')
+        print("✅ Form loaded !")
+        return state
 
-        # Extract values from conversation if not already injected
+    async def extract_values_from_conversation_async(self, state):
+        """Extract values from conversation if exists."""
         if 'chat_history' in state:
             print("🔍 Extracting values from conversation...\n")
             extracted_values = await FormTools.extract_values_from_conversation_async(state['chat_history'], Form.from_dict(state["form"]))
+            print("✅ Extracted values:")
+            AgentSupervisor.print_aligned_group_field_and_value(extracted_values)
             if len(extracted_values) > 0:
                 filled_form = FormTools.fill_form_with_provided_values(Form.from_dict(state["form"]), extracted_values)
                 state["form"] = filled_form.to_dict()
-        self.initialized = True
         return state
+    
+    def print_aligned_group_field_and_value(extracted_values: list[dict[str, any]]) -> None:
+        groups: list[str] = []
+        fields: list[str] = []
+        for extracted_value in extracted_values:
+            for key in extracted_value.keys():
+                group, field = key.split(".")
+                groups.append(group)
+                fields.append(field)
+        max_group: int = max(len(g) for g in groups) if groups else 0
+        max_field: int = max(len(f) for f in fields) if fields else 0
+        for extracted_value in extracted_values:
+            for key, value in extracted_value.items():
+                group, field = key.split(".")
+                group_str: str = f"'{group}'"
+                field_str: str = f"'{field}'"
+                print("  - Group: " + group_str.ljust(max_group + 2) +
+                    " | Field: " + field_str.ljust(max_field + 2) +
+                    " | Value = '" + str(value) + "'.")
+
+    def resolve_file_references(self, data: any, references_files_path = '') -> dict:
+        if isinstance(data, dict):
+            for key, value in data.items():
+                if isinstance(value, str) and value.startswith("@file:"):
+                    file_path: str = value[len("@file:"):]
+                    reference_file = file.get_as_yaml(references_files_path + file_path)
+                    data[key] = reference_file[key]
+                else:
+                    data[key] = self.resolve_file_references(value, references_files_path)
+        elif isinstance(data, list):
+            for index, item in enumerate(data):
+                data[index] = self.resolve_file_references(item, references_files_path)
+        return data
 
     def analyse_missing_form_fields(self, state):
         """Analyse form's missing fields values."""
@@ -36,20 +74,16 @@ class AgentSupervisor:
         return state
 
     def decide_next_step(self, state):
-        """determines next action."""
-        # if not 'missing_fields' in state or state['missing_fields'] is None:
-        #     return "analyse_missing_fields"
         if any(state["missing_fields"]):
             return "build_question"
         if not any(state["missing_fields"]) and self.is_form_validated(state):
             return "end"
-        return "analyse_missing_fields"
+        raise interrupt("Error: No missing fields found, but form is not validated.")
         
     def is_form_validated(self, state: dict[str, any]) -> bool:
         """Validate the form."""
-        return "form" in state and Form.from_dict(state["form"]).is_valid
-    
-    
+        return "form" in state and Form.from_dict(state["form"]).is_valid    
+
 class AgentHIL:    
     static_answers: list = [] 
 
