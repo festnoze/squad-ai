@@ -46,8 +46,8 @@ class LlmService:
 
     async def query_user_to_fill_group_fields_async(self, group):
         group_question = await self.get_question_for_group_values_async(group)
-        print("\nQuestion groupée :")
-        print(group_question)
+        txt.print("\nQuestion groupée :")
+        txt.print(group_question)
         answer_text = input('> ')
         fields_values = await self.get_group_values_from_text_async(group, answer_text)
         if fields_values and isinstance(fields_values, dict):
@@ -79,9 +79,9 @@ class LlmService:
     async def query_user_to_fill_field_value_async(self, field: Field):
         if field.is_valid:
             return
-        print("\nQuestion simple :")
+        txt.print("\nQuestion simple :")
         field_question = await self.get_question_to_fix_field_value_async(field)
-        print(field_question)
+        txt.print(field_question)
         answer = input('> ')
         field.value = answer
 
@@ -124,8 +124,11 @@ class LlmService:
         
         chain = promptlate | self.llm | RunnablePassthrough()
         response = await Llm.invoke_chain_with_input_async("get json group values from user answer", chain)
-        values_list = Llm.extract_json_from_llm_response(response)
-        
+        try:
+            values_list = Llm.extract_json_from_llm_response(response)
+        except Exception:
+            values_list = None
+            
         # In case of failure, fallback with output parser
         if values_list is None:
             prompt_for_output_parser, output_parser = Llm.get_prompt_and_json_output_parser(

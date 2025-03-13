@@ -2,7 +2,10 @@ import asyncio
 from enum import Enum
 import re
 from typing import Union
+from helper import Helper
 from models.validation_models import ValidationError, ValidationResult
+from common_tools.helpers.rag_bm25_retriever_helper import BM25RetrieverHelper
+from common_tools.helpers.txt_helper import txt
 
 class FieldType(Enum):
     INTEGER = 'integer'
@@ -60,16 +63,7 @@ class Field:
 
         # Validate 'value' for: type, min/max value or size, regex, and allowed values
         if self.value:
-            valid_values = [item[0] if isinstance(item, list) else item for item in self.allowed_values] if self.allowed_values else None
-            
-            new_value = Field.get_field_value_fuzzy_matching_allowed_values(self.name, self.value, self.allowed_values)
-            if new_value != self.value:
-                self.value = new_value
-                return
-            
-            if self.allowed_values and self.value not in valid_values:
-                errors.append(ValidationError("invalid_value", "Value do not belongs to allowed values", {"provided_value": self.value, "allowed_values": self.allowed_values}))
-            
+            # Check for type and constraints
             if self.type == FieldType.STRING:
                 if not isinstance(self.value, str):
                     errors.append(ValidationError("invalid_type", "Expected type str"))
@@ -98,6 +92,28 @@ class Field:
             elif self.type == FieldType.BOOL:
                 if not isinstance(self.value, bool):
                     errors.append(ValidationError("invalid_type", "Expected type bool"))
+
+            
+            flatten_allowed_values = Helper.flatten_inner_lists(self.allowed_values)
+
+            # Check if value belongs to the allowed ones
+            if self.allowed_values and any(self.allowed_values):
+                # Check if the value is an exact match within the allowed values
+                if self.value in flatten_allowed_values:   
+                    # check if the value is the default value for this allowed values group (the 1st item of the sub-list), ...
+                    # if not, replace the actual value by the corresponding default value of this group.
+                    exact_match_default_value = Field.get_default_field_value_exactly_matching_allowed_values_async(self.value, self.allowed_values)
+                    if exact_match_default_value and self.value != exact_match_default_value:
+                        self.value = exact_match_default_value
+                        return
+                
+                # If the value is invalid value, search within allowed values for a fuzzy matching value
+                if self.value not in flatten_allowed_values:                
+                    new_value = Field.get_field_value_fuzzy_matching_allowed_values(self.name, self.value, flatten_allowed_values)
+                    if new_value is not None and new_value != self.value:
+                        self.value = new_value
+                        return
+                    errors.append(ValidationError("invalid_value", "Value do not belongs to allowed values", {"provided_value": self.value, "allowed_values": self.allowed_values}))
 
             # Validate 'value' using the custom validation function
             if self.validation_func_name:
@@ -135,8 +151,7 @@ class Field:
         if self.validation_func_name:
             constraints.append(f"validation_func= '{self.validation_func_name}'")
         if self.allowed_values:
-            formatted_values = [f"{' or '.join(av) if isinstance(av, list) else av}" for av in self.allowed_values]
-            constraints.append(f"allowed_values={', '.join(formatted_values)}")
+            constraints.append(f"allowed_values={', '.join(Helper.flatten_inner_lists(self.allowed_values))}")
         constraints_str: str = f"{', '.join(constraints)}" if constraints else ""
         return f"◦ Field: {self.name} <{self.type.value}>{f" = '{self.value}'" if self.value else ""} with constraints: {constraints_str}."
     
@@ -177,32 +192,23 @@ class Field:
 
         field._value = field_dict.get("value")
         return field
-    
-    
-    def get_field_value_fuzzy_matching_allowed_values(field_name: str, field_value: str, allowed_values: list, score_min_threshold: float = 0.5) -> str | None:
-        from common_tools.helpers.rag_bm25_retriever_helper import BM25RetrieverHelper
-        from common_tools.helpers.txt_helper import txt
-        #
-        if not allowed_values or not any(allowed_values):
-            return field_value
         
+    def get_field_value_fuzzy_matching_allowed_values(field_name: str, field_value: str, flatten_allowed_values: list[str], score_min_threshold: float = 0.5) -> str | None:
         # Search exact value matching allowed values (case insensitive + get default value if sub-lists)
-        matching_default_value = Field.get_field_value_exactly_matching_allowed_values_async(field_value, allowed_values)
-        if matching_default_value:
-            return matching_default_value
+        if Field.get_default_field_value_exactly_matching_allowed_values_async(field_value, flatten_allowed_values):
+            raise ValueError(f"Field '{field_name}' with value: '{field_value}' has an exact match in allowed values and shouldn't be looking for fuzzy matching.")
         
         # Search nearest value matching allowed values
-        candidates: list = [av[0] if isinstance(av, list) else av for av in allowed_values]
         best_match: str; score: float
-        best_match, score = BM25RetrieverHelper.find_best_match_bm25(candidates, field_value)
+        best_match, score = BM25RetrieverHelper.find_best_match_bm25(flatten_allowed_values, field_value)
         if score > score_min_threshold:
             txt.print(f"/!\\ Field '{field_name}' with invalid value: '{field_value}' was replaced by the nearest match: '{best_match}' with score: [{score}].")
-            return Field.get_field_value_exactly_matching_allowed_values_async(best_match, allowed_values)
+            return Field.get_default_field_value_exactly_matching_allowed_values_async(best_match, flatten_allowed_values)
 
-        txt.print(f"/!\\ Field '{field_name}' has an invalid value: '{field_value}'.\nNo close match were found within field's allowed values:\n[{', '.join([av[0] if isinstance(av, list) else av for av in allowed_values])}].\nNearest matching value found is: '{best_match}', with score: {str(score)} - which is less than the specified threshold of {str(score_min_threshold)}.")    
+        txt.print(f"/!\\ Field '{field_name}' has an invalid value: '{field_value}'.\nNo close match were found within field's allowed values:\n[{', '.join(flatten_allowed_values)}].\nNearest matching value found is: '{best_match}', with score: {str(score)} - which is less than the specified threshold of {str(score_min_threshold)}.")    
         return None
     
-    def get_field_value_exactly_matching_allowed_values_async(value: any, allowed_values:list):
+    def get_default_field_value_exactly_matching_allowed_values_async(value: any, allowed_values:list):
             value_lower = value.strip().lower()
             for allowed_value in allowed_values:
                 if isinstance(allowed_value, list):

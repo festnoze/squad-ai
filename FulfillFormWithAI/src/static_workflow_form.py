@@ -22,7 +22,7 @@ class StaticWorkflowForm:
         return state
 
     def load_form_tool(self, state: dict[str, any]) -> dict[str, any]:
-        state["form"] = Form.from_dict(file.get_as_yaml(state["form_info_file_path"]))
+        state["form"] = Form.from_dict(file.get_as_yaml(state["form_structure_file_path"]))
         if "chat_history" in state:
             extracted_values: any = FormTools.extract_values_from_conversation_async(state["chat_history"], state["form"])
             if extracted_values:

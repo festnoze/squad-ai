@@ -70,13 +70,13 @@ class FormTools:
         if isinstance(form_item, Field):
             linked_values = [{ f'{form_item.group.name}.{form_item.name}': values[0] }] #TODO: cannot work, because form_item isn't the group name, need to be fixed
         return linked_values
-
     
     def fill_form_with_provided_values(form: Form, fields_values_to_integrate: list[dict]) -> Form:
         """Fill the form with the provided values (with keys like: 'group_name.field_name')."""
+        if not fields_values_to_integrate or not any(fields_values_to_integrate):
+            return form
         extracted_values_count = len(fields_values_to_integrate)
-        setted_values_count = 0        
-        if extracted_values_count == 0: return form
+        setted_values_count = 0
         extracted_values_keys = [list(d.keys())[0] for d in fields_values_to_integrate]
         for group in form.groups:
             for field in group.fields:

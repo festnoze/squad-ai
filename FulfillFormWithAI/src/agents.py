@@ -1,11 +1,13 @@
-
-# ================== Définition des Agents ================== #
-
-from agent_tools import FormTools
-from models.form import Form
 from langchain.schema.messages import HumanMessage, AIMessage, SystemMessage
 from langgraph.types import interrupt, Command
+#
 from common_tools.helpers.file_helper import file
+from common_tools.helpers.txt_helper import txt
+#
+from agent_tools import FormTools
+from models.form import Form
+
+# ================== Définition des Agents ================== #
 
 class AgentSupervisor:
     """Supervises the workflow, loads the YAML file, and orchestrates actions."""
@@ -16,25 +18,23 @@ class AgentSupervisor:
     def initialize(self, state):
         """Initialize the workflow: load form + fields values extraction from conversation."""        
         # Load form from yaml file
-        print("🔄 Loading form from YAML...")
-        form_dict = file.get_as_yaml(state['form_info_file_path'])
+        txt.print("🔄 Loading form from YAML...")
+        form_dict = file.get_as_yaml(state['form_structure_file_path'])
         state['form'] = self.resolve_file_references(form_dict, 'config/')
-        print("✅ Form loaded !")
+        txt.print("✅ Form loaded !")
         return state
 
     async def extract_values_from_conversation_async(self, state):
         """Extract values from conversation if exists."""
         if 'chat_history' in state:
-            print("🔍 Extracting values from conversation...\n")
+            txt.print("🔍 Extracting values from conversation...\n")
             extracted_values = await FormTools.extract_values_from_conversation_async(state['chat_history'], Form.from_dict(state["form"]))
-            print("✅ Extracted values:")
-            AgentSupervisor.print_aligned_group_field_and_value(extracted_values)
-            if len(extracted_values) > 0:
-                filled_form = FormTools.fill_form_with_provided_values(Form.from_dict(state["form"]), extracted_values)
-                state["form"] = filled_form.to_dict()
+            txt.print("✅ Extracted values:")
+            self.print_aligned_group_field_and_value(extracted_values)
+            state['extracted_values'] = extracted_values
         return state
     
-    def print_aligned_group_field_and_value(extracted_values: list[dict[str, any]]) -> None:
+    def print_aligned_group_field_and_value(self, extracted_values: list[dict[str, any]]) -> None:
         groups: list[str] = []
         fields: list[str] = []
         for extracted_value in extracted_values:
@@ -44,12 +44,14 @@ class AgentSupervisor:
                 fields.append(field)
         max_group: int = max(len(g) for g in groups) if groups else 0
         max_field: int = max(len(f) for f in fields) if fields else 0
+        if not any(extracted_values):
+            txt.print("  - No values extracted from conversation -")
         for extracted_value in extracted_values:
             for key, value in extracted_value.items():
                 group, field = key.split(".")
                 group_str: str = f"'{group}'"
                 field_str: str = f"'{field}'"
-                print("  - Group: " + group_str.ljust(max_group + 2) +
+                txt.print("  - Group: " + group_str.ljust(max_group + 2) +
                     " | Field: " + field_str.ljust(max_field + 2) +
                     " | Value = '" + str(value) + "'.")
 
@@ -84,8 +86,13 @@ class AgentSupervisor:
         """Validate the form."""
         return "form" in state and Form.from_dict(state["form"]).is_valid    
 
-class AgentHIL:    
-    static_answers: list = [] 
+class AgentHIL:
+    static_answers_file_path = 'inputs/form_automatic_answers.txt'    
+    static_answers: list = []
+
+    def __init__(self):
+        if file.exists(AgentHIL.static_answers_file_path):
+            AgentHIL.static_answers = file.get_as_str(AgentHIL.static_answers_file_path).splitlines()
 
     async def build_question_async(self, state: dict[str, any]):
         """Create a question to ask the user (Human In the Loop)."""
@@ -106,14 +113,14 @@ class AgentHIL:
         """Ask the user to answer question (Human In the Loop)."""
         if not isinstance(state["chat_history"][-1], AIMessage):
             raise ValueError("Last message in chat history should be an AIMessage.")
-        print(f"🤖 Question : {state["chat_history"][-1].content}")
+        txt.print(f"🤖 Question : {state["chat_history"][-1].content}")
         
         if not any(self.static_answers):
             user_answer: str = input("> ")
         else:
             user_answer = self.static_answers.pop(0)
         
-        print(f"👤 Réponse : {user_answer}")
+        txt.print(f"👤 Réponse : {user_answer}")
 
         state["chat_history"].append(HumanMessage(user_answer))
         return state
@@ -136,7 +143,7 @@ class AgentInterpretation:
     
     def fill_form(self, state: dict[str, any]) -> Form:
         """Fill the form with extracted values."""
-        filled_form = FormTools.fill_form_with_provided_values(Form.from_dict(state['form']), state['extracted_values'])
+        filled_form = FormTools.fill_form_with_provided_values(Form.from_dict(state['form']), state.get('extracted_values'))
         state['form'] = filled_form.to_dict()
         return state
 
