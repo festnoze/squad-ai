@@ -10,6 +10,61 @@ st.title("Analyseur de dépendances pour projet Python")
 analyzer = None
 groups = None
 
+# CSS pour personnaliser les expandeurs et ajouter les tooltips
+def init_custom_css():
+    st.markdown("""
+    <style>
+    .no-border {
+        border: none !important;
+        box-shadow: none !important;
+        background-color: transparent !important;
+    }
+    .no-border .streamlit-expanderHeader {
+        background-color: transparent !important;
+        font-weight: bold;
+    }
+    .no-border .streamlit-expanderContent {
+        border: none !important;
+        padding-left: 20px !important;
+    }
+    
+    /* Style pour les tooltips au survol */
+    .tooltip {
+        position: relative;
+        display: inline-block;
+        cursor: pointer;
+    }
+    
+    .tooltip .tooltiptext {
+        visibility: hidden;
+        width: auto;
+        background-color: #f1f1f1;
+        color: #333;
+        text-align: left;
+        border-radius: 6px;
+        padding: 8px;
+        position: absolute;
+        z-index: 1;
+        bottom: 125%;
+        left: 0;
+        margin-left: 0;
+        opacity: 0;
+        transition: opacity 0.3s;
+        box-shadow: 0px 2px 4px rgba(0,0,0,0.2);
+        font-size: 14px;
+        white-space: nowrap;
+    }
+    
+    .tooltip:hover .tooltiptext {
+        visibility: visible;
+        opacity: 1;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+# Initialiser le CSS personnalisé
+init_custom_css()
+
 # Configuration dans la barre latérale
 with st.sidebar:
     project_path = st.text_input("Chemin vers le projet", value="C:/Dev/IA/CommonTools")
@@ -59,7 +114,7 @@ def group_modules_hierarchically(modules, project_name):
     
     return hierarchy
 
-# Fonction pour afficher la structure hiérarchique dans Streamlit avec indentation
+# Fonction pour afficher la structure hiérarchique dans Streamlit
 def display_hierarchy(hierarchy, indent=0, parent_path="", project_name=""):
     # Trier les clés pour un affichage cohérent
     sorted_keys = sorted(hierarchy.keys())
@@ -70,27 +125,46 @@ def display_hierarchy(hierarchy, indent=0, parent_path="", project_name=""):
         children = node['children']
         is_leaf = node['is_leaf']
         
+        # Indentation basée sur le niveau
+        padding = indent * 20
+        
         # Toujours afficher ce nœud, qu'il ait des enfants ou non
         if children or is_leaf:
-            # Déterminer quel texte afficher
-            if children:  # Nœud avec enfants
-                # Simplifier l'affichage en utilisant *
-                display_text = f"{full_path}.*"
-                st.markdown("&nbsp;" * (indent * 2) + f"- **{display_text}**")
+            # Vérifier si ce nœud est l'avant-dernier niveau (a des enfants feuilles)
+            has_leaf_children_only = all(child['is_leaf'] and not child['children'] for child in children.values()) if children else False
+            
+            # Si c'est l'avant-dernier niveau (a uniquement des enfants feuilles)
+            if has_leaf_children_only and children:
+                # Collecter tous les modules feuilles pour le tooltip
+                leaf_modules = [child['full_path'] for child in children.values()]
                 
-                # Afficher les enfants avec indentation supplémentaire
+                # Formater le texte du tooltip
+                tooltip_content = "<br>".join([f"- {leaf}" for leaf in sorted(leaf_modules)])
+                
+                # Afficher avec tooltip contenant les feuilles
+                st.markdown(f"""
+                <div style="margin-left: {padding}px;" class="tooltip">
+                  <span><b>{full_path}.*</b></span>
+                  <span class="tooltiptext">{tooltip_content}</span>
+                </div>
+                """, unsafe_allow_html=True)
+            
+            # Pour les niveaux intermédiaires
+            elif children and not has_leaf_children_only:
+                # Afficher ce nœud normalement
+                st.markdown(f"<div style='margin-left: {padding}px;'><b>{full_path}.*</b></div>", unsafe_allow_html=True)
+                
+                # Afficher récursivement les enfants (sauf si ce sont des feuilles)
                 display_hierarchy(children, indent + 1, full_path, project_name)
             
-            # Si c'est une feuille (même si ça a aussi des enfants, car un module peut être à la fois un package et un module)
-            if is_leaf:
-                # Utiliser *.module_name si le module est niché sous un parent
-                if parent_path:
-                    # Extraire le dernier segment du chemin complet
-                    last_segment = full_path.split('.')[-1]
-                    display_text = f"*.{last_segment}"
-                    st.markdown("&nbsp;" * (indent * 2) + f"- *{display_text}*")
-                elif not children:  # Seulement si ce n'est pas déjà affiché comme parent
-                    st.markdown("&nbsp;" * (indent * 2) + f"- *{full_path}*")
+            # Si c'est une feuille sans enfants et pas au premier niveau, ne pas l'afficher
+            # (ils seront dans les tooltips du niveau parent)
+            elif is_leaf and not children and indent > 0:
+                continue
+            
+            # Si c'est une feuille au premier niveau (sans parent)
+            elif is_leaf and not children and indent == 0:
+                st.markdown(f"<div style='margin-left: {padding}px;'><i>{full_path}</i></div>", unsafe_allow_html=True)
 
 # Affichage des résultats dans la fenêtre principale
 if analyzer and groups:
