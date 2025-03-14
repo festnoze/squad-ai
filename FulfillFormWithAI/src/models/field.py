@@ -153,12 +153,14 @@ class Field:
         if self.allowed_values:
             constraints.append(f"allowed_values={', '.join(Helper.flatten_inner_lists(self.allowed_values))}")
         constraints_str: str = f"{', '.join(constraints)}" if constraints else ""
-        return f"◦ Field: {self.name} <{self.type.value}>{f" = '{self.value}'" if self.value else ""} with constraints: {constraints_str}."
+        return f"◦ Field: {self.name}{f" = '{self.value}'" if self.value else ""} <{self.type.value}> with constraints: {constraints_str}."
     
     def to_dict(self) -> dict:
         return {
-            "group_name": self.group.name,
             "name": self.name,
+            "value": self._value,
+            "is_valid": self.is_valid,
+            "group_name": self.group.name,
             "description": self.description,
             "optional": self.optional,
             "type": self.type.value,
@@ -169,8 +171,6 @@ class Field:
             "validation_func_name": self.validation_func_name,
             "default_value": self.default_value,
             "allowed_values": self.allowed_values,
-            "value": self._value,
-            "is_valid": self.is_valid,
         }
     
     @staticmethod

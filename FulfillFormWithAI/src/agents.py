@@ -5,6 +5,7 @@ from common_tools.helpers.file_helper import file
 from common_tools.helpers.txt_helper import txt
 #
 from agent_tools import FormTools
+from helper import Helper
 from models.form import Form
 
 # ================== Définition des Agents ================== #
@@ -12,70 +13,32 @@ from models.form import Form
 class AgentSupervisor:
     """Supervises the workflow, loads the YAML file, and orchestrates actions."""
 
-    def __init__(self):
-        pass
-
-    def initialize(self, state):
+    def initialize(self, state: dict[str, any]):
         """Initialize the workflow: load form + fields values extraction from conversation."""        
         # Load form from yaml file
         txt.print("🔄 Loading form from YAML...")
         form_dict = file.get_as_yaml(state['form_structure_file_path'])
-        state['form'] = self.resolve_file_references(form_dict, 'config/')
+        state['form'] = Helper.resolve_file_references(form_dict, 'config/')
         txt.print("✅ Form loaded !")
         return state
 
-    async def extract_values_from_conversation_async(self, state):
+    async def extract_values_from_conversation_async(self, state: dict[str, any]):
         """Extract values from conversation if exists."""
         if 'chat_history' in state:
             txt.print("🔍 Extracting values from conversation...\n")
             extracted_values = await FormTools.extract_values_from_conversation_async(state['chat_history'], Form.from_dict(state["form"]))
             txt.print("✅ Extracted values:")
-            self.print_aligned_group_field_and_value(extracted_values)
+            Helper.print_fields_values(extracted_values)
             state['extracted_values'] = extracted_values
         return state
-    
-    def print_aligned_group_field_and_value(self, extracted_values: list[dict[str, any]]) -> None:
-        groups: list[str] = []
-        fields: list[str] = []
-        for extracted_value in extracted_values:
-            for key in extracted_value.keys():
-                group, field = key.split(".")
-                groups.append(group)
-                fields.append(field)
-        max_group: int = max(len(g) for g in groups) if groups else 0
-        max_field: int = max(len(f) for f in fields) if fields else 0
-        if not any(extracted_values):
-            txt.print("  - No values extracted from conversation -")
-        for extracted_value in extracted_values:
-            for key, value in extracted_value.items():
-                group, field = key.split(".")
-                group_str: str = f"'{group}'"
-                field_str: str = f"'{field}'"
-                txt.print("  - Group: " + group_str.ljust(max_group + 2) +
-                    " | Field: " + field_str.ljust(max_field + 2) +
-                    " | Value = '" + str(value) + "'.")
 
-    def resolve_file_references(self, data: any, references_files_path = '') -> dict:
-        if isinstance(data, dict):
-            for key, value in data.items():
-                if isinstance(value, str) and value.startswith("@file:"):
-                    file_path: str = value[len("@file:"):]
-                    reference_file = file.get_as_yaml(references_files_path + file_path)
-                    data[key] = reference_file[key]
-                else:
-                    data[key] = self.resolve_file_references(value, references_files_path)
-        elif isinstance(data, list):
-            for index, item in enumerate(data):
-                data[index] = self.resolve_file_references(item, references_files_path)
-        return data
-
-    def analyse_missing_form_fields(self, state):
+    def analyse_missing_form_fields(self, state: dict[str, any]):
         """Analyse form's missing fields values."""
         missing_fields = FormTools.get_missing_groups_and_fields(Form.from_dict(state["form"]))
         state['missing_fields'] = missing_fields
         return state
 
-    def decide_next_step(self, state):
+    def decide_next_step(self, state: dict[str, any]):
         if any(state["missing_fields"]):
             return "build_question"
         if not any(state["missing_fields"]) and self.is_form_validated(state):
@@ -121,7 +84,6 @@ class AgentHIL:
             user_answer = self.static_answers.pop(0)
         
         txt.print(f"👤 Réponse : {user_answer}")
-
         state["chat_history"].append(HumanMessage(user_answer))
         return state
     
@@ -145,5 +107,6 @@ class AgentInterpretation:
         """Fill the form with extracted values."""
         filled_form = FormTools.fill_form_with_provided_values(Form.from_dict(state['form']), state.get('extracted_values'))
         state['form'] = filled_form.to_dict()
+        state['extracted_values'] = None
         return state
 
