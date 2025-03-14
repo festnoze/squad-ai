@@ -1,0 +1,30 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+
+        {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "analyze_lib_split.py",
+            "args": [
+                "C:/Dev/IA/CommonTools",
+                "common_tools",
+                // o1
+                // "--granularity",
+                // "20"
+
+                // Claude
+                "--output-dir",
+                "analysis_output",
+                "--graph",
+                "--graph-format",
+                "svg"
+            ],
+            "console": "integratedTerminal"
+        }
+    ]
+}

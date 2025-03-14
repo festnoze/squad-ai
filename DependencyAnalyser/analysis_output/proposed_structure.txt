@@ -1,0 +1,713 @@
+# Plan de Restructuration pour common_tools
+
+## 1. Packages de Base (Sans dépendances internes)
+- common_tools.build.lib.common_tools
+- common_tools.build.lib.common_tools.database
+- common_tools.build.lib.common_tools.helpers
+- common_tools.build.lib.common_tools.helpers.batch_helper
+- common_tools.build.lib.common_tools.helpers.display_helper
+- common_tools.build.lib.common_tools.helpers.json_helper
+- common_tools.build.lib.common_tools.helpers.lists_helper
+- common_tools.build.lib.common_tools.helpers.matching_helper
+- common_tools.build.lib.common_tools.helpers.misc
+- common_tools.build.lib.common_tools.helpers.python_helpers
+- common_tools.build.lib.common_tools.helpers.rag_bm25_retriever_helper
+- common_tools.build.lib.common_tools.helpers.reflexion_helper
+- common_tools.build.lib.common_tools.helpers.test_helper
+- common_tools.build.lib.common_tools.helpers.unicode_helper
+- common_tools.build.lib.common_tools.langchains
+- common_tools.build.lib.common_tools.models
+- common_tools.build.lib.common_tools.models.base_desc
+- common_tools.build.lib.common_tools.models.device_info
+- common_tools.build.lib.common_tools.models.embedding_type
+- common_tools.build.lib.common_tools.models.file_already_exists_policy
+- common_tools.build.lib.common_tools.models.langchain_adapter_type
+- common_tools.build.lib.common_tools.models.langgraph_agent_state
+- common_tools.build.lib.common_tools.models.logical_operator
+- common_tools.build.lib.common_tools.models.message
+- common_tools.build.lib.common_tools.models.metadata_description
+- common_tools.build.lib.common_tools.models.question_analysis_base
+- common_tools.build.lib.common_tools.models.vector_db_type
+- common_tools.build.lib.common_tools.project
+- common_tools.build.lib.common_tools.project.import_listing
+- common_tools.build.lib.common_tools.prompts
+- common_tools.build.lib.common_tools.rag
+- common_tools.build.lib.common_tools.rag.configs
+- common_tools.build.lib.common_tools.rag.rag_inference_pipeline
+- common_tools.build.lib.common_tools.rag.rag_inference_pipeline.custom_pinecone_hybrid_retriever
+- common_tools.build.lib.common_tools.rag.rag_inference_pipeline.end_pipeline_exception
+- common_tools.build.lib.common_tools.rag.rag_inference_pipeline.rag_inference_pipeline_with_prefect
+- common_tools.build.lib.common_tools.rag.rag_ingestion_pipeline
+- common_tools.build.lib.common_tools.rag.rag_ingestion_pipeline.rag_chunking
+- common_tools.build.lib.common_tools.rageval
+- common_tools.build.lib.common_tools.workflows
+- common_tools.build.lib.common_tools.workflows.workflow_output_decorator
+- common_tools.common_tools
+- common_tools.common_tools.database
+- common_tools.common_tools.helpers
+- common_tools.common_tools.helpers.batch_helper
+- common_tools.common_tools.helpers.display_helper
+- common_tools.common_tools.helpers.json_helper
+- common_tools.common_tools.helpers.lists_helper
+- common_tools.common_tools.helpers.matching_helper
+- common_tools.common_tools.helpers.misc
+- common_tools.common_tools.helpers.python_helpers
+- common_tools.common_tools.helpers.reflexion_helper
+- common_tools.common_tools.helpers.test_helper
+- common_tools.common_tools.helpers.unicode_helper
+- common_tools.common_tools.langchains
+- common_tools.common_tools.models
+- common_tools.common_tools.models.base_desc
+- common_tools.common_tools.models.device_info
+- common_tools.common_tools.models.embedding_type
+- common_tools.common_tools.models.file_already_exists_policy
+- common_tools.common_tools.models.langchain_adapter_type
+- common_tools.common_tools.models.langgraph_agent_state
+- common_tools.common_tools.models.logical_operator
+- common_tools.common_tools.models.message
+- common_tools.common_tools.models.metadata_description
+- common_tools.common_tools.models.question_analysis_base
+- common_tools.common_tools.models.vector_db_type
+- common_tools.common_tools.project
+- common_tools.common_tools.project.import_listing
+- common_tools.common_tools.prompts
+- common_tools.common_tools.rag
+- common_tools.common_tools.rag.configs
+- common_tools.common_tools.rag.rag_inference_pipeline
+- common_tools.common_tools.rag.rag_inference_pipeline.custom_pinecone_hybrid_retriever
+- common_tools.common_tools.rag.rag_inference_pipeline.end_pipeline_exception
+- common_tools.common_tools.rag.rag_inference_pipeline.rag_inference_pipeline_with_prefect
+- common_tools.common_tools.rag.rag_ingestion_pipeline
+- common_tools.common_tools.rag.rag_ingestion_pipeline.rag_chunking
+- common_tools.common_tools.rageval
+- common_tools.common_tools.workflows
+- common_tools.common_tools.workflows.end_workflow_exception
+- common_tools.common_tools.workflows.workflow_output_decorator
+- common_tools.setup
+- common_tools.tests.conftest
+
+## 2. Packages avec Dépendances Circulaires
+
+## 3. Groupes par Dépendances Externes
+
+### Ext Group 3
+Dépendances externes:
+- asyncio
+- contextlib
+- os
+- sqlalchemy
+- sqlalchemy.exc
+- sqlalchemy.ext.asyncio
+- sqlalchemy.orm
+- sqlalchemy.sql.expression
+- typing
+- uuid
+
+Modules:
+- common_tools.build.lib.common_tools.database.generic_datacontext
+- common_tools.common_tools.database.generic_datacontext
+
+### Ext Group 4
+Dépendances externes:
+- json
+- sys
+- typing
+
+Modules:
+- common_tools.build.lib.common_tools.helpers.batch_helper
+- common_tools.common_tools.helpers.batch_helper
+
+### Ext Group 5
+Dépendances externes:
+- re
+- time
+
+Modules:
+- common_tools.build.lib.common_tools.helpers.duration_helper
+- common_tools.common_tools.helpers.duration_helper
+
+### Ext Group 6
+Dépendances externes:
+- dotenv
+- json
+- os
+
+Modules:
+- common_tools.build.lib.common_tools.helpers.env_helper
+- common_tools.common_tools.helpers.env_helper
+
+### Ext Group 7
+Dépendances externes:
+- asyncio
+- concurrent.futures
+- functools
+- inspect
+- sys
+- types
+- typing
+
+Modules:
+- common_tools.build.lib.common_tools.helpers.execute_helper
+- common_tools.common_tools.helpers.execute_helper
+
+### Ext Group 8
+Dépendances externes:
+- .txt_helper
+- csv
+- glob
+- json
+- os
+- re
+- shutil
+- typing
+- yaml
+
+Modules:
+- common_tools.build.lib.common_tools.helpers.file_helper
+- common_tools.common_tools.helpers.file_helper
+
+### Ext Group 9
+Dépendances externes:
+- groq
+
+Modules:
+- common_tools.build.lib.common_tools.helpers.groq_helper
+- common_tools.common_tools.helpers.groq_helper
+
+### Ext Group 10
+Dépendances externes:
+- importlib
+
+Modules:
+- common_tools.build.lib.common_tools.helpers.import_helper
+- common_tools.common_tools.helpers.import_helper
+
+### Ext Group 11
+Dépendances externes:
+- json
+- os
+
+Modules:
+- common_tools.build.lib.common_tools.helpers.json_helper
+- common_tools.common_tools.helpers.json_helper
+
+### Ext Group 12
+Dépendances externes:
+- asyncio
+- inspect
+- json
+- langchain.agents
+- langchain.chains.base
+- langchain.schema.messages
+- langchain_community.callbacks
+- langchain_core.language_models.chat_models
+- langchain_core.output_parsers
+- langchain_core.prompts
+- langchain_core.runnables
+- pydantic
+- time
+- typing
+
+Modules:
+- common_tools.build.lib.common_tools.helpers.llm_helper
+- common_tools.common_tools.helpers.llm_helper
+
+### Ext Group 13
+Dépendances externes:
+- fuzzywuzzy
+- numpy
+- rank_bm25
+- rapidfuzz
+
+Modules:
+- common_tools.build.lib.common_tools.helpers.matching_helper
+- common_tools.common_tools.helpers.matching_helper
+
+### Ext Group 14
+Dépendances externes:
+- asyncio
+- functools
+- inspect
+- time
+- typing
+
+Modules:
+- common_tools.build.lib.common_tools.helpers.method_decorator_helper
+- common_tools.common_tools.helpers.method_decorator_helper
+
+### Ext Group 15
+Dépendances externes:
+- datetime
+- json
+- time
+
+Modules:
+- common_tools.build.lib.common_tools.helpers.misc
+- common_tools.common_tools.helpers.misc
+
+### Ext Group 16
+Dépendances externes:
+- asyncio
+- concurrent.futures
+- datetime
+- enum
+- openai
+- time
+- uuid
+
+Modules:
+- common_tools.build.lib.common_tools.helpers.openai_helper
+- common_tools.common_tools.helpers.openai_helper
+
+### Ext Group 18
+Dépendances externes:
+- collections
+- langchain.schema
+- langchain_community.query_constructors.chroma
+- langchain_community.query_constructors.pinecone
+- langchain_community.query_constructors.qdrant
+- langchain_core.structured_query
+- typing
+
+Modules:
+- common_tools.build.lib.common_tools.helpers.rag_filtering_metadata_helper
+- common_tools.common_tools.helpers.rag_filtering_metadata_helper
+
+### Ext Group 19
+Dépendances externes:
+- importlib
+- inspect
+- typing
+
+Modules:
+- common_tools.build.lib.common_tools.helpers.reflexion_helper
+- common_tools.common_tools.helpers.reflexion_helper
+
+### Ext Group 20
+Dépendances externes:
+- importlib.resources
+- re
+- yaml
+
+Modules:
+- common_tools.build.lib.common_tools.helpers.ressource_helper
+- common_tools.common_tools.helpers.ressource_helper
+
+### Ext Group 21
+Dépendances externes:
+- inspect
+- unittest.mock
+
+Modules:
+- common_tools.build.lib.common_tools.helpers.test_helper
+- common_tools.common_tools.helpers.test_helper
+
+### Ext Group 22
+Dépendances externes:
+- datetime
+- langchain.tools
+- langchain_core.runnables
+- random
+- string
+
+Modules:
+- common_tools.build.lib.common_tools.helpers.tools_helpers
+- common_tools.common_tools.helpers.tools_helpers
+
+### Ext Group 23
+Dépendances externes:
+- json
+- re
+- sys
+- threading
+- time
+- typing
+
+Modules:
+- common_tools.build.lib.common_tools.helpers.txt_helper
+- common_tools.common_tools.helpers.txt_helper
+
+### Ext Group 24
+Dépendances externes:
+- re
+
+Modules:
+- common_tools.build.lib.common_tools.helpers.unicode_helper
+- common_tools.common_tools.helpers.unicode_helper
+
+### Ext Group 25
+Dépendances externes:
+- dotenv
+- langchain_anthropic
+- langchain_core.language_models.chat_models
+- langchain_core.runnables
+- langchain_groq
+- langchain_ollama
+- langchain_openai
+- openai
+- os
+- uuid
+
+Modules:
+- common_tools.build.lib.common_tools.langchains.langchain_factory
+- common_tools.common_tools.langchains.langchain_factory
+
+### Ext Group 26
+Dépendances externes:
+- datetime
+- langsmith
+- os
+- requests
+- uuid
+
+Modules:
+- common_tools.build.lib.common_tools.langchains.langsmith_client
+- common_tools.common_tools.langchains.langsmith_client
+
+### Ext Group 27
+Dépendances externes:
+- abc
+
+Modules:
+- common_tools.build.lib.common_tools.models.base_desc
+- common_tools.common_tools.models.base_desc
+
+### Ext Group 28
+Dépendances externes:
+- datetime
+- langchain.memory
+- langchain.schema.messages
+- langchain_core.messages.base
+- typing
+- uuid
+
+Modules:
+- common_tools.build.lib.common_tools.models.conversation
+- common_tools.common_tools.models.conversation
+
+### Ext Group 29
+Dépendances externes:
+- datetime
+- typing
+- uuid
+
+Modules:
+- common_tools.build.lib.common_tools.models.device_info
+- common_tools.build.lib.common_tools.models.user
+- common_tools.common_tools.models.device_info
+- common_tools.common_tools.models.user
+
+### Ext Group 30
+Dépendances externes:
+- langchain.schema
+- pandas
+- pydantic
+- typing
+
+Modules:
+- common_tools.build.lib.common_tools.models.doc_w_summary_chunks_questions
+- common_tools.common_tools.models.doc_w_summary_chunks_questions
+
+### Ext Group 31
+Dépendances externes:
+- enum
+
+Modules:
+- common_tools.build.lib.common_tools.models.embedding_model
+- common_tools.build.lib.common_tools.models.embedding_type
+- common_tools.build.lib.common_tools.models.file_already_exists_policy
+- common_tools.build.lib.common_tools.models.langchain_adapter_type
+- common_tools.build.lib.common_tools.models.logical_operator
+- common_tools.build.lib.common_tools.models.vector_db_type
+- common_tools.common_tools.models.embedding_model
+- common_tools.common_tools.models.embedding_type
+- common_tools.common_tools.models.file_already_exists_policy
+- common_tools.common_tools.models.langchain_adapter_type
+- common_tools.common_tools.models.logical_operator
+- common_tools.common_tools.models.vector_db_type
+
+### Ext Group 32
+Dépendances externes:
+- langchain_community.embeddings
+- langchain_community.embeddings.sentence_transformer
+- langchain_core.embeddings
+- langchain_openai
+
+Modules:
+- common_tools.build.lib.common_tools.models.embedding_model_factory
+- common_tools.common_tools.models.embedding_model_factory
+
+### Ext Group 33
+Dépendances externes:
+- typing
+
+Modules:
+- common_tools.build.lib.common_tools.models.enum_desc
+- common_tools.common_tools.models.enum_desc
+
+### Ext Group 34
+Dépendances externes:
+- langchain_core.agents
+- langchain_core.messages
+- operator
+- typing
+
+Modules:
+- common_tools.build.lib.common_tools.models.langgraph_agent_state
+- common_tools.common_tools.models.langgraph_agent_state
+
+### Ext Group 35
+Dépendances externes:
+- datetime
+- uuid
+
+Modules:
+- common_tools.build.lib.common_tools.models.message
+- common_tools.common_tools.models.message
+
+### Ext Group 36
+Dépendances externes:
+- dataclasses
+- pydantic
+- typing
+
+Modules:
+- common_tools.build.lib.common_tools.models.metadata_description
+- common_tools.common_tools.models.metadata_description
+
+### Ext Group 37
+Dépendances externes:
+- pydantic
+
+Modules:
+- common_tools.build.lib.common_tools.models.question_analysis_base
+- common_tools.build.lib.common_tools.models.question_rewritting
+- common_tools.build.lib.common_tools.models.question_translation
+- common_tools.common_tools.models.question_analysis_base
+- common_tools.common_tools.models.question_rewritting
+- common_tools.common_tools.models.question_translation
+
+### Ext Group 38
+Dépendances externes:
+- collections
+- os
+- pkg_resources
+
+Modules:
+- common_tools.build.lib.common_tools.project.import_listing
+- common_tools.common_tools.project.import_listing
+
+### Ext Group 39
+Dépendances externes:
+- ast
+- collections
+- os
+
+Modules:
+- common_tools.build.lib.common_tools.project.useless_code_analyser
+- common_tools.common_tools.project.useless_code_analyser
+
+### Ext Group 40
+Dépendances externes:
+- collections
+- json
+- langchain_chroma
+- langchain_core.documents
+- langchain_core.embeddings
+- langchain_core.runnables
+- langchain_core.vectorstores
+- langchain_pinecone
+- langchain_qdrant
+- os
+- pinecone
+- qdrant_client
+- time
+- typing
+
+Modules:
+- common_tools.build.lib.common_tools.rag.rag_service
+- common_tools.common_tools.rag.rag_service
+
+### Ext Group 41
+Dépendances externes:
+- hashlib
+- langchain_core.callbacks
+- langchain_core.documents
+- langchain_core.embeddings
+- langchain_core.retrievers
+- langchain_core.utils
+- numpy
+- pinecone_text.hybrid
+- pinecone_text.sparse.base_sparse_encoder
+- pydantic
+- tqdm.auto
+- typing
+
+Modules:
+- common_tools.build.lib.common_tools.rag.rag_inference_pipeline.custom_pinecone_hybrid_retriever
+- common_tools.common_tools.rag.rag_inference_pipeline.custom_pinecone_hybrid_retriever
+
+### Ext Group 42
+Dépendances externes:
+- asyncio
+- langchain_core.documents
+- langchain_core.prompts
+- langchain_core.runnables
+- typing
+
+Modules:
+- common_tools.build.lib.common_tools.rag.rag_inference_pipeline.rag_augmented_generation_tasks
+- common_tools.common_tools.rag.rag_inference_pipeline.rag_augmented_generation_tasks
+
+### Ext Group 43
+Dépendances externes:
+- asyncio
+- time
+- typing
+
+Modules:
+- common_tools.build.lib.common_tools.rag.rag_inference_pipeline.rag_guardrails_tasks
+- common_tools.common_tools.rag.rag_inference_pipeline.rag_guardrails_tasks
+
+### Ext Group 44
+Dépendances externes:
+- asyncio
+- langchain.agents
+- langchain.tools.render
+- langchain_experimental.utilities
+- typing
+
+Modules:
+- common_tools.build.lib.common_tools.rag.rag_inference_pipeline.rag_inference_pipeline
+- common_tools.common_tools.rag.rag_inference_pipeline.rag_inference_pipeline
+
+### Ext Group 45
+Dépendances externes:
+- langchain_core.structured_query
+- typing
+
+Modules:
+- common_tools.build.lib.common_tools.rag.rag_inference_pipeline.rag_pre_treatment_tasks
+- common_tools.common_tools.rag.rag_inference_pipeline.rag_pre_treatment_tasks
+
+### Ext Group 46
+Dépendances externes:
+- collections
+- json
+- langchain.chains.query_constructor.base
+- langchain.retrievers.self_query.base
+- langchain_community.query_constructors.chroma
+- langchain_community.query_constructors.pinecone
+- langchain_community.query_constructors.qdrant
+- langchain_core.documents
+- langchain_core.prompts
+- langchain_core.runnables
+- typing
+
+Modules:
+- common_tools.build.lib.common_tools.rag.rag_inference_pipeline.rag_pre_treat_metadata_filters_analysis
+- common_tools.common_tools.rag.rag_inference_pipeline.rag_pre_treat_metadata_filters_analysis
+
+### Ext Group 47
+Dépendances externes:
+- langchain.retrievers
+- langchain.retrievers.document_compressors
+- langchain_community.retrievers
+- langchain_core.documents
+- langchain_core.structured_query
+- pinecone_text.sparse
+- typing
+
+Modules:
+- common_tools.build.lib.common_tools.rag.rag_inference_pipeline.rag_retrieval
+- common_tools.common_tools.rag.rag_inference_pipeline.rag_retrieval
+
+### Ext Group 48
+Dépendances externes:
+- langchain.text_splitter
+- langchain_community.document_loaders
+- langchain_core.documents
+
+Modules:
+- common_tools.build.lib.common_tools.rag.rag_ingestion_pipeline.rag_chunking
+- common_tools.common_tools.rag.rag_ingestion_pipeline.rag_chunking
+
+### Ext Group 49
+Dépendances externes:
+- json
+- langchain_chroma
+- langchain_community.query_constructors.chroma
+- langchain_core.documents
+- langchain_core.embeddings
+- langchain_core.runnables
+- langchain_pinecone
+- langchain_qdrant
+- numpy
+- os
+- pinecone
+- qdrant_client
+- qdrant_client.http.models
+- re
+- sys
+- time
+- typing
+- uuid
+
+Modules:
+- common_tools.build.lib.common_tools.rag.rag_ingestion_pipeline.rag_ingestion_pipeline
+- common_tools.common_tools.rag.rag_ingestion_pipeline.rag_ingestion_pipeline
+
+### Ext Group 50
+Dépendances externes:
+- langchain_core.documents
+- numpy
+- os
+- pickle
+- scipy.sparse
+- sklearn.feature_extraction.text
+
+Modules:
+- common_tools.build.lib.common_tools.rag.rag_ingestion_pipeline.sparse_vector_embedding
+- common_tools.common_tools.rag.rag_ingestion_pipeline.sparse_vector_embedding
+
+### Ext Group 51
+Dépendances externes:
+- langchain_core.documents
+- pandas
+- ragas.testset.synthesizers.abstract_query
+- ragas.testset.synthesizers.generate
+- ragas.testset.synthesizers.specific_query
+
+Modules:
+- common_tools.build.lib.common_tools.rageval.ground_truth_dataset
+- common_tools.common_tools.rageval.ground_truth_dataset
+
+### Ext Group 52
+Dépendances externes:
+- asyncio
+- inspect
+- types
+- typing
+
+Modules:
+- common_tools.build.lib.common_tools.workflows.workflow_executor
+- common_tools.common_tools.workflows.workflow_executor
+
+### Ext Group 53
+Dépendances externes:
+- collections
+- functools
+- inspect
+
+Modules:
+- common_tools.build.lib.common_tools.workflows.workflow_output_decorator
+- common_tools.common_tools.workflows.workflow_output_decorator
+
+### Ext Group 54
+Dépendances externes:
+- pytest
+
+Modules:
+- common_tools.tests.conftest
+- common_tools.tests.execute_activate_global_strong_type_function_verification_test
+- common_tools.tests.ressource_helper_test
