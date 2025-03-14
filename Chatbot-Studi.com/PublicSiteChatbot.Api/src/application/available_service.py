@@ -31,7 +31,7 @@ from common_tools.rag.rag_inference_pipeline.rag_augmented_generation_tasks impo
 from common_tools.helpers.ressource_helper import Ressource
 from common_tools.models.conversation import Conversation, Message, User
 from common_tools.models.device_info import DeviceInfo
-from common_tools.rag.rag_inference_pipeline.end_pipeline_exception import EndPipelineException
+from common_tools.workflows.end_workflow_exception import EndWorkflowException
 from common_tools.models.vector_db_type import VectorDbType
 from common_tools.helpers.env_helper import EnvHelper
 from common_tools.langchains.langchain_factory import LangChainFactory
@@ -255,7 +255,7 @@ class AvailableService:
                                                                     pipeline_config_file_path = 'studi_com_chatbot_rag_pipeline_default_config_wo_AG_for_streaming.yaml', 
                                                                     format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
             pipeline_succeeded = True
-        except EndPipelineException as ex:                        
+        except EndWorkflowException as ex:                        
             pipeline_succeeded = False
             pipeline_ended_response = ex.message
 

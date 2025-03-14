@@ -22,7 +22,7 @@ async def generate_ground_truth():
         
     #testset = await RagasService.run_eval_on_ground_truth_dataset_async(llms[0], samples_count= 3)
     #testset = await RagasService.generate_test_dataset_from_documents_langchain_async(
-    testset = RagasService.generate_test_dataset_from_documents_generic(
+    testset = RagasService.generate_or_load_test_dataset_from_documents_generic(
                                     trainings_docs,
                                     llms[0], 
                                     embedding_model, 

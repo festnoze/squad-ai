@@ -135,7 +135,7 @@ class RagasService:
             return trainings_objects
         
 
-    def generate_test_dataset_from_documents_generic(docs: list, generator_llm: Runnable, generator_embedding: EmbeddingModel, samples_count:int = 10, saved_knowledge_graph_file_path = './outputs/ragas_kg.json'):
+    def generate_or_load_test_dataset_from_documents_generic(docs: list, generator_llm: Runnable, generator_embedding: EmbeddingModel, samples_count:int = 10, saved_knowledge_graph_file_path = './outputs/ragas_kg.json'):
         from ragas.testset.graph import KnowledgeGraph
         from ragas.testset.graph import Node, NodeType
         from ragas.testset.transforms import default_transforms, apply_transforms

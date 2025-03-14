@@ -10,7 +10,6 @@ from client_models.user_request_model import UserRequestModel
 from common_tools.helpers.txt_helper import txt
 from common_tools.models.conversation import Conversation
 from common_tools.models.user import User
-from common_tools.rag.rag_inference_pipeline.end_pipeline_exception import EndPipelineException
 from chatbot_api_client import ChatbotApiClient
 
 class ChatbotFront:
