@@ -70,25 +70,27 @@ def display_hierarchy(hierarchy, indent=0, parent_path="", project_name=""):
         children = node['children']
         is_leaf = node['is_leaf']
         
-        # Déterminer quel texte afficher
-        if children:  # Nœud avec enfants
-            # Simplifier l'affichage en utilisant *
-            display_text = f"{full_path}.*"
-            st.markdown("&nbsp;" * (indent * 2) + f"- **{display_text}**")
+        # Toujours afficher ce nœud, qu'il ait des enfants ou non
+        if children or is_leaf:
+            # Déterminer quel texte afficher
+            if children:  # Nœud avec enfants
+                # Simplifier l'affichage en utilisant *
+                display_text = f"{full_path}.*"
+                st.markdown("&nbsp;" * (indent * 2) + f"- **{display_text}**")
+                
+                # Afficher les enfants avec indentation supplémentaire
+                display_hierarchy(children, indent + 1, full_path, project_name)
             
-            # Afficher les enfants avec indentation supplémentaire
-            display_hierarchy(children, indent + 1, full_path, project_name)
-        elif is_leaf:  # Feuille sans enfants
-            # Afficher le module individuel si ce n'est pas déjà couvert par un parent
-            if not parent_path or not full_path.startswith(parent_path):
-                # Utiliser *.module_name si le module est profondément niché
+            # Si c'est une feuille (même si ça a aussi des enfants, car un module peut être à la fois un package et un module)
+            if is_leaf:
+                # Utiliser *.module_name si le module est niché sous un parent
                 if parent_path:
                     # Extraire le dernier segment du chemin complet
                     last_segment = full_path.split('.')[-1]
                     display_text = f"*.{last_segment}"
-                else:
-                    display_text = full_path
-                st.markdown("&nbsp;" * (indent * 2) + f"- *{display_text}*")
+                    st.markdown("&nbsp;" * (indent * 2) + f"- *{display_text}*")
+                elif not children:  # Seulement si ce n'est pas déjà affiché comme parent
+                    st.markdown("&nbsp;" * (indent * 2) + f"- *{full_path}*")
 
 # Affichage des résultats dans la fenêtre principale
 if analyzer and groups:
