@@ -12,7 +12,11 @@ Voici la liste des champs contenus dans ce groupe de questions à laquelle l'uti
 </contexte>
 
 <user_query>
-Demande, en français, dans une question unique et la plus minimaliste possible, de fournir les valeurs pour tous les champs compris dans le groupe de questions indiqué.
+Output attendu et formatage :
+Demande, en français, dans une question unique et la plus minimaliste possible, de fournir les valeurs pour tous les champs indiqués du groupe de questions. 
+Nomme les champs en utilisant une version synthétique de leurs descriptions respectives.
+Ajoute au début de ta question une description synthétique du groupe de question pour contextueliser ta demande.
+Regroupe les champs optionnels à la fin de ta question, en ajoutant après chacun d'eux le texte : "(optionnel)".
 </user_query>
 
 

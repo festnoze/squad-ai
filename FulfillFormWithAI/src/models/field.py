@@ -1,16 +1,15 @@
-import asyncio
 from enum import Enum
 import re
 from typing import Union
 from helper import Helper
-from models.validation_models import ValidationError, ValidationResult
-from common_tools.helpers.rag_bm25_retriever_helper import BM25RetrieverHelper
+from models.validation_models import ErrorCode, ValidationError, ValidationResult
+from common_tools.helpers.matching_helper import MatchingHelper
 from common_tools.helpers.txt_helper import txt
 
 class FieldType(Enum):
-    INTEGER = 'integer'
     STRING = 'string'
-    DECIMAL = 'decimal'
+    INTEGER = 'integer'
+    FLOAT = 'float'
     DATE = 'date'
     DATETIME = 'datetime'
     BOOLEAN = 'boolean'
@@ -44,12 +43,13 @@ class Field:
 
     @value.setter
     def value(self, new_value: any) -> None:
-        if (new_value is None or new_value == "null"):
-            if not self.optional: 
-                raise ValueError("Value is required because the field is flagged as not-optional")
-            self._value = None
+        if new_value is None or new_value == "null": 
+            if self.default_value is not None:
+                self._value = self.default_value
+            else:
+                self._value = None
         else:
-            self._value = self.normalize_value(new_value)        
+            self._value = self.normalize_value(new_value)                
         self.perform_validation()
         
     def perform_validation(self):        
@@ -58,71 +58,76 @@ class Field:
             return
         
         errors: list = []        
-        if not self.value and not self.optional:
-            errors.append(ValidationError("value_missing", "Value is required"))
+        if (self._value is None or self._value == "null") and not self.optional:
+            errors.append(ValidationError("value_missing", "Value is required because the field is not flagged as optional"))
 
-        # Validate 'value' for: type, min/max value or size, regex, and allowed values
+        # Validate 'value' for: type, min / max value or size, regex, and allowed values
         if self.value:
-            # Check for type and constraints
+            # Check value for type and other constraints
             if self.type == FieldType.STRING:
                 if not isinstance(self.value, str):
-                    errors.append(ValidationError("invalid_type", "Expected type str"))
-                else:
-                    if self.regex and not re.match(self.regex, self.value):
-                        errors.append(ValidationError("regex_no_match", f"Value does not match the following required pattern: {self.regex_description if self.regex_description else self.regex}", {"provided_value": self.value, "regex": self.regex, "regex_description": self.regex_description}))
-            
-            elif self.type == FieldType.INT:
+                    errors.append(ValidationError(ErrorCode.invalid_type, "Expect type to be string"))
+
+            elif self.type == FieldType.INTEGER:
                 if not isinstance(self.value, int):
-                    errors.append(ValidationError("invalid_type", "Expected type int"))
-                else:
-                    if self.min_size_or_value and self.value < self.min_size_or_value:
-                        errors.append(ValidationError("min_size_or_value", "Value is below the minimum allowed", {"provided_value": self.value, "min_size_or_value": self.min_size_or_value}))
-                    if self.max_size_or_value and self.value > self.max_size_or_value:
-                        errors.append(ValidationError("max_size_or_value", "Value exceeds the maximum allowed", {"provided_value": self.value, "max_size_or_value": self.max_size_or_value}))
-            
+                    errors.append(ValidationError(ErrorCode.invalid_type, "Expect type to be integer"))
+
             elif self.type == FieldType.FLOAT:
                 if not isinstance(self.value, float):
-                    errors.append(ValidationError("invalid_type", "Expected type float"))
-                else:
-                    if self.min_size_or_value and self.value < self.min_size_or_value:
-                        errors.append(ValidationError("min_size_or_value", "Value is below the minimum allowed", {"provided_value": self.value, "min_size_or_value": self.min_size_or_value}))
-                    if self.max_size_or_value and self.value > self.max_size_or_value:
-                        errors.append(ValidationError("max_size_or_value", "Value exceeds the maximum allowed", {"provided_value": self.value, "max_size_or_value": self.max_size_or_value}))
-            
-            elif self.type == FieldType.BOOL:
+                    errors.append(ValidationError(ErrorCode.invalid_type, "Expect type to be floating point number"))
+
+            elif self.type == FieldType.BOOLEAN:
                 if not isinstance(self.value, bool):
-                    errors.append(ValidationError("invalid_type", "Expected type bool"))
+                    errors.append(ValidationError(ErrorCode.invalid_type, "Expect type to be boolean"))
 
+            # Check for other constraints only if type is correct
+            if any(error.code == ErrorCode.invalid_type for error in errors):
+                self.validation_result = ValidationResult(errors)
+                self.group.perform_validation()
+                return
             
-            flatten_allowed_values = Helper.flatten_inner_lists(self.allowed_values)
-
-            # Check if value belongs to the allowed ones
+            # Check for min / max size (if string) or value (if number)
+            if self.type == FieldType.STRING:
+                if self.min_size_or_value and len(self.value) < self.min_size_or_value:
+                    errors.append(ValidationError(ErrorCode.min_size_or_value_not_reached, "String length is below the minimum allowed", {"provided_size": len(self.value), "min_size_or_value": self.min_size_or_value}))
+                if self.max_size_or_value and len(self.value) > self.max_size_or_value:
+                    errors.append(ValidationError(ErrorCode.max_size_or_value_exceeded, "String length exceeds the maximum allowed", {"provided_size": len(self.value), "max_size_or_value": self.max_size_or_value}))
+            
+            elif self.type == FieldType.INTEGER or self.type == FieldType.FLOAT:
+                if self.min_size_or_value and self.value < self.min_size_or_value:
+                    errors.append(ValidationError(ErrorCode.min_size_or_value_not_reached, "Value is below the minimum allowed", {"provided_value": self.value, "min_size_or_value": self.min_size_or_value}))
+                if self.max_size_or_value and self.value > self.max_size_or_value:
+                    errors.append(ValidationError(ErrorCode.max_size_or_value_exceeded, "Value exceeds the maximum allowed", {"provided_value": self.value, "max_size_or_value": self.max_size_or_value}))
+        
+            # Check for Regex (only for string values)
+            if self.type == FieldType.STRING:
+                if self.regex and not re.match(self.regex, self.value):
+                    errors.append(ValidationError(ErrorCode.regex_no_match, f"Value does not match the following required Regex pattern: {self.regex_description if self.regex_description else self.regex}", {"provided_value": self.value, "regex": self.regex, "regex_description": self.regex_description}))
+            
             if self.allowed_values and any(self.allowed_values):
-                # Check if the value is an exact match within the allowed values
-                if self.value in flatten_allowed_values:   
-                    # check if the value is the default value for this allowed values group (the 1st item of the sub-list), ...
-                    # if not, replace the actual value by the corresponding default value of this group.
-                    exact_match_default_value = Field.get_default_field_value_exactly_matching_allowed_values_async(self.value, self.allowed_values)
-                    if exact_match_default_value and self.value != exact_match_default_value:
+                exact_match_default_value = self.get_default_field_value_exactly_matching_allowed_values(self.value)
+                if exact_match_default_value is not None:   
+                    if self.value != exact_match_default_value:
                         self.value = exact_match_default_value
                         return
                 
-                # If the value is invalid value, search within allowed values for a fuzzy matching value
-                if self.value not in flatten_allowed_values:                
-                    new_value = Field.get_field_value_fuzzy_matching_allowed_values(self.name, self.value, flatten_allowed_values)
+                if exact_match_default_value is None:          
+                    new_value = self.search_fuzzy_match_within_allowed_values(self.name, self.value, score_min_threshold=0.80)
                     if new_value is not None and new_value != self.value:
                         self.value = new_value
                         return
-                    errors.append(ValidationError("invalid_value", "Value do not belongs to allowed values", {"provided_value": self.value, "allowed_values": self.allowed_values}))
+                    else:
+                        errors.append(ValidationError(ErrorCode.no_allowed_values_match, "Value do not belongs to allowed values, neither an approximation of it.", {"provided_value": self.value, "allowed_values": self.allowed_values}))
 
             # Validate 'value' using the custom validation function
             if self.validation_func_name:
                 validation_func = getattr(self.group, self.validation_func_name, None)
                 if validation_func and not validation_func(self):
-                    errors.append(ValidationError("custom_validation", f"Custom validation '{self.validation_func_name}' failed"))
+                    errors.append(ValidationError(ErrorCode.custom_validation_fails, f"Custom validation '{self.validation_func_name}' failed"))
         
         self.validation_result = ValidationResult(errors)
         self.group.perform_validation()
+        
     
     def normalize_value(self, input_value: any) -> any:
         "if allowed_values is defined, return the first value that matches the input_value"
@@ -189,28 +194,30 @@ class Field:
             allowed_values=field_dict.get('allowed_values'),
             validation_func_name= field_dict.get('validation_func_name'),
         )
-
-        field._value = field_dict.get("value")
+        field.value = field_dict.get("value")
         return field
         
-    def get_field_value_fuzzy_matching_allowed_values(field_name: str, field_value: str, flatten_allowed_values: list[str], score_min_threshold: float = 0.5) -> str | None:
-        # Search exact value matching allowed values (case insensitive + get default value if sub-lists)
-        if Field.get_default_field_value_exactly_matching_allowed_values_async(field_value, flatten_allowed_values):
+    def search_fuzzy_match_within_allowed_values(self, field_name: str, field_value: str, score_min_threshold: float = 0.75) -> str | None:
+        best_match: str; score: float
+        flatten_allowed_values: list[str] = Helper.flatten_inner_lists(self.allowed_values)
+        
+        if self.get_default_field_value_exactly_matching_allowed_values(field_value):
             raise ValueError(f"Field '{field_name}' with value: '{field_value}' has an exact match in allowed values and shouldn't be looking for fuzzy matching.")
         
-        # Search nearest value matching allowed values
-        best_match: str; score: float
-        best_match, score = BM25RetrieverHelper.find_best_match_bm25(flatten_allowed_values, field_value)
-        if score > score_min_threshold:
+        # Search nearest value matching allowed values ...
+        best_match, score = MatchingHelper.find_best_approximate_match(flatten_allowed_values, field_value)
+        if score >= score_min_threshold:
             txt.print(f"/!\\ Field '{field_name}' with invalid value: '{field_value}' was replaced by the nearest match: '{best_match}' with score: [{score}].")
-            return Field.get_default_field_value_exactly_matching_allowed_values_async(best_match, flatten_allowed_values)
-
+            # ... then return the default value of the allowed values group containing the best match
+            best_match_default_value = self.get_default_field_value_exactly_matching_allowed_values(best_match)
+            return best_match_default_value
+        
         txt.print(f"/!\\ Field '{field_name}' has an invalid value: '{field_value}'.\nNo close match were found within field's allowed values:\n[{', '.join(flatten_allowed_values)}].\nNearest matching value found is: '{best_match}', with score: {str(score)} - which is less than the specified threshold of {str(score_min_threshold)}.")    
         return None
     
-    def get_default_field_value_exactly_matching_allowed_values_async(value: any, allowed_values:list):
+    def get_default_field_value_exactly_matching_allowed_values(self, value: any):
             value_lower = value.strip().lower()
-            for allowed_value in allowed_values:
+            for allowed_value in self.allowed_values:
                 if isinstance(allowed_value, list):
                     for allowed_value_sub_item in allowed_value:
                         if value_lower == allowed_value_sub_item.strip().lower():

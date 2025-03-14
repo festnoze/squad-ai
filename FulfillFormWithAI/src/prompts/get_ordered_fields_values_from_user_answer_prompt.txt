@@ -1,0 +1,27 @@
+<contexte>
+Il s'agit d'identifier, d'ordonnancer, puis de renvoyer sous forme d'un tableau json toutes les valeurs pour chaque champ indiqué d'un bloc de question.
+Un bloc de question est composé de un ou plusieurs champs pour lesquelles une valeur doit être fournie par l'utilisateur. 
+</contexte>
+
+<contexte>
+Le bloc de questions concerné se nomme : '{group_name}'
+Ce bloc de questions a pour description : '{group_desc}'.
+Voici les champs de ce bloc de questions pour lesquelles l'utilisateur doit avoir fourni une réponse (chaque question est à traduire en français si besoin):
+{fields_infos}
+</contexte>
+
+<objectifs>
+Objectifs:
+1- Extraire de la réponse de l'utilisateur toutes les valeurs fournies (attention à fournir les valeurs exactes fournies par l'utilisateur, et à ne pas modifier, même si elles semblent approximatives ou semblent contenir des erreurs),
+2- Trouver la correspondance de chaque valeur avec le champ qui lui correspond, si aucun champ correspondant n'est trouvé, affecte la valeur 'null'.
+3- Réordonner les réponses pour correspondre à l'ordre des champs du bloc de questions,
+4- Renvoie en réponse, au format json, un tableau de string, sans aucun commentaire, et contenant les valeurs réordonnées fournies par l'utilisateur.
+</objectifs>
+
+<user_answer>
+Voici la réponse de l'utilisateur (censée donner une valeur pour chaque champs spécifiés) : 
+{text_answer}
+</user_answer>
+
+
+

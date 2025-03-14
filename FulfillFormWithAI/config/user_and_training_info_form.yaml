@@ -23,25 +23,6 @@ form:
           min_size_or_value: 2
           max_size_or_value: 50
           optional: false
-    - name: "contact"
-      description: "Contact Information"
-      fields:
-        - name: "email"
-          description: "User email address"
-          type: "string"
-          min_size_or_value: 5
-          max_size_or_value: 100
-          regex: "^[\\w\\.-]+@[\\w\\.-]+\\.[a-zA-Z]{2,}$"
-          regex_description: "The email address should respect the following format: 'xxx@yyy.zz'"
-          optional: false
-        - name: "phone_number"
-          description: "User phone number"
-          type: "string"
-          min_size_or_value: 5
-          max_size_or_value: 30
-          regex: "^(?:(?:\\+\\d{2}(?: ?\\d){9})|(?:(?:\\d ?){9}\\d))$"
-          regex_description: "The phone number should be either: 10 digits long, or a plus followed by the country code of 2 digits followed by 9 digits. Spaces are allowed between digits."
-          optional: false
     - name: "postal_address"
       description: "Postal Address"
       fields:
@@ -76,6 +57,25 @@ form:
           max_size_or_value: 50
           optional: true
           default_value: "France"
+    - name: "contact"
+      description: "Contact Information"
+      fields:
+        - name: "email"
+          description: "User email address"
+          type: "string"
+          min_size_or_value: 5
+          max_size_or_value: 100
+          regex: "^[\\w\\.-]+@[\\w\\.-]+\\.[a-zA-Z]{2,}$"
+          regex_description: "The email address should respect the following format: 'xxx@yyy.zz'"
+          optional: false
+        - name: "phone_number"
+          description: "User phone number"
+          type: "string"
+          min_size_or_value: 5
+          max_size_or_value: 30
+          regex: "^(?:(?:\\+\\d{2}(?: ?\\d){9})|(?:(?:\\d ?){9}\\d))$"
+          regex_description: "The phone number should be either: 10 digits long, or a plus followed by the country code of 2 digits followed by 9 digits. Spaces are allowed between digits."
+          optional: false
     - name: "training_preference"
       description: "Training Preference"
       fields:

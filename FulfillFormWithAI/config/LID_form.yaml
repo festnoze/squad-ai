@@ -1,8 +1,8 @@
 form:
   name: "LID_form"
   groups:
-    - name: "personal_info"
-      description: "Informations personnelles"
+    - name: "identity"
+      description: "Identité du lead"
       fields:
         - name: "nom"
           description: "Nom"
@@ -52,7 +52,33 @@ form:
           type: "string"
           min_size_or_value: 1
           max_size_or_value: 100
-          optional: true
+          optional: true  
+    - name: "address"
+      description: "Adresse postale"
+      fields:
+        - name: "street"
+          description: "Adresse (rue, numéro)"
+          type: "string"
+          min_size_or_value: 1
+          max_size_or_value: 200
+        - name: "postal_code"
+          description: "Code postal"
+          type: "string"
+          min_size_or_value: 4
+          max_size_or_value: 10
+        - name: "city"
+          description: "Ville"
+          type: "string"
+          min_size_or_value: 1
+          max_size_or_value: 100
+        - name: "pays"
+          description: "Nom du pays (ou code ISO 3166-1 alpha-2)"
+          type: "string"
+          min_size_or_value: 2
+          max_size_or_value: 20
+          optional: false
+          allowed_values: "@file:country_allowed_values.yaml"
+          default_value: "FR"
     - name: "contact_info"
       description: "Informations de contact"
       fields:
@@ -72,6 +98,9 @@ form:
           optional: false
           regex: "^\\+\\d{8,15}$"
           regex_description: "Doit être en format E.164"
+    - name: "technical_info"
+      description: "Informations techniques"
+      fields:
         - name: "url"
           description: "URL complète de la page de conversion"
           type: "string"
@@ -137,32 +166,6 @@ form:
           min_size_or_value: 1
           max_size_or_value: 100
           optional: true
-    - name: "address"
-      description: "Adresse postale"
-      fields:
-        - name: "street"
-          description: "Adresse (rue, numéro)"
-          type: "string"
-          min_size_or_value: 1
-          max_size_or_value: 200
-        - name: "postal_code"
-          description: "Code postal"
-          type: "string"
-          min_size_or_value: 4
-          max_size_or_value: 10
-        - name: "city"
-          description: "Ville"
-          type: "string"
-          min_size_or_value: 1
-          max_size_or_value: 100
-        - name: "pays"
-          description: "Nom du pays (ou code ISO 3166-1 alpha-2)"
-          type: "string"
-          min_size_or_value: 2
-          max_size_or_value: 20
-          optional: false
-          allowed_values: "@file:country_allowed_values.yaml"
-          default_value: "FR"
     - name: "additional"
       description: "Informations complémentaires"
       fields:
@@ -241,7 +244,9 @@ form:
         - name: "alternance"
           description: "Indique si le candidat est en alternance"
           type: "boolean"
-          optional: true
+          optional: false
+          allowed_values: ["Oui", "Non"]
+          default_value: "Non"
         - name: "tech_source"
           description: "Source technique (form, make, ...)"
           type: "string"

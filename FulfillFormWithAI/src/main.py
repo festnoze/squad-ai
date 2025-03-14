@@ -14,7 +14,7 @@ def get_init_env_and_graph(form_struct_file_path:str = None, conversation_file_p
     llms_infos = EnvHelper.get_llms_infos_from_env_config()
     FormTools.init(llms_infos)
 
-    conversation = None if not file.exists(conversation_file_path) else file.get_as_str(conversation_file_path)
+    conversation = '' if not file.exists(conversation_file_path) else file.get_as_str(conversation_file_path, remove_comments=True)
     workflow_graph = GraphWorkflowForm(agent_state_initial_values = { "form_structure_file_path": form_struct_file_path, "chat_history": conversation })    
     
     return workflow_graph

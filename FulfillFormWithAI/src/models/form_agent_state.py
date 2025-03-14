@@ -20,7 +20,10 @@ class FormAgentState(AgentState):
             if not hasattr(FormAgentState, key) and not not hasattr(AgentState, key):
                 raise Exception(f"'{FormAgentState.set_initial_values.__name__}' fails as: FormAgentState has no attribute named '{key}'")
             if key == 'chat_history' and isinstance(value, str):
-                value = [HumanMessage(line) for line in value.splitlines()]
+                if value:
+                    value = [HumanMessage(line) for line in value.splitlines()]
+                else:
+                    value = []
             setattr(FormAgentState, key, value)
 
     

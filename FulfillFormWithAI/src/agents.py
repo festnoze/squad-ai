@@ -41,7 +41,7 @@ class AgentSupervisor:
     def decide_next_step(self, state: dict[str, any]):
         if any(state["missing_fields"]):
             return "build_question"
-        if not any(state["missing_fields"]) and self.is_form_validated(state):
+        if self.is_form_validated(state):
             return "end"
         raise interrupt("Error: No missing fields found, but form is not validated.")
         
@@ -55,19 +55,19 @@ class AgentHIL:
 
     def __init__(self):
         if file.exists(AgentHIL.static_answers_file_path):
-            AgentHIL.static_answers = file.get_as_str(AgentHIL.static_answers_file_path).splitlines()
+            AgentHIL.static_answers = file.get_as_str(AgentHIL.static_answers_file_path, remove_comments=True).splitlines()
 
     async def build_question_async(self, state: dict[str, any]):
         """Create a question to ask the user (Human In the Loop)."""
         if len(state["missing_fields"]) == 0:
             return
-        next_item = state["missing_fields"][0]
-        form_item_to_query = FormTools.get_group_or_field(Form.from_dict(state['form']), next_item)
+        next_item_to_query = state["missing_fields"][0]
+        fields_to_query_for_value = FormTools.get_group_fields(Form.from_dict(state['form']), next_item_to_query)
 
-        if next_item["field"] is None:
-            question = await FormTools.generate_question_for_group_async(form_item_to_query)
+        if len(fields_to_query_for_value) > 1:
+            question = await FormTools.generate_question_for_group_fields_async(fields_to_query_for_value)
         else:
-            question = await FormTools.generate_question_for_field_async(form_item_to_query)
+            question = await FormTools.generate_question_for_single_field_async(fields_to_query_for_value[0])
         
         state["chat_history"].append(AIMessage(question))
         return state
@@ -76,8 +76,8 @@ class AgentHIL:
         """Ask the user to answer question (Human In the Loop)."""
         if not isinstance(state["chat_history"][-1], AIMessage):
             raise ValueError("Last message in chat history should be an AIMessage.")
-        txt.print(f"🤖 Question : {state["chat_history"][-1].content}")
         
+        txt.print(f"🤖 Question : {state["chat_history"][-1].content}")
         if not any(self.static_answers):
             user_answer: str = input("> ")
         else:
@@ -89,7 +89,7 @@ class AgentHIL:
     
 class AgentInterpretation:
     async def interpret_user_response_async(self, state: dict[str, any]) -> dict[str, any]:
-        """Interpret user response to extract field values."""        
+        """Interpret user response to extract field values."""
         if not isinstance(state["chat_history"][-1], HumanMessage):
             raise ValueError("Last message in chat history should be a HumanMessage.")
         if len(state["missing_fields"]) == 0:
@@ -97,10 +97,9 @@ class AgentInterpretation:
            
         next_item = state["missing_fields"][0]
         user_answer = state["chat_history"][-1].content
-        targeted_form_item = FormTools.get_group_or_field(Form.from_dict(state['form']), next_item)
-        interpreted_user_answer = await FormTools.interpret_user_response_async(targeted_form_item, user_answer)
-        linked_fields_and_values = FormTools.link_values_with_fields(interpreted_user_answer, targeted_form_item)
-        state["extracted_values"] = linked_fields_and_values
+        targeted_fields = FormTools.get_group_fields(Form.from_dict(state['form']), next_item)
+        interpreted_user_answer = await FormTools.interpret_user_response_async(targeted_fields, user_answer)
+        state["extracted_values"] = FormTools.link_values_with_fields(interpreted_user_answer, targeted_fields)
         return state
     
     def fill_form(self, state: dict[str, any]) -> Form:
