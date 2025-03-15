@@ -104,14 +104,12 @@ class DependencyAnalyzer:
     def partition_by_granularity(self, granularity: int) -> None:
         """
         Divise les modules en sous-librairies selon les critères suivants:
-        1. Chaque fichier n'apparaît que dans une seule sous-librairie
-        2. Commence par regrouper les fichiers qui partagent les mêmes dépendances externes et 
-           qui n'ont pas de dépendances internes
-        3. Essaie de maintenir les fichiers du même dossier ensemble, sauf pour les dossiers 
-           dans la liste splitable_folders
+        1. Garde les fichiers du même dossier ensemble (sauf pour les dossiers dans splitable_folders)
+        2. Chaque fichier n'apparaît que dans une seule sous-librairie
+        3. Les dépendances externes sont prises en compte pour regrouper les modules similaires
         
         Args:
-            granularity: Nombre cible de sous-librairies à créer (guidage, peut ne pas être exact)
+            granularity: Nombre cible de sous-librairies à créer
         """
         all_modules = list(self.dependency_graph.nodes())
         self.module_to_group.clear()  # Réinitialiser les assignations
@@ -120,53 +118,33 @@ class DependencyAnalyzer:
         sub_libraries = {}
         current_sub_lib = 1
         
-        # Phase 1: Fichiers sans dépendances internes, groupés par dépendances externes identiques
-        standalone_by_ext_deps = defaultdict(list)
-        for module, deps in self.dependencies.items():
-            if not deps['internal']:  # Pas de dépendances internes
-                ext_deps_key = frozenset(deps['external'])
-                standalone_by_ext_deps[ext_deps_key].append(module)
-        
-        # Assigner un groupe à chaque ensemble de fichiers indépendants avec mêmes dépendances externes
-        for ext_deps, modules in standalone_by_ext_deps.items():
-            if modules:
-                sub_libraries[current_sub_lib] = modules
-                for module in modules:
-                    self.module_to_group[module] = current_sub_lib
-                current_sub_lib += 1
-        
-        # Phase 2: Fichiers restants, groupés par dossier (sauf ceux dans splitable_folders)
-        
-        # Identifier les modules restants
-        remaining_modules = [m for m in all_modules if m not in self.module_to_group]
-        
-        # Grouper par dossier, en identifiant les fichiers dans les dossiers splitable
+        # Phase 1: D'abord, grouper par dossier (sauf pour les dossiers splitable)
         folder_to_modules = defaultdict(list)
         splitable_modules = []
         
-        for module in remaining_modules:
+        for module in all_modules:
             # Extraire le chemin du dossier à partir du nom du module
             path_parts = module.split('.')
-            if len(path_parts) <= 1:  # Module au niveau racine
-                folder_path = ''
-            else:
-                # Vérifier si le module est dans un dossier splitable
-                is_splitable = False
+            
+            # Vérifier si le module est dans un dossier splitable
+            is_splitable = False
+            if len(path_parts) > 1:  # Module pas au niveau racine
                 for splitable_folder in self.splitable_folders:
                     if splitable_folder in path_parts:
                         is_splitable = True
                         break
-                
-                if is_splitable:
-                    splitable_modules.append(module)
-                    continue
-                
-                # Sinon, l'affecter à son dossier
-                folder_path = '.'.join(path_parts[:-1])  # Exclure le nom du fichier
             
-            folder_to_modules[folder_path].append(module)
+            if is_splitable:
+                splitable_modules.append(module)
+            else:
+                if len(path_parts) <= 1:  # Module au niveau racine
+                    folder_path = ''
+                else:
+                    folder_path = '.'.join(path_parts[:-1])  # Exclure le nom du fichier
+                
+                folder_to_modules[folder_path].append(module)
         
-        # Assigner les groupes par dossier
+        # Assigner des groupes par dossier
         for folder, modules in folder_to_modules.items():
             if modules:
                 sub_libraries[current_sub_lib] = modules
@@ -174,26 +152,24 @@ class DependencyAnalyzer:
                     self.module_to_group[module] = current_sub_lib
                 current_sub_lib += 1
         
-        # Phase 3: Traiter les modules dans les dossiers splitable
-        # Regrouper par dépendances externes
-        splitable_by_ext_deps = defaultdict(list)
-        for module in splitable_modules:
-            # Vérifier que le module existe dans les dépendances analysées
-            if module in self.dependencies:
-                ext_deps_key = frozenset(self.dependencies[module]['external'])
-                splitable_by_ext_deps[ext_deps_key].append(module)
-            else:
-                # Si le module n'a pas d'entrée dans self.dependencies, le mettre dans un groupe séparé
-                # Cela peut arriver si le module est référencé mais n'a pas été correctement analysé
-                splitable_by_ext_deps[frozenset()].append(module)
-        
-        # Assigner des groupes aux modules splitable
-        for ext_deps, modules in splitable_by_ext_deps.items():
-            if modules:
-                sub_libraries[current_sub_lib] = modules
-                for module in modules:
-                    self.module_to_group[module] = current_sub_lib
-                current_sub_lib += 1
+        # Phase 2: Traiter les modules dans les dossiers splitable
+        # Les regrouper par dépendances externes
+        if splitable_modules:
+            ext_deps_to_modules = defaultdict(list)
+            
+            for module in splitable_modules:
+                ext_deps = frozenset()
+                if module in self.dependencies:
+                    ext_deps = frozenset(self.dependencies[module]['external'])
+                ext_deps_to_modules[ext_deps].append(module)
+            
+            # Assigner des groupes aux modules regroupés par dépendances externes
+            for ext_deps, modules in ext_deps_to_modules.items():
+                if modules:
+                    sub_libraries[current_sub_lib] = modules
+                    for module in modules:
+                        self.module_to_group[module] = current_sub_lib
+                    current_sub_lib += 1
         
         # Phase 4: Fusion des sous-librairies pour respecter la granularité cible
         # Si nous avons plus de sous-librairies que souhaité, on fusionne les plus similaires
@@ -532,18 +508,143 @@ class DependencyAnalyzer:
         }
         return proposed_structure
     def visualize_sub_libraries(self, output_file: str = 'sub_libraries.png') -> None:
-        plt.figure(figsize=(10, 8))
-        pos = nx.spring_layout(self.grouped_graph, k=0.3)
-        nx.draw_networkx_nodes(self.grouped_graph, pos, node_color='cyan', node_size=700)
-        nx.draw_networkx_edges(self.grouped_graph, pos, arrows=True)
-        labels = {n: f"Lib {n}" for n in self.grouped_graph.nodes()}
-        nx.draw_networkx_labels(self.grouped_graph, pos, labels=labels, font_size=8)
-        plt.title(f"Sous-librairies (granularite)")
+        """
+        Génère une visualisation des sous-librairies et leurs dépendances.
+        
+        Args:
+            output_file: Chemin du fichier de sortie
+        """
+        plt.figure(figsize=(12, 10))
+        
+        # Utiliser un layout hiérarchique pour mieux visualiser les dépendances
+        try:
+            pos = nx.nx_agraph.graphviz_layout(self.grouped_graph, prog='dot')
+        except:
+            # Fallback si graphviz n'est pas installé
+            pos = nx.spring_layout(self.grouped_graph, k=0.4, iterations=100)
+
+        # Calculer les tailles des noeuds proportionnelles au nombre de modules
+        sizes = {}
+        for group_id in self.grouped_graph.nodes():
+            modules_count = sum(1 for m, g in self.module_to_group.items() if g == group_id)
+            sizes[group_id] = 300 + (modules_count * 50)  # Taille de base + facteur proportionnel
+        
+        # Déterminer les couleurs basées sur les dépendances externes moyennes
+        colors = {}
+        for group_id in self.grouped_graph.nodes():
+            modules = [m for m, g in self.module_to_group.items() if g == group_id]
+            external_deps_count = 0
+            for module in modules:
+                if module in self.dependencies:
+                    external_deps_count += len(self.dependencies[module]['external'])
+            
+            avg_deps = external_deps_count / len(modules) if modules else 0
+            # Échelle de couleur: bleu (peu de dépendances) à rouge (beaucoup de dépendances)
+            colors[group_id] = plt.cm.viridis(min(avg_deps / 10, 1.0))  # Normaliser à max 10 dépendances
+
+        # Dessiner les noeuds et arêtes
+        for node in self.grouped_graph.nodes():
+            nx.draw_networkx_nodes(
+                self.grouped_graph, pos, 
+                nodelist=[node], 
+                node_size=sizes.get(node, 500),
+                node_color=[colors.get(node, 'skyblue')],
+                alpha=0.8,
+                linewidths=1,
+                edgecolors='black'
+            )
+        
+        nx.draw_networkx_edges(
+            self.grouped_graph, pos, 
+            arrows=True, 
+            arrowsize=15, 
+            arrowstyle='-|>',
+            width=1.5,
+            edge_color='gray',
+            alpha=0.7
+        )
+        
+        # Étiquettes des noeuds avec nombre de modules
+        labels = {}
+        for group_id in self.grouped_graph.nodes():
+            modules_count = sum(1 for m, g in self.module_to_group.items() if g == group_id)
+            labels[group_id] = f"Lib {group_id}\n({modules_count} modules)"
+        
+        nx.draw_networkx_labels(
+            self.grouped_graph, pos, 
+            labels=labels, 
+            font_size=9,
+            font_weight='bold',
+            font_color='black'
+        )
+        
+        plt.title(f"Structure des sous-librairies (granularité: {len(self.grouped_graph.nodes())})")
         plt.axis('off')
         plt.tight_layout()
-        plt.savefig(output_file, dpi=300)
+        plt.savefig(output_file, dpi=300, bbox_inches='tight')
+        plt.close()
+
+    def print_sub_libraries_info(self) -> str:
+        """
+        Génère un rapport textuel détaillé sur les sous-librairies créées.
+        
+        Returns:
+            Rapport formaté sur les sous-librairies
+        """
+        output = []
+        output.append("# Rapport des sous-librairies")
+        output.append(f"\nNombre total de sous-librairies: {len(set(self.module_to_group.values()))}")
+        
+        # Organiser les modules par groupe
+        groups = defaultdict(list)
+        for module, group_id in self.module_to_group.items():
+            groups[group_id].append(module)
+        
+        # Analyser chaque groupe
+        for group_id in sorted(groups.keys()):
+            modules = groups[group_id]
+            output.append(f"\n## Sous-librairie {group_id}")
+            output.append(f"Nombre de modules: {len(modules)}")
+            
+            # Analyser les dépendances externes
+            ext_deps = set()
+            for module in modules:
+                if module in self.dependencies:
+                    ext_deps.update(self.dependencies[module]['external'])
+            
+            if ext_deps:
+                output.append("\nDépendances externes principales:")
+                for dep in sorted(ext_deps)[:10]:  # Limiter à 10 pour la lisibilité
+                    output.append(f"- {dep}")
+                if len(ext_deps) > 10:
+                    output.append(f"- ... et {len(ext_deps) - 10} autres")
+            
+            # Regrouper les modules par dossier pour une meilleure lisibilité
+            by_folder = defaultdict(list)
+            for module in sorted(modules):
+                parts = module.split('.')
+                if len(parts) <= 1:
+                    folder = ""
+                else:
+                    folder = '.'.join(parts[:-1])
+                by_folder[folder].append(parts[-1])
+            
+            output.append("\nModules par dossier:")
+            for folder, files in sorted(by_folder.items()):
+                folder_display = folder or f"{self.project_name} (racine)"
+                output.append(f"- {folder_display}: {', '.join(sorted(files))}")
+        
+        return '\n'.join(output)
     def generate_restructuring_plan(self, output_dir='restructuring_plan') -> None:
+        """
+        Génère des rapports et visualisations du plan de restructuration proposé.
+        
+        Args:
+            output_dir: Répertoire où sauvegarder les fichiers de sortie
+        """
         Path(output_dir).mkdir(exist_ok=True)
+        
+        # 1. Génération du fichier de structure basé sur l'analyse suggérée
         structure_file: Path = Path(output_dir) / 'proposed_structure.txt'
         proposed_structure: Dict[str, Any] = self.suggest_packages()
         with open(structure_file, 'w', encoding='utf-8') as f:
@@ -565,6 +666,8 @@ class DependencyAnalyzer:
                 f.write("\nModules:\n")
                 for module in sorted(group_info['modules']):
                     f.write(f"- {module}\n")
+        
+        # 2. Génération de la matrice de dépendances
         matrix_file: Path = Path(output_dir) / 'dependency_matrix.txt'
         with open(matrix_file, 'w', encoding='utf-8') as f:
             f.write("# Matrice de Dépendances\n\n")
@@ -577,28 +680,78 @@ class DependencyAnalyzer:
                 while len(deps_str) < 5:
                     deps_str.append("-")
                 f.write(f"| {module.replace(f'{self.project_name}.', '')} | {' | '.join(deps_str)} |\n")
+        
+        # 3. Génération du rapport détaillé des sous-librairies
+        sublibs_file: Path = Path(output_dir) / 'sub_libraries_details.md'
+        with open(sublibs_file, 'w', encoding='utf-8') as f:
+            f.write(self.print_sub_libraries_info())
+        
+        # 4. Génération de la visualisation graphique
+        graph_path: Path = Path(output_dir) / f"sub_libraries_graph.png"
+        self.visualize_sub_libraries(output_file=str(graph_path))
 
 
 def main():
     parser: argparse.ArgumentParser = argparse.ArgumentParser(description="Analyseur de dépendances Python.")
     parser.add_argument("project_path", help="Chemin vers le répertoire racine du projet")
     parser.add_argument("project_name", help="Nom du package (pour identifier les imports internes)")
-    parser.add_argument("--output-dir", default="output")
-    parser.add_argument("--graph", action="store_true")
-    parser.add_argument("--graph-format", choices=["png", "pdf", "svg"], default="png")
-    parser.add_argument("--granularity", type=int, default=10)
+    parser.add_argument("--output-dir", default="output", help="Répertoire de sortie pour les rapports et visualisations")
+    parser.add_argument("--granularity", type=int, default=10, help="Nombre cible de sous-librairies à créer")
     parser.add_argument("--splitable-folders", nargs="+", default=["helpers"], 
                         help="Liste des dossiers pouvant être divisés entre sous-librairies")
+    parser.add_argument("--detailed-report", action="store_true", help="Générer un rapport détaillé des sous-librairies")
+    parser.add_argument("--no-graph", action="store_true", help="Ne pas générer de graphe de dépendances")
+    parser.add_argument("--graph-format", choices=["png", "pdf", "svg"], default="png", 
+                        help="Format du graphe de dépendances")
+    
     args: argparse.Namespace = parser.parse_args()
-    analyzer: DependencyAnalyzer = DependencyAnalyzer(args.project_path, args.project_name, args.splitable_folders)
-    analyzer.find_python_files()
-    analyzer.extract_imports()
-    analyzer.analyze_dependency_structure()
-    analyzer.partition_by_granularity(args.granularity)
-    analyzer.generate_restructuring_plan(output_dir=args.output_dir)
-    if args.graph:
-        graph_path: Path = Path(args.output_dir) / f"dependency_graph.{args.graph_format}"
-        analyzer.visualize_sub_libraries(output_file=str(graph_path))
+    
+    try:
+        print(f"Analyse du projet: {args.project_name} ({args.project_path})")
+        print(f"Granularité cible: {args.granularity} sous-librairies")
+        print(f"Dossiers divisibles: {', '.join(args.splitable_folders)}")
+        
+        analyzer: DependencyAnalyzer = DependencyAnalyzer(args.project_path, args.project_name, args.splitable_folders)
+        
+        print("Identification des fichiers Python...")
+        analyzer.find_python_files()
+        print(f"Trouvé {len(analyzer.python_files)} fichiers Python")
+        
+        print("Analyse des dépendances...")
+        analyzer.extract_imports()
+        analyzer.analyze_dependency_structure()
+        
+        print(f"Partitionnement en {args.granularity} sous-librairies...")
+        analyzer.partition_by_granularity(args.granularity)
+        actual_count = len(set(analyzer.module_to_group.values()))
+        print(f"Résultat: {actual_count} sous-librairies créées")
+        
+        print(f"Génération des rapports dans le dossier '{args.output_dir}'...")
+        analyzer.generate_restructuring_plan(output_dir=args.output_dir)
+        
+        if not args.no_graph:
+            try:
+                # Tentative d'importation de graphviz (facultatif)
+                import pygraphviz
+                print("Utilisation de graphviz pour la visualisation")
+            except ImportError:
+                print("Graphviz non détecté, utilisation du layout spring par défaut")
+            
+            print(f"Génération du graphe de dépendances (format: {args.graph_format})...")
+        
+        print(f"\nTerminé! Les résultats sont disponibles dans: {args.output_dir}")
+        print(f"  - Plan de restructuration: {args.output_dir}/proposed_structure.txt")
+        print(f"  - Matrice de dépendances: {args.output_dir}/dependency_matrix.txt")
+        print(f"  - Détails des sous-librairies: {args.output_dir}/sub_libraries_details.md")
+        print(f"  - Graphe des sous-librairies: {args.output_dir}/sub_libraries_graph.png")
+    
+    except Exception as e:
+        print(f"Erreur lors de l'analyse: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return 1
+    
+    return 0
 
 # if __name__ == "__main__":
 #     main()

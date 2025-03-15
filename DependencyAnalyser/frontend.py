@@ -69,8 +69,9 @@ init_custom_css()
 with st.sidebar:
     project_path = st.text_input("Chemin vers le projet", value="C:/Dev/IA/CommonTools")
     project_name = st.text_input("Nom du package Python", value="common_tools")
-    granularity = st.slider("Granularité", min_value=2, max_value=50, value=10, step=1)
-    
+    granularity = st.slider("Granularité", min_value=2, max_value=50, value=10, step=1, 
+                           help="Nombre cible de sous-librairies à créer")
+
     with st.expander("Options avancées"):
         splitable_folders_input = st.text_input(
             "Dossiers divisibles (séparés par des virgules)", 
@@ -78,15 +79,19 @@ with st.sidebar:
             help="Ces dossiers peuvent être divisés entre différentes sous-librairies"
         )
         splitable_folders = [folder.strip() for folder in splitable_folders_input.split(",") if folder.strip()]
+        
+        show_detailed_report = st.checkbox("Afficher le rapport détaillé", value=True,
+                                           help="Montrer les détails complets des sous-librairies")
 
     if st.button("Analyser"):
-        analyzer = DependencyAnalyzer(project_path, project_name, splitable_folders)
-        analyzer.find_python_files()
-        analyzer.extract_imports()
-        analyzer.analyze_dependency_structure()
-        analyzer.partition_by_granularity(granularity)
-        groups = set(analyzer.module_to_group.values())
-        st.sidebar.write(f"Nombre de sous-librairies détectées: {len(groups)}")
+        with st.spinner("Analyse en cours..."):
+            analyzer = DependencyAnalyzer(project_path, project_name, splitable_folders)
+            analyzer.find_python_files()
+            analyzer.extract_imports()
+            analyzer.analyze_dependency_structure()
+            analyzer.partition_by_granularity(granularity)
+            groups = set(analyzer.module_to_group.values())
+            st.sidebar.write(f"Nombre de sous-librairies détectées: {len(groups)}")
 
 # Fonction pour regrouper hiérarchiquement les modules
 def group_modules_hierarchically(modules, project_name):
@@ -176,28 +181,102 @@ def display_hierarchy(hierarchy, indent=0, parent_path="", project_name=""):
 
 # Affichage des résultats dans la fenêtre principale
 if analyzer and groups:
-    # Affichage du graphe de dépendances
-    st.header("Graphe de dépendances entre sous-librairies")
-    sub_lib_graph = analyzer.grouped_graph
-    fig, ax = plt.subplots(figsize=(10, 8))
-    pos = nx.spring_layout(sub_lib_graph, k=0.3)
-    nx.draw_networkx_nodes(sub_lib_graph, pos, node_color='cyan', node_size=700, ax=ax)
-    nx.draw_networkx_edges(sub_lib_graph, pos, arrows=True, ax=ax)
-    labels = {n: f"Lib {n}" for n in sub_lib_graph.nodes()}
-    nx.draw_networkx_labels(sub_lib_graph, pos, labels=labels, font_size=10, ax=ax)
-    plt.title("Sous-librairies (Dépendances inter-libs)")
-    plt.axis('off')
-    st.pyplot(fig)
+    # Onglets principaux pour les différentes vues
+    tab1, tab2, tab3 = st.tabs(["Visualisation", "Détails des sous-librairies", "Rapport"])
     
-    # Affichage des détails des sous-librairies avec regroupement hiérarchique
-    st.header("Détails des sous-librairies")
-    
-    # Présentation sur une seule colonne avec éléments collapsables (fermés par défaut)
-    for g_id in sorted(list(groups)):
-        members = [m for m, grp in analyzer.module_to_group.items() if grp == g_id]
+    with tab1:
+        st.header("Graphe de dépendances entre sous-librairies")
         
-        # Créer un élément expansible (fermé par défaut)
-        with st.expander(f"Sous-librairie {g_id}", expanded=False):
-            # Utilisation du regroupement hiérarchique pour l'affichage
-            hierarchy = group_modules_hierarchically(sorted(members), project_name)
-            display_hierarchy(hierarchy, project_name=project_name)
+        # Utiliser temporairement un fichier pour sauvegarder la visualisation
+        import tempfile
+        import os
+        
+        with tempfile.TemporaryDirectory() as tmpdirname:
+            graph_path = os.path.join(tmpdirname, "graph.png")
+            analyzer.visualize_sub_libraries(output_file=graph_path)
+            
+            # Afficher l'image générée
+            try:
+                st.image(graph_path, use_container_width=True)
+                st.caption(f"Structure des sous-librairies (granularité: {len(groups)})")
+            except Exception as e:
+                # Fallback à l'ancienne méthode si la visualisation améliorée échoue
+                st.error(f"Erreur lors de la génération du graphe amélioré: {str(e)}")
+                sub_lib_graph = analyzer.grouped_graph
+                fig, ax = plt.subplots(figsize=(10, 8))
+                pos = nx.spring_layout(sub_lib_graph, k=0.3)
+                nx.draw_networkx_nodes(sub_lib_graph, pos, node_color='cyan', node_size=700, ax=ax)
+                nx.draw_networkx_edges(sub_lib_graph, pos, arrows=True, ax=ax)
+                labels = {n: f"Lib {n}" for n in sub_lib_graph.nodes()}
+                nx.draw_networkx_labels(sub_lib_graph, pos, labels=labels, font_size=10, ax=ax)
+                plt.title("Sous-librairies (Dépendances inter-libs)")
+                plt.axis('off')
+                st.pyplot(fig)
+    
+    with tab2:
+        st.header("Détails des sous-librairies")
+        
+        # Statistiques générales
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Nombre de sous-librairies", len(groups))
+        with col2:
+            st.metric("Nombre de fichiers Python", len(analyzer.python_files))
+        with col3:
+            avg_size = len(analyzer.python_files) / len(groups) if groups else 0
+            st.metric("Taille moyenne", f"{avg_size:.1f} fichiers")
+        
+        st.markdown("---")
+        
+        # Présentation sur une seule colonne avec éléments collapsables
+        for g_id in sorted(list(groups)):
+            members = [m for m, grp in analyzer.module_to_group.items() if grp == g_id]
+            
+            # Collecter des statistiques pour cette sous-librairie
+            ext_deps = set()
+            for module in members:
+                if module in analyzer.dependencies:
+                    ext_deps.update(analyzer.dependencies[module]['external'])
+            
+            # Créer un élément expansible
+            with st.expander(f"Sous-librairie {g_id} ({len(members)} modules, {len(ext_deps)} dépendances externes)", expanded=False):
+                # Affichage de la liste complète des modules
+                st.subheader("Modules")
+                
+                # Créer une liste scrollable de modules si la liste est longue
+                if len(members) > 10:
+                    with st.container():
+                        scroll_container = st.empty()
+                        with scroll_container.container():
+                            st.write('\n'.join([f"- `{m.replace(project_name+'.', '')}`" for m in sorted(members)]))
+                else:
+                    # Affichage simple pour peu de modules
+                    for m in sorted(members):
+                        st.markdown(f"- `{m.replace(project_name+'.', '')}`")
+                
+                st.markdown("---")
+                
+                # Organisation en colonnes pour structure et dépendances
+                subcol1, subcol2 = st.columns([2, 3])
+                
+                with subcol1:
+                    st.subheader("Structure hiérarchique")
+                    hierarchy = group_modules_hierarchically(sorted(members), project_name)
+                    display_hierarchy(hierarchy, project_name=project_name)
+                
+                with subcol2:
+                    st.subheader("Dépendances externes")
+                    if ext_deps:
+                        for dep in sorted(ext_deps):
+                            st.markdown(f"- `{dep}`")
+                    else:
+                        st.info("Aucune dépendance externe")
+    
+    with tab3:
+        st.header("Rapport détaillé")
+        
+        if show_detailed_report:
+            report = analyzer.print_sub_libraries_info()
+            st.markdown(report)
+        else:
+            st.info("Activer 'Afficher le rapport détaillé' dans les options avancées pour voir le rapport complet.")
