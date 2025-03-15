@@ -70,9 +70,17 @@ with st.sidebar:
     project_path = st.text_input("Chemin vers le projet", value="C:/Dev/IA/CommonTools")
     project_name = st.text_input("Nom du package Python", value="common_tools")
     granularity = st.slider("Granularité", min_value=2, max_value=50, value=10, step=1)
+    
+    with st.expander("Options avancées"):
+        splitable_folders_input = st.text_input(
+            "Dossiers divisibles (séparés par des virgules)", 
+            value="helpers",
+            help="Ces dossiers peuvent être divisés entre différentes sous-librairies"
+        )
+        splitable_folders = [folder.strip() for folder in splitable_folders_input.split(",") if folder.strip()]
 
     if st.button("Analyser"):
-        analyzer = DependencyAnalyzer(project_path, project_name)
+        analyzer = DependencyAnalyzer(project_path, project_name, splitable_folders)
         analyzer.find_python_files()
         analyzer.extract_imports()
         analyzer.analyze_dependency_structure()

@@ -29,7 +29,7 @@ class ImportVisitor(ast.NodeVisitor):
                     self.from_imports[module_path] = {alias.name}
 
 class DependencyAnalyzer:
-    def __init__(self, project_path: str, project_name: str):
+    def __init__(self, project_path: str, project_name: str, splitable_folders: List[str] = None):
         self.project_path: Path = Path(project_path).resolve()
         self.project_name: str = project_name
         self.python_files: Dict[Path, str] = {}
@@ -38,6 +38,7 @@ class DependencyAnalyzer:
         self.module_groups: Dict[str, Any] = {}
         self.module_to_group: Dict[str,int] = {}
         self.grouped_graph: nx.DiGraph = nx.DiGraph()
+        self.splitable_folders: List[str] = splitable_folders if splitable_folders is not None else ['helpers']
     def find_python_files(self) -> None:
         for root, _, files in os.walk(self.project_path):
             for file in files:
@@ -102,45 +103,101 @@ class DependencyAnalyzer:
         }
     def partition_by_granularity(self, granularity: int) -> None:
         """
-        Divise les modules en exactement 'granularity' sous-librairies si possible,
-        en utilisant une combinaison de critères (dépendances internes, externes, hiérarchie).
+        Divise les modules en sous-librairies selon les critères suivants:
+        1. Chaque fichier n'apparaît que dans une seule sous-librairie
+        2. Commence par regrouper les fichiers qui partagent les mêmes dépendances externes et 
+           qui n'ont pas de dépendances internes
+        3. Essaie de maintenir les fichiers du même dossier ensemble, sauf pour les dossiers 
+           dans la liste splitable_folders
         
         Args:
-            granularity: Nombre cible de sous-librairies à créer
+            granularity: Nombre cible de sous-librairies à créer (guidage, peut ne pas être exact)
         """
-        if granularity < 1:
-            granularity = 1
-        
         all_modules = list(self.dependency_graph.nodes())
-        if len(all_modules) <= granularity:
-            # Si le nombre de modules est inférieur ou égal à la granularité,
-            # chaque module forme sa propre sous-librairie
-            for idx, module in enumerate(all_modules, 1):
-                self.module_to_group[module] = idx
-        else:
-            # Plusieurs stratégies pour créer les groupes
-            strategies = [
-                self._group_by_internal_deps,
-                self._group_by_external_deps,
-                self._group_by_hierarchy
-            ]
+        self.module_to_group.clear()  # Réinitialiser les assignations
+        
+        # Dict pour stocker les sous-librairies
+        sub_libraries = {}
+        current_sub_lib = 1
+        
+        # Phase 1: Fichiers sans dépendances internes, groupés par dépendances externes identiques
+        standalone_by_ext_deps = defaultdict(list)
+        for module, deps in self.dependencies.items():
+            if not deps['internal']:  # Pas de dépendances internes
+                ext_deps_key = frozenset(deps['external'])
+                standalone_by_ext_deps[ext_deps_key].append(module)
+        
+        # Assigner un groupe à chaque ensemble de fichiers indépendants avec mêmes dépendances externes
+        for ext_deps, modules in standalone_by_ext_deps.items():
+            if modules:
+                sub_libraries[current_sub_lib] = modules
+                for module in modules:
+                    self.module_to_group[module] = current_sub_lib
+                current_sub_lib += 1
+        
+        # Phase 2: Fichiers restants, groupés par dossier (sauf ceux dans splitable_folders)
+        
+        # Identifier les modules restants
+        remaining_modules = [m for m in all_modules if m not in self.module_to_group]
+        
+        # Grouper par dossier, en identifiant les fichiers dans les dossiers splitable
+        folder_to_modules = defaultdict(list)
+        splitable_modules = []
+        
+        for module in remaining_modules:
+            # Extraire le chemin du dossier à partir du nom du module
+            path_parts = module.split('.')
+            if len(path_parts) <= 1:  # Module au niveau racine
+                folder_path = ''
+            else:
+                # Vérifier si le module est dans un dossier splitable
+                is_splitable = False
+                for splitable_folder in self.splitable_folders:
+                    if splitable_folder in path_parts:
+                        is_splitable = True
+                        break
+                
+                if is_splitable:
+                    splitable_modules.append(module)
+                    continue
+                
+                # Sinon, l'affecter à son dossier
+                folder_path = '.'.join(path_parts[:-1])  # Exclure le nom du fichier
             
-            # Évaluer chaque stratégie et sélectionner celle qui donne le meilleur équilibre
-            best_strategy = None
-            best_score = float('inf')
-            
-            for strategy in strategies:
-                groups, score = strategy(granularity)
-                if score < best_score:
-                    best_score = score
-                    best_strategy = groups
-            
-            # Appliquer la meilleure stratégie
-            idx = 1
-            for group in best_strategy:
-                for module in group:
-                    self.module_to_group[module] = idx
-                idx += 1
+            folder_to_modules[folder_path].append(module)
+        
+        # Assigner les groupes par dossier
+        for folder, modules in folder_to_modules.items():
+            if modules:
+                sub_libraries[current_sub_lib] = modules
+                for module in modules:
+                    self.module_to_group[module] = current_sub_lib
+                current_sub_lib += 1
+        
+        # Phase 3: Traiter les modules dans les dossiers splitable
+        # Regrouper par dépendances externes
+        splitable_by_ext_deps = defaultdict(list)
+        for module in splitable_modules:
+            # Vérifier que le module existe dans les dépendances analysées
+            if module in self.dependencies:
+                ext_deps_key = frozenset(self.dependencies[module]['external'])
+                splitable_by_ext_deps[ext_deps_key].append(module)
+            else:
+                # Si le module n'a pas d'entrée dans self.dependencies, le mettre dans un groupe séparé
+                # Cela peut arriver si le module est référencé mais n'a pas été correctement analysé
+                splitable_by_ext_deps[frozenset()].append(module)
+        
+        # Assigner des groupes aux modules splitable
+        for ext_deps, modules in splitable_by_ext_deps.items():
+            if modules:
+                sub_libraries[current_sub_lib] = modules
+                for module in modules:
+                    self.module_to_group[module] = current_sub_lib
+                current_sub_lib += 1
+        
+        # Si nous avons plus de sous-librairies que souhaité, on peut essayer de fusionner
+        # les plus petites (optionnel, à implémenter si nécessaire)
+        # [Code pour fusionner des sous-librairies si nécessaire]
         
         # Créer le graphe des dépendances entre groupes
         self.grouped_graph = nx.DiGraph()
@@ -466,8 +523,10 @@ def main():
     parser.add_argument("--graph", action="store_true")
     parser.add_argument("--graph-format", choices=["png", "pdf", "svg"], default="png")
     parser.add_argument("--granularity", type=int, default=10)
+    parser.add_argument("--splitable-folders", nargs="+", default=["helpers"], 
+                        help="Liste des dossiers pouvant être divisés entre sous-librairies")
     args: argparse.Namespace = parser.parse_args()
-    analyzer: DependencyAnalyzer = DependencyAnalyzer(args.project_path, args.project_name)
+    analyzer: DependencyAnalyzer = DependencyAnalyzer(args.project_path, args.project_name, args.splitable_folders)
     analyzer.find_python_files()
     analyzer.extract_imports()
     analyzer.analyze_dependency_structure()
