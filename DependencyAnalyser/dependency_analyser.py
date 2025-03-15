@@ -195,15 +195,79 @@ class DependencyAnalyzer:
                     self.module_to_group[module] = current_sub_lib
                 current_sub_lib += 1
         
-        # Si nous avons plus de sous-librairies que souhaité, on peut essayer de fusionner
-        # les plus petites (optionnel, à implémenter si nécessaire)
-        # [Code pour fusionner des sous-librairies si nécessaire]
+        # Phase 4: Fusion des sous-librairies pour respecter la granularité cible
+        # Si nous avons plus de sous-librairies que souhaité, on fusionne les plus similaires
+        actual_num_libs = current_sub_lib - 1  # Nombre réel de sous-librairies créées
+        
+        if actual_num_libs > granularity:
+            # Calculer les similarités entre sous-librairies basées sur leurs dépendances
+            while len(sub_libraries) > granularity:
+                # Trouver les sous-librairies les plus similaires à fusionner
+                similarity_scores = []
+                
+                for lib_id1 in sorted(sub_libraries.keys()):
+                    for lib_id2 in sorted([lid for lid in sub_libraries.keys() if lid > lib_id1]):
+                        # Collecter toutes les dépendances externes pour les deux sous-librairies
+                        libs1_ext_deps = set()
+                        for module in sub_libraries[lib_id1]:
+                            if module in self.dependencies:
+                                libs1_ext_deps.update(self.dependencies[module]['external'])
+                                
+                        libs2_ext_deps = set()
+                        for module in sub_libraries[lib_id2]:
+                            if module in self.dependencies:
+                                libs2_ext_deps.update(self.dependencies[module]['external'])
+                        
+                        # Calculer la similarité (indice de Jaccard)
+                        if not libs1_ext_deps and not libs2_ext_deps:
+                            similarity = 1.0  # Les deux n'ont pas de dépendances externes
+                        else:
+                            intersection = len(libs1_ext_deps.intersection(libs2_ext_deps))
+                            union = len(libs1_ext_deps.union(libs2_ext_deps))
+                            similarity = intersection / union if union > 0 else 0
+                        
+                        # Favoriser également les petites sous-librairies pour la fusion
+                        size_factor = 1.0 / (len(sub_libraries[lib_id1]) + len(sub_libraries[lib_id2]))
+                        adjusted_score = similarity + 0.3 * size_factor  # Pondération pour favoriser légèrement la similarité
+                        
+                        similarity_scores.append((adjusted_score, lib_id1, lib_id2))
+                
+                if similarity_scores:
+                    # Fusionner les deux sous-librairies les plus similaires
+                    similarity_scores.sort(reverse=True)  # Trier par similarité (décroissant)
+                    _, lib_id1, lib_id2 = similarity_scores[0]
+                    
+                    # Fusionner lib_id2 dans lib_id1
+                    sub_libraries[lib_id1].extend(sub_libraries[lib_id2])
+                    
+                    # Mettre à jour le mapping des modules vers les groupes
+                    for module in sub_libraries[lib_id2]:
+                        self.module_to_group[module] = lib_id1
+                    
+                    # Supprimer lib_id2
+                    del sub_libraries[lib_id2]
+                else:
+                    break  # Aucune fusion possible
+            
+            # Réindexer les groupes de façon continue (1, 2, 3, ...) en conservant l'ordre
+            old_to_new_id = {}
+            for idx, old_id in enumerate(sorted(sub_libraries.keys()), 1):
+                old_to_new_id[old_id] = idx
+            
+            # Mettre à jour le mapping des modules vers les groupes
+            for module, old_group_id in self.module_to_group.items():
+                if old_group_id in old_to_new_id:
+                    self.module_to_group[module] = old_to_new_id[old_group_id]
         
         # Créer le graphe des dépendances entre groupes
+        # Utiliser les IDs de groupe réels plutôt que de supposer qu'ils sont séquentiels
+        unique_group_ids = set(self.module_to_group.values())
+        
         self.grouped_graph = nx.DiGraph()
-        for group_id in range(1, len(set(self.module_to_group.values())) + 1):
+        for group_id in unique_group_ids:
             self.grouped_graph.add_node(group_id)
         
+        # Ajouter les arêtes entre les groupes
         for source, target in self.dependency_graph.edges():
             g_s = self.module_to_group.get(source)
             g_t = self.module_to_group.get(target)
