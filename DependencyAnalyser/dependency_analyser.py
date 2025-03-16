@@ -104,9 +104,10 @@ class DependencyAnalyzer:
     def partition_by_granularity(self, granularity: int) -> None:
         """
         Divise les modules en sous-librairies selon les critères suivants:
-        1. Garde les fichiers du même dossier ensemble (sauf pour les dossiers dans splitable_folders)
-        2. Chaque fichier n'apparaît que dans une seule sous-librairie
-        3. Les dépendances externes sont prises en compte pour regrouper les modules similaires
+        1. Groupe les fichiers partageant les mêmes dépendances externes
+        2. Considère les dépendances internes pour affiner les groupes
+        3. Essaie de garder les fichiers du même dossier ensemble (sauf pour splitable_folders)
+        4. Chaque fichier n'apparaît que dans une seule sous-librairie
         
         Args:
             granularity: Nombre cible de sous-librairies à créer
@@ -114,103 +115,136 @@ class DependencyAnalyzer:
         all_modules = list(self.dependency_graph.nodes())
         self.module_to_group.clear()  # Réinitialiser les assignations
         
-        # Dict pour stocker les sous-librairies
+        # Dict pour stocker les groupes temporaires et sous-librairies finales
+        temp_groups = defaultdict(list)
         sub_libraries = {}
         current_sub_lib = 1
         
-        # Phase 1: D'abord, grouper par dossier (sauf pour les dossiers splitable)
-        folder_to_modules = defaultdict(list)
-        splitable_modules = []
+        # Phase 1: Regrouper d'abord par signatures de dépendances externes
+        # Priorité absolue aux dépendances externes identiques
+        ext_deps_signature = {}
         
         for module in all_modules:
-            # Extraire le chemin du dossier à partir du nom du module
-            path_parts = module.split('.')
+            # Signature = ensemble des dépendances externes
+            ext_deps = frozenset()
+            if module in self.dependencies:
+                ext_deps = frozenset(self.dependencies[module]['external'])
             
-            # Vérifier si le module est dans un dossier splitable
-            is_splitable = False
-            if len(path_parts) > 1:  # Module pas au niveau racine
-                for splitable_folder in self.splitable_folders:
-                    if splitable_folder in path_parts:
-                        is_splitable = True
-                        break
+            # Enregistrer la signature pour ce module
+            ext_deps_signature[module] = ext_deps
             
-            if is_splitable:
-                splitable_modules.append(module)
-            else:
-                if len(path_parts) <= 1:  # Module au niveau racine
-                    folder_path = ''
-                else:
-                    folder_path = '.'.join(path_parts[:-1])  # Exclure le nom du fichier
-                
-                folder_to_modules[folder_path].append(module)
+            # Grouper par signature
+            temp_groups[ext_deps].append(module)
         
-        # Assigner des groupes par dossier
-        for folder, modules in folder_to_modules.items():
-            if modules:
+        # Phase 2: Analyser les dépendances internes pour chaque groupe temporaire
+        # Si un groupe est trop grand, le diviser en considérant les dépendances internes
+        # et l'appartenance aux dossiers
+        folder_to_modules = defaultdict(list)
+        
+        # Compteur pour les groupes finaux
+        for ext_deps, modules in temp_groups.items():
+            # Si le groupe est petit, le garder tel quel
+            if len(modules) <= 5:  # Seuil arbitraire pour les petits groupes
                 sub_libraries[current_sub_lib] = modules
                 for module in modules:
                     self.module_to_group[module] = current_sub_lib
                 current_sub_lib += 1
-        
-        # Phase 2: Traiter les modules dans les dossiers splitable
-        # Les regrouper par dépendances externes
-        if splitable_modules:
-            ext_deps_to_modules = defaultdict(list)
+                continue
             
-            for module in splitable_modules:
-                ext_deps = frozenset()
-                if module in self.dependencies:
-                    ext_deps = frozenset(self.dependencies[module]['external'])
-                ext_deps_to_modules[ext_deps].append(module)
+            # Pour les groupes plus grands, analyser par dossier
+            # Regrouper par dossier tout en respectant les dossiers splitable
+            folder_modules = defaultdict(list)
+            for module in modules:
+                path_parts = module.split('.')
+                
+                # Vérifier si le module est dans un dossier splitable
+                is_splitable = False
+                if len(path_parts) > 1:
+                    for splitable_folder in self.splitable_folders:
+                        if splitable_folder in path_parts:
+                            is_splitable = True
+                            break
+                
+                if is_splitable:
+                    # Pour les dossiers splitables, nous allons évaluer les dépendances internes
+                    internal_deps = self.dependencies.get(module, {}).get('internal', set())
+                    
+                    # Créer une clé basée sur les 3 premières dépendances internes (si disponibles)
+                    # pour créer des groupes plus petits mais cohérents
+                    int_deps_key = frozenset(sorted(internal_deps)[:3]) if internal_deps else frozenset(['no_deps'])
+                    folder_key = f"split_{int_deps_key}"
+                    folder_modules[folder_key].append(module)
+                else:
+                    # Pour les dossiers non-splitables, garder ensemble
+                    if len(path_parts) <= 1:
+                        folder_key = ''  # Module racine
+                    else:
+                        folder_key = '.'.join(path_parts[:-1])
+                    folder_modules[folder_key].append(module)
             
-            # Assigner des groupes aux modules regroupés par dépendances externes
-            for ext_deps, modules in ext_deps_to_modules.items():
-                if modules:
-                    sub_libraries[current_sub_lib] = modules
-                    for module in modules:
-                        self.module_to_group[module] = current_sub_lib
-                    current_sub_lib += 1
+            # Ajouter chaque groupe de dossier comme sous-librairie
+            for folder_key, folder_module_list in folder_modules.items():
+                sub_libraries[current_sub_lib] = folder_module_list
+                for module in folder_module_list:
+                    self.module_to_group[module] = current_sub_lib
+                current_sub_lib += 1
         
-        # Phase 4: Fusion des sous-librairies pour respecter la granularité cible
-        # Si nous avons plus de sous-librairies que souhaité, on fusionne les plus similaires
-        actual_num_libs = current_sub_lib - 1  # Nombre réel de sous-librairies créées
+        # Phase 3: Fusion des sous-librairies si nécessaire pour respecter la granularité
+        actual_num_libs = len(sub_libraries)
         
         if actual_num_libs > granularity:
-            # Calculer les similarités entre sous-librairies basées sur leurs dépendances
+            # Calculer les similarités entre sous-librairies
             while len(sub_libraries) > granularity:
-                # Trouver les sous-librairies les plus similaires à fusionner
                 similarity_scores = []
                 
                 for lib_id1 in sorted(sub_libraries.keys()):
                     for lib_id2 in sorted([lid for lid in sub_libraries.keys() if lid > lib_id1]):
-                        # Collecter toutes les dépendances externes pour les deux sous-librairies
+                        # Vérifier si les deux sous-librairies ont des modules du même dossier
+                        # (indice qu'elles devraient peut-être être fusionnées)
+                        folders1 = set()
+                        folders2 = set()
+                        
+                        for module in sub_libraries[lib_id1]:
+                            parts = module.split('.')
+                            folder = '.'.join(parts[:-1]) if len(parts) > 1 else ''
+                            folders1.add(folder)
+                        
+                        for module in sub_libraries[lib_id2]:
+                            parts = module.split('.')
+                            folder = '.'.join(parts[:-1]) if len(parts) > 1 else ''
+                            folders2.add(folder)
+                        
+                        # Vérifier également la similarité des dépendances externes
                         libs1_ext_deps = set()
                         for module in sub_libraries[lib_id1]:
                             if module in self.dependencies:
                                 libs1_ext_deps.update(self.dependencies[module]['external'])
-                                
+                        
                         libs2_ext_deps = set()
                         for module in sub_libraries[lib_id2]:
                             if module in self.dependencies:
                                 libs2_ext_deps.update(self.dependencies[module]['external'])
                         
-                        # Calculer la similarité (indice de Jaccard)
+                        # Calculer la similarité (pondération des facteurs)
+                        folder_overlap = len(folders1.intersection(folders2)) / len(folders1.union(folders2)) if folders1.union(folders2) else 0
+                        
+                        # Similarité des dépendances externes (indice de Jaccard)
                         if not libs1_ext_deps and not libs2_ext_deps:
-                            similarity = 1.0  # Les deux n'ont pas de dépendances externes
+                            deps_similarity = 1.0  # Les deux n'ont pas de dépendances externes
                         else:
                             intersection = len(libs1_ext_deps.intersection(libs2_ext_deps))
                             union = len(libs1_ext_deps.union(libs2_ext_deps))
-                            similarity = intersection / union if union > 0 else 0
+                            deps_similarity = intersection / union if union > 0 else 0
                         
-                        # Favoriser également les petites sous-librairies pour la fusion
+                        # Calculer le score final (pondération: 60% deps, 30% dossiers, 10% taille)
                         size_factor = 1.0 / (len(sub_libraries[lib_id1]) + len(sub_libraries[lib_id2]))
-                        adjusted_score = similarity + 0.3 * size_factor  # Pondération pour favoriser légèrement la similarité
+                        score = 0.6 * deps_similarity + 0.3 * folder_overlap + 0.1 * size_factor
                         
-                        similarity_scores.append((adjusted_score, lib_id1, lib_id2))
+                        similarity_scores.append((score, lib_id1, lib_id2))
                 
                 if similarity_scores:
                     # Fusionner les deux sous-librairies les plus similaires
-                    similarity_scores.sort(reverse=True)  # Trier par similarité (décroissant)
+                    similarity_scores.sort(reverse=True)
                     _, lib_id1, lib_id2 = similarity_scores[0]
                     
                     # Fusionner lib_id2 dans lib_id1
@@ -235,8 +269,14 @@ class DependencyAnalyzer:
                 if old_group_id in old_to_new_id:
                     self.module_to_group[module] = old_to_new_id[old_group_id]
         
+        # Phase 4: Optimiser la composition des sous-librairies en analysant les dépendances internes
+        # Réaffecter certains modules si nécessaire pour minimiser les dépendances entre sous-librairies
+        for _ in range(2):  # Deux passes d'optimisation
+            changes_made = self._optimize_assignments_by_internal_deps()
+            if not changes_made:
+                break
+        
         # Créer le graphe des dépendances entre groupes
-        # Utiliser les IDs de groupe réels plutôt que de supposer qu'ils sont séquentiels
         unique_group_ids = set(self.module_to_group.values())
         
         self.grouped_graph = nx.DiGraph()
@@ -249,6 +289,81 @@ class DependencyAnalyzer:
             g_t = self.module_to_group.get(target)
             if g_s and g_t and g_s != g_t:
                 self.grouped_graph.add_edge(g_s, g_t)
+    
+    def _optimize_assignments_by_internal_deps(self) -> bool:
+        """
+        Optimise l'affectation des modules en considérant les dépendances internes.
+        Essaie de réduire le nombre de dépendances entre sous-librairies.
+        
+        Returns:
+            True si des changements ont été effectués, False sinon
+        """
+        changes_made = False
+        
+        # Pour chaque module, évaluer s'il serait mieux placé dans une autre sous-librairie
+        # en fonction de ses dépendances internes
+        all_modules = list(self.dependency_graph.nodes())
+        
+        for module in all_modules:
+            current_group = self.module_to_group.get(module)
+            if not current_group:
+                continue
+            
+            # Compter les dépendances internes vers chaque sous-librairie
+            internal_deps_count = defaultdict(int)
+            
+            # Dépendances sortantes
+            if module in self.dependencies:
+                for dep in self.dependencies[module]['internal']:
+                    if dep in self.module_to_group:
+                        dep_group = self.module_to_group[dep]
+                        if dep_group != current_group:
+                            internal_deps_count[dep_group] += 1
+            
+            # Dépendances entrantes
+            for source, deps in self.dependencies.items():
+                if module in deps['internal'] and source in self.module_to_group:
+                    source_group = self.module_to_group[source]
+                    if source_group != current_group:
+                        internal_deps_count[source_group] += 1
+            
+            # Vérifier si un autre groupe a plus de dépendances avec ce module
+            best_group = current_group
+            max_deps = 0
+            
+            for group, count in internal_deps_count.items():
+                if count > max_deps:
+                    max_deps = count
+                    best_group = group
+            
+            # Si un meilleur groupe est trouvé, et que le module n'est pas dans un dossier protégé
+            if best_group != current_group and max_deps >= 2:  # Seuil arbitraire
+                # Vérifier si le module est dans un dossier splitable
+                path_parts = module.split('.')
+                is_splitable = False
+                
+                if len(path_parts) > 1:
+                    for splitable_folder in self.splitable_folders:
+                        if splitable_folder in path_parts:
+                            is_splitable = True
+                            break
+                
+                # Vérifier si tous les autres modules du même dossier sont dans le même groupe
+                if not is_splitable and len(path_parts) > 1:
+                    folder_path = '.'.join(path_parts[:-1])
+                    same_folder_modules = [m for m in all_modules if m.startswith(folder_path + '.')]
+                    same_folder_groups = {self.module_to_group.get(m) for m in same_folder_modules if m != module}
+                    
+                    # Si tous les autres modules du dossier sont dans le même groupe, 
+                    # ne pas déplacer ce module
+                    if len(same_folder_groups) == 1 and current_group in same_folder_groups:
+                        continue
+                
+                # Réaffecter le module au meilleur groupe
+                self.module_to_group[module] = best_group
+                changes_made = True
+        
+        return changes_made
     def _group_by_internal_deps(self, granularity: int) -> Tuple[List[List[str]], float]:
         """
         Groupe les modules selon leurs dépendances internes pour obtenir 'granularity' groupes.
@@ -509,7 +624,7 @@ class DependencyAnalyzer:
         return proposed_structure
     def visualize_sub_libraries(self, output_file: str = 'sub_libraries.png') -> None:
         """
-        Génère une visualisation des sous-librairies et leurs dépendances.
+        Génère une visualisation statique des sous-librairies et leurs dépendances.
         
         Args:
             output_file: Chemin du fichier de sortie
@@ -583,6 +698,49 @@ class DependencyAnalyzer:
         plt.tight_layout()
         plt.savefig(output_file, dpi=300, bbox_inches='tight')
         plt.close()
+    
+    def get_graph_json_data(self) -> Dict[str, Any]:
+        """
+        Convertit le graphe de dépendances en format JSON pour la visualisation JavaScript
+        
+        Returns:
+            Dictionnaire avec les données du graphe formatées pour D3.js
+        """
+        # Préparer les données des noeuds
+        nodes = []
+        for group_id in sorted(set(self.module_to_group.values())):
+            modules = [m for m, g in self.module_to_group.items() if g == group_id]
+            module_count = len(modules)
+            
+            # Calculer le nombre de dépendances externes
+            external_deps_count = 0
+            for module in modules:
+                if module in self.dependencies:
+                    external_deps_count += len(self.dependencies[module]['external'])
+            
+            # Créer le noeud
+            nodes.append({
+                "id": group_id,
+                "label": f"Lib {group_id}",
+                "moduleCount": module_count,
+                "externalDepsCount": external_deps_count
+            })
+        
+        # Préparer les données des liens
+        links = []
+        edge_index = 0
+        for source, target in self.grouped_graph.edges():
+            links.append({
+                "source": source,
+                "target": target,
+                "index": edge_index
+            })
+            edge_index += 1
+        
+        return {
+            "nodes": nodes,
+            "links": links
+        }
 
     def print_sub_libraries_info(self) -> str:
         """

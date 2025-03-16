@@ -3,6 +3,12 @@ import matplotlib.pyplot as plt
 import matplotlib
 matplotlib.use('Agg')
 import networkx as nx
+import json
+import os
+from pathlib import Path
+import shutil
+import tempfile
+from streamlit.components.v1 import html
 
 from dependency_analyser import DependencyAnalyzer
 
@@ -187,31 +193,81 @@ if analyzer and groups:
     with tab1:
         st.header("Graphe de dépendances entre sous-librairies")
         
-        # Utiliser temporairement un fichier pour sauvegarder la visualisation
-        import tempfile
-        import os
+        # Vérifier que les fichiers de visualisation sont disponibles
+        js_file = Path("static/dependency_graph.js")
+        html_file = Path("static/dependency_graph.html")
         
-        with tempfile.TemporaryDirectory() as tmpdirname:
-            graph_path = os.path.join(tmpdirname, "graph.png")
-            analyzer.visualize_sub_libraries(output_file=graph_path)
+        if not js_file.exists() or not html_file.exists():
+            st.error("Fichiers de visualisation non trouvés. Assurez-vous que les fichiers static/dependency_graph.js et static/dependency_graph.html existent.")
+        else:
+            # Obtenir les données du graphe au format JSON
+            graph_data = analyzer.get_graph_json_data()
+            graph_data_json = json.dumps(graph_data)
             
-            # Afficher l'image générée
-            try:
-                st.image(graph_path, use_container_width=True)
-                st.caption(f"Structure des sous-librairies (granularité: {len(groups)})")
-            except Exception as e:
-                # Fallback à l'ancienne méthode si la visualisation améliorée échoue
-                st.error(f"Erreur lors de la génération du graphe amélioré: {str(e)}")
-                sub_lib_graph = analyzer.grouped_graph
-                fig, ax = plt.subplots(figsize=(10, 8))
-                pos = nx.spring_layout(sub_lib_graph, k=0.3)
-                nx.draw_networkx_nodes(sub_lib_graph, pos, node_color='cyan', node_size=700, ax=ax)
-                nx.draw_networkx_edges(sub_lib_graph, pos, arrows=True, ax=ax)
-                labels = {n: f"Lib {n}" for n in sub_lib_graph.nodes()}
-                nx.draw_networkx_labels(sub_lib_graph, pos, labels=labels, font_size=10, ax=ax)
-                plt.title("Sous-librairies (Dépendances inter-libs)")
-                plt.axis('off')
-                st.pyplot(fig)
+            # Créer le HTML autonome pour la visualisation
+            standalone_html = f"""
+            <!DOCTYPE html>
+            <html lang="fr">
+            <head>
+                <meta charset="UTF-8">
+                <title>Visualisation des dépendances</title>
+                <script src="https://d3js.org/d3.v7.min.js"></script>
+                <script>
+                {open(js_file, "r").read()}
+                
+                document.addEventListener('DOMContentLoaded', function() {{
+                    const graphData = {graph_data_json};
+                    createDependencyGraph('graph-container', graphData, {{
+                        width: 800,
+                        height: 600,
+                        nodeMinSize: 40,
+                        nodeMaxSize: 120,
+                        fontMinSize: 14,
+                        fontMaxSize: 20,
+                        fontActiveSize: 24
+                    }});
+                }});
+                </script>
+                <style>
+                    body {{
+                        margin: 0;
+                        padding: 0;
+                        overflow: hidden;
+                    }}
+                    #graph-container {{
+                        width: 100%;
+                        height: 100vh;
+                        background-color: #f5f5f5;
+                    }}
+                </style>
+            </head>
+            <body>
+                <div id="graph-container"></div>
+            </body>
+            </html>
+            """
+            
+            # Afficher la visualisation directement
+            st.components.v1.html(standalone_html, height=600)
+            
+            st.caption(f"Structure des sous-librairies (granularité: {len(groups)}). Cliquez sur une libraire pour zoomer.")
+            
+            with st.expander("Instructions d'utilisation"):
+                st.markdown("""
+                - **Cliquez sur un nœud** pour le mettre en évidence avec ses connexions
+                - **Cliquez à nouveau** sur un nœud sélectionné pour annuler la sélection
+                - **Faites glisser un nœud** pour ajuster manuellement la disposition
+                - **Utilisez la molette de la souris** pour zoomer et dézoomer
+                - **Cliquez et faites glisser l'arrière-plan** pour vous déplacer dans le graphique
+                """)
+            
+            # Option pour télécharger la visualisation
+            st.download_button(
+                "Télécharger la visualisation interactive",
+                standalone_html,
+                "dependency_graph.html",
+                "text/html"
+            )
     
     with tab2:
         st.header("Détails des sous-librairies")

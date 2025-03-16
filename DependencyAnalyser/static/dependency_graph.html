@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualisation des dépendances</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f5f5f5;
+            overflow: hidden;
+        }
+        
+        #graph-container {
+            width: 100%;
+            height: 100vh;
+            position: relative;
+        }
+        
+        .dependency-graph {
+            width: 100%;
+            height: 100%;
+            background-color: #f5f5f5;
+        }
+        
+        .tooltip {
+            position: absolute;
+            background-color: rgba(255, 255, 255, 0.9);
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 8px;
+            font-size: 12px;
+            pointer-events: none;
+            max-width: 300px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            z-index: 10;
+        }
+        
+        .controls {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            z-index: 5;
+        }
+    </style>
+</head>
+<body>
+    <div id="graph-container"></div>
+    
+    <script src="dependency_graph.js"></script>
+    <script>
+        // This function will be called by Streamlit to update the visualization
+        function updateGraph(graphData) {
+            createDependencyGraph('graph-container', graphData, {
+                width: window.innerWidth,
+                height: window.innerHeight,
+                nodeMinSize: 40,
+                nodeMaxSize: 120,
+                fontMinSize: 14,
+                fontMaxSize: 20,
+                fontActiveSize: 24,
+                nodeActiveSizeMultiplier: 1.5
+            });
+        }
+        
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            if (window.graphData) {
+                updateGraph(window.graphData);
+            }
+        });
+        
+        // Initial data loading (can be overridden by Streamlit)
+        window.graphData = {
+            nodes: [
+                { id: 1, label: "Lib 1", moduleCount: 5, externalDepsCount: 2 },
+                { id: 2, label: "Lib 2", moduleCount: 3, externalDepsCount: 1 }
+            ],
+            links: [
+                { source: 1, target: 2, index: 0 }
+            ]
+        };
+        
+        // Initial rendering with placeholder data
+        updateGraph(window.graphData);
+        
+        // Function to receive data from Streamlit
+        window.addEventListener('message', function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'graphData') {
+                    window.graphData = data.graphData;
+                    updateGraph(window.graphData);
+                }
+            } catch (err) {
+                console.error('Error processing message:', err);
+            }
+        });
+    </script>
+</body>
+</html>
