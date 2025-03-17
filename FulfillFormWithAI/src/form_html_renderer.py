@@ -26,11 +26,11 @@ class FormHTMLRenderer:
             '<style>',
             '  body { font-family: Arial, sans-serif; margin: 20px; }',
             '  .group { margin-bottom: 30px; }',
-            '  table { border-collapse: collapse; width: 100%; }',
-            '  table, th, td { border: 1px solid #ccc; }',
-            '  th, td { padding: 8px; text-align: left; }',
-            '  .valid { border: 2px solid green; }',
-            '  .invalid { border: 2px solid red; }',
+            '  .form-row { display: flex; align-items: center; gap: 5px; margin-bottom: 5px; }',
+            '  .field-name { flex: 0 0 auto; padding-right: 5px; font-weight: bold; }',
+            '  .field-value { flex: 1; padding: 5px; border: 1px solid #ccc; }',
+            '  .valid { border-color: green; }',
+            '  .invalid { border-color: red; }',
             '  .tooltip { position: relative; display: inline-block; }',
             '  .tooltip .tooltiptext { visibility: hidden; width: 200px; background-color: #555; color: #fff;',
             '    text-align: center; border-radius: 6px; padding: 5px; position: absolute; z-index: 1;',
@@ -42,29 +42,17 @@ class FormHTMLRenderer:
             '<h1>{}</h1>'.format(self.form.name)
         ]
 
-        # Pour chaque groupe du formulaire, créer une section avec un tableau de champs
         for group in self.form.groups:
             html.append('<div class="group">')
             html.append('<h2 class="tooltip" title="{}">{}</h2>'.format(group.description, group.name.upper()))
-            html.append('<table>')
-            html.append('<thead>')
-            html.append('<tr>')
-            html.append('<th>Champ</th>')
-            html.append('<th>Valeur</th>')
-            html.append('</tr>')
-            html.append('</thead>')
-            html.append('<tbody>')
-
+            
             for field in group.fields:
                 valid_class = "valid" if field.is_valid else "invalid"
-                valid_text = "Oui" if field.is_valid else "Non"
-                html.append('<tr>')
-                html.append('<td class="tooltip" title="{}">{}</td>'.format(field.description, self.format_field_name(field.name)))
-                html.append('<td class="{}">{}</td>'.format(valid_class, field.value))
-                html.append('</tr>')
-
-            html.append('</tbody>')
-            html.append('</table>')
+                html.append('<div class="form-row">')
+                html.append('<div class="field-name tooltip" title="{}">{}</div>'.format(field.description, self.format_field_name(field.name)))
+                html.append('<div class="field-value {}">{}</div>'.format(valid_class, field.value))
+                html.append('</div>')
+            
             html.append('</div>')
 
         html.append('</body>')
