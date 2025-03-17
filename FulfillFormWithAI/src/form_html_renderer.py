@@ -26,9 +26,8 @@ class FormHTMLRenderer:
             '<style>',
             '  body { font-family: Arial, sans-serif; margin: 20px; }',
             '  .group { margin-bottom: 30px; }',
-            '  table { border-collapse: collapse; width: 100%; }',
-            '  table, th, td { border: 1px solid #ccc; }',
-            '  th, td { padding: 8px; text-align: left; }',
+            '  table { border-collapse: collapse; border-spacing: 0; width: max-content; }',
+            '  table, th { border: 1px solid #ccc; }',
             '  .valid { border: 2px solid green; }',
             '  .invalid { border: 2px solid red; }',
             '  .tooltip { position: relative; display: inline-block; }',
@@ -36,8 +35,11 @@ class FormHTMLRenderer:
             '    text-align: center; border-radius: 6px; padding: 5px; position: absolute; z-index: 1;',
             '    bottom: 125%; left: 50%; margin-left: -100px; opacity: 0; transition: opacity 0.3s; }',
             '  .tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }',
-'  .field-name {{ flex: 0 0 auto; width: {}ch; }}'.format(self.calculate_max_field_length()),
-'  .field-value {{width: calc(100% - {}ch); }}'.format(self.calculate_max_field_length()),
+            '  .field-name, .field-spacer, .field-value { padding: 0; }',
+'  .field-name { white-space: nowrap; }',
+            '  .field-spacer { width: 5px; }',
+            '  .field-value { white-space: nowrap; }',
+            '  td.field-name, td.field-spacer, td.field-value { padding: 5px !important; }',
             '</style>',
             '</head>',
             '<body>',
@@ -47,25 +49,22 @@ class FormHTMLRenderer:
         # Pour chaque groupe du formulaire, créer une section avec un tableau de champs
         for group in self.form.groups:
             html.append('<div class="group">')
-            html.append('<h2 class="tooltip" title="{}">{}</h2>'.format(group.description, group.name.upper()))
+            html.append('<h2 class="tooltip" title="{}">{}</h2>'.format(group.description, self.format_field_name(group.name)))
             html.append('<table>')
             html.append('<tbody>')
-
             for field in group.fields:
                 valid_class = "valid" if field.is_valid else "invalid"
                 valid_text = "Oui" if field.is_valid else "Non"
                 html.append('<tr>')
                 html.append('<td class="tooltip field-name" title="{}">{}</td>'.format(field.description, self.format_field_name(field.name)))
+                html.append('<td class="field-spacer"></td>')
                 html.append('<td class="{} field-value">{}</td>'.format(valid_class, field.value))
                 html.append('</tr>')
-
             html.append('</tbody>')
             html.append('</table>')
             html.append('</div>')
-
         html.append('</body>')
         html.append('</html>')
-
         return '\n'.join(html)
 
     def format_field_name(self, name: str) -> str:
