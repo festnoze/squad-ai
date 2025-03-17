@@ -10,6 +10,7 @@ from common_tools.helpers.file_helper import file
 from common_tools.models.file_already_exists_policy import FileAlreadyExistsPolicy
 from common_tools.helpers.txt_helper import txt
 #
+from form_html_renderer import FormHTMLRenderer
 from models.form import Form
 from models.form_agent_state import FormAgentState
 from agents import AgentSupervisor, AgentHIL, AgentInterpretation
@@ -58,7 +59,7 @@ class GraphWorkflowForm:
         self.compiled_graph = self.graph.compile(checkpointer=memory_saver)
         txt.print("✅ Graphe LangGraph consruit !")
 
-    async def run_async(self, yaml_path: str = None, conversation: Optional[str] = None) -> dict:
+    async def run_async(self, yaml_path: str = None, conversation: Optional[str] = None, file_policy = FileAlreadyExistsPolicy.Override) -> dict:
         """Runs the workflow with an optional conversation for pre-filling the form."""
         txt.print("🔄 Workflow en cours d'execution ...")
 
@@ -67,8 +68,20 @@ class GraphWorkflowForm:
         
         # Run the agentic workflow
         result = await self.compiled_graph.ainvoke(form_agent_state, {"recursion_limit": 50, "configurable": {"thread_id": "thread-1"}})
-
         txt.print("\n✅ Formulaire completé !")
-        file.write_file(result["form"], "outputs/filled_form.json", FileAlreadyExistsPolicy.AutoRename)
-        file.write_file(Form.from_dict(result["form"]).get_all_fields_values(), "outputs/filled_form_flatten_fields_values.json", FileAlreadyExistsPolicy.AutoRename)
-        return result["form"]
+        
+        # Saving the filled form (as json and html)
+        form = Form.from_dict(result["form"])
+        json_path = "outputs/filled_form.json"
+        flatten_json_path = "outputs/filled_form_flatten_fields_values.json"
+        html_path = "outputs/form.html"
+
+        file.write_file(result["form"], json_path, file_policy)
+        txt.print(f"\n📄 Formulaire rempli sauvegardé au format json dans : '{json_path}'")
+        file.write_file(form.get_all_fields_values(), flatten_json_path, file_policy)
+        txt.print(f"\n📄 Formulaire rempli minimaliste sauvegardé au format json dans : '{flatten_json_path}'")
+
+        renderer = FormHTMLRenderer(form)
+        html_output = renderer.render()
+        file.write_file(html_output, html_path, file_policy)
+        txt.print(f"\n📄 Formulaire rempli sauvegardé au format html dans : 'outputs/form.html'")
