@@ -14,6 +14,7 @@ from form_html_renderer import FormHTMLRenderer
 from models.form import Form
 from models.form_agent_state import FormAgentState
 from agents import AgentSupervisor, AgentHIL, AgentInterpretation
+import subprocess
 
 # ================== Définition du Graph de workflow d'agents ================== #
 
@@ -84,4 +85,4 @@ class GraphWorkflowForm:
         renderer = FormHTMLRenderer(form)
         html_output = renderer.render()
         file.write_file(html_output, html_path, file_policy)
-        txt.print(f"\n📄 Formulaire rempli sauvegardé au format html dans : 'outputs/form.html'")
+        txt.print(f"\n📄 Formulaire rempli sauvegardé au format html dans : '{html_path}'")
