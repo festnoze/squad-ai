@@ -28,9 +28,9 @@ class FormHTMLRenderer:
             '  body { font-family: Calibri, sans-serif, 20px; margin: 20px; }',
             '  .group { margin-bottom: 30px; }',
             '  table { border-collapse: separate; border-spacing: 8px; padding: 8px; width: 100%; max-width: 1000px; }',
-            '  table, th { border: 1px solid #DDD; border-radius: 10px;}',
-            '  .valid { border: 2px solid #0B0; border-radius: 8px;}',
-            '  .invalid { border: 2px solid #E42; border-radius: 8px;}',
+            '  table, th { border: 1px solid #DDD; border-radius: 10px;} ',
+            '  .valid { border: 2px solid #0B0; border-radius: 8px;} ',
+            '  .invalid { border: 2px solid #E42; border-radius: 8px;} ',
             '  .tooltip { position: relative; display: inline-block; }',
             '  .tooltip .tooltiptext { visibility: hidden; width: 200px; background-color: #555; color: #fff;',
             '    text-align: center; border-radius: 6px; padding: 5px; position: absolute; z-index: 1;',
@@ -39,10 +39,10 @@ class FormHTMLRenderer:
             '  .field-name, .field-spacer, .field-value { padding: 0; }',
             '  .field-name { white-space: nowrap; text-align: right; }',
             '  .field-spacer { width: 5px; }',
-            '  .field-value { white-space: nowrap; width: 100%; text-align: left; }',
-            '  .field-input { width: 97%; }',
-            '  td.field-name, td.field-spacer, td.field-value { padding: 12px 5px !important; }',
-            '  td.valid.field-value, td.invalid.field-value { padding: 10px 5px !important; }',
+            '  .field-value { white-space: normal; word-wrap: break-word; width: 100%; text-align: left; }',
+            '  td.field-name, td.field-spacer, td.field-value { padding: 12px 5px !important; vertical-align: middle; }',
+            '  td.valid.field-value, td.invalid.field-value { padding: 10px 5px !important; vertical-align: middle; }',
+            '  input, textarea, select { width: 100%; height: 100%; border: none; outline: none; box-sizing: border-box; background: transparent; }',
             '</style>',
             '</head>',
             '<body>',
@@ -66,7 +66,7 @@ class FormHTMLRenderer:
                 html.append('<td class="tooltip field-name" style="width: {}ch;" title="{}">{}</td>'.format(
                     max_char_width, self.format_field_name(field.name), field.description))
                 html.append('<td class="field-spacer"></td>')
-                html.append('<td class="{} field-value"><input type="text" class="field-input" value="{}" data-field-name="{}" data-field-description="{}" data-is-valid="{}" data-optional="{}" data-type="{}" data-regex="{}" data-regex-description="{}" data-min="{}" data-max="{}" data-validation-func-name="{}" data-default-value="{}" data-allowed-values="{}"></td>'.format(valid_class, field.value, field.name, field.description, field.is_valid, field.optional, field.type, field.regex if field.regex is not None else "", field.regex_description if field.regex_description is not None else "", field.min_size_or_value, field.max_size_or_value, field.validation_func_name if field.validation_func_name is not None else "", field.default_value if field.default_value is not None else "", field.allowed_values if field.allowed_values is not None else ""))
+                html.append('<td class="{} field-value"><input type="text" class="field-input" value="{}" data-field-name="{}" data-field-description="{}" data-is-valid="{}" data-optional="{}" data-type="{}" data-regex="{}" data-regex-description="{}" data-min="{}" data-max="{}" data-validation-func-name="{}" data-default-value="{}" data-allowed-values="{}"></td>'.format(valid_class, field.value if field.value else '', field.name, field.description, field.is_valid, field.optional, field.type, field.regex if field.regex is not None else "", field.regex_description if field.regex_description is not None else "", field.min_size_or_value, field.max_size_or_value, field.validation_func_name if field.validation_func_name is not None else "", field.default_value if field.default_value is not None else "", field.allowed_values if field.allowed_values is not None else ""))
                 html.append('</tr>')
             html.append('</tbody>')
             html.append('</table>')
