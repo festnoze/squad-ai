@@ -17,14 +17,15 @@ async def generate_ground_truth():
     embedding_model = EnvHelper.get_embedding_model()
     EmbeddingModelFactory.create_instance(embedding_model)
     trainings_docs = await RagasService.get_trainings_objects_or_docs_async(files_path, True)
-    trainings_samples_count = 50
+    trainings_samples_count = 10
     #trainings_samples = random.sample(trainings_docs, trainings_samples_count) if trainings_samples_count else trainings_docs
-        
-    #testset = await RagasService.run_eval_on_ground_truth_dataset_async(llms[0], samples_count= 3)
+
+    # This one works:  
+    testset = await RagasService.run_eval_on_ground_truth_dataset_async(llms[0], samples_count= trainings_samples_count)
     #testset = await RagasService.generate_test_dataset_from_documents_langchain_async(
-    testset = RagasService.generate_or_load_test_dataset_from_documents_generic(
-                                    trainings_docs,
-                                    llms[0], 
-                                    embedding_model, 
-                                    samples_count= 3)
+    # testset = RagasService.generate_or_load_test_dataset_from_documents_generic(
+    #                                 trainings_docs,
+    #                                 llms[0], 
+    #                                 embedding_model, 
+    #                                 samples_count= trainings_samples_count)
     return {"testset": testset.to_dict()}

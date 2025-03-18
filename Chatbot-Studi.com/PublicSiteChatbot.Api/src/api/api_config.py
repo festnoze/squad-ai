@@ -31,7 +31,8 @@ class ApiConfig:
             AvailableService.init(activate_print=True)  
 
             startup_duration = time.time() - started_at
-            print(f"API Startup duration: {startup_duration:.2f}s.")
+            print(f"\n✓ API Startup duration: {startup_duration:.2f}s.")
+            print("\n  ------------------------------\n  | - RAG API up and running - |\n  ------------------------------\n")
             yield
 
         finally:

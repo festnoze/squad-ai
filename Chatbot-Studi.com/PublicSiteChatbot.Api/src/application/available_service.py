@@ -59,7 +59,6 @@ class AvailableService:
             RAGAugmentedGeneration.augmented_generation_prompt = Ressource.get_rag_augmented_generation_prompt_on_studi()
             RAGPreTreatment.domain_specific_metadata_filters_validation_and_correction_async_method = StudiPublicWebsiteRagSpecificConfig.get_domain_specific_metadata_filters_validation_and_correction_async_method
             AvailableService.inference = RagInferencePipeline(rag= AvailableService.rag_service, default_filters= StudiPublicWebsiteRagSpecificConfig.get_domain_specific_default_filters(), metadata_descriptions= metadata_descriptions_for_studi_public_site, tools= None)
-        print("\n  ------------------------------\n  | - RAG API up and running - |\n  ------------------------------\n")
             
     def re_init():
         AvailableService.rag_service = None

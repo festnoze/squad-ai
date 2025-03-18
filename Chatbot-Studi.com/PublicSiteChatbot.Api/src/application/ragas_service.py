@@ -61,7 +61,7 @@ from ragas.metrics import LLMContextRecall, Faithfulness, FactualCorrectness
 
 class RagasService:    
     async def run_eval_on_ground_truth_dataset_async(llm_or_chain: Runnable, samples_count:int = 10):
-        ragas_token = EnvHelper.generic_get_env_variable_value_by_name('RAGAS_APP_TOKEN')
+        ragas_token = EnvHelper.get_env_variable_value_by_name('RAGAS_APP_TOKEN')
         os.environ['RAGAS_APP_TOKEN'] = ragas_token
         
         metadata_descriptions_for_studi_public_site = MetadataDescriptionHelper.get_metadata_descriptions_for_studi_public_site(AvailableService.out_dir)
@@ -82,12 +82,13 @@ class RagasService:
                 include_bm25_retrieval=True,
                 give_score=True,
                 pipeline_config_file_path = 'studi_com_chatbot_rag_pipeline_default_config_wo_AG_for_streaming.yaml',
-                format_retrieved_docs_function=AvailableService.format_retrieved_docs_function)
+                format_retrieved_docs_function=AvailableService.format_retrieved_docs_function
+            )
             data['retrieved_contexts'] = [retrieved_doc.page_content for retrieved_doc in retrieved_docs[0]] #TODO: why retrieved_chunks is an array of array?
 
             all_chunks_output = []
-            augmented_generation_function = inference_pipeline.workflow_concrete_classes['RAGAugmentedGeneration'].rag_augmented_answer_generation_streaming_async
-            async for chunk in augmented_generation_function(llm_or_chain, query, retrieved_docs[0], analysed_query, AvailableService.format_retrieved_docs_function):
+            augmented_generation_function = inference_pipeline.workflow_concrete_classes['RAGAugmentedGeneration'].augmented_answer_generation_from_llm_streaming_async
+            async for chunk in augmented_generation_function(llm_or_chain, query, retrieved_docs[0], analysed_query, function_for_specific_formating_retrieved_docs = AvailableService.format_retrieved_docs_function):
                 all_chunks_output.append(chunk)
 
             data['response'] = ''.join(all_chunks_output)
@@ -114,10 +115,10 @@ class RagasService:
                         {
                             'user_input': question.text,
                             'reference': chunk.text,
-                            'reference_full': training_obj.doc_summary, #training_obj.doc_content,
-                            'reference_id': training_obj.metadata['id'],
-                            'reference_type': training_obj.metadata['type'],
-                            'reference_name': training_obj.metadata['name'],
+                            # 'reference_full': training_obj.doc_summary, #training_obj.doc_content,
+                            # 'reference_id': training_obj.metadata['id'],
+                            # 'reference_type': training_obj.metadata['type'],
+                            # 'reference_name': training_obj.metadata['name'],
                         }
                     )
         return dataset
@@ -165,9 +166,9 @@ class RagasService:
         generator = TestsetGenerator(llm=generator_llm, embedding_model=generator_embedding, knowledge_graph=ragas_kg)
 
         query_distribution = [
-                (SingleHopSpecificQuerySynthesizer(llm=generator_llm), 0.5),
-                (MultiHopAbstractQuerySynthesizer(llm=generator_llm), 0.25),
-                (MultiHopSpecificQuerySynthesizer(llm=generator_llm), 0.25),
+                (SingleHopSpecificQuerySynthesizer(llm=generator_llm), 1.0),
+                # (MultiHopAbstractQuerySynthesizer(llm=generator_llm), 0.25),
+                # (MultiHopSpecificQuerySynthesizer(llm=generator_llm), 0.25),
         ]
         testset = generator.generate(testset_size=samples_count, query_distribution=query_distribution)
         #testset.to_pandas()
