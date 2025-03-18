@@ -12,10 +12,11 @@ from models.form import Form
 
 class AgentSupervisor:
     """Supervises the workflow, loads the YAML file, and orchestrates actions."""
-
+    max_loops = 1
+    
     def initialize(self, state: dict[str, any]):
         """Initialize the workflow: load form + fields values extraction from conversation."""     
-        self.i = 0   
+        self.loop_counter = 0   
         # Load form from yaml file
         txt.print("🔄 Loading form from YAML...")
         form_dict = file.get_as_yaml(state['form_structure_file_path'])
@@ -40,9 +41,9 @@ class AgentSupervisor:
         return state
 
     def decide_next_step(self, state: dict[str, any]):
-        if self.i == 1:
+        if self.loop_counter == self.max_loops:
             return "end"
-        self.i += 1
+        self.loop_counter += 1
 
         if any(state["missing_fields"]):
             return "build_question"
