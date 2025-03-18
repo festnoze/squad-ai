@@ -11,6 +11,7 @@ class FormHTMLRenderer:
         :param form: Instance de Form (objet Form déjà créé et validé)
         """
         self.form = form
+        self.form.perform_full_validation()
 
     def render(self) -> str:
         """
@@ -22,11 +23,11 @@ class FormHTMLRenderer:
             '<html lang="fr">',
             '<head>',
             '<meta charset="UTF-8">',
-            '<title>{}</title>'.format(self.format_field_name(self.form.name)),
+            '<title>{}</title>'.format(self.form.name),
             '<style>',
             '  body { font-family: Calibri, sans-serif, 20px; margin: 20px; }',
             '  .group { margin-bottom: 30px; }',
-            '  table { border-collapse: separate; border-spacing: 8px; padding: 8px; width: 100%; max-width: 800px; }',
+            '  table { border-collapse: separate; border-spacing: 8px; padding: 8px; width: 100%; max-width: 1000px; }',
             '  table, th { border: 1px solid #DDD; border-radius: 10px;}',
             '  .valid { border: 2px solid #0B0; border-radius: 8px;}',
             '  .invalid { border: 2px solid #E42; border-radius: 8px;}',
@@ -44,26 +45,27 @@ class FormHTMLRenderer:
             '</style>',
             '</head>',
             '<body>',
-            '<h1>{}</h1>'.format(self.form.name)
+            '<h1>{}</h1>'.format(self.form.description), 
+            '<h3><i>{}</i></h3>'.format(self.format_field_name(self.form.name)),
         ]
         
         # Calculate max field name length for fixed width column
-        max_width = self.calculate_max_field_length()
+        max_char_width = self.calculate_max_field_length()
         
         # Pour chaque groupe du formulaire, créer une section avec un tableau de champs
         for group in self.form.groups:
             html.append('<div class="group">')
-            html.append('<h2 class="tooltip" title="{}">{}</h2>'.format(group.description, self.format_field_name(group.name)))
+            html.append('<h2 class="tooltip" title="{}">{}</h2>'.format(self.format_field_name(group.name), group.description))
             html.append('<table>')
             html.append('<tbody>')
             for field in group.fields:
                 valid_class = "valid" if field.is_valid else "invalid"
-                valid_text = "Oui" if field.is_valid else "Non"
+                #valid_text = "Oui" if field.is_valid else "Non"
                 html.append('<tr>')
                 html.append('<td class="tooltip field-name" style="width: {}ch;" title="{}">{}</td>'.format(
-                    max_width, field.description, self.format_field_name(field.name)))
+                    max_char_width, self.format_field_name(field.name), field.description))
                 html.append('<td class="field-spacer"></td>')
-                html.append('<td class="{} field-value">{}</td>'.format(valid_class, field.value))
+                html.append('<td class="{} field-value">{}</td>'.format(valid_class, field.value if field.value and field.value != "None" else "Non renseigné"))
                 html.append('</tr>')
             html.append('</tbody>')
             html.append('</table>')
@@ -80,8 +82,8 @@ class FormHTMLRenderer:
         :return: Nom du champ formaté
         """
         words = name.split('_')
-        formatted_name = ' '.join(word.capitalize() for word in words)
-        return formatted_name
+        formatted_name = ' '.join(word.capitalize() if word.lower() == word else word for word in words)
+        return f"{formatted_name}"
 
     def calculate_max_field_length(self) -> int:
         """
@@ -91,6 +93,5 @@ class FormHTMLRenderer:
         max_length = 0
         for group in self.form.groups:
             for field in group.fields:
-                formatted_name = self.format_field_name(field.name)
-                max_length = max(max_length, len(formatted_name))
+                max_length = max(max_length, len(field.description))
         return max_length + 4  # Ajoute un peu de marge pour l'affichage

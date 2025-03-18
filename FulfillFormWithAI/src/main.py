@@ -30,7 +30,7 @@ def print_form_struct(form):
     txt.print("---------------------------------------------------------------------\n")
 
 graph_class = get_init_env_and_graph(
-                form_struct_file_path = "config/user_and_training_info_form.yaml", #LID_form.yaml", 
+                form_struct_file_path = "config/LID_form.yaml", #"config/user_and_training_info_form.yaml", # 
                 conversation_file_path = 'inputs/conversation.txt'
             )
 graph = graph_class.graph

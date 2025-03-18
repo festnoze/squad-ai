@@ -1,5 +1,6 @@
 form:
   name: "example_form"
+  description: "Formulaire d'exemple"
   groups:
     - name: "personal_info"
       description: "Personal Information"

@@ -1,5 +1,6 @@
 form:
   name: "LID_form"
+  description: "Formulaire de LID"
   groups:
     - name: "identity"
       description: "Identité du lead"
@@ -24,7 +25,7 @@ form:
           optional: true
           allowed_values: [["M.", "Monsieur", "Mr", "homme"], ["Mme", "Madame", "Mrs", "femme"], ["Dr", "docteur"], "autre"]
         - name: "birthdate"
-          description: "Date de naissance, format DD/MM/YYYY"
+          description: "Date de naissance"
           type: "date"
           optional: true
           regex: "^\\d{2}/\\d{2}/\\d{4}$"
@@ -72,7 +73,7 @@ form:
           min_size_or_value: 1
           max_size_or_value: 100
         - name: "pays"
-          description: "Nom du pays (ou code ISO 3166-1 alpha-2)"
+          description: "Nom du pays (ou code ISO 3166-1)"
           type: "string"
           min_size_or_value: 2
           max_size_or_value: 20
@@ -83,7 +84,7 @@ form:
       description: "Informations de contact"
       fields:
         - name: "email"
-          description: "Adresse email, doit contenir '@' et '.'"
+          description: "Adresse email"
           type: "string"
           min_size_or_value: 5
           max_size_or_value: 100
@@ -91,7 +92,7 @@ form:
           regex: "^[\\w\\.-]+@[\\w\\.-]+\\.[a-zA-Z]{2,}$"
           regex_description: "Format email valide"
         - name: "telephone"
-          description: "Numéro de téléphone avec indicatif internationnal - format E.164 (ex: +336...)"
+          description: "Numéro de téléphone avec indicatif internationnal"
           type: "string"
           min_size_or_value: 8
           max_size_or_value: 20
@@ -116,7 +117,7 @@ form:
           max_size_or_value: 15
           optional: true
         - name: "device"
-          description: "Type d'appareil, ex: ordinateur, téléphone, tablette"
+          description: "Type d'appareil (ordinateur, téléphone, tablette)"
           type: "string"
           min_size_or_value: 1
           max_size_or_value: 50
@@ -136,7 +137,7 @@ form:
       description: "Informations UTM"
       fields:
         - name: "utm_source"
-          description: "Nom du partenaire (défini avec Studi en amont)"
+          description: "Nom du partenaire"
           type: "string"
           min_size_or_value: 1
           max_size_or_value: 100
@@ -149,19 +150,19 @@ form:
           optional: false
           allowed_values: "@file:utm_medium_allowed_values.yaml"
         - name: "utm_campaign"
-          description: "Campagne UTM (défini avec Studi en amont)"
+          description: "Campagne UTM"
           type: "string"
           min_size_or_value: 1
           max_size_or_value: 100
           optional: true
         - name: "utm_content"
-          description: "Contenu UTM (défini avec Studi en amont)"
+          description: "Contenu UTM"
           type: "string"
           min_size_or_value: 1
           max_size_or_value: 100
           optional: true
         - name: "utm_term"
-          description: "Terme UTM (défini avec Studi en amont)"
+          description: "Terme UTM"
           type: "string"
           min_size_or_value: 1
           max_size_or_value: 100
@@ -170,19 +171,19 @@ form:
       description: "Informations complémentaires"
       fields:
         - name: "thematique"
-          description: "Thématique (texte libre basé sur des valeurs recommandées)"
+          description: "Thématique"
           type: "string"
           min_size_or_value: 0
           max_size_or_value: 100
           optional: true
         - name: "formulaire"
-          description: "Nom de la formation ou description courte du projet du prospect"
+          description: "Nom de la formation ou description du projet"
           type: "string"
           min_size_or_value: 1
           max_size_or_value: 100
           optional: false
         - name: "consentement"
-          description: "Texte de consentement du formulaire accepté par l'utilisateur"
+          description: "Texte de consentement du formulaire accepté"
           type: "string"
           min_size_or_value: 1
           max_size_or_value: 500
@@ -243,7 +244,7 @@ form:
           optional: true
         - name: "alternance"
           description: "Indique si le candidat est en alternance"
-          type: "boolean"
+          type: "string"
           optional: false
           allowed_values: ["Oui", "Non"]
           default_value: "Non"
@@ -254,6 +255,6 @@ form:
           max_size_or_value: 100
           optional: true
         - name: "cv"
-          description: "CV du candidat sous forme d'URL ou contenu en base64"
+          description: "CV du candidat : URL ou contenu en base64"
           type: "file"
           optional: true

@@ -14,7 +14,8 @@ class AgentSupervisor:
     """Supervises the workflow, loads the YAML file, and orchestrates actions."""
 
     def initialize(self, state: dict[str, any]):
-        """Initialize the workflow: load form + fields values extraction from conversation."""        
+        """Initialize the workflow: load form + fields values extraction from conversation."""     
+        self.i = 0   
         # Load form from yaml file
         txt.print("🔄 Loading form from YAML...")
         form_dict = file.get_as_yaml(state['form_structure_file_path'])
@@ -39,6 +40,10 @@ class AgentSupervisor:
         return state
 
     def decide_next_step(self, state: dict[str, any]):
+        if self.i == 1:
+            return "end"
+        self.i += 1
+
         if any(state["missing_fields"]):
             return "build_question"
         if self.is_form_validated(state):
