@@ -17,7 +17,10 @@ class FormHTMLRenderer:
         """
         Construit la page HTML complète sous forme de chaîne de caractères.
         :return: Code HTML complet pour visualiser le formulaire.
-        """
+        """        
+        # Calculate max field name length for fixed width column
+        max_char_width = self.calculate_max_field_length()
+
         html = [
             '<!DOCTYPE html>',
             '<html lang="fr">',
@@ -37,7 +40,7 @@ class FormHTMLRenderer:
             '    bottom: 125%; left: 50%; margin-left: -100px; opacity: 0; transition: opacity 0.3s; }',
             '  .tooltip:hover .tooltiptext { visibility: visible; opacity: 1; }',
             '  .field-name, .field-spacer, .field-value { padding: 0; }',
-            '  .field-name { white-space: nowrap; text-align: right; }',
+            f'  .field-name {{ white-space: nowrap; text-align: right; width: {max_char_width}ch;}}',
             '  .field-spacer { width: 5px; }',
             '  .field-value { white-space: normal; word-wrap: break-word; width: 100%; text-align: left; }',
             '  td.field-name, td.field-spacer, td.field-value { padding: 12px 5px !important; vertical-align: middle; }',
@@ -50,8 +53,6 @@ class FormHTMLRenderer:
             '<h3><i>{}</i></h3>'.format(self.format_field_name(self.form.name)),
         ]
         
-        # Calculate max field name length for fixed width column
-        max_char_width = self.calculate_max_field_length()
         
         # Pour chaque groupe du formulaire, créer une section avec un tableau de champs
         for group in self.form.groups:
@@ -63,8 +64,7 @@ class FormHTMLRenderer:
                 valid_class = "valid" if field.is_valid else "invalid"
                 #valid_text = "Oui" if field.is_valid else "Non"
                 html.append('<tr>')
-                html.append('<td class="tooltip field-name" style="width: {}ch;" title="{}">{}</td>'.format(
-                    max_char_width, self.format_field_name(field.name), field.description))
+                html.append('<td class="tooltip field-name" title="{}">{}</td>'.format(self.format_field_name(field.name), field.description))
                 html.append('<td class="field-spacer"></td>')
                 html.append('<td class="{} field-value"><input type="text" class="field-input" value="{}" data-field-name="{}" data-field-description="{}" data-is-valid="{}" data-optional="{}" data-type="{}" data-regex="{}" data-regex-description="{}" data-min="{}" data-max="{}" data-validation-func-name="{}" data-default-value="{}" data-allowed-values="{}"></td>'.format(valid_class, field.value if field.value else '', field.name, field.description, field.is_valid, field.optional, field.type, field.regex if field.regex is not None else "", field.regex_description if field.regex_description is not None else "", field.min_size_or_value, field.max_size_or_value, field.validation_func_name if field.validation_func_name is not None else "", field.default_value if field.default_value is not None else "", field.allowed_values if field.allowed_values is not None else ""))
                 html.append('</tr>')

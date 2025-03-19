@@ -69,24 +69,20 @@ class AvailableService:
         drupal = DrupalDataRetrieval(AvailableService.out_dir)
         drupal.retrieve_all_data()
 
-    def create_vector_after_chunking_and_embedding_documents(out_dir, BM25_storage_in_database_sparse_vectors:bool = True):
+    def create_vector_after_chunking_and_embedding_documents(out_dir):
         from common_tools.rag.rag_ingestion_pipeline.rag_ingestion_pipeline import RagIngestionPipeline
         #
         all_docs = GenerateDocumentsAndMetadata().load_all_docs_as_json(out_dir, write_all_lists=True)
         injection_pipeline = RagIngestionPipeline(AvailableService.rag_service)
         txt.print_with_spinner("Chunking documents...")
-        documents_chunks = injection_pipeline.chunk_documents(
-                                                    documents= all_docs,
-                                                    chunk_size= 5000,
-                                                    children_chunk_size= 0
-                                                )
-        txt.stop_spinner_replace_text("Documents chunked")
+        documents_chunks = injection_pipeline.chunk_documents(documents= all_docs)
+
+        txt.stop_spinner_replace_text("Documents chunked\n")
         txt.print_with_spinner("Inserting documents into vector database...")
-        AvailableService.rag_service.vectorstore = injection_pipeline.build_vectorstore_from_chunked_docs(
+        AvailableService.rag_service.vectorstore = injection_pipeline.add_chunked_docs_to_vectorstore(
                             docs_chunks= documents_chunks,
                             vector_db_type=AvailableService.rag_service.vector_db_type,
                             collection_name= AvailableService.rag_service.vector_db_name,
-                            BM25_storage_in_database_sparse_vectors=BM25_storage_in_database_sparse_vectors,
                             delete_existing= True
                         )
         txt.stop_spinner_replace_text("Vector database created")
@@ -104,12 +100,9 @@ class AvailableService:
                                                 separate_chunks_and_questions=False)
         
         injection_pipeline = RagIngestionPipeline(AvailableService.rag_service)
-        documents_chunks = injection_pipeline.chunk_documents(
-                                                    documents= all_summaries_and_questions_docs,
-                                                    chunk_size= 5000,
-                                                    children_chunk_size= 0
-                                                )
-        AvailableService.rag_service.vectorstore = injection_pipeline.build_vectorstore_from_chunked_docs(
+        documents_chunks = injection_pipeline.chunk_documents(all_summaries_and_questions_docs)
+
+        AvailableService.rag_service.vectorstore = injection_pipeline.add_chunked_docs_to_vectorstore(
                             docs_chunks= documents_chunks,
                             vector_db_type=AvailableService.rag_service.vector_db_type,
                             collection_name= AvailableService.rag_service.vector_db_name,

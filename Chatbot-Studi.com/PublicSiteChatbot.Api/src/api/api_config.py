@@ -72,9 +72,9 @@ class ApiConfig:
             
         logging.basicConfig(
             level=logging.INFO,
-            format="Log: %(asctime)s - %(levelname)s - %(message)s",
+            format="%(asctime)s - %(levelname)s - %(message)s",
             handlers=[
-                logging.FileHandler(f"outputs/logs/app.{datetime.now().strftime("%Y-%m-%d.%H%M%S")}.log"),
+                logging.FileHandler(f"outputs/logs/public_site_chatbot.{datetime.now().strftime("%Y-%m-%d")}.log"),
                 logging.StreamHandler()  # Also print logs to the terminal
             ]
         )

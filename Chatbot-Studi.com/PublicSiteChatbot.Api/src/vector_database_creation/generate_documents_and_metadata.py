@@ -3,6 +3,7 @@ import json
 import os
 import re
 from typing import List, Dict
+import uuid
 from langchain.schema import Document
 #
 from common_tools.helpers.txt_helper import txt
@@ -78,7 +79,8 @@ class GenerateDocumentsAndMetadata:
         txt.print(f"Fundings count: {len(fundings_data)}")
         txt.print(f"Jobs count: {len(jobs_data)}")
         txt.print(f"Trainings count: {len(trainings_data)}")
-        txt.print(f"---------------------")
+        txt.print(f"Trainings docs count: {len(trainings_docs)}")
+        txt.print(f"--------------------------------")
         txt.print(f"Total documents created: {len(all_docs)}")
         return all_docs
     
@@ -110,7 +112,8 @@ class GenerateDocumentsAndMetadata:
             item_name = item.get('name')
             all_certifiers_names.add(item_name)
             metadata = {
-                "id": item.get("id"),
+                "id": str(uuid.uuid4()),
+                "doc_id": item.get("id"),
                 "type": "certifieur",
                 "name": item_name,
                 "changed": item.get("changed"),
@@ -128,7 +131,8 @@ class GenerateDocumentsAndMetadata:
             item_name = item.get('name')
             all_certifications_names.add(item_name)
             metadata = {
-                "id": item.get("id"),
+                "id": str(uuid.uuid4()),
+                "doc_id": item.get("id"),
                 "type": "certification",
                 "name": item_name,
                 "changed": item.get("changed"),
@@ -147,7 +151,8 @@ class GenerateDocumentsAndMetadata:
             title = re.sub(r'\(.*?\)', '', title).replace("\n", " ").replace(" ?", "").replace("Nos formations en ligne ", "").replace(" en ligne", "").replace("niveau", "").replace("Qu’est-ce qu’un ", "").replace(" +", "+").replace("Nos ", "").replace(" by Studi", "").strip()
             all_diplomas_names.add(title)
             metadata = {
-                "id": item.get("id"),
+                "id": str(uuid.uuid4()),
+                "doc_id": item.get("id"),
                 "type": "diplôme",
                 "name": item.get("title"),
                 "changed": item.get("changed"),
@@ -167,7 +172,8 @@ class GenerateDocumentsAndMetadata:
             item_name = item.get('name')
             all_domains_names.add(item_name)
             metadata = {
-                "id": item.get("id"),
+                "id": str(uuid.uuid4()),
+                "doc_id": item.get("id"),
                 "type": "domaine",
                 "name": item_name,
                 "changed": item.get("changed"),
@@ -185,7 +191,8 @@ class GenerateDocumentsAndMetadata:
             item_name = item.get('name')
             all_subdomains_names.add(item_name)
             metadata = {
-                "id": item.get("id"),
+                "id": str(uuid.uuid4()),
+                "doc_id": item.get("id"),
                 "type": "sous-domaine",
                 "name": item_name,
                 "changed": item.get("changed"),
@@ -204,7 +211,8 @@ class GenerateDocumentsAndMetadata:
         for item in data:
             all_fundings_names.add(item.get("title"))
             metadata = {
-                "id": item.get("id"),
+                "id": str(uuid.uuid4()),
+                "doc_id": item.get("id"),
                 "type": "financement",
                 "name": item.get("title"),
                 "changed": item.get("changed"),
@@ -224,7 +232,8 @@ class GenerateDocumentsAndMetadata:
             job_title = item.get("title")
             all_jobs_names.add(job_title)
             metadata = {
-                "id": item.get("id"),
+                "id": str(uuid.uuid4()),
+                "doc_id": item.get("id"),
                 "type": "métier",
                 "name": job_title,
                 "changed": item.get("changed"),
@@ -244,29 +253,30 @@ class GenerateDocumentsAndMetadata:
         return docs, list(all_jobs_names)
 
     def process_trainings(self, trainings_data: List[Dict], trainings_details: dict, existing_docs:list = [], domains_data = None, sub_domains_data = None) -> List[Document]:
-        if not trainings_data:
-            return []
+        if not trainings_data: return []
         docs = []
         all_trainings_titles = set()
+        
         for training_data in trainings_data:
             training_title = training_data.get("title")
             all_trainings_titles.add(training_title)
             related_ids = training_data.get("related_ids", {})
             metadata_common = {
-                "id": training_data.get("id"),
+                "id": str(uuid.uuid4()),
+                "doc_id": training_data.get("id"),
                 "type": "formation",
                 "name": training_title,
                 "changed": training_data.get("changed"),
                 "rel_ids": self.get_all_ids_as_str(related_ids),
             }            
             sub_domain_id = related_ids.get("domain", "not found")
-            subdoms = [sub_domain for sub_domain in sub_domains_data if sub_domain['id'] == sub_domain_id]
+            subdoms = [sub_domain for sub_domain in sub_domains_data if sub_domain["id"] == sub_domain_id]
             if sub_domain_id == 'not found' or not subdoms or not any(subdoms) or 'parent' not in subdoms[0]['related_ids'] or not subdoms[0]['related_ids']['parent']:
-                doms = [domain for domain in domains_data if domain['id'] == sub_domain_id] # check if the sub_domain_id is if fact a domain_id
+                doms = [domain for domain in domains_data if domain["id"] == sub_domain_id] # check if the sub_domain_id is if fact a domain_id
                 if not doms or not any(doms):
                     domain_id = 'not found'
                 else:
-                    domain_id = doms[0]['id']
+                    domain_id = doms[0]["id"]
             else:
                 domain_id = subdoms[0]['related_ids']['parent'][0]
 
@@ -283,13 +293,13 @@ class GenerateDocumentsAndMetadata:
                 if value:
                     is_list = key.endswith('s')
                     if is_list:
-                        existing_docs_ids = [doc for doc in existing_docs if doc.metadata.get("id") in value]
+                        existing_docs_ids = [doc for doc in existing_docs if doc.metadata.get("doc_id") in value]
                         if len(existing_docs_ids) != len(value):
                             txt.print(f"In process_trainings, on: {key}, {len(value) - len(existing_docs_ids)} docs were not found by its id, on those ids: {value}")
                         if any(existing_docs_ids):
                             metadata_common[key] = ' | '.join(self.get_list_with_items_as_str([doc.metadata.get("name") for doc in existing_docs_ids]))
                     else:
-                        existing_docs_ids = [doc for doc in existing_docs if doc.metadata.get("id") == value]
+                        existing_docs_ids = [doc for doc in existing_docs if doc.metadata.get("doc_id") == value]
                         #assert len(existing_docs_ids) == 1, f"Multiple or none docs found for: {key} {value}"
                         if any(existing_docs_ids):
                             metadata_common[key] = existing_docs_ids[0].metadata.get("name")
