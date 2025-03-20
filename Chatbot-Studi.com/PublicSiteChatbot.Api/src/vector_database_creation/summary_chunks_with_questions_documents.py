@@ -429,7 +429,7 @@ class SummaryWithQuestionsByChunkDocumentsService:
         if obj_training_title != doc_training_title:
             raise ValueError(f"Training name mismatch: {training_doc.metadata['name']} != {doc_training_title}")
 
-    async def get_all_summaries_with_questions_documents_async(self, files_path: str, llm_and_fallback: list, separate_chunks_and_questions: bool = False) -> list[Document]:
+    async def get_all_summaries_with_questions_documents_async(self, files_path: str, llm_and_fallback: list, create_questions_from_data: bool = True , merge_questions_with_data: bool = True) -> list[Document]:
         all_documents: list[Document] = []
         all_but_trainings_documents = self.build_all_but_trainings_documents(files_path)
         all_documents.extend(all_but_trainings_documents)
@@ -439,19 +439,21 @@ class SummaryWithQuestionsByChunkDocumentsService:
 
         trainings_objects = await self.build_trainings_objects_with_summaries_and_chunks_by_questions_async(files_path, trainings_docs, llm_and_fallback)
                 
-        trainings_chunks_and_questions_documents = self.build_trainings_docs_from_objs(separate_chunks_and_questions, trainings_objects)
+        trainings_chunks_and_questions_documents = self.build_trainings_docs_from_objs(trainings_objects, create_questions_from_data, merge_questions_with_data)
         all_documents.extend(trainings_chunks_and_questions_documents)
         
         return all_documents
 
-    def build_trainings_docs_from_objs(self, separate_chunks_and_questions, trainings_objects):
+    def build_trainings_docs_from_objs(self, trainings_objects, create_questions_from_data: bool = True, merge_questions_with_data: bool = True):
         trainings_chunks_and_questions_documents = []
-        for training_object in trainings_objects:
-            if separate_chunks_and_questions:
-                trainings_chunks_and_questions_documents.extend(training_object.to_langchain_documents_chunked_summary_and_questions(True, False))
-                trainings_chunks_and_questions_documents.extend(training_object.to_langchain_documents_chunked_summary_and_questions(False, True))
-            else:
+        if create_questions_from_data and merge_questions_with_data:
+            for training_object in trainings_objects:
                 trainings_chunks_and_questions_documents.extend(training_object.to_langchain_documents_chunked_summary_and_questions(True, True))
+        else:
+            for training_object in trainings_objects:
+                trainings_chunks_and_questions_documents.extend(training_object.to_langchain_documents_chunked_summary_and_questions(True, False))
+                if create_questions_from_data:
+                    trainings_chunks_and_questions_documents.extend(training_object.to_langchain_documents_chunked_summary_and_questions(False, True))
         return trainings_chunks_and_questions_documents
     
 

@@ -38,7 +38,8 @@ class DependencyAnalyzer:
         self.module_groups: Dict[str, Any] = {}
         self.module_to_group: Dict[str,int] = {}
         self.grouped_graph: nx.DiGraph = nx.DiGraph()
-        self.splitable_folders: List[str] = splitable_folders if splitable_folders is not None else ['helpers']
+        self.splitable_folders: List[str] = splitable_folders if splitable_folders is not None else []
+
     def find_python_files(self) -> None:
         for root, _, files in os.walk(self.project_path):
             for file in files:
@@ -58,6 +59,7 @@ class DependencyAnalyzer:
                         else:
                             module_path = f"{self.project_name}.{module_path}"
                     self.python_files[file_path] = module_path
+
     def extract_imports(self) -> None:
         for file_path, module_name in self.python_files.items():
             try:
@@ -86,6 +88,7 @@ class DependencyAnalyzer:
                     self.dependency_graph.add_edge(module_name, dep)
             except Exception:
                 pass
+
     def analyze_dependency_structure(self) -> None:
         standalone_modules: List[str] = []
         for module, deps in self.dependencies.items():
@@ -101,6 +104,7 @@ class DependencyAnalyzer:
             'cycles': sccs,
             'by_external_deps': dict(external_dep_groups)
         }
+
     def partition_by_granularity(self, granularity: int) -> None:
         """
         Divise les modules en sous-librairies selon les critères suivants:
@@ -364,6 +368,7 @@ class DependencyAnalyzer:
                 changes_made = True
         
         return changes_made
+    
     def _group_by_internal_deps(self, granularity: int) -> Tuple[List[List[str]], float]:
         """
         Groupe les modules selon leurs dépendances internes pour obtenir 'granularity' groupes.
@@ -622,6 +627,7 @@ class DependencyAnalyzer:
             'external_dependency_groups': ext_packages
         }
         return proposed_structure
+    
     def visualize_sub_libraries(self, output_file: str = 'sub_libraries.png') -> None:
         """
         Génère une visualisation statique des sous-librairies et leurs dépendances.

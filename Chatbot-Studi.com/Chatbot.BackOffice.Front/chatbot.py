@@ -66,8 +66,8 @@ class ChatbotFront:
             st.button("🧪 Tester tous les modèles d'inférence",   on_click=lambda: ChatbotFront.test_all_inference_models())
             st.button('📥 Récupérer données Drupal par json-api',   on_click=lambda: st.session_state.api_client.retrieve_all_data())
             st.button('🌐 Scraping des pages web des formations',   on_click=lambda: st.session_state.api_client.scrape_website_pages())
-            st.button('🗂️ Construction de la base vectorielle',     on_click=lambda: st.session_state.api_client.build_vectorstore())
-            st.button('🗃️ Construction base vectorielle synthétique + questions', on_click=lambda: st.session_state.api_client.build_summary_vectorstore())
+            st.divider()
+            st.button("🗂️ Documents: Chunking + Embedding + Insertion en base vectorielle + Génération de Questions et d'une Synthèse en option", on_click=lambda: st.session_state.api_client.build_vectorstore())
             st.divider()
             
             st.subheader("💫 Evaluation du pipeline d'inference")

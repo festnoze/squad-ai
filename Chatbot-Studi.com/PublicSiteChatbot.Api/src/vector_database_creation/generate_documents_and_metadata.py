@@ -12,52 +12,50 @@ from common_tools.helpers.json_helper import JsonHelper
 from common_tools.helpers.ressource_helper import Ressource
 
 class GenerateDocumentsAndMetadata:
-    def __init__(self):
-        pass
-       
-    def load_all_docs_as_json(self, path: str, write_all_lists = True) -> List[Document]:
+    
+    def load_all_docs_as_json(path: str, write_all_lists = True) -> List[Document]:
         all_docs = []
         txt.print_with_spinner(f"Build all Langchain documents ...")
 
         # Process certifiers
         certifiers_data = JsonHelper.load_from_json(os.path.join(path, 'certifiers.json'))
-        certifiers_docs, all_certifiers_names = self.process_certifiers(certifiers_data)
+        certifiers_docs, all_certifiers_names = GenerateDocumentsAndMetadata.process_certifiers(certifiers_data)
         all_docs.extend(certifiers_docs)
 
         # Process certifications
         certifications_data = JsonHelper.load_from_json(os.path.join(path, 'certifications.json'))
-        certifications_docs, all_certifications_names = self.process_certifications(certifications_data)
+        certifications_docs, all_certifications_names = GenerateDocumentsAndMetadata.process_certifications(certifications_data)
         all_docs.extend(certifications_docs)
 
         # Process diplomas
         diplomas_data = JsonHelper.load_from_json(os.path.join(path, 'diplomas.json'))
-        diplomas_docs, all_diplomas_names = self.process_diplomas(diplomas_data)
+        diplomas_docs, all_diplomas_names = GenerateDocumentsAndMetadata.process_diplomas(diplomas_data)
         all_docs.extend(diplomas_docs)
 
         # Process domains
         domains_data = JsonHelper.load_from_json(os.path.join(path, 'domains.json'))
-        domains_docs, all_domains_names = self.process_domains(domains_data)
+        domains_docs, all_domains_names = GenerateDocumentsAndMetadata.process_domains(domains_data)
         all_docs.extend(domains_docs)
 
         # Process sub-domains
         sub_domains_data = JsonHelper.load_from_json(os.path.join(path, 'subdomains.json'))
-        sub_domains_docs, all_sub_domains_names = self.process_sub_domains(sub_domains_data)
+        sub_domains_docs, all_sub_domains_names = GenerateDocumentsAndMetadata.process_sub_domains(sub_domains_data)
         all_docs.extend(sub_domains_docs)
 
         # Process fundings
         fundings_data = JsonHelper.load_from_json(os.path.join(path, 'fundings.json'))
-        fundings_docs, all_fundings_names = self.process_fundings(fundings_data)
+        fundings_docs, all_fundings_names = GenerateDocumentsAndMetadata.process_fundings(fundings_data)
         all_docs.extend(fundings_docs)
 
         # Process jobs
         jobs_data = JsonHelper.load_from_json(os.path.join(path, 'jobs.json'))
-        jobs_docs, all_jobs_names = self.process_jobs(jobs_data, domains_data)
+        jobs_docs, all_jobs_names = GenerateDocumentsAndMetadata.process_jobs(jobs_data, domains_data)
         all_docs.extend(jobs_docs)
 
         # Process trainings
         trainings_data = JsonHelper.load_from_json(os.path.join(path, 'trainings.json'))
-        trainings_details = self.load_trainings_details_as_json(path)
-        trainings_docs, all_trainings_names = self.process_trainings(trainings_data, trainings_details, all_docs, domains_data, sub_domains_data)
+        trainings_details = GenerateDocumentsAndMetadata.load_trainings_details_as_json(path)
+        trainings_docs, all_trainings_names = GenerateDocumentsAndMetadata.process_trainings(trainings_data, trainings_details, all_docs, domains_data, sub_domains_data)
         all_docs.extend(trainings_docs)
 
         if write_all_lists:
@@ -84,7 +82,7 @@ class GenerateDocumentsAndMetadata:
         txt.print(f"Total documents created: {len(all_docs)}")
         return all_docs
     
-    def load_trainings_details_as_json(self, path: str) -> dict:
+    def load_trainings_details_as_json(path: str) -> dict:
         files_str = file.get_files_paths_and_contents(os.path.join(path, 'scraped/'))
         contents = {}
         for file_path, content_str in files_str.items():
@@ -103,7 +101,7 @@ class GenerateDocumentsAndMetadata:
         #     txt.print(f"---------------------")
 
 
-    def process_certifiers(self, data: List[Dict]) -> List[Document]:
+    def process_certifiers(data: List[Dict]) -> List[Document]:
         if not data:
             return []
         all_certifiers_names = set()
@@ -122,7 +120,7 @@ class GenerateDocumentsAndMetadata:
             docs.append(doc)
         return docs, list(all_certifiers_names)
     
-    def process_certifications(self, data: List[Dict]) -> List[Document]:
+    def process_certifications(data: List[Dict]) -> List[Document]:
         if not data:
             return []
         all_certifications_names = set()
@@ -141,7 +139,7 @@ class GenerateDocumentsAndMetadata:
             docs.append(doc)
         return docs, list(all_certifications_names)
 
-    def process_diplomas(self, data: List[Dict]) -> List[Document]:
+    def process_diplomas(data: List[Dict]) -> List[Document]:
         if not data:
             return []
         docs = []
@@ -163,7 +161,7 @@ class GenerateDocumentsAndMetadata:
             docs.append(doc)
         return docs, list(all_diplomas_names)
 
-    def process_domains(self, data: List[Dict]) -> List[Document]:
+    def process_domains(data: List[Dict]) -> List[Document]:
         if not data:
             return []
         docs = []
@@ -182,7 +180,7 @@ class GenerateDocumentsAndMetadata:
             docs.append(doc)
         return docs, list(all_domains_names)
     
-    def process_sub_domains(self, data: List[Dict]) -> List[Document]:
+    def process_sub_domains(data: List[Dict]) -> List[Document]:
         if not data:
             return []
         docs = []
@@ -203,7 +201,7 @@ class GenerateDocumentsAndMetadata:
             docs.append(doc)
         return docs, list(all_subdomains_names)
 
-    def process_fundings(self, data: List[Dict]) -> List[Document]:
+    def process_fundings(data: List[Dict]) -> List[Document]:
         if not data:
             return []
         docs = []
@@ -223,7 +221,7 @@ class GenerateDocumentsAndMetadata:
             docs.append(doc)
         return docs, list(all_fundings_names)
 
-    def process_jobs(self, data: List[Dict], domains) -> List[Document]:
+    def process_jobs(data: List[Dict], domains) -> List[Document]:
         if not data:
             return []
         docs = []
@@ -237,7 +235,7 @@ class GenerateDocumentsAndMetadata:
                 "type": "métier",
                 "name": job_title,
                 "changed": item.get("changed"),
-                "rel_ids": self.get_all_ids_as_str(item.get("related_ids", {}))
+                "rel_ids": GenerateDocumentsAndMetadata.get_all_ids_as_str(item.get("related_ids", {}))
             }
             domain_id = item.get("related_ids", {}).get("domain", "")
             domain = ''
@@ -252,7 +250,7 @@ class GenerateDocumentsAndMetadata:
         #docs.append(Document(page_content= 'Liste complète de tous les métiers couvert par Studi :\n' + ', '.join(all_jobs_names), metadata={"type": "liste_métiers",}))
         return docs, list(all_jobs_names)
 
-    def process_trainings(self, trainings_data: List[Dict], trainings_details: dict, existing_docs:list = [], domains_data = None, sub_domains_data = None) -> List[Document]:
+    def process_trainings(trainings_data: List[Dict], trainings_details: dict, existing_docs:list = [], domains_data = None, sub_domains_data = None) -> List[Document]:
         if not trainings_data: return []
         docs = []
         all_trainings_titles = set()
@@ -267,7 +265,7 @@ class GenerateDocumentsAndMetadata:
                 "type": "formation",
                 "name": training_title,
                 "changed": training_data.get("changed"),
-                "rel_ids": self.get_all_ids_as_str(related_ids),
+                "rel_ids": GenerateDocumentsAndMetadata.get_all_ids_as_str(related_ids),
             }            
             sub_domain_id = related_ids.get("domain", "not found")
             subdoms = [sub_domain for sub_domain in sub_domains_data if sub_domain["id"] == sub_domain_id]
@@ -284,10 +282,10 @@ class GenerateDocumentsAndMetadata:
                 "sub_domain_name": sub_domain_id,
                 "domain_name": domain_id,
                 "certification_name": related_ids.get("certification", ""),
-                # don't work, ids are not all in jobs_ids list: "diplome_names": self.get_list_with_items_as_str(related_ids.get("diploma", [])),
-                # don't work, ids are not all in jobs_ids list: "nom_metiers": self.get_list_with_items_as_str(related_ids.get("job", [])),
-                # don't work, ids are not in fundings_ids list: "nom_financements": self.get_list_with_items_as_str(related_ids.get("funding", [])),
-                # "nom_objectifs": self.as_str(related_ids.get("goal", [])),
+                # don't work, ids are not all in jobs_ids list: "diplome_names": GenerateDocumentsAndMetadata.get_list_with_items_as_str(related_ids.get("diploma", [])),
+                # don't work, ids are not all in jobs_ids list: "nom_metiers": GenerateDocumentsAndMetadata.get_list_with_items_as_str(related_ids.get("job", [])),
+                # don't work, ids are not in fundings_ids list: "nom_financements": GenerateDocumentsAndMetadata.get_list_with_items_as_str(related_ids.get("funding", [])),
+                # "nom_objectifs": GenerateDocumentsAndMetadata.as_str(related_ids.get("goal", [])),
             }
             for key, value in ids_by_metadata_names.items():
                 if value:
@@ -297,7 +295,7 @@ class GenerateDocumentsAndMetadata:
                         if len(existing_docs_ids) != len(value):
                             txt.print(f"In process_trainings, on: {key}, {len(value) - len(existing_docs_ids)} docs were not found by its id, on those ids: {value}")
                         if any(existing_docs_ids):
-                            metadata_common[key] = ' | '.join(self.get_list_with_items_as_str([doc.metadata.get("name") for doc in existing_docs_ids]))
+                            metadata_common[key] = ' | '.join(GenerateDocumentsAndMetadata.get_list_with_items_as_str([doc.metadata.get("name") for doc in existing_docs_ids]))
                     else:
                         existing_docs_ids = [doc for doc in existing_docs if doc.metadata.get("doc_id") == value]
                         #assert len(existing_docs_ids) == 1, f"Multiple or none docs found for: {key} {value}"
@@ -317,7 +315,7 @@ class GenerateDocumentsAndMetadata:
                 txt.print(f"/!\\ Training details not found for: {training_title}")
 
             # Add 'summary' document with infos from json-api source only
-            contents = [f"\n##{self.get_french_section(key)}##\n{Ressource.remove_curly_brackets(value)}" for key, value in training_data.get('attributes', {}).items()]
+            contents = [f"\n##{GenerateDocumentsAndMetadata.get_french_section(key)}##\n{Ressource.remove_curly_brackets(value)}" for key, value in training_data.get('attributes', {}).items()]
             
             content = f"Formation : {training_data.get('title', '')}\nLien vers la page : {training_url}\n{'\n'.join(contents)}"            
             metadata_summary = metadata_common.copy()
@@ -328,7 +326,7 @@ class GenerateDocumentsAndMetadata:
             if training_detail and any(training_detail):
                 for section_name in training_detail:
                     if section_name not in ['url', 'title']:
-                        content = f"##{self.get_french_section(section_name)} de la formation : {training_data.get('title', '')}##\n"
+                        content = f"##{GenerateDocumentsAndMetadata.get_french_section(section_name)} de la formation : {training_data.get('title', '')}##\n"
                         content += training_detail[section_name]
                         metadata_detail = metadata_common.copy()
                         metadata_detail['training_info_type'] = section_name
@@ -337,7 +335,7 @@ class GenerateDocumentsAndMetadata:
         #docs.append(Document(page_content= 'Liste complète de toutes les formations proposées par Studi :\n' + ', '.join(all_trainings_titles), metadata={"type": "liste_formations",}))
         return docs, list(all_trainings_titles)
     
-    def get_french_section(self, section: str) -> str:
+    def get_french_section(section: str) -> str:
         if section == 'title':
             return "Titre"
         elif section == 'academic_level':
@@ -383,12 +381,12 @@ class GenerateDocumentsAndMetadata:
         else:
             return section
     
-    def get_list_with_items_as_str(self, lst: list):
+    def get_list_with_items_as_str(lst: list):
         if not lst:
             return []
         return [str(uid) for uid in lst]
     
-    def get_all_ids_as_str(self, related_ids):
+    def get_all_ids_as_str(related_ids):
         all_ids = []
 
         # Iterate over all keys and values in related_ids

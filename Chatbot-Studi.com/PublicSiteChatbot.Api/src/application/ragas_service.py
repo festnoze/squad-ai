@@ -130,7 +130,7 @@ class RagasService:
         
         if return_trainings_docs:
             #TODO: see if it worth the same than the previous trainings_docs above
-            trainings_docs = summaries_and_questions_generation_service.build_trainings_docs_from_objs(False, trainings_objects)
+            trainings_docs = summaries_and_questions_generation_service.build_trainings_docs_from_objs(trainings_objects)
             return trainings_docs
         else:
             return trainings_objects
