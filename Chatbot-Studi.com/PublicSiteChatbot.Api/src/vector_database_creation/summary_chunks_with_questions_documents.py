@@ -285,11 +285,11 @@ class SummaryWithQuestionsByChunkDocumentsService:
             docs.append(doc)
         return docs
 
-    def build_trainings_docs(self, files_path: str, add_full_details: bool = False, add_full_doc: bool = True) -> list[Document]:
+    def build_trainings_docs(self, files_path: str, add_sub_sections: bool = True, add_full_doc: bool = False) -> list[Document]:
         domains_data = JsonHelper.load_from_json(os.path.join(files_path, 'domains.json'))
         sub_domains_data = JsonHelper.load_from_json(os.path.join(files_path, 'subdomains.json'))
         trainings_data = JsonHelper.load_from_json(os.path.join(files_path, 'trainings.json'))
-        trainings_details = self.load_trainings_details_as_json(files_path)
+        trainings_details = self.load_trainings_scraped_details_as_json(files_path)
         if not trainings_data: return []
 
         all_trainings_docs = []
@@ -325,15 +325,14 @@ class SummaryWithQuestionsByChunkDocumentsService:
             content = f"Formation : {training_title}\nLien vers la page : {training_url}\n{chr(92).join(contents)}"
             metadata_summary = metadata_common.copy()
             metadata_summary['training_info_type'] = 'full'
-            if training_detail:
+            if training_detail and add_sub_sections:
                 for section_name in training_detail:
                     if section_name not in ['url', 'title']:
                         content_detail = f"###{self.get_french_section(section_name)} de la formation : {training_title}###\n" + training_detail[section_name]
                         content += f"\n\n{content_detail}"
                         metadata_detail = metadata_common.copy()
                         metadata_detail['training_info_type'] = section_name
-                        if add_full_details:
-                            all_trainings_docs.append(Document(page_content=content_detail, metadata=metadata_detail))
+                        all_trainings_docs.append(Document(page_content=content_detail, metadata=metadata_detail))
             if add_full_doc:
                 all_trainings_docs.append(Document(page_content=content, metadata=metadata_summary))
         return all_trainings_docs
@@ -365,7 +364,7 @@ class SummaryWithQuestionsByChunkDocumentsService:
         docs.extend(jobs_docs)
         return docs
 
-    def load_trainings_details_as_json(self, files_path: str) -> dict:
+    def load_trainings_scraped_details_as_json(self, files_path: str) -> dict:
         files_str = file.get_files_paths_and_contents(os.path.join(files_path, 'scraped'))
         contents: dict = {}
         for file_path, content_str in files_str.items():
@@ -380,6 +379,7 @@ class SummaryWithQuestionsByChunkDocumentsService:
             subject = 'trainings'
             txt.print(f">>> Loaded existing {len(trainings_objects)} docs about '{subject}' with: summary, chunks and questions from file: {docs_with_summary_chunks_and_questions_file_path}")
             return trainings_objects
+        return None
     
     async def generate_trainings_objects_with_summaries_and_chunks_by_questions_async(
             self, trainings_docs: list[Document], llm_and_fallback: list, docs_with_summary_chunks_and_questions_file_path: str
@@ -389,7 +389,7 @@ class SummaryWithQuestionsByChunkDocumentsService:
         txt.print_with_spinner(f"Generating summaries, chunking and questions in 3 steps for each {len(trainings_docs)} documents")
         trainings_objects = await self.create_summary_and_questions_from_docs_in_three_steps_async(llm_and_fallback, trainings_docs, 50)
         
-        docs_json = [doc.to_dict(include_full_doc=False) for doc in trainings_objects]
+        docs_json = [doc.to_dict(include_full_doc=True) for doc in trainings_objects]
         file.write_file(docs_json, docs_with_summary_chunks_and_questions_file_path)
         
         elapsed_str = txt.get_elapsed_str(time.time() - start)
@@ -398,44 +398,46 @@ class SummaryWithQuestionsByChunkDocumentsService:
         return trainings_objects
 
     async def build_trainings_objects_with_summaries_and_chunks_by_questions_async(
-            self, files_path: str, trainings_docs: list[Document], llm_and_fallback: list = None
+            self, files_path: str, trainings_docs: list[Document], llm_and_fallback: list = None, load_existing_summaries_and_questions_from_file: bool = True
         ) -> list[DocWithSummaryChunksAndQuestions]:
         
         docs_with_summary_chunks_and_questions_file_path = os.path.join(files_path, 'trainings_summaries_chunks_and_questions_objects.json')
-        trainings_objects = await self.load_trainings_objects_with_summaries_and_chunks_by_questions_async(docs_with_summary_chunks_and_questions_file_path)
+        trainings_objects = None
+        if load_existing_summaries_and_questions_from_file:
+            trainings_objects = await self.load_trainings_objects_with_summaries_and_chunks_by_questions_async(docs_with_summary_chunks_and_questions_file_path)
         
         if not trainings_objects:
             trainings_objects = await self.generate_trainings_objects_with_summaries_and_chunks_by_questions_async(
                 trainings_docs, llm_and_fallback, docs_with_summary_chunks_and_questions_file_path
             )
 
-        # Enrich trainings objects from trainings docs
+        # Verify that trainings objects correspond to trainings docs
         for training_obj, training_doc in zip(trainings_objects, trainings_docs):
-            self.check_for_training_name(training_obj, training_doc)
-            training_obj.doc_content = training_doc.page_content
-            training_obj.metadata = training_doc.metadata
-        
+            if training_obj.doc_content != training_doc.page_content:
+                raise ValueError(f"Content mismatch in: {training_doc.metadata['name']}")
+            if training_obj.metadata != training_doc.metadata:
+                raise ValueError(f"Metadata mismatch in: {training_doc.metadata['name']}")        
         return trainings_objects
+    
+    # def check_for_training_name(self, training_obj: DocWithSummaryChunksAndQuestions, training_doc: Document) -> None:
+    #     match = re.search(r'formation : "(.*?)"', training_obj.doc_summary)
+    #     if not match:
+    #         raise ValueError(f"Could not find the training name in the summary: {training_obj.doc_summary[:100]}...")
+    #     doc_training_title = match.group(1).replace('  ', ' ')
+    #     obj_training_title = training_doc.metadata['name'].replace('  ', ' ')
+    #     obj_title_first_quote_index = obj_training_title.find('"')
+    #     if obj_title_first_quote_index != -1:
+    #         obj_training_title = obj_training_title[:obj_title_first_quote_index]
+    #     if obj_training_title != doc_training_title:
+    #         raise ValueError(f"Training name mismatch: {training_doc.metadata['name']} != {doc_training_title}")
 
-    def check_for_training_name(self, training_obj: DocWithSummaryChunksAndQuestions, training_doc: Document) -> None:
-        match = re.search(r'formation : "(.*?)"', training_obj.doc_summary)
-        if not match:
-            raise ValueError(f"Could not find the training name in the summary: {training_obj.doc_summary[:100]}...")
-        doc_training_title = match.group(1).replace('  ', ' ')
-        obj_training_title = training_doc.metadata['name'].replace('  ', ' ')
-        obj_title_first_quote_index = obj_training_title.find('"')
-        if obj_title_first_quote_index != -1:
-            obj_training_title = obj_training_title[:obj_title_first_quote_index]
-        if obj_training_title != doc_training_title:
-            raise ValueError(f"Training name mismatch: {training_doc.metadata['name']} != {doc_training_title}")
-
-    async def get_all_summaries_with_questions_documents_async(self, files_path: str, llm_and_fallback: list, create_questions_from_data: bool = True , merge_questions_with_data: bool = True) -> list[Document]:
+    async def generate_summaries_and_questions_for_documents_async(self, files_path: str, llm_and_fallback: list, create_questions_from_data: bool = True , merge_questions_with_data: bool = True) -> list[Document]:
         all_documents: list[Document] = []
         all_but_trainings_documents = self.build_all_but_trainings_documents(files_path)
         all_documents.extend(all_but_trainings_documents)
 
-        trainings_docs = self.build_trainings_docs(files_path, False, True)
-        all_documents.extend(trainings_docs)
+        trainings_docs = self.build_trainings_docs(files_path)
+        #all_documents.extend(trainings_docs)
 
         trainings_objects = await self.build_trainings_objects_with_summaries_and_chunks_by_questions_async(files_path, trainings_docs, llm_and_fallback)
                 
@@ -544,7 +546,7 @@ class SummaryWithQuestionsByChunkDocumentsService:
     # Method to test the 3 ways of generating summaries, chunks and questions (use to be in 'available services')
     async def test_different_splitting_of_summarize_chunks_and_questions_creation_async(rag_service:RagService, files_path):
         summary_w_questions_service = SummaryWithQuestionsByChunkDocumentsService()
-        trainings_docs = summary_w_questions_service.load_trainings_details_as_json(files_path)
+        trainings_docs = summary_w_questions_service.load_trainings_scraped_details_as_json(files_path)
 
         txt.print("-"*70)
         start = time.time()

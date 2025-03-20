@@ -67,7 +67,7 @@ class ChatbotFront:
             st.button('📥 Récupérer données Drupal par json-api',   on_click=lambda: st.session_state.api_client.retrieve_all_data())
             st.button('🌐 Scraping des pages web des formations',   on_click=lambda: st.session_state.api_client.scrape_website_pages())
             st.divider()
-            st.button("🗂️ Documents: Chunking + Embedding + Insertion en base vectorielle + Génération de Questions et d'une Synthèse en option", on_click=lambda: st.session_state.api_client.build_vectorstore())
+            st.button("🗂️ Insertion en base vectorielle : _ Chunking + embedding des documents \nOption: génération synthèse/questions", on_click=lambda: st.session_state.api_client.build_vectorstore())
             st.divider()
             
             st.subheader("💫 Evaluation du pipeline d'inference")

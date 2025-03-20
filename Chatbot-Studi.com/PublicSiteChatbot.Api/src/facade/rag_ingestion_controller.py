@@ -18,7 +18,7 @@ async def scrape_website():
 
 @ingestion_router.post("/vectorstore/create/full")
 async def create_vectorstore():
-    await AvailableService.create_vector_db_after_generate_chunk_and_embed_documents_summaries_and_questions_async(
+    await AvailableService.add_to_vectorstore_chunked_and_embeded_documents_async(
                             AvailableService.out_dir, 
                             load_existing_embeddings_from_file_if_exists= False
                         )

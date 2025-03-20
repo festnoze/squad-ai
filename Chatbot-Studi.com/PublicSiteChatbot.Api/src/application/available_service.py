@@ -69,17 +69,18 @@ class AvailableService:
         drupal = DrupalDataRetrieval(AvailableService.out_dir)
         drupal.retrieve_all_data()
 
-    async def create_vector_db_after_generate_chunk_and_embed_documents_summaries_and_questions_async(out_dir, load_existing_embeddings_from_file_if_exists = True):
-        if EnvHelper.get_is_summarized_data():
+    async def add_to_vectorstore_chunked_and_embeded_documents_async(out_dir, load_existing_embeddings_from_file_if_exists = True):
+        do_create_summary_from_data = EnvHelper.get_is_summarized_data()
+        if do_create_summary_from_data:
             from vector_database_creation.summary_chunks_with_questions_documents import SummaryWithQuestionsByChunkDocumentsService
-            create_questions_from_data = EnvHelper.get_is_questions_created_from_data()
-            merge_questions_with_data = EnvHelper.get_is_mixed_questions_and_data()
+            do_create_questions_from_data = EnvHelper.get_is_questions_created_from_data()
+            do_merge_questions_with_data = EnvHelper.get_is_mixed_questions_and_data()
             generate_summaries_and_questions_services = SummaryWithQuestionsByChunkDocumentsService()
-            all_docs = await generate_summaries_and_questions_services.get_all_summaries_with_questions_documents_async(
+            all_docs = await generate_summaries_and_questions_services.generate_summaries_and_questions_for_documents_async(
                                                     files_path= out_dir,
                                                     llm_and_fallback= [AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2, AvailableService.rag_service.llm_3],
-                                                    create_questions_from_data = create_questions_from_data,
-                                                    merge_questions_with_data = merge_questions_with_data)
+                                                    create_questions_from_data = do_create_questions_from_data,
+                                                    merge_questions_with_data = do_merge_questions_with_data)
         else:            
             all_docs = GenerateDocumentsAndMetadata.load_all_docs_as_json(out_dir, write_all_lists=True)
             

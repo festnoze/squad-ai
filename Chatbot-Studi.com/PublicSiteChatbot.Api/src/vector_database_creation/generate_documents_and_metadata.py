@@ -110,7 +110,6 @@ class GenerateDocumentsAndMetadata:
             item_name = item.get('name')
             all_certifiers_names.add(item_name)
             metadata = {
-                "id": str(uuid.uuid4()),
                 "doc_id": item.get("id"),
                 "type": "certifieur",
                 "name": item_name,
@@ -129,7 +128,6 @@ class GenerateDocumentsAndMetadata:
             item_name = item.get('name')
             all_certifications_names.add(item_name)
             metadata = {
-                "id": str(uuid.uuid4()),
                 "doc_id": item.get("id"),
                 "type": "certification",
                 "name": item_name,
@@ -149,7 +147,6 @@ class GenerateDocumentsAndMetadata:
             title = re.sub(r'\(.*?\)', '', title).replace("\n", " ").replace(" ?", "").replace("Nos formations en ligne ", "").replace(" en ligne", "").replace("niveau", "").replace("Qu’est-ce qu’un ", "").replace(" +", "+").replace("Nos ", "").replace(" by Studi", "").strip()
             all_diplomas_names.add(title)
             metadata = {
-                "id": str(uuid.uuid4()),
                 "doc_id": item.get("id"),
                 "type": "diplôme",
                 "name": item.get("title"),
@@ -170,7 +167,6 @@ class GenerateDocumentsAndMetadata:
             item_name = item.get('name')
             all_domains_names.add(item_name)
             metadata = {
-                "id": str(uuid.uuid4()),
                 "doc_id": item.get("id"),
                 "type": "domaine",
                 "name": item_name,
@@ -189,7 +185,6 @@ class GenerateDocumentsAndMetadata:
             item_name = item.get('name')
             all_subdomains_names.add(item_name)
             metadata = {
-                "id": str(uuid.uuid4()),
                 "doc_id": item.get("id"),
                 "type": "sous-domaine",
                 "name": item_name,
@@ -209,7 +204,6 @@ class GenerateDocumentsAndMetadata:
         for item in data:
             all_fundings_names.add(item.get("title"))
             metadata = {
-                "id": str(uuid.uuid4()),
                 "doc_id": item.get("id"),
                 "type": "financement",
                 "name": item.get("title"),
@@ -230,7 +224,6 @@ class GenerateDocumentsAndMetadata:
             job_title = item.get("title")
             all_jobs_names.add(job_title)
             metadata = {
-                "id": str(uuid.uuid4()),
                 "doc_id": item.get("id"),
                 "type": "métier",
                 "name": job_title,
@@ -260,7 +253,6 @@ class GenerateDocumentsAndMetadata:
             all_trainings_titles.add(training_title)
             related_ids = training_data.get("related_ids", {})
             metadata_common = {
-                "id": str(uuid.uuid4()),
                 "doc_id": training_data.get("id"),
                 "type": "formation",
                 "name": training_title,
@@ -291,13 +283,13 @@ class GenerateDocumentsAndMetadata:
                 if value:
                     is_list = key.endswith('s')
                     if is_list:
-                        existing_docs_ids = [doc for doc in existing_docs if doc.metadata.get("doc_id") in value]
+                        existing_docs_ids = [doc for doc in existing_docs if doc.metadata.get("id") in value]
                         if len(existing_docs_ids) != len(value):
                             txt.print(f"In process_trainings, on: {key}, {len(value) - len(existing_docs_ids)} docs were not found by its id, on those ids: {value}")
                         if any(existing_docs_ids):
                             metadata_common[key] = ' | '.join(GenerateDocumentsAndMetadata.get_list_with_items_as_str([doc.metadata.get("name") for doc in existing_docs_ids]))
                     else:
-                        existing_docs_ids = [doc for doc in existing_docs if doc.metadata.get("doc_id") == value]
+                        existing_docs_ids = [doc for doc in existing_docs if doc.metadata.get("id") == value]
                         #assert len(existing_docs_ids) == 1, f"Multiple or none docs found for: {key} {value}"
                         if any(existing_docs_ids):
                             metadata_common[key] = existing_docs_ids[0].metadata.get("name")
