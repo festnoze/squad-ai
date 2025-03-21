@@ -20,6 +20,6 @@ async def scrape_website():
 async def create_vectorstore():
     await AvailableService.add_to_vectorstore_chunked_and_embeded_documents_async(
                             AvailableService.out_dir, 
-                            load_existing_embeddings_from_file_if_exists= False
+                            load_embeddings_from_file_if_exists= True
                         )
     return {"message": "Vector store created successfully"}

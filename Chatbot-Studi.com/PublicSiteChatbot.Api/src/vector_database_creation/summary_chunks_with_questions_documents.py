@@ -416,7 +416,17 @@ class SummaryWithQuestionsByChunkDocumentsService:
             if training_obj.doc_content != training_doc.page_content:
                 raise ValueError(f"Content mismatch in: {training_doc.metadata['name']}")
             if training_obj.metadata != training_doc.metadata:
-                raise ValueError(f"Metadata mismatch in: {training_doc.metadata['name']}")        
+                raise ValueError(f"Metadata mismatch in: {training_doc.metadata['name']}")
+        
+        # for training_obj in trainings_objects:
+        #     trainings_doc = [doc for doc in trainings_docs if doc.metadata['id'] == training_obj.metadata['id']]
+        #     if not trainings_doc:
+        #         raise ValueError(f"Could not find the training doc with id: {training_obj.metadata['id']}")
+        #     training_doc = trainings_doc[0]
+        #     if training_obj.doc_content != training_doc.page_content:
+        #         raise ValueError(f"Content mismatch in: {training_doc.metadata['name']}")
+        #     if training_obj.metadata != training_doc.metadata:
+        #         raise ValueError(f"Metadata mismatch in: {training_doc.metadata['name']}")           
         return trainings_objects
     
     # def check_for_training_name(self, training_obj: DocWithSummaryChunksAndQuestions, training_doc: Document) -> None:
@@ -436,7 +446,7 @@ class SummaryWithQuestionsByChunkDocumentsService:
         all_but_trainings_documents = self.build_all_but_trainings_documents(files_path)
         all_documents.extend(all_but_trainings_documents)
 
-        trainings_docs = self.build_trainings_docs(files_path)
+        trainings_docs = self.build_trainings_docs(files_path, add_sub_sections=True, add_full_doc=True)
         #all_documents.extend(trainings_docs)
 
         trainings_objects = await self.build_trainings_objects_with_summaries_and_chunks_by_questions_async(files_path, trainings_docs, llm_and_fallback)

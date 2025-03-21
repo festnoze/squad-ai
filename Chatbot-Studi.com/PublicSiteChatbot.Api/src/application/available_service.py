@@ -69,7 +69,7 @@ class AvailableService:
         drupal = DrupalDataRetrieval(AvailableService.out_dir)
         drupal.retrieve_all_data()
 
-    async def add_to_vectorstore_chunked_and_embeded_documents_async(out_dir, load_existing_embeddings_from_file_if_exists = True):
+    async def add_to_vectorstore_chunked_and_embeded_documents_async(out_dir, load_embeddings_from_file_if_exists = True):
         do_create_summary_from_data = EnvHelper.get_is_summarized_data()
         if do_create_summary_from_data:
             from vector_database_creation.summary_chunks_with_questions_documents import SummaryWithQuestionsByChunkDocumentsService
@@ -84,9 +84,9 @@ class AvailableService:
         else:            
             all_docs = GenerateDocumentsAndMetadata.load_all_docs_as_json(out_dir, write_all_lists=True)
             
-        AvailableService.chunk_docs_and_add_to_vector_db(all_docs, load_existing_embeddings_from_file_if_exists)
+        AvailableService.chunk_docs_and_add_to_vector_db(all_docs, load_embeddings_from_file_if_exists)
 
-    def chunk_docs_and_add_to_vector_db(all_docs, load_existing_embeddings_from_file_if_exists = True):
+    def chunk_docs_and_add_to_vector_db(all_docs, load_embeddings_from_file_if_exists = True):
         txt.print_with_spinner("Chunking documents...")
         from common_tools.rag.rag_ingestion_pipeline.rag_ingestion_pipeline import RagIngestionPipeline
         injection_pipeline = RagIngestionPipeline(AvailableService.rag_service)
@@ -94,12 +94,12 @@ class AvailableService:
 
         txt.stop_spinner_replace_text("Documents chunked\n")
         txt.print_with_spinner("Inserting documents into vector database...")
-        AvailableService.rag_service.vectorstore = injection_pipeline.add_chunked_docs_to_vectorstore(
+        AvailableService.rag_service.vectorstore = injection_pipeline.embed_chunked_docs_then_add_to_vectorstore(
                             docs_chunks= documents_chunks,
                             vector_db_type=AvailableService.rag_service.vector_db_type,
                             collection_name= AvailableService.rag_service.vector_db_name,
                             delete_existing= True,
-                            load_embeddings_from_file_if_exists= load_existing_embeddings_from_file_if_exists,
+                            load_embeddings_from_file_if_exists= load_embeddings_from_file_if_exists,
                         )
         txt.stop_spinner_replace_text("Vector database filled with embedded and chunked documents\n")
         # Reload rag_service with the new vectorstore (and langchain documents for BM25)

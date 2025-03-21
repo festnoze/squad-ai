@@ -124,13 +124,13 @@ class RagasService:
         return dataset
 
     async def get_trainings_objects_or_docs_async(files_path, return_trainings_docs=False):
-        summaries_and_questions_generation_service = SummaryWithQuestionsByChunkDocumentsService()
-        trainings_docs = summaries_and_questions_generation_service.build_trainings_docs(files_path, False, True)
-        trainings_objects = await summaries_and_questions_generation_service.build_trainings_objects_with_summaries_and_chunks_by_questions_async(files_path, trainings_docs)
+        summary_gen_service = SummaryWithQuestionsByChunkDocumentsService()
+        trainings_docs = summary_gen_service.build_trainings_docs(files_path, True, True)
+        trainings_objects = await summary_gen_service.build_trainings_objects_with_summaries_and_chunks_by_questions_async(files_path, trainings_docs)
         
         if return_trainings_docs:
             #TODO: see if it worth the same than the previous trainings_docs above
-            trainings_docs = summaries_and_questions_generation_service.build_trainings_docs_from_objs(trainings_objects)
+            trainings_docs = summary_gen_service.build_trainings_docs_from_objs(trainings_objects)
             return trainings_docs
         else:
             return trainings_objects
