@@ -1,0 +1,3503 @@
+﻿[
+    {
+        "type": "node--funding",
+        "id": "56688577-548a-4666-84b5-72e3f9fb060c",
+        "links": {
+            "self": {
+                "href": "https://www.studi.com/fr/jsonapi/node/funding/56688577-548a-4666-84b5-72e3f9fb060c?resourceVersion=id%3A787"
+            }
+        },
+        "attributes": {
+            "drupal_internal__nid": 446,
+            "drupal_internal__vid": 787,
+            "langcode": "fr",
+            "revision_timestamp": "2021-08-17T10:12:20+00:00",
+            "revision_log": null,
+            "status": true,
+            "title": "Compte Personnel de Formation (CPF)",
+            "created": "2021-08-17T10:06:51+00:00",
+            "changed": "2024-07-30T15:23:38+00:00",
+            "promote": false,
+            "sticky": false,
+            "default_langcode": true,
+            "revision_translation_affected": true,
+            "publish_on": null,
+            "unpublish_on": null,
+            "satellite_site": [],
+            "body": {
+                "value": "<p>Le CPF est un droit individuel qui permet \u00e0 toute personne, salari\u00e9e ou demandeur d\u2019emploi, de cumuler un cr\u00e9dit en euros et de suivre une action de formation, utilisable tout au long de sa vie active.</p>\r\n",
+                "format": "basic_html",
+                "processed": "<p>Le CPF est un droit individuel qui permet \u00e0 toute personne, salari\u00e9e ou demandeur d\u2019emploi, de cumuler un cr\u00e9dit en euros et de suivre une action de formation, utilisable tout au long de sa vie active.</p>\n",
+                "summary": ""
+            },
+            "field_dark_mode": false,
+            "field_metatag": null
+        },
+        "relationships": {
+            "node_type": {
+                "data": {
+                    "type": "node_type--node_type",
+                    "id": "5d7d645e-a53e-4921-83f0-e142b0307f8e",
+                    "meta": {
+                        "drupal_internal__target_id": "funding"
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/56688577-548a-4666-84b5-72e3f9fb060c/node_type?resourceVersion=id%3A787"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/56688577-548a-4666-84b5-72e3f9fb060c/relationships/node_type?resourceVersion=id%3A787"
+                    }
+                }
+            },
+            "revision_uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/56688577-548a-4666-84b5-72e3f9fb060c/relationships/revision_uid?resourceVersion=id%3A787"
+                    }
+                }
+            },
+            "uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/56688577-548a-4666-84b5-72e3f9fb060c/relationships/uid?resourceVersion=id%3A787"
+                    }
+                }
+            },
+            "field_header": {
+                "data": {
+                    "type": "paragraph--header",
+                    "id": "cfe2ba92-f821-4720-a0a7-3bf2cb0a6f78",
+                    "meta": {
+                        "target_revision_id": 3379,
+                        "drupal_internal__target_id": 1278
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/56688577-548a-4666-84b5-72e3f9fb060c/field_header?resourceVersion=id%3A787"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/56688577-548a-4666-84b5-72e3f9fb060c/relationships/field_header?resourceVersion=id%3A787"
+                    }
+                }
+            },
+            "field_image": {
+                "data": {
+                    "type": "media--image",
+                    "id": "8c0670a6-86a0-4125-ae2c-45db611343ee",
+                    "meta": {
+                        "drupal_internal__target_id": 540
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/56688577-548a-4666-84b5-72e3f9fb060c/field_image?resourceVersion=id%3A787"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/56688577-548a-4666-84b5-72e3f9fb060c/relationships/field_image?resourceVersion=id%3A787"
+                    }
+                }
+            },
+            "field_logo": {
+                "data": null,
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/56688577-548a-4666-84b5-72e3f9fb060c/field_logo?resourceVersion=id%3A787"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/56688577-548a-4666-84b5-72e3f9fb060c/relationships/field_logo?resourceVersion=id%3A787"
+                    }
+                }
+            },
+            "field_paragraph": {
+                "data": [
+                    {
+                        "type": "paragraph--basic",
+                        "id": "31ad392a-207f-4276-8cf8-2cb561f7923d",
+                        "meta": {
+                            "target_revision_id": 40825,
+                            "drupal_internal__target_id": 7567
+                        }
+                    },
+                    {
+                        "type": "paragraph--accordions",
+                        "id": "233d9519-db7c-4143-9c9a-60e438e1b86c",
+                        "meta": {
+                            "target_revision_id": 733,
+                            "drupal_internal__target_id": 249
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/56688577-548a-4666-84b5-72e3f9fb060c/field_paragraph?resourceVersion=id%3A787"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/56688577-548a-4666-84b5-72e3f9fb060c/relationships/field_paragraph?resourceVersion=id%3A787"
+                    }
+                }
+            },
+            "field_situation_prospect": {
+                "data": [
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "de8dcb4a-b8db-4564-9a10-110cd8b3e1e7",
+                        "meta": {
+                            "drupal_internal__target_id": 609
+                        }
+                    },
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "520041ce-1203-4c23-ba49-f8a8b7e46c1d",
+                        "meta": {
+                            "drupal_internal__target_id": 610
+                        }
+                    },
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "d8ff77dd-058d-41e9-8692-90c7e111c39d",
+                        "meta": {
+                            "drupal_internal__target_id": 616
+                        }
+                    },
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "43b9b286-e909-4c5b-a60d-ff34bb705fb0",
+                        "meta": {
+                            "drupal_internal__target_id": 618
+                        }
+                    },
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "994c9ca9-1232-41ca-a2fc-2abcd115d634",
+                        "meta": {
+                            "drupal_internal__target_id": 620
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/56688577-548a-4666-84b5-72e3f9fb060c/field_situation_prospect?resourceVersion=id%3A787"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/56688577-548a-4666-84b5-72e3f9fb060c/relationships/field_situation_prospect?resourceVersion=id%3A787"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "node--funding",
+        "id": "9c02b63a-866d-4775-a583-0e9ed706d8df",
+        "links": {
+            "self": {
+                "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df?resourceVersion=id%3A794"
+            }
+        },
+        "attributes": {
+            "drupal_internal__nid": 448,
+            "drupal_internal__vid": 794,
+            "langcode": "fr",
+            "revision_timestamp": "2021-08-17T11:48:25+00:00",
+            "revision_log": null,
+            "status": true,
+            "title": "CPF de transition professionnelle",
+            "created": "2021-08-17T11:47:15+00:00",
+            "changed": "2023-03-14T16:01:58+00:00",
+            "promote": false,
+            "sticky": false,
+            "default_langcode": true,
+            "revision_translation_affected": true,
+            "publish_on": null,
+            "unpublish_on": null,
+            "satellite_site": [],
+            "body": {
+                "value": "<p>Le Projet de Transition Professionnelle est une modalit\u00e9 particuli\u00e8re de mobilisation du CPF (Compte personnel de formation), permettant aux salari\u00e9s souhaitant changer de m\u00e9tier ou de profession de financer des formations certifiantes en lien avec leur projet.</p>\r\n",
+                "format": "basic_html",
+                "processed": "<p>Le Projet de Transition Professionnelle est une modalit\u00e9 particuli\u00e8re de mobilisation du CPF (Compte personnel de formation), permettant aux salari\u00e9s souhaitant changer de m\u00e9tier ou de profession de financer des formations certifiantes en lien avec leur projet.</p>\n",
+                "summary": ""
+            },
+            "field_dark_mode": false,
+            "field_metatag": null
+        },
+        "relationships": {
+            "node_type": {
+                "data": {
+                    "type": "node_type--node_type",
+                    "id": "5d7d645e-a53e-4921-83f0-e142b0307f8e",
+                    "meta": {
+                        "drupal_internal__target_id": "funding"
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df/node_type?resourceVersion=id%3A794"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df/relationships/node_type?resourceVersion=id%3A794"
+                    }
+                }
+            },
+            "revision_uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df/relationships/revision_uid?resourceVersion=id%3A794"
+                    }
+                }
+            },
+            "uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df/relationships/uid?resourceVersion=id%3A794"
+                    }
+                }
+            },
+            "field_header": {
+                "data": {
+                    "type": "paragraph--header",
+                    "id": "e5c9cb86-0e5b-44a7-8e3d-950ddd3d2dd2",
+                    "meta": {
+                        "target_revision_id": 3375,
+                        "drupal_internal__target_id": 1274
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df/field_header?resourceVersion=id%3A794"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df/relationships/field_header?resourceVersion=id%3A794"
+                    }
+                }
+            },
+            "field_image": {
+                "data": {
+                    "type": "media--image",
+                    "id": "cb6612c7-366f-44df-b2bc-f9b8d1395f0a",
+                    "meta": {
+                        "drupal_internal__target_id": 541
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df/field_image?resourceVersion=id%3A794"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df/relationships/field_image?resourceVersion=id%3A794"
+                    }
+                }
+            },
+            "field_logo": {
+                "data": null,
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df/field_logo?resourceVersion=id%3A794"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df/relationships/field_logo?resourceVersion=id%3A794"
+                    }
+                }
+            },
+            "field_paragraph": {
+                "data": [
+                    {
+                        "type": "paragraph--basic",
+                        "id": "6946aec2-a956-427d-98e4-d52b9756de2e",
+                        "meta": {
+                            "target_revision_id": 758,
+                            "drupal_internal__target_id": 261
+                        }
+                    },
+                    {
+                        "type": "paragraph--accordions",
+                        "id": "505ca95f-b55d-47da-b92e-5eb350957130",
+                        "meta": {
+                            "target_revision_id": 40841,
+                            "drupal_internal__target_id": 7583
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df/field_paragraph?resourceVersion=id%3A794"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df/relationships/field_paragraph?resourceVersion=id%3A794"
+                    }
+                }
+            },
+            "field_situation_prospect": {
+                "data": [
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "de8dcb4a-b8db-4564-9a10-110cd8b3e1e7",
+                        "meta": {
+                            "drupal_internal__target_id": 609
+                        }
+                    },
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "994c9ca9-1232-41ca-a2fc-2abcd115d634",
+                        "meta": {
+                            "drupal_internal__target_id": 620
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df/field_situation_prospect?resourceVersion=id%3A794"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df/relationships/field_situation_prospect?resourceVersion=id%3A794"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "node--funding",
+        "id": "97540098-109b-4efb-bcea-00fd02b0387d",
+        "links": {
+            "self": {
+                "href": "https://www.studi.com/fr/jsonapi/node/funding/97540098-109b-4efb-bcea-00fd02b0387d?resourceVersion=id%3A795"
+            }
+        },
+        "attributes": {
+            "drupal_internal__nid": 449,
+            "drupal_internal__vid": 795,
+            "langcode": "fr",
+            "revision_timestamp": "2021-08-17T11:53:12+00:00",
+            "revision_log": null,
+            "status": true,
+            "title": "Plan de d\u00e9veloppement des comp\u00e9tences (PDC)",
+            "created": "2021-08-17T11:51:39+00:00",
+            "changed": "2023-03-07T13:53:21+00:00",
+            "promote": false,
+            "sticky": false,
+            "default_langcode": true,
+            "revision_translation_affected": true,
+            "publish_on": null,
+            "unpublish_on": null,
+            "satellite_site": [],
+            "body": {
+                "value": "<p>Le plan de d\u00e9veloppement des comp\u00e9tences est un document qui rassemble l\u2019ensemble des actions de formation retenues par l\u2019employeur pour ses salari\u00e9s.&nbsp;</p>\r\n",
+                "format": "basic_html",
+                "processed": "<p>Le plan de d\u00e9veloppement des comp\u00e9tences est un document qui rassemble l\u2019ensemble des actions de formation retenues par l\u2019employeur pour ses salari\u00e9s.\u00a0</p>\n",
+                "summary": ""
+            },
+            "field_dark_mode": false,
+            "field_metatag": null
+        },
+        "relationships": {
+            "node_type": {
+                "data": {
+                    "type": "node_type--node_type",
+                    "id": "5d7d645e-a53e-4921-83f0-e142b0307f8e",
+                    "meta": {
+                        "drupal_internal__target_id": "funding"
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/97540098-109b-4efb-bcea-00fd02b0387d/node_type?resourceVersion=id%3A795"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/97540098-109b-4efb-bcea-00fd02b0387d/relationships/node_type?resourceVersion=id%3A795"
+                    }
+                }
+            },
+            "revision_uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/97540098-109b-4efb-bcea-00fd02b0387d/relationships/revision_uid?resourceVersion=id%3A795"
+                    }
+                }
+            },
+            "uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/97540098-109b-4efb-bcea-00fd02b0387d/relationships/uid?resourceVersion=id%3A795"
+                    }
+                }
+            },
+            "field_header": {
+                "data": {
+                    "type": "paragraph--header",
+                    "id": "f795a352-7ac8-4931-96e9-6ff20c3413bf",
+                    "meta": {
+                        "target_revision_id": 3376,
+                        "drupal_internal__target_id": 1275
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/97540098-109b-4efb-bcea-00fd02b0387d/field_header?resourceVersion=id%3A795"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/97540098-109b-4efb-bcea-00fd02b0387d/relationships/field_header?resourceVersion=id%3A795"
+                    }
+                }
+            },
+            "field_image": {
+                "data": {
+                    "type": "media--image",
+                    "id": "9711d463-e8dc-4c92-b1a7-dabe7826dc65",
+                    "meta": {
+                        "drupal_internal__target_id": 542
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/97540098-109b-4efb-bcea-00fd02b0387d/field_image?resourceVersion=id%3A795"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/97540098-109b-4efb-bcea-00fd02b0387d/relationships/field_image?resourceVersion=id%3A795"
+                    }
+                }
+            },
+            "field_logo": {
+                "data": null,
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/97540098-109b-4efb-bcea-00fd02b0387d/field_logo?resourceVersion=id%3A795"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/97540098-109b-4efb-bcea-00fd02b0387d/relationships/field_logo?resourceVersion=id%3A795"
+                    }
+                }
+            },
+            "field_paragraph": {
+                "data": [
+                    {
+                        "type": "paragraph--basic",
+                        "id": "24a65a31-bf2d-4a0b-845b-63ea14294676",
+                        "meta": {
+                            "target_revision_id": 40813,
+                            "drupal_internal__target_id": 7555
+                        }
+                    },
+                    {
+                        "type": "paragraph--accordions",
+                        "id": "88efbae3-e12e-4eb7-b6f0-2d5c72ede662",
+                        "meta": {
+                            "target_revision_id": 40834,
+                            "drupal_internal__target_id": 7576
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/97540098-109b-4efb-bcea-00fd02b0387d/field_paragraph?resourceVersion=id%3A795"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/97540098-109b-4efb-bcea-00fd02b0387d/relationships/field_paragraph?resourceVersion=id%3A795"
+                    }
+                }
+            },
+            "field_situation_prospect": {
+                "data": [
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "de8dcb4a-b8db-4564-9a10-110cd8b3e1e7",
+                        "meta": {
+                            "drupal_internal__target_id": 609
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/97540098-109b-4efb-bcea-00fd02b0387d/field_situation_prospect?resourceVersion=id%3A795"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/97540098-109b-4efb-bcea-00fd02b0387d/relationships/field_situation_prospect?resourceVersion=id%3A795"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "node--funding",
+        "id": "f94d49d6-65ec-4fa7-9421-f86d827c2224",
+        "links": {
+            "self": {
+                "href": "https://www.studi.com/fr/jsonapi/node/funding/f94d49d6-65ec-4fa7-9421-f86d827c2224?resourceVersion=id%3A797"
+            }
+        },
+        "attributes": {
+            "drupal_internal__nid": 451,
+            "drupal_internal__vid": 797,
+            "langcode": "fr",
+            "revision_timestamp": "2021-08-17T11:58:17+00:00",
+            "revision_log": null,
+            "status": true,
+            "title": "Transitions collectives",
+            "created": "2021-08-17T11:57:27+00:00",
+            "changed": "2024-03-12T15:34:57+00:00",
+            "promote": false,
+            "sticky": false,
+            "default_langcode": true,
+            "revision_translation_affected": true,
+            "publish_on": null,
+            "unpublish_on": null,
+            "satellite_site": [],
+            "body": {
+                "value": "<p>Transitions collectives, dispositif co-construit avec les partenaires sociaux dans le cadre du plan France Relance, permet aux employeurs d\u2019anticiper les mutations \u00e9conomiques de leur secteur et aux salari\u00e9s d\u2019\u00eatre accompagn\u00e9s pour se reconvertir dans le but d\u2019acc\u00e9der \u00e0 un m\u00e9tier porteur dans le m\u00eame bassin de vie.</p>\r\n",
+                "format": "basic_html",
+                "processed": "<p>Transitions collectives, dispositif co-construit avec les partenaires sociaux dans le cadre du plan France Relance, permet aux employeurs d\u2019anticiper les mutations \u00e9conomiques de leur secteur et aux salari\u00e9s d\u2019\u00eatre accompagn\u00e9s pour se reconvertir dans le but d\u2019acc\u00e9der \u00e0 un m\u00e9tier porteur dans le m\u00eame bassin de vie.</p>\n",
+                "summary": ""
+            },
+            "field_dark_mode": false,
+            "field_metatag": null
+        },
+        "relationships": {
+            "node_type": {
+                "data": {
+                    "type": "node_type--node_type",
+                    "id": "5d7d645e-a53e-4921-83f0-e142b0307f8e",
+                    "meta": {
+                        "drupal_internal__target_id": "funding"
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/f94d49d6-65ec-4fa7-9421-f86d827c2224/node_type?resourceVersion=id%3A797"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/f94d49d6-65ec-4fa7-9421-f86d827c2224/relationships/node_type?resourceVersion=id%3A797"
+                    }
+                }
+            },
+            "revision_uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/f94d49d6-65ec-4fa7-9421-f86d827c2224/relationships/revision_uid?resourceVersion=id%3A797"
+                    }
+                }
+            },
+            "uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/f94d49d6-65ec-4fa7-9421-f86d827c2224/relationships/uid?resourceVersion=id%3A797"
+                    }
+                }
+            },
+            "field_header": {
+                "data": {
+                    "type": "paragraph--header",
+                    "id": "5989d4c9-9764-43c8-9d4b-fb0b914790ea",
+                    "meta": {
+                        "target_revision_id": 3378,
+                        "drupal_internal__target_id": 1277
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/f94d49d6-65ec-4fa7-9421-f86d827c2224/field_header?resourceVersion=id%3A797"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/f94d49d6-65ec-4fa7-9421-f86d827c2224/relationships/field_header?resourceVersion=id%3A797"
+                    }
+                }
+            },
+            "field_image": {
+                "data": {
+                    "type": "media--image",
+                    "id": "b2be80a2-ca7a-4bf9-8ae0-cf3d148be8f6",
+                    "meta": {
+                        "drupal_internal__target_id": 609
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/f94d49d6-65ec-4fa7-9421-f86d827c2224/field_image?resourceVersion=id%3A797"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/f94d49d6-65ec-4fa7-9421-f86d827c2224/relationships/field_image?resourceVersion=id%3A797"
+                    }
+                }
+            },
+            "field_logo": {
+                "data": null,
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/f94d49d6-65ec-4fa7-9421-f86d827c2224/field_logo?resourceVersion=id%3A797"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/f94d49d6-65ec-4fa7-9421-f86d827c2224/relationships/field_logo?resourceVersion=id%3A797"
+                    }
+                }
+            },
+            "field_paragraph": {
+                "data": [
+                    {
+                        "type": "paragraph--basic",
+                        "id": "d45cdf54-9122-4ba5-854f-f4b265fae77f",
+                        "meta": {
+                            "target_revision_id": 764,
+                            "drupal_internal__target_id": 267
+                        }
+                    },
+                    {
+                        "type": "paragraph--accordions",
+                        "id": "bc2be811-1712-4c37-8b04-91434e26d8a8",
+                        "meta": {
+                            "target_revision_id": 40852,
+                            "drupal_internal__target_id": 7594
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/f94d49d6-65ec-4fa7-9421-f86d827c2224/field_paragraph?resourceVersion=id%3A797"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/f94d49d6-65ec-4fa7-9421-f86d827c2224/relationships/field_paragraph?resourceVersion=id%3A797"
+                    }
+                }
+            },
+            "field_situation_prospect": {
+                "data": [
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "de8dcb4a-b8db-4564-9a10-110cd8b3e1e7",
+                        "meta": {
+                            "drupal_internal__target_id": 609
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/f94d49d6-65ec-4fa7-9421-f86d827c2224/field_situation_prospect?resourceVersion=id%3A797"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/f94d49d6-65ec-4fa7-9421-f86d827c2224/relationships/field_situation_prospect?resourceVersion=id%3A797"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "node--funding",
+        "id": "14196e83-afdd-4d83-a2a5-7dd1f0957bb7",
+        "links": {
+            "self": {
+                "href": "https://www.studi.com/fr/jsonapi/node/funding/14196e83-afdd-4d83-a2a5-7dd1f0957bb7?resourceVersion=id%3A798"
+            }
+        },
+        "attributes": {
+            "drupal_internal__nid": 452,
+            "drupal_internal__vid": 798,
+            "langcode": "fr",
+            "revision_timestamp": "2021-08-17T12:00:33+00:00",
+            "revision_log": null,
+            "status": true,
+            "title": "Contrat d'apprentissage",
+            "created": "2021-08-17T11:59:56+00:00",
+            "changed": "2024-01-05T16:14:38+00:00",
+            "promote": false,
+            "sticky": false,
+            "default_langcode": true,
+            "revision_translation_affected": true,
+            "publish_on": null,
+            "unpublish_on": null,
+            "satellite_site": [],
+            "body": {
+                "value": "<p><span><span><span><span><span><span>Le contrat d'apprentissage permet \u00e0 l'apprenti de suivre une formation en alternance en entreprise sous la responsabilit\u00e9 d'un ma\u00eetre d'apprentissage et en centre de formation des apprentis (CFA) pendant 6 mois \u00e0 3 ans.</span></span></span></span></span></span></p>\r\n",
+                "format": "basic_html",
+                "processed": "<p><span><span><span><span><span><span>Le contrat d'apprentissage permet \u00e0 l'apprenti de suivre une formation en alternance en entreprise sous la responsabilit\u00e9 d'un ma\u00eetre d'apprentissage et en centre de formation des apprentis (CFA) pendant 6 mois \u00e0 3 ans.</span></span></span></span></span></span></p>\n",
+                "summary": ""
+            },
+            "field_dark_mode": false,
+            "field_metatag": null
+        },
+        "relationships": {
+            "node_type": {
+                "data": {
+                    "type": "node_type--node_type",
+                    "id": "5d7d645e-a53e-4921-83f0-e142b0307f8e",
+                    "meta": {
+                        "drupal_internal__target_id": "funding"
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/14196e83-afdd-4d83-a2a5-7dd1f0957bb7/node_type?resourceVersion=id%3A798"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/14196e83-afdd-4d83-a2a5-7dd1f0957bb7/relationships/node_type?resourceVersion=id%3A798"
+                    }
+                }
+            },
+            "revision_uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/14196e83-afdd-4d83-a2a5-7dd1f0957bb7/relationships/revision_uid?resourceVersion=id%3A798"
+                    }
+                }
+            },
+            "uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/14196e83-afdd-4d83-a2a5-7dd1f0957bb7/relationships/uid?resourceVersion=id%3A798"
+                    }
+                }
+            },
+            "field_header": {
+                "data": {
+                    "type": "paragraph--header",
+                    "id": "347b31c5-6a71-45ec-9db8-84f862697531",
+                    "meta": {
+                        "target_revision_id": 3368,
+                        "drupal_internal__target_id": 1267
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/14196e83-afdd-4d83-a2a5-7dd1f0957bb7/field_header?resourceVersion=id%3A798"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/14196e83-afdd-4d83-a2a5-7dd1f0957bb7/relationships/field_header?resourceVersion=id%3A798"
+                    }
+                }
+            },
+            "field_image": {
+                "data": {
+                    "type": "media--image",
+                    "id": "1b98ab8d-55b6-483d-968e-d0fced566d3b",
+                    "meta": {
+                        "drupal_internal__target_id": 544
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/14196e83-afdd-4d83-a2a5-7dd1f0957bb7/field_image?resourceVersion=id%3A798"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/14196e83-afdd-4d83-a2a5-7dd1f0957bb7/relationships/field_image?resourceVersion=id%3A798"
+                    }
+                }
+            },
+            "field_logo": {
+                "data": null,
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/14196e83-afdd-4d83-a2a5-7dd1f0957bb7/field_logo?resourceVersion=id%3A798"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/14196e83-afdd-4d83-a2a5-7dd1f0957bb7/relationships/field_logo?resourceVersion=id%3A798"
+                    }
+                }
+            },
+            "field_paragraph": {
+                "data": [
+                    {
+                        "type": "paragraph--basic",
+                        "id": "8da993d8-549d-459c-9ceb-f4a9484c6436",
+                        "meta": {
+                            "target_revision_id": 766,
+                            "drupal_internal__target_id": 269
+                        }
+                    },
+                    {
+                        "type": "paragraph--accordions",
+                        "id": "6218cadf-c7c5-4cc3-8922-fdf15a9bfc23",
+                        "meta": {
+                            "target_revision_id": 40860,
+                            "drupal_internal__target_id": 7602
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/14196e83-afdd-4d83-a2a5-7dd1f0957bb7/field_paragraph?resourceVersion=id%3A798"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/14196e83-afdd-4d83-a2a5-7dd1f0957bb7/relationships/field_paragraph?resourceVersion=id%3A798"
+                    }
+                }
+            },
+            "field_situation_prospect": {
+                "data": [
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "ba24346b-1361-4eda-bf8d-1d082111379c",
+                        "meta": {
+                            "drupal_internal__target_id": 617
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/14196e83-afdd-4d83-a2a5-7dd1f0957bb7/field_situation_prospect?resourceVersion=id%3A798"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/14196e83-afdd-4d83-a2a5-7dd1f0957bb7/relationships/field_situation_prospect?resourceVersion=id%3A798"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "node--funding",
+        "id": "e4c88ffe-ab4f-4f1d-83e1-1ef1adc64f9b",
+        "links": {
+            "self": {
+                "href": "https://www.studi.com/fr/jsonapi/node/funding/e4c88ffe-ab4f-4f1d-83e1-1ef1adc64f9b?resourceVersion=id%3A800"
+            }
+        },
+        "attributes": {
+            "drupal_internal__nid": 454,
+            "drupal_internal__vid": 800,
+            "langcode": "fr",
+            "revision_timestamp": "2021-08-17T12:06:32+00:00",
+            "revision_log": null,
+            "status": true,
+            "title": "Contrat de professionnalisation",
+            "created": "2021-08-17T12:03:03+00:00",
+            "changed": "2023-03-03T11:05:54+00:00",
+            "promote": false,
+            "sticky": false,
+            "default_langcode": true,
+            "revision_translation_affected": true,
+            "publish_on": null,
+            "unpublish_on": null,
+            "satellite_site": [
+                "academee"
+            ],
+            "body": {
+                "value": "<p>Le contrat de professionnalisation vise l\u2019insertion ou le retour \u00e0 l\u2019emploi des jeunes et des adultes et permet l\u2019acquisition \u2013 dans le cadre de la formation continue \u2013 d\u2019une qualification professionnelle reconnue par l\u2019\u00c9tat et/ou la branche professionnelle.&nbsp;</p>\r\n",
+                "format": "basic_html",
+                "processed": "<p>Le contrat de professionnalisation vise l\u2019insertion ou le retour \u00e0 l\u2019emploi des jeunes et des adultes et permet l\u2019acquisition \u2013 dans le cadre de la formation continue \u2013 d\u2019une qualification professionnelle reconnue par l\u2019\u00c9tat et/ou la branche professionnelle.\u00a0</p>\n",
+                "summary": ""
+            },
+            "field_dark_mode": false,
+            "field_metatag": null
+        },
+        "relationships": {
+            "node_type": {
+                "data": {
+                    "type": "node_type--node_type",
+                    "id": "5d7d645e-a53e-4921-83f0-e142b0307f8e",
+                    "meta": {
+                        "drupal_internal__target_id": "funding"
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/e4c88ffe-ab4f-4f1d-83e1-1ef1adc64f9b/node_type?resourceVersion=id%3A800"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/e4c88ffe-ab4f-4f1d-83e1-1ef1adc64f9b/relationships/node_type?resourceVersion=id%3A800"
+                    }
+                }
+            },
+            "revision_uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/e4c88ffe-ab4f-4f1d-83e1-1ef1adc64f9b/relationships/revision_uid?resourceVersion=id%3A800"
+                    }
+                }
+            },
+            "uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/e4c88ffe-ab4f-4f1d-83e1-1ef1adc64f9b/relationships/uid?resourceVersion=id%3A800"
+                    }
+                }
+            },
+            "field_header": {
+                "data": {
+                    "type": "paragraph--header",
+                    "id": "18568e3c-743d-4047-b494-a6691613c8d9",
+                    "meta": {
+                        "target_revision_id": 17926,
+                        "drupal_internal__target_id": 3956
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/e4c88ffe-ab4f-4f1d-83e1-1ef1adc64f9b/field_header?resourceVersion=id%3A800"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/e4c88ffe-ab4f-4f1d-83e1-1ef1adc64f9b/relationships/field_header?resourceVersion=id%3A800"
+                    }
+                }
+            },
+            "field_image": {
+                "data": {
+                    "type": "media--image",
+                    "id": "cb9abea0-02a9-431c-94f3-a6d2651aba1a",
+                    "meta": {
+                        "drupal_internal__target_id": 902
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/e4c88ffe-ab4f-4f1d-83e1-1ef1adc64f9b/field_image?resourceVersion=id%3A800"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/e4c88ffe-ab4f-4f1d-83e1-1ef1adc64f9b/relationships/field_image?resourceVersion=id%3A800"
+                    }
+                }
+            },
+            "field_logo": {
+                "data": null,
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/e4c88ffe-ab4f-4f1d-83e1-1ef1adc64f9b/field_logo?resourceVersion=id%3A800"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/e4c88ffe-ab4f-4f1d-83e1-1ef1adc64f9b/relationships/field_logo?resourceVersion=id%3A800"
+                    }
+                }
+            },
+            "field_paragraph": {
+                "data": [
+                    {
+                        "type": "paragraph--basic",
+                        "id": "cdfde172-6bd4-4bfe-8cc3-f49a9e6b5b67",
+                        "meta": {
+                            "target_revision_id": 793,
+                            "drupal_internal__target_id": 296
+                        }
+                    },
+                    {
+                        "type": "paragraph--accordions",
+                        "id": "e120392a-2533-4c07-957a-ac6446af41b1",
+                        "meta": {
+                            "target_revision_id": 40868,
+                            "drupal_internal__target_id": 7610
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/e4c88ffe-ab4f-4f1d-83e1-1ef1adc64f9b/field_paragraph?resourceVersion=id%3A800"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/e4c88ffe-ab4f-4f1d-83e1-1ef1adc64f9b/relationships/field_paragraph?resourceVersion=id%3A800"
+                    }
+                }
+            },
+            "field_situation_prospect": {
+                "data": [
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "ba24346b-1361-4eda-bf8d-1d082111379c",
+                        "meta": {
+                            "drupal_internal__target_id": 617
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/e4c88ffe-ab4f-4f1d-83e1-1ef1adc64f9b/field_situation_prospect?resourceVersion=id%3A800"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/e4c88ffe-ab4f-4f1d-83e1-1ef1adc64f9b/relationships/field_situation_prospect?resourceVersion=id%3A800"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "node--funding",
+        "id": "21261f47-37ff-40d0-a269-623d69823799",
+        "links": {
+            "self": {
+                "href": "https://www.studi.com/fr/jsonapi/node/funding/21261f47-37ff-40d0-a269-623d69823799?resourceVersion=id%3A801"
+            }
+        },
+        "attributes": {
+            "drupal_internal__nid": 455,
+            "drupal_internal__vid": 801,
+            "langcode": "fr",
+            "revision_timestamp": "2021-08-17T12:13:26+00:00",
+            "revision_log": null,
+            "status": true,
+            "title": "Aide individuelle \u00e0 la formation (AIF)",
+            "created": "2021-08-17T12:08:54+00:00",
+            "changed": "2024-09-20T14:16:06+00:00",
+            "promote": false,
+            "sticky": false,
+            "default_langcode": true,
+            "revision_translation_affected": true,
+            "publish_on": null,
+            "unpublish_on": null,
+            "satellite_site": [],
+            "body": {
+                "value": "<p>L\u2019Aide individuelle \u00e0 la formation (AIF) permet de (co)financer, dans certaines situations sp\u00e9cifiques, tout ou partie des frais p\u00e9dagogiques d\u2019une formation en vue d\u2019un retour durable \u00e0 l'emploi.</p>\r\n",
+                "format": "basic_html",
+                "processed": "<p>L\u2019Aide individuelle \u00e0 la formation (AIF) permet de (co)financer, dans certaines situations sp\u00e9cifiques, tout ou partie des frais p\u00e9dagogiques d\u2019une formation en vue d\u2019un retour durable \u00e0 l'emploi.</p>\n",
+                "summary": ""
+            },
+            "field_dark_mode": false,
+            "field_metatag": null
+        },
+        "relationships": {
+            "node_type": {
+                "data": {
+                    "type": "node_type--node_type",
+                    "id": "5d7d645e-a53e-4921-83f0-e142b0307f8e",
+                    "meta": {
+                        "drupal_internal__target_id": "funding"
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/21261f47-37ff-40d0-a269-623d69823799/node_type?resourceVersion=id%3A801"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/21261f47-37ff-40d0-a269-623d69823799/relationships/node_type?resourceVersion=id%3A801"
+                    }
+                }
+            },
+            "revision_uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/21261f47-37ff-40d0-a269-623d69823799/relationships/revision_uid?resourceVersion=id%3A801"
+                    }
+                }
+            },
+            "uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/21261f47-37ff-40d0-a269-623d69823799/relationships/uid?resourceVersion=id%3A801"
+                    }
+                }
+            },
+            "field_header": {
+                "data": {
+                    "type": "paragraph--header",
+                    "id": "8fc94f27-dd72-4113-a652-da2f361111dd",
+                    "meta": {
+                        "target_revision_id": 3374,
+                        "drupal_internal__target_id": 1273
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/21261f47-37ff-40d0-a269-623d69823799/field_header?resourceVersion=id%3A801"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/21261f47-37ff-40d0-a269-623d69823799/relationships/field_header?resourceVersion=id%3A801"
+                    }
+                }
+            },
+            "field_image": {
+                "data": {
+                    "type": "media--image",
+                    "id": "f917f7d5-b359-4f37-9663-defbaf233878",
+                    "meta": {
+                        "drupal_internal__target_id": 903
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/21261f47-37ff-40d0-a269-623d69823799/field_image?resourceVersion=id%3A801"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/21261f47-37ff-40d0-a269-623d69823799/relationships/field_image?resourceVersion=id%3A801"
+                    }
+                }
+            },
+            "field_logo": {
+                "data": null,
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/21261f47-37ff-40d0-a269-623d69823799/field_logo?resourceVersion=id%3A801"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/21261f47-37ff-40d0-a269-623d69823799/relationships/field_logo?resourceVersion=id%3A801"
+                    }
+                }
+            },
+            "field_paragraph": {
+                "data": [
+                    {
+                        "type": "paragraph--basic",
+                        "id": "46d1b162-b1ce-45a5-8cde-17ec87d33d61",
+                        "meta": {
+                            "target_revision_id": 795,
+                            "drupal_internal__target_id": 298
+                        }
+                    },
+                    {
+                        "type": "paragraph--accordions",
+                        "id": "e82ac98f-0b55-43f5-a264-0a3bce55b84d",
+                        "meta": {
+                            "target_revision_id": 40871,
+                            "drupal_internal__target_id": 7613
+                        }
+                    },
+                    {
+                        "type": "paragraph--columns",
+                        "id": "8cadc315-410b-49cc-ad2a-54c838b98212",
+                        "meta": {
+                            "target_revision_id": 798,
+                            "drupal_internal__target_id": 301
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/21261f47-37ff-40d0-a269-623d69823799/field_paragraph?resourceVersion=id%3A801"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/21261f47-37ff-40d0-a269-623d69823799/relationships/field_paragraph?resourceVersion=id%3A801"
+                    }
+                }
+            },
+            "field_situation_prospect": {
+                "data": [
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "520041ce-1203-4c23-ba49-f8a8b7e46c1d",
+                        "meta": {
+                            "drupal_internal__target_id": 610
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/21261f47-37ff-40d0-a269-623d69823799/field_situation_prospect?resourceVersion=id%3A801"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/21261f47-37ff-40d0-a269-623d69823799/relationships/field_situation_prospect?resourceVersion=id%3A801"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "node--funding",
+        "id": "90eb3e3a-1feb-463a-b627-702f2c1ebdfc",
+        "links": {
+            "self": {
+                "href": "https://www.studi.com/fr/jsonapi/node/funding/90eb3e3a-1feb-463a-b627-702f2c1ebdfc?resourceVersion=id%3A803"
+            }
+        },
+        "attributes": {
+            "drupal_internal__nid": 457,
+            "drupal_internal__vid": 803,
+            "langcode": "fr",
+            "revision_timestamp": "2021-08-17T12:20:55+00:00",
+            "revision_log": null,
+            "status": true,
+            "title": "Validation des acquis de l'exp\u00e9rience",
+            "created": "2021-08-17T12:19:57+00:00",
+            "changed": "2024-09-20T14:00:56+00:00",
+            "promote": false,
+            "sticky": false,
+            "default_langcode": true,
+            "revision_translation_affected": true,
+            "publish_on": null,
+            "unpublish_on": null,
+            "satellite_site": [],
+            "body": {
+                "value": "<p>La VAE permet d\u2019obtenir un dipl\u00f4me correspondant \u00e0 son exp\u00e9rience professionnelle. Les comp\u00e9tences acquises au fil des ann\u00e9es sont ainsi valoris\u00e9es au m\u00eame titre que si vous les aviez acquises par une formation \u00e9quivalente.</p>\r\n",
+                "format": "basic_html",
+                "processed": "<p>La VAE permet d\u2019obtenir un dipl\u00f4me correspondant \u00e0 son exp\u00e9rience professionnelle. Les comp\u00e9tences acquises au fil des ann\u00e9es sont ainsi valoris\u00e9es au m\u00eame titre que si vous les aviez acquises par une formation \u00e9quivalente.</p>\n",
+                "summary": ""
+            },
+            "field_dark_mode": false,
+            "field_metatag": null
+        },
+        "relationships": {
+            "node_type": {
+                "data": {
+                    "type": "node_type--node_type",
+                    "id": "5d7d645e-a53e-4921-83f0-e142b0307f8e",
+                    "meta": {
+                        "drupal_internal__target_id": "funding"
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/90eb3e3a-1feb-463a-b627-702f2c1ebdfc/node_type?resourceVersion=id%3A803"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/90eb3e3a-1feb-463a-b627-702f2c1ebdfc/relationships/node_type?resourceVersion=id%3A803"
+                    }
+                }
+            },
+            "revision_uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/90eb3e3a-1feb-463a-b627-702f2c1ebdfc/relationships/revision_uid?resourceVersion=id%3A803"
+                    }
+                }
+            },
+            "uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/90eb3e3a-1feb-463a-b627-702f2c1ebdfc/relationships/uid?resourceVersion=id%3A803"
+                    }
+                }
+            },
+            "field_header": {
+                "data": {
+                    "type": "paragraph--header",
+                    "id": "29027ee0-eac7-444f-b57a-379830becd25",
+                    "meta": {
+                        "target_revision_id": 3372,
+                        "drupal_internal__target_id": 1271
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/90eb3e3a-1feb-463a-b627-702f2c1ebdfc/field_header?resourceVersion=id%3A803"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/90eb3e3a-1feb-463a-b627-702f2c1ebdfc/relationships/field_header?resourceVersion=id%3A803"
+                    }
+                }
+            },
+            "field_image": {
+                "data": {
+                    "type": "media--image",
+                    "id": "bb3d6f4f-61b6-4a95-88a3-e6cd7403b925",
+                    "meta": {
+                        "drupal_internal__target_id": 905
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/90eb3e3a-1feb-463a-b627-702f2c1ebdfc/field_image?resourceVersion=id%3A803"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/90eb3e3a-1feb-463a-b627-702f2c1ebdfc/relationships/field_image?resourceVersion=id%3A803"
+                    }
+                }
+            },
+            "field_logo": {
+                "data": null,
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/90eb3e3a-1feb-463a-b627-702f2c1ebdfc/field_logo?resourceVersion=id%3A803"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/90eb3e3a-1feb-463a-b627-702f2c1ebdfc/relationships/field_logo?resourceVersion=id%3A803"
+                    }
+                }
+            },
+            "field_paragraph": {
+                "data": [
+                    {
+                        "type": "paragraph--basic",
+                        "id": "42e5a5ee-a7c2-4492-a9e0-18254d341524",
+                        "meta": {
+                            "target_revision_id": 803,
+                            "drupal_internal__target_id": 306
+                        }
+                    },
+                    {
+                        "type": "paragraph--accordions",
+                        "id": "819946ae-c8bc-45f6-abd6-c3e98dee0bb0",
+                        "meta": {
+                            "target_revision_id": 40886,
+                            "drupal_internal__target_id": 7628
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/90eb3e3a-1feb-463a-b627-702f2c1ebdfc/field_paragraph?resourceVersion=id%3A803"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/90eb3e3a-1feb-463a-b627-702f2c1ebdfc/relationships/field_paragraph?resourceVersion=id%3A803"
+                    }
+                }
+            },
+            "field_situation_prospect": {
+                "data": [
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "de8dcb4a-b8db-4564-9a10-110cd8b3e1e7",
+                        "meta": {
+                            "drupal_internal__target_id": 609
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/90eb3e3a-1feb-463a-b627-702f2c1ebdfc/field_situation_prospect?resourceVersion=id%3A803"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/90eb3e3a-1feb-463a-b627-702f2c1ebdfc/relationships/field_situation_prospect?resourceVersion=id%3A803"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "node--funding",
+        "id": "995b7bca-9440-41b0-a652-37846bde7654",
+        "links": {
+            "self": {
+                "href": "https://www.studi.com/fr/jsonapi/node/funding/995b7bca-9440-41b0-a652-37846bde7654?resourceVersion=id%3A804"
+            }
+        },
+        "attributes": {
+            "drupal_internal__nid": 458,
+            "drupal_internal__vid": 804,
+            "langcode": "fr",
+            "revision_timestamp": "2021-08-17T12:22:52+00:00",
+            "revision_log": null,
+            "status": true,
+            "title": "Dispositif d\u00e9missionnaire",
+            "created": "2021-08-17T12:21:47+00:00",
+            "changed": "2024-09-20T14:26:51+00:00",
+            "promote": false,
+            "sticky": false,
+            "default_langcode": true,
+            "revision_translation_affected": true,
+            "publish_on": null,
+            "unpublish_on": null,
+            "satellite_site": [],
+            "body": {
+                "value": "<p>Ce dispositif vous offre la possibilit\u00e9 de d\u00e9missionner afin de mettre en \u0153uvre votre projet professionnel et percevoir l\u2019allocation ch\u00f4mage. Le projet professionnel peut \u00eatre soit un projet de reconversion professionnelle n\u00e9cessitant le suivi d\u2019une formation, soit un projet de cr\u00e9ation d\u2019entreprise ou une reprise d\u2019entreprise.</p>\r\n",
+                "format": "basic_html",
+                "processed": "<p>Ce dispositif vous offre la possibilit\u00e9 de d\u00e9missionner afin de mettre en \u0153uvre votre projet professionnel et percevoir l\u2019allocation ch\u00f4mage. Le projet professionnel peut \u00eatre soit un projet de reconversion professionnelle n\u00e9cessitant le suivi d\u2019une formation, soit un projet de cr\u00e9ation d\u2019entreprise ou une reprise d\u2019entreprise.</p>\n",
+                "summary": ""
+            },
+            "field_dark_mode": false,
+            "field_metatag": null
+        },
+        "relationships": {
+            "node_type": {
+                "data": {
+                    "type": "node_type--node_type",
+                    "id": "5d7d645e-a53e-4921-83f0-e142b0307f8e",
+                    "meta": {
+                        "drupal_internal__target_id": "funding"
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/995b7bca-9440-41b0-a652-37846bde7654/node_type?resourceVersion=id%3A804"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/995b7bca-9440-41b0-a652-37846bde7654/relationships/node_type?resourceVersion=id%3A804"
+                    }
+                }
+            },
+            "revision_uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/995b7bca-9440-41b0-a652-37846bde7654/relationships/revision_uid?resourceVersion=id%3A804"
+                    }
+                }
+            },
+            "uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/995b7bca-9440-41b0-a652-37846bde7654/relationships/uid?resourceVersion=id%3A804"
+                    }
+                }
+            },
+            "field_header": {
+                "data": {
+                    "type": "paragraph--header",
+                    "id": "0f23f37c-ad8e-4d29-a5e7-ca8c10830516",
+                    "meta": {
+                        "target_revision_id": 3371,
+                        "drupal_internal__target_id": 1270
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/995b7bca-9440-41b0-a652-37846bde7654/field_header?resourceVersion=id%3A804"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/995b7bca-9440-41b0-a652-37846bde7654/relationships/field_header?resourceVersion=id%3A804"
+                    }
+                }
+            },
+            "field_image": {
+                "data": {
+                    "type": "media--image",
+                    "id": "584cf704-8b56-40ce-8850-4651288ed542",
+                    "meta": {
+                        "drupal_internal__target_id": 906
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/995b7bca-9440-41b0-a652-37846bde7654/field_image?resourceVersion=id%3A804"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/995b7bca-9440-41b0-a652-37846bde7654/relationships/field_image?resourceVersion=id%3A804"
+                    }
+                }
+            },
+            "field_logo": {
+                "data": null,
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/995b7bca-9440-41b0-a652-37846bde7654/field_logo?resourceVersion=id%3A804"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/995b7bca-9440-41b0-a652-37846bde7654/relationships/field_logo?resourceVersion=id%3A804"
+                    }
+                }
+            },
+            "field_paragraph": {
+                "data": [
+                    {
+                        "type": "paragraph--basic",
+                        "id": "cfec5039-e4af-44e6-8c3e-c0c977957b24",
+                        "meta": {
+                            "target_revision_id": 805,
+                            "drupal_internal__target_id": 308
+                        }
+                    },
+                    {
+                        "type": "paragraph--accordions",
+                        "id": "5c1fd722-1b39-436d-ba64-5f18c1a39a29",
+                        "meta": {
+                            "target_revision_id": 40890,
+                            "drupal_internal__target_id": 7632
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/995b7bca-9440-41b0-a652-37846bde7654/field_paragraph?resourceVersion=id%3A804"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/995b7bca-9440-41b0-a652-37846bde7654/relationships/field_paragraph?resourceVersion=id%3A804"
+                    }
+                }
+            },
+            "field_situation_prospect": {
+                "data": [
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "de8dcb4a-b8db-4564-9a10-110cd8b3e1e7",
+                        "meta": {
+                            "drupal_internal__target_id": 609
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/995b7bca-9440-41b0-a652-37846bde7654/field_situation_prospect?resourceVersion=id%3A804"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/995b7bca-9440-41b0-a652-37846bde7654/relationships/field_situation_prospect?resourceVersion=id%3A804"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "node--funding",
+        "id": "d22423ea-0229-41d6-8cd3-dfd3f24bcdd3",
+        "links": {
+            "self": {
+                "href": "https://www.studi.com/fr/jsonapi/node/funding/d22423ea-0229-41d6-8cd3-dfd3f24bcdd3?resourceVersion=id%3A805"
+            }
+        },
+        "attributes": {
+            "drupal_internal__nid": 459,
+            "drupal_internal__vid": 805,
+            "langcode": "fr",
+            "revision_timestamp": "2021-08-17T12:24:47+00:00",
+            "revision_log": null,
+            "status": true,
+            "title": "Contrat de s\u00e9curisation professionnelle",
+            "created": "2021-08-17T12:23:43+00:00",
+            "changed": "2024-09-20T14:08:25+00:00",
+            "promote": false,
+            "sticky": false,
+            "default_langcode": true,
+            "revision_translation_affected": true,
+            "publish_on": null,
+            "unpublish_on": null,
+            "satellite_site": [],
+            "body": {
+                "value": "<p>Le contrat de s\u00e9curisation professionnelle (CSP) est un dispositif d'accompagnement renforc\u00e9, sous forme de suivi individualis\u00e9, en cas de licenciement pour motif \u00e9conomique du salari\u00e9, qui pr\u00e9voit l'organisation et le d\u00e9roulement d'un parcours de retour \u00e0 l'emploi.</p>\r\n",
+                "format": "basic_html",
+                "processed": "<p>Le contrat de s\u00e9curisation professionnelle (CSP) est un dispositif d'accompagnement renforc\u00e9, sous forme de suivi individualis\u00e9, en cas de licenciement pour motif \u00e9conomique du salari\u00e9, qui pr\u00e9voit l'organisation et le d\u00e9roulement d'un parcours de retour \u00e0 l'emploi.</p>\n",
+                "summary": ""
+            },
+            "field_dark_mode": false,
+            "field_metatag": null
+        },
+        "relationships": {
+            "node_type": {
+                "data": {
+                    "type": "node_type--node_type",
+                    "id": "5d7d645e-a53e-4921-83f0-e142b0307f8e",
+                    "meta": {
+                        "drupal_internal__target_id": "funding"
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/d22423ea-0229-41d6-8cd3-dfd3f24bcdd3/node_type?resourceVersion=id%3A805"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/d22423ea-0229-41d6-8cd3-dfd3f24bcdd3/relationships/node_type?resourceVersion=id%3A805"
+                    }
+                }
+            },
+            "revision_uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/d22423ea-0229-41d6-8cd3-dfd3f24bcdd3/relationships/revision_uid?resourceVersion=id%3A805"
+                    }
+                }
+            },
+            "uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/d22423ea-0229-41d6-8cd3-dfd3f24bcdd3/relationships/uid?resourceVersion=id%3A805"
+                    }
+                }
+            },
+            "field_header": {
+                "data": {
+                    "type": "paragraph--header",
+                    "id": "542f6d1e-c28d-4ba2-a007-cb2255249ae6",
+                    "meta": {
+                        "target_revision_id": 3370,
+                        "drupal_internal__target_id": 1269
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/d22423ea-0229-41d6-8cd3-dfd3f24bcdd3/field_header?resourceVersion=id%3A805"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/d22423ea-0229-41d6-8cd3-dfd3f24bcdd3/relationships/field_header?resourceVersion=id%3A805"
+                    }
+                }
+            },
+            "field_image": {
+                "data": {
+                    "type": "media--image",
+                    "id": "45fcafdc-829e-4651-ad25-1b5e2903acbe",
+                    "meta": {
+                        "drupal_internal__target_id": 907
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/d22423ea-0229-41d6-8cd3-dfd3f24bcdd3/field_image?resourceVersion=id%3A805"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/d22423ea-0229-41d6-8cd3-dfd3f24bcdd3/relationships/field_image?resourceVersion=id%3A805"
+                    }
+                }
+            },
+            "field_logo": {
+                "data": null,
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/d22423ea-0229-41d6-8cd3-dfd3f24bcdd3/field_logo?resourceVersion=id%3A805"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/d22423ea-0229-41d6-8cd3-dfd3f24bcdd3/relationships/field_logo?resourceVersion=id%3A805"
+                    }
+                }
+            },
+            "field_paragraph": {
+                "data": [
+                    {
+                        "type": "paragraph--basic",
+                        "id": "a2db5e77-3449-495b-a049-258c7745f976",
+                        "meta": {
+                            "target_revision_id": 807,
+                            "drupal_internal__target_id": 310
+                        }
+                    },
+                    {
+                        "type": "paragraph--accordions",
+                        "id": "0b9f7ce1-b629-4b12-a03e-b355fbcb687e",
+                        "meta": {
+                            "target_revision_id": 40897,
+                            "drupal_internal__target_id": 7639
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/d22423ea-0229-41d6-8cd3-dfd3f24bcdd3/field_paragraph?resourceVersion=id%3A805"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/d22423ea-0229-41d6-8cd3-dfd3f24bcdd3/relationships/field_paragraph?resourceVersion=id%3A805"
+                    }
+                }
+            },
+            "field_situation_prospect": {
+                "data": [],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/d22423ea-0229-41d6-8cd3-dfd3f24bcdd3/field_situation_prospect?resourceVersion=id%3A805"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/d22423ea-0229-41d6-8cd3-dfd3f24bcdd3/relationships/field_situation_prospect?resourceVersion=id%3A805"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "node--funding",
+        "id": "bf562a9a-717f-48d9-9e6e-5d066ae4c067",
+        "links": {
+            "self": {
+                "href": "https://www.studi.com/fr/jsonapi/node/funding/bf562a9a-717f-48d9-9e6e-5d066ae4c067?resourceVersion=id%3A806"
+            }
+        },
+        "attributes": {
+            "drupal_internal__nid": 460,
+            "drupal_internal__vid": 806,
+            "langcode": "fr",
+            "revision_timestamp": "2021-08-17T12:26:27+00:00",
+            "revision_log": null,
+            "status": true,
+            "title": "Pr\u00e9paration op\u00e9rationnelle \u00e0 l\u2019emploi Collective",
+            "created": "2021-08-17T12:25:50+00:00",
+            "changed": "2024-09-20T14:24:44+00:00",
+            "promote": false,
+            "sticky": false,
+            "default_langcode": true,
+            "revision_translation_affected": true,
+            "publish_on": null,
+            "unpublish_on": null,
+            "satellite_site": [],
+            "body": {
+                "value": "<p>La Pr\u00e9paration Op\u00e9rationnelle \u00e0 l\u2019Emploi Collective (POEC) est une action de formation permettant \u00e0 plusieurs demandeurs d\u2019emploi d\u2019acqu\u00e9rir les comp\u00e9tences requises pour occuper des emplois correspondant \u00e0 des besoins identifi\u00e9s par une branche professionnelle</p>\r\n",
+                "format": "basic_html",
+                "processed": "<p>La Pr\u00e9paration Op\u00e9rationnelle \u00e0 l\u2019Emploi Collective (POEC) est une action de formation permettant \u00e0 plusieurs demandeurs d\u2019emploi d\u2019acqu\u00e9rir les comp\u00e9tences requises pour occuper des emplois correspondant \u00e0 des besoins identifi\u00e9s par une branche professionnelle</p>\n",
+                "summary": ""
+            },
+            "field_dark_mode": false,
+            "field_metatag": null
+        },
+        "relationships": {
+            "node_type": {
+                "data": {
+                    "type": "node_type--node_type",
+                    "id": "5d7d645e-a53e-4921-83f0-e142b0307f8e",
+                    "meta": {
+                        "drupal_internal__target_id": "funding"
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/bf562a9a-717f-48d9-9e6e-5d066ae4c067/node_type?resourceVersion=id%3A806"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/bf562a9a-717f-48d9-9e6e-5d066ae4c067/relationships/node_type?resourceVersion=id%3A806"
+                    }
+                }
+            },
+            "revision_uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/bf562a9a-717f-48d9-9e6e-5d066ae4c067/relationships/revision_uid?resourceVersion=id%3A806"
+                    }
+                }
+            },
+            "uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/bf562a9a-717f-48d9-9e6e-5d066ae4c067/relationships/uid?resourceVersion=id%3A806"
+                    }
+                }
+            },
+            "field_header": {
+                "data": {
+                    "type": "paragraph--header",
+                    "id": "658ae1c9-40a2-4ca0-acac-ef382902ed59",
+                    "meta": {
+                        "target_revision_id": 3369,
+                        "drupal_internal__target_id": 1268
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/bf562a9a-717f-48d9-9e6e-5d066ae4c067/field_header?resourceVersion=id%3A806"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/bf562a9a-717f-48d9-9e6e-5d066ae4c067/relationships/field_header?resourceVersion=id%3A806"
+                    }
+                }
+            },
+            "field_image": {
+                "data": {
+                    "type": "media--image",
+                    "id": "8616c579-3ca0-48c7-99e9-d38863a1d574",
+                    "meta": {
+                        "drupal_internal__target_id": 908
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/bf562a9a-717f-48d9-9e6e-5d066ae4c067/field_image?resourceVersion=id%3A806"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/bf562a9a-717f-48d9-9e6e-5d066ae4c067/relationships/field_image?resourceVersion=id%3A806"
+                    }
+                }
+            },
+            "field_logo": {
+                "data": null,
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/bf562a9a-717f-48d9-9e6e-5d066ae4c067/field_logo?resourceVersion=id%3A806"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/bf562a9a-717f-48d9-9e6e-5d066ae4c067/relationships/field_logo?resourceVersion=id%3A806"
+                    }
+                }
+            },
+            "field_paragraph": {
+                "data": [
+                    {
+                        "type": "paragraph--basic",
+                        "id": "4813e4f4-23a6-45c7-ac2f-3225de8f10bc",
+                        "meta": {
+                            "target_revision_id": 809,
+                            "drupal_internal__target_id": 312
+                        }
+                    },
+                    {
+                        "type": "paragraph--accordions",
+                        "id": "7ddb8bd0-c6f7-4d56-9ac5-487e0b2d9234",
+                        "meta": {
+                            "target_revision_id": 40902,
+                            "drupal_internal__target_id": 7644
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/bf562a9a-717f-48d9-9e6e-5d066ae4c067/field_paragraph?resourceVersion=id%3A806"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/bf562a9a-717f-48d9-9e6e-5d066ae4c067/relationships/field_paragraph?resourceVersion=id%3A806"
+                    }
+                }
+            },
+            "field_situation_prospect": {
+                "data": [
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "520041ce-1203-4c23-ba49-f8a8b7e46c1d",
+                        "meta": {
+                            "drupal_internal__target_id": 610
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/bf562a9a-717f-48d9-9e6e-5d066ae4c067/field_situation_prospect?resourceVersion=id%3A806"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/bf562a9a-717f-48d9-9e6e-5d066ae4c067/relationships/field_situation_prospect?resourceVersion=id%3A806"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "node--funding",
+        "id": "9cb2fce6-c5bd-4341-bffe-8f2d6f4bf6fc",
+        "links": {
+            "self": {
+                "href": "https://www.studi.com/fr/jsonapi/node/funding/9cb2fce6-c5bd-4341-bffe-8f2d6f4bf6fc?resourceVersion=id%3A5130"
+            }
+        },
+        "attributes": {
+            "drupal_internal__nid": 770,
+            "drupal_internal__vid": 5130,
+            "langcode": "fr",
+            "revision_timestamp": "2021-10-05T14:49:50+00:00",
+            "revision_log": null,
+            "status": true,
+            "title": "Pr\u00e9paration Op\u00e9rationnelle \u00e0 l\u2019Emploi  individuelle",
+            "created": "2021-10-05T14:47:24+00:00",
+            "changed": "2024-09-20T13:39:25+00:00",
+            "promote": false,
+            "sticky": false,
+            "default_langcode": true,
+            "revision_translation_affected": true,
+            "publish_on": null,
+            "unpublish_on": null,
+            "satellite_site": [],
+            "body": {
+                "value": "<p><span><span><span><span><span><span>La Pr\u00e9paration Op\u00e9rationnelle \u00e0 l'Emploi individuelle (POEI) permet de former un futur collaborateur avant son embauche par l\u2019interm\u00e9diaire de France Travail.</span></span></span></span></span></span></p>\r\n",
+                "format": "basic_html",
+                "processed": "<p><span><span><span><span><span><span>La Pr\u00e9paration Op\u00e9rationnelle \u00e0 l'Emploi individuelle (POEI) permet de former un futur collaborateur avant son embauche par l\u2019interm\u00e9diaire de France Travail.</span></span></span></span></span></span></p>\n",
+                "summary": ""
+            },
+            "field_dark_mode": false,
+            "field_metatag": null
+        },
+        "relationships": {
+            "node_type": {
+                "data": {
+                    "type": "node_type--node_type",
+                    "id": "5d7d645e-a53e-4921-83f0-e142b0307f8e",
+                    "meta": {
+                        "drupal_internal__target_id": "funding"
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9cb2fce6-c5bd-4341-bffe-8f2d6f4bf6fc/node_type?resourceVersion=id%3A5130"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9cb2fce6-c5bd-4341-bffe-8f2d6f4bf6fc/relationships/node_type?resourceVersion=id%3A5130"
+                    }
+                }
+            },
+            "revision_uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9cb2fce6-c5bd-4341-bffe-8f2d6f4bf6fc/relationships/revision_uid?resourceVersion=id%3A5130"
+                    }
+                }
+            },
+            "uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9cb2fce6-c5bd-4341-bffe-8f2d6f4bf6fc/relationships/uid?resourceVersion=id%3A5130"
+                    }
+                }
+            },
+            "field_header": {
+                "data": {
+                    "type": "paragraph--header",
+                    "id": "11470532-77f6-4b5f-8653-839608e2f981",
+                    "meta": {
+                        "target_revision_id": 25717,
+                        "drupal_internal__target_id": 4559
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9cb2fce6-c5bd-4341-bffe-8f2d6f4bf6fc/field_header?resourceVersion=id%3A5130"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9cb2fce6-c5bd-4341-bffe-8f2d6f4bf6fc/relationships/field_header?resourceVersion=id%3A5130"
+                    }
+                }
+            },
+            "field_image": {
+                "data": {
+                    "type": "media--image",
+                    "id": "87ae0a50-1357-454c-bf90-7ce003a09cbe",
+                    "meta": {
+                        "drupal_internal__target_id": 909
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9cb2fce6-c5bd-4341-bffe-8f2d6f4bf6fc/field_image?resourceVersion=id%3A5130"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9cb2fce6-c5bd-4341-bffe-8f2d6f4bf6fc/relationships/field_image?resourceVersion=id%3A5130"
+                    }
+                }
+            },
+            "field_logo": {
+                "data": null,
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9cb2fce6-c5bd-4341-bffe-8f2d6f4bf6fc/field_logo?resourceVersion=id%3A5130"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9cb2fce6-c5bd-4341-bffe-8f2d6f4bf6fc/relationships/field_logo?resourceVersion=id%3A5130"
+                    }
+                }
+            },
+            "field_paragraph": {
+                "data": [
+                    {
+                        "type": "paragraph--basic",
+                        "id": "4d80f786-244b-487e-90f0-6746623050e8",
+                        "meta": {
+                            "target_revision_id": 25718,
+                            "drupal_internal__target_id": 4560
+                        }
+                    },
+                    {
+                        "type": "paragraph--accordions",
+                        "id": "1b2877df-5adc-4b6f-b972-be12b64399d6",
+                        "meta": {
+                            "target_revision_id": 40907,
+                            "drupal_internal__target_id": 7649
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9cb2fce6-c5bd-4341-bffe-8f2d6f4bf6fc/field_paragraph?resourceVersion=id%3A5130"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9cb2fce6-c5bd-4341-bffe-8f2d6f4bf6fc/relationships/field_paragraph?resourceVersion=id%3A5130"
+                    }
+                }
+            },
+            "field_situation_prospect": {
+                "data": [
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "520041ce-1203-4c23-ba49-f8a8b7e46c1d",
+                        "meta": {
+                            "drupal_internal__target_id": 610
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9cb2fce6-c5bd-4341-bffe-8f2d6f4bf6fc/field_situation_prospect?resourceVersion=id%3A5130"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9cb2fce6-c5bd-4341-bffe-8f2d6f4bf6fc/relationships/field_situation_prospect?resourceVersion=id%3A5130"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "node--funding",
+        "id": "50c10921-75b4-48b6-a9b6-71fca5bdb480",
+        "links": {
+            "self": {
+                "href": "https://www.studi.com/fr/jsonapi/node/funding/50c10921-75b4-48b6-a9b6-71fca5bdb480?resourceVersion=id%3A5131"
+            }
+        },
+        "attributes": {
+            "drupal_internal__nid": 771,
+            "drupal_internal__vid": 5131,
+            "langcode": "fr",
+            "revision_timestamp": "2021-10-05T15:39:54+00:00",
+            "revision_log": null,
+            "status": true,
+            "title": "Action de Formation Pr\u00e9alable au Recrutement",
+            "created": "2021-10-05T15:38:50+00:00",
+            "changed": "2024-09-20T14:38:43+00:00",
+            "promote": false,
+            "sticky": false,
+            "default_langcode": true,
+            "revision_translation_affected": true,
+            "publish_on": null,
+            "unpublish_on": null,
+            "satellite_site": [],
+            "body": {
+                "value": "<p><span><span><span><span><span><span>L'Action de Formation Pr\u00e9alable au Recrutement (AFPR) est destin\u00e9e \u00e0 combler l'\u00e9cart entre les comp\u00e9tences que vous d\u00e9tenez et celles que requiert l'emploi que vous visez. Ce dispositif s'applique \u00e0 toute personne inscrite \u00e0 France Travail.</span></span></span></span></span></span></p>\r\n",
+                "format": "basic_html",
+                "processed": "<p><span><span><span><span><span><span>L'Action de Formation Pr\u00e9alable au Recrutement (AFPR) est destin\u00e9e \u00e0 combler l'\u00e9cart entre les comp\u00e9tences que vous d\u00e9tenez et celles que requiert l'emploi que vous visez. Ce dispositif s'applique \u00e0 toute personne inscrite \u00e0 France Travail.</span></span></span></span></span></span></p>\n",
+                "summary": ""
+            },
+            "field_dark_mode": false,
+            "field_metatag": null
+        },
+        "relationships": {
+            "node_type": {
+                "data": {
+                    "type": "node_type--node_type",
+                    "id": "5d7d645e-a53e-4921-83f0-e142b0307f8e",
+                    "meta": {
+                        "drupal_internal__target_id": "funding"
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/50c10921-75b4-48b6-a9b6-71fca5bdb480/node_type?resourceVersion=id%3A5131"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/50c10921-75b4-48b6-a9b6-71fca5bdb480/relationships/node_type?resourceVersion=id%3A5131"
+                    }
+                }
+            },
+            "revision_uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/50c10921-75b4-48b6-a9b6-71fca5bdb480/relationships/revision_uid?resourceVersion=id%3A5131"
+                    }
+                }
+            },
+            "uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/50c10921-75b4-48b6-a9b6-71fca5bdb480/relationships/uid?resourceVersion=id%3A5131"
+                    }
+                }
+            },
+            "field_header": {
+                "data": {
+                    "type": "paragraph--header",
+                    "id": "7ca96950-faa3-4af7-8282-366855b916e7",
+                    "meta": {
+                        "target_revision_id": 25719,
+                        "drupal_internal__target_id": 4561
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/50c10921-75b4-48b6-a9b6-71fca5bdb480/field_header?resourceVersion=id%3A5131"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/50c10921-75b4-48b6-a9b6-71fca5bdb480/relationships/field_header?resourceVersion=id%3A5131"
+                    }
+                }
+            },
+            "field_image": {
+                "data": {
+                    "type": "media--image",
+                    "id": "b024e270-21b2-426e-8617-b73ca36c5c86",
+                    "meta": {
+                        "drupal_internal__target_id": 910
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/50c10921-75b4-48b6-a9b6-71fca5bdb480/field_image?resourceVersion=id%3A5131"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/50c10921-75b4-48b6-a9b6-71fca5bdb480/relationships/field_image?resourceVersion=id%3A5131"
+                    }
+                }
+            },
+            "field_logo": {
+                "data": null,
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/50c10921-75b4-48b6-a9b6-71fca5bdb480/field_logo?resourceVersion=id%3A5131"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/50c10921-75b4-48b6-a9b6-71fca5bdb480/relationships/field_logo?resourceVersion=id%3A5131"
+                    }
+                }
+            },
+            "field_paragraph": {
+                "data": [
+                    {
+                        "type": "paragraph--basic",
+                        "id": "6c520da7-3966-4590-a705-fcc4d0bc544e",
+                        "meta": {
+                            "target_revision_id": 25720,
+                            "drupal_internal__target_id": 4562
+                        }
+                    },
+                    {
+                        "type": "paragraph--accordions",
+                        "id": "cc098d4d-05c3-49fc-a9b9-936ac1a2b293",
+                        "meta": {
+                            "target_revision_id": 40912,
+                            "drupal_internal__target_id": 7654
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/50c10921-75b4-48b6-a9b6-71fca5bdb480/field_paragraph?resourceVersion=id%3A5131"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/50c10921-75b4-48b6-a9b6-71fca5bdb480/relationships/field_paragraph?resourceVersion=id%3A5131"
+                    }
+                }
+            },
+            "field_situation_prospect": {
+                "data": [
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "520041ce-1203-4c23-ba49-f8a8b7e46c1d",
+                        "meta": {
+                            "drupal_internal__target_id": 610
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/50c10921-75b4-48b6-a9b6-71fca5bdb480/field_situation_prospect?resourceVersion=id%3A5131"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/50c10921-75b4-48b6-a9b6-71fca5bdb480/relationships/field_situation_prospect?resourceVersion=id%3A5131"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "node--funding",
+        "id": "5a9e7666-2a53-47da-9eee-9561c1ffbc23",
+        "links": {
+            "self": {
+                "href": "https://www.studi.com/fr/jsonapi/node/funding/5a9e7666-2a53-47da-9eee-9561c1ffbc23?resourceVersion=id%3A5132"
+            }
+        },
+        "attributes": {
+            "drupal_internal__nid": 772,
+            "drupal_internal__vid": 5132,
+            "langcode": "fr",
+            "revision_timestamp": "2021-10-05T15:47:18+00:00",
+            "revision_log": null,
+            "status": true,
+            "title": "Cong\u00e9 de formation professionnelle",
+            "created": "2021-10-05T15:43:51+00:00",
+            "changed": "2024-03-11T10:08:45+00:00",
+            "promote": false,
+            "sticky": false,
+            "default_langcode": true,
+            "revision_translation_affected": true,
+            "publish_on": null,
+            "unpublish_on": null,
+            "satellite_site": [],
+            "body": {
+                "value": "<p><span><span><span><span><span><span><span>L'agent de la fonction publique d\u2019\u00c9tat qui souhaite se former pour satisfaire un projet professionnel ou personnel peut b\u00e9n\u00e9ficier d'un cong\u00e9 de formation professionnelle d'une dur\u00e9e maximale de 3 ans est r\u00e9mun\u00e9r\u00e9 pendant 12 mois.</span></span></span></span></span></span></span></p>\r\n",
+                "format": "basic_html",
+                "processed": "<p><span><span><span><span><span><span><span>L'agent de la fonction publique d\u2019\u00c9tat qui souhaite se former pour satisfaire un projet professionnel ou personnel peut b\u00e9n\u00e9ficier d'un cong\u00e9 de formation professionnelle d'une dur\u00e9e maximale de 3 ans est r\u00e9mun\u00e9r\u00e9 pendant 12 mois.</span></span></span></span></span></span></span></p>\n",
+                "summary": ""
+            },
+            "field_dark_mode": false,
+            "field_metatag": null
+        },
+        "relationships": {
+            "node_type": {
+                "data": {
+                    "type": "node_type--node_type",
+                    "id": "5d7d645e-a53e-4921-83f0-e142b0307f8e",
+                    "meta": {
+                        "drupal_internal__target_id": "funding"
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/5a9e7666-2a53-47da-9eee-9561c1ffbc23/node_type?resourceVersion=id%3A5132"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/5a9e7666-2a53-47da-9eee-9561c1ffbc23/relationships/node_type?resourceVersion=id%3A5132"
+                    }
+                }
+            },
+            "revision_uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/5a9e7666-2a53-47da-9eee-9561c1ffbc23/relationships/revision_uid?resourceVersion=id%3A5132"
+                    }
+                }
+            },
+            "uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/5a9e7666-2a53-47da-9eee-9561c1ffbc23/relationships/uid?resourceVersion=id%3A5132"
+                    }
+                }
+            },
+            "field_header": {
+                "data": {
+                    "type": "paragraph--header",
+                    "id": "277aab96-39e7-45de-8324-738633f88837",
+                    "meta": {
+                        "target_revision_id": 25721,
+                        "drupal_internal__target_id": 4563
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/5a9e7666-2a53-47da-9eee-9561c1ffbc23/field_header?resourceVersion=id%3A5132"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/5a9e7666-2a53-47da-9eee-9561c1ffbc23/relationships/field_header?resourceVersion=id%3A5132"
+                    }
+                }
+            },
+            "field_image": {
+                "data": {
+                    "type": "media--image",
+                    "id": "2b01d32d-d818-4ad6-b6c1-c866641c78ff",
+                    "meta": {
+                        "drupal_internal__target_id": 911
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/5a9e7666-2a53-47da-9eee-9561c1ffbc23/field_image?resourceVersion=id%3A5132"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/5a9e7666-2a53-47da-9eee-9561c1ffbc23/relationships/field_image?resourceVersion=id%3A5132"
+                    }
+                }
+            },
+            "field_logo": {
+                "data": null,
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/5a9e7666-2a53-47da-9eee-9561c1ffbc23/field_logo?resourceVersion=id%3A5132"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/5a9e7666-2a53-47da-9eee-9561c1ffbc23/relationships/field_logo?resourceVersion=id%3A5132"
+                    }
+                }
+            },
+            "field_paragraph": {
+                "data": [
+                    {
+                        "type": "paragraph--basic",
+                        "id": "332ed20c-a08f-4593-b936-cb49f539642c",
+                        "meta": {
+                            "target_revision_id": 25722,
+                            "drupal_internal__target_id": 4564
+                        }
+                    },
+                    {
+                        "type": "paragraph--accordions",
+                        "id": "3ecc10d5-2ca5-4f33-86a9-8bd7102f0730",
+                        "meta": {
+                            "target_revision_id": 40919,
+                            "drupal_internal__target_id": 7661
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/5a9e7666-2a53-47da-9eee-9561c1ffbc23/field_paragraph?resourceVersion=id%3A5132"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/5a9e7666-2a53-47da-9eee-9561c1ffbc23/relationships/field_paragraph?resourceVersion=id%3A5132"
+                    }
+                }
+            },
+            "field_situation_prospect": {
+                "data": [
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "43b9b286-e909-4c5b-a60d-ff34bb705fb0",
+                        "meta": {
+                            "drupal_internal__target_id": 618
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/5a9e7666-2a53-47da-9eee-9561c1ffbc23/field_situation_prospect?resourceVersion=id%3A5132"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/5a9e7666-2a53-47da-9eee-9561c1ffbc23/relationships/field_situation_prospect?resourceVersion=id%3A5132"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "node--funding",
+        "id": "a5e66e74-b379-494d-b0e0-f540ce5d6439",
+        "links": {
+            "self": {
+                "href": "https://www.studi.com/fr/jsonapi/node/funding/a5e66e74-b379-494d-b0e0-f540ce5d6439?resourceVersion=id%3A5133"
+            }
+        },
+        "attributes": {
+            "drupal_internal__nid": 773,
+            "drupal_internal__vid": 5133,
+            "langcode": "fr",
+            "revision_timestamp": "2021-10-05T15:51:06+00:00",
+            "revision_log": null,
+            "status": true,
+            "title": "Action de Formation Conventionn\u00e9e par France Travail (AFC) ",
+            "created": "2021-10-05T15:50:16+00:00",
+            "changed": "2024-09-20T13:35:09+00:00",
+            "promote": false,
+            "sticky": false,
+            "default_langcode": true,
+            "revision_translation_affected": true,
+            "publish_on": null,
+            "unpublish_on": null,
+            "satellite_site": [],
+            "body": {
+                "value": "<p><span><span><span><span><span><span>L'Action de Formation Conventionn\u00e9e par France Travail (AFC) vise \u00e0 faciliter le retour rapide \u00e0 l'emploi. Sa mise en \u0153uvre permet de combler un \u00e9cart entre les comp\u00e9tences d\u00e9tenues par le demandeur d'emploi et les exigences du march\u00e9 du travail.</span></span></span></span></span></span></p>\r\n",
+                "format": "basic_html",
+                "processed": "<p><span><span><span><span><span><span>L'Action de Formation Conventionn\u00e9e par France Travail (AFC) vise \u00e0 faciliter le retour rapide \u00e0 l'emploi. Sa mise en \u0153uvre permet de combler un \u00e9cart entre les comp\u00e9tences d\u00e9tenues par le demandeur d'emploi et les exigences du march\u00e9 du travail.</span></span></span></span></span></span></p>\n",
+                "summary": ""
+            },
+            "field_dark_mode": false,
+            "field_metatag": null
+        },
+        "relationships": {
+            "node_type": {
+                "data": {
+                    "type": "node_type--node_type",
+                    "id": "5d7d645e-a53e-4921-83f0-e142b0307f8e",
+                    "meta": {
+                        "drupal_internal__target_id": "funding"
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/a5e66e74-b379-494d-b0e0-f540ce5d6439/node_type?resourceVersion=id%3A5133"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/a5e66e74-b379-494d-b0e0-f540ce5d6439/relationships/node_type?resourceVersion=id%3A5133"
+                    }
+                }
+            },
+            "revision_uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/a5e66e74-b379-494d-b0e0-f540ce5d6439/relationships/revision_uid?resourceVersion=id%3A5133"
+                    }
+                }
+            },
+            "uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/a5e66e74-b379-494d-b0e0-f540ce5d6439/relationships/uid?resourceVersion=id%3A5133"
+                    }
+                }
+            },
+            "field_header": {
+                "data": {
+                    "type": "paragraph--header",
+                    "id": "3115a655-5ef6-4212-a85c-4242786eb7ac",
+                    "meta": {
+                        "target_revision_id": 25723,
+                        "drupal_internal__target_id": 4565
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/a5e66e74-b379-494d-b0e0-f540ce5d6439/field_header?resourceVersion=id%3A5133"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/a5e66e74-b379-494d-b0e0-f540ce5d6439/relationships/field_header?resourceVersion=id%3A5133"
+                    }
+                }
+            },
+            "field_image": {
+                "data": {
+                    "type": "media--image",
+                    "id": "751271b1-16e8-46dc-a8a3-ecf628b671cf",
+                    "meta": {
+                        "drupal_internal__target_id": 912
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/a5e66e74-b379-494d-b0e0-f540ce5d6439/field_image?resourceVersion=id%3A5133"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/a5e66e74-b379-494d-b0e0-f540ce5d6439/relationships/field_image?resourceVersion=id%3A5133"
+                    }
+                }
+            },
+            "field_logo": {
+                "data": null,
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/a5e66e74-b379-494d-b0e0-f540ce5d6439/field_logo?resourceVersion=id%3A5133"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/a5e66e74-b379-494d-b0e0-f540ce5d6439/relationships/field_logo?resourceVersion=id%3A5133"
+                    }
+                }
+            },
+            "field_paragraph": {
+                "data": [
+                    {
+                        "type": "paragraph--basic",
+                        "id": "74efb0d3-5646-4eb8-9af3-bef972b35b7d",
+                        "meta": {
+                            "target_revision_id": 25724,
+                            "drupal_internal__target_id": 4566
+                        }
+                    },
+                    {
+                        "type": "paragraph--accordions",
+                        "id": "7fdf565b-b65f-4216-b7e3-0fb1a2630388",
+                        "meta": {
+                            "target_revision_id": 40924,
+                            "drupal_internal__target_id": 7666
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/a5e66e74-b379-494d-b0e0-f540ce5d6439/field_paragraph?resourceVersion=id%3A5133"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/a5e66e74-b379-494d-b0e0-f540ce5d6439/relationships/field_paragraph?resourceVersion=id%3A5133"
+                    }
+                }
+            },
+            "field_situation_prospect": {
+                "data": [
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "520041ce-1203-4c23-ba49-f8a8b7e46c1d",
+                        "meta": {
+                            "drupal_internal__target_id": 610
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/a5e66e74-b379-494d-b0e0-f540ce5d6439/field_situation_prospect?resourceVersion=id%3A5133"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/a5e66e74-b379-494d-b0e0-f540ce5d6439/relationships/field_situation_prospect?resourceVersion=id%3A5133"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "node--funding",
+        "id": "eb59b2b3-1cf2-4420-a87f-13e4c675cb63",
+        "links": {
+            "self": {
+                "href": "https://www.studi.com/fr/jsonapi/node/funding/eb59b2b3-1cf2-4420-a87f-13e4c675cb63?resourceVersion=id%3A5134"
+            }
+        },
+        "attributes": {
+            "drupal_internal__nid": 774,
+            "drupal_internal__vid": 5134,
+            "langcode": "fr",
+            "revision_timestamp": "2021-10-05T15:53:54+00:00",
+            "revision_log": null,
+            "status": true,
+            "title": "FAF",
+            "created": "2021-10-05T15:53:08+00:00",
+            "changed": "2023-03-07T13:14:30+00:00",
+            "promote": false,
+            "sticky": false,
+            "default_langcode": true,
+            "revision_translation_affected": true,
+            "publish_on": null,
+            "unpublish_on": null,
+            "satellite_site": [],
+            "body": {
+                "value": "<p><span><span><span><span><span><span>En contrepartie de la contribution \u00e0 la formation professionnelle (CFP), \u00e0 laquelle ils sont soumis, les travailleurs ind\u00e9pendants peuvent b\u00e9n\u00e9ficier du financement total ou partiel de leurs formations.</span></span></span></span></span></span></p>\r\n",
+                "format": "basic_html",
+                "processed": "<p><span><span><span><span><span><span>En contrepartie de la contribution \u00e0 la formation professionnelle (CFP), \u00e0 laquelle ils sont soumis, les travailleurs ind\u00e9pendants peuvent b\u00e9n\u00e9ficier du financement total ou partiel de leurs formations.</span></span></span></span></span></span></p>\n",
+                "summary": ""
+            },
+            "field_dark_mode": false,
+            "field_metatag": null
+        },
+        "relationships": {
+            "node_type": {
+                "data": {
+                    "type": "node_type--node_type",
+                    "id": "5d7d645e-a53e-4921-83f0-e142b0307f8e",
+                    "meta": {
+                        "drupal_internal__target_id": "funding"
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/eb59b2b3-1cf2-4420-a87f-13e4c675cb63/node_type?resourceVersion=id%3A5134"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/eb59b2b3-1cf2-4420-a87f-13e4c675cb63/relationships/node_type?resourceVersion=id%3A5134"
+                    }
+                }
+            },
+            "revision_uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/eb59b2b3-1cf2-4420-a87f-13e4c675cb63/relationships/revision_uid?resourceVersion=id%3A5134"
+                    }
+                }
+            },
+            "uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/eb59b2b3-1cf2-4420-a87f-13e4c675cb63/relationships/uid?resourceVersion=id%3A5134"
+                    }
+                }
+            },
+            "field_header": {
+                "data": {
+                    "type": "paragraph--header",
+                    "id": "d0ad5844-5fc6-40b9-87dd-a0c22b386ddd",
+                    "meta": {
+                        "target_revision_id": 25725,
+                        "drupal_internal__target_id": 4567
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/eb59b2b3-1cf2-4420-a87f-13e4c675cb63/field_header?resourceVersion=id%3A5134"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/eb59b2b3-1cf2-4420-a87f-13e4c675cb63/relationships/field_header?resourceVersion=id%3A5134"
+                    }
+                }
+            },
+            "field_image": {
+                "data": {
+                    "type": "media--image",
+                    "id": "791c250f-3224-4aa5-b699-37162129a095",
+                    "meta": {
+                        "drupal_internal__target_id": 913
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/eb59b2b3-1cf2-4420-a87f-13e4c675cb63/field_image?resourceVersion=id%3A5134"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/eb59b2b3-1cf2-4420-a87f-13e4c675cb63/relationships/field_image?resourceVersion=id%3A5134"
+                    }
+                }
+            },
+            "field_logo": {
+                "data": null,
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/eb59b2b3-1cf2-4420-a87f-13e4c675cb63/field_logo?resourceVersion=id%3A5134"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/eb59b2b3-1cf2-4420-a87f-13e4c675cb63/relationships/field_logo?resourceVersion=id%3A5134"
+                    }
+                }
+            },
+            "field_paragraph": {
+                "data": [
+                    {
+                        "type": "paragraph--basic",
+                        "id": "e0d84202-8624-4e1e-9bf7-6342b041ac7c",
+                        "meta": {
+                            "target_revision_id": 25726,
+                            "drupal_internal__target_id": 4568
+                        }
+                    },
+                    {
+                        "type": "paragraph--accordions",
+                        "id": "422588e2-117f-4efb-a52f-8edee16d9917",
+                        "meta": {
+                            "target_revision_id": 40930,
+                            "drupal_internal__target_id": 7672
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/eb59b2b3-1cf2-4420-a87f-13e4c675cb63/field_paragraph?resourceVersion=id%3A5134"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/eb59b2b3-1cf2-4420-a87f-13e4c675cb63/relationships/field_paragraph?resourceVersion=id%3A5134"
+                    }
+                }
+            },
+            "field_situation_prospect": {
+                "data": [
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "d8ff77dd-058d-41e9-8692-90c7e111c39d",
+                        "meta": {
+                            "drupal_internal__target_id": 616
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/eb59b2b3-1cf2-4420-a87f-13e4c675cb63/field_situation_prospect?resourceVersion=id%3A5134"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/eb59b2b3-1cf2-4420-a87f-13e4c675cb63/relationships/field_situation_prospect?resourceVersion=id%3A5134"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "node--funding",
+        "id": "67a2abdb-fa66-4162-ab72-797049272c89",
+        "links": {
+            "self": {
+                "href": "https://www.studi.com/fr/jsonapi/node/funding/67a2abdb-fa66-4162-ab72-797049272c89?resourceVersion=id%3A14137"
+            }
+        },
+        "attributes": {
+            "drupal_internal__nid": 1185,
+            "drupal_internal__vid": 14137,
+            "langcode": "fr",
+            "revision_timestamp": "2022-05-30T09:34:32+00:00",
+            "revision_log": null,
+            "status": true,
+            "title": "CDI-Apprentissage",
+            "created": "2022-05-30T09:30:17+00:00",
+            "changed": "2024-03-11T09:29:20+00:00",
+            "promote": false,
+            "sticky": false,
+            "default_langcode": true,
+            "revision_translation_affected": true,
+            "publish_on": null,
+            "unpublish_on": null,
+            "satellite_site": [],
+            "body": {
+                "value": "<p>L\u2019article L. 6222-13 du code du travail permet au salari\u00e9 d\u00e9j\u00e0 titulaire d\u2019un CDI dans une entreprise, de suspendre son CDI, en plein accord avec son employeur, pour conclure un contrat d\u2019apprentissage avec ce m\u00eame employeur.</p>\r\n",
+                "format": "basic_html",
+                "processed": "<p>L\u2019article L. 6222-13 du code du travail permet au salari\u00e9 d\u00e9j\u00e0 titulaire d\u2019un CDI dans une entreprise, de suspendre son CDI, en plein accord avec son employeur, pour conclure un contrat d\u2019apprentissage avec ce m\u00eame employeur.</p>\n",
+                "summary": ""
+            },
+            "field_dark_mode": false,
+            "field_metatag": {
+                "value": {
+                    "description": "La solution CDI \u2013 Apprentissage de Studi, permet de pr\u00e9parer \u00e0 l'obtention d'un Dipl\u00f4me d'Etat, d'un Titre Professionnel ou d'un Titre RNCP",
+                    "robots": "index, follow",
+                    "canonical_url": "[node:url]",
+                    "image_src": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg",
+                    "title": "[node:title] | [site:name]",
+                    "og_image": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                }
+            }
+        },
+        "relationships": {
+            "node_type": {
+                "data": {
+                    "type": "node_type--node_type",
+                    "id": "5d7d645e-a53e-4921-83f0-e142b0307f8e",
+                    "meta": {
+                        "drupal_internal__target_id": "funding"
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/67a2abdb-fa66-4162-ab72-797049272c89/node_type?resourceVersion=id%3A14137"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/67a2abdb-fa66-4162-ab72-797049272c89/relationships/node_type?resourceVersion=id%3A14137"
+                    }
+                }
+            },
+            "revision_uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/67a2abdb-fa66-4162-ab72-797049272c89/relationships/revision_uid?resourceVersion=id%3A14137"
+                    }
+                }
+            },
+            "uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/67a2abdb-fa66-4162-ab72-797049272c89/relationships/uid?resourceVersion=id%3A14137"
+                    }
+                }
+            },
+            "field_header": {
+                "data": {
+                    "type": "paragraph--header",
+                    "id": "21e2c106-1774-474f-a3f7-e20b3ce2f2ab",
+                    "meta": {
+                        "target_revision_id": 44794,
+                        "drupal_internal__target_id": 8460
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/67a2abdb-fa66-4162-ab72-797049272c89/field_header?resourceVersion=id%3A14137"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/67a2abdb-fa66-4162-ab72-797049272c89/relationships/field_header?resourceVersion=id%3A14137"
+                    }
+                }
+            },
+            "field_image": {
+                "data": {
+                    "type": "media--image",
+                    "id": "73adb598-1e93-4276-a1ba-46dd6c67fe4a",
+                    "meta": {
+                        "drupal_internal__target_id": 904
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/67a2abdb-fa66-4162-ab72-797049272c89/field_image?resourceVersion=id%3A14137"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/67a2abdb-fa66-4162-ab72-797049272c89/relationships/field_image?resourceVersion=id%3A14137"
+                    }
+                }
+            },
+            "field_logo": {
+                "data": null,
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/67a2abdb-fa66-4162-ab72-797049272c89/field_logo?resourceVersion=id%3A14137"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/67a2abdb-fa66-4162-ab72-797049272c89/relationships/field_logo?resourceVersion=id%3A14137"
+                    }
+                }
+            },
+            "field_paragraph": {
+                "data": [
+                    {
+                        "type": "paragraph--basic",
+                        "id": "182dcca9-68f7-4ba5-a37d-57e8aa1d3288",
+                        "meta": {
+                            "target_revision_id": 44795,
+                            "drupal_internal__target_id": 8461
+                        }
+                    },
+                    {
+                        "type": "paragraph--accordions",
+                        "id": "12ff7760-5fdd-4da7-8d75-c6c68975d3f2",
+                        "meta": {
+                            "target_revision_id": 44803,
+                            "drupal_internal__target_id": 8469
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/67a2abdb-fa66-4162-ab72-797049272c89/field_paragraph?resourceVersion=id%3A14137"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/67a2abdb-fa66-4162-ab72-797049272c89/relationships/field_paragraph?resourceVersion=id%3A14137"
+                    }
+                }
+            },
+            "field_situation_prospect": {
+                "data": [
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "de8dcb4a-b8db-4564-9a10-110cd8b3e1e7",
+                        "meta": {
+                            "drupal_internal__target_id": 609
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/67a2abdb-fa66-4162-ab72-797049272c89/field_situation_prospect?resourceVersion=id%3A14137"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/67a2abdb-fa66-4162-ab72-797049272c89/relationships/field_situation_prospect?resourceVersion=id%3A14137"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "node--funding",
+        "id": "408813da-452c-4281-8335-b74c3bd318a7",
+        "links": {
+            "self": {
+                "href": "https://www.studi.com/fr/jsonapi/node/funding/408813da-452c-4281-8335-b74c3bd318a7?resourceVersion=id%3A20653"
+            }
+        },
+        "attributes": {
+            "drupal_internal__nid": 2280,
+            "drupal_internal__vid": 20653,
+            "langcode": "fr",
+            "revision_timestamp": "2022-09-02T11:55:41+00:00",
+            "revision_log": null,
+            "status": true,
+            "title": "Les formations 100% financ\u00e9es \u00e0 destination des demandeurs d'emploi en R\u00e9gion Ile-de-France",
+            "created": "2022-09-02T11:53:29+00:00",
+            "changed": "2024-09-20T14:52:24+00:00",
+            "promote": false,
+            "sticky": false,
+            "default_langcode": true,
+            "revision_translation_affected": true,
+            "publish_on": null,
+            "unpublish_on": null,
+            "satellite_site": [],
+            "body": {
+                "value": "<p>Vous r\u00e9sidez en \u00cele-de-France et recherchez un emploi? La R\u00e9gion Ile-de-France vous propose une formation dipl\u00f4mante pour vous pr\u00e9parer aux m\u00e9tiers les&nbsp;plus recherch\u00e9s par les recruteurs. Formez-vous \u00e0 un m\u00e9tier d'avenir&nbsp;gr\u00e2ce \u00e0 des formations 100% financ\u00e9es !</p>\r\n",
+                "format": "basic_html",
+                "processed": "<p>Vous r\u00e9sidez en \u00cele-de-France et recherchez un emploi? La R\u00e9gion Ile-de-France vous propose une formation dipl\u00f4mante pour vous pr\u00e9parer aux m\u00e9tiers les\u00a0plus recherch\u00e9s par les recruteurs. Formez-vous \u00e0 un m\u00e9tier d'avenir\u00a0gr\u00e2ce \u00e0 des formations 100% financ\u00e9es !</p>\n",
+                "summary": ""
+            },
+            "field_dark_mode": false,
+            "field_metatag": null
+        },
+        "relationships": {
+            "node_type": {
+                "data": {
+                    "type": "node_type--node_type",
+                    "id": "5d7d645e-a53e-4921-83f0-e142b0307f8e",
+                    "meta": {
+                        "drupal_internal__target_id": "funding"
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/408813da-452c-4281-8335-b74c3bd318a7/node_type?resourceVersion=id%3A20653"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/408813da-452c-4281-8335-b74c3bd318a7/relationships/node_type?resourceVersion=id%3A20653"
+                    }
+                }
+            },
+            "revision_uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/408813da-452c-4281-8335-b74c3bd318a7/relationships/revision_uid?resourceVersion=id%3A20653"
+                    }
+                }
+            },
+            "uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/408813da-452c-4281-8335-b74c3bd318a7/relationships/uid?resourceVersion=id%3A20653"
+                    }
+                }
+            },
+            "field_header": {
+                "data": {
+                    "type": "paragraph--header",
+                    "id": "08c466dd-2a5d-4cee-9e49-94a6b88e2f73",
+                    "meta": {
+                        "target_revision_id": 53143,
+                        "drupal_internal__target_id": 10572
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/408813da-452c-4281-8335-b74c3bd318a7/field_header?resourceVersion=id%3A20653"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/408813da-452c-4281-8335-b74c3bd318a7/relationships/field_header?resourceVersion=id%3A20653"
+                    }
+                }
+            },
+            "field_image": {
+                "data": {
+                    "type": "media--image",
+                    "id": "1e2c60c7-f7ac-4217-b392-a05a643a895d",
+                    "meta": {
+                        "drupal_internal__target_id": 482
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/408813da-452c-4281-8335-b74c3bd318a7/field_image?resourceVersion=id%3A20653"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/408813da-452c-4281-8335-b74c3bd318a7/relationships/field_image?resourceVersion=id%3A20653"
+                    }
+                }
+            },
+            "field_logo": {
+                "data": null,
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/408813da-452c-4281-8335-b74c3bd318a7/field_logo?resourceVersion=id%3A20653"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/408813da-452c-4281-8335-b74c3bd318a7/relationships/field_logo?resourceVersion=id%3A20653"
+                    }
+                }
+            },
+            "field_paragraph": {
+                "data": [
+                    {
+                        "type": "paragraph--basic",
+                        "id": "bbbf851d-d5ba-4ea6-913c-c6f3e9851376",
+                        "meta": {
+                            "target_revision_id": 53144,
+                            "drupal_internal__target_id": 10573
+                        }
+                    },
+                    {
+                        "type": "paragraph--accordions",
+                        "id": "db86f7ca-8a80-416e-bb07-38a8ef953cb1",
+                        "meta": {
+                            "target_revision_id": 53150,
+                            "drupal_internal__target_id": 10579
+                        }
+                    },
+                    {
+                        "type": "paragraph--cta",
+                        "id": "ef4a2da3-3f25-428e-9b33-d27b6712777d",
+                        "meta": {
+                            "target_revision_id": 288613,
+                            "drupal_internal__target_id": 32967
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/408813da-452c-4281-8335-b74c3bd318a7/field_paragraph?resourceVersion=id%3A20653"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/408813da-452c-4281-8335-b74c3bd318a7/relationships/field_paragraph?resourceVersion=id%3A20653"
+                    }
+                }
+            },
+            "field_situation_prospect": {
+                "data": [
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "520041ce-1203-4c23-ba49-f8a8b7e46c1d",
+                        "meta": {
+                            "drupal_internal__target_id": 610
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/408813da-452c-4281-8335-b74c3bd318a7/field_situation_prospect?resourceVersion=id%3A20653"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/408813da-452c-4281-8335-b74c3bd318a7/relationships/field_situation_prospect?resourceVersion=id%3A20653"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "node--funding",
+        "id": "faaf2567-d175-4cf7-86a0-b26e9fdc8933",
+        "links": {
+            "self": {
+                "href": "https://www.studi.com/fr/jsonapi/node/funding/faaf2567-d175-4cf7-86a0-b26e9fdc8933?resourceVersion=id%3A20654"
+            }
+        },
+        "attributes": {
+            "drupal_internal__nid": 2281,
+            "drupal_internal__vid": 20654,
+            "langcode": "fr",
+            "revision_timestamp": "2022-09-02T11:55:41+00:00",
+            "revision_log": null,
+            "status": true,
+            "title": "Les formations 100% financ\u00e9es \u00e0 destination des demandeurs d'emploi partout en France",
+            "created": "2022-09-02T12:10:28+00:00",
+            "changed": "2024-09-30T09:28:55+00:00",
+            "promote": false,
+            "sticky": false,
+            "default_langcode": true,
+            "revision_translation_affected": true,
+            "publish_on": null,
+            "unpublish_on": null,
+            "satellite_site": [],
+            "body": {
+                "value": "<p>Vous \u00eates demandeur d'emploi ? France Travail et Studi vous forment aux m\u00e9tiers qui recrutent !&nbsp;</p>\r\n",
+                "format": "basic_html",
+                "processed": "<p>Vous \u00eates demandeur d'emploi ? France Travail et Studi vous forment aux m\u00e9tiers qui recrutent !\u00a0</p>\n",
+                "summary": ""
+            },
+            "field_dark_mode": false,
+            "field_metatag": null
+        },
+        "relationships": {
+            "node_type": {
+                "data": {
+                    "type": "node_type--node_type",
+                    "id": "5d7d645e-a53e-4921-83f0-e142b0307f8e",
+                    "meta": {
+                        "drupal_internal__target_id": "funding"
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/faaf2567-d175-4cf7-86a0-b26e9fdc8933/node_type?resourceVersion=id%3A20654"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/faaf2567-d175-4cf7-86a0-b26e9fdc8933/relationships/node_type?resourceVersion=id%3A20654"
+                    }
+                }
+            },
+            "revision_uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/faaf2567-d175-4cf7-86a0-b26e9fdc8933/relationships/revision_uid?resourceVersion=id%3A20654"
+                    }
+                }
+            },
+            "uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/faaf2567-d175-4cf7-86a0-b26e9fdc8933/relationships/uid?resourceVersion=id%3A20654"
+                    }
+                }
+            },
+            "field_header": {
+                "data": {
+                    "type": "paragraph--header",
+                    "id": "1760f04b-8d58-43cf-ad54-046ca6515a16",
+                    "meta": {
+                        "target_revision_id": 53151,
+                        "drupal_internal__target_id": 10580
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/faaf2567-d175-4cf7-86a0-b26e9fdc8933/field_header?resourceVersion=id%3A20654"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/faaf2567-d175-4cf7-86a0-b26e9fdc8933/relationships/field_header?resourceVersion=id%3A20654"
+                    }
+                }
+            },
+            "field_image": {
+                "data": {
+                    "type": "media--image",
+                    "id": "f47c4b89-18ae-479d-9a28-f920da89cac9",
+                    "meta": {
+                        "drupal_internal__target_id": 4223
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/faaf2567-d175-4cf7-86a0-b26e9fdc8933/field_image?resourceVersion=id%3A20654"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/faaf2567-d175-4cf7-86a0-b26e9fdc8933/relationships/field_image?resourceVersion=id%3A20654"
+                    }
+                }
+            },
+            "field_logo": {
+                "data": null,
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/faaf2567-d175-4cf7-86a0-b26e9fdc8933/field_logo?resourceVersion=id%3A20654"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/faaf2567-d175-4cf7-86a0-b26e9fdc8933/relationships/field_logo?resourceVersion=id%3A20654"
+                    }
+                }
+            },
+            "field_paragraph": {
+                "data": [
+                    {
+                        "type": "paragraph--basic",
+                        "id": "863fd989-8315-4fc9-b8f4-eb16b42c4048",
+                        "meta": {
+                            "target_revision_id": 53152,
+                            "drupal_internal__target_id": 10581
+                        }
+                    },
+                    {
+                        "type": "paragraph--accordions",
+                        "id": "e8154edc-ff3c-4b8b-9d06-c8fa26b9cf5a",
+                        "meta": {
+                            "target_revision_id": 53158,
+                            "drupal_internal__target_id": 10587
+                        }
+                    },
+                    {
+                        "type": "paragraph--cta",
+                        "id": "e2fefec3-a7d0-41a5-b367-bee390422f7a",
+                        "meta": {
+                            "target_revision_id": 287396,
+                            "drupal_internal__target_id": 32860
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/faaf2567-d175-4cf7-86a0-b26e9fdc8933/field_paragraph?resourceVersion=id%3A20654"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/faaf2567-d175-4cf7-86a0-b26e9fdc8933/relationships/field_paragraph?resourceVersion=id%3A20654"
+                    }
+                }
+            },
+            "field_situation_prospect": {
+                "data": [
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "520041ce-1203-4c23-ba49-f8a8b7e46c1d",
+                        "meta": {
+                            "drupal_internal__target_id": 610
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/faaf2567-d175-4cf7-86a0-b26e9fdc8933/field_situation_prospect?resourceVersion=id%3A20654"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/faaf2567-d175-4cf7-86a0-b26e9fdc8933/relationships/field_situation_prospect?resourceVersion=id%3A20654"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "node--funding",
+        "id": "0d46c57c-84c2-437a-badf-fa4f96bb7fdf",
+        "links": {
+            "self": {
+                "href": "https://www.studi.com/fr/jsonapi/node/funding/0d46c57c-84c2-437a-badf-fa4f96bb7fdf?resourceVersion=id%3A116760"
+            }
+        },
+        "attributes": {
+            "drupal_internal__nid": 10150,
+            "drupal_internal__vid": 116760,
+            "langcode": "fr",
+            "revision_timestamp": "2024-09-26T14:35:58+00:00",
+            "revision_log": null,
+            "status": true,
+            "title": "Financement personnel ",
+            "created": "2024-09-26T14:33:35+00:00",
+            "changed": "2024-09-27T10:17:56+00:00",
+            "promote": false,
+            "sticky": false,
+            "default_langcode": true,
+            "revision_translation_affected": true,
+            "publish_on": null,
+            "unpublish_on": null,
+            "satellite_site": [],
+            "body": {
+                "value": "<p>Ma\u00eetrisez votre budget formation sur un \u00e9chelonnement possible de 10, 12, 24 ou 36 mois sans frais (0% d'int\u00e9r\u00eat).&nbsp;<br />\r\nD\u00e9marrez votre formation \u00e0 partir de seulement 69\u20ac/mois.&nbsp;</p>\r\n",
+                "format": "basic_html",
+                "processed": "<p>Ma\u00eetrisez votre budget formation sur un \u00e9chelonnement possible de 10, 12, 24 ou 36 mois sans frais (0% d'int\u00e9r\u00eat).\u00a0<br />\nD\u00e9marrez votre formation \u00e0 partir de seulement 69\u20ac/mois.\u00a0</p>\n",
+                "summary": ""
+            },
+            "field_dark_mode": false,
+            "field_metatag": null
+        },
+        "relationships": {
+            "node_type": {
+                "data": {
+                    "type": "node_type--node_type",
+                    "id": "5d7d645e-a53e-4921-83f0-e142b0307f8e",
+                    "meta": {
+                        "drupal_internal__target_id": "funding"
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/0d46c57c-84c2-437a-badf-fa4f96bb7fdf/node_type?resourceVersion=id%3A116760"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/0d46c57c-84c2-437a-badf-fa4f96bb7fdf/relationships/node_type?resourceVersion=id%3A116760"
+                    }
+                }
+            },
+            "revision_uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/0d46c57c-84c2-437a-badf-fa4f96bb7fdf/relationships/revision_uid?resourceVersion=id%3A116760"
+                    }
+                }
+            },
+            "uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/0d46c57c-84c2-437a-badf-fa4f96bb7fdf/relationships/uid?resourceVersion=id%3A116760"
+                    }
+                }
+            },
+            "field_header": {
+                "data": {
+                    "type": "paragraph--header",
+                    "id": "9950cf79-8a7e-4539-8c2a-59e45ec3cfc7",
+                    "meta": {
+                        "target_revision_id": 295855,
+                        "drupal_internal__target_id": 33519
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/0d46c57c-84c2-437a-badf-fa4f96bb7fdf/field_header?resourceVersion=id%3A116760"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/0d46c57c-84c2-437a-badf-fa4f96bb7fdf/relationships/field_header?resourceVersion=id%3A116760"
+                    }
+                }
+            },
+            "field_image": {
+                "data": {
+                    "type": "media--image",
+                    "id": "0eb4a0b8-a10b-4dec-a882-d72668bd602c",
+                    "meta": {
+                        "drupal_internal__target_id": 5644
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/0d46c57c-84c2-437a-badf-fa4f96bb7fdf/field_image?resourceVersion=id%3A116760"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/0d46c57c-84c2-437a-badf-fa4f96bb7fdf/relationships/field_image?resourceVersion=id%3A116760"
+                    }
+                }
+            },
+            "field_logo": {
+                "data": null,
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/0d46c57c-84c2-437a-badf-fa4f96bb7fdf/field_logo?resourceVersion=id%3A116760"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/0d46c57c-84c2-437a-badf-fa4f96bb7fdf/relationships/field_logo?resourceVersion=id%3A116760"
+                    }
+                }
+            },
+            "field_paragraph": {
+                "data": [
+                    {
+                        "type": "paragraph--basic",
+                        "id": "50dc65ad-b6c2-40ca-bcbd-0e15e28689d1",
+                        "meta": {
+                            "target_revision_id": 295860,
+                            "drupal_internal__target_id": 33524
+                        }
+                    },
+                    {
+                        "type": "paragraph--accordions",
+                        "id": "2eea36a7-877e-4917-ac72-404d8a25b691",
+                        "meta": {
+                            "target_revision_id": 295858,
+                            "drupal_internal__target_id": 33522
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/0d46c57c-84c2-437a-badf-fa4f96bb7fdf/field_paragraph?resourceVersion=id%3A116760"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/0d46c57c-84c2-437a-badf-fa4f96bb7fdf/relationships/field_paragraph?resourceVersion=id%3A116760"
+                    }
+                }
+            },
+            "field_situation_prospect": {
+                "data": [
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "de8dcb4a-b8db-4564-9a10-110cd8b3e1e7",
+                        "meta": {
+                            "drupal_internal__target_id": 609
+                        }
+                    },
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "520041ce-1203-4c23-ba49-f8a8b7e46c1d",
+                        "meta": {
+                            "drupal_internal__target_id": 610
+                        }
+                    },
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "ba24346b-1361-4eda-bf8d-1d082111379c",
+                        "meta": {
+                            "drupal_internal__target_id": 617
+                        }
+                    },
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "d8ff77dd-058d-41e9-8692-90c7e111c39d",
+                        "meta": {
+                            "drupal_internal__target_id": 616
+                        }
+                    },
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "43b9b286-e909-4c5b-a60d-ff34bb705fb0",
+                        "meta": {
+                            "drupal_internal__target_id": 618
+                        }
+                    },
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "994c9ca9-1232-41ca-a2fc-2abcd115d634",
+                        "meta": {
+                            "drupal_internal__target_id": 620
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/0d46c57c-84c2-437a-badf-fa4f96bb7fdf/field_situation_prospect?resourceVersion=id%3A116760"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/0d46c57c-84c2-437a-badf-fa4f96bb7fdf/relationships/field_situation_prospect?resourceVersion=id%3A116760"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "node--funding",
+        "id": "fbd2ce8f-4f6a-48c1-a358-f0a5b799939f",
+        "links": {
+            "self": {
+                "href": "https://www.studi.com/fr/jsonapi/node/funding/fbd2ce8f-4f6a-48c1-a358-f0a5b799939f?resourceVersion=id%3A116891"
+            }
+        },
+        "attributes": {
+            "drupal_internal__nid": 10153,
+            "drupal_internal__vid": 116891,
+            "langcode": "fr",
+            "revision_timestamp": "2024-09-30T13:33:18+00:00",
+            "revision_log": null,
+            "status": true,
+            "title": "Votre formation 100% financ\u00e9e par France Travail",
+            "created": "2024-09-30T13:14:33+00:00",
+            "changed": "2024-09-30T13:33:51+00:00",
+            "promote": false,
+            "sticky": false,
+            "default_langcode": true,
+            "revision_translation_affected": true,
+            "publish_on": null,
+            "unpublish_on": null,
+            "satellite_site": [],
+            "body": null,
+            "field_dark_mode": false,
+            "field_metatag": {
+                "value": {
+                    "robots": "noindex, nofollow",
+                    "canonical_url": "[node:url]",
+                    "image_src": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg",
+                    "title": "[node:title] | [site:name]",
+                    "og_image": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg",
+                    "description": "[node:summary]"
+                }
+            }
+        },
+        "relationships": {
+            "node_type": {
+                "data": {
+                    "type": "node_type--node_type",
+                    "id": "5d7d645e-a53e-4921-83f0-e142b0307f8e",
+                    "meta": {
+                        "drupal_internal__target_id": "funding"
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/fbd2ce8f-4f6a-48c1-a358-f0a5b799939f/node_type?resourceVersion=id%3A116891"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/fbd2ce8f-4f6a-48c1-a358-f0a5b799939f/relationships/node_type?resourceVersion=id%3A116891"
+                    }
+                }
+            },
+            "revision_uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/fbd2ce8f-4f6a-48c1-a358-f0a5b799939f/relationships/revision_uid?resourceVersion=id%3A116891"
+                    }
+                }
+            },
+            "uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/fbd2ce8f-4f6a-48c1-a358-f0a5b799939f/relationships/uid?resourceVersion=id%3A116891"
+                    }
+                }
+            },
+            "field_header": {
+                "data": {
+                    "type": "paragraph--header",
+                    "id": "6d93fc67-5918-4da9-ad3a-98f9abcc24cd",
+                    "meta": {
+                        "target_revision_id": 297697,
+                        "drupal_internal__target_id": 33546
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/fbd2ce8f-4f6a-48c1-a358-f0a5b799939f/field_header?resourceVersion=id%3A116891"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/fbd2ce8f-4f6a-48c1-a358-f0a5b799939f/relationships/field_header?resourceVersion=id%3A116891"
+                    }
+                }
+            },
+            "field_image": {
+                "data": null,
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/fbd2ce8f-4f6a-48c1-a358-f0a5b799939f/field_image?resourceVersion=id%3A116891"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/fbd2ce8f-4f6a-48c1-a358-f0a5b799939f/relationships/field_image?resourceVersion=id%3A116891"
+                    }
+                }
+            },
+            "field_logo": {
+                "data": null,
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/fbd2ce8f-4f6a-48c1-a358-f0a5b799939f/field_logo?resourceVersion=id%3A116891"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/fbd2ce8f-4f6a-48c1-a358-f0a5b799939f/relationships/field_logo?resourceVersion=id%3A116891"
+                    }
+                }
+            },
+            "field_paragraph": {
+                "data": [],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/fbd2ce8f-4f6a-48c1-a358-f0a5b799939f/field_paragraph?resourceVersion=id%3A116891"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/fbd2ce8f-4f6a-48c1-a358-f0a5b799939f/relationships/field_paragraph?resourceVersion=id%3A116891"
+                    }
+                }
+            },
+            "field_situation_prospect": {
+                "data": [
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "520041ce-1203-4c23-ba49-f8a8b7e46c1d",
+                        "meta": {
+                            "drupal_internal__target_id": 610
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/fbd2ce8f-4f6a-48c1-a358-f0a5b799939f/field_situation_prospect?resourceVersion=id%3A116891"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/fbd2ce8f-4f6a-48c1-a358-f0a5b799939f/relationships/field_situation_prospect?resourceVersion=id%3A116891"
+                    }
+                }
+            }
+        }
+    }
+]
