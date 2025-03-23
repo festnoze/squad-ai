@@ -412,6 +412,8 @@ class SummaryWithQuestionsByChunkDocumentsService:
             )
 
         # Verify that trainings objects correspond to trainings docs
+        if len(trainings_objects) != len(trainings_docs):
+            raise ValueError(f"Number of training objects ({len(trainings_objects)}) != number of training docs ({len(trainings_docs)})")
         for training_obj, training_doc in zip(trainings_objects, trainings_docs):
             if training_obj.doc_content != training_doc.page_content:
                 raise ValueError(f"Content mismatch in: {training_doc.metadata['name']}")
@@ -429,24 +431,28 @@ class SummaryWithQuestionsByChunkDocumentsService:
         #         raise ValueError(f"Metadata mismatch in: {training_doc.metadata['name']}")           
         return trainings_objects
     
-    # def check_for_training_name(self, training_obj: DocWithSummaryChunksAndQuestions, training_doc: Document) -> None:
-    #     match = re.search(r'formation : "(.*?)"', training_obj.doc_summary)
-    #     if not match:
-    #         raise ValueError(f"Could not find the training name in the summary: {training_obj.doc_summary[:100]}...")
-    #     doc_training_title = match.group(1).replace('  ', ' ')
-    #     obj_training_title = training_doc.metadata['name'].replace('  ', ' ')
-    #     obj_title_first_quote_index = obj_training_title.find('"')
-    #     if obj_title_first_quote_index != -1:
-    #         obj_training_title = obj_training_title[:obj_title_first_quote_index]
-    #     if obj_training_title != doc_training_title:
-    #         raise ValueError(f"Training name mismatch: {training_doc.metadata['name']} != {doc_training_title}")
-
+    async def build_trainings_objects_async(self, path):
+        trainings_docs_raw = self.build_trainings_docs(path)
+        trainings_objects = await self.build_trainings_objects_with_summaries_and_chunks_by_questions_async(path, trainings_docs_raw)
+        return trainings_objects
+    
+    async def build_trainings_docs_with_summary_and_questions_async(self, path):
+        trainings_docs_raw = self.build_trainings_docs(path)
+        trainings_objects = await self.build_trainings_objects_with_summaries_and_chunks_by_questions_async(path, trainings_docs_raw)
+        trainings_docs_with_summary_and_questions = self.build_trainings_docs_from_objs(trainings_objects)
+        for training_doc_summary_with_questions in trainings_docs_with_summary_and_questions:
+            trainings_docs = [doc for doc in trainings_docs_raw if doc.metadata['name'] == training_doc_summary_with_questions.metadata['name']]
+        # for training_doc, training_doc_summary_with_questions in zip(trainings_docs_raw, trainings_docs_with_summary_and_questions):
+        #     if training_doc.metadata != training_doc_summary_with_questions.metadata:
+        #         raise ValueError("'trainings_docs' and 'trainings_docs_with_summary_and_questions' metadata are not the same:\n"+ training_doc.metadata + " \nvs: " + training_doc_summary_with_questions.metadata)
+        return trainings_docs_with_summary_and_questions
+    
     async def generate_summaries_and_questions_for_documents_async(self, files_path: str, llm_and_fallback: list, create_questions_from_data: bool = True , merge_questions_with_data: bool = True) -> list[Document]:
         all_documents: list[Document] = []
         all_but_trainings_documents = self.build_all_but_trainings_documents(files_path)
         all_documents.extend(all_but_trainings_documents)
 
-        trainings_docs = self.build_trainings_docs(files_path, add_sub_sections=True, add_full_doc=True)
+        trainings_docs = self.build_trainings_docs(files_path)
         #all_documents.extend(trainings_docs)
 
         trainings_objects = await self.build_trainings_objects_with_summaries_and_chunks_by_questions_async(files_path, trainings_docs, llm_and_fallback)
@@ -470,7 +476,6 @@ class SummaryWithQuestionsByChunkDocumentsService:
     
 
     section_to_french:dict = None # Singleton prop. containing the static mapping of section names to their french equivalent.
-    #
     def get_french_section(self, section_name: str) -> str:
         if not SummaryWithQuestionsByChunkDocumentsService.section_to_french:
             self.init_sections_names_french_mapping()
@@ -552,7 +557,6 @@ class SummaryWithQuestionsByChunkDocumentsService:
         all_ids_str = ",".join(all_ids)
         return all_ids_str
     
-        
     # Method to test the 3 ways of generating summaries, chunks and questions (use to be in 'available services')
     async def test_different_splitting_of_summarize_chunks_and_questions_creation_async(rag_service:RagService, files_path):
         summary_w_questions_service = SummaryWithQuestionsByChunkDocumentsService()
