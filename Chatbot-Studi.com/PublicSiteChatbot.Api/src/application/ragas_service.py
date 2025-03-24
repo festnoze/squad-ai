@@ -22,7 +22,7 @@ from vector_database_creation.summary_chunks_with_questions_documents import Sum
 from ragas import EvaluationDataset
 from ragas import evaluate
 from ragas.llms import LangchainLLMWrapper
-from ragas.metrics import LLMContextRecall, Faithfulness, FactualCorrectness
+from ragas.metrics import LLMContextRecall, Faithfulness, FactualCorrectness, ContextPrecision, ContextRelevance, AnswerAccuracy
 from ragas.testset.graph import KnowledgeGraph
 from ragas.testset.graph import Node, NodeType
 from ragas.testset.transforms import default_transforms, apply_transforms
@@ -129,7 +129,7 @@ class RagasService:
         evaluator_llm = LangchainLLMWrapper(llm_or_chain)
         result = evaluate(
                     dataset=evaluation_dataset,
-                    metrics=[LLMContextRecall(), Faithfulness(), FactualCorrectness()],
+                    metrics=[LLMContextRecall(), Faithfulness(), FactualCorrectness(), ContextPrecision()],
                     llm=evaluator_llm,
                 )
         link = result.upload()

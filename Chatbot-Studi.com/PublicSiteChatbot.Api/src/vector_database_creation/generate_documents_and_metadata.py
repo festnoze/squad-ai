@@ -259,16 +259,21 @@ class GenerateDocumentsAndMetadata:
                 "changed": training_data.get("changed"),
                 "rel_ids": GenerateDocumentsAndMetadata.get_all_ids_as_str(related_ids),
             }            
-            sub_domain_id = related_ids.get("domain", "not found")
-            subdoms = [sub_domain for sub_domain in sub_domains_data if sub_domain["id"] == sub_domain_id]
-            if sub_domain_id == 'not found' or not subdoms or not any(subdoms) or 'parent' not in subdoms[0]['related_ids'] or not subdoms[0]['related_ids']['parent']:
-                doms = [domain for domain in domains_data if domain["id"] == sub_domain_id] # check if the sub_domain_id is if fact a domain_id
-                if not doms or not any(doms):
-                    domain_id = 'not found'
-                else:
-                    domain_id = doms[0]["id"]
-            else:
-                domain_id = subdoms[0]['related_ids']['parent'][0]
+            
+            # Verify domain and sub-domain from their ids
+            domain_id = related_ids.get("domain", None)
+            sub_domain_id = None
+            # Search for domain with domain_id
+            doms = [domain for domain in domains_data if domain["id"] == domain_id]
+            # If unfound "domain_id", look if it rather is a sub_domain_id
+            if not doms:
+                sub_domains = [sub_domain for sub_domain in sub_domains_data if sub_domain["id"] == domain_id]
+                if not sub_domains:
+                    raise ValueError(f"Domain or Sub-domain not found with id: {domain_id}")
+                sub_domain_id = sub_domains[0]["id"]
+                # Deduce the domain from the sub-domain parent
+                if 'parent' in sub_domains[0]['related_ids'] and sub_domains[0]['related_ids']['parent']:
+                    domain_id = sub_domains[0]['related_ids']['parent'][0]
 
             ids_by_metadata_names = {
                 "sub_domain_name": sub_domain_id,
@@ -283,16 +288,13 @@ class GenerateDocumentsAndMetadata:
                 if value:
                     is_list = key.endswith('s')
                     if is_list:
-                        existing_docs_ids = [doc for doc in existing_docs if doc.metadata.get("id") in value]
-                        if len(existing_docs_ids) != len(value):
-                            txt.print(f"In process_trainings, on: {key}, {len(value) - len(existing_docs_ids)} docs were not found by its id, on those ids: {value}")
-                        if any(existing_docs_ids):
-                            metadata_common[key] = ' | '.join(GenerateDocumentsAndMetadata.get_list_with_items_as_str([doc.metadata.get("name") for doc in existing_docs_ids]))
+                        existing_docs_ids = [doc for doc in existing_docs if doc.metadata.get("doc_id") in value]
+                        assert len(existing_docs_ids) == len(value), f"In process_trainings, on: {key}, {len(value) - len(existing_docs_ids)} docs were not found by its id, on those ids: {value}"
+                        metadata_common[key] = ' | '.join(GenerateDocumentsAndMetadata.get_list_with_items_as_str([doc.metadata.get("name") for doc in existing_docs_ids]))
                     else:
-                        existing_docs_ids = [doc for doc in existing_docs if doc.metadata.get("id") == value]
-                        #assert len(existing_docs_ids) == 1, f"Multiple or none docs found for: {key} {value}"
-                        if any(existing_docs_ids):
-                            metadata_common[key] = existing_docs_ids[0].metadata.get("name")
+                        existing_docs_ids = [doc for doc in existing_docs if doc.metadata.get("doc_id") == value]
+                        assert len(existing_docs_ids) == 1, f"Multiple or none docs found for: {key} {value}"
+                        metadata_common[key] = existing_docs_ids[0].metadata.get("name")
 
             # Add training URL from details source to metadata
             training_url = ''

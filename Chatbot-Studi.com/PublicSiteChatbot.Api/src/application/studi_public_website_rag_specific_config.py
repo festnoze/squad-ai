@@ -29,8 +29,10 @@ class StudiPublicWebsiteRagSpecificConfig:
                         return Comparison(attribute=filter_obj.attribute, comparator=filter_obj.comparator, value="Bac")
                     elif filter_obj.value == "BTS":
                         return Comparison(attribute=filter_obj.attribute, comparator=filter_obj.comparator, value="Bac+2")
-                    elif filter_obj.value == "graduate":
+                    elif filter_obj.value in ["graduate", "bachelor", "licence"]:
                         return Comparison(attribute=filter_obj.attribute, comparator=filter_obj.comparator, value="Bac+3")
+                    elif filter_obj.value in ["MBA", "master"]:
+                        return Comparison(attribute=filter_obj.attribute, comparator=filter_obj.comparator, value="Bac+5")
                 
                 # Name corrections based on type (formation or métier)
                 elif filter_obj.attribute == "name":

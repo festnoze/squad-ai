@@ -18,21 +18,24 @@ async def generate_ground_truth():
     embedding_model = EnvHelper.get_embedding_model()
     EmbeddingModelFactory.create_instance(embedding_model)
     summary_gen_service = SummaryWithQuestionsByChunkDocumentsService()
-    trainings_docs_with_summary_and_questions = await summary_gen_service.build_trainings_docs_with_summary_and_questions_async(files_path)
-    trainings_samples_count = 10
+    trainings_docs_with_summary_chunked_by_questions = await summary_gen_service.build_trainings_docs_with_summary_chunked_by_questions_async(files_path)
+    trainings_samples_count = 5
     #trainings_samples = random.sample(trainings_docs, trainings_samples_count) if trainings_samples_count else trainings_docs
 
-    # This one works:
+    # Works:
+    testset = await RagasService.build_sample_inference_dataset_async(samples_count= trainings_samples_count)
+    eval_res = RagasService.run_ragas_evaluation(llms[0], testset)
+    return {"testset": testset}
+
     testset = await RagasService.generate_test_dataset_from_documents_langchain_async(
-                                    trainings_docs_with_summary_and_questions,
+                                    trainings_docs_with_summary_chunked_by_questions,
                                     llms[0], 
                                     embedding_model, 
                                     samples_count= trainings_samples_count)
-    testset = await RagasService.build_sample_inference_dataset_async(samples_count= trainings_samples_count)
     RagasService.run_ragas_evaluation(llms[0], testset)
 
     knowledge_graph = RagasService.generate_or_load_ragas_knowledge_graph_from_documents(
-                                    trainings_docs_with_summary_and_questions,
+                                    trainings_docs_with_summary_chunked_by_questions,
                                     llms[0], 
                                     embedding_model, 
                                     samples_count= trainings_samples_count)

@@ -436,16 +436,42 @@ class SummaryWithQuestionsByChunkDocumentsService:
         trainings_objects = await self.build_trainings_objects_with_summaries_and_chunks_by_questions_async(path, trainings_docs_raw)
         return trainings_objects
     
-    async def build_trainings_docs_with_summary_and_questions_async(self, path):
+    async def build_trainings_docs_with_summary_chunked_by_questions_async(self, path):
         trainings_docs_raw = self.build_trainings_docs(path)
         trainings_objects = await self.build_trainings_objects_with_summaries_and_chunks_by_questions_async(path, trainings_docs_raw)
-        trainings_docs_with_summary_and_questions = self.build_trainings_docs_from_objs(trainings_objects)
-        for training_doc_summary_with_questions in trainings_docs_with_summary_and_questions:
-            trainings_docs = [doc for doc in trainings_docs_raw if doc.metadata['name'] == training_doc_summary_with_questions.metadata['name']]
-        # for training_doc, training_doc_summary_with_questions in zip(trainings_docs_raw, trainings_docs_with_summary_and_questions):
-        #     if training_doc.metadata != training_doc_summary_with_questions.metadata:
-        #         raise ValueError("'trainings_docs' and 'trainings_docs_with_summary_and_questions' metadata are not the same:\n"+ training_doc.metadata + " \nvs: " + training_doc_summary_with_questions.metadata)
-        return trainings_docs_with_summary_and_questions
+        trainings_chunks_splitted_by_questions = self.build_trainings_docs_from_objs(trainings_objects)
+
+        # Display all chunks with questions by training doc
+        for training_doc_raw in trainings_docs_raw[:5]:
+            trainings_docs = [doc for doc in trainings_chunks_splitted_by_questions 
+                              if doc.metadata['name'] == training_doc_raw.metadata['name']
+                              and doc.metadata['training_info_type'] == training_doc_raw.metadata['training_info_type']]
+            print("##################################################")
+            print(f"For training doc: {training_doc_raw.metadata['name']}")
+            print(f"For training type: '{training_doc_raw.metadata['training_info_type']}'")
+            print(f"with content: {training_doc_raw.page_content}")
+            print("--------------------------------------------------")
+            print(f"Found {len(trainings_docs)} corresponding docs with summary and questions. Here are the summaries only:")
+            for training_doc in trainings_docs:
+                if not '### Réponses ###' in training_doc.page_content:
+                    raise ValueError(f"Could not find the '### Réponses ###' in: {training_doc.metadata['name']}")
+                splitted_training_doc = training_doc.page_content.split('### Réponses ###')
+                print(f"=> {splitted_training_doc[1]}")
+                print(f"{splitted_training_doc[0]}")
+
+        # Verify that trainings docs correspond to trainings docs with summary and questions
+        # for training_doc_summary_with_questions in trainings_docs_with_summary_and_questions:
+        #     trainings_docs = [doc for doc in trainings_docs_raw 
+        #                       if doc.metadata['name'] == training_doc_summary_with_questions.metadata['name']
+        #                       and doc.metadata['training_info_type'] == training_doc_summary_with_questions.metadata['training_info_type']]
+        #     if not trainings_docs:
+        #         raise ValueError(f"Could not find the training doc with name: {training_doc_summary_with_questions.metadata['name']} and type: {training_doc_summary_with_questions.metadata['training_info_type']}")
+        #     if len(trainings_docs) > 1:
+        #         raise ValueError(f"Found more than one training doc with name: {training_doc_summary_with_questions.metadata['name']} and type: {training_doc_summary_with_questions.metadata['training_info_type']}")
+        #     if trainings_docs[0].metadata != training_doc_summary_with_questions.metadata:
+        #         raise ValueError(f"Metadata mismatch in: {training_doc_summary_with_questions.metadata['name']}")
+            
+        return trainings_chunks_splitted_by_questions
     
     async def generate_summaries_and_questions_for_documents_async(self, files_path: str, llm_and_fallback: list, create_questions_from_data: bool = True , merge_questions_with_data: bool = True) -> list[Document]:
         all_documents: list[Document] = []
