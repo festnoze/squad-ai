@@ -11,6 +11,9 @@ from common_tools.helpers.rag_filtering_metadata_helper import RagFilteringMetad
 from common_tools.helpers.matching_helper import MatchingHelper
 
 class StudiPublicWebsiteRagSpecificConfig:
+    all_dir: str = "./outputs/all/"
+    all_trainings_names: list[str] = file.get_as_json(all_dir + "all_trainings_names")
+    all_jobs_names: list[str] = file.get_as_json(all_dir + "all_jobs_names")
     @staticmethod
     async def get_domain_specific_metadata_filters_validation_and_correction_async_method(langchain_filters: Union[Operation, Comparison]) -> Union[Operation, Comparison, None]:
         """
@@ -25,7 +28,7 @@ class StudiPublicWebsiteRagSpecificConfig:
             elif isinstance(filter_obj, Comparison):
                 # Academic level corrections
                 if filter_obj.attribute == "academic_level":
-                    if filter_obj.value in ["pre-graduate", "pré-graduate"]:
+                    if filter_obj.value in ["pre-graduate", "pregraduate", "pré-graduate"]:
                         return Comparison(attribute=filter_obj.attribute, comparator=filter_obj.comparator, value="Bac")
                     elif filter_obj.value == "BTS":
                         return Comparison(attribute=filter_obj.attribute, comparator=filter_obj.comparator, value="Bac+2")
@@ -42,9 +45,8 @@ class StudiPublicWebsiteRagSpecificConfig:
 
                     all_dir = "./outputs/all/"
                     if filter_by_type_value == "formation":
-                        all_trainings_names = file.get_as_json(all_dir + "all_trainings_names")
-                        if filter_obj.value not in all_trainings_names:
-                            retrieved_value, retrieval_score = MatchingHelper.find_best_approximate_match(all_trainings_names, filter_obj.value)
+                        if filter_obj.value not in StudiPublicWebsiteRagSpecificConfig.all_trainings_names:
+                            retrieved_value, retrieval_score = MatchingHelper.find_best_approximate_match(StudiPublicWebsiteRagSpecificConfig.all_trainings_names, filter_obj.value)
                             if retrieval_score > 0.5:
                                 print(
                                     f"No match found for metadata value: '{filter_obj.value}' in all trainings names. "
@@ -58,9 +60,8 @@ class StudiPublicWebsiteRagSpecificConfig:
                                 )
                                 return None
                     elif filter_by_type_value == "metier":
-                        all_jobs_names = file.get_as_json(all_dir + "all_jobs_names")
-                        if filter_obj.value not in all_jobs_names:
-                            retrieved_value, retrieval_score = MatchingHelper.find_best_approximate_match(all_jobs_names, filter_obj.value)
+                        if filter_obj.value not in StudiPublicWebsiteRagSpecificConfig.all_jobs_names:
+                            retrieved_value, retrieval_score = MatchingHelper.find_best_approximate_match(StudiPublicWebsiteRagSpecificConfig.all_jobs_names, filter_obj.value)
                             if retrieval_score > 0.5:
                                 print(
                                     f"No match found for metadata value: '{filter_obj.value}' in all jobs names. "

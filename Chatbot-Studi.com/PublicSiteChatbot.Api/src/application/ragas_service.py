@@ -17,7 +17,7 @@ from common_tools.helpers.file_helper import file
 from application.studi_public_website_metadata_descriptions import MetadataDescriptionHelper
 from application.available_service import AvailableService
 from application.studi_public_website_rag_specific_config import StudiPublicWebsiteRagSpecificConfig
-from vector_database_creation.summary_chunks_with_questions_documents import SummaryWithQuestionsByChunkDocumentsService
+from vector_database_creation.summary_and_questions_chunks_service import SummaryAndQuestionsChunksService
 #
 from ragas import EvaluationDataset
 from ragas import evaluate
@@ -78,8 +78,7 @@ class RagasService:
         return dataset
     
     async def generate_ground_truth_dataset_from_trainings_objs_file(path:str = './outputs'):
-        summary_gen_service = SummaryWithQuestionsByChunkDocumentsService()
-        trainings_objects = await summary_gen_service.build_trainings_objects_async(path)
+        trainings_objects = await SummaryAndQuestionsChunksService.build_trainings_objects_with_summaries_and_chunks_by_questions_async(path)
         
         # Build the ground truth dataset
         dataset = []

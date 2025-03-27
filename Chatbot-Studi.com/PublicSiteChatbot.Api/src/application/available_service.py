@@ -69,20 +69,17 @@ class AvailableService:
         drupal = DrupalDataRetrieval(AvailableService.out_dir)
         drupal.retrieve_all_data()
 
-    async def add_to_vectorstore_chunked_and_embeded_documents_async(out_dir, load_embeddings_from_file_if_exists = True):
+    async def add_to_vectorstore_chunked_and_embeded_documents_async(out_dir, load_embeddings_from_file_if_exists = True):   
+        all_docs, trainings_docs = GenerateDocumentsAndMetadata.build_all_docs_and_trainings(out_dir, write_all_names_lists=True)
         do_create_summary_from_data = EnvHelper.get_is_summarized_data()
         if do_create_summary_from_data:
-            from vector_database_creation.summary_chunks_with_questions_documents import SummaryWithQuestionsByChunkDocumentsService
-            do_create_questions_from_data = EnvHelper.get_is_questions_created_from_data()
-            do_merge_questions_with_data = EnvHelper.get_is_mixed_questions_and_data()
-            generate_summaries_and_questions_services = SummaryWithQuestionsByChunkDocumentsService()
-            all_docs = await generate_summaries_and_questions_services.generate_summaries_and_questions_for_documents_async(
-                                                    files_path= out_dir,
-                                                    llm_and_fallback= [AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2, AvailableService.rag_service.llm_3],
-                                                    create_questions_from_data = do_create_questions_from_data,
-                                                    merge_questions_with_data = do_merge_questions_with_data)
+            from vector_database_creation.summary_and_questions_chunks_service import SummaryAndQuestionsChunksService
+            trainings_docs_chunked_by_questions = await SummaryAndQuestionsChunksService.build_trainings_docs_summary_chunked_by_questions_async(
+                                                    path= out_dir,
+                                                    llm_and_fallback= [AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2, AvailableService.rag_service.llm_3])
+            all_docs.extend(trainings_docs_chunked_by_questions)
         else:            
-            all_docs = GenerateDocumentsAndMetadata.load_all_docs_as_json(out_dir, write_all_lists=True)
+            all_docs.extend(trainings_docs)
             
         AvailableService.chunk_docs_and_add_to_vector_db(all_docs, load_embeddings_from_file_if_exists)
 
@@ -91,10 +88,10 @@ class AvailableService:
         from common_tools.rag.rag_ingestion_pipeline.rag_ingestion_pipeline import RagIngestionPipeline
         injection_pipeline = RagIngestionPipeline(AvailableService.rag_service)
         documents_chunks = injection_pipeline.chunk_documents(documents= all_docs)
-
+        
         txt.stop_spinner_replace_text("Documents chunked\n")
         txt.print_with_spinner("Inserting documents into vector database...")
-        AvailableService.rag_service.vectorstore = injection_pipeline.embed_chunked_docs_then_add_to_vectorstore(
+        AvailableService.rag_service.vectorstore = injection_pipeline.embed_chunks_then_add_to_vectorstore(
                             docs_chunks= documents_chunks,
                             vector_db_type=AvailableService.rag_service.vector_db_type,
                             collection_name= AvailableService.rag_service.vector_db_name,
@@ -102,6 +99,7 @@ class AvailableService:
                             load_embeddings_from_file_if_exists= load_embeddings_from_file_if_exists,
                         )
         txt.stop_spinner_replace_text("Vector database filled with embedded and chunked documents\n")
+        
         # Reload rag_service with the new vectorstore (and langchain documents for BM25)
         AvailableService.re_init()
 

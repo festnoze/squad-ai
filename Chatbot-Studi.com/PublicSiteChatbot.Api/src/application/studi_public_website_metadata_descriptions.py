@@ -24,7 +24,7 @@ class MetadataDescriptionHelper:
                     Ajoute systématiquement un filtre sur le 'type'. Ce filtre aura systématiquement la valeur : 'formation', sauf si la question parle explicitement d'un autre thème listé sans lien avec les formations correspondantes (Exemple: demande d'infos sur un 'métier' ou un 'domaine'). 
                     Attention, n'appliquer qu'un seul filtre sur 'type' maximum. Ne jamais utiliser d'opérateurs 'or' ou 'and' pour combiner plusieurs types. Dans ce cas, ne pas mettre de filtre sur 'type'.
                     Si 'type' = 'formation', vérifie si la demande est à un sujet précis concerant la formation, auquel cas, regarde pour aussi ajouter des filtres spécifiques aux formations parmi : 
-                    ['training_info_type', 'domain_name', 'sub_domain_name', 'certification_name', 'academic_level'], si on recherche des informations spécifiques sur une formation, ou une formation précise."""),
+                    ['training_info_type', 'domain_name', 'sub_domain_name', 'certification_name', 'academic_level'], si on recherche des informations spécifiques concernant une formation."""),
                     possible_values= ['formation', 'métier', 'certifieur', 'certification', 'diplôme', 'domaine', 'sous-domaine'],
                     type='str'),
                 MetadataDescription(name='training_info_type', description= dedent(f"""\
@@ -40,6 +40,8 @@ class MetadataDescriptionHelper:
                         "'modalites' (les conditions d'admission, de formation, de passage des examens et autres modalités)", 
                         "'financement' (informations sur le tarif, le prix, et le financement et les modes de financement de la formation)", 
                         "'simulation' (simulation de la date de début et de la durée de formation, en cas de démarrage à la prochaine session / promotion)",
+                        "'metiers' (liste des métiers accessibles après la formation)",
+                        "'academic_level' (niveau d'études acquis à l'issu de la formation)",
                     ],
                     type='str'),
                 MetadataDescription(name='domain_name', description= dedent(f"""\

@@ -4,7 +4,7 @@ from common_tools.helpers.env_helper import EnvHelper
 from common_tools.langchains.langchain_factory import LangChainFactory
 from common_tools.models.embedding_model import EmbeddingModel
 from common_tools.models.embedding_model_factory import EmbeddingModelFactory
-from vector_database_creation.summary_chunks_with_questions_documents import SummaryWithQuestionsByChunkDocumentsService
+from vector_database_creation.summary_and_questions_chunks_service import SummaryAndQuestionsChunksService
 
 evaluation_router = APIRouter(prefix="/rag/evaluation", tags=["Evaluation"])
 
@@ -12,13 +12,13 @@ evaluation_router = APIRouter(prefix="/rag/evaluation", tags=["Evaluation"])
 async def generate_ground_truth():
     from application.ragas_service import RagasService
     #
-    files_path:str = './outputs'
+    path:str = './outputs'
     llms_infos = EnvHelper.get_llms_infos_from_env_config()
     llms = LangChainFactory.create_llms_from_infos(llms_infos)
     embedding_model = EnvHelper.get_embedding_model()
     EmbeddingModelFactory.create_instance(embedding_model)
-    summary_gen_service = SummaryWithQuestionsByChunkDocumentsService()
-    trainings_docs_with_summary_chunked_by_questions = await summary_gen_service.build_trainings_docs_with_summary_chunked_by_questions_async(files_path)
+    #
+    trainings_docs_with_summary_chunked_by_questions = await SummaryAndQuestionsChunksService.build_trainings_objects_with_summaries_and_chunks_by_questions_from_docs_async(path, None, llms)
     trainings_samples_count = 5
     #trainings_samples = random.sample(trainings_docs, trainings_samples_count) if trainings_samples_count else trainings_docs
 
