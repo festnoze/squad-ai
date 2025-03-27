@@ -112,7 +112,7 @@ class Field:
                         return
                 
                 if exact_match_default_value is None:          
-                    new_value = self.search_fuzzy_match_within_allowed_values(self.name, self.value, score_min_threshold=0.80)
+                    new_value = self.search_best_match_within_allowed_values(self.name, self.value, score_min_threshold=0.80)
                     if new_value is not None and new_value != self.value:
                         self.value = new_value
                         return
@@ -197,7 +197,7 @@ class Field:
         field.value = field_dict.get("value")
         return field
         
-    def search_fuzzy_match_within_allowed_values(self, field_name: str, field_value: str, score_min_threshold: float = 0.75) -> str | None:
+    def search_best_match_within_allowed_values(self, field_name: str, field_value: str, score_min_threshold: float = 0.75) -> str | None:
         best_match: str; score: float
         flatten_allowed_values: list[str] = Helper.flatten_inner_lists(self.allowed_values)
         
