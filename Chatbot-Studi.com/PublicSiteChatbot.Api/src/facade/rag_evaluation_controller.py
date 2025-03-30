@@ -14,9 +14,9 @@ evaluation_router = APIRouter(prefix="/rag/evaluation", tags=["Evaluation"])
 output_path:str = './outputs'
 
 @evaluation_router.post("/create-ground-truth-dataset-run-inference-and-evaluate")
-async def create_q_and_a_dataset_then_run_inference_then_evaluate(sample_count: int = 5, categorize_by_metadata: bool = False) -> Dict[str, Any]:
-    testset_sample = await EvaluationService.create_q_and_a_sample_dataset_from_existing_summary_and_questions_objects_async(sample_count, categorize_by_metadata)
-    testset_sample_with_inference_results = await EvaluationService.add_to_dataset_retrieved_chunks_and_augmented_generation_from_RAG_inference_execution_async(testset_sample)
+async def create_q_and_a_dataset_then_run_inference_then_evaluate(sample_count: int = 10, categorize_by_metadata: bool = False, batch_size: int = 3) -> Dict[str, Any]:
+    testset_sample =                             await EvaluationService.create_q_and_a_sample_dataset_from_existing_summary_and_questions_objects_async(sample_count, categorize_by_metadata)
+    testset_sample_with_inference_results =      await EvaluationService.add_to_dataset_retrieved_chunks_and_augmented_generation_from_RAG_inference_execution_async(testset_sample, batch_size)
     evaluation_results, evaluation_results_url = await EvaluationService.run_ragas_evaluation_and_upload_async(testset_sample_with_inference_results)
     return {"dataset": testset_sample, "inference": testset_sample_with_inference_results, "evaluation URL": evaluation_results_url, "evaluation": evaluation_results}
 

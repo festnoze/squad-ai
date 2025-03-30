@@ -1,7 +1,5 @@
 import os
-from ragas import evaluate
-
-# new imports
+import asyncio
 import random
 #
 from langchain_core.runnables import Runnable
@@ -19,6 +17,7 @@ from application.available_service import AvailableService
 from application.studi_public_website_rag_specific_config import StudiPublicWebsiteRagSpecificConfig
 from vector_database_creation.summary_and_questions_chunks_service import SummaryAndQuestionsChunksService
 #
+from ragas import evaluate
 from ragas import EvaluationDataset
 from ragas import evaluate
 from ragas.llms import LangchainLLMWrapper
@@ -51,35 +50,54 @@ class EvaluationService:
         return subset
     
     @staticmethod
-    async def add_to_dataset_retrieved_chunks_and_augmented_generation_from_RAG_inference_execution_async(dataset :list) -> list[dict]:
-        ragas_token = EnvHelper.get_env_variable_value_by_name('RAGAS_APP_TOKEN')
+    async def add_to_dataset_retrieved_chunks_and_augmented_generation_from_RAG_inference_execution_async(dataset: list, batch_size: int = 10) -> list[dict]:
+        ragas_token: str = EnvHelper.get_env_variable_value_by_name('RAGAS_APP_TOKEN')
         os.environ['RAGAS_APP_TOKEN'] = ragas_token
-        
-        metadata_descriptions_for_studi_public_site = MetadataDescriptionHelper.get_metadata_descriptions_for_studi_public_site(AvailableService.out_dir)
-        rag_service: RagService = RagServiceFactory.build_from_env_config()
+
+        metadata_descriptions = MetadataDescriptionHelper.get_metadata_descriptions_for_studi_public_site(AvailableService.out_dir)
+        rag_service = RagServiceFactory.build_from_env_config()
         inference_pipeline = RagInferencePipeline(
-                                rag= rag_service,
-                                default_filters= StudiPublicWebsiteRagSpecificConfig.get_domain_specific_default_filters(),
-                                metadata_descriptions= metadata_descriptions_for_studi_public_site,
-                                tools= None)
-        for data in dataset:
-            query = data['user_input']
+            rag=rag_service,
+            default_filters=StudiPublicWebsiteRagSpecificConfig.get_domain_specific_default_filters(),
+            metadata_descriptions=metadata_descriptions,
+            tools=None
+        )
+        batches: list = [dataset[i:i + batch_size] for i in range(0, len(dataset), batch_size)]
 
-            analysed_query, retrieved_docs = await inference_pipeline.run_pipeline_dynamic_but_augmented_generation_async(
-                query=query,
-                include_bm25_retrieval=True,
-                give_score=True,
-                pipeline_config_file_path = 'studi_com_chatbot_rag_pipeline_default_config_wo_AG_for_streaming.yaml',
-                format_retrieved_docs_function=AvailableService.format_retrieved_docs_function
-            )
-            data['retrieved_contexts'] = [retrieved_doc.page_content for retrieved_doc in retrieved_docs[0]] #TODO: why retrieved_chunks is an array of array?
+        async def get_augmented_generation_full_answer(query: str, retrieved_docs: list, analysed_query: any, rag_service: any, augmented_generation_method) -> str:
+            chunks: list = []
+            async for chunk in augmented_generation_method(
+                    rag_service, query, retrieved_docs, analysed_query, 
+                    function_for_specific_formating_retrieved_docs=AvailableService.format_retrieved_docs_function):
+                chunks.append(chunk)
+            return ''.join(chunks)
 
-            all_chunks_output = []
-            AugmentedGenerationFunction = inference_pipeline.workflow_concrete_classes['RAGAugmentedGeneration'].rag_augmented_answer_generation_streaming_async
-            async for chunk in AugmentedGenerationFunction(rag_service, query, retrieved_docs[0], analysed_query, function_for_specific_formating_retrieved_docs = AvailableService.format_retrieved_docs_function):
-                all_chunks_output.append(chunk)
-
-            data['response'] = ''.join(all_chunks_output)
+        for batch in batches:
+            retrieval_tasks = [
+                asyncio.create_task(
+                    inference_pipeline.run_pipeline_dynamic_but_augmented_generation_async(
+                        query=data['user_input'],
+                        include_bm25_retrieval=True,
+                        give_score=True,
+                        pipeline_config_file_path='studi_com_chatbot_rag_pipeline_default_config_wo_AG_for_streaming.yaml',
+                        format_retrieved_docs_function=AvailableService.format_retrieved_docs_function
+                    )
+                )
+                for data in batch
+            ]
+            retrieval_results = await asyncio.gather(*retrieval_tasks)
+            for data, (analysed_query, retrieved_docs) in zip(batch, retrieval_results):
+                data['retrieved_contexts'] = [doc.page_content for doc in retrieved_docs[0]]
+            augmented_generation_method = inference_pipeline.workflow_concrete_classes['RAGAugmentedGeneration'].rag_augmented_answer_generation_streaming_async
+            generation_tasks = [
+                asyncio.create_task(
+                    get_augmented_generation_full_answer(data['user_input'], retrieved_docs[0], analysed_query, rag_service, augmented_generation_method)
+                )
+                for data, (analysed_query, retrieved_docs) in zip(batch, retrieval_results)
+            ]
+            generation_results = await asyncio.gather(*generation_tasks)
+            for data, response in zip(batch, generation_results):
+                data['response'] = response
 
         return dataset
 
@@ -134,9 +152,28 @@ class EvaluationService:
         evaluation_dataset = EvaluationDataset.from_list(dataset)
         evaluator_llm = LangchainLLMWrapper(EvaluationService.rag_service.llm_1)
 
+        ragas_metrics = [
+
+            # Context-related metrics
+            # LLMContextRecall(): Measures how effectively the language model retrieves and recalls the relevant context from available documents.
+            # ContextPrecision(): Evaluates the exactness of the retrieved context, ensuring that the information closely matches the query needs.
+            # ContextRelevance(): Assesses the overall relevance of the context that was retrieved relative to the query.
+            LLMContextRecall(),
+            ContextPrecision(),
+            ContextRelevance(),
+
+            # Answer-related metrics
+            # Faithfulness(): Checks if the generated answer accurately reflects the information present in the retrieved context without introducing hallucinated content.
+            # FactualCorrectness(): Measures the correctness of the facts in the answer compared to verified or established data.
+            # AnswerAccuracy(): Evaluates the overall correctness and completeness of the final answer.
+            Faithfulness(),
+            FactualCorrectness(),
+            AnswerAccuracy()
+        ]
+
         result = evaluate(
                     dataset=evaluation_dataset,
-                    metrics=[LLMContextRecall(), Faithfulness(), FactualCorrectness(), ContextPrecision()],
+                    metrics=ragas_metrics,
                     llm=evaluator_llm,
                 )
         link = result.upload()
