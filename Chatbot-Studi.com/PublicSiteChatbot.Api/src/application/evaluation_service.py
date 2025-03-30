@@ -29,10 +29,29 @@ from ragas.testset.transforms import default_transforms, apply_transforms
 from ragas.testset import TestsetGenerator
 from ragas.testset.synthesizers import default_query_distribution, SingleHopSpecificQuerySynthesizer, MultiHopAbstractQuerySynthesizer, MultiHopSpecificQuerySynthesizer
 
-class RagasService:    
-    # region Creation of dataset for evaluation
+class EvaluationService:
+    rag_service: RagService = RagServiceFactory.build_from_env_config()
 
-    async def build_a_sample_dataset_from_trainings_objs_file_and_RAG_inference_execution_async(samples_count:int = 10) -> list[dict]:
+    @staticmethod
+    async def create_q_and_a_sample_dataset_from_existing_summary_and_questions_objects_async(samples_count: int = 0, categorize_by_metadata: bool = False, input_objects_file_path:str = './outputs'):
+        trainings_objects = await SummaryAndQuestionsChunksService.build_trainings_objects_with_summaries_and_chunks_by_questions_async(input_objects_file_path, EvaluationService.rag_service.llm_1)
+        
+        # Build the Q&A 'ground truth' dataset
+        dataset = []
+        for training_obj in trainings_objects:
+            for chunk in training_obj.doc_chunks:
+                for question in chunk.questions:
+                    dataset.append({
+                            'user_input': question.text,
+                            'reference': chunk.text,
+                        })
+                    
+        # If samples_count is provided, randomly sample from the dataset
+        subset = random.sample(dataset, samples_count) if samples_count and samples_count > 0 else dataset
+        return subset
+    
+    @staticmethod
+    async def add_to_dataset_retrieved_chunks_and_augmented_generation_from_RAG_inference_execution_async(dataset :list) -> list[dict]:
         ragas_token = EnvHelper.get_env_variable_value_by_name('RAGAS_APP_TOKEN')
         os.environ['RAGAS_APP_TOKEN'] = ragas_token
         
@@ -43,11 +62,7 @@ class RagasService:
                                 default_filters= StudiPublicWebsiteRagSpecificConfig.get_domain_specific_default_filters(),
                                 metadata_descriptions= metadata_descriptions_for_studi_public_site,
                                 tools= None)
-        
-        dataset: list = await RagasService.generate_ground_truth_dataset_from_trainings_objs_file(rag_service.llm_1)
-        subset = random.sample(dataset, samples_count) if samples_count else dataset
-
-        for data in subset:
+        for data in dataset:
             query = data['user_input']
 
             analysed_query, retrieved_docs = await inference_pipeline.run_pipeline_dynamic_but_augmented_generation_async(
@@ -66,9 +81,10 @@ class RagasService:
 
             data['response'] = ''.join(all_chunks_output)
 
-        return subset
+        return dataset
 
-    async def generate_test_dataset_from_documents_langchain_async(docs: list, generator_llm: Runnable = None, generator_embeddings: EmbeddingModel = None, files_path:str = './outputs', samples_count:int = 10):
+    @staticmethod
+    async def generate_test_dataset_from_documents_langchain_async(lc_docs: list, generator_llm: Runnable = None, generator_embeddings: EmbeddingModel = None, samples_count:int = 10):
         from ragas.testset import TestsetGenerator
         #
         rag_service: RagService = RagServiceFactory.build_from_env_config()
@@ -78,22 +94,8 @@ class RagasService:
         generator = TestsetGenerator(llm=generator_llm, embedding_model=generator_embeddings)
 
         # Manually extract a subset out of the documents of the same size
-        docs_sample = random.sample(docs, samples_count) if samples_count else docs
+        docs_sample = random.sample(lc_docs, samples_count) if samples_count else lc_docs
         dataset = generator.generate_with_langchain_docs(docs_sample, testset_size=samples_count)
-        return dataset
-    
-    async def generate_ground_truth_dataset_from_trainings_objs_file(llm, path:str = './outputs'):
-        trainings_objects = await SummaryAndQuestionsChunksService.build_trainings_objects_with_summaries_and_chunks_by_questions_async(path, llm)
-        
-        # Build the ground truth dataset
-        dataset = []
-        for training_obj in trainings_objects:
-            for chunk in training_obj.doc_chunks:
-                for question in chunk.questions:
-                    dataset.append({
-                            'user_input': question.text,
-                            'reference': chunk.text,
-                        })
         return dataset
     
     def generate_or_load_ragas_knowledge_graph_from_documents(docs: list, generator_llm: Runnable, generator_embedding: EmbeddingModel, samples_count:int = 10, saved_knowledge_graph_file_path = './outputs/ragas_kg.json'):
@@ -127,17 +129,15 @@ class RagasService:
         ]
         testset = generator.generate(testset_size=samples_count, query_distribution=query_distribution)
         return testset
-    # endregion
-
-    # region Running RAGAS Evaluation
-    def run_ragas_evaluation(llm_or_chain: Runnable, dataset: list[dict]):
+    
+    async def run_ragas_evaluation_and_upload_async(dataset: list[dict]):
         evaluation_dataset = EvaluationDataset.from_list(dataset)
-        evaluator_llm = LangchainLLMWrapper(llm_or_chain)
+        evaluator_llm = LangchainLLMWrapper(EvaluationService.rag_service.llm_1)
+
         result = evaluate(
                     dataset=evaluation_dataset,
                     metrics=[LLMContextRecall(), Faithfulness(), FactualCorrectness(), ContextPrecision()],
                     llm=evaluator_llm,
                 )
         link = result.upload()
-        return result
-    # endregion
+        return result, link
