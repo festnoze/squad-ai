@@ -1,0 +1,71 @@
+﻿@using Microsoft.AspNetCore.Components
+@using Microsoft.JSInterop
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+@code {
+    private IJSObjectReference? module;
+    private IJSObjectReference? speaker;
+    private bool isInteractive;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isInteractive = JS != null;
+        if (!isInteractive)
+        {
+            return;
+        }
+        module = await JS.InvokeAsync<IJSObjectReference>("import", "./Support/Speaker.razor.js");
+        speaker = await module.InvokeAsync<IJSObjectReference>("start");
+    }
+
+    public async Task EnqueueAsync(byte[]? audioData)
+    {
+        if (isInteractive && speaker is not null && audioData is not null)
+        {
+            try
+            {
+                await speaker.InvokeVoidAsync("enqueue", audioData);
+            }
+            catch (Exception ex)
+            {
+                await DispatchExceptionAsync(ex);
+            }
+        }
+    }
+
+    public async Task ClearPlaybackAsync()
+    {
+        if (isInteractive && speaker is not null)
+        {
+            await speaker.InvokeVoidAsync("clear");
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (isInteractive)
+        {
+            try
+            {
+                if (speaker is not null)
+                {
+                    await speaker.DisposeAsync();
+                }
+                if (module is not null)
+                {
+                    await module.DisposeAsync();
+                }
+            }
+            catch (JSDisconnectedException)
+            {
+                // Not an error
+            }
+        }
+    }
+
+    private Task DispatchExceptionAsync(Exception ex)
+    {
+        // Implement exception handling logic here
+        return Task.CompletedTask;
+    }
+}

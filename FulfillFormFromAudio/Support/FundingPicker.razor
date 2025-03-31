@@ -1,0 +1,33 @@
+﻿@using System.Linq.Expressions
+@using Microsoft.AspNetCore.Components.Forms
+<InputSelect class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500"
+             Value="@Value"
+             ValueChanged="@ValueChanged"
+             ValueExpression="@ValueExpression">
+    <option value=""></option>
+    <option value="@(Funding.CORE_PKL_Contrat_individuel)">CORE_PKL_Contrat_individuel</option>
+    <option value="@(Funding.CORE_PKL_CPF)">CORE_PKL_CPF</option>
+    <option value="@(Funding.CORE_PKL_CPF_abonde)">CORE_PKL_CPF_abonde</option>
+    <option value="@(Funding.STUDI_PKL_CPF_Public)">STUDI_PKL_CPF_Public</option>
+    <option value="@(Funding.CORE_PKL_CPF_de_transition)">CORE_PKL_CPF_de_transition</option>
+    <option value="@(Funding.CORE_PKL_AIF)">CORE_PKL_AIF</option>
+    <option value="@(Funding.CORE_PKL_SAS_Apprentissage)">CORE_PKL_SAS_Apprentissage</option>
+    <option value="@(Funding.CORE_PKL_AO_Pole_emploi)">CORE_PKL_AO_Pole_emploi</option>
+    <option value="@(Funding.CORE_PKL_SAFIR_IDF)">CORE_PKL_SAFIR_IDF</option>
+    <option value="@(Funding.CORE_PKL_FNE_Chomage)">CORE_PKL_FNE_Chomage</option>
+    <option value="@(Funding.CORE_PKL_Contrat_de_professionnalisation)">CORE_PKL_Contrat_de_professionnalisation</option>
+    <option value="@(Funding.CORE_PKL_ProA)">CORE_PKL_ProA</option>
+    <option value="@(Funding.CORE_PKL_Apprentissage)">CORE_PKL_Apprentissage</option>
+    <option value="@(Funding.CORE_PKL_Plan_de_Developpement_des_Competences)">CORE_PKL_Plan_de_Developpement_des_Competences</option>
+    <option value="@(Funding.CORE_PKL_Contrat_de_reclassement)">CORE_PKL_Contrat_de_reclassement</option>
+    <option value="@(Funding.STUDI_PKL_AIRE2)">STUDI_PKL_AIRE2</option>
+    <option value="@(Funding.STUDI_PKL_PRF_IDF)">STUDI_PKL_PRF_IDF</option>
+</InputSelect>
+@code {
+    [Parameter]
+    public Funding? Value { get; set; }
+    [Parameter]
+    public EventCallback<Funding?> ValueChanged { get; set; }
+    [Parameter]
+    public Expression<Func<Funding?>>? ValueExpression { get; set; }
+}

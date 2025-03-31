@@ -16,8 +16,11 @@ structures_descriptions*/
 *.exe
 *.bin
 *.sqlite3
-*.tar.gz
 *.whl
+*.tar.gz
+*.zip
+*.rar
+*.7z
 
 .qodo/
 

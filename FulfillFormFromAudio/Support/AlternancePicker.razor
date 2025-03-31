@@ -1,0 +1,18 @@
+﻿@using System.Linq.Expressions
+@using Microsoft.AspNetCore.Components.Forms
+<InputSelect class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500" 
+             Value="@Value" 
+             ValueChanged="@ValueChanged" 
+             ValueExpression="@ValueExpression">
+    <option value=""></option>
+    <option value="@(Alternance.Oui)">Oui</option>
+    <option value="@(Alternance.Non)">Non</option>
+</InputSelect>
+@code {
+    [Parameter]
+    public Alternance Value { get; set; }
+    [Parameter]
+    public EventCallback<Alternance> ValueChanged { get; set; }
+    [Parameter]
+    public Expression<Func<Alternance>>? ValueExpression { get; set; }
+}

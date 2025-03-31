@@ -1,0 +1,19 @@
+﻿@using System.Linq.Expressions
+@using Microsoft.AspNetCore.Components.Forms
+<InputSelect class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500"
+             Value="@Value"
+             ValueChanged="@ValueChanged"
+             ValueExpression="@ValueExpression">
+    <option value=""></option>
+    <option value="@(CaptureChannel.CORE_PKL_Phone_call)">CORE_PKL_Phone_call</option>
+    <option value="@(CaptureChannel.CORE_PKL_Application_Online)">CORE_PKL_Application_Online</option>
+    <option value="@(CaptureChannel.CORE_PKL_Web_form)">CORE_PKL_Web_form</option>
+</InputSelect>
+@code {
+    [Parameter]
+    public CaptureChannel? Value { get; set; }
+    [Parameter]
+    public EventCallback<CaptureChannel?> ValueChanged { get; set; }
+    [Parameter]
+    public Expression<Func<CaptureChannel?>>? ValueExpression { get; set; }
+}

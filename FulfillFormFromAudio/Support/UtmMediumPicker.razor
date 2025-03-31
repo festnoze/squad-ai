@@ -1,0 +1,44 @@
+﻿@using System.Linq.Expressions
+@using Microsoft.AspNetCore.Components.Forms
+<InputSelect class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500"
+             Value="@Value"
+             ValueChanged="@ValueChanged"
+             ValueExpression="@ValueExpression">
+    <option value=""></option>
+    <option value="@(UtmMedium.CORE_PKL_Directory)">Annuaire</option>
+    <option value="@(UtmMedium.CORE_PKL_Bot)">Bot</option>
+    <option value="@(UtmMedium.CORE_PKL_Cpc)">CPC</option>
+    <option value="@(UtmMedium.CORE_PKL_Display)">Affichage</option>
+    <option value="@(UtmMedium.CORE_PKL_Email)">Email</option>
+    <option value="@(UtmMedium.CORE_PKL_PDF)">PDF</option>
+    <option value="@(UtmMedium.CORE_PKL_Organic)">Biologique</option>
+    <option value="@(UtmMedium.CORE_PKL_PT)">Partenariat (PT)</option>
+    <option value="@(UtmMedium.CORE_PKL_Referral)">Référence</option>
+    <option value="@(UtmMedium.CORE_PKL_Site)">Sites Gge</option>
+    <option value="@(UtmMedium.CORE_PKL_Smo)">SMO</option>
+    <option value="@(UtmMedium.CORE_PKL_Sms)">SMS</option>
+    <option value="@(UtmMedium.CORE_PKL_None)">Aucun</option>
+    <option value="@(UtmMedium.CORE_PKL_Affiliate)">Affilié</option>
+    <option value="@(UtmMedium.CORE_PKL_Print)">Imprimer</option>
+    <option value="@(UtmMedium.CORE_PKL_Unknown)">Inconnu</option>
+    <option value="@(UtmMedium.CORE_PKL_Remarketing)">Remarketing</option>
+    <option value="@(UtmMedium.CORE_PKL_SMA)">SMA</option>
+    <option value="@(UtmMedium.IT_PKL_AutoreplyLinks)">AutoreplyLinks</option>
+    <option value="@(UtmMedium.IT_PKL_Fair)">Fair</option>
+    <option value="@(UtmMedium.IT_PKL_ADVBA)">ADVBA</option>
+    <option value="@(UtmMedium.IT_PKL_SchoolForum)">SchoolForum</option>
+    <option value="@(UtmMedium.IT_PKL_internalEmail)">InternalEmail</option>
+    <option value="@(UtmMedium.CORE_PKL_SEA)">SEA</option>
+    <option value="@(UtmMedium.CORE_PKL_Perfmax)">Perf Max</option>
+    <option value="@(UtmMedium.CORE_PKL_Video)">Vidéo</option>
+    <option value="@(UtmMedium.STUDI_PKL_Import)">Import</option>
+    <option value="@(UtmMedium.STUDI_PKL_Whatsapp)">Whatsapp</option>
+</InputSelect>
+@code {
+    [Parameter]
+    public UtmMedium Value { get; set; }
+    [Parameter]
+    public EventCallback<UtmMedium> ValueChanged { get; set; }
+    [Parameter]
+    public Expression<Func<UtmMedium>>? ValueExpression { get; set; }
+}

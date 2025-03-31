@@ -1,0 +1,20 @@
+﻿@using System.Linq.Expressions
+@using Microsoft.AspNetCore.Components.Forms
+<InputSelect class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500"
+             Value="@Value"
+             ValueChanged="@ValueChanged"
+             ValueExpression="@ValueExpression">
+    <option value=""></option>
+    <option value="@(Gender.M)">Monsieur</option>
+    <option value="@(Gender.Mme)">Madame</option>
+    <option value="@(Gender.Dr)">docteur</option>
+    <option value="@(Gender.Autre)">Autre</option>
+</InputSelect>
+@code {
+    [Parameter]
+    public Gender? Value { get; set; }
+    [Parameter]
+    public EventCallback<Gender?> ValueChanged { get; set; }
+    [Parameter]
+    public Expression<Func<Gender?>>? ValueExpression { get; set; }
+}

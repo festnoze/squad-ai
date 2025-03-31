@@ -1,0 +1,6 @@
+.tailwind/
+wwwroot/*.out.css
+*.csproj.user
+bin/
+obj/
+.vs/

@@ -1,0 +1,25 @@
+﻿@using System.Linq.Expressions
+@using Microsoft.AspNetCore.Components.Forms
+<InputSelect class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500"
+             Value="@Value"
+             ValueChanged="@ValueChanged"
+             ValueExpression="@ValueExpression">
+    <option value=""></option>
+    <option value="@(FormArea.CORE_PKL_Bottom_of_page)">CORE_PKL_Bottom_of_page</option>
+    <option value="@(FormArea.CORE_PKL_Thank_you_page)">CORE_PKL_Thank_you_page</option>
+    <option value="@(FormArea.CORE_PKL_Content)">CORE_PKL_Content</option>
+    <option value="@(FormArea.CORE_PKL_Embeded)">CORE_PKL_Embeded</option>
+    <option value="@(FormArea.CORE_PKL_Footer)">CORE_PKL_Footer</option>
+    <option value="@(FormArea.CORE_PKL_Header)">CORE_PKL_Header</option>
+    <option value="@(FormArea.CORE_PKL_Interstitial)">CORE_PKL_Interstitial</option>
+    <option value="@(FormArea.CORE_PKL_Page)">CORE_PKL_Page</option>
+    <option value="@(FormArea.CORE_PKL_Sidebar)">CORE_PKL_Sidebar</option>
+</InputSelect>
+@code {
+    [Parameter]
+    public FormArea? Value { get; set; }
+    [Parameter]
+    public EventCallback<FormArea?> ValueChanged { get; set; }
+    [Parameter]
+    public Expression<Func<FormArea?>>? ValueExpression { get; set; }
+}

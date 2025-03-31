@@ -1,0 +1,35 @@
+﻿@using System.Linq.Expressions
+@using Microsoft.AspNetCore.Components.Forms
+<InputSelect class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500"
+             Value="@Value"
+             ValueChanged="@ValueChanged"
+             ValueExpression="@ValueExpression">
+    <option value=""></option>
+    <option value="@(FormType.CORE_PKL_Online_Shop)">CORE_PKL_Online_Shop</option>
+    <option value="@(FormType.CORE_PKL_Application_file)">CORE_PKL_Application_file</option>
+    <option value="@(FormType.CORE_PKL_Application_online)">CORE_PKL_Application_online</option>
+    <option value="@(FormType.CORE_PKL_Examination)">CORE_PKL_Examination</option>
+    <option value="@(FormType.CORE_PKL_Contact)">CORE_PKL_Contact</option>
+    <option value="@(FormType.CORE_PKL_Booking_appointment)">CORE_PKL_Booking_appointment</option>
+    <option value="@(FormType.CORE_PKL_Preparation_Day_Mock_Competition)">CORE_PKL_Preparation_Day_Mock_Competition</option>
+    <option value="@(FormType.CORE_PKL_Funding)">CORE_PKL_Funding</option>
+    <option value="@(FormType.CORE_PKL_Registration)">CORE_PKL_Registration</option>
+    <option value="@(FormType.CORE_PKL_Open_day)">CORE_PKL_Open_day</option>
+    <option value="@(FormType.CORE_PKL_Call_back)">CORE_PKL_Call_back</option>
+    <option value="@(FormType.CORE_PKL_Fairs)">CORE_PKL_Fairs</option>
+    <option value="@(FormType.CORE_PKL_Admission_session)">CORE_PKL_Admission_session</option>
+    <option value="@(FormType.CORE_PKL_Surqualification)">CORE_PKL_Surqualification</option>
+    <option value="@(FormType.CORE_PKL_Virtual_open_day)">CORE_PKL_Virtual_open_day</option>
+    <option value="@(FormType.CORE_PKL_Webinar)">CORE_PKL_Webinar</option>
+    <option value="@(FormType.CORE_PKL_Scholarship)">CORE_PKL_Scholarship</option>
+    <option value="@(FormType.CORE_PKL_Trial_Period)">CORE_PKL_Trial_Period</option>
+    <option value="@(FormType.CORE_PKL_Sponsorship)">CORE_PKL_Sponsorship</option>
+</InputSelect>
+@code {
+    [Parameter]
+    public FormType? Value { get; set; }
+    [Parameter]
+    public EventCallback<FormType?> ValueChanged { get; set; }
+    [Parameter]
+    public Expression<Func<FormType?>>? ValueExpression { get; set; }
+}
