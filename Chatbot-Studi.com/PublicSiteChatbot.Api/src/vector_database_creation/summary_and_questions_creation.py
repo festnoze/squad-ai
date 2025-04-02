@@ -12,7 +12,7 @@ from common_tools.helpers.llm_helper import Llm
 from common_tools.models.doc_w_summary_chunks_questions import Question, DocChunk, DocWithSummaryChunksAndQuestions, DocWithSummaryChunksAndQuestionsPydantic, DocQuestionsByChunkPydantic
 from common_tools.helpers.ressource_helper import Ressource
 
-from common_tools.rag.rag_service import RagService
+from common_tools.RAG.rag_service import RagService
 
 class SummaryAndQuestionsChunksCreation:
 

@@ -22,12 +22,12 @@ from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.execute_helper import Execute
 from common_tools.helpers.llm_helper import Llm
 from common_tools.models.question_rewritting import QuestionRewritting, QuestionRewrittingPydantic
-from common_tools.rag.rag_service import RagService
-from common_tools.rag.rag_service_factory import RagServiceFactory
-from common_tools.rag.rag_inference_pipeline.rag_pre_treatment_tasks import RAGPreTreatment
-from common_tools.rag.rag_ingestion_pipeline.rag_chunking import RagChunking
-from common_tools.rag.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
-from common_tools.rag.rag_inference_pipeline.rag_augmented_generation_tasks import RAGAugmentedGeneration
+from common_tools.RAG.rag_service import RagService
+from common_tools.RAG.rag_service_factory import RagServiceFactory
+from common_tools.RAG.rag_inference_pipeline.rag_pre_treatment_tasks import RAGPreTreatment
+from common_tools.RAG.rag_ingestion_pipeline.rag_chunking import RagChunking
+from common_tools.RAG.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
+from common_tools.RAG.rag_inference_pipeline.rag_augmented_generation_tasks import RAGAugmentedGeneration
 from common_tools.helpers.ressource_helper import Ressource
 from common_tools.models.conversation import Conversation, Message, User
 from common_tools.models.device_info import DeviceInfo
@@ -85,7 +85,7 @@ class AvailableService:
 
     def chunk_docs_and_add_to_vector_db(all_docs, load_embeddings_from_file_if_exists = True):
         txt.print_with_spinner("Chunking documents...")
-        from common_tools.rag.rag_ingestion_pipeline.rag_ingestion_pipeline import RagIngestionPipeline
+        from common_tools.RAG.rag_ingestion_pipeline.rag_ingestion_pipeline import RagIngestionPipeline
         injection_pipeline = RagIngestionPipeline(AvailableService.rag_service)
         documents_chunks = injection_pipeline.chunk_documents(documents= all_docs)
         

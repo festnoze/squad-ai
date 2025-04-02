@@ -5,8 +5,8 @@ from fastapi import APIRouter, HTTPException
 from application.available_service import AvailableService
 from src.infrastructure.user_repository import UserRepository
 from application.service_exceptions import QuotaOverloadException
-from common_tools.rag.rag_service import RagService
-from common_tools.rag.rag_service_factory import RagServiceFactory
+from common_tools.RAG.rag_service import RagService
+from common_tools.RAG.rag_service_factory import RagServiceFactory
 from facade.request_models.conversation_request_model import ConversationRequestModel
 from fastapi.responses import JSONResponse, StreamingResponse, Response
 

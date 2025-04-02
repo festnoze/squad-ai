@@ -11,6 +11,7 @@ from src.database_conversations.conversation_converters import ConversationConve
 from src.database_conversations.entities import UserEntity, DeviceInfoEntity
 from src.infrastructure.user_repository import UserRepository
 #
+from common_tools.helpers.txt_helper import txt
 from common_tools.models.user import User
 from common_tools.models.device_info import DeviceInfo
 
@@ -18,6 +19,7 @@ class TestUserRepository:
     db_path_or_url:str = "tests/infrastructure/conversations_test.db"
 
     def setup_method(self):
+        txt.activate_print = True
         self.sample_device_info = DeviceInfo(ip="1.2.3.4", user_agent="Mozilla/5.0", platform="Windows", app_version="1.0", os="Windows", browser="Chrome", is_mobile=False)
         self.sample_user = User(id= uuid4(), name= "First User", device_info= self.sample_device_info)
         self.user_repository = UserRepository(db_path_or_url=self.db_path_or_url)
