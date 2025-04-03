@@ -12,6 +12,7 @@ from common_tools.helpers.file_helper import file
 
 
 # internal import
+from common_tools.models.user import User
 from common_tools.models.conversation import Conversation
 from common_tools.models.message import Message
 from langchains.langchain_adapter_generic import LangChainAdapter
@@ -63,7 +64,8 @@ class Orchestrator:
     async def do_metier_pm_exchanges_async(self, initial_request: str) -> Conversation:
         initial_request_instruction = f"Le besoin fonctionnel central et but à atteindre est : '{initial_request}'."
         business_answer = initial_request_instruction
-        conversation = Conversation()
+        user = User("default user")
+        conversation = Conversation(user)
         conversation.add_new_message(Orchestrator.business_role, initial_request_instruction, 0)
         counter = 0        
 
@@ -87,7 +89,7 @@ class Orchestrator:
             pm_answer_message = await self.langchain.ask_llm_new_pm_business_message_streamed_to_front_async(
                     user_role= Orchestrator.pm_role,
                     conversation= conversation,
-                    instructions= [self.pm_instructions, initial_request_instruction]
+                    instructions= [self.pm_instructions]
             )
 
             # If PM has no more questions, ask business if they still want to add other points

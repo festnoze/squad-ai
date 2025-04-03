@@ -1,1 +1,2 @@
--e C:/Dev/IA/CommonTools # local package to common internal tooling
+-e C:/Dev/IA/CommonTools # local package with all internal tooling
+-r requirements_common.txt

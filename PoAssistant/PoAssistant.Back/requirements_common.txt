@@ -1,0 +1,12 @@
+# pytest
+# pytest-asyncio
+# numpy
+# ragas
+# requests
+# BeautifulSoup4
+# selenium
+# sqlalchemy
+# aiosqlite
+# dependency-injector
+# fastapi
+# uvicorn

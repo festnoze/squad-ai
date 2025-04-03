@@ -57,7 +57,7 @@ class LangChainAdapter():
         exchanges = conversation.to_langchain_messages(user_role, instructions)            
         start_time = time.time()
         content_chunks = []
-        content_stream = Llm.invoke_as_async_stream(llm_or_chain=self.llm, input= exchanges, display_console= True, content_chunks= content_chunks)
+        content_stream = Llm.invoke_as_async_stream('ask_pm_business_message', llm_or_chain=self.llm, input= exchanges, display_console= True, content_chunks= content_chunks, does_stream_across_http= True)
         await front_client.post_new_metier_or_pm_answer_as_stream(content_stream)
         end_time = time.time()
         elapsed = misc.get_elapsed_time_seconds(start_time, end_time)
