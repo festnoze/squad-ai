@@ -78,7 +78,8 @@ class front_client:
 
     async def post_new_metier_or_pm_answer_as_stream(content_stream: AsyncGenerator[bytes, None]):
         url = f"{front_client.host_uri}/{front_client.frontend_proxy_subpath}/{front_client.new_metier_pm_message_url_post}/stream"  
-        async with httpx.AsyncClient() as http_client:            
+        timeout = httpx.Timeout(180.0)  # Set read timeout to 180 seconds
+        async with httpx.AsyncClient(timeout=timeout) as http_client:           
             headers = {"Content-Type": "application/octet-stream"}
             # Stream the data to the API endpoint
             response = await http_client.post(url, content=content_stream, headers=headers)

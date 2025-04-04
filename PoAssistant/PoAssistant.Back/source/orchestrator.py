@@ -33,14 +33,18 @@ class Orchestrator:
 
     async def perform_workflow_async(self):  
         self.delete_all_outputs()        
-        print("Waiting for front-end connection establishment .....")
+        print("\nWaiting for front-end connection establishment .....")
         front_client.ping_front_until_responding()
         front_client.delete_all_metier_po_thread()
         print("Communication with front-end established!!!")
 
-        # Load roles instructions
+        # Load predefined instructions by roles
+        technical_stack = ".NET Core, Angular et SQL Server"
+        domain_description = "l'éducation et la formation en ligne"
+        target_software =  "il s'agit d'un site web et d'applis mobiles existantes, c'est un LMS (Learning Managment System) permettant aux apprenants de faire toutes les actions liées à leur apprentissage."
+        
+        self.pm_instructions = file.get_as_str("pm_assistant_instructions.txt").format(max_exchanges_count= self.max_exchanges_count, technical_stack= technical_stack, domain_description= domain_description, target_software= target_software)
         self.business_instructions= file.get_as_str("business_expert_assistant_instructions.txt")
-        self.pm_instructions = file.get_as_str("pm_assistant_instructions.txt").format(max_exchanges_count= self.max_exchanges_count)
         self.po_instructions= file.get_as_str("po_us_assistant_instructions.txt")
         self.qa_instructions= file.get_as_str("qa_assistant_instructions.txt")
         
@@ -49,7 +53,7 @@ class Orchestrator:
         request_message = front_client.wait_need_expression_creation_and_get()
         print(f"Description initiale de l'objectif : {request_message}")
 
-        conversation = await self.do_metier_pm_exchanges_async(request_message)
+        conversation = await self.loop_on_metier_pm_exchanges_async(request_message)
         self.save_metier_pm_exchanges(conversation)
     
         us_contents = self.create_po_us_and_usecases(conversation)
@@ -61,7 +65,7 @@ class Orchestrator:
         self.save_qa_acceptance_tests(threads_ids)
 
 
-    async def do_metier_pm_exchanges_async(self, initial_request: str) -> Conversation:
+    async def loop_on_metier_pm_exchanges_async(self, initial_request: str) -> Conversation:
         initial_request_instruction = f"Le besoin fonctionnel central et but à atteindre est : '{initial_request}'."
         business_answer = initial_request_instruction
         user = User("default user")
