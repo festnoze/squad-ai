@@ -48,22 +48,34 @@ class EvaluationService:
         EvaluationService._inference_pipeline = inference_pipeline
 
     @staticmethod
-    async def create_q_and_a_sample_dataset_from_existing_summary_and_questions_objects_async(samples_count: int = 0, categorize_by_metadata: bool = False, input_objects_file_path:str = './outputs'):
+    async def create_q_and_a_sample_dataset_from_existing_summary_and_questions_objects_async(samples_count_by_metadata: int = 0, input_objects_file_path:str = './outputs'):        
         trainings_objects = await SummaryAndQuestionsChunksService.build_trainings_objects_with_summaries_and_chunks_by_questions_async(input_objects_file_path, EvaluationService._rag_service.llm_1)
         
-        # Build the Q&A 'ground truth' dataset
+        # Build the full Q&A dataset
         dataset = []
+        all_categories = set()
         for training_obj in trainings_objects:
+            all_categories.add(training_obj.metadata['training_info_type'])
             for chunk in training_obj.doc_chunks:
                 for question in chunk.questions:
-                    dataset.append({
-                            'user_input': question.text,
-                            'reference': chunk.text,
-                        })
-                    
-        # If samples_count is provided, randomly sample from the dataset
-        subset = random.sample(dataset, samples_count) if samples_count and samples_count > 0 else dataset
-        return subset
+                        dataset.append({
+                                'training_name': training_obj.metadata['name'],
+                                'category': training_obj.metadata['training_info_type'],
+                                'domain': training_obj.metadata['domain_name'],
+                                'sub_domain': training_obj.metadata['sub_domain_name'] if 'sub_domain_name' in training_obj.metadata else '',
+                                'user_input': question.text,
+                                'reference': chunk.text,
+                            })
+
+        if samples_count_by_metadata <= 0:
+            return dataset
+        
+        samples_dataset = []
+        for category in all_categories:
+            filtered_dataset = [item for item in dataset if item['category'] == category]
+            sampled_items = random.sample(filtered_dataset, min(samples_count_by_metadata, len(filtered_dataset)))
+            samples_dataset.extend(sampled_items)
+        return samples_dataset
     
     @staticmethod
     async def add_to_dataset_retrieved_chunks_and_augmented_generation_from_RAG_inference_execution_async(dataset: list, batch_size: int = 10) -> list[dict]:

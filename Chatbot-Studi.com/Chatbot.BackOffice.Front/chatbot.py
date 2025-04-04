@@ -71,7 +71,8 @@ class ChatbotFront:
             st.divider()
             
             st.subheader("💫 Evaluation du pipeline d'inference")
-            st.button('✨ Générer RAGAS Ground Truth dataset',      on_click=lambda: st.session_state.api_client.generate_ground_truth())
+            st.button('🧪 Générer dataset Questions & Réponses', on_click=lambda: st.session_state.api_client.create_QA_dataset())
+            st.button('✨ Générer RAGAS Ground Truth dataset', on_click=lambda: st.session_state.api_client.generate_ground_truth())
 
         for msg in st.session_state.messages:
             st.chat_message(msg['role']).write(msg['content'])

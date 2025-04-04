@@ -15,9 +15,9 @@ evaluation_router = APIRouter(prefix="/rag/evaluation", tags=["Evaluation"])
 output_path:str = './outputs'
 
 @evaluation_router.post("/create-ground-truth-dataset-run-inference-and-evaluate")
-async def create_q_and_a_dataset_then_run_inference_then_evaluate(sample_count: int = 20, categorize_by_metadata: bool = False, batch_size: int = 20) -> Dict[str, Any]:
+async def create_q_and_a_dataset_then_run_inference_then_evaluate(samples_count_by_metadata: int = 20, batch_size: int = 20) -> Dict[str, Any]:
     
-    testset_sample =                             await EvaluationService.create_q_and_a_sample_dataset_from_existing_summary_and_questions_objects_async(sample_count, categorize_by_metadata)
+    testset_sample =                             await EvaluationService.create_q_and_a_sample_dataset_from_existing_summary_and_questions_objects_async(samples_count_by_metadata)
     start_inference = time.time()
     testset_sample_with_inference_results =      await EvaluationService.add_to_dataset_retrieved_chunks_and_augmented_generation_from_RAG_inference_execution_async(testset_sample, batch_size)
     end_inference = time.time()
@@ -31,12 +31,17 @@ async def create_q_and_a_dataset_then_run_inference_then_evaluate(sample_count: 
     return {"dataset": testset_sample, "inference": testset_sample_with_inference_results, "evaluation URL": evaluation_results_url, "evaluation": evaluation_results}
 
 @evaluation_router.post("/create-QA-dataset")
-async def create_q_and_a_dataset_from_existing_summary_and_questions_objects_async(number_of_items: int = 5, categorize_by_metadata: bool = False, output_file: str = None) -> Dict[str, Any]:
-    result = await EvaluationService.create_q_and_a_sample_dataset_from_existing_summary_and_questions_objects_async(number_of_items, categorize_by_metadata, output_file)
+async def create_q_and_a_dataset_from_existing_summary_and_questions_objects_async(samples_count_by_metadata: int = 10, output_file: str = None) -> Dict[str, Any]:
+    result = await EvaluationService.create_q_and_a_sample_dataset_from_existing_summary_and_questions_objects_async(samples_count_by_metadata, './outputs')
     
     if output_file:
+        import pandas as pd
         file.write_file(result, os.path.join(output_path, output_file))
-    return result
+        # Transform the array of dicts into a CSV file using pandas
+        df = pd.DataFrame(result)  # Convert the list of dictionaries to a DataFrame
+        csv_file_path = os.path.join(output_path, output_file.replace('.json', '.csv'))
+        df.to_csv(csv_file_path, index=False, sep=';')  # Save the DataFrame as a CSV file
+    return result[:10]  # Return only the first 10 items for brevity
 
 @evaluation_router.post("/run-inference")
 async def run_questions_dataset_through_rag_inference_pipeline_and_save_async(input_file: str = "QA-dataset.json", output_file: str = None) -> Dict[str, Any]:

@@ -2,9 +2,12 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "Clear Terminal",
+            "label": "open docs",
             "type": "shell",
-            "command": "cls",
+            "command": "start http://localhost:8281/docs",
+            "windows": {
+                "command": "start http://localhost:8281/docs"
+            },
             "problemMatcher": []
         }
     ]

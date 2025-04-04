@@ -20,7 +20,7 @@
                 "PYTHONPATH": "C:/Dev/IA/CommonTools;${workspaceFolder}/src"
             },
             "console": "integratedTerminal",
-            //"preLaunchTask": "Clear Terminal"
+            //"preLaunchTask": "open docs"
         }
     ]
 }

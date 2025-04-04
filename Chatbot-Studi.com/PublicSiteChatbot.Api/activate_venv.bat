@@ -1,1 +1,1 @@
-start  senv\Scripts\activate
+start senv\Scripts\activate

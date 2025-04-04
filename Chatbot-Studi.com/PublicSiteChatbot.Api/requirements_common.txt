@@ -10,3 +10,5 @@ aiosqlite
 dependency-injector
 fastapi
 uvicorn
+streamlit
+pandas

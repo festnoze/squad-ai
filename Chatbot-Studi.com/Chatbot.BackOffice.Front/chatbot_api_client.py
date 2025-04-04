@@ -26,6 +26,20 @@ class ChatbotApiClient:
     def generate_ground_truth(self) -> None:
         requests.post(f"{self.evaluation_prefix}/groundtruth/generate")
 
+    def create_QA_dataset(self, samples_count_by_metadata: int = 10, output_file: str = "QA_dataset.json") -> requests.Response:
+        params: Dict[str, any] = {"samples_count_by_metadata": samples_count_by_metadata}
+        if output_file is not None: params["output_file"] = output_file
+        return requests.post(f"{self.evaluation_prefix}/create-QA-dataset", params=params)
+        
+    def run_inference(self, input_file: str = "QA-dataset.json", output_file: str = None) -> requests.Response:
+        params: Dict[str, any] = {"input_file": input_file}
+        if output_file is not None: params["output_file"] = output_file
+        return requests.post(f"{self.evaluation_prefix}/run-inference", params=params)
+
+    def evaluate(self, input_file: str = "inference.json") -> requests.Response:
+        params: Dict[str, any] = {"input_file": input_file}
+        return requests.post(f"{self.evaluation_prefix}/evaluate", params=params)
+
     ### Inference endpoints ###
     def re_init_api(self):
         resp = requests.post( f"{self.inference_prefix}/reinitialize")
