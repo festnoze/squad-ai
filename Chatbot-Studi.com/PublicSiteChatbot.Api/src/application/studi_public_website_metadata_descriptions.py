@@ -70,15 +70,15 @@ class MetadataDescriptionHelper:
                         {and_operator_not_allowed}"""),
                     possible_values= diplomes_names, 
                     type='str'),
-                MetadataDescription(
-                    name='name', 
-                    description=f"""\
-                        Le nom du document. 
-                        Par exemple, en conjonction avec le filtre : type = 'formation', il s'agira du nom de la formation.
-                        Ce filtre est à utiliser lorsque l'on cherche un élément nommé explicitement (s'applique pour 'type' = ['formation', 'métier']).
-                        Ce filtre est utilisable avec n'importe quelle valeur, même partielle ou approximative (car l'élément sémantiquement le plus proche sera alors recherché).""",
-                        possible_values=  trainings_names,
-                        type='str'),
+                # MetadataDescription(
+                #     name='name', 
+                #     description=f"""\
+                #         Le nom du document. 
+                #         Par exemple, en conjonction avec le filtre : type = 'formation', il s'agira du nom de la formation.
+                #         Ce filtre est à utiliser lorsque l'on cherche un élément nommé explicitement (s'applique pour 'type' = ['formation', 'métier']).
+                #         Ce filtre est utilisable avec n'importe quelle valeur, même partielle ou approximative (car l'élément sémantiquement le plus proche sera alors recherché).""",
+                #         possible_values=  trainings_names,
+                #         type='str'),
 
                 # MetadataDescription(name='changed', description="La date du document", type='str'),
                 # MetadataDescription(name='url', description="l'URL vers la page web de l'élément recherché. Ne s'applique que pour les types suivants : formation.", type='str'),

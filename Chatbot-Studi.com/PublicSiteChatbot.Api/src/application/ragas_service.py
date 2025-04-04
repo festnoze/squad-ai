@@ -6,6 +6,7 @@ import random
 #
 from langchain_core.runnables import Runnable
 #
+from application.retrieved_docs_formating_service import RetrievedDocsService
 from common_tools.helpers.llm_helper import Llm
 from common_tools.models.embedding_model import EmbeddingModel
 from common_tools.helpers.env_helper import EnvHelper
@@ -55,13 +56,13 @@ class RagasService:
                 include_bm25_retrieval=True,
                 give_score=True,
                 pipeline_config_file_path = 'studi_com_chatbot_rag_pipeline_default_config_wo_AG_for_streaming.yaml',
-                format_retrieved_docs_function=AvailableService.format_retrieved_docs_function
+                format_retrieved_docs_function=RetrievedDocsService.format_retrieved_docs_function
             )
             data['retrieved_contexts'] = [retrieved_doc.page_content for retrieved_doc in retrieved_docs[0]] #TODO: why retrieved_chunks is an array of array?
 
             all_chunks_output = []
             AugmentedGenerationFunction = inference_pipeline.workflow_concrete_classes['RAGAugmentedGeneration'].rag_augmented_answer_generation_streaming_async
-            async for chunk in AugmentedGenerationFunction(rag_service, query, retrieved_docs[0], analysed_query, function_for_specific_formating_retrieved_docs = AvailableService.format_retrieved_docs_function):
+            async for chunk in AugmentedGenerationFunction(rag_service, query, retrieved_docs[0], analysed_query, function_for_specific_formating_retrieved_docs = RetrievedDocsService.format_retrieved_docs_function):
                 all_chunks_output.append(chunk)
 
             data['response'] = ''.join(all_chunks_output)

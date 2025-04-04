@@ -8,6 +8,8 @@ from dotenv import load_dotenv
 from langchain_core.runnables import Runnable, RunnablePassthrough
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.docstore.document import Document
+from application.evaluation_service import EvaluationService
+from application.retrieved_docs_formating_service import RetrievedDocsService
 from application.service_exceptions import QuotaOverloadException
 from application.studi_public_website_rag_specific_config import StudiPublicWebsiteRagSpecificConfig
 from data_retrieval.drupal_data_retrieval import DrupalDataRetrieval
@@ -37,7 +39,7 @@ from common_tools.helpers.env_helper import EnvHelper
 from common_tools.langchains.langchain_factory import LangChainFactory
 
 class AvailableService:
-    inference: RagInferencePipeline = None
+    inference_pipeline: RagInferencePipeline = None
     rag_service: RagService = None
     max_conversations_by_day = 10
     max_messages_by_conversation = 10
@@ -53,16 +55,16 @@ class AvailableService:
         if not AvailableService.rag_service:
             AvailableService.rag_service = RagServiceFactory.build_from_env_config(vector_db_base_path=None)
 
-        if not AvailableService.inference:
-            default_filters = {}
+        if not AvailableService.inference_pipeline:
             metadata_descriptions_for_studi_public_site = MetadataDescriptionHelper.get_metadata_descriptions_for_studi_public_site(AvailableService.out_dir)
             RAGAugmentedGeneration.augmented_generation_prompt = Ressource.get_rag_augmented_generation_prompt_on_studi()
             RAGPreTreatment.domain_specific_metadata_filters_validation_and_correction_async_method = StudiPublicWebsiteRagSpecificConfig.get_domain_specific_metadata_filters_validation_and_correction_async_method
-            AvailableService.inference = RagInferencePipeline(rag= AvailableService.rag_service, default_filters= StudiPublicWebsiteRagSpecificConfig.get_domain_specific_default_filters(), metadata_descriptions= metadata_descriptions_for_studi_public_site, tools= None)
-            
+            AvailableService.inference_pipeline = RagInferencePipeline(rag= AvailableService.rag_service, default_filters= StudiPublicWebsiteRagSpecificConfig.get_domain_specific_default_filters(), metadata_descriptions= metadata_descriptions_for_studi_public_site, tools= None)
+            EvaluationService.init_existing_services(AvailableService.rag_service, AvailableService.inference_pipeline)
+
     def re_init():
         AvailableService.rag_service = None
-        AvailableService.inference = None
+        AvailableService.inference_pipeline = None
         AvailableService.init(txt.activate_print)
 
     def retrieve_all_data():
@@ -233,12 +235,12 @@ class AvailableService:
             async for chunk in Llm.write_static_text_as_stream(AvailableService.waiting_message):
                 yield chunk
         try:
-            analysed_query, retrieved_chunks = await AvailableService.inference.run_pipeline_dynamic_but_augmented_generation_async(
+            analysed_query, retrieved_chunks = await AvailableService.inference_pipeline.run_pipeline_dynamic_but_augmented_generation_async(
                                                                     conversation_history, 
                                                                     include_bm25_retrieval= True,
                                                                     give_score=True, 
                                                                     pipeline_config_file_path = 'studi_com_chatbot_rag_pipeline_default_config_wo_AG_for_streaming.yaml', 
-                                                                    format_retrieved_docs_function = AvailableService.format_retrieved_docs_function)
+                                                                    format_retrieved_docs_function = RetrievedDocsService.format_retrieved_docs_function)
             pipeline_succeeded = True
         except EndWorkflowException as ex:                        
             pipeline_succeeded = False
@@ -266,7 +268,7 @@ class AvailableService:
                 analysed_query, 
                 is_stream_decoded,
                 all_chunks_output,
-                AvailableService.format_retrieved_docs_function):
+                RetrievedDocsService.format_retrieved_docs_function):
             yield chunk
 
     async def rag_query_dynamic_pipeline_streaming_async(conversation_history: Conversation, all_chunks_output = [], decoded_stream = False):
@@ -274,12 +276,12 @@ class AvailableService:
             raise ValueError("Conversation history should end with a user message")
         txt.print_with_spinner("Executing inference pipeline...")
         
-        async for stream_chunk in AvailableService.inference.run_pipeline_dynamic_streaming_async(
+        async for stream_chunk in AvailableService.inference_pipeline.run_pipeline_dynamic_streaming_async(
             query=conversation_history,
             include_bm25_retrieval=True,
             give_score=True,
             pipeline_config_file_path = 'studi_com_chatbot_rag_pipeline_default_config_wo_AG_for_streaming.yaml',
-            format_retrieved_docs_function=AvailableService.format_retrieved_docs_function,
+            format_retrieved_docs_function=RetrievedDocsService.format_retrieved_docs_function,
             all_chunks_output=all_chunks_output
         ):
             if decoded_stream:
@@ -296,9 +298,9 @@ class AvailableService:
         
         pipeline_method = None
         if use_dynamic_pipeline:
-            pipeline_method = AvailableService.inference.run_pipeline_dynamic_streaming_async
+            pipeline_method = AvailableService.inference_pipeline.run_pipeline_dynamic_streaming_async
         else:
-            pipeline_method = AvailableService.inference.run_pipeline_static_streaming_async
+            pipeline_method = AvailableService.inference_pipeline.run_pipeline_static_streaming_async
 
         for stream_chunk in Execute.async_generator_wrapper_to_sync(
             pipeline_method,
@@ -306,7 +308,7 @@ class AvailableService:
             include_bm25_retrieval=True,
             give_score=True,
             pipeline_config_file_path = 'studi_com_chatbot_rag_pipeline_default_config_wo_AG_for_streaming.yaml',
-            format_retrieved_docs_function=AvailableService.format_retrieved_docs_function,
+            format_retrieved_docs_function=RetrievedDocsService.format_retrieved_docs_function,
             all_chunks_output=all_chunks_output
         ):
             if not special_streaming_chars:
@@ -319,9 +321,9 @@ class AvailableService:
     def rag_query_full_pipeline_no_streaming_no_async(conversation_history:Conversation, use_dynamic_pipeline = True):        
         txt.print_with_spinner("Executing inference pipeline...")
         if use_dynamic_pipeline:
-            pipeline_method = AvailableService.inference.run_pipeline_dynamic_streaming_async
+            pipeline_method = AvailableService.inference_pipeline.run_pipeline_dynamic_streaming_async
         else:
-            pipeline_method = AvailableService.inference.run_pipeline_static_streaming_async
+            pipeline_method = AvailableService.inference_pipeline.run_pipeline_static_streaming_async
 
         all_chunks_output = []
         sync_generator = Execute.async_generator_wrapper_to_sync(
@@ -330,7 +332,7 @@ class AvailableService:
             include_bm25_retrieval=True,
             give_score=True,
             pipeline_config_file_path = 'studi_com_chatbot_rag_pipeline_default_config_wo_AG_for_streaming.yaml',
-            format_retrieved_docs_function=AvailableService.format_retrieved_docs_function,
+            format_retrieved_docs_function=RetrievedDocsService.format_retrieved_docs_function,
             all_chunks_output=all_chunks_output
         )
         for chunk in sync_generator:
@@ -346,25 +348,4 @@ class AvailableService:
         promptlate = ChatPromptTemplate.from_template(summarize_rag_answer_prompt)
         chain = promptlate | AvailableService.rag_service.llm_1 | RunnablePassthrough()
         result = await Llm.invoke_chain_with_input_async('Answer summarization', chain, text)
-        return Llm.get_content(result)
-        
-    #todo: to delete or write to add metadata to context
-    @staticmethod
-    def format_retrieved_docs_function(retrieved_docs):
-        if not any(retrieved_docs):
-            return 'Not a single relevant information were found. Can\'t answer the question.'
-        
-        total_size = sum([len(re.split(r'[ .,;:!?]', doc.page_content)) for doc in retrieved_docs])
-        if total_size > 15000:
-            sub_list = []
-            current_size = 0            
-            for doc in retrieved_docs:
-                doc_size = len(re.split(r'[ .,;:!?]', doc.page_content))
-                if current_size + doc_size <= 15000:
-                    sub_list.append(doc)
-                    current_size += doc_size
-                else:
-                    break            
-            return sub_list
-        else:
-            return retrieved_docs   
+        return Llm.get_content(result) 
