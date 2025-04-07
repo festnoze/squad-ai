@@ -1,1 +1,0 @@
-start streamlit.exe run src/api/UI_select_dataset_QA.py QA_dataset.csv QA_dataset_selected.csv
