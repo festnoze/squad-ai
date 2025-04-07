@@ -31,17 +31,17 @@ async def create_q_and_a_dataset_then_run_inference_then_evaluate(samples_count_
     return {"dataset": testset_sample, "inference": testset_sample_with_inference_results, "evaluation URL": evaluation_results_url, "evaluation": evaluation_results}
 
 @evaluation_router.post("/create-QA-dataset")
-async def create_q_and_a_dataset_from_existing_summary_and_questions_objects_async(samples_count_by_metadata: int = 10, output_file: str = None) -> Dict[str, Any]:
-    result = await EvaluationService.create_q_and_a_sample_dataset_from_existing_summary_and_questions_objects_async(samples_count_by_metadata, './outputs')
+async def create_q_and_a_dataset_from_existing_summary_and_questions_objects_async(samples_count_by_metadata: int = 10, output_file: str = None, limited_to_specified_metadata = None) -> list[dict]:
+    results = await EvaluationService.create_q_and_a_sample_dataset_from_existing_summary_and_questions_objects_async(samples_count_by_metadata, './outputs', limited_to_specified_metadata)
     
     if output_file:
         import pandas as pd
-        file.write_file(result, os.path.join(output_path, output_file))
-        # Transform the array of dicts into a CSV file using pandas
-        df = pd.DataFrame(result)  # Convert the list of dictionaries to a DataFrame
-        csv_file_path = os.path.join(output_path, output_file.replace('.json', '.csv'))
-        df.to_csv(csv_file_path, index=False, sep=';')  # Save the DataFrame as a CSV file
-    return result[:10]  # Return only the first 10 items for brevity
+        file.write_file(results, os.path.join(output_path, output_file))
+        # Transform the array of dicts into an excel file using pandas
+        df = pd.DataFrame(results)  # Convert the list of dictionaries to a DataFrame
+        xlsx_file_path = os.path.join(output_path, output_file.replace('.json', '.xlsx'))
+        df.to_excel(xlsx_file_path)
+    return results
 
 @evaluation_router.post("/run-inference")
 async def run_questions_dataset_through_rag_inference_pipeline_and_save_async(input_file: str = "QA-dataset.json", output_file: str = None) -> Dict[str, Any]:

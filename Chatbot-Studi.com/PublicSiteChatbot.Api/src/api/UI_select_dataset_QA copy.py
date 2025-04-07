@@ -2,42 +2,66 @@ import streamlit as st
 import pandas as pd
 import sys
 
+st.set_page_config(layout="wide")
+
 input_filename: str = "default_input.csv" if len(sys.argv) < 2 else sys.argv[1]
 output_filename: str = "default_output.csv" if len(sys.argv) < 3 else sys.argv[2]
-path :str = "./outputs/"
+path: str = "./outputs/"
 
-# Charger le fichier CSV
 @st.cache_data
-def load_data():
-    df = pd.read_csv(path + input_filename, sep=';')
+def load_data() -> pd.DataFrame:
+    df: pd.DataFrame = pd.read_csv(path + input_filename, sep=';')
     return df
 
-df = load_data()
-
-# État global pour sélectionner/désélectionner toutes les lignes
+df: pd.DataFrame = load_data()
 if 'select_all' not in st.session_state:
     st.session_state['select_all'] = False
 
-# Bouton pour tout sélectionner / désélectionner
-if st.button('Sélectionner/Désélectionner toutes les lignes'):
+if st.sidebar.button('Select/Deselect All'):
     st.session_state['select_all'] = not st.session_state['select_all']
 
-# Afficher le DataFrame avec pagination et checkbox
-rows_per_page = st.sidebar.slider("Lignes par page", min_value=10, max_value=100, value=20)
-total_pages = len(df) // rows_per_page + (1 if len(df) % rows_per_page > 0 else 0)
-page_number = st.sidebar.number_input("Page", min_value=1, max_value=total_pages, step=1)
-start_idx = (page_number - 1) * rows_per_page
-end_idx = start_idx + rows_per_page
+rows_per_page: int = st.sidebar.slider("Rows per page", 10, 100, 20)
+total_pages: int = len(df) // rows_per_page + (1 if len(df) % rows_per_page > 0 else 0)
+page_number: int = st.sidebar.number_input("Page", 1, total_pages, 1)
+start_idx: int = (page_number - 1) * rows_per_page
+end_idx: int = start_idx + rows_per_page
 
-# Créer une colonne de sélection
-df['Sélectionner'] = st.session_state['select_all']
+# Slider for row height multiplier (default row height is 35px)
+multiplier: int = st.sidebar.slider("Row height multiplier", 1, 7, 1)
+default_row_height: int = 35
+custom_row_height: int = multiplier * default_row_height
+header_height: int = 50
 
-# Afficher le DataFrame avec la colonne de sélection
-st.dataframe(df.iloc[start_idx:end_idx], height=400)
+# Fix container height to always show 'rows_per_page' rows at default height
+table_container_height: int = rows_per_page * default_row_height + header_height
 
-# Bouton pour sauvegarder les lignes sélectionnées
-if st.button('Sauvegarder les lignes sélectionnées'):
-    selected_rows = df[df['Sélectionner']].copy()
-    selected_rows.drop(columns=['Sélectionner'], inplace=True)  # Supprimer la colonne de sélection
-    selected_rows.to_csv(output_filename, index=False, sep=';')
-    st.success(f"{len(selected_rows)} lignes sauvegardées dans {output_filename}")
+df['Select'] = st.session_state['select_all']
+cols: list = df.columns.tolist()
+cols.insert(0, cols.pop(cols.index('Select')))
+df = df[cols]
+page_df: pd.DataFrame = df.iloc[start_idx:end_idx].copy()
+
+st.markdown(
+    f"""
+    <style>
+    div[data-testid="stDataEditorGrid"] .grid-row {{
+        height: {custom_row_height}px !important;
+        min-height: {custom_row_height}px !important;
+        max-height: {custom_row_height}px !important;
+    }}
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+edited_df: pd.DataFrame = st.data_editor(
+    page_df,
+    use_container_width=True,
+    height=table_container_height
+)
+
+if st.sidebar.button("Save Selected Rows"):
+    selected_df: pd.DataFrame = edited_df[edited_df['Select']].copy()
+    selected_df.drop(columns=['Select'], inplace=True)
+    selected_df.to_csv(output_filename, index=False, sep=';')
+    st.sidebar.success(f"{len(selected_df)} rows saved to {output_filename}")

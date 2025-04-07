@@ -10,6 +10,7 @@ from common_tools.models.embedding_model import EmbeddingModel
 from common_tools.helpers.env_helper import EnvHelper
 from common_tools.RAG.rag_service import RagService
 from common_tools.RAG.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
+from common_tools.helpers.ressource_helper import Ressource
 from common_tools.helpers.file_helper import file
 #
 from vector_database_creation.summary_and_questions_chunks_service import SummaryAndQuestionsChunksService
@@ -48,7 +49,7 @@ class EvaluationService:
         EvaluationService._inference_pipeline = inference_pipeline
 
     @staticmethod
-    async def create_q_and_a_sample_dataset_from_existing_summary_and_questions_objects_async(samples_count_by_metadata: int = 0, input_objects_file_path:str = './outputs'):        
+    async def create_q_and_a_sample_dataset_from_existing_summary_and_questions_objects_async(samples_count_by_metadata: int = 0, input_objects_file_path:str = './outputs', limited_to_specified_metadata = None) -> list[dict]:        
         trainings_objects = await SummaryAndQuestionsChunksService.build_trainings_objects_with_summaries_and_chunks_by_questions_async(input_objects_file_path, EvaluationService._rag_service.llm_1)
         
         # Build the full Q&A dataset
@@ -67,15 +68,46 @@ class EvaluationService:
                                 'reference': chunk.text,
                             })
 
-        if samples_count_by_metadata <= 0:
-            return dataset
-        
+        # Extract subset from the dataset based on 'samples_count_by_metadata'
+        if limited_to_specified_metadata:
+            all_categories = [category for category in all_categories if category == limited_to_specified_metadata]
         samples_dataset = []
-        for category in all_categories:
-            filtered_dataset = [item for item in dataset if item['category'] == category]
-            sampled_items = random.sample(filtered_dataset, min(samples_count_by_metadata, len(filtered_dataset)))
-            samples_dataset.extend(sampled_items)
+        if samples_count_by_metadata <= 0:
+            samples_dataset = dataset
+        else:        
+            for category in all_categories:
+                filtered_dataset = [item for item in dataset if item['category'] == category]
+                sampled_items = random.sample(filtered_dataset, min(samples_count_by_metadata, len(filtered_dataset)))
+                samples_dataset.extend(sampled_items)
+        
+        answers = await EvaluationService.extract_answers_from_references_async(samples_dataset, [EvaluationService._rag_service.llm_1, EvaluationService._rag_service.llm_1, EvaluationService._rag_service.llm_2]) 
+        for sample_dataset, answer in zip(samples_dataset, answers):
+            sample_dataset['answer'] = answer
         return samples_dataset
+    
+    @staticmethod
+    async def extract_answers_from_references_async(dataset: dict, llm_and_fallbacks, batch_size = 50) -> dict:
+        prompts_summarize_doc = []
+        for sample in dataset:
+            if not 'reference' in sample or not 'user_input' in sample:
+                raise ValueError(f"Missing 'references' or 'user_input' in sample: {sample}")
+            if 'answer' in sample:
+                raise ValueError(f"Sample already contains 'answer': {sample}")
+            
+            prompt_summarize_doc = Ressource.load_with_replaced_variables(
+                file_name='extract_answer_of_question_from_context.txt',
+                variables_values={'question': sample['user_input'], 'doc_content': sample['reference']}
+            )
+            prompts_summarize_doc.append(prompt_summarize_doc)
+
+        extracted_answers = await Llm.invoke_parallel_prompts_with_parser_batchs_fallbacks_async(
+            f'Extract answer to question from reference',
+            llm_and_fallbacks,
+            None,
+            batch_size,
+            *prompts_summarize_doc
+        )
+        return extracted_answers
     
     @staticmethod
     async def add_to_dataset_retrieved_chunks_and_augmented_generation_from_RAG_inference_execution_async(dataset: list, batch_size: int = 10) -> list[dict]:

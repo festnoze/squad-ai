@@ -48,7 +48,7 @@ class SummaryAndQuestionsChunksService:
                 for key, value in training_obj.metadata.items():
                     if key != 'id' and (key not in training_doc.metadata or training_doc.metadata[key] != value):
                         raise ValueError(f"Metadata mismatch in: {training_doc.metadata['name']} for key: {key}")
-        return trainings_objects
+        return trainings_objects                
    
     def _load_trainings_scraped_details_as_json(files_path: str) -> dict:
         files_str = file.get_files_paths_and_contents(os.path.join(files_path, 'scraped'))
