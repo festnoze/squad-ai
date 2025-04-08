@@ -1,3 +1,4 @@
+dotenv
 streamlit
 pandas
 openpyxl # allow pandas to export asframe as excel file

@@ -11,9 +11,9 @@
             "program": "${workspaceFolder}/senv/Scripts/streamlit.exe",
             "args": [
                "run", 
-               "UI_select_dataset_QA.py", 
-               "QA4.xlsx",
-               "QA_all_selected.xlsx",
+               "startup.py", 
+               "test.xlsx",
+               "test_ex.xlsx",
                "--server.port", "8333"
             ],
             "env": {

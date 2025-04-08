@@ -1,6 +1,5 @@
 import os
 import time
-from typing import Any, Dict
 from fastapi import APIRouter
 from application.evaluation_service import EvaluationService
 from common_tools.helpers.env_helper import EnvHelper
@@ -15,7 +14,7 @@ evaluation_router = APIRouter(prefix="/rag/evaluation", tags=["Evaluation"])
 output_path:str = './outputs'
 
 @evaluation_router.post("/create-ground-truth-dataset-run-inference-and-evaluate")
-async def create_q_and_a_dataset_then_run_inference_then_evaluate(samples_count_by_metadata: int = 20, batch_size: int = 20) -> Dict[str, Any]:
+async def create_q_and_a_dataset_then_run_inference_then_evaluate(samples_count_by_metadata: int = 20, batch_size: int = 20) -> dict[str, any]:
     
     testset_sample =                             await EvaluationService.create_q_and_a_sample_dataset_from_existing_summary_and_questions_objects_async(samples_count_by_metadata)
     start_inference = time.time()
@@ -43,19 +42,43 @@ async def create_q_and_a_dataset_from_existing_summary_and_questions_objects_asy
         df.to_excel(xlsx_file_path)
     return results
 
-@evaluation_router.post("/run-inference")
-async def run_questions_dataset_through_rag_inference_pipeline_and_save_async(input_file: str = "QA-dataset.json", output_file: str = None) -> Dict[str, Any]:
-    dataset = file.get_as_json(input_file)
+@evaluation_router.post("/run-inference/from-file")
+async def run_questions_dataset_through_rag_inference_pipeline_from_file_and_save_async(input_file: str = "QA-dataset.json", output_file: str = None) -> dict[str, any]:
+    file_path = os.path.join(output_path, input_file)
+    if input_file.endswith('.json'):
+        dataset = file.get_as_json(file_path)
+    elif input_file.endswith('.xlsx'):
+        import pandas as pd
+        df = pd.read_excel(file_path)
+        dataset = df.to_dict(orient='records')
     result = await EvaluationService.add_to_dataset_retrieved_chunks_and_augmented_generation_from_RAG_inference_execution_async(dataset)
     
     if output_file:
+        output_file = os.path.join(output_path, output_file)
         file.write_file(result, os.path.join(output_path, output_file))
     return result
 
-@evaluation_router.post("/evaluate")
-async def run_ragas_evaluation_and_upload_async(input_file: str = "inference.json") -> Dict[str, Any]:
-    result = await EvaluationService.run_ragas_evaluation_and_upload_async(input_file)
+@evaluation_router.post("/run-inference")
+async def run_questions_dataset_through_rag_inference_pipeline_and_save_async(dataset: dict) -> dict[str, any]:
+    result = await EvaluationService.add_to_dataset_retrieved_chunks_and_augmented_generation_from_RAG_inference_execution_async(dataset)
     return result
+
+@evaluation_router.post("/evaluate/from-file")
+async def run_ragas_evaluation_and_upload_from_file_async(input_file: str = "inference.json", path: str = "./outputs/") -> tuple[dict[str, any], str]:
+    file_path = path + input_file
+    if input_file.endswith('.json'):
+        testset = file.get_as_json(file_path)
+    elif input_file.endswith('.xlsx'):
+        import pandas as pd
+        df = pd.read_excel(file_path)
+        testset = df.to_dict(orient='records')
+    result, link = await EvaluationService.run_ragas_evaluation_and_upload_async(testset)
+    return result, link
+
+@evaluation_router.post("/evaluate")
+async def run_ragas_evaluation_and_upload_async(testset: dict) -> tuple[dict[str, any], str]:
+    result, link = await EvaluationService.run_ragas_evaluation_and_upload_async(testset)
+    return result, link
 
 @evaluation_router.post("/groundtruth/generate")
 async def generate_ground_truth():

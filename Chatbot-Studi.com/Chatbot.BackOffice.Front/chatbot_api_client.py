@@ -22,7 +22,8 @@ class ChatbotApiClient:
 
     def build_vectorstore(self) -> None:
         requests.post(f"{self.ingestion_prefix}/vectorstore/create/full")
-
+    
+    ### Evaluation endpoints ###
     def generate_ground_truth(self) -> None:
         requests.post(f"{self.evaluation_prefix}/groundtruth/generate")
 
@@ -31,14 +32,14 @@ class ChatbotApiClient:
         if output_file is not None: params["output_file"] = output_file
         return requests.post(f"{self.evaluation_prefix}/create-QA-dataset", params=params)
         
-    def run_inference(self, input_file: str = "QA-dataset.json", output_file: str = None) -> requests.Response:
+    def run_inference_from_file(self, input_file: str = "QA-dataset.json", output_file: str = None) -> requests.Response:
         params: Dict[str, any] = {"input_file": input_file}
         if output_file is not None: params["output_file"] = output_file
-        return requests.post(f"{self.evaluation_prefix}/run-inference", params=params)
+        return requests.post(f"{self.evaluation_prefix}/run-inference/from-file", params=params)
 
-    def evaluate(self, input_file: str = "inference.json") -> requests.Response:
+    def evaluate_from_file(self, input_file: str = "inference.json") -> requests.Response:
         params: Dict[str, any] = {"input_file": input_file}
-        return requests.post(f"{self.evaluation_prefix}/evaluate", params=params)
+        return requests.post(f"{self.evaluation_prefix}/evaluate/from-file", params=params)
 
     ### Inference endpoints ###
     def re_init_api(self):

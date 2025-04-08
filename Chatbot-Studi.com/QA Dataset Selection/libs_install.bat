@@ -1,1 +1,1 @@
-python -m pip install -r requirements.txt --upgrade
+python -m uv pip install -r requirements.txt --upgrade
