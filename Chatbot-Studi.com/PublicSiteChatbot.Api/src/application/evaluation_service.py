@@ -110,7 +110,7 @@ class EvaluationService:
         return extracted_answers
     
     @staticmethod
-    async def add_to_dataset_retrieved_chunks_and_augmented_generation_from_RAG_inference_execution_async(dataset: list, batch_size: int = 10) -> list[dict]:
+    async def add_to_dataset_retrieved_chunks_and_augmented_generation_from_RAG_inference_execution_async(dataset: list[dict], batch_size: int = 30) -> list[dict]:
         ragas_token: str = EnvHelper.get_env_variable_value_by_name('RAGAS_APP_TOKEN')
         os.environ['RAGAS_APP_TOKEN'] = ragas_token
         batches: list = [dataset[i:i + batch_size] for i in range(0, len(dataset), batch_size)]

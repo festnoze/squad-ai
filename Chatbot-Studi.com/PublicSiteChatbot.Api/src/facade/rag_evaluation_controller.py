@@ -59,7 +59,7 @@ async def run_questions_dataset_through_rag_inference_pipeline_from_file_and_sav
     return result
 
 @evaluation_router.post("/run-inference")
-async def run_questions_dataset_through_rag_inference_pipeline_and_save_async(dataset: dict) -> dict:
+async def run_questions_dataset_through_rag_inference_pipeline_and_save_async(dataset: list[dict]) -> list[dict]:
     result = await EvaluationService.add_to_dataset_retrieved_chunks_and_augmented_generation_from_RAG_inference_execution_async(dataset)
     return result
 

@@ -12,10 +12,8 @@ class ChatbotApiClient:
         if limited_to_specified_metadata is not None: params["limited_to_specified_metadata"] = limited_to_specified_metadata
         return requests.post(f"{self.evaluation_prefix}/create-QA-dataset", params=params)
         
-    def run_inference(self, dataset: dict, output_file: str = None) -> requests.Response:
-        params: dict[str, any] = {"dataset": dataset}
-        if output_file is not None: params["output_file"] = output_file
-        return requests.post(f"{self.evaluation_prefix}/run-inference", params=params)
+    def run_inference(self, dataset: dict) -> requests.Response:
+        return requests.post(f"{self.evaluation_prefix}/run-inference", json=dataset)
 
     def evaluate(self, dataset: dict) -> requests.Response:
         params: dict[str, any] = {"testset": dataset}
