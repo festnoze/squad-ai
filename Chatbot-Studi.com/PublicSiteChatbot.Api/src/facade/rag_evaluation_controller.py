@@ -14,7 +14,7 @@ evaluation_router = APIRouter(prefix="/rag/evaluation", tags=["Evaluation"])
 output_path:str = './outputs'
 
 @evaluation_router.post("/create-ground-truth-dataset-run-inference-and-evaluate")
-async def create_q_and_a_dataset_then_run_inference_then_evaluate(samples_count_by_metadata: int = 20, batch_size: int = 20) -> dict[str, any]:
+async def create_q_and_a_dataset_then_run_inference_then_evaluate(samples_count_by_metadata: int = 20, batch_size: int = 20) -> dict:
     
     testset_sample =                             await EvaluationService.create_q_and_a_sample_dataset_from_existing_summary_and_questions_objects_async(samples_count_by_metadata)
     start_inference = time.time()
@@ -43,7 +43,7 @@ async def create_q_and_a_dataset_from_existing_summary_and_questions_objects_asy
     return results
 
 @evaluation_router.post("/run-inference/from-file")
-async def run_questions_dataset_through_rag_inference_pipeline_from_file_and_save_async(input_file: str = "QA-dataset.json", output_file: str = None) -> dict[str, any]:
+async def run_questions_dataset_through_rag_inference_pipeline_from_file_and_save_async(input_file: str = "QA-dataset.json", output_file: str = None) -> dict:
     file_path = os.path.join(output_path, input_file)
     if input_file.endswith('.json'):
         dataset = file.get_as_json(file_path)
@@ -59,12 +59,12 @@ async def run_questions_dataset_through_rag_inference_pipeline_from_file_and_sav
     return result
 
 @evaluation_router.post("/run-inference")
-async def run_questions_dataset_through_rag_inference_pipeline_and_save_async(dataset: dict) -> dict[str, any]:
+async def run_questions_dataset_through_rag_inference_pipeline_and_save_async(dataset: dict) -> dict:
     result = await EvaluationService.add_to_dataset_retrieved_chunks_and_augmented_generation_from_RAG_inference_execution_async(dataset)
     return result
 
 @evaluation_router.post("/evaluate/from-file")
-async def run_ragas_evaluation_and_upload_from_file_async(input_file: str = "inference.json", path: str = "./outputs/") -> tuple[dict[str, any], str]:
+async def run_ragas_evaluation_and_upload_from_file_async(input_file: str = "inference.json", path: str = "./outputs/") -> tuple[dict, str]:
     file_path = path + input_file
     if input_file.endswith('.json'):
         testset = file.get_as_json(file_path)
@@ -76,7 +76,7 @@ async def run_ragas_evaluation_and_upload_from_file_async(input_file: str = "inf
     return result, link
 
 @evaluation_router.post("/evaluate")
-async def run_ragas_evaluation_and_upload_async(testset: dict) -> tuple[dict[str, any], str]:
+async def run_ragas_evaluation_and_upload_async(testset: dict) -> tuple[dict, str]:
     result, link = await EvaluationService.run_ragas_evaluation_and_upload_async(testset)
     return result, link
 
