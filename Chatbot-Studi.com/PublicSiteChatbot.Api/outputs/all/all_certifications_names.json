@@ -1,16 +1,16 @@
 [
-    "Certificat Répertoire Spécifique",
     "Diplôme d'Etat",
-    "Bloc - Certification professionnelle (RNCP)",
     "Bloc de compétences RNCP",
-    "Certificat Studi (FM)",
-    "Diplôme d'Etat (DE)",
-    "Préparation Concours",
     "Titre Professionnel",
-    "Titre RNCP",
+    "Certificat Studi (FM)",
+    "Certificat Répertoire Spécifique",
+    "Formation qualifiante",
     "Formation Métier (FM)",
     "Bloc de compétences",
-    "Formation qualifiante",
+    "Diplôme d'Etat (DE)",
+    "Titre RNCP",
+    "Bloc - Certification professionnelle (RNCP)",
     "Titre - Certification professionnelle (RNCP)",
-    "Certification complémentaire (Répertoire Spécifique)"
+    "Certification complémentaire (Répertoire Spécifique)",
+    "Préparation Concours"
 ]

@@ -71,7 +71,7 @@ class ApiConfig:
             os.makedirs("outputs/logs")
             
         logging.basicConfig(
-            level=logging.INFO,
+            level=logging.ERROR,
             format="Log: %(asctime)s - %(levelname)s - %(message)s",
             handlers=[
                 logging.FileHandler(f"outputs/logs/public_site_chatbot.{datetime.now().strftime("%Y-%m-%d")}.log"),

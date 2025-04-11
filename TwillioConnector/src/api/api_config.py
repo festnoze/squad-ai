@@ -1,3 +1,5 @@
+import os
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi import FastAPI, Request
@@ -14,7 +16,9 @@ class ApiConfig:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         try:
-            print(f"Twilio Proxy API Startup.")
+            print('\n\n---------------------------------')
+            print('🌐 Twilio Proxy API 🚀 started 🚀')
+            print('---------------------------------')
             yield
 
         finally:

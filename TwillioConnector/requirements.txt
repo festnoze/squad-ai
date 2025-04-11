@@ -3,6 +3,7 @@ requests
 twilio
 python-dotenv
 python-multipart
+websockets
 fastapi
 uvicorn
 pytest
