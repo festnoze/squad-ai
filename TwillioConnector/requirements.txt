@@ -1,5 +1,9 @@
+uv
 requests
+twilio
 python-dotenv
-slack-sdk
+python-multipart
 fastapi
 uvicorn
+pytest
+httpx

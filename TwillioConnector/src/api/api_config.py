@@ -8,13 +8,13 @@ from contextlib import asynccontextmanager
 import logging
 from datetime import datetime
 #
-from twillio_controller import twillio_router
+from twilio_controller import twilio_router
 
 class ApiConfig:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         try:
-            print(f"Slack API Startup.")
+            print(f"Twilio Proxy API Startup.")
             yield
 
         finally:
@@ -24,15 +24,15 @@ class ApiConfig:
     # Configure the FastAPI app
     def create_app() -> FastAPI:
         app = FastAPI(
-            title="Slack API",
-            description="Backend API for Slack integration",
+            title="Twilio Proxy API",
+            description="Backend API for Twilio integration",
             version= f"{datetime.now().strftime("%Y.%m.%d.%H%M%S")}",
             lifespan=ApiConfig.lifespan
         )
         app.state.shutdown = lambda: None
         
         # Include controllers as routers
-        app.include_router(twillio_router)
+        app.include_router(twilio_router)
 
         # All CORS settings are enabled for development purposes
         app.add_middleware(

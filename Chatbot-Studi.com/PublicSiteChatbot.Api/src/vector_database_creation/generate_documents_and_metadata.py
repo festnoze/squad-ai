@@ -269,7 +269,7 @@ class GenerateDocumentsAndMetadata:
             # Only keep the training from Drupal if it's also present onto the website
             if not training_detail:
                 unfound_in_scraped_trainings_count += 1                    
-                txt.print(f"!!! N°{unfound_in_scraped_trainings_count} unfound training from Drupal: '{training_title}', doesn't exists onto the website (or at least into the scraped data).")
+                #txt.print(f"!!! N°{unfound_in_scraped_trainings_count} unfound training from Drupal: '{training_title}', doesn't exists onto the website (or at least into the scraped data).")
                 continue
 
             related_ids = training_data_drupal.get("related_ids", {})
@@ -348,6 +348,9 @@ class GenerateDocumentsAndMetadata:
                     else:
                         removed_sections_names.add(section_name)
 
+        if unfound_in_scraped_trainings_count > 0:
+            txt.print(f"!!! Total : {unfound_in_scraped_trainings_count} trainings from json-api Drupal were not found on the scraped website data.")
+        
         #docs.append(Document(page_content= 'Liste complète de toutes les formations proposées par Studi :\n' + ', '.join(all_trainings_titles), metadata={"type": "liste_formations",}))
         return docs
     
