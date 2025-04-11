@@ -1,4 +1,4 @@
-﻿[
+[
     {
         "type": "taxonomy_term--certification",
         "id": "f3ca5a7d-d507-49ec-9d45-1104cc252a61",
@@ -20,6 +20,48 @@
             "changed": "2022-12-01T08:07:27+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Bloc - Certification professionnelle (RNCP) | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/125"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -100,6 +142,48 @@
             "changed": "2022-12-01T08:07:31+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Bloc de comp\u00e9tences | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/1120"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -180,6 +264,48 @@
             "changed": "2022-12-01T08:07:34+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Bloc de comp\u00e9tences RNCP | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/1005"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -260,6 +386,48 @@
             "changed": "2022-12-01T08:07:39+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Certificat R\u00e9pertoire Sp\u00e9cifique | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/1000"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -340,6 +508,48 @@
             "changed": "2022-12-01T08:07:43+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Certificat Studi (FM) | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/117"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -420,6 +630,48 @@
             "changed": "2022-12-01T08:07:46+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Certification compl\u00e9mentaire (R\u00e9pertoire Sp\u00e9cifique) | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/91"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -504,6 +756,55 @@
             "changed": "2023-10-02T22:20:16+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Dipl\u00f4me d'Etat | Studi"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "description",
+                        "content": "R\u00e9sultats cumul\u00e9s de nos apprenants qui ont obtenu leur dipl\u00f4me (total des apprenants en formation entre juin 2010 et juin 2022 ayant d\u00e9clar\u00e9 avoir pass\u00e9 leur examen lors de notre enqu\u00eate Audirep r\u00e9alis\u00e9e en juillet 2021 et notre enqu\u00eate Studi r\u00e9alis\u00e9e en Mars 2023)"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/1004"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -588,6 +889,55 @@
             "changed": "2022-11-16T00:16:33+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Dipl\u00f4me d'Etat (DE) | Studi"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "description",
+                        "content": "R\u00e9sultats cumul\u00e9s de nos apprenants qui ont obtenu leur dipl\u00f4me (total des apprenants en formation entre juin 2010 et juin 2021 ayant d\u00e9clar\u00e9 avoir pass\u00e9 leur examen lors de notre enqu\u00eate Audirep r\u00e9alis\u00e9e en juillet 2021)"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/134"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -668,6 +1018,48 @@
             "changed": "2021-08-19T00:00:12+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Formation M\u00e9tier (FM) | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/882"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -748,6 +1140,48 @@
             "changed": "2022-12-01T08:07:54+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Formation M\u00e9tier (FM) | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/916"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -828,6 +1262,48 @@
             "changed": "2022-12-01T08:07:58+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Formation qualifiante | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/1002"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -908,6 +1384,48 @@
             "changed": "2022-12-01T08:08:02+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Pr\u00e9paration Concours | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/111"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -988,6 +1506,48 @@
             "changed": "2022-12-01T08:08:05+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Titre - Certification professionnelle (RNCP) | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/130"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -1068,6 +1628,48 @@
             "changed": "2022-12-01T08:08:09+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Titre Professionnel | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/1109"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -1148,6 +1750,48 @@
             "changed": "2022-12-01T08:08:13+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Titre RNCP | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/1003"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],

@@ -28,8 +28,6 @@ class TwillioService:
             TwillioService.QUERY_EXTERNAL_ENDPOINT_URL_STREAMING = os.environ["QUERY_EXTERNAL_ENDPOINT_URL_STREAMING"]
             TwillioService.STREAMING_RESPONSE = os.environ["STREAMING_RESPONSE"].lower() == 'true'
 
-        self.signature_verifier: SignatureVerifier = SignatureVerifier(self.SLACK_SIGNING_SECRET)
-        self.client: WebClient = WebClient(token=self.SLACK_BOT_TOKEN)
         
     def is_valid_request(self, body_str, request):
         return self.signature_verifier.is_valid_request(body_str, request.headers)
@@ -103,13 +101,6 @@ class TwillioService:
                 full_response += chunk.replace(TwillioService.new_line_for_stream_over_http, '\r\n')
                 self.client.chat_update(channel=channel, ts=msg_ts, text=Helper.convert_markdown(full_response), mrkdwn=True)
         return msg_ts
-    
-    def delete_message(self, channel: str, timestamp: str) -> None:
-        try:
-            response = self.client.chat_delete(channel=channel, ts=timestamp)
-            print("Message supprimé avec succès :", response)
-        except SlackApiError as e:
-            print(f"Erreur lors de la suppression du message : {e.response['error']}")
 
     def ping_external_api(self) -> str:
         url = f"{self.HTTP_SCHEMA}://{self.EXTERNAL_API_HOST}"

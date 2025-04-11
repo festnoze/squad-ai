@@ -8,7 +8,7 @@ from contextlib import asynccontextmanager
 import logging
 from datetime import datetime
 #
-from slack_controller import twillio_router
+from twillio_controller import twillio_router
 
 class ApiConfig:
     @asynccontextmanager

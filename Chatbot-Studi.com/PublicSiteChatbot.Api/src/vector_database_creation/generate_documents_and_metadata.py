@@ -80,7 +80,7 @@ class GenerateDocumentsAndMetadata:
         files_str = file.get_files_paths_and_contents(os.path.join(path, 'scraped/'))
         contents = {}
         for file_path, content_str in files_str.items():
-            filename = file_path.split('/')[-1].split('.')[0]
+            #filename = file_path.split('/')[-1].split('.')[0]
             content = json.loads(content_str)
             contents[content['title']] = content
         return contents
@@ -141,11 +141,12 @@ class GenerateDocumentsAndMetadata:
             doc = Document(page_content=content, metadata=metadata)
             docs.append(doc)
 
-        # Add extra diploma names
+        # Add extra diploma names (use of: academic level and admission level)
         all_diplomas_names.add("pre-graduate")
         all_diplomas_names.add("pregraduate")
         all_diplomas_names.add("master")
         all_diplomas_names.add("MBA")
+        all_diplomas_names.add("aucun")
         return docs, list(all_diplomas_names)
 
     def process_domains(data: List[Dict]) -> tuple[list[Document], list[str]]:
@@ -244,66 +245,93 @@ class GenerateDocumentsAndMetadata:
         if not domains_data: domains_data = JsonHelper.load_from_json(os.path.join(path, 'domains.json'))
         if not sub_domains_data: sub_domains_data = JsonHelper.load_from_json(os.path.join(path, 'subdomains.json'))
         if not certifications_data: certifications_data = JsonHelper.load_from_json(os.path.join(path, 'certifications.json'))
-        trainings_data = JsonHelper.load_from_json(os.path.join(path, 'trainings.json'))
-        if not trainings_data: raise ValueError("No trainings data found. The file 'trainings.json' might be missing or be empty.")
-        trainings_details = GenerateDocumentsAndMetadata.load_trainings_details_from_scraped_dir(path)
-        if not trainings_details: raise ValueError("No trainings details found. The 'scraped' directory might be missing or be empty.")
+        trainings_data_from_drupal = JsonHelper.load_from_json(os.path.join(path, 'trainings.json'))
+        if not trainings_data_from_drupal: raise ValueError("No trainings data found. The file 'trainings.json' might be missing or be empty.")
+        trainings_details_from_scraping = GenerateDocumentsAndMetadata.load_trainings_details_from_scraped_dir(path)
+        if not trainings_details_from_scraping: raise ValueError("No trainings details found. The 'scraped' directory might be missing or be empty.")
         
+        unfound_in_scraped_trainings_count = 0
+        unfound_in_drupal_trainings_count = 0
+        unfound_domain_or_certif_count = 0
         docs = []
         removed_sections_names: set = set()
-        for training_data in trainings_data:
-            training_title = training_data.get("title")
-            related_ids = training_data.get("related_ids", {})
+
+        # Check first that all scraped trainings from Studi.com are present in the Drupal data
+        for training_title in trainings_details_from_scraping.keys():
+            training_data_drupal = next((training for training in trainings_data_from_drupal if training.get("title") == training_title), None)
+            if not training_data_drupal:
+                unfound_in_drupal_trainings_count += 1
+                txt.print(f"!!! N°{unfound_in_drupal_trainings_count} unfound training from scraped data: '{training_title}', doesn't exists onto the Drupal data.")
+
+        for training_data_drupal in trainings_data_from_drupal:
+            training_title = training_data_drupal.get("title")
+            training_detail = trainings_details_from_scraping.get(training_title)
+            # Only keep the training from Drupal if it's also present onto the website
+            if not training_detail:
+                unfound_in_scraped_trainings_count += 1                    
+                txt.print(f"!!! N°{unfound_in_scraped_trainings_count} unfound training from Drupal: '{training_title}', doesn't exists onto the website (or at least into the scraped data).")
+                continue
+
+            related_ids = training_data_drupal.get("related_ids", {})
             metadata_common = {
-                "doc_id": training_data.get("id"),
+                "doc_id": training_data_drupal.get("id"),
                 "type": "formation",
                 "name": training_title,
-                "changed": training_data.get("changed"),
+                "changed": training_data_drupal.get("changed"),
                 "rel_ids": GenerateDocumentsAndMetadata.get_all_ids_as_str(related_ids),
             }            
             
             # Verify domain and sub-domain from their ids
             domain_id = related_ids.get("domain", None)
             sub_domain_id = None
-            # Search for domain with domain_id
-            doms = [domain for domain in domains_data if domain["id"] == domain_id]
-            # If unfound "domain_id", look if it rather is a sub_domain_id
-            if not doms:
-                sub_domains = [sub_domain for sub_domain in sub_domains_data if sub_domain["id"] == domain_id]
-                if not sub_domains:
-                    raise ValueError(f"Domain or Sub-domain not found with id: {domain_id}")
-                sub_domain_id = sub_domains[0]["id"]
-                # Deduce the domain from the sub-domain parent
-                if 'parent' in sub_domains[0]['related_ids'] and sub_domains[0]['related_ids']['parent']:
-                    domain_id = sub_domains[0]['related_ids']['parent'][0]
+            if domain_id:
+                # Search for domain with domain_id
+                doms = [domain for domain in domains_data if domain["id"] == domain_id]
+                # If unfound "domain_id", look if it rather is a sub_domain_id
+                if not doms:
+                    sub_domains = [sub_domain for sub_domain in sub_domains_data if sub_domain["id"] == domain_id]
+                    if not sub_domains:
+                        raise ValueError(f"Domain or Sub-domain not found with id: {domain_id}")
+                    sub_domain_id = sub_domains[0]["id"]
+                    # Deduce the domain from the sub-domain parent
+                    if 'parent' in sub_domains[0]['related_ids'] and sub_domains[0]['related_ids']['parent']:
+                        domain_id = sub_domains[0]['related_ids']['parent'][0]
 
             certification_id = related_ids.get("certification", None)
 
             if domain_id:
                 metadata_common["domain_name"] = next((dom.get("name") for dom in domains_data if dom.get("id") == domain_id), "")
+            else:
+                unfound_domain_or_certif_count += 1
+                txt.print(f"## N°{unfound_domain_or_certif_count} unfound 'domain'. For: {training_title}")
+            
             if sub_domain_id:
                 metadata_common["sub_domain_name"] = next((sub_dom.get("name") for sub_dom in sub_domains_data if sub_dom.get("id") == sub_domain_id), "")
+            else:
+                unfound_domain_or_certif_count += 1
+                txt.print(f"## N°{unfound_domain_or_certif_count} unfound 'sub-domain'. For: {training_title}")
+            
             if certification_id:
                 metadata_common["certification_name"] = next((cert.get("name") for cert in certifications_data if cert.get("id") == certification_id), "")
-            
+            else:
+                unfound_domain_or_certif_count += 1
+                txt.print(f"## N°{unfound_domain_or_certif_count} unfound 'certification'. For: {training_title}")
+
             # Add training URL from details source to metadata
             training_url = ''
-            training_detail = trainings_details.get(training_title)
-            if training_detail and any(training_detail):
-                if 'url' in training_detail:
-                    training_url = training_detail['url']
-                    metadata_common['url'] = training_url
-                if 'academic_level' in training_detail:
-                    metadata_common['academic_level'] = training_detail['academic_level']
-                else:
-                    metadata_common['academic_level'] = 'autre'
-            else:                    
-                txt.print(f"/!\\ Training details not found for: {training_title}")
+            
+            if 'url' in training_detail:
+                training_url = training_detail['url']
+                metadata_common['url'] = training_url
+            if 'academic_level' in training_detail:
+                metadata_common['academic_level'] = training_detail['academic_level']
+            else:
+                metadata_common['academic_level'] = 'aucun'
 
             # Add 'summary' document with all attributs infos from json-api source only
             if add_training_summary:
-                contents = [f"\n###{GenerateDocumentsAndMetadata.get_french_section(key)}###\n{Ressource.remove_curly_brackets(value)}" for key, value in training_data.get('attributes', {}).items()]  
-                content = f"Formation : {training_data.get('title', '')}\nLien vers la page : {training_url}\n{'\n'.join(contents)}"            
+                contents = [f"\n###{GenerateDocumentsAndMetadata.get_french_section(key)}###\n{Ressource.remove_curly_brackets(value)}" for key, value in training_data_drupal.get('attributes', {}).items()]  
+                content = f"Formation : {training_data_drupal.get('title', '')}\nLien vers la page : {training_url}\n{'\n'.join(contents)}"            
                 metadata_summary = metadata_common.copy()
                 metadata_summary['training_info_type'] = "summary"
                 docs.append(Document(page_content=content, metadata=metadata_summary))
@@ -313,7 +341,7 @@ class GenerateDocumentsAndMetadata:
                 for section_name in training_detail:
                     #TODO: Possible to add more sections: 'metiers' and 'academic_level' (also add to metadata description in this case)
                     if section_name in ['summary', 'bref', 'header-training', 'programme', 'cards-diploma', 'methode', 'modalites', 'financement', 'simulation', 'metiers', 'academic_level']:
-                        content = f"###{GenerateDocumentsAndMetadata.get_french_section(section_name)} de la formation : {training_data.get('title', '')}###\n{training_detail[section_name]}"
+                        content = f"###{GenerateDocumentsAndMetadata.get_french_section(section_name)} de la formation : {training_data_drupal.get('title', '')}###\n{training_detail[section_name]}"
                         metadata_detail = metadata_common.copy()
                         metadata_detail['training_info_type'] = section_name
                         docs.append(Document(page_content=content, metadata=metadata_detail))
@@ -325,7 +353,8 @@ class GenerateDocumentsAndMetadata:
     
     def get_french_section(section_name: str) -> str:
         if not section_name in GenerateDocumentsAndMetadata.section_to_french:
-            raise ValueError(f"Unhandled section name: {section_name} in get_french_section")
+            print(f"<>>>>> Unhandled section name: {section_name} in {GenerateDocumentsAndMetadata.get_french_section.__name__} <<<<<<>")
+            return section_name.replace('_', ' ').capitalize()
         return GenerateDocumentsAndMetadata.section_to_french[section_name]
 
     section_to_french = {
@@ -377,7 +406,9 @@ class GenerateDocumentsAndMetadata:
                 'wyg_certifier_link': "Lien de certification WYG",
                 'hook': "Accroche",
                 'pedago_modalities': "Modalités pédagogiques",
-                'code_rncp': "Code RNCP"
+                'code_rncp': "Code RNCP",
+                # Added 04/2025
+                'color_text': "Texte en couleur",
             }
 
     def get_all_ids_as_str(related_ids):

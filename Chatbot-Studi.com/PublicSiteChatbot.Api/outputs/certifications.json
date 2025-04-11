@@ -4,6 +4,9 @@
         "type": "taxonomy_term--certification",
         "name": "Bloc - Certification professionnelle (RNCP)",
         "changed": "2022-12-01T08:07:27+00:00",
+        "attributes": {
+            "metatag": "title\r\nBloc - Certification professionnelle (RNCP) | Studi\r\nrobots"
+        },
         "related_url": {}
     },
     {
@@ -11,6 +14,9 @@
         "type": "taxonomy_term--certification",
         "name": "Bloc de comp\u00e9tences",
         "changed": "2022-12-01T08:07:31+00:00",
+        "attributes": {
+            "metatag": "title\r\nrobots"
+        },
         "related_url": {}
     },
     {
@@ -18,6 +24,9 @@
         "type": "taxonomy_term--certification",
         "name": "Bloc de comp\u00e9tences RNCP",
         "changed": "2022-12-01T08:07:34+00:00",
+        "attributes": {
+            "metatag": "title\r\nrobots"
+        },
         "related_url": {}
     },
     {
@@ -25,6 +34,9 @@
         "type": "taxonomy_term--certification",
         "name": "Certificat R\u00e9pertoire Sp\u00e9cifique",
         "changed": "2022-12-01T08:07:39+00:00",
+        "attributes": {
+            "metatag": "title\r\nrobots"
+        },
         "related_url": {}
     },
     {
@@ -32,6 +44,9 @@
         "type": "taxonomy_term--certification",
         "name": "Certificat Studi (FM)",
         "changed": "2022-12-01T08:07:43+00:00",
+        "attributes": {
+            "metatag": "title\r\nrobots"
+        },
         "related_url": {}
     },
     {
@@ -40,7 +55,8 @@
         "name": "Certification compl\u00e9mentaire (R\u00e9pertoire Sp\u00e9cifique)",
         "changed": "2022-12-01T08:07:46+00:00",
         "attributes": {
-            "name": "Certification compl\u00e9mentaire (R\u00e9pertoire Sp\u00e9cifique)"
+            "name": "Certification compl\u00e9mentaire (R\u00e9pertoire Sp\u00e9cifique)",
+            "metatag": "title\r\nCertification compl\u00e9mentaire (R\u00e9pertoire Sp\u00e9cifique) | Studi\r\nrobots"
         },
         "related_url": {}
     },
@@ -51,7 +67,8 @@
         "description": "R\u00e9sultats cumul\u00e9s de nos apprenants qui ont obtenu leur dipl\u00f4me (total des apprenants en formation entre juin 2010 et juin 2022 ayant d\u00e9clar\u00e9 avoir pass\u00e9 leur examen lors de notre enqu\u00eate Audirep r\u00e9alis\u00e9e en juillet 2021 et notre enqu\u00eate Studi r\u00e9alis\u00e9e en Mars 2023)",
         "changed": "2023-10-02T22:20:16+00:00",
         "attributes": {
-            "description": "R\u00e9sultats cumul\u00e9s de nos apprenants qui ont obtenu leur dipl\u00f4me (total des apprenants en formation entre juin 2010 et juin 2022 ayant d\u00e9clar\u00e9 avoir pass\u00e9 leur examen lors de notre enqu\u00eate Audirep r\u00e9alis\u00e9e en juillet 2021 et notre enqu\u00eate Studi r\u00e9alis\u00e9e en Mars 2023)\r\nR\u00e9sultats cumul\u00e9s de nos apprenants qui ont obtenu leur dipl\u00f4me (total des apprenants en formation entre juin 2010 et juin 2022 ayant d\u00e9clar\u00e9 avoir pass\u00e9 leur examen lors de notre enqu\u00eate Audirep r\u00e9alis\u00e9e en juillet 2021 et notre enqu\u00eate Studi r\u00e9alis\u00e9e en Mars 2023)"
+            "description": "R\u00e9sultats cumul\u00e9s de nos apprenants qui ont obtenu leur dipl\u00f4me (total des apprenants en formation entre juin 2010 et juin 2022 ayant d\u00e9clar\u00e9 avoir pass\u00e9 leur examen lors de notre enqu\u00eate Audirep r\u00e9alis\u00e9e en juillet 2021 et notre enqu\u00eate Studi r\u00e9alis\u00e9e en Mars 2023)\r\nR\u00e9sultats cumul\u00e9s de nos apprenants qui ont obtenu leur dipl\u00f4me (total des apprenants en formation entre juin 2010 et juin 2022 ayant d\u00e9clar\u00e9 avoir pass\u00e9 leur examen lors de notre enqu\u00eate Audirep r\u00e9alis\u00e9e en juillet 2021 et notre enqu\u00eate Studi r\u00e9alis\u00e9e en Mars 2023)",
+            "metatag": "title\r\ndescription\r\nR\u00e9sultats cumul\u00e9s de nos apprenants qui ont obtenu leur dipl\u00f4me (total des apprenants en formation entre juin 2010 et juin 2022 ayant d\u00e9clar\u00e9 avoir pass\u00e9 leur examen lors de notre enqu\u00eate Audirep r\u00e9alis\u00e9e en juillet 2021 et notre enqu\u00eate Studi r\u00e9alis\u00e9e en Mars 2023)\r\nrobots"
         },
         "related_url": {}
     },
@@ -62,7 +79,8 @@
         "description": "R\u00e9sultats cumul\u00e9s de nos apprenants qui ont obtenu leur dipl\u00f4me (total des apprenants en formation entre juin 2010 et juin 2021 ayant d\u00e9clar\u00e9 avoir pass\u00e9 leur examen lors de notre enqu\u00eate Audirep r\u00e9alis\u00e9e en juillet 2021)",
         "changed": "2022-11-16T00:16:33+00:00",
         "attributes": {
-            "description": "R\u00e9sultats cumul\u00e9s de nos apprenants qui ont obtenu leur dipl\u00f4me (total des apprenants en formation entre juin 2010 et juin 2021 ayant d\u00e9clar\u00e9 avoir pass\u00e9 leur examen lors de notre enqu\u00eate Audirep r\u00e9alis\u00e9e en juillet 2021)\r\nR\u00e9sultats cumul\u00e9s de nos apprenants qui ont obtenu leur dipl\u00f4me (total des apprenants en formation entre juin 2010 et juin 2021 ayant d\u00e9clar\u00e9 avoir pass\u00e9 leur examen lors de notre enqu\u00eate Audirep r\u00e9alis\u00e9e en juillet 2021)"
+            "description": "R\u00e9sultats cumul\u00e9s de nos apprenants qui ont obtenu leur dipl\u00f4me (total des apprenants en formation entre juin 2010 et juin 2021 ayant d\u00e9clar\u00e9 avoir pass\u00e9 leur examen lors de notre enqu\u00eate Audirep r\u00e9alis\u00e9e en juillet 2021)\r\nR\u00e9sultats cumul\u00e9s de nos apprenants qui ont obtenu leur dipl\u00f4me (total des apprenants en formation entre juin 2010 et juin 2021 ayant d\u00e9clar\u00e9 avoir pass\u00e9 leur examen lors de notre enqu\u00eate Audirep r\u00e9alis\u00e9e en juillet 2021)",
+            "metatag": "title\r\ndescription\r\nR\u00e9sultats cumul\u00e9s de nos apprenants qui ont obtenu leur dipl\u00f4me (total des apprenants en formation entre juin 2010 et juin 2021 ayant d\u00e9clar\u00e9 avoir pass\u00e9 leur examen lors de notre enqu\u00eate Audirep r\u00e9alis\u00e9e en juillet 2021)\r\nrobots"
         },
         "related_url": {}
     },
@@ -71,6 +89,9 @@
         "type": "taxonomy_term--certification",
         "name": "Formation M\u00e9tier (FM)",
         "changed": "2021-08-19T00:00:12+00:00",
+        "attributes": {
+            "metatag": "title\r\nrobots"
+        },
         "related_url": {}
     },
     {
@@ -78,6 +99,9 @@
         "type": "taxonomy_term--certification",
         "name": "Formation M\u00e9tier (FM)",
         "changed": "2022-12-01T08:07:54+00:00",
+        "attributes": {
+            "metatag": "title\r\nrobots"
+        },
         "related_url": {}
     },
     {
@@ -85,6 +109,9 @@
         "type": "taxonomy_term--certification",
         "name": "Formation qualifiante",
         "changed": "2022-12-01T08:07:58+00:00",
+        "attributes": {
+            "metatag": "title\r\nrobots"
+        },
         "related_url": {}
     },
     {
@@ -92,6 +119,9 @@
         "type": "taxonomy_term--certification",
         "name": "Pr\u00e9paration Concours",
         "changed": "2022-12-01T08:08:02+00:00",
+        "attributes": {
+            "metatag": "title\r\nrobots"
+        },
         "related_url": {}
     },
     {
@@ -99,6 +129,9 @@
         "type": "taxonomy_term--certification",
         "name": "Titre - Certification professionnelle (RNCP)",
         "changed": "2022-12-01T08:08:05+00:00",
+        "attributes": {
+            "metatag": "title\r\nTitre - Certification professionnelle (RNCP) | Studi\r\nrobots"
+        },
         "related_url": {}
     },
     {
@@ -106,6 +139,9 @@
         "type": "taxonomy_term--certification",
         "name": "Titre Professionnel",
         "changed": "2022-12-01T08:08:09+00:00",
+        "attributes": {
+            "metatag": "title\r\nrobots"
+        },
         "related_url": {}
     },
     {
@@ -113,6 +149,9 @@
         "type": "taxonomy_term--certification",
         "name": "Titre RNCP",
         "changed": "2022-12-01T08:08:13+00:00",
+        "attributes": {
+            "metatag": "title\r\nrobots"
+        },
         "related_url": {}
     }
 ]

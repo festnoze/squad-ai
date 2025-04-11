@@ -1,4 +1,4 @@
-﻿[
+[
     {
         "type": "taxonomy_term--certifier",
         "id": "d26b4a08-ed5e-4664-bb4e-7fd2d3b37629",
@@ -20,6 +20,48 @@
             "changed": "2022-10-19T02:01:43+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Academee | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/1233"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -114,6 +156,48 @@
             "changed": "2022-10-19T02:01:43+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "ADEN / CREFO | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/1110"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -208,6 +292,48 @@
             "changed": "2021-11-08T14:13:40+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "ADEN FORMATION | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/1094"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -302,6 +428,48 @@
             "changed": "2021-11-08T14:08:43+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "AFTEC/IHECF | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/157"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -396,6 +564,48 @@
             "changed": "2022-10-19T02:01:43+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "ASCENCIA PARIS LA DEFENSE | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/1076"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -490,6 +700,48 @@
             "changed": "2024-06-22T02:01:02+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "BELLECOUR ECOLE | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/1365"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -584,6 +836,48 @@
             "changed": "2023-04-25T09:37:36+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Bellecour Ecoles d'art / Ateliers de S\u00e8vres (GGE) | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/1267"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -678,6 +972,48 @@
             "changed": "2022-10-19T02:01:43+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Comptalia | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/124"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -772,6 +1108,48 @@
             "changed": "2024-06-22T02:01:02+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "DIGITAL CAMPUS | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/1363"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -866,6 +1244,48 @@
             "changed": "2022-10-19T02:01:43+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Divers Instituts de formation | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/116"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -960,6 +1380,48 @@
             "changed": "2022-10-19T02:01:43+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "ECAD / DIGITAL CAMPUS | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/150"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -1035,6 +1497,142 @@
     },
     {
         "type": "taxonomy_term--certifier",
+        "id": "cc3deb30-c589-4bc9-994c-ce7a8c344577",
+        "links": {
+            "self": {
+                "href": "https://www.studi.com/fr/jsonapi/taxonomy_term/certifier/cc3deb30-c589-4bc9-994c-ce7a8c344577?resourceVersion=id%3A1376"
+            }
+        },
+        "attributes": {
+            "drupal_internal__tid": 1376,
+            "drupal_internal__revision_id": 1376,
+            "langcode": "fr",
+            "revision_created": "2024-10-11T02:00:43+00:00",
+            "revision_log_message": null,
+            "status": true,
+            "name": "ECAD CONSULTANTS",
+            "description": null,
+            "weight": 0,
+            "changed": "2024-10-11T02:00:43+00:00",
+            "default_langcode": true,
+            "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "ECAD CONSULTANTS | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/1376"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
+            "publish_on": null,
+            "unpublish_on": null,
+            "satellite_site": [],
+            "field_certifier_link": null,
+            "field_hash": "9a200ac4070e615d4874f0a7f31ef0efeb4019cd",
+            "field_size_logo_partner": null,
+            "field_size_logo_wyg": null
+        },
+        "relationships": {
+            "vid": {
+                "data": {
+                    "type": "taxonomy_vocabulary--taxonomy_vocabulary",
+                    "id": "d7b73069-ab16-4482-88ba-01de69a8e87a",
+                    "meta": {
+                        "drupal_internal__target_id": "certifier"
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/taxonomy_term/certifier/cc3deb30-c589-4bc9-994c-ce7a8c344577/vid?resourceVersion=id%3A1376"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/taxonomy_term/certifier/cc3deb30-c589-4bc9-994c-ce7a8c344577/relationships/vid?resourceVersion=id%3A1376"
+                    }
+                }
+            },
+            "revision_user": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/taxonomy_term/certifier/cc3deb30-c589-4bc9-994c-ce7a8c344577/relationships/revision_user?resourceVersion=id%3A1376"
+                    }
+                }
+            },
+            "parent": {
+                "data": [
+                    {
+                        "type": "taxonomy_term--certifier",
+                        "id": "virtual",
+                        "meta": {
+                            "links": {
+                                "help": {
+                                    "href": "https://www.drupal.org/docs/8/modules/json-api/core-concepts#virtual",
+                                    "meta": {
+                                        "about": "Usage and meaning of the 'virtual' resource identifier."
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/taxonomy_term/certifier/cc3deb30-c589-4bc9-994c-ce7a8c344577/parent?resourceVersion=id%3A1376"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/taxonomy_term/certifier/cc3deb30-c589-4bc9-994c-ce7a8c344577/relationships/parent?resourceVersion=id%3A1376"
+                    }
+                }
+            },
+            "field_media_image": {
+                "data": null,
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/taxonomy_term/certifier/cc3deb30-c589-4bc9-994c-ce7a8c344577/field_media_image?resourceVersion=id%3A1376"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/taxonomy_term/certifier/cc3deb30-c589-4bc9-994c-ce7a8c344577/relationships/field_media_image?resourceVersion=id%3A1376"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "taxonomy_term--certifier",
         "id": "54b3b597-1d91-47ad-9615-0a3bb17c20a2",
         "links": {
             "self": {
@@ -1054,6 +1652,48 @@
             "changed": "2022-10-19T02:01:43+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "ESG CV | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/147"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -1148,6 +1788,48 @@
             "changed": "2024-06-22T02:01:02+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "ESG Ecoles de commerce | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/1364"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -1242,6 +1924,48 @@
             "changed": "2023-03-11T02:01:34+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "ESG-ECOLES DE COMMERCE | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/1311"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -1336,6 +2060,48 @@
             "changed": "2022-10-19T02:01:43+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "FORMATIVES | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/676"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -1434,6 +2200,48 @@
             "changed": "2022-10-19T02:01:43+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "HETIC | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/155"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -1528,6 +2336,48 @@
             "changed": "2022-10-19T02:01:43+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "ICDL | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/1154"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -1622,6 +2472,48 @@
             "changed": "2022-10-19T02:01:43+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "IFA | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/113"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -1716,6 +2608,48 @@
             "changed": "2022-11-18T02:02:21+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "IFA (Institut de Formation d'Ambulanciers) | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/1269"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -1810,6 +2744,48 @@
             "changed": "2022-10-19T02:01:43+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "IICP | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/1108"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -1904,6 +2880,48 @@
             "changed": "2021-08-13T10:10:08+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "IRSAP (INSAP) | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/141"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -1998,6 +3016,48 @@
             "changed": "2022-10-19T02:01:43+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Isograd - TOSA | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/81"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -2092,6 +3152,48 @@
             "changed": "2022-10-19T02:01:43+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Kagilum | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/104"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -2186,6 +3288,48 @@
             "changed": "2021-08-18T00:00:20+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "L'\u00e9cole du multimedia | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/627"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -2280,6 +3424,48 @@
             "changed": "2022-10-19T02:01:43+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "L'\u00e9cole multim\u00e9dia | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/738"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -2374,6 +3560,48 @@
             "changed": "2021-11-08T14:05:59+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "La WAB | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/99"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -2468,6 +3696,48 @@
             "changed": "2022-10-19T02:01:43+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Leader Films Conservatoire libre du cin\u00e9ma fran\u00e7ais (CLCF) | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/626"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -2562,6 +3832,48 @@
             "changed": "2022-10-19T02:01:43+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "LISAA | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/625"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -2656,6 +3968,48 @@
             "changed": "2023-03-11T02:01:34+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "MBA ESG | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/1312"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -2750,6 +4104,48 @@
             "changed": "2022-10-19T02:01:43+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Minist\u00e8re de l'Agriculture et de l'Alimentation | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/1174"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -2844,6 +4240,48 @@
             "changed": "2022-11-14T17:40:18+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Minist\u00e8re de l'\u00e9ducation nationale | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/133"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -2944,6 +4382,48 @@
             "changed": "2024-07-18T12:46:20+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Minist\u00e8re de l\u2019Enseignement sup\u00e9rieur, de la Recherche et de l\u2019Innovation | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/144"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -3041,9 +4521,51 @@
             "name": "Minist\u00e8re de la Sant\u00e9",
             "description": null,
             "weight": 0,
-            "changed": "2022-10-19T02:01:43+00:00",
+            "changed": "2024-09-30T14:30:09+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Minist\u00e8re de la Sant\u00e9 | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/114"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -3138,6 +4660,48 @@
             "changed": "2024-07-18T12:47:44+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Minist\u00e8re du Travail | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/127"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -3238,6 +4802,48 @@
             "changed": "2023-06-14T02:00:47+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Narratiiv | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/1327"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -3332,6 +4938,48 @@
             "changed": "2022-10-19T02:01:43+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Pas de certificateur | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/106"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -3407,6 +5055,142 @@
     },
     {
         "type": "taxonomy_term--certifier",
+        "id": "3de532b9-b948-4d0b-82de-a2929f4cc40b",
+        "links": {
+            "self": {
+                "href": "https://www.studi.com/fr/jsonapi/taxonomy_term/certifier/3de532b9-b948-4d0b-82de-a2929f4cc40b?resourceVersion=id%3A1377"
+            }
+        },
+        "attributes": {
+            "drupal_internal__tid": 1377,
+            "drupal_internal__revision_id": 1377,
+            "langcode": "fr",
+            "revision_created": "2024-10-23T13:58:24+00:00",
+            "revision_log_message": null,
+            "status": true,
+            "name": "S E J E R",
+            "description": null,
+            "weight": 0,
+            "changed": "2024-10-23T13:58:24+00:00",
+            "default_langcode": true,
+            "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "S E J E R | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/1377"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
+            "publish_on": null,
+            "unpublish_on": null,
+            "satellite_site": [],
+            "field_certifier_link": null,
+            "field_hash": "ce30db04909ae86a3864319dd9e3dbbeb26510ca",
+            "field_size_logo_partner": null,
+            "field_size_logo_wyg": null
+        },
+        "relationships": {
+            "vid": {
+                "data": {
+                    "type": "taxonomy_vocabulary--taxonomy_vocabulary",
+                    "id": "d7b73069-ab16-4482-88ba-01de69a8e87a",
+                    "meta": {
+                        "drupal_internal__target_id": "certifier"
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/taxonomy_term/certifier/3de532b9-b948-4d0b-82de-a2929f4cc40b/vid?resourceVersion=id%3A1377"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/taxonomy_term/certifier/3de532b9-b948-4d0b-82de-a2929f4cc40b/relationships/vid?resourceVersion=id%3A1377"
+                    }
+                }
+            },
+            "revision_user": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/taxonomy_term/certifier/3de532b9-b948-4d0b-82de-a2929f4cc40b/relationships/revision_user?resourceVersion=id%3A1377"
+                    }
+                }
+            },
+            "parent": {
+                "data": [
+                    {
+                        "type": "taxonomy_term--certifier",
+                        "id": "virtual",
+                        "meta": {
+                            "links": {
+                                "help": {
+                                    "href": "https://www.drupal.org/docs/8/modules/json-api/core-concepts#virtual",
+                                    "meta": {
+                                        "about": "Usage and meaning of the 'virtual' resource identifier."
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/taxonomy_term/certifier/3de532b9-b948-4d0b-82de-a2929f4cc40b/parent?resourceVersion=id%3A1377"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/taxonomy_term/certifier/3de532b9-b948-4d0b-82de-a2929f4cc40b/relationships/parent?resourceVersion=id%3A1377"
+                    }
+                }
+            },
+            "field_media_image": {
+                "data": null,
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/taxonomy_term/certifier/3de532b9-b948-4d0b-82de-a2929f4cc40b/field_media_image?resourceVersion=id%3A1377"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/taxonomy_term/certifier/3de532b9-b948-4d0b-82de-a2929f4cc40b/relationships/field_media_image?resourceVersion=id%3A1377"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "taxonomy_term--certifier",
         "id": "c8634327-e616-4f1e-8af4-d16de5c69d6c",
         "links": {
             "self": {
@@ -3426,6 +5210,48 @@
             "changed": "2022-10-19T02:01:43+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Sciences-U Lille | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/142"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -3520,6 +5346,48 @@
             "changed": "2023-10-30T10:38:06+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Studi | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/1067"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
@@ -3620,6 +5488,48 @@
             "changed": "2021-11-08T14:05:55+00:00",
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Toupie Makeup | Studi"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/taxonomy/term/95"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "path": {
+                "alias": null,
+                "pid": null,
+                "langcode": "fr"
+            },
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],

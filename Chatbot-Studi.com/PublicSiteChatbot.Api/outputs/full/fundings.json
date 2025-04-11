@@ -1,4 +1,4 @@
-﻿[
+[
     {
         "type": "node--funding",
         "id": "56688577-548a-4666-84b5-72e3f9fb060c",
@@ -16,22 +16,69 @@
             "status": true,
             "title": "Compte Personnel de Formation (CPF)",
             "created": "2021-08-17T10:06:51+00:00",
-            "changed": "2024-07-30T15:23:38+00:00",
+            "changed": "2025-01-07T10:59:26+00:00",
             "promote": false,
             "sticky": false,
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Compte Personnel de Formation (CPF) | Studi"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "description",
+                        "content": "Le CPF est un droit individuel qui permet \u00e0 toute personne, salari\u00e9e ou demandeur d\u2019emploi, de cumuler un cr\u00e9dit en euros et de suivre une action de formation, utilisable tout au long de sa vie active."
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/financement/cpf"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
+            "content_translation_source": "und",
+            "content_translation_outdated": false,
             "body": {
-                "value": "<p>Le CPF est un droit individuel qui permet \u00e0 toute personne, salari\u00e9e ou demandeur d\u2019emploi, de cumuler un cr\u00e9dit en euros et de suivre une action de formation, utilisable tout au long de sa vie active.</p>\r\n",
+                "value": "<p>Le CPF est un droit individuel qui permet \u00e0 toute personne, salari\u00e9e ou demandeur d\u2019emploi, de cumuler un cr\u00e9dit en euros et de suivre une action de formation, utilisable tout au long de sa vie active.</p>",
                 "format": "basic_html",
                 "processed": "<p>Le CPF est un droit individuel qui permet \u00e0 toute personne, salari\u00e9e ou demandeur d\u2019emploi, de cumuler un cr\u00e9dit en euros et de suivre une action de formation, utilisable tout au long de sa vie active.</p>\n",
                 "summary": ""
             },
             "field_dark_mode": false,
-            "field_metatag": null
+            "field_metatag": null,
+            "field_sitemap_exclude": false
         },
         "relationships": {
             "node_type": {
@@ -192,176 +239,6 @@
     },
     {
         "type": "node--funding",
-        "id": "9c02b63a-866d-4775-a583-0e9ed706d8df",
-        "links": {
-            "self": {
-                "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df?resourceVersion=id%3A794"
-            }
-        },
-        "attributes": {
-            "drupal_internal__nid": 448,
-            "drupal_internal__vid": 794,
-            "langcode": "fr",
-            "revision_timestamp": "2021-08-17T11:48:25+00:00",
-            "revision_log": null,
-            "status": true,
-            "title": "CPF de transition professionnelle",
-            "created": "2021-08-17T11:47:15+00:00",
-            "changed": "2023-03-14T16:01:58+00:00",
-            "promote": false,
-            "sticky": false,
-            "default_langcode": true,
-            "revision_translation_affected": true,
-            "publish_on": null,
-            "unpublish_on": null,
-            "satellite_site": [],
-            "body": {
-                "value": "<p>Le Projet de Transition Professionnelle est une modalit\u00e9 particuli\u00e8re de mobilisation du CPF (Compte personnel de formation), permettant aux salari\u00e9s souhaitant changer de m\u00e9tier ou de profession de financer des formations certifiantes en lien avec leur projet.</p>\r\n",
-                "format": "basic_html",
-                "processed": "<p>Le Projet de Transition Professionnelle est une modalit\u00e9 particuli\u00e8re de mobilisation du CPF (Compte personnel de formation), permettant aux salari\u00e9s souhaitant changer de m\u00e9tier ou de profession de financer des formations certifiantes en lien avec leur projet.</p>\n",
-                "summary": ""
-            },
-            "field_dark_mode": false,
-            "field_metatag": null
-        },
-        "relationships": {
-            "node_type": {
-                "data": {
-                    "type": "node_type--node_type",
-                    "id": "5d7d645e-a53e-4921-83f0-e142b0307f8e",
-                    "meta": {
-                        "drupal_internal__target_id": "funding"
-                    }
-                },
-                "links": {
-                    "related": {
-                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df/node_type?resourceVersion=id%3A794"
-                    },
-                    "self": {
-                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df/relationships/node_type?resourceVersion=id%3A794"
-                    }
-                }
-            },
-            "revision_uid": {
-                "data": null,
-                "links": {
-                    "self": {
-                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df/relationships/revision_uid?resourceVersion=id%3A794"
-                    }
-                }
-            },
-            "uid": {
-                "data": null,
-                "links": {
-                    "self": {
-                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df/relationships/uid?resourceVersion=id%3A794"
-                    }
-                }
-            },
-            "field_header": {
-                "data": {
-                    "type": "paragraph--header",
-                    "id": "e5c9cb86-0e5b-44a7-8e3d-950ddd3d2dd2",
-                    "meta": {
-                        "target_revision_id": 3375,
-                        "drupal_internal__target_id": 1274
-                    }
-                },
-                "links": {
-                    "related": {
-                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df/field_header?resourceVersion=id%3A794"
-                    },
-                    "self": {
-                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df/relationships/field_header?resourceVersion=id%3A794"
-                    }
-                }
-            },
-            "field_image": {
-                "data": {
-                    "type": "media--image",
-                    "id": "cb6612c7-366f-44df-b2bc-f9b8d1395f0a",
-                    "meta": {
-                        "drupal_internal__target_id": 541
-                    }
-                },
-                "links": {
-                    "related": {
-                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df/field_image?resourceVersion=id%3A794"
-                    },
-                    "self": {
-                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df/relationships/field_image?resourceVersion=id%3A794"
-                    }
-                }
-            },
-            "field_logo": {
-                "data": null,
-                "links": {
-                    "related": {
-                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df/field_logo?resourceVersion=id%3A794"
-                    },
-                    "self": {
-                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df/relationships/field_logo?resourceVersion=id%3A794"
-                    }
-                }
-            },
-            "field_paragraph": {
-                "data": [
-                    {
-                        "type": "paragraph--basic",
-                        "id": "6946aec2-a956-427d-98e4-d52b9756de2e",
-                        "meta": {
-                            "target_revision_id": 758,
-                            "drupal_internal__target_id": 261
-                        }
-                    },
-                    {
-                        "type": "paragraph--accordions",
-                        "id": "505ca95f-b55d-47da-b92e-5eb350957130",
-                        "meta": {
-                            "target_revision_id": 40841,
-                            "drupal_internal__target_id": 7583
-                        }
-                    }
-                ],
-                "links": {
-                    "related": {
-                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df/field_paragraph?resourceVersion=id%3A794"
-                    },
-                    "self": {
-                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df/relationships/field_paragraph?resourceVersion=id%3A794"
-                    }
-                }
-            },
-            "field_situation_prospect": {
-                "data": [
-                    {
-                        "type": "taxonomy_term--situation_prospect",
-                        "id": "de8dcb4a-b8db-4564-9a10-110cd8b3e1e7",
-                        "meta": {
-                            "drupal_internal__target_id": 609
-                        }
-                    },
-                    {
-                        "type": "taxonomy_term--situation_prospect",
-                        "id": "994c9ca9-1232-41ca-a2fc-2abcd115d634",
-                        "meta": {
-                            "drupal_internal__target_id": 620
-                        }
-                    }
-                ],
-                "links": {
-                    "related": {
-                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df/field_situation_prospect?resourceVersion=id%3A794"
-                    },
-                    "self": {
-                        "href": "https://www.studi.com/fr/jsonapi/node/funding/9c02b63a-866d-4775-a583-0e9ed706d8df/relationships/field_situation_prospect?resourceVersion=id%3A794"
-                    }
-                }
-            }
-        }
-    },
-    {
-        "type": "node--funding",
         "id": "97540098-109b-4efb-bcea-00fd02b0387d",
         "links": {
             "self": {
@@ -382,17 +259,64 @@
             "sticky": false,
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Plan de d\u00e9veloppement des comp\u00e9tences (PDC) | Studi"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "description",
+                        "content": "Le plan de d\u00e9veloppement des comp\u00e9tences est un document qui rassemble l\u2019ensemble des actions de formation retenues par l\u2019employeur pour ses salari\u00e9s.\u00a0"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/financement/plan-developpement-des-competences"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
+            "content_translation_source": "und",
+            "content_translation_outdated": false,
             "body": {
                 "value": "<p>Le plan de d\u00e9veloppement des comp\u00e9tences est un document qui rassemble l\u2019ensemble des actions de formation retenues par l\u2019employeur pour ses salari\u00e9s.&nbsp;</p>\r\n",
                 "format": "basic_html",
-                "processed": "<p>Le plan de d\u00e9veloppement des comp\u00e9tences est un document qui rassemble l\u2019ensemble des actions de formation retenues par l\u2019employeur pour ses salari\u00e9s.\u00a0</p>\n",
+                "processed": "<p>Le plan de d\u00e9veloppement des comp\u00e9tences est un document qui rassemble l\u2019ensemble des actions de formation retenues par l\u2019employeur pour ses salari\u00e9s.&nbsp;</p>\n",
                 "summary": ""
             },
             "field_dark_mode": false,
-            "field_metatag": null
+            "field_metatag": null,
+            "field_sitemap_exclude": null
         },
         "relationships": {
             "node_type": {
@@ -525,6 +449,216 @@
     },
     {
         "type": "node--funding",
+        "id": "147e944f-fb1e-4b56-95f1-d086030835d8",
+        "links": {
+            "self": {
+                "href": "https://www.studi.com/fr/jsonapi/node/funding/147e944f-fb1e-4b56-95f1-d086030835d8?resourceVersion=id%3A796"
+            }
+        },
+        "attributes": {
+            "drupal_internal__nid": 450,
+            "drupal_internal__vid": 796,
+            "langcode": "fr",
+            "revision_timestamp": "2021-08-17T11:55:40+00:00",
+            "revision_log": null,
+            "status": false,
+            "title": "Reconversion ou Promotion par Alternance (Pro-A)",
+            "created": "2021-08-17T11:54:40+00:00",
+            "changed": "2024-09-30T09:08:25+00:00",
+            "promote": false,
+            "sticky": false,
+            "default_langcode": true,
+            "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Reconversion ou Promotion par Alternance (Pro-A) | Studi"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "description",
+                        "content": "La reconversion ou la promotion par alternance (ex-p\u00e9riode de professionnalisation), dite Pro-A, vise \u00e0 favoriser, par une formation en alternance, le maintien dans l'emploi des salari\u00e9s les moins qualifi\u00e9s."
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/financement/reconversion-promotion-par-alternance"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "publish_on": null,
+            "unpublish_on": null,
+            "satellite_site": [],
+            "content_translation_source": "und",
+            "content_translation_outdated": false,
+            "body": {
+                "value": "<p>La reconversion ou la promotion par alternance (ex-p\u00e9riode de professionnalisation), dite Pro-A, vise \u00e0 favoriser, par une formation en alternance, le maintien dans l'emploi des salari\u00e9s les moins qualifi\u00e9s.</p>\r\n",
+                "format": "basic_html",
+                "processed": "<p>La reconversion ou la promotion par alternance (ex-p\u00e9riode de professionnalisation), dite Pro-A, vise \u00e0 favoriser, par une formation en alternance, le maintien dans l'emploi des salari\u00e9s les moins qualifi\u00e9s.</p>\n",
+                "summary": ""
+            },
+            "field_dark_mode": false,
+            "field_metatag": null,
+            "field_sitemap_exclude": null
+        },
+        "relationships": {
+            "node_type": {
+                "data": {
+                    "type": "node_type--node_type",
+                    "id": "5d7d645e-a53e-4921-83f0-e142b0307f8e",
+                    "meta": {
+                        "drupal_internal__target_id": "funding"
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/147e944f-fb1e-4b56-95f1-d086030835d8/node_type?resourceVersion=id%3A796"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/147e944f-fb1e-4b56-95f1-d086030835d8/relationships/node_type?resourceVersion=id%3A796"
+                    }
+                }
+            },
+            "revision_uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/147e944f-fb1e-4b56-95f1-d086030835d8/relationships/revision_uid?resourceVersion=id%3A796"
+                    }
+                }
+            },
+            "uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/147e944f-fb1e-4b56-95f1-d086030835d8/relationships/uid?resourceVersion=id%3A796"
+                    }
+                }
+            },
+            "field_header": {
+                "data": {
+                    "type": "paragraph--header",
+                    "id": "726f2ad5-1c40-4e36-b2a7-a9365a05be6b",
+                    "meta": {
+                        "target_revision_id": 3377,
+                        "drupal_internal__target_id": 1276
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/147e944f-fb1e-4b56-95f1-d086030835d8/field_header?resourceVersion=id%3A796"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/147e944f-fb1e-4b56-95f1-d086030835d8/relationships/field_header?resourceVersion=id%3A796"
+                    }
+                }
+            },
+            "field_image": {
+                "data": {
+                    "type": "media--image",
+                    "id": "cdc241c6-e6aa-4017-9464-a162e22791fd",
+                    "meta": {
+                        "drupal_internal__target_id": 613
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/147e944f-fb1e-4b56-95f1-d086030835d8/field_image?resourceVersion=id%3A796"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/147e944f-fb1e-4b56-95f1-d086030835d8/relationships/field_image?resourceVersion=id%3A796"
+                    }
+                }
+            },
+            "field_logo": {
+                "data": null,
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/147e944f-fb1e-4b56-95f1-d086030835d8/field_logo?resourceVersion=id%3A796"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/147e944f-fb1e-4b56-95f1-d086030835d8/relationships/field_logo?resourceVersion=id%3A796"
+                    }
+                }
+            },
+            "field_paragraph": {
+                "data": [
+                    {
+                        "type": "paragraph--basic",
+                        "id": "f0096349-8d0b-43f9-bec8-9fefc9944b18",
+                        "meta": {
+                            "target_revision_id": 762,
+                            "drupal_internal__target_id": 265
+                        }
+                    },
+                    {
+                        "type": "paragraph--accordions",
+                        "id": "b1acb388-5653-4745-9f5b-8c1764dd3a1e",
+                        "meta": {
+                            "target_revision_id": 40845,
+                            "drupal_internal__target_id": 7587
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/147e944f-fb1e-4b56-95f1-d086030835d8/field_paragraph?resourceVersion=id%3A796"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/147e944f-fb1e-4b56-95f1-d086030835d8/relationships/field_paragraph?resourceVersion=id%3A796"
+                    }
+                }
+            },
+            "field_situation_prospect": {
+                "data": [
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "de8dcb4a-b8db-4564-9a10-110cd8b3e1e7",
+                        "meta": {
+                            "drupal_internal__target_id": 609
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/147e944f-fb1e-4b56-95f1-d086030835d8/field_situation_prospect?resourceVersion=id%3A796"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/147e944f-fb1e-4b56-95f1-d086030835d8/relationships/field_situation_prospect?resourceVersion=id%3A796"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "node--funding",
         "id": "f94d49d6-65ec-4fa7-9421-f86d827c2224",
         "links": {
             "self": {
@@ -545,9 +679,55 @@
             "sticky": false,
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Transitions collectives | Studi"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "description",
+                        "content": "Transitions collectives, dispositif co-construit avec les partenaires sociaux dans le cadre du plan France Relance, permet aux employeurs d\u2019anticiper les mutations \u00e9conomiques de leur secteur et aux salari\u00e9s d\u2019\u00eatre accompagn\u00e9s pour se reconvertir dans le but d\u2019acc\u00e9der \u00e0 un m\u00e9tier porteur dans le m\u00eame bassin de vie."
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/financement/transitions-collectives"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
+            "content_translation_source": "und",
+            "content_translation_outdated": false,
             "body": {
                 "value": "<p>Transitions collectives, dispositif co-construit avec les partenaires sociaux dans le cadre du plan France Relance, permet aux employeurs d\u2019anticiper les mutations \u00e9conomiques de leur secteur et aux salari\u00e9s d\u2019\u00eatre accompagn\u00e9s pour se reconvertir dans le but d\u2019acc\u00e9der \u00e0 un m\u00e9tier porteur dans le m\u00eame bassin de vie.</p>\r\n",
                 "format": "basic_html",
@@ -555,7 +735,8 @@
                 "summary": ""
             },
             "field_dark_mode": false,
-            "field_metatag": null
+            "field_metatag": null,
+            "field_sitemap_exclude": null
         },
         "relationships": {
             "node_type": {
@@ -708,9 +889,55 @@
             "sticky": false,
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Contrat d'apprentissage | Studi"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "description",
+                        "content": "Le contrat d'apprentissage permet \u00e0 l'apprenti de suivre une formation en alternance en entreprise sous la responsabilit\u00e9 d'un ma\u00eetre d'apprentissage et en centre de formation des apprentis (CFA) pendant 6 mois \u00e0 3 ans."
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/financement/contrat-apprentissage"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
+            "content_translation_source": "und",
+            "content_translation_outdated": false,
             "body": {
                 "value": "<p><span><span><span><span><span><span>Le contrat d'apprentissage permet \u00e0 l'apprenti de suivre une formation en alternance en entreprise sous la responsabilit\u00e9 d'un ma\u00eetre d'apprentissage et en centre de formation des apprentis (CFA) pendant 6 mois \u00e0 3 ans.</span></span></span></span></span></span></p>\r\n",
                 "format": "basic_html",
@@ -718,7 +945,8 @@
                 "summary": ""
             },
             "field_dark_mode": false,
-            "field_metatag": null
+            "field_metatag": null,
+            "field_sitemap_exclude": null
         },
         "relationships": {
             "node_type": {
@@ -871,19 +1099,66 @@
             "sticky": false,
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Contrat de professionnalisation | Studi"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "description",
+                        "content": "Le contrat de professionnalisation vise l\u2019insertion ou le retour \u00e0 l\u2019emploi des jeunes et des adultes et permet l\u2019acquisition \u2013 dans le cadre de la formation continue \u2013 d\u2019une qualification professionnelle reconnue par l\u2019\u00c9tat et/ou la branche professionnelle.\u00a0"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/financement/contrat-de-professionnalisation"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [
                 "academee"
             ],
+            "content_translation_source": "und",
+            "content_translation_outdated": false,
             "body": {
                 "value": "<p>Le contrat de professionnalisation vise l\u2019insertion ou le retour \u00e0 l\u2019emploi des jeunes et des adultes et permet l\u2019acquisition \u2013 dans le cadre de la formation continue \u2013 d\u2019une qualification professionnelle reconnue par l\u2019\u00c9tat et/ou la branche professionnelle.&nbsp;</p>\r\n",
                 "format": "basic_html",
-                "processed": "<p>Le contrat de professionnalisation vise l\u2019insertion ou le retour \u00e0 l\u2019emploi des jeunes et des adultes et permet l\u2019acquisition \u2013 dans le cadre de la formation continue \u2013 d\u2019une qualification professionnelle reconnue par l\u2019\u00c9tat et/ou la branche professionnelle.\u00a0</p>\n",
+                "processed": "<p>Le contrat de professionnalisation vise l\u2019insertion ou le retour \u00e0 l\u2019emploi des jeunes et des adultes et permet l\u2019acquisition \u2013 dans le cadre de la formation continue \u2013 d\u2019une qualification professionnelle reconnue par l\u2019\u00c9tat et/ou la branche professionnelle.&nbsp;</p>\n",
                 "summary": ""
             },
             "field_dark_mode": false,
-            "field_metatag": null
+            "field_metatag": null,
+            "field_sitemap_exclude": null
         },
         "relationships": {
             "node_type": {
@@ -1036,9 +1311,55 @@
             "sticky": false,
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Aide individuelle \u00e0 la formation (AIF) | Studi"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "description",
+                        "content": "L\u2019Aide individuelle \u00e0 la formation (AIF) permet de (co)financer, dans certaines situations sp\u00e9cifiques, tout ou partie des frais p\u00e9dagogiques d\u2019une formation en vue d\u2019un retour durable \u00e0 l'emploi."
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/financement/aide-individuelle-formation"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
+            "content_translation_source": "und",
+            "content_translation_outdated": false,
             "body": {
                 "value": "<p>L\u2019Aide individuelle \u00e0 la formation (AIF) permet de (co)financer, dans certaines situations sp\u00e9cifiques, tout ou partie des frais p\u00e9dagogiques d\u2019une formation en vue d\u2019un retour durable \u00e0 l'emploi.</p>\r\n",
                 "format": "basic_html",
@@ -1046,7 +1367,8 @@
                 "summary": ""
             },
             "field_dark_mode": false,
-            "field_metatag": null
+            "field_metatag": null,
+            "field_sitemap_exclude": null
         },
         "relationships": {
             "node_type": {
@@ -1187,6 +1509,216 @@
     },
     {
         "type": "node--funding",
+        "id": "ce035c60-cdcd-4a62-979d-7ecdb4db7b4f",
+        "links": {
+            "self": {
+                "href": "https://www.studi.com/fr/jsonapi/node/funding/ce035c60-cdcd-4a62-979d-7ecdb4db7b4f?resourceVersion=id%3A802"
+            }
+        },
+        "attributes": {
+            "drupal_internal__nid": 456,
+            "drupal_internal__vid": 802,
+            "langcode": "fr",
+            "revision_timestamp": "2021-08-17T12:18:35+00:00",
+            "revision_log": null,
+            "status": false,
+            "title": "Fonds national de l\u2019emploi",
+            "created": "2021-08-17T12:18:06+00:00",
+            "changed": "2024-09-30T09:08:51+00:00",
+            "promote": false,
+            "sticky": false,
+            "default_langcode": true,
+            "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Fonds national de l\u2019emploi | Studi"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "description",
+                        "content": "Le FNE-Formation est un dispositif d\u00e9di\u00e9 \u00e0 la formation des salari\u00e9s plac\u00e9s en activit\u00e9 partielle ou en activit\u00e9 partielle de longue dur\u00e9e. Il consiste en une prise en charge par l\u2019Etat d\u2019une partie des co\u00fbts p\u00e9dagogiques du projet de formation."
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/financement/fonds-national-emploi"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "publish_on": null,
+            "unpublish_on": null,
+            "satellite_site": [],
+            "content_translation_source": "und",
+            "content_translation_outdated": false,
+            "body": {
+                "value": "<p>Le FNE-Formation est un dispositif d\u00e9di\u00e9 \u00e0 la formation des salari\u00e9s plac\u00e9s en activit\u00e9 partielle ou en activit\u00e9 partielle de longue dur\u00e9e. Il consiste en une prise en charge par l\u2019Etat d\u2019une partie des co\u00fbts p\u00e9dagogiques du projet de formation.</p>\r\n",
+                "format": "basic_html",
+                "processed": "<p>Le FNE-Formation est un dispositif d\u00e9di\u00e9 \u00e0 la formation des salari\u00e9s plac\u00e9s en activit\u00e9 partielle ou en activit\u00e9 partielle de longue dur\u00e9e. Il consiste en une prise en charge par l\u2019Etat d\u2019une partie des co\u00fbts p\u00e9dagogiques du projet de formation.</p>\n",
+                "summary": ""
+            },
+            "field_dark_mode": false,
+            "field_metatag": null,
+            "field_sitemap_exclude": null
+        },
+        "relationships": {
+            "node_type": {
+                "data": {
+                    "type": "node_type--node_type",
+                    "id": "5d7d645e-a53e-4921-83f0-e142b0307f8e",
+                    "meta": {
+                        "drupal_internal__target_id": "funding"
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/ce035c60-cdcd-4a62-979d-7ecdb4db7b4f/node_type?resourceVersion=id%3A802"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/ce035c60-cdcd-4a62-979d-7ecdb4db7b4f/relationships/node_type?resourceVersion=id%3A802"
+                    }
+                }
+            },
+            "revision_uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/ce035c60-cdcd-4a62-979d-7ecdb4db7b4f/relationships/revision_uid?resourceVersion=id%3A802"
+                    }
+                }
+            },
+            "uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/ce035c60-cdcd-4a62-979d-7ecdb4db7b4f/relationships/uid?resourceVersion=id%3A802"
+                    }
+                }
+            },
+            "field_header": {
+                "data": {
+                    "type": "paragraph--header",
+                    "id": "cb86a6f9-487e-4288-8ff5-6193e7ee4de3",
+                    "meta": {
+                        "target_revision_id": 3373,
+                        "drupal_internal__target_id": 1272
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/ce035c60-cdcd-4a62-979d-7ecdb4db7b4f/field_header?resourceVersion=id%3A802"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/ce035c60-cdcd-4a62-979d-7ecdb4db7b4f/relationships/field_header?resourceVersion=id%3A802"
+                    }
+                }
+            },
+            "field_image": {
+                "data": {
+                    "type": "media--image",
+                    "id": "73adb598-1e93-4276-a1ba-46dd6c67fe4a",
+                    "meta": {
+                        "drupal_internal__target_id": 904
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/ce035c60-cdcd-4a62-979d-7ecdb4db7b4f/field_image?resourceVersion=id%3A802"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/ce035c60-cdcd-4a62-979d-7ecdb4db7b4f/relationships/field_image?resourceVersion=id%3A802"
+                    }
+                }
+            },
+            "field_logo": {
+                "data": null,
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/ce035c60-cdcd-4a62-979d-7ecdb4db7b4f/field_logo?resourceVersion=id%3A802"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/ce035c60-cdcd-4a62-979d-7ecdb4db7b4f/relationships/field_logo?resourceVersion=id%3A802"
+                    }
+                }
+            },
+            "field_paragraph": {
+                "data": [
+                    {
+                        "type": "paragraph--basic",
+                        "id": "9f55bb43-7170-425c-a0ee-d93285fc7684",
+                        "meta": {
+                            "target_revision_id": 801,
+                            "drupal_internal__target_id": 304
+                        }
+                    },
+                    {
+                        "type": "paragraph--accordions",
+                        "id": "fe2a8822-5850-46f0-a419-d56c7b276d1d",
+                        "meta": {
+                            "target_revision_id": 40877,
+                            "drupal_internal__target_id": 7619
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/ce035c60-cdcd-4a62-979d-7ecdb4db7b4f/field_paragraph?resourceVersion=id%3A802"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/ce035c60-cdcd-4a62-979d-7ecdb4db7b4f/relationships/field_paragraph?resourceVersion=id%3A802"
+                    }
+                }
+            },
+            "field_situation_prospect": {
+                "data": [
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "de8dcb4a-b8db-4564-9a10-110cd8b3e1e7",
+                        "meta": {
+                            "drupal_internal__target_id": 609
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/ce035c60-cdcd-4a62-979d-7ecdb4db7b4f/field_situation_prospect?resourceVersion=id%3A802"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/ce035c60-cdcd-4a62-979d-7ecdb4db7b4f/relationships/field_situation_prospect?resourceVersion=id%3A802"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "node--funding",
         "id": "90eb3e3a-1feb-463a-b627-702f2c1ebdfc",
         "links": {
             "self": {
@@ -1199,17 +1731,63 @@
             "langcode": "fr",
             "revision_timestamp": "2021-08-17T12:20:55+00:00",
             "revision_log": null,
-            "status": true,
+            "status": false,
             "title": "Validation des acquis de l'exp\u00e9rience",
             "created": "2021-08-17T12:19:57+00:00",
-            "changed": "2024-09-20T14:00:56+00:00",
+            "changed": "2024-10-01T07:54:24+00:00",
             "promote": false,
             "sticky": false,
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Validation des acquis de l'exp\u00e9rience | Studi"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "description",
+                        "content": "La VAE permet d\u2019obtenir un dipl\u00f4me correspondant \u00e0 son exp\u00e9rience professionnelle. Les comp\u00e9tences acquises au fil des ann\u00e9es sont ainsi valoris\u00e9es au m\u00eame titre que si vous les aviez acquises par une formation \u00e9quivalente."
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/financement/validation-acquis-experience"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
+            "content_translation_source": "und",
+            "content_translation_outdated": false,
             "body": {
                 "value": "<p>La VAE permet d\u2019obtenir un dipl\u00f4me correspondant \u00e0 son exp\u00e9rience professionnelle. Les comp\u00e9tences acquises au fil des ann\u00e9es sont ainsi valoris\u00e9es au m\u00eame titre que si vous les aviez acquises par une formation \u00e9quivalente.</p>\r\n",
                 "format": "basic_html",
@@ -1217,7 +1795,8 @@
                 "summary": ""
             },
             "field_dark_mode": false,
-            "field_metatag": null
+            "field_metatag": null,
+            "field_sitemap_exclude": null
         },
         "relationships": {
             "node_type": {
@@ -1370,9 +1949,55 @@
             "sticky": false,
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Dispositif d\u00e9missionnaire | Studi"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "description",
+                        "content": "Ce dispositif vous offre la possibilit\u00e9 de d\u00e9missionner afin de mettre en \u0153uvre votre projet professionnel et percevoir l\u2019allocation ch\u00f4mage. Le projet professionnel peut \u00eatre soit un projet de reconversion professionnelle n\u00e9cessitant le suivi d\u2019une formation, soit un projet de cr\u00e9ation d\u2019entreprise ou une reprise d\u2019entreprise."
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/financement/dispositif-demissionnaire"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
+            "content_translation_source": "und",
+            "content_translation_outdated": false,
             "body": {
                 "value": "<p>Ce dispositif vous offre la possibilit\u00e9 de d\u00e9missionner afin de mettre en \u0153uvre votre projet professionnel et percevoir l\u2019allocation ch\u00f4mage. Le projet professionnel peut \u00eatre soit un projet de reconversion professionnelle n\u00e9cessitant le suivi d\u2019une formation, soit un projet de cr\u00e9ation d\u2019entreprise ou une reprise d\u2019entreprise.</p>\r\n",
                 "format": "basic_html",
@@ -1380,7 +2005,8 @@
                 "summary": ""
             },
             "field_dark_mode": false,
-            "field_metatag": null
+            "field_metatag": null,
+            "field_sitemap_exclude": null
         },
         "relationships": {
             "node_type": {
@@ -1533,9 +2159,55 @@
             "sticky": false,
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Contrat de s\u00e9curisation professionnelle | Studi"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "description",
+                        "content": "Le contrat de s\u00e9curisation professionnelle (CSP) est un dispositif d'accompagnement renforc\u00e9, sous forme de suivi individualis\u00e9, en cas de licenciement pour motif \u00e9conomique du salari\u00e9, qui pr\u00e9voit l'organisation et le d\u00e9roulement d'un parcours de retour \u00e0 l'emploi."
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/financement/contrat-securisation-professionnelle"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
+            "content_translation_source": "und",
+            "content_translation_outdated": false,
             "body": {
                 "value": "<p>Le contrat de s\u00e9curisation professionnelle (CSP) est un dispositif d'accompagnement renforc\u00e9, sous forme de suivi individualis\u00e9, en cas de licenciement pour motif \u00e9conomique du salari\u00e9, qui pr\u00e9voit l'organisation et le d\u00e9roulement d'un parcours de retour \u00e0 l'emploi.</p>\r\n",
                 "format": "basic_html",
@@ -1543,7 +2215,8 @@
                 "summary": ""
             },
             "field_dark_mode": false,
-            "field_metatag": null
+            "field_metatag": null,
+            "field_sitemap_exclude": null
         },
         "relationships": {
             "node_type": {
@@ -1688,9 +2361,55 @@
             "sticky": false,
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Pr\u00e9paration op\u00e9rationnelle \u00e0 l\u2019emploi Collective | Studi"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "description",
+                        "content": "La Pr\u00e9paration Op\u00e9rationnelle \u00e0 l\u2019Emploi Collective (POEC) est une action de formation permettant \u00e0 plusieurs demandeurs d\u2019emploi d\u2019acqu\u00e9rir les comp\u00e9tences requises pour occuper des emplois correspondant \u00e0 des besoins identifi\u00e9s par une branche professionnelle"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/financement/preparation-operationnelle-emploi-collective"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
+            "content_translation_source": "und",
+            "content_translation_outdated": false,
             "body": {
                 "value": "<p>La Pr\u00e9paration Op\u00e9rationnelle \u00e0 l\u2019Emploi Collective (POEC) est une action de formation permettant \u00e0 plusieurs demandeurs d\u2019emploi d\u2019acqu\u00e9rir les comp\u00e9tences requises pour occuper des emplois correspondant \u00e0 des besoins identifi\u00e9s par une branche professionnelle</p>\r\n",
                 "format": "basic_html",
@@ -1698,7 +2417,8 @@
                 "summary": ""
             },
             "field_dark_mode": false,
-            "field_metatag": null
+            "field_metatag": null,
+            "field_sitemap_exclude": null
         },
         "relationships": {
             "node_type": {
@@ -1846,22 +2566,69 @@
             "status": true,
             "title": "Pr\u00e9paration Op\u00e9rationnelle \u00e0 l\u2019Emploi  individuelle",
             "created": "2021-10-05T14:47:24+00:00",
-            "changed": "2024-09-20T13:39:25+00:00",
+            "changed": "2025-02-25T16:45:37+00:00",
             "promote": false,
             "sticky": false,
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Pr\u00e9paration Op\u00e9rationnelle \u00e0 l\u2019Emploi individuelle | Studi"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "description",
+                        "content": "La Pr\u00e9paration Op\u00e9rationnelle \u00e0 l'Emploi individuelle (POEI) permet de former un futur collaborateur avant son embauche par l\u2019interm\u00e9diaire de France Travail."
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/financement/preparation-operationnelle-lemploi-individuelle"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
+            "content_translation_source": "und",
+            "content_translation_outdated": false,
             "body": {
-                "value": "<p><span><span><span><span><span><span>La Pr\u00e9paration Op\u00e9rationnelle \u00e0 l'Emploi individuelle (POEI) permet de former un futur collaborateur avant son embauche par l\u2019interm\u00e9diaire de France Travail.</span></span></span></span></span></span></p>\r\n",
+                "value": "<p><span>La Pr\u00e9paration Op\u00e9rationnelle \u00e0 l'Emploi individuelle (POEI) permet de former un futur collaborateur avant son embauche par l\u2019interm\u00e9diaire de France Travail.</span></p>",
                 "format": "basic_html",
-                "processed": "<p><span><span><span><span><span><span>La Pr\u00e9paration Op\u00e9rationnelle \u00e0 l'Emploi individuelle (POEI) permet de former un futur collaborateur avant son embauche par l\u2019interm\u00e9diaire de France Travail.</span></span></span></span></span></span></p>\n",
+                "processed": "<p><span>La Pr\u00e9paration Op\u00e9rationnelle \u00e0 l'Emploi individuelle (POEI) permet de former un futur collaborateur avant son embauche par l\u2019interm\u00e9diaire de France Travail.</span></p>\n",
                 "summary": ""
             },
             "field_dark_mode": false,
-            "field_metatag": null
+            "field_metatag": null,
+            "field_sitemap_exclude": false
         },
         "relationships": {
             "node_type": {
@@ -2014,9 +2781,55 @@
             "sticky": false,
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Action de Formation Pr\u00e9alable au Recrutement | Studi"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "description",
+                        "content": "L'Action de Formation Pr\u00e9alable au Recrutement (AFPR) est destin\u00e9e \u00e0 combler l'\u00e9cart entre les comp\u00e9tences que vous d\u00e9tenez et celles que requiert l'emploi que vous visez. Ce dispositif s'applique \u00e0 toute personne inscrite \u00e0 France Travail."
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/financement/action-de-formation-prealable-au-recrutement"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
+            "content_translation_source": "und",
+            "content_translation_outdated": false,
             "body": {
                 "value": "<p><span><span><span><span><span><span>L'Action de Formation Pr\u00e9alable au Recrutement (AFPR) est destin\u00e9e \u00e0 combler l'\u00e9cart entre les comp\u00e9tences que vous d\u00e9tenez et celles que requiert l'emploi que vous visez. Ce dispositif s'applique \u00e0 toute personne inscrite \u00e0 France Travail.</span></span></span></span></span></span></p>\r\n",
                 "format": "basic_html",
@@ -2024,7 +2837,8 @@
                 "summary": ""
             },
             "field_dark_mode": false,
-            "field_metatag": null
+            "field_metatag": null,
+            "field_sitemap_exclude": null
         },
         "relationships": {
             "node_type": {
@@ -2177,9 +2991,55 @@
             "sticky": false,
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Cong\u00e9 de formation professionnelle | Studi"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "description",
+                        "content": "L'agent de la fonction publique d\u2019\u00c9tat qui souhaite se former pour satisfaire un projet professionnel ou personnel peut b\u00e9n\u00e9ficier d'un cong\u00e9 de formation professionnelle d'une dur\u00e9e maximale de 3 ans est r\u00e9mun\u00e9r\u00e9 pendant 12 mois."
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/financement/conge-de-formation-professionnelle"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
+            "content_translation_source": "und",
+            "content_translation_outdated": false,
             "body": {
                 "value": "<p><span><span><span><span><span><span><span>L'agent de la fonction publique d\u2019\u00c9tat qui souhaite se former pour satisfaire un projet professionnel ou personnel peut b\u00e9n\u00e9ficier d'un cong\u00e9 de formation professionnelle d'une dur\u00e9e maximale de 3 ans est r\u00e9mun\u00e9r\u00e9 pendant 12 mois.</span></span></span></span></span></span></span></p>\r\n",
                 "format": "basic_html",
@@ -2187,7 +3047,8 @@
                 "summary": ""
             },
             "field_dark_mode": false,
-            "field_metatag": null
+            "field_metatag": null,
+            "field_sitemap_exclude": null
         },
         "relationships": {
             "node_type": {
@@ -2340,9 +3201,55 @@
             "sticky": false,
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Action de Formation Conventionn\u00e9e par France Travail (AFC) | Studi"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "description",
+                        "content": "L'Action de Formation Conventionn\u00e9e par France Travail (AFC) vise \u00e0 faciliter le retour rapide \u00e0 l'emploi. Sa mise en \u0153uvre permet de combler un \u00e9cart entre les comp\u00e9tences d\u00e9tenues par le demandeur d'emploi et les exigences du march\u00e9 du travail."
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/financement/action-de-formation-conventionnee-par-france-travail-afc"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
+            "content_translation_source": "und",
+            "content_translation_outdated": false,
             "body": {
                 "value": "<p><span><span><span><span><span><span>L'Action de Formation Conventionn\u00e9e par France Travail (AFC) vise \u00e0 faciliter le retour rapide \u00e0 l'emploi. Sa mise en \u0153uvre permet de combler un \u00e9cart entre les comp\u00e9tences d\u00e9tenues par le demandeur d'emploi et les exigences du march\u00e9 du travail.</span></span></span></span></span></span></p>\r\n",
                 "format": "basic_html",
@@ -2350,7 +3257,8 @@
                 "summary": ""
             },
             "field_dark_mode": false,
-            "field_metatag": null
+            "field_metatag": null,
+            "field_sitemap_exclude": null
         },
         "relationships": {
             "node_type": {
@@ -2503,9 +3411,55 @@
             "sticky": false,
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "FAF | Studi"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "description",
+                        "content": "En contrepartie de la contribution \u00e0 la formation professionnelle (CFP), \u00e0 laquelle ils sont soumis, les travailleurs ind\u00e9pendants peuvent b\u00e9n\u00e9ficier du financement total ou partiel de leurs formations."
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/financement/faf"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
+            "content_translation_source": "und",
+            "content_translation_outdated": false,
             "body": {
                 "value": "<p><span><span><span><span><span><span>En contrepartie de la contribution \u00e0 la formation professionnelle (CFP), \u00e0 laquelle ils sont soumis, les travailleurs ind\u00e9pendants peuvent b\u00e9n\u00e9ficier du financement total ou partiel de leurs formations.</span></span></span></span></span></span></p>\r\n",
                 "format": "basic_html",
@@ -2513,7 +3467,8 @@
                 "summary": ""
             },
             "field_dark_mode": false,
-            "field_metatag": null
+            "field_metatag": null,
+            "field_sitemap_exclude": null
         },
         "relationships": {
             "node_type": {
@@ -2666,9 +3621,55 @@
             "sticky": false,
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "CDI-Apprentissage | Studi"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "description",
+                        "content": "La solution CDI \u2013 Apprentissage de Studi, permet de pr\u00e9parer \u00e0 l'obtention d'un Dipl\u00f4me d'Etat, d'un Titre Professionnel ou d'un Titre RNCP"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/financement/cdi-apprentissage"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
+            "content_translation_source": "und",
+            "content_translation_outdated": false,
             "body": {
                 "value": "<p>L\u2019article L. 6222-13 du code du travail permet au salari\u00e9 d\u00e9j\u00e0 titulaire d\u2019un CDI dans une entreprise, de suspendre son CDI, en plein accord avec son employeur, pour conclure un contrat d\u2019apprentissage avec ce m\u00eame employeur.</p>\r\n",
                 "format": "basic_html",
@@ -2685,7 +3686,8 @@
                     "title": "[node:title] | [site:name]",
                     "og_image": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
                 }
-            }
+            },
+            "field_sitemap_exclude": null
         },
         "relationships": {
             "node_type": {
@@ -2830,25 +3832,72 @@
             "langcode": "fr",
             "revision_timestamp": "2022-09-02T11:55:41+00:00",
             "revision_log": null,
-            "status": true,
+            "status": false,
             "title": "Les formations 100% financ\u00e9es \u00e0 destination des demandeurs d'emploi en R\u00e9gion Ile-de-France",
             "created": "2022-09-02T11:53:29+00:00",
-            "changed": "2024-09-20T14:52:24+00:00",
+            "changed": "2024-10-10T13:28:33+00:00",
             "promote": false,
             "sticky": false,
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Les formations 100% financ\u00e9es \u00e0 destination des demandeurs d'emploi en R\u00e9gion Ile-de-France | Studi"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "description",
+                        "content": "Vous r\u00e9sidez en \u00cele-de-France et recherchez un emploi? La R\u00e9gion Ile-de-France vous propose une formation dipl\u00f4mante pour vous pr\u00e9parer aux m\u00e9tiers les\u00a0plus recherch\u00e9s par les recruteurs. Formez-vous \u00e0 un m\u00e9tier d'avenir\u00a0gr\u00e2ce \u00e0 des formations 100% financ\u00e9es !"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/financement/les-formations-100-financees-destination-des-demandeurs-demploi-en-region-ile-de-france-old"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
+            "content_translation_source": "und",
+            "content_translation_outdated": false,
             "body": {
                 "value": "<p>Vous r\u00e9sidez en \u00cele-de-France et recherchez un emploi? La R\u00e9gion Ile-de-France vous propose une formation dipl\u00f4mante pour vous pr\u00e9parer aux m\u00e9tiers les&nbsp;plus recherch\u00e9s par les recruteurs. Formez-vous \u00e0 un m\u00e9tier d'avenir&nbsp;gr\u00e2ce \u00e0 des formations 100% financ\u00e9es !</p>\r\n",
                 "format": "basic_html",
-                "processed": "<p>Vous r\u00e9sidez en \u00cele-de-France et recherchez un emploi? La R\u00e9gion Ile-de-France vous propose une formation dipl\u00f4mante pour vous pr\u00e9parer aux m\u00e9tiers les\u00a0plus recherch\u00e9s par les recruteurs. Formez-vous \u00e0 un m\u00e9tier d'avenir\u00a0gr\u00e2ce \u00e0 des formations 100% financ\u00e9es !</p>\n",
+                "processed": "<p>Vous r\u00e9sidez en \u00cele-de-France et recherchez un emploi? La R\u00e9gion Ile-de-France vous propose une formation dipl\u00f4mante pour vous pr\u00e9parer aux m\u00e9tiers les&nbsp;plus recherch\u00e9s par les recruteurs. Formez-vous \u00e0 un m\u00e9tier d'avenir&nbsp;gr\u00e2ce \u00e0 des formations 100% financ\u00e9es !</p>\n",
                 "summary": ""
             },
             "field_dark_mode": false,
-            "field_metatag": null
+            "field_metatag": null,
+            "field_sitemap_exclude": null
         },
         "relationships": {
             "node_type": {
@@ -3001,25 +4050,81 @@
             "langcode": "fr",
             "revision_timestamp": "2022-09-02T11:55:41+00:00",
             "revision_log": null,
-            "status": true,
+            "status": false,
             "title": "Les formations 100% financ\u00e9es \u00e0 destination des demandeurs d'emploi partout en France",
             "created": "2022-09-02T12:10:28+00:00",
-            "changed": "2024-09-30T09:28:55+00:00",
+            "changed": "2024-10-07T10:06:51+00:00",
             "promote": false,
             "sticky": false,
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Les formations 100% financ\u00e9es \u00e0 destination des demandeurs d'emploi partout en France | Studi"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "description",
+                        "content": "Vous \u00eates demandeur d'emploi ? France Travail et Studi vous forment aux m\u00e9tiers qui recrutent !\u00a0"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/financement/les-formations-100-financees-destination-des-demandeurs-demploi-partout-en-france-old"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "noindex, nofollow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
+            "content_translation_source": "und",
+            "content_translation_outdated": false,
             "body": {
                 "value": "<p>Vous \u00eates demandeur d'emploi ? France Travail et Studi vous forment aux m\u00e9tiers qui recrutent !&nbsp;</p>\r\n",
                 "format": "basic_html",
-                "processed": "<p>Vous \u00eates demandeur d'emploi ? France Travail et Studi vous forment aux m\u00e9tiers qui recrutent !\u00a0</p>\n",
+                "processed": "<p>Vous \u00eates demandeur d'emploi ? France Travail et Studi vous forment aux m\u00e9tiers qui recrutent !&nbsp;</p>\n",
                 "summary": ""
             },
             "field_dark_mode": false,
-            "field_metatag": null
+            "field_metatag": {
+                "value": {
+                    "robots": "noindex, nofollow",
+                    "canonical_url": "[node:url]",
+                    "image_src": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg",
+                    "title": "[node:title] | [site:name]",
+                    "og_image": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg",
+                    "description": "[node:summary]"
+                }
+            },
+            "field_sitemap_exclude": null
         },
         "relationships": {
             "node_type": {
@@ -3175,22 +4280,69 @@
             "status": true,
             "title": "Financement personnel ",
             "created": "2024-09-26T14:33:35+00:00",
-            "changed": "2024-09-27T10:17:56+00:00",
+            "changed": "2025-03-28T21:04:49+00:00",
             "promote": false,
             "sticky": false,
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Financement personnel | Studi"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "description",
+                        "content": "Financez votre formation facilement en plusieurs fois sans frais jusqu'\u00e0 36 mois. \u00a0"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/financement/financement-personnel"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
+            "content_translation_source": "und",
+            "content_translation_outdated": false,
             "body": {
-                "value": "<p>Ma\u00eetrisez votre budget formation sur un \u00e9chelonnement possible de 10, 12, 24 ou 36 mois sans frais (0% d'int\u00e9r\u00eat).&nbsp;<br />\r\nD\u00e9marrez votre formation \u00e0 partir de seulement 69\u20ac/mois.&nbsp;</p>\r\n",
+                "value": "<p>Financez votre formation facilement en plusieurs fois sans frais jusqu'\u00e0 36 mois. &nbsp;</p>",
                 "format": "basic_html",
-                "processed": "<p>Ma\u00eetrisez votre budget formation sur un \u00e9chelonnement possible de 10, 12, 24 ou 36 mois sans frais (0% d'int\u00e9r\u00eat).\u00a0<br />\nD\u00e9marrez votre formation \u00e0 partir de seulement 69\u20ac/mois.\u00a0</p>\n",
+                "processed": "<p>Financez votre formation facilement en plusieurs fois sans frais jusqu'\u00e0 36 mois. &nbsp;</p>\n",
                 "summary": ""
             },
             "field_dark_mode": false,
-            "field_metatag": null
+            "field_metatag": null,
+            "field_sitemap_exclude": false
         },
         "relationships": {
             "node_type": {
@@ -3283,11 +4435,27 @@
                         }
                     },
                     {
-                        "type": "paragraph--accordions",
-                        "id": "2eea36a7-877e-4917-ac72-404d8a25b691",
+                        "type": "paragraph--basic",
+                        "id": "33f4f240-5023-4c42-9608-2d2e9574990a",
                         "meta": {
-                            "target_revision_id": 295858,
-                            "drupal_internal__target_id": 33522
+                            "target_revision_id": 317358,
+                            "drupal_internal__target_id": 34781
+                        }
+                    },
+                    {
+                        "type": "paragraph--basic",
+                        "id": "eb7dbf42-b3f3-448e-84af-f17ad7898259",
+                        "meta": {
+                            "target_revision_id": 327942,
+                            "drupal_internal__target_id": 36014
+                        }
+                    },
+                    {
+                        "type": "paragraph--cta",
+                        "id": "583bffdd-1b8d-431c-8ba7-13042b1ed6c0",
+                        "meta": {
+                            "target_revision_id": 327943,
+                            "drupal_internal__target_id": 36015
                         }
                     }
                 ],
@@ -3371,28 +4539,71 @@
             "revision_timestamp": "2024-09-30T13:33:18+00:00",
             "revision_log": null,
             "status": true,
-            "title": "Votre formation 100% financ\u00e9e par France Travail",
+            "title": " Demandeurs d'emploi :  Votre formation 100% financ\u00e9e par France Travail",
             "created": "2024-09-30T13:14:33+00:00",
-            "changed": "2024-09-30T13:33:51+00:00",
+            "changed": "2025-03-31T14:12:34+00:00",
             "promote": false,
             "sticky": false,
             "default_langcode": true,
             "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Demandeurs d'emploi : Votre formation 100% financ\u00e9e par France Travail | Studi"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "description",
+                        "content": "Studi et France Travail s'associent pour vous former aux m\u00e9tiers les plus recherch\u00e9s par les recruteurs."
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/financement/les-formations-100-financees-destination-des-demandeurs-demploi-partout-en-france"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
             "publish_on": null,
             "unpublish_on": null,
             "satellite_site": [],
-            "body": null,
-            "field_dark_mode": false,
-            "field_metatag": {
-                "value": {
-                    "robots": "noindex, nofollow",
-                    "canonical_url": "[node:url]",
-                    "image_src": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg",
-                    "title": "[node:title] | [site:name]",
-                    "og_image": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg",
-                    "description": "[node:summary]"
-                }
-            }
+            "content_translation_source": "und",
+            "content_translation_outdated": false,
+            "body": {
+                "value": "<p>Studi et France Travail s'associent pour vous former aux m\u00e9tiers les plus recherch\u00e9s par les recruteurs.</p>",
+                "format": "basic_html",
+                "processed": "<p>Studi et France Travail s'associent pour vous former aux m\u00e9tiers les plus recherch\u00e9s par les recruteurs.</p>\n",
+                "summary": ""
+            },
+            "field_dark_mode": true,
+            "field_metatag": null,
+            "field_sitemap_exclude": false
         },
         "relationships": {
             "node_type": {
@@ -3447,7 +4658,13 @@
                 }
             },
             "field_image": {
-                "data": null,
+                "data": {
+                    "type": "media--image",
+                    "id": "3a012f1e-7fb7-46a5-bdac-0bb08d7a83e8",
+                    "meta": {
+                        "drupal_internal__target_id": 4234
+                    }
+                },
                 "links": {
                     "related": {
                         "href": "https://www.studi.com/fr/jsonapi/node/funding/fbd2ce8f-4f6a-48c1-a358-f0a5b799939f/field_image?resourceVersion=id%3A116891"
@@ -3469,7 +4686,144 @@
                 }
             },
             "field_paragraph": {
-                "data": [],
+                "data": [
+                    {
+                        "type": "paragraph--text_media",
+                        "id": "e4775c60-67d8-4e38-98f5-1662e5280651",
+                        "meta": {
+                            "target_revision_id": 298072,
+                            "drupal_internal__target_id": 33687
+                        }
+                    },
+                    {
+                        "type": "paragraph--anchor",
+                        "id": "2459c5e9-2aab-4d31-ab3a-2472d75b653e",
+                        "meta": {
+                            "target_revision_id": 312073,
+                            "drupal_internal__target_id": 34553
+                        }
+                    },
+                    {
+                        "type": "paragraph--training",
+                        "id": "842502df-5f43-4c15-91dc-be5528603a7f",
+                        "meta": {
+                            "target_revision_id": 297849,
+                            "drupal_internal__target_id": 33635
+                        }
+                    },
+                    {
+                        "type": "paragraph--anchor",
+                        "id": "6fddd0a8-08d8-4458-9992-338e0c661f7a",
+                        "meta": {
+                            "target_revision_id": 311537,
+                            "drupal_internal__target_id": 34483
+                        }
+                    },
+                    {
+                        "type": "paragraph--bloc_existant",
+                        "id": "62d38865-8801-4f20-9e12-9d1ea4690ed6",
+                        "meta": {
+                            "target_revision_id": 311536,
+                            "drupal_internal__target_id": 34482
+                        }
+                    },
+                    {
+                        "type": "paragraph--anchor",
+                        "id": "339188c7-c760-422b-b671-db7abe0cabf4",
+                        "meta": {
+                            "target_revision_id": 314764,
+                            "drupal_internal__target_id": 34598
+                        }
+                    },
+                    {
+                        "type": "paragraph--columns",
+                        "id": "454a03bb-c90f-40bb-8087-baa6551aa191",
+                        "meta": {
+                            "target_revision_id": 297983,
+                            "drupal_internal__target_id": 33648
+                        }
+                    },
+                    {
+                        "type": "paragraph--cta",
+                        "id": "5cf00b18-f7f8-4c7d-a780-6d84ca5b22e6",
+                        "meta": {
+                            "target_revision_id": 297999,
+                            "drupal_internal__target_id": 33664
+                        }
+                    },
+                    {
+                        "type": "paragraph--contributed_block",
+                        "id": "a71c5701-86fe-4e76-a716-7ff84ae92b78",
+                        "meta": {
+                            "target_revision_id": 307144,
+                            "drupal_internal__target_id": 34207
+                        }
+                    },
+                    {
+                        "type": "paragraph--anchor",
+                        "id": "40abbfbc-a1ee-4abf-8ca6-4200117db141",
+                        "meta": {
+                            "target_revision_id": 314766,
+                            "drupal_internal__target_id": 34600
+                        }
+                    },
+                    {
+                        "type": "paragraph--text_media",
+                        "id": "e0cf2628-1c14-400d-8cce-30f7756960af",
+                        "meta": {
+                            "target_revision_id": 297984,
+                            "drupal_internal__target_id": 33649
+                        }
+                    },
+                    {
+                        "type": "paragraph--text_media",
+                        "id": "b0410fa8-9295-47c0-8444-fe2d2070cecb",
+                        "meta": {
+                            "target_revision_id": 297985,
+                            "drupal_internal__target_id": 33650
+                        }
+                    },
+                    {
+                        "type": "paragraph--anchor",
+                        "id": "9cb20461-ab7d-4721-a653-71b853663f65",
+                        "meta": {
+                            "target_revision_id": 314765,
+                            "drupal_internal__target_id": 34599
+                        }
+                    },
+                    {
+                        "type": "paragraph--columns",
+                        "id": "4b79fe0e-3672-4f2a-8511-178a4e08f521",
+                        "meta": {
+                            "target_revision_id": 297848,
+                            "drupal_internal__target_id": 33634
+                        }
+                    },
+                    {
+                        "type": "paragraph--cta",
+                        "id": "a4393fe8-92b7-4d3d-9c02-bbf03fb5cc9a",
+                        "meta": {
+                            "target_revision_id": 298009,
+                            "drupal_internal__target_id": 33674
+                        }
+                    },
+                    {
+                        "type": "paragraph--contributed_block",
+                        "id": "67c15ea4-2560-48fa-ad91-21e94e12a260",
+                        "meta": {
+                            "target_revision_id": 344697,
+                            "drupal_internal__target_id": 37514
+                        }
+                    },
+                    {
+                        "type": "paragraph--contributed_block",
+                        "id": "85d4d827-74f4-4a20-ae8f-29f8eb872fa9",
+                        "meta": {
+                            "target_revision_id": 345530,
+                            "drupal_internal__target_id": 37600
+                        }
+                    }
+                ],
                 "links": {
                     "related": {
                         "href": "https://www.studi.com/fr/jsonapi/node/funding/fbd2ce8f-4f6a-48c1-a358-f0a5b799939f/field_paragraph?resourceVersion=id%3A116891"
@@ -3495,6 +4849,534 @@
                     },
                     "self": {
                         "href": "https://www.studi.com/fr/jsonapi/node/funding/fbd2ce8f-4f6a-48c1-a358-f0a5b799939f/relationships/field_situation_prospect?resourceVersion=id%3A116891"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "node--funding",
+        "id": "d50eb972-d446-441e-8ae2-0f0b180ea832",
+        "links": {
+            "self": {
+                "href": "https://www.studi.com/fr/jsonapi/node/funding/d50eb972-d446-441e-8ae2-0f0b180ea832?resourceVersion=id%3A117502"
+            }
+        },
+        "attributes": {
+            "drupal_internal__nid": 10176,
+            "drupal_internal__vid": 117502,
+            "langcode": "fr",
+            "revision_timestamp": "2024-10-04T08:13:11+00:00",
+            "revision_log": null,
+            "status": true,
+            "title": "Demandeurs d'emploi en Ile-de-France :  Votre formation 100% financ\u00e9e par la R\u00e9gion Ile-de-France",
+            "created": "2024-10-04T08:10:12+00:00",
+            "changed": "2024-11-18T08:53:06+00:00",
+            "promote": false,
+            "sticky": false,
+            "default_langcode": true,
+            "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Demandeurs d'emploi en Ile-de-France : Votre formation 100% financ\u00e9e par la R\u00e9gion Ile-de-France | Studi"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "description",
+                        "content": "Vous \u00eates demandeur d'emploi et vous r\u00e9sidez en Ile-de-France ? La r\u00e9gion Ile-de-France et Studi vous forment \u00e0 des m\u00e9tiers d'avenir !"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/financement/les-formations-100-financees-destination-des-demandeurs-demploi-en-region-ile-de-france"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "index, follow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "publish_on": null,
+            "unpublish_on": null,
+            "satellite_site": [],
+            "content_translation_source": "und",
+            "content_translation_outdated": false,
+            "body": {
+                "value": "<p>Vous \u00eates demandeur d'emploi et vous r\u00e9sidez en Ile-de-France ? La r\u00e9gion Ile-de-France et Studi vous forment \u00e0 des m\u00e9tiers d'avenir !</p>",
+                "format": "basic_html",
+                "processed": "<p>Vous \u00eates demandeur d'emploi et vous r\u00e9sidez en Ile-de-France ? La r\u00e9gion Ile-de-France et Studi vous forment \u00e0 des m\u00e9tiers d'avenir !</p>\n",
+                "summary": ""
+            },
+            "field_dark_mode": false,
+            "field_metatag": null,
+            "field_sitemap_exclude": false
+        },
+        "relationships": {
+            "node_type": {
+                "data": {
+                    "type": "node_type--node_type",
+                    "id": "5d7d645e-a53e-4921-83f0-e142b0307f8e",
+                    "meta": {
+                        "drupal_internal__target_id": "funding"
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/d50eb972-d446-441e-8ae2-0f0b180ea832/node_type?resourceVersion=id%3A117502"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/d50eb972-d446-441e-8ae2-0f0b180ea832/relationships/node_type?resourceVersion=id%3A117502"
+                    }
+                }
+            },
+            "revision_uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/d50eb972-d446-441e-8ae2-0f0b180ea832/relationships/revision_uid?resourceVersion=id%3A117502"
+                    }
+                }
+            },
+            "uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/d50eb972-d446-441e-8ae2-0f0b180ea832/relationships/uid?resourceVersion=id%3A117502"
+                    }
+                }
+            },
+            "field_header": {
+                "data": {
+                    "type": "paragraph--header",
+                    "id": "9aa63e94-4daf-465a-a23e-900f9b263fda",
+                    "meta": {
+                        "target_revision_id": 300270,
+                        "drupal_internal__target_id": 33828
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/d50eb972-d446-441e-8ae2-0f0b180ea832/field_header?resourceVersion=id%3A117502"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/d50eb972-d446-441e-8ae2-0f0b180ea832/relationships/field_header?resourceVersion=id%3A117502"
+                    }
+                }
+            },
+            "field_image": {
+                "data": {
+                    "type": "media--image",
+                    "id": "1e2c60c7-f7ac-4217-b392-a05a643a895d",
+                    "meta": {
+                        "drupal_internal__target_id": 482
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/d50eb972-d446-441e-8ae2-0f0b180ea832/field_image?resourceVersion=id%3A117502"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/d50eb972-d446-441e-8ae2-0f0b180ea832/relationships/field_image?resourceVersion=id%3A117502"
+                    }
+                }
+            },
+            "field_logo": {
+                "data": null,
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/d50eb972-d446-441e-8ae2-0f0b180ea832/field_logo?resourceVersion=id%3A117502"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/d50eb972-d446-441e-8ae2-0f0b180ea832/relationships/field_logo?resourceVersion=id%3A117502"
+                    }
+                }
+            },
+            "field_paragraph": {
+                "data": [
+                    {
+                        "type": "paragraph--text_media",
+                        "id": "03db35a4-4db0-4c8a-b1ce-8ece9d8cd09e",
+                        "meta": {
+                            "target_revision_id": 300271,
+                            "drupal_internal__target_id": 33829
+                        }
+                    },
+                    {
+                        "type": "paragraph--training",
+                        "id": "48bff6bc-2ffa-4660-997e-c1609cccb280",
+                        "meta": {
+                            "target_revision_id": 300272,
+                            "drupal_internal__target_id": 33830
+                        }
+                    },
+                    {
+                        "type": "paragraph--cta",
+                        "id": "55eaff4a-f6f2-49cb-9d16-82c77bac9144",
+                        "meta": {
+                            "target_revision_id": 300294,
+                            "drupal_internal__target_id": 33846
+                        }
+                    },
+                    {
+                        "type": "paragraph--contributed_block",
+                        "id": "abf6e17a-1317-4f6b-8ce0-c1004ccd567c",
+                        "meta": {
+                            "target_revision_id": 307145,
+                            "drupal_internal__target_id": 34208
+                        }
+                    },
+                    {
+                        "type": "paragraph--text_media",
+                        "id": "e63cd577-ced1-4bc0-9921-cc82aeff0277",
+                        "meta": {
+                            "target_revision_id": 300273,
+                            "drupal_internal__target_id": 33831
+                        }
+                    },
+                    {
+                        "type": "paragraph--text_media",
+                        "id": "1f07dfcb-98e4-4674-8946-53cc5c8f810a",
+                        "meta": {
+                            "target_revision_id": 300274,
+                            "drupal_internal__target_id": 33832
+                        }
+                    },
+                    {
+                        "type": "paragraph--columns",
+                        "id": "e6dcbbdc-3802-4b4b-94e1-aa935d63403f",
+                        "meta": {
+                            "target_revision_id": 300277,
+                            "drupal_internal__target_id": 33835
+                        }
+                    },
+                    {
+                        "type": "paragraph--cta",
+                        "id": "5d0b7c15-d79d-49ea-baa6-9c010b079a13",
+                        "meta": {
+                            "target_revision_id": 300295,
+                            "drupal_internal__target_id": 33847
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/d50eb972-d446-441e-8ae2-0f0b180ea832/field_paragraph?resourceVersion=id%3A117502"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/d50eb972-d446-441e-8ae2-0f0b180ea832/relationships/field_paragraph?resourceVersion=id%3A117502"
+                    }
+                }
+            },
+            "field_situation_prospect": {
+                "data": [
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "520041ce-1203-4c23-ba49-f8a8b7e46c1d",
+                        "meta": {
+                            "drupal_internal__target_id": 610
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/d50eb972-d446-441e-8ae2-0f0b180ea832/field_situation_prospect?resourceVersion=id%3A117502"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/d50eb972-d446-441e-8ae2-0f0b180ea832/relationships/field_situation_prospect?resourceVersion=id%3A117502"
+                    }
+                }
+            }
+        }
+    },
+    {
+        "type": "node--funding",
+        "id": "f86f6760-7a57-49b5-a938-09234bfa6664",
+        "links": {
+            "self": {
+                "href": "https://www.studi.com/fr/jsonapi/node/funding/f86f6760-7a57-49b5-a938-09234bfa6664?resourceVersion=id%3A122277"
+            }
+        },
+        "attributes": {
+            "drupal_internal__nid": 10382,
+            "drupal_internal__vid": 122277,
+            "langcode": "fr",
+            "revision_timestamp": "2024-09-26T14:35:58+00:00",
+            "revision_log": null,
+            "status": false,
+            "title": "Financement personnel",
+            "created": "2025-01-13T10:36:53+00:00",
+            "changed": "2025-01-14T07:58:37+00:00",
+            "promote": false,
+            "sticky": false,
+            "default_langcode": true,
+            "revision_translation_affected": true,
+            "metatag": [
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "title",
+                        "content": "Financement personnel | Studi"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "description",
+                        "content": "Ma\u00eetrisez vos d\u00e9penses de formation gr\u00e2ce aux paiements en plusieurs fois sans frais."
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "canonical",
+                        "href": "https://www.studi.com/fr/financement/financement-personnel-0"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "name": "robots",
+                        "content": "noindex, nofollow"
+                    }
+                },
+                {
+                    "tag": "link",
+                    "attributes": {
+                        "rel": "image_src",
+                        "href": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                },
+                {
+                    "tag": "meta",
+                    "attributes": {
+                        "property": "og:image",
+                        "content": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg"
+                    }
+                }
+            ],
+            "publish_on": null,
+            "unpublish_on": null,
+            "satellite_site": [],
+            "content_translation_source": "und",
+            "content_translation_outdated": false,
+            "body": {
+                "value": "<p>Ma\u00eetrisez vos d\u00e9penses de formation gr\u00e2ce aux paiements en plusieurs fois sans frais.</p>",
+                "format": "basic_html",
+                "processed": "<p>Ma\u00eetrisez vos d\u00e9penses de formation gr\u00e2ce aux paiements en plusieurs fois sans frais.</p>\n",
+                "summary": ""
+            },
+            "field_dark_mode": false,
+            "field_metatag": {
+                "value": {
+                    "robots": "noindex, nofollow",
+                    "canonical_url": "[node:url]",
+                    "image_src": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg",
+                    "title": "[node:title] | [site:name]",
+                    "og_image": "https://www.studi.com/sites/default/files/2021-09/og_img_studi.jpg",
+                    "description": "[node:summary]"
+                }
+            },
+            "field_sitemap_exclude": false
+        },
+        "relationships": {
+            "node_type": {
+                "data": {
+                    "type": "node_type--node_type",
+                    "id": "5d7d645e-a53e-4921-83f0-e142b0307f8e",
+                    "meta": {
+                        "drupal_internal__target_id": "funding"
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/f86f6760-7a57-49b5-a938-09234bfa6664/node_type?resourceVersion=id%3A122277"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/f86f6760-7a57-49b5-a938-09234bfa6664/relationships/node_type?resourceVersion=id%3A122277"
+                    }
+                }
+            },
+            "revision_uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/f86f6760-7a57-49b5-a938-09234bfa6664/relationships/revision_uid?resourceVersion=id%3A122277"
+                    }
+                }
+            },
+            "uid": {
+                "data": null,
+                "links": {
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/f86f6760-7a57-49b5-a938-09234bfa6664/relationships/uid?resourceVersion=id%3A122277"
+                    }
+                }
+            },
+            "field_header": {
+                "data": {
+                    "type": "paragraph--header",
+                    "id": "b7be5f77-14de-49db-a7ca-e0539b24612e",
+                    "meta": {
+                        "target_revision_id": 327937,
+                        "drupal_internal__target_id": 36009
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/f86f6760-7a57-49b5-a938-09234bfa6664/field_header?resourceVersion=id%3A122277"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/f86f6760-7a57-49b5-a938-09234bfa6664/relationships/field_header?resourceVersion=id%3A122277"
+                    }
+                }
+            },
+            "field_image": {
+                "data": {
+                    "type": "media--image",
+                    "id": "0eb4a0b8-a10b-4dec-a882-d72668bd602c",
+                    "meta": {
+                        "drupal_internal__target_id": 5644
+                    }
+                },
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/f86f6760-7a57-49b5-a938-09234bfa6664/field_image?resourceVersion=id%3A122277"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/f86f6760-7a57-49b5-a938-09234bfa6664/relationships/field_image?resourceVersion=id%3A122277"
+                    }
+                }
+            },
+            "field_logo": {
+                "data": null,
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/f86f6760-7a57-49b5-a938-09234bfa6664/field_logo?resourceVersion=id%3A122277"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/f86f6760-7a57-49b5-a938-09234bfa6664/relationships/field_logo?resourceVersion=id%3A122277"
+                    }
+                }
+            },
+            "field_paragraph": {
+                "data": [
+                    {
+                        "type": "paragraph--basic",
+                        "id": "89522b70-d8ba-4290-bc27-7fee4ff57720",
+                        "meta": {
+                            "target_revision_id": 327938,
+                            "drupal_internal__target_id": 36010
+                        }
+                    },
+                    {
+                        "type": "paragraph--basic",
+                        "id": "97349ba5-e00d-4662-a718-d427f357cde4",
+                        "meta": {
+                            "target_revision_id": 327939,
+                            "drupal_internal__target_id": 36011
+                        }
+                    },
+                    {
+                        "type": "paragraph--basic",
+                        "id": "4622dbf6-4131-4a4c-abaa-b0e6ac746796",
+                        "meta": {
+                            "target_revision_id": 327940,
+                            "drupal_internal__target_id": 36012
+                        }
+                    },
+                    {
+                        "type": "paragraph--cta",
+                        "id": "adfa2d02-c922-40c9-a274-efa1e55eedb7",
+                        "meta": {
+                            "target_revision_id": 327941,
+                            "drupal_internal__target_id": 36013
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/f86f6760-7a57-49b5-a938-09234bfa6664/field_paragraph?resourceVersion=id%3A122277"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/f86f6760-7a57-49b5-a938-09234bfa6664/relationships/field_paragraph?resourceVersion=id%3A122277"
+                    }
+                }
+            },
+            "field_situation_prospect": {
+                "data": [
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "de8dcb4a-b8db-4564-9a10-110cd8b3e1e7",
+                        "meta": {
+                            "drupal_internal__target_id": 609
+                        }
+                    },
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "520041ce-1203-4c23-ba49-f8a8b7e46c1d",
+                        "meta": {
+                            "drupal_internal__target_id": 610
+                        }
+                    },
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "ba24346b-1361-4eda-bf8d-1d082111379c",
+                        "meta": {
+                            "drupal_internal__target_id": 617
+                        }
+                    },
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "d8ff77dd-058d-41e9-8692-90c7e111c39d",
+                        "meta": {
+                            "drupal_internal__target_id": 616
+                        }
+                    },
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "43b9b286-e909-4c5b-a60d-ff34bb705fb0",
+                        "meta": {
+                            "drupal_internal__target_id": 618
+                        }
+                    },
+                    {
+                        "type": "taxonomy_term--situation_prospect",
+                        "id": "994c9ca9-1232-41ca-a2fc-2abcd115d634",
+                        "meta": {
+                            "drupal_internal__target_id": 620
+                        }
+                    }
+                ],
+                "links": {
+                    "related": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/f86f6760-7a57-49b5-a938-09234bfa6664/field_situation_prospect?resourceVersion=id%3A122277"
+                    },
+                    "self": {
+                        "href": "https://www.studi.com/fr/jsonapi/node/funding/f86f6760-7a57-49b5-a938-09234bfa6664/relationships/field_situation_prospect?resourceVersion=id%3A122277"
                     }
                 }
             }

@@ -229,7 +229,7 @@ class DrupalJsonApiClient:
                     extract_field_text_values(item)
 
         extract_field_text_values(json_data)
-        field_text_values = DrupalJsonApiClient.remove_redundant_strings_based_on_similarity_threshold(field_text_values, similarity_threshold=0.3)
+        field_text_values = json_data # Set back to remove identical items: DrupalJsonApiClient.remove_redundant_strings_based_on_similarity_threshold(field_text_values, similarity_threshold=0.3)
         return field_text_values
     
     #todo: to move to common_tools, BM25 section

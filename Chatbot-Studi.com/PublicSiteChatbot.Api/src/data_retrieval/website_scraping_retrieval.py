@@ -74,23 +74,18 @@ class WebsiteScrapingRetrieval:
         options.add_argument("--log-level=3")  # Suppress logging
         driver = webdriver.Chrome(options=options)
         url = base_url + str(page)
-        response = driver.get(url)
+        driver.get(url)
         time.sleep(2)
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            hits_list = soup.find('ol', class_='ais-Hits-list')
-
-            if hits_list:
-                    # Find all links in the hits list
-                for item in hits_list.find_all('a', href=True):
-                    href = item['href']
-                    if href.startswith("/fr/formation/"):
-                        training_links.append("https://www.studi.com" + href)
-            else:
-                print(f"No content found on page {page}")        
+        html: str = driver.page_source
+        soup: BeautifulSoup = BeautifulSoup(html, 'html.parser')
+        hits_list = soup.find('ol', class_='ais-Hits-list')
+        if hits_list:
+            for item in hits_list.find_all('a', href=True):
+                href: str = item['href']
+                if href.startswith("/fr/formation/"):
+                    training_links.append("https://www.studi.com" + href)
         else:
-            print(f"Failed to retrieve page {page}")
-        
+            print(f"No content found on page {page}")
         driver.quit()
         return training_links
 

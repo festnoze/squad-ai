@@ -9,7 +9,7 @@ from textwrap import dedent
 class DrupalDataRetrieval:
     def __init__(self, outdir):
         txt.activate_print = True
-        self.out_dir = outdir
+        self.out_dir = outdir if (outdir.endswith("/") or outdir.endswith("\\")) else  outdir + "/"
         self.studiClient = DrupalJsonApiClient("https://www.studi.com/jsonapi/", "etienne.millerioux@studi.fr", "khHD%!izshbv65A")
 
     def retrieve_all_data(self):

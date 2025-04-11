@@ -12,8 +12,8 @@ from common_tools.helpers.matching_helper import MatchingHelper
 
 class StudiPublicWebsiteRagSpecificConfig:
     all_dir: str = "./outputs/all/"
-    all_trainings_names: list[str] = file.get_as_json(all_dir + "all_trainings_names")
-    all_jobs_names: list[str] = file.get_as_json(all_dir + "all_jobs_names")
+    all_trainings_names: list[str] = file.get_as_json(all_dir + "all_trainings_names", fail_if_not_exists=False)
+    all_jobs_names: list[str] = file.get_as_json(all_dir + "all_jobs_names", fail_if_not_exists=False)
     @staticmethod
     async def get_domain_specific_metadata_filters_validation_and_correction_async_method(langchain_filters: Union[Operation, Comparison]) -> Union[Operation, Comparison, None]:
         """
