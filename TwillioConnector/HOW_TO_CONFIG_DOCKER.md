@@ -175,38 +175,33 @@ EXTERNAL_API_PORT="8281"
       Chaque API expose un endpoint "/ping" qui permet de test son bon fonctionnement, et renvoie "pong" en cas de réussite.
       De plus, l'API Twilio expose un endpoint "/ping-api" qui appelle le endpoint "/ping" de l'API RAG, permettant de tester la chaine, et le bon fonctionnement de la communication entre containers des deux containters docker.
 
-
-
 6. **Créer un tunnel ngrok pour rendre l'API Twilio visible depuis le web :** 
-   
-   
+
    => Soit <u>automatiquement</u>, si le fichier **ngrok.yml** dans "`C:\Users\aze\AppData\Local\ngrok`" definit déjà l'authentification, ainsi que les tunnels à ouvrir. Il vous suffit alors de lancer la commande :
-   
-   ```bash
-   ngrok start --all
-   ```
-   
+
+```bash
+ngrok start --all
+```
+
    => Soit <u>manuellement</u>, vous pouvez procéder à l'authentification, puis à l'ouverture des tunnels ngrok souhaités:
-   
+
    Dans une nouvelle fenêtre de commande (comme powershell) :
-   
-   - Authentification à ngrok (si nécessaire) : 
-   
-   ```bash
-   ngrok config add-authtoken <ngrok-token>
-   ```
-   
-           *remplacer `<ngrok-token>` par votre token ngrok*
-   
-   
-   
-   - Ouverture d'un tunnel ngrok pour **CodeDoc** :
-   
-   ```bash
-   ngrok http --url=code-doc.twilio.studi.ngrok.app 8301
-   ```
-   
-   - Ouverture d'un tunnel ngrok pour**StudiPublicWebsite** : 
+
+- Authentification à ngrok (si nécessaire) : 
+  
+  ```bash
+  ngrok config add-authtoken <ngrok-token>
+  ```
+  
+          *remplacer `<ngrok-token>` par votre token ngrok*
+
+- Ouverture d'un tunnel ngrok pour **CodeDoc** :
+  
+  ```bash
+  ngrok http --url=code-doc.twilio.studi.ngrok.app 8301
+  ```
+
+- Ouverture d'un tunnel ngrok pour**StudiPublicWebsite** : 
 
 ```bash
 ngrok http --url=public-website.twilio.studi.ngrok.app 8302
