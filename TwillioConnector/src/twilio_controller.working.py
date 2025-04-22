@@ -59,11 +59,6 @@ LOG_EVENT_TYPES = [
 ]
 SHOW_TIMING_MATH = False
 
-
-@twilio_router.get("/ping")
-def test_endpoint():
-    return "pong"
-
 @twilio_router.get("/", response_class=JSONResponse)
 async def index_page():
     return {"message": "Twilio Media Stream Server is running!"}
@@ -87,7 +82,7 @@ async def twilio_incoming_voice_call(request: Request):
 
 @twilio_router.websocket("/media-stream")
 async def handle_media_stream(websocket: WebSocket):
-    """Handle WebSocket connections between Twilio and LLM."""
+    """Handle WebSocket connections between Twilio and OpenAI."""
     print("Client connected")
     await websocket.accept()
 

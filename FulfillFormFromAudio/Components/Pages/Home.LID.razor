@@ -1,0 +1,389 @@
+﻿@page "/LID"
+@using Microsoft.AspNetCore.Components.Sections
+@using OpenAI.RealtimeConversation
+@using System.Collections
+@using System.IO.Pipelines
+@using System.ComponentModel.DataAnnotations
+@using System.Text.Json.Serialization
+@using System.Reflection
+@using FulfillFormFromWithAudio.Support
+@implements IAsyncDisposable
+@inject IJSRuntime JS
+@inject RealtimeConversationClient RealtimeClient
+
+<PageTitle>Ajouter nouveau formulaire LID</PageTitle>
+
+<SectionContent SectionName="header-bar">
+    <span>Ajouter un nouveau formulaire LID</span>
+    <MicControl Status="micStatus" OnClick="ChangeMicStatusAsync" class="ml-auto mr-4" />
+    <Speaker @ref="speaker" />
+    <button @onclick="() => editContext?.Validate()" type="button" class="flex items-center gap-2 text-lg py-2 px-5 bg-gray-900/50 rounded-lg text-white font-semibold hover:bg-blue-600 active:bg-blue-900 active:translate-y-px transition-all">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="size-5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
+        </svg>
+        Enregistrer
+    </button>
+</SectionContent>
+
+<EditForm EditContext="editContext" class="grid grid-cols-12 gap-x-10 gap-y-8">
+    <ObjectGraphDataAnnotationsValidator />
+
+    <!-- Identité du lead -->
+    <div class="bg-gray-200 px-6 py-5 rounded-lg col-span-12">
+        <h2 class="text-lg font-semibold mb-4">Identité du lead</h2>
+        <div class="grid grid-cols-2 gap-x-8 gap-y-5">
+            <div>
+                <label class="text-sm block font-medium text-gray-700">Nom</label>
+                <InputText @bind-Value="form.Identity.Nom" class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500" />
+            </div>
+            <div>
+                <label class="text-sm block font-medium text-gray-700">Prénom</label>
+                <InputText @bind-Value="form.Identity.Prenom" class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500" />
+            </div>
+            <div>
+                <label class="text-sm block font-medium text-gray-700">Gender</label>
+                <GenderPicker @bind-Value="form.Identity.Gender" />
+            </div>
+            <div>
+                <label class="text-sm block font-medium text-gray-700">Date de naissance</label>
+                <InputDate @bind-Value="form.Identity.Birthdate" class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500" />
+            </div>
+        </div>
+    </div>
+    <div class="bg-gray-200 px-6 py-5 rounded-lg col-span-12">
+        <h2 class="text-lg font-semibold mb-4">Etudes & Emploi</h2>
+        <div class="grid grid-cols-2 gap-x-8 gap-y-5">
+            <div>
+                <label class="text-sm block font-medium text-gray-700">Niveau de diplôme</label>
+                <InputText @bind-Value="form.Identity.DiplomaLevel" class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500" />
+            </div>
+            <div>
+                <label class="text-sm block font-medium text-gray-700">Situation professionnelle</label>
+                <InputText @bind-Value="form.Identity.ProfessionalSituation" class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500" />
+            </div>
+            <div>
+                <label class="text-sm block font-medium text-gray-700">Nom du diplôme</label>
+                <InputText @bind-Value="form.Identity.DiplomaName" class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500" />
+            </div>
+        </div>
+    </div>
+
+    <!-- Adresse postale -->
+    <div class="bg-gray-200 px-6 py-5 rounded-lg col-span-12">
+        <h2 class="text-lg font-semibold mb-4">Adresse postale</h2>
+        <div class="grid grid-cols-2 gap-x-8 gap-y-5">
+            <div>
+                <label class="text-sm block font-medium text-gray-700">Adresse (rue, numéro)</label>
+                <InputText @bind-Value="form.Address.Street" class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500" />
+            </div>
+            <div>
+                <label class="text-sm block font-medium text-gray-700">Code postal</label>
+                <InputText @bind-Value="form.Address.PostalCode" class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500" />
+            </div>
+            <div>
+                <label class="text-sm block font-medium text-gray-700">Ville</label>
+                <InputText @bind-Value="form.Address.City" class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500" />
+            </div>
+            <div>
+                <label class="text-sm block font-medium text-gray-700">Pays</label>
+                <CountryPicker @bind-Value="form.Address.Pays" />
+            </div>
+        </div>
+    </div>
+
+    <!-- Informations de contact -->
+    <div class="bg-gray-200 px-6 py-5 rounded-lg col-span-12">
+        <h2 class="text-lg font-semibold mb-4">Informations de contact</h2>
+        <div class="grid grid-cols-2 gap-x-8 gap-y-5">
+            <div>
+                <label class="text-sm block font-medium text-gray-700">Email</label>
+                <InputText @bind-Value="form.ContactInfo.Email" class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500" />
+            </div>
+            <div>
+                <label class="text-sm block font-medium text-gray-700">Téléphone</label>
+                <InputText @bind-Value="form.ContactInfo.Telephone" class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500" />
+            </div>
+        </div>
+    </div>
+
+    <!-- Informations techniques -->
+    <div class="bg-gray-200 px-6 py-5 rounded-lg col-span-12">
+        <h2 class="text-lg font-semibold mb-4">Informations techniques</h2>
+        <div class="grid grid-cols-2 gap-x-8 gap-y-5">
+            <div>
+                <label class="text-sm block font-medium text-gray-700">URL</label>
+                <InputText @bind-Value="form.TechnicalInfo.Url" class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500" />
+            </div>
+            <div>
+                <label class="text-sm block font-medium text-gray-700">Adresse IP</label>
+                <InputText @bind-Value="form.TechnicalInfo.IpAddress" class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500" />
+            </div>
+            <div>
+                <label class="text-sm block font-medium text-gray-700">Appareil</label>
+                <DeviceTypePicker @bind-Value="form.TechnicalInfo.Device" />
+            </div>
+            <div>
+                <label class="text-sm block font-medium text-gray-700">Première visite</label>
+                <InputDate @bind-Value="form.TechnicalInfo.FirstVisit" class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500" />
+            </div>
+            <div class="col-span-2">
+                <label class="text-sm block font-medium text-gray-700">Première page visitée</label>
+                <InputText @bind-Value="form.TechnicalInfo.FirstPage" class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500" />
+            </div>
+        </div>
+    </div>
+
+    <!-- Informations UTM -->
+    <div class="bg-gray-200 px-6 py-5 rounded-lg col-span-12">
+        <h2 class="text-lg font-semibold mb-4">Informations UTM</h2>
+        <div class="grid grid-cols-2 gap-x-8 gap-y-5">
+            <div>
+                <label class="text-sm block font-medium text-gray-700">UTM Source</label>
+                <InputText @bind-Value="form.Utm.UtmSource" class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500" />
+            </div>
+            <div>
+                <label class="text-sm block font-medium text-gray-700">UTM Medium</label>
+                <UtmMediumPicker @bind-Value="form.Utm.UtmMedium" />
+            </div>
+            <div>
+                <label class="text-sm block font-medium text-gray-700">UTM Campaign</label>
+                <InputText @bind-Value="form.Utm.UtmCampaign" class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500" />
+            </div>
+            <div>
+                <label class="text-sm block font-medium text-gray-700">UTM Content</label>
+                <InputText @bind-Value="form.Utm.UtmContent" class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500" />
+            </div>
+            <div>
+                <label class="text-sm block font-medium text-gray-700">UTM Term</label>
+                <InputText @bind-Value="form.Utm.UtmTerm" class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500" />
+            </div>
+        </div>
+    </div>
+
+    <!-- Informations complémentaires -->
+    <div class="bg-gray-200 px-6 py-5 rounded-lg col-span-12">
+        <h2 class="text-lg font-semibold mb-4">Informations complémentaires</h2>
+        <div class="grid grid-cols-2 gap-x-8 gap-y-5">
+            <div>
+                <label class="text-sm block font-medium text-gray-700">Thématique</label>
+                <InputText @bind-Value="form.Additional.Thematique" class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500" />
+            </div>
+            <div>
+                <label class="text-sm block font-medium text-gray-700">Formulaire</label>
+                <InputText @bind-Value="form.Additional.Formulaire" class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500" />
+            </div>
+            <div>
+                <label class="text-sm block font-medium text-gray-700">Consentement</label>
+                <InputText @bind-Value="form.Additional.Consentement" class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500" />
+            </div>
+            <div>
+                <label class="text-sm block font-medium text-gray-700">Document URL</label>
+                <InputText @bind-Value="form.Additional.DocumentUrl" class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500" />
+            </div>
+            <div>
+                <label class="text-sm block font-medium text-gray-700">Funding</label>
+                <FundingPicker @bind-Value="form.Additional.Funding" />
+            </div>
+            <div>
+                <label class="text-sm block font-medium text-gray-700">Capture Channel</label>
+                <CaptureChannelPicker @bind-Value="form.Additional.CaptureChannel" />
+            </div>
+            <div>
+                <label class="text-sm block font-medium text-gray-700">Form Type</label>
+                <FormTypePicker @bind-Value="form.Additional.FormType" />
+            </div>
+            <div>
+                <label class="text-sm block font-medium text-gray-700">Form Area</label>
+                <FormAreaPicker @bind-Value="form.Additional.FormArea" />
+            </div>
+            <div class="col-span-2">
+                <label class="text-sm block font-medium text-gray-700">Informations complémentaires sur le formulaire</label>
+                <InputText @bind-Value="form.Additional.FormMoreInformation" class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500" />
+            </div>
+            <div class="col-span-2">
+                <label class="text-sm block font-medium text-gray-700">Commentaires</label>
+                <InputText @bind-Value="form.Additional.Comments" class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500" />
+            </div>
+            <div>
+                <label class="text-sm block font-medium text-gray-700">Training Course ID</label>
+                <InputText @bind-Value="form.Additional.TrainingCourseId" class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500" />
+            </div>
+            <div>
+                <label class="text-sm block font-medium text-gray-700">Alternance</label>
+                <AlternancePicker @bind-Value="form.Additional.Alternance" />
+            </div>
+            <div>
+                <label class="text-sm block font-medium text-gray-700">Tech Source</label>
+                <InputText @bind-Value="form.Additional.TechSource" class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500" />
+            </div>
+            <div>
+                <label class="text-sm block font-medium text-gray-700">CV</label>
+                <InputText @bind-Value="form.Additional.Cv" class="w-full mt-2 px-3 py-1 rounded-md shadow-md focus:outline focus:outline-2 focus:outline-blue-500" />
+            </div>
+        </div>
+    </div>
+</EditForm>
+
+<details class="mt-4">
+    <summary>Log (@messages.Count)</summary>
+    <ul>
+        @foreach (var message in messages)
+        {
+            <li>@message</li>
+        }
+    </ul>
+</details>
+
+@if (messages.LastOrDefault() is { } lastMessage)
+{
+    <div class="sticky bottom-4 shadow-lg mt-4 border-solid border-2 border-gray-300 bg-amber-50 px-4 pr-5 py-3 w-fit m-auto rounded-2xl flex gap-3 text-gray-700">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" />
+        </svg>
+        @lastMessage
+    </div>
+}
+
+@code {
+    readonly LIDForm form = new();
+    EditContext? editContext;
+    Task<IJSObjectReference>? moduleTask;
+    IJSObjectReference? mic;
+    DotNetObjectReference<Home_LID>? selfReference;
+    Pipe micPipe = new();
+    Speaker? speaker;
+    RealtimeConversationManager<LIDForm>? realtimeConversationManager;
+    CancellationTokenSource disposalCts = new();
+    List<string> messages = new();
+    SemaphoreSlim writeAudioSemaphore = new(1);
+    MicControl.MicStatus micStatus = MicControl.MicStatus.Disconnected;
+
+    protected override void OnInitialized()
+    {
+        editContext = new EditContext(form);
+        selfReference = DotNetObjectReference.Create(this);
+        moduleTask = JS.InvokeAsync<IJSObjectReference>("import", "./Components/Pages/Home.razor.js").AsTask();
+    }
+
+    [JSInvokable]
+    public async Task OnMicConnectedAsync()
+    {
+        if (realtimeConversationManager is null)
+        {
+            try
+            {
+                realtimeConversationManager = new RealtimeConversationManager<LIDForm>(
+                    "Nouveau formulaire LID", RealtimeClient, micPipe.Reader.AsStream(), speaker!, UpdateModel, AddMessage);
+                await realtimeConversationManager.RunAsync(disposalCts.Token);
+            }
+            catch (Exception ex)
+            {
+                await DispatchExceptionAsync(ex);
+            }
+        }
+    }
+
+    private void UpdateModel(LIDForm newForm)
+    {
+        InvokeAsync(() =>
+        {
+            if (UpdateModelProperties(form, newForm))
+            {
+                StateHasChanged();
+            }
+        });
+    }
+
+    private void AddMessage(string message)
+    {
+        if (!string.IsNullOrEmpty(message))
+        {
+            InvokeAsync(() =>
+            {
+                messages.Add(message);
+                StateHasChanged();
+            });
+        }
+    }
+
+    [JSInvokable]
+    public Task ReceiveAudioDataAsync(byte[] data) => InvokeAsync(async () =>
+    {
+        if (writeAudioSemaphore.Wait(0))
+        {
+            try
+            {
+                await micPipe.Writer.WriteAsync(data);
+            }
+            finally
+            {
+                writeAudioSemaphore.Release();
+            }
+        }
+    });
+
+    public async ValueTask DisposeAsync()
+    {
+        disposalCts.Dispose();
+        selfReference?.Dispose();
+        realtimeConversationManager?.Dispose();
+        try
+        {
+            var module = await moduleTask!;
+            await module.DisposeAsync();
+        }
+        catch (JSDisconnectedException) { }
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        realtimeConversationManager?.SetModelData(form);
+    }
+
+    private bool UpdateModelProperties(object oldModel, object newModel)
+    {
+        var foundChange = false;
+        foreach (var prop in oldModel.GetType().GetProperties())
+        {
+            var oldValue = prop.GetValue(oldModel);
+            var newValue = prop.GetValue(newModel);
+            if (prop.PropertyType.GetCustomAttributes<ValidateComplexTypeAttribute>().Any())
+            {
+                foundChange |= UpdateModelProperties(oldValue!, newValue!);
+            }
+            else if (prop.PropertyType.IsClass && prop.PropertyType != typeof(string))
+            {
+                foundChange |= UpdateModelProperties(oldValue!, newValue!);
+            }
+            else if (oldValue?.ToString() != newValue?.ToString() && newValue != null && newValue.ToString() != string.Empty)
+            {
+                prop.SetValue(oldModel, newValue);
+                editContext!.NotifyFieldChanged(new FieldIdentifier(oldModel, prop.Name));
+                foundChange = true;
+            }
+        }
+        return foundChange;
+    }
+
+    private async Task ChangeMicStatusAsync()
+    {
+        var module = await moduleTask!;
+        switch (micStatus)
+        {
+            case MicControl.MicStatus.Disconnected:
+                micStatus = MicControl.MicStatus.Active;
+                mic = await module.InvokeAsync<IJSObjectReference>("start", selfReference);
+                break;
+            case MicControl.MicStatus.Active:
+                micStatus = MicControl.MicStatus.Muted;
+                await module.InvokeVoidAsync("setMute", mic, true);
+                break;
+            case MicControl.MicStatus.Muted:
+                micStatus = MicControl.MicStatus.Active;
+                await module.InvokeVoidAsync("setMute", mic, false);
+                break;
+        }
+    }
+
+    private Task DispatchExceptionAsync(Exception ex) => Task.CompletedTask;
+}
