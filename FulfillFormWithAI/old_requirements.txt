@@ -7,4 +7,5 @@ langchain_core
 langchain_openai
 langchain_groq
 langsmith
+sounddevice
 -e C:/Dev/IA/CommonTools # local package to internal tooling

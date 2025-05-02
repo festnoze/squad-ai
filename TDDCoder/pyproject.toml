@@ -1,0 +1,10 @@
+[project]
+name = "tddcoder"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastmcp>=2.2.5",
+    "mcp>=1.6.0",
+]

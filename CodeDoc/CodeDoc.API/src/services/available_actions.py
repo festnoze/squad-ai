@@ -6,8 +6,7 @@ from common_tools.helpers.txt_helper import txt
 from common_tools.models.llm_info import LlmInfo
 from common_tools.helpers.env_helper import EnvHelper
 from common_tools.langchains.langchain_factory import LangChainFactory
-from common_tools.RAG.rag_service import RagService
-from common_tools.RAG.rag_service_factory import RagServiceFactory
+from common_tools.RAG.rag_service import RagService, RagServiceFactory
 from common_tools.models.embedding_model import EmbeddingModel
 from common_tools.RAG.rag_ingestion_pipeline.rag_ingestion_pipeline import RagIngestionPipeline
 from common_tools.RAG.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline

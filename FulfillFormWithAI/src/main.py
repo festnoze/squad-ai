@@ -20,7 +20,8 @@ def get_init_env_and_graph(form_struct_file_path:str = None, conversation_file_p
     return workflow_graph
 
 async def main_async(workflow_graph: GraphWorkflowForm = None):  
-    if not workflow_graph: workflow_graph = get_init_env_and_graph()      
+    if not workflow_graph: 
+        workflow_graph = get_init_env_and_graph()      
 
     await workflow_graph.run_async()
 
@@ -31,7 +32,7 @@ def print_form_struct(form):
 
 graph_class = get_init_env_and_graph(
                 form_struct_file_path = "config/LID_form.yaml", #"config/user_and_training_info_form.yaml", # 
-                conversation_file_path = 'inputs/conversation.txt'
+                conversation_file_path = None #'inputs/conversation.txt'
             )
 graph = graph_class.graph
 

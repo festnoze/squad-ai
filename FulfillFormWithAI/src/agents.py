@@ -59,8 +59,8 @@ class AgentHIL:
     static_answers_file_path = 'inputs/form_automatic_answers.txt'    
     static_answers: list = []
 
-    def __init__(self):
-        if file.exists(AgentHIL.static_answers_file_path):
+    def __init__(self, load_static_answers: bool = False) -> None:
+        if load_static_answers and file.exists(AgentHIL.static_answers_file_path):
             AgentHIL.static_answers = file.get_as_str(AgentHIL.static_answers_file_path, remove_comments=True).splitlines()
 
     async def build_question_async(self, state: dict[str, any]):

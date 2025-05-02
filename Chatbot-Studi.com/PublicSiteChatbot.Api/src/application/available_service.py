@@ -24,8 +24,7 @@ from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.execute_helper import Execute
 from common_tools.helpers.llm_helper import Llm
 from common_tools.models.question_rewritting import QuestionRewritting, QuestionRewrittingPydantic
-from common_tools.RAG.rag_service import RagService
-from common_tools.RAG.rag_service_factory import RagServiceFactory
+from common_tools.RAG.rag_service import RagService, RagServiceFactory
 from common_tools.RAG.rag_inference_pipeline.rag_pre_treatment_tasks import RAGPreTreatment
 from common_tools.RAG.rag_ingestion_pipeline.rag_chunking import RagChunking
 from common_tools.RAG.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline

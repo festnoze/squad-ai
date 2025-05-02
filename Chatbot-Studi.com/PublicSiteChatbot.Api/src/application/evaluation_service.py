@@ -8,7 +8,7 @@ from application.retrieved_docs_formating_service import RetrievedDocsService
 from common_tools.helpers.llm_helper import Llm
 from common_tools.models.embedding_model import EmbeddingModel
 from common_tools.helpers.env_helper import EnvHelper
-from common_tools.RAG.rag_service import RagService
+from common_tools.RAG.rag_service import RagService, RagServiceFactory
 from common_tools.RAG.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
 from common_tools.helpers.ressource_helper import Ressource
 from common_tools.helpers.file_helper import file
@@ -33,7 +33,6 @@ class EvaluationService:
     # REMOVED because of circular deps with 'AvailableService'
     #  @staticmethod
     # def init():
-    #     from common_tools.RAG.rag_service_factory import RagServiceFactory
     #     metadata_descriptions = MetadataDescriptionHelper.get_metadata_descriptions_for_studi_public_site(AvailableService.out_dir)
     #     #
     #     EvaluationService._rag_service = RagServiceFactory.build_from_env_config()        

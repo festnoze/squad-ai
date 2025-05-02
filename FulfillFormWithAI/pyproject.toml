@@ -21,6 +21,7 @@ dependencies = [
   "langchain_groq",
   "langsmith",
   "langgraph-cli[inmem]",
+  "sounddevice",
   "common_tools @ file:///C:/Dev/IA/CommonTools"
 ]
 
