@@ -9,6 +9,7 @@ chroma_db/
 scraped*/
 structures_descriptions*/
 .langgraph_api/
+.DS_Store
 
 .env*
 *.db
