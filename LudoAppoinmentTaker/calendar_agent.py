@@ -11,8 +11,6 @@ from googleapiclient.errors import HttpError
 from datetime import timezone,timedelta,datetime
 from zoneinfo import ZoneInfo
 
-
-
 class CalendarAgent:
     
     def __init__(self,first_name,last_name,email,owner_first_name,owner_last_name,owner_email,config_path: str = "calendar_agent.yaml"):
@@ -40,6 +38,7 @@ class CalendarAgent:
         self.date = ""
         self.slot_selected = ""
 
+        # TODO ETM: to fix langchain llm
         openai_config = self.config.get('openai', {})
         api_key = openai_config.get('api_key', '')
         

@@ -9,7 +9,7 @@ load_dotenv()
 # Explicitly set Google Credentials path if needed (adapt path as necessary)
 # Assumes credentials file is in the project root, relative to this file in app/
 project_root = os.path.dirname(os.path.dirname(__file__))
-cred_filename = 'studi-ai-454216-185215ccea8c.json' # Consider getting this filename from env var
+cred_filename = "secrets/studi-ai-454216-185215ccea8c.json" # Consider getting this filename from env var
 credentials_path = os.path.join(project_root, os.getenv("GOOGLE_APPLICATION_CREDENTIALS_FILENAME", cred_filename))
 
 if os.path.exists(credentials_path):

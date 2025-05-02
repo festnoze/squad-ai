@@ -1,0 +1,590 @@
+api:
+  base_url: "https://preprod-lid-studi.studi.fr/"
+  endpoints:
+    lead_injection:
+      path: "contacts/api/contact/school/studi"
+      method: "POST"
+      required_fields:
+        email: 
+          type: string
+          description: "Adresse email"
+          ask_in_conversation: true
+        nom: 
+          type: string
+          description: "Nom de famille"
+          ask_in_conversation: true
+        prenom: 
+          type: string
+          description: "Prénom"
+          ask_in_conversation: true
+        tel: 
+          type: string
+          description: "Numéro de téléphone"
+          ask_in_conversation: true
+        formulaire: 
+          type: string
+          description: "Nom du formulaire source"
+          ask_in_conversation: false
+          default: "formation-test"
+        url: 
+          type: string
+          description: "URL de la page source"
+          ask_in_conversation: false
+          default: "https://grauseristhebest.com"
+        utm_source: 
+          type: string
+          description: "Source de trafic (UTM)"
+          ask_in_conversation: false
+          default: "studia"
+        utm_medium: 
+          type: string
+          description: "Support de trafic (UTM)"
+          ask_in_conversation: false
+          default: "CORE_PKL_Bot"
+        pays: 
+          type: string
+          description: "Pays de résidence du lead"
+          ask_in_conversation: false
+          default: "FR"
+      optional_fields:
+        thematique: 
+          type: string
+          description: "Thématique de formation d'intérêt"
+          ask_in_conversation: true
+        document_url: 
+          type: string
+          description: "URL du document téléchargé"
+          ask_in_conversation: false
+        utm_campaign: 
+          type: string
+          description: "Nom de la campagne (UTM)"
+          ask_in_conversation: false
+        utm_content: 
+          type: string
+          description: "Contenu spécifique (UTM)"
+          ask_in_conversation: false
+        utm_term: 
+          type: string
+          description: "Terme de recherche (UTM)"
+          ask_in_conversation: false
+        funding: 
+          type: string
+          description: "Mode de financement"
+          ask_in_conversation: true
+        gender: 
+          type: string
+          description: "Genre du lead"
+          ask_in_conversation: true
+        professional_situation: 
+          type: string
+          description: "Situation professionnelle actuelle"
+          ask_in_conversation: true
+        diploma_level: 
+          type: string
+          description: "Niveau de diplôme"
+          ask_in_conversation: true
+        diploma_name: 
+          type: string
+          description: "Nom du diplôme"
+          ask_in_conversation: true
+        birthyear: 
+          type: number
+          description: "Année de naissance"
+          ask_in_conversation: true
+        postal_code: 
+          type: string
+          description: "Code postal"
+          ask_in_conversation: true
+        street: 
+          type: string
+          description: "Adresse postale"
+          ask_in_conversation: true
+        city: 
+          type: string
+          description: "Ville"
+          ask_in_conversation: true
+        birthdate: 
+          type: string
+          description: "Date de naissance"
+          ask_in_conversation: true
+        first_visit: 
+          type: string
+          description: "Date de première visite"
+          ask_in_conversation: false
+        first_page: 
+          type: string
+          description: "Première page visitée"
+          ask_in_conversation: false
+        device: 
+          type: string
+          description: "Appareil utilisé"
+          ask_in_conversation: false
+        ip_address: 
+          type: string
+          description: "Adresse IP"
+          ask_in_conversation: false
+        capture_channel: 
+          type: string
+          description: "Canal de capture"
+          ask_in_conversation: false
+        form_type: 
+          type: string
+          description: "Type de formulaire"
+          ask_in_conversation: false
+        form_area: 
+          type: string
+          description: "Zone du formulaire"
+          ask_in_conversation: false
+        form_more_information: 
+          type: string
+          description: "Demande d'informations supplémentaires"
+          ask_in_conversation: false
+        comments: 
+          type: string
+          description: "Commentaires du lead"
+          ask_in_conversation: true
+        training_course_id: 
+          type: string
+          description: "ID de la formation"
+          ask_in_conversation: true
+        alternance: 
+          type: boolean
+          description: "Intérêt pour l'alternance"
+          ask_in_conversation: true
+        tech_source: 
+          type: string
+          description: "Source technique"
+          ask_in_conversation: false
+        cv: 
+          type: string
+          description: "URL du CV"
+          ask_in_conversation: false
+        consentement: 
+          type: string
+          description: "Consentement aux conditions"
+          ask_in_conversation: true
+        password: 
+          type: string
+          description: "Mot de passe"
+          ask_in_conversation: false
+        email_validate: 
+          type: string
+          description: "Validation de l'email"
+          ask_in_conversation: false
+        phone_validate: 
+          type: string
+          description: "Validation du téléphone"
+          ask_in_conversation: false
+        vocalcom_status: 
+          type: string
+          description: "Statut Vocalcom"
+          ask_in_conversation: false
+        sendinblue_status: 
+          type: string
+          description: "Statut Sendinblue"
+          ask_in_conversation: false
+        request_host: 
+          type: string
+          description: "Hôte de la requête"
+          ask_in_conversation: false
+        request_url: 
+          type: string
+          description: "URL de la requête"
+          ask_in_conversation: false
+      field_types:
+        email: string
+        nom: string
+        prenom: string
+        tel: string
+        thematique: string
+        formulaire: string
+        url: string
+        document_url: string
+        utm_campaign: string
+        utm_source: string
+        utm_medium: string
+        utm_content: string
+        utm_term: string
+        funding: string
+        gender: string
+        professional_situation: string
+        diploma_level: string
+        diploma_name: string
+        birthyear: number
+        postal_code: string
+        street: string
+        city: string
+        pays: string
+        birthdate: string
+        first_visit: string
+        first_page: string
+        device: string
+        ip_address: string
+        capture_channel: string
+        form_type: string
+        form_area: string
+        form_more_information: string
+        comments: string
+        training_course_id: string
+        alternance: boolean
+        tech_source: string
+        cv: string
+        consentement: string
+        password: string
+        email_validate: string
+        phone_validate: string
+        vocalcom_status: string
+        sendinblue_status: string
+        request_host: string
+        request_url: string
+      enum_values:
+        utm_medium:
+          - CORE_PKL_Directory
+          - CORE_PKL_Bot
+          - CORE_PKL_Cpc
+          - CORE_PKL_Display
+          - CORE_PKL_Email
+          - CORE_PKL_PDF
+          - CORE_PKL_Organic
+          - CORE_PKL_PT
+          - CORE_PKL_Referral
+          - CORE_PKL_Site
+          - CORE_PKL_Smo
+          - CORE_PKL_Sms
+          - CORE_PKL_None
+          - CORE_PKL_Affiliate
+          - CORE_PKL_Print
+          - CORE_PKL_Unknown
+          - CORE_PKL_Remarketing
+          - CORE_PKL_SMA
+          - IT_PKL_AutoreplyLinks
+          - IT_PKL_Fair
+          - IT_PKL_ADVBA
+          - IT_PKL_SchoolForum
+          - IT_PKL_internalEmail
+          - CORE_PKL_SEA
+          - CORE_PKL_Perfmax
+          - CORE_PKL_Video
+          - STUDI_PKL_Import
+          - STUDI_PKL_Whatsapp
+        form_area:
+          - CORE_PKL_Bottom_of_page
+          - CORE_PKL_Thank_you_page
+          - CORE_PKL_Content
+          - CORE_PKL_Embeded
+          - CORE_PKL_Footer
+          - CORE_PKL_Header
+          - CORE_PKL_Interstitial
+          - CORE_PKL_Page
+          - CORE_PKL_Sidebar
+        thematique:
+          - Animation
+          - Animation - 3D - VFX
+          - Architecture intérieure
+          - Assurance
+          - Bachelor Motion Designer
+          - Banque
+          - Banque - Assurance
+          - Banque - Gestion de patrimoine
+          - Beauté
+          - Beauté & Bien-être
+          - Boulangerie
+          - Business gaming
+          - Code - Développement
+          - Code - IT
+          - Coiffure
+          - commerce
+          - Commerce - Vente
+          - Commerce & Vente
+          - Commerce international
+          - Commerce-Vente
+          - Commercial
+          - Commercial - Relation client
+          - Communication
+          - Comptabilité
+          - Concours d'aptitudes ATSEM
+          - Cuisine
+          - Cuisine - Pâtisserie
+          - Cuisine & Pâtisserie
+          - Culture digitale - Logiciels métier
+          - Data - IA
+          - Décoration
+          - Design
+          - Design & gaming
+          - Design de mode
+          - Design gaming
+          - Design graphique et digital
+          - Développement
+          - Développeur
+          - Digital - Communication
+          - Digital Marketing - Communication
+          - Digital Marketing & Communication
+          - Droit - Fiscalité
+          - E-sport
+          - Esthétique
+          - Esthétique - Coiffure
+          - Finance - Comptabilité
+          - Finance - Contrôle de gestion
+          - Fiscalité
+          - Gaming
+          - gestion
+          - Gestion de projet
+          - Gestion Paie
+          - Hébergement - Management
+          - Immobilier
+          - Infra - Sécurité
+          - Langues
+          - Maison & Décoration
+          - Management
+          - Management - Gestion
+          - Management - Gestion de projet
+          - Management - Secrétariat
+          - Management - Stratégie d'entreprise
+          - Management de projet
+          - Management et marketing de la mode
+          - Marketing
+          - Marketing - Communication
+          - Métiers de bouche
+          - Mode
+          - Mode - Luxe
+          - Office management - Secrétariat
+          - Pâtisserie
+          - Petite enfance
+          - Petite enfance - Services à la personne
+          - Politique RH - Recrutement
+          - Programmation gaming
+          - Relation client
+          - Relation client dans le tourisme
+          - Ressources Humaines - Paie
+          - Retail
+          - Retail - Point de vente
+          - Retail & Point de vente
+          - RH - Paie
+          - Service à la personne
+          - Services
+          - Social
+          - Social - Paie
+          - Sport
+          - Sport Business
+          - Tourisme
+    user_registration:
+      path: "/api/users"
+      method: "POST"
+      required_fields:
+        - name: "email"
+          type: "string"
+          format: "email"
+        - name: "nom"
+          type: "string"
+        - name: "prenom"
+          type: "string"
+        - name: "telephone"
+          type: "string"
+      optional_fields:
+        - name: "utm_source"
+          type: "string"
+        - name: "utm_medium"
+          type: "string"
+          enum: ["cpc", "email", "social", "organic"]
+        - name: "utm_campaign"
+          type: "string"
+        - name: "form_area"
+          type: "string"
+          enum: ["homepage", "blog", "contact"]
+        - name: "form_type"
+          type: "string"
+          enum: ["newsletter", "contact", "demo"]
+      subfields:
+        address:
+          required_fields:
+            - name: "street"
+              type: "string"
+            - name: "city"
+              type: "string"
+            - name: "postal_code"
+              type: "string"
+            - name: "country"
+              type: "string"
+          optional_fields:
+            - name: "street_type"
+              type: "string"
+            - name: "address_type"
+              type: "string"
+            - name: "address_use"
+              type: "string"
+      field_types:
+        email: string
+        nom: string
+        prenom: string
+        tel: string
+        thematique: string
+        formulaire: string
+        url: string
+        document_url: string
+        utm_campaign: string
+        utm_source: string
+        utm_medium: string
+        utm_content: string
+        utm_term: string
+        funding: string
+        gender: string
+        professional_situation: string
+        diploma_level: string
+        diploma_name: string
+        birthyear: number
+        postal_code: string
+        street: string
+        city: string
+        pays: string
+        birthdate: string
+        first_visit: string
+        first_page: string
+        device: string
+        ip_address: string
+        capture_channel: string
+        form_type: string
+        form_area: string
+        form_more_information: string
+        comments: string
+        training_course_id: string
+        alternance: boolean
+        tech_source: string
+        cv: string
+        consentement: string
+        password: string
+        email_validate: string
+        phone_validate: string
+        vocalcom_status: string
+        sendinblue_status: string
+        request_host: string
+        request_url: string
+      enum_values:
+        utm_medium:
+          - CORE_PKL_Directory
+          - CORE_PKL_Bot
+          - CORE_PKL_Cpc
+          - CORE_PKL_Display
+          - CORE_PKL_Email
+          - CORE_PKL_PDF
+          - CORE_PKL_Organic
+          - CORE_PKL_PT
+          - CORE_PKL_Referral
+          - CORE_PKL_Site
+          - CORE_PKL_Smo
+          - CORE_PKL_Sms
+          - CORE_PKL_None
+          - CORE_PKL_Affiliate
+          - CORE_PKL_Print
+          - CORE_PKL_Unknown
+          - CORE_PKL_Remarketing
+          - CORE_PKL_SMA
+          - IT_PKL_AutoreplyLinks
+          - IT_PKL_Fair
+          - IT_PKL_ADVBA
+          - IT_PKL_SchoolForum
+          - IT_PKL_internalEmail
+          - CORE_PKL_SEA
+          - CORE_PKL_Perfmax
+          - CORE_PKL_Video
+          - STUDI_PKL_Import
+          - STUDI_PKL_Whatsapp
+        form_area:
+          - CORE_PKL_Bottom_of_page
+          - CORE_PKL_Thank_you_page
+          - CORE_PKL_Content
+          - CORE_PKL_Embeded
+          - CORE_PKL_Footer
+          - CORE_PKL_Header
+          - CORE_PKL_Interstitial
+          - CORE_PKL_Page
+          - CORE_PKL_Sidebar
+        thematique:
+          - Animation
+          - Animation - 3D - VFX
+          - Architecture intérieure
+          - Assurance
+          - Bachelor Motion Designer
+          - Banque
+          - Banque - Assurance
+          - Banque - Gestion de patrimoine
+          - Beauté
+          - Beauté & Bien-être
+          - Boulangerie
+          - Business gaming
+          - Code - Développement
+          - Code - IT
+          - Coiffure
+          - commerce
+          - Commerce - Vente
+          - Commerce & Vente
+          - Commerce international
+          - Commerce-Vente
+          - Commercial
+          - Commercial - Relation client
+          - Communication
+          - Comptabilité
+          - Concours d'aptitudes ATSEM
+          - Cuisine
+          - Cuisine - Pâtisserie
+          - Cuisine & Pâtisserie
+          - Culture digitale - Logiciels métier
+          - Data - IA
+          - Décoration
+          - Design
+          - Design & gaming
+          - Design de mode
+          - Design gaming
+          - Design graphique et digital
+          - Développement
+          - Développeur
+          - Digital - Communication
+          - Digital Marketing - Communication
+          - Digital Marketing & Communication
+          - Droit - Fiscalité
+          - E-sport
+          - Esthétique
+          - Esthétique - Coiffure
+          - Finance - Comptabilité
+          - Finance - Contrôle de gestion
+          - Fiscalité
+          - Gaming
+          - gestion
+          - Gestion de projet
+          - Gestion Paie
+          - Hébergement - Management
+          - Immobilier
+          - Infra - Sécurité
+          - Langues
+          - Maison & Décoration
+          - Management
+          - Management - Gestion
+          - Management - Gestion de projet
+          - Management - Secrétariat
+          - Management - Stratégie d'entreprise
+          - Management de projet
+          - Management et marketing de la mode
+          - Marketing
+          - Marketing - Communication
+          - Métiers de bouche
+          - Mode
+          - Mode - Luxe
+          - Office management - Secrétariat
+          - Pâtisserie
+          - Petite enfance
+          - Petite enfance - Services à la personne
+          - Politique RH - Recrutement
+          - Programmation gaming
+          - Relation client
+          - Relation client dans le tourisme
+          - Ressources Humaines - Paie
+          - Retail
+          - Retail - Point de vente
+          - Retail & Point de vente
+          - RH - Paie
+          - Service à la personne
+          - Services
+          - Social
+          - Social - Paie
+          - Sport
+          - Sport Business
+          - Tourisme 

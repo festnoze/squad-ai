@@ -5,7 +5,7 @@ import requests
 from openai import OpenAI
 
 class LeadAgent:
-    def __init__(self, config_path="lid_api_config.yaml"):
+    def __init__(self, llm, config_path="lid_api_config.yaml"):
         """Initialise l'agent avec la configuration YAML."""
         try:
             with open(config_path, 'r') as file:
@@ -18,27 +18,7 @@ class LeadAgent:
             if 'lead_injection' not in self.config['api']['endpoints']:
                 raise ValueError("La configuration YAML doit contenir un endpoint 'lead_injection'")
             
-            # Initialiser le client OpenAI avec la configuration
-            openai_config = self.config['api'].get('openai', {})
-            api_key = openai_config.get('api_key', '')
-            
-            # Remplacer la variable d'environnement si présente
-            if '${OPENAI_API_KEY}' in api_key:
-                env_key = os.getenv('OPENAI_API_KEY')
-                if not env_key:
-                    raise ValueError("La variable d'environnement OPENAI_API_KEY n'est pas définie")
-                api_key = api_key.replace('${OPENAI_API_KEY}', env_key)
-            
-            if not api_key:
-                raise ValueError("La clé API OpenAI n'est pas définie dans la configuration")
-            
-            # Initialiser le client OpenAI avec la version 1.12.0
-            self.client = OpenAI(api_key=api_key)
-            
-            self.model = openai_config.get('model', 'gpt-4-turbo')
-            self.temperature = openai_config.get('temperature', 0.1)
-            self.max_tokens = openai_config.get('max_tokens', 500)
-
+            self.llm = llm
             self.extracted_info = {}
             self.missing_fields = []
             self.request_data = []
@@ -188,25 +168,20 @@ class LeadAgent:
             prompt += f"""
 
             Transforme le numéro de téléphone en format sans espaces.
-
-         
-            
             Réponse (uniquement l'objet JSON, sans autre texte):
             """
             
-            # Appeler l'API OpenAI
-            response = self.client.chat.completions.create(
-                model=self.model,
+            # Appeler le LLM
+            # TODO ETM: to fix with langchain
+            response = self.llm.invoke(
                 messages=[
                     {"role": "system", "content": prompt},
                     {"role": "user", "content": text}
-                ],
-                temperature=self.temperature,
-                max_tokens=self.max_tokens
+                ]
             )
             
             # Extraire la réponse JSON
-            response_text = response.choices[0].message.content.strip()
+            response_text = response.content
             
             # Nettoyer la réponse pour s'assurer qu'elle est un JSON valide
             if response_text.startswith("```json"):

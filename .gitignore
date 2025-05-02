@@ -5,6 +5,7 @@ exchanges/
 *.egg-info/
 *.save/
 *.old/
+secrets/
 chroma_db/
 scraped*/
 structures_descriptions*/

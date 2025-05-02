@@ -1,0 +1,11 @@
+google_calendar:
+  calendar_id: ludovic.grauser@studi.fr
+  credentials_path: secrets/studi-ai-454216-185215ccea8c.json
+
+rendez_vous:
+  duration_minutes: 30
+  working_hours:
+    start: 09:00
+    end: 18:00
+  days_ahead: 2
+  max_slots: 3
