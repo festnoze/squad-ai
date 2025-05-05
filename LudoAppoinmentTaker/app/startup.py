@@ -1,3 +1,3 @@
-from api_config import ApiConfig
+from app.api_config import ApiConfig
 
 app = ApiConfig.create_app()

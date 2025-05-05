@@ -30,7 +30,7 @@ from google.cloud import texttospeech
 from urllib.parse import urlparse, parse_qs
 
 # Chemin du fichier de credentials (modifie ce chemin avec le bon fichier JSON sur ta machine)
-credentials_path = "secrets/studi-ai-454216-185215ccea8c.json"
+credentials_path = "secrets/google-calendar-credentials.json"
 
 # Charger les credentials dans le code directement
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = credentials_path
