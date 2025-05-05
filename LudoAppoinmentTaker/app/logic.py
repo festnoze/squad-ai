@@ -15,7 +15,8 @@ from google.cloud import speech, texttospeech
 from openai import OpenAI
 from typing import Any, Dict, Optional
 from fastapi import WebSocket
-from agents_graph import create_graph, ConversationState
+from agents_graph import AgentsGraph
+from app.agents.conversation_state_model import ConversationState
 
 class BusinessLogic:
     logger: logging.Logger = None
@@ -44,11 +45,8 @@ class BusinessLogic:
     
     def init_graph():
         """Initialize the LangGraph workflow compilation."""
-        try:
-            BusinessLogic.compiled_graph = create_graph()
-            BusinessLogic.logger.info("LangGraph compiled successfully.")
-        except Exception as graph_init_error:
-            BusinessLogic.logger.error(f"FATAL: Failed to compile LangGraph: {graph_init_error}", exc_info=True)
+        agents_graph = AgentsGraph()
+        BusinessLogic.compiled_graph = agents_graph.graph
 
     @staticmethod
     def _init_stream_vars():

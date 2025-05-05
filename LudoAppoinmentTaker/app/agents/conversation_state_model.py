@@ -1,5 +1,5 @@
 from typing import TypedDict, Dict, Any, Annotated, Sequence
-from collections.abc import operator
+import operator
 
 class ConversationState(TypedDict):
     """Represents the state of the conversation at any point."""

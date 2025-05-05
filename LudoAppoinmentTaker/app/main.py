@@ -73,15 +73,6 @@ def startup_event():
     # Create static directory if it doesn't exist
     os.makedirs("static/audio", exist_ok=True)
     
-    # Initialize the LangGraph workflow
-    try:
-        BusinessLogic.init_graph()
-        logger.info("Successfully initialized conversation workflow")
-    except Exception as e:
-        logger.error(f"Failed to initialize conversation workflow: {e}", exc_info=True)
-        # We don't raise here to allow the server to start even if graph init fails
-        # This allows the system to be fixed without restarting
-
 @app.on_event("shutdown")
 def shutdown_event():
     """Cleanup on application shutdown"""
