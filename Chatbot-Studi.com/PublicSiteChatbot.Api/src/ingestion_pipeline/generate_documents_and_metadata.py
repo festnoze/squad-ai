@@ -10,8 +10,26 @@ from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.file_helper import file
 from common_tools.helpers.json_helper import JsonHelper
 from common_tools.helpers.ressource_helper import Ressource
+#
+from common_tools.RAG.rag_ingestion_pipeline.summary_and_questions.summary_and_questions_chunks_service import SummaryAndQuestionsChunksService
 
 class GenerateDocumentsAndMetadata:
+    
+    async def build_trainings_docs_summary_chunked_by_questions_async(path, llm_and_fallback: list) -> list[Document]:
+        trainings_objects = await GenerateDocumentsAndMetadata.build_trainings_objects_with_summaries_and_chunks_by_questions_async(path, llm_and_fallback)
+        trainings_chunks_splitted_by_questions = SummaryAndQuestionsChunksService.build_chunks_splitted_by_questions_from_summaries_and_chunks_by_questions_objects(trainings_objects)
+        return trainings_chunks_splitted_by_questions
+
+    async def build_trainings_objects_with_summaries_and_chunks_by_questions_async(path, llm_and_fallback: list):
+        trainings_docs_by_sections = GenerateDocumentsAndMetadata.build_trainings_docs_by_sections(path)
+        trainings_objects = await SummaryAndQuestionsChunksService.build_summaries_and_chunks_by_questions_objects_from_docs_async(
+                                                                            documents=trainings_docs_by_sections, 
+                                                                            llm_and_fallback=llm_and_fallback,
+                                                                            load_existing_summaries_and_questions_from_file=True,
+                                                                            file_path=path, 
+                                                                            existing_summaries_and_questions_filename= 'trainings_summaries_chunks_and_questions_objects.json'
+                                                                            )
+        return trainings_objects
     
     def build_all_docs_and_trainings(path: str, write_all_names_lists = True) -> List[Document]:
         all_docs_but_trainings = []

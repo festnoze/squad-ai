@@ -16,7 +16,7 @@ from data_retrieval.drupal_data_retrieval import DrupalDataRetrieval
 from infrastructure.conversation_repository import ConversationRepository
 from infrastructure.user_repository import UserRepository
 from application.studi_public_website_metadata_descriptions import MetadataDescriptionHelper
-from vector_database_creation.generate_documents_and_metadata import GenerateDocumentsAndMetadata
+from ingestion_pipeline.generate_documents_and_metadata import GenerateDocumentsAndMetadata
 from api.task_handler import task_handler
 
 # Internal tools imports
@@ -26,14 +26,12 @@ from common_tools.helpers.llm_helper import Llm
 from common_tools.models.question_rewritting import QuestionRewritting, QuestionRewrittingPydantic
 from common_tools.RAG.rag_service import RagService, RagServiceFactory
 from common_tools.RAG.rag_inference_pipeline.rag_pre_treatment_tasks import RAGPreTreatment
-from common_tools.RAG.rag_ingestion_pipeline.rag_chunking import RagChunking
 from common_tools.RAG.rag_inference_pipeline.rag_inference_pipeline import RagInferencePipeline
 from common_tools.RAG.rag_inference_pipeline.rag_augmented_generation_tasks import RAGAugmentedGeneration
 from common_tools.helpers.ressource_helper import Ressource
 from common_tools.models.conversation import Conversation, Message, User
 from common_tools.models.device_info import DeviceInfo
 from common_tools.workflows.end_workflow_exception import EndWorkflowException
-from common_tools.models.vector_db_type import VectorDbType
 from common_tools.helpers.env_helper import EnvHelper
 from common_tools.langchains.langchain_factory import LangChainFactory
 
@@ -74,8 +72,7 @@ class AvailableService:
         all_docs, trainings_docs = GenerateDocumentsAndMetadata.build_all_docs_and_trainings(out_dir, write_all_names_lists=True)
         do_create_summary_from_data = EnvHelper.get_is_summarized_data()
         if do_create_summary_from_data:
-            from vector_database_creation.summary_and_questions_chunks_service import SummaryAndQuestionsChunksService
-            trainings_docs_chunked_by_questions = await SummaryAndQuestionsChunksService.build_trainings_docs_summary_chunked_by_questions_async(
+            trainings_docs_chunked_by_questions = await GenerateDocumentsAndMetadata.build_trainings_docs_summary_chunked_by_questions_async(
                                                     path= out_dir,
                                                     llm_and_fallback= [AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_1, AvailableService.rag_service.llm_2, AvailableService.rag_service.llm_3])
             all_docs.extend(trainings_docs_chunked_by_questions)

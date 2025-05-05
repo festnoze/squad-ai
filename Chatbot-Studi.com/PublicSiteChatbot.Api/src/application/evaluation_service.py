@@ -13,7 +13,7 @@ from common_tools.RAG.rag_inference_pipeline.rag_inference_pipeline import RagIn
 from common_tools.helpers.ressource_helper import Ressource
 from common_tools.helpers.file_helper import file
 #
-from vector_database_creation.summary_and_questions_chunks_service import SummaryAndQuestionsChunksService
+from common_tools.RAG.rag_ingestion_pipeline.summary_and_questions.summary_and_questions_chunks_service import SummaryAndQuestionsChunksService
 #
 from ragas import evaluate
 from ragas import EvaluationDataset

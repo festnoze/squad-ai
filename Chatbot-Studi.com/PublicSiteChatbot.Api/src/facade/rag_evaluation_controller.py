@@ -8,7 +8,7 @@ from common_tools.langchains.langchain_factory import LangChainFactory
 from common_tools.models.embedding_model import EmbeddingModel
 from common_tools.models.embedding_model_factory import EmbeddingModelFactory
 from common_tools.models.doc_w_summary_chunks_questions import DocWithSummaryChunksAndQuestions
-from vector_database_creation.summary_and_questions_chunks_service import SummaryAndQuestionsChunksService
+from common_tools.RAG.rag_ingestion_pipeline.summary_and_questions.summary_and_questions_chunks_service import SummaryAndQuestionsChunksService
 
 evaluation_router = APIRouter(prefix="/rag/evaluation", tags=["Evaluation"])
 output_path:str = './outputs'
