@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 import logging
 from datetime import datetime
 #
-from twilio_controller import twilio_router
+from src.twilio_controller import twilio_router
 
 class ApiConfig:
     @asynccontextmanager
@@ -53,7 +53,7 @@ class ApiConfig:
         )
         logger = logging.getLogger(__name__)
                 
-        print('\n\r---------------------------------')
+        print('\r\n\n\r---------------------------------')
         print('🌐 Twilio Proxy API 🚀 started 🚀')
         print('---------------------------------')
         

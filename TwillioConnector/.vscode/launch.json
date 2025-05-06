@@ -10,7 +10,7 @@
             "request": "launch",
             "module": "uvicorn",
             "args": [
-                "src.api.startup:app", // The FastAPI app instance (in: src/api/startup.py)
+                "api.startup:app", // The FastAPI app instance (in: src/api/startup.py)
                 "--host", "127.0.0.1", // Host to bind
                 "--port", "8344",      // Port to bind
                 "--log-level", "error",//"warning" //"info", // Corrected log-level argument
