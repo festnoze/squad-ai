@@ -36,7 +36,7 @@ class AgentsGraph:
         
     def _build_graph(self):
         workflow = StateGraph(ConversationState)
-        logger.info("Agents graph ongoing creation.")
+        self.logger.info("Agents graph ongoing creation.")
 
         # Add nodes
         workflow.add_node("route_initial_query", self.route_initial_query)
@@ -64,75 +64,81 @@ class AgentsGraph:
         # app_graph = workflow.compile(checkpointer=checkpointer)
 
         app_graph = workflow.compile() # Compile w/o checkpointer
-        logger.info("Agents graph compiled successfully.")
+        self.logger.info("Agents graph compiled successfully.")
         return app_graph
 
-    async def route_initial_query(self, state: ConversationState) -> str:
+    async def route_initial_query(self, state: ConversationState) -> dict:
         """Determines the first agent to handle the query based on the conversation state."""
         call_sid = state.get('call_sid', 'N/A')
-        logger.info(f"[{call_sid}] Routing initial query: {state['user_input']}")
+        self.logger.info(f"[{call_sid}] Routing initial query: {state.get('user_input', '')}")
+        
+        # Create a dictionary for the next node
+        next_node = {}
         
         # Check if this is a returning user with SF info
         if state.get('agent_scratchpad', {}).get('sf_account_info'):
-            logger.info(f"[{call_sid}] Routing to calendar_agent (returning user)")
-            return "calendar_agent"
+            self.logger.info(f"[{call_sid}] Routing to calendar_agent (returning user)")
+            next_node = {"next": "calendar_agent"}
         
         # If we have partial lead information, continue with lead agent
-        if state.get('agent_scratchpad', {}).get('lead_extracted_info'):
-            logger.info(f"[{call_sid}] Routing to lead_agent (continuing lead collection)")
-            return "lead_agent"
+        elif state.get('agent_scratchpad', {}).get('lead_extracted_info'):
+            self.logger.info(f"[{call_sid}] Routing to lead_agent (continuing lead collection)")
+            next_node = {"next": "lead_agent"}
         
         # Check phone number to route to SF lookup
-        if state.get('caller_phone'):
-            logger.info(f"[{call_sid}] Routing to sf_agent for account lookup")
-            return "sf_agent"
+        elif state.get('caller_phone'):
+            self.logger.info(f"[{call_sid}] Routing to sf_agent for account lookup")
+            next_node = {"next": "sf_agent"}
         
         # Default: Start with Lead Agent
-        logger.info(f"[{call_sid}] Default routing to lead_agent")
-        return "lead_agent"
+        else:
+            self.logger.info(f"[{call_sid}] Default routing to lead_agent")
+            next_node = {"next": "lead_agent"}
+            
+        return next_node
 
     async def lead_agent_node(self, state: ConversationState) -> dict:
         """Handles lead qualification and information gathering using LeadAgent."""
         call_sid = state.get('call_sid', 'N/A')
-        logger.info(f"[{call_sid}] Entering Lead Agent node")
+        self.logger.info(f"[{call_sid}] Entering Lead Agent node")
         user_input = state['user_input']
         # Retrieve previously extracted info from scratchpad if continuing interaction
         current_extracted_info = state.get('agent_scratchpad', {}).get('lead_extracted_info', {})
 
-        if not lead_agent_instance:
-            logger.error(f"[{call_sid}] LeadAgent not initialized. Cannot process.")
+        if not self.lead_agent_instance:
+            self.logger.error(f"[{call_sid}] LeadAgent not initialized. Cannot process.")
             response_text = "Je rencontre un problème technique avec l'agent de contact."
             return {"history": [("Human", user_input), ("AI", response_text)], "agent_scratchpad": {"error": "LeadAgent not initialized"}}
 
         try:
             # 1. Extract info using LLM (based on LeadAgent logic)
             # Use latest user input + potentially context from history if needed
-            logger.debug(f"[{call_sid}] Extracting info from: {user_input}")
+            self.logger.debug(f"[{call_sid}] Extracting info from: {user_input}")
             # Ensure the agent method handles potential errors gracefully
             new_extracted_info = {}
             try:
-                new_extracted_info = lead_agent_instance._extract_info_with_llm(user_input)
+                new_extracted_info = self.lead_agent_instance._extract_info_with_llm(user_input)
             except Exception as llm_exc:
-                logger.error(f"[{call_sid}] Error during _extract_info_with_llm: {llm_exc}", exc_info=True)
+                self.logger.error(f"[{call_sid}] Error during _extract_info_with_llm: {llm_exc}", exc_info=True)
                 # Handle error, maybe return a specific state or default info
 
-            logger.debug(f"[{call_sid}] Newly extracted info: {new_extracted_info}")
+            self.logger.debug(f"[{call_sid}] Newly extracted info: {new_extracted_info}")
 
             # Merge new info with existing info from scratchpad
             combined_info = {**current_extracted_info, **new_extracted_info}
-            logger.debug(f"[{call_sid}] Combined extracted info: {combined_info}")
+            self.logger.debug(f"[{call_sid}] Combined extracted info: {combined_info}")
 
             # 2. Identify missing fields (based on LeadAgent logic)
-            missing_fields = lead_agent_instance._get_missing_fields(combined_info)
-            logger.debug(f"[{call_sid}] Missing fields: {missing_fields}")
+            missing_fields = self.lead_agent_instance._get_missing_fields(combined_info)
+            self.logger.debug(f"[{call_sid}] Missing fields: {missing_fields}")
 
             # 3. Format request data (based on LeadAgent logic)
-            request_data = lead_agent_instance._format_request(combined_info)
-            logger.debug(f"[{call_sid}] Formatted request data: {request_data}")
+            request_data = self.lead_agent_instance._format_request(combined_info)
+            self.logger.debug(f"[{call_sid}] Formatted request data: {request_data}")
 
             # 4. Validate request (based on LeadAgent logic)
-            is_valid, validation_error = lead_agent_instance._validate_request(request_data)
-            logger.info(f"[{call_sid}] Request validation - Valid: {is_valid}, Error: {validation_error}")
+            is_valid, validation_error = self.lead_agent_instance._validate_request(request_data)
+            self.logger.info(f"[{call_sid}] Request validation - Valid: {is_valid}, Error: {validation_error}")
 
             # 5. Determine response and next step
             if not is_valid:
@@ -142,12 +148,12 @@ class AgentsGraph:
             else:
                 # Attempt to send the lead data
                 try:
-                    logger.info(f"[{call_sid}] Sending valid lead data: {request_data}")
+                    self.logger.info(f"[{call_sid}] Sending valid lead data: {request_data}")
                     # NOTE: send_request is synchronous in the original agent.
                     # Consider making it async or running in a thread pool if it's slow.
                     # For now, assume it's acceptable to run synchronously within the async node.
-                    result = lead_agent_instance.send_request(request_data)
-                    logger.info(f"[{call_sid}] Lead injection API response status: {result.status_code}")
+                    result = self.lead_agent_instance.send_request(request_data)
+                    self.logger.info(f"[{call_sid}] Lead injection API response status: {result.status_code}")
 
                     # Check response status code
                     if 200 <= result.status_code < 300:
@@ -159,7 +165,7 @@ class AgentsGraph:
                         response_text = f"Désolé, une erreur est survenue ({result.status_code}: {error_detail}) lors de la création de votre fiche. Veuillez réessayer plus tard."
                         next_step = "api_error"
                 except Exception as api_exc:
-                    logger.error(f"[{call_sid}] Error sending lead data: {api_exc}", exc_info=True)
+                    self.logger.error(f"[{call_sid}] Error sending lead data: {api_exc}", exc_info=True)
                     response_text = "Désolé, une erreur technique est survenue lors de l'enregistrement. Veuillez réessayer plus tard."
                     next_step = "api_error"
 
@@ -175,7 +181,7 @@ class AgentsGraph:
             }
 
         except Exception as e:
-            logger.error(f"[{call_sid}] Error in Lead Agent node: {e}", exc_info=True)
+            self.logger.error(f"[{call_sid}] Error in Lead Agent node: {e}", exc_info=True)
             response_text = "Je rencontre un problème pour traiter votre demande."
             # Include the error in the scratchpad for debugging if needed
             error_scratchpad = state.get('agent_scratchpad', {})
@@ -186,10 +192,10 @@ class AgentsGraph:
         """Handles Salesforce account lookup using SFAgent."""
         call_sid = state.get('call_sid', 'N/A')
         phone = state.get('caller_phone', '')
-        logger.info(f"[{call_sid}] Entering SF Agent node for phone: {phone}")
+        self.logger.info(f"[{call_sid}] Entering SF Agent node for phone: {phone}")
         
         if not phone:
-            logger.warning(f"[{call_sid}] No phone number available for SF lookup")
+            self.logger.warning(f"[{call_sid}] No phone number available for SF lookup")
             return {"next_agent_needed": "lead_agent"}
         
         try:
@@ -230,7 +236,7 @@ class AgentsGraph:
             }
             
         except Exception as e:
-            logger.error(f"[{call_sid}] Error in SF Agent node: {e}", exc_info=True)
+            self.logger.error(f"[{call_sid}] Error in SF Agent node: {e}", exc_info=True)
             # Default to lead agent in case of error
             return {
                 "history": [("AI", "Bienvenue chez Studi. Pouvez-vous me laisser vos coordonnées afin qu'un conseiller puisse vous contacter ?")],
@@ -241,13 +247,13 @@ class AgentsGraph:
         """Handles calendar operations using CalendarAgent."""
         call_sid = state.get('call_sid', 'N/A')
         user_input = state.get('user_input', '')
-        logger.info(f"[{call_sid}] Entering Calendar Agent node")
+        self.logger.info(f"[{call_sid}] Entering Calendar Agent node")
         
         # Get SF account info from scratchpad
         sf_account_info = state.get('agent_scratchpad', {}).get('sf_account_info', {})
         
         if not sf_account_info:
-            logger.warning(f"[{call_sid}] No SF account info available for calendar operations")
+            self.logger.warning(f"[{call_sid}] No SF account info available for calendar operations")
             return {
                 "history": [("Human", user_input), ("AI", "Je n'ai pas trouvé vos informations. Pourriez-vous me donner vos coordonnées à nouveau ?")],
                 "agent_scratchpad": {"next_agent_needed": "lead_agent"}
@@ -281,7 +287,7 @@ class AgentsGraph:
             }
             
         except Exception as e:
-            logger.error(f"[{call_sid}] Error in Calendar Agent node: {e}", exc_info=True)
+            self.logger.error(f"[{call_sid}] Error in Calendar Agent node: {e}", exc_info=True)
             return {
                 "history": [("Human", user_input), ("AI", "Je rencontre un problème pour gérer votre rendez-vous. Pourriez-vous réessayer plus tard ?")],
                 "agent_scratchpad": {"error": str(e)}
@@ -290,32 +296,32 @@ class AgentsGraph:
     async def decide_next_step(self, state: ConversationState) -> str:
         """Determines the next node to visit based on the current state."""
         call_sid = state.get('call_sid', 'N/A')
-        logger.info(f"[{call_sid}] Deciding next step")
+        self.logger.info(f"[{call_sid}] Deciding next step")
         
         # Check if next agent is explicitly specified
         next_agent = state.get('agent_scratchpad', {}).get('next_agent_needed')
         if next_agent:
-            logger.info(f"[{call_sid}] Explicit routing to: {next_agent}")
+            self.logger.info(f"[{call_sid}] Explicit routing to: {next_agent}")
             return next_agent
         
         # Check lead agent status
         lead_status = state.get('agent_scratchpad', {}).get('lead_last_status')
         if lead_status:
             if lead_status == "lead_captured":
-                logger.info(f"[{call_sid}] Lead captured, ending conversation.")
+                self.logger.info(f"[{call_sid}] Lead captured, ending conversation.")
                 return END
             elif lead_status == "api_error":
-                logger.warning(f"[{call_sid}] API error occurred, ending conversation.")
+                self.logger.warning(f"[{call_sid}] API error occurred, ending conversation.")
                 return END
             elif lead_status == "ask_user_for_info":
-                logger.info(f"[{call_sid}] Need more lead info from user, ending graph run.")
+                self.logger.info(f"[{call_sid}] Need more lead info from user, ending graph run.")
                 return END
         
         # Check calendar agent status
         if state.get('agent_scratchpad', {}).get('appointment_created'):
-            logger.info(f"[{call_sid}] Appointment created, ending conversation.")
+            self.logger.info(f"[{call_sid}] Appointment created, ending conversation.")
             return END
         
         # Default behavior
-        logger.info(f"[{call_sid}] No specific routing condition met, ending graph run.")
+        self.logger.info(f"[{call_sid}] No specific routing condition met, ending graph run.")
         return END

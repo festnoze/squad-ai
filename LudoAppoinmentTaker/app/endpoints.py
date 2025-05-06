@@ -1,12 +1,12 @@
 import os
 import logging
 
-from fastapi import APIRouter, FastAPI, WebSocket, Request, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, Request, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from twilio.twiml.voice_response import VoiceResponse, Connect
 from logic import BusinessLogic
 
-logger: logging.Logger = None
+logger: logging.Logger = logging.getLogger(__name__)
 
 router = APIRouter()
 static_audio_path: str = "static/audio/"
@@ -51,7 +51,7 @@ async def websocket_endpoint(ws: WebSocket) -> None:
     await ws.accept()
     logger.info(f"WebSocket connection accepted from: {ws.client.host}:{ws.client.port}")
     try:
-        await BusinessLogic.handler_websocket(ws)
+        await BusinessLogic().handler_websocket(ws)
     except WebSocketDisconnect:
         logger.info(f"WebSocket disconnected: {ws.client.host}:{ws.client.port}")
     except Exception as e:
@@ -59,6 +59,9 @@ async def websocket_endpoint(ws: WebSocket) -> None:
         try:
             await ws.close(code=1011)
         except RuntimeError:
+            logger.error("Error closing WebSocket connection", exc_info=True)
+            
             pass
+        
     finally:
         logger.info(f"WebSocket endpoint finished for: {ws.client.host}:{ws.client.port}")

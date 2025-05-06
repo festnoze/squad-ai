@@ -16,11 +16,7 @@ class ApiConfig:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         try:
-            print('\n\n---------------------------------')
-            print('🌐 Twilio Proxy API 🚀 started 🚀')
-            print('---------------------------------')
             yield
-
         finally:
             if app:
                 await app.state.shutdown()
@@ -56,7 +52,12 @@ class ApiConfig:
             ]
         )
         logger = logging.getLogger(__name__)
+                
+        print('\n\r---------------------------------')
+        print('🌐 Twilio Proxy API 🚀 started 🚀')
+        print('---------------------------------')
         
+    
         def handle_error(request: Request, error_msg: str):
             logger.error(f"Logged Error: {error_msg}")
 

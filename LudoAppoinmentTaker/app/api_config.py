@@ -8,18 +8,14 @@ from starlette.responses import Response as StarletteResponse
 from contextlib import asynccontextmanager
 from datetime import datetime
 #
-import endpoints
-from logic import BusinessLogic
+from app import endpoints
+from app.logic import BusinessLogic
 
 class ApiConfig:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         try:
-            print('\n\n---------------------------------------------')
-            print('🌐 Voice Appointment Maker API 🚀 started 🚀')
-            print('---------------------------------------------')
             yield
-
         finally:
             if app:
                 app.state.shutdown()
@@ -54,13 +50,16 @@ class ApiConfig:
                 logging.StreamHandler()  # Also print logs to the terminal
             ]
         )
+
         logger = logging.getLogger(__name__)
-
-        endpoints.logger = logger
-        BusinessLogic.logger = logger
-        BusinessLogic.init_graph()
-
         
+        # Initialize the BusinessLogic singleton
+        # business_logic = BusinessLogic()
+        
+        print('\n\n---------------------------------------------')
+        print('🌐 Voice Appointment Maker API 🚀 started 🚀')
+        print('---------------------------------------------')
+
         def handle_error(request: Request, error_msg: str):
             logger.error(f"Logged Error: {error_msg}")
 

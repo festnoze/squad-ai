@@ -14,7 +14,7 @@
                 "--host", "127.0.0.1", // Host to bind
                 "--port", "8344",      // Port to bind
                 "--log-level", "info",//"warning" //"error", // Corrected log-level argument
-                "--reload",    // Enable/disable auto-reload on code change (for development)
+                //"--reload",    // Enable/disable auto-reload on code change (for development)
             ],
             "env": {
                 "PYTHONPATH": "${workspaceFolder}/app"
