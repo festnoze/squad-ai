@@ -14,7 +14,7 @@ LOG_EVENT_TYPES = [
     'session.created'
 ]
 
-class WebSocketHandler:
+class VocalConversationService:
     """Handles WebSocket connections between Twilio and OpenAI."""
     
     def __init__(self, twilio_websocket: WebSocket, openai_websocket):
@@ -29,7 +29,7 @@ class WebSocketHandler:
         self.mark_queue = []
         self.response_start_timestamp_twilio = None
     
-    async def handle_vocal_conversation(self):
+    async def handle_conversation(self):
         """Main method to handle the WebSocket connections."""
         await asyncio.gather(self.received_vocal_input(), self.send_vocal_output())
     

@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Request, Response, HTTPException
 from src.twilio_service import TwilioService
 from src.studi_public_website_client import StudiPublicWebsiteClient
-from src.websocket_handler import WebSocketHandler
+from src.vocal_conversation_service import VocalConversationService
 
 import os
 import json
@@ -87,24 +87,22 @@ async def twilio_incoming_voice_call(request: Request):
 @twilio_router.websocket("/media-stream")
 async def handle_media_stream(websocket: WebSocket):
     """Handle WebSocket connections between Twilio and LLM."""
-    print("Client connected")
-    await websocket.accept()
 
-    async with websockets.connect(
+    await websocket.accept()
+    voice_to_voice_llm_ws = await connect_voice_to_voice_llm_ws()
+
+    try:
+        await initialize_session(voice_to_voice_llm_ws)
+        vocal_service = VocalConversationService(websocket, voice_to_voice_llm_ws)
+        await vocal_service.handle_conversation()
+    finally:
+        await voice_to_voice_llm_ws.close()
+
+async def connect_voice_to_voice_llm_ws():
+    return await websockets.connect(
         'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01',
-        additional_headers={
-            "Authorization": f"Bearer {OPENAI_API_KEY}",
-            "OpenAI-Beta": "realtime=v1"
-        }
-    ) as openai_ws:
-        # Initialize the OpenAI session
-        await initialize_session(openai_ws)
-        
-        # Create the WebSocket handler
-        ws_handler = WebSocketHandler(websocket, openai_ws)
-        
-        # Handle the connection
-        await ws_handler.handle_vocal_conversation()
+        additional_headers={ "Authorization": f"Bearer {OPENAI_API_KEY}", "OpenAI-Beta": "realtime=v1"}
+    )
 
 async def initialize_session(openai_ws):
     """Control initial session with OpenAI."""
@@ -120,13 +118,10 @@ async def initialize_session(openai_ws):
             "temperature": 0.8,
         }
     }
-    #print('Sending session update:', json.dumps(session_update))
     await openai_ws.send(json.dumps(session_update))
+    await send_conversation_greetings(openai_ws)
 
-    # comment the next line to not have the AI speak first
-    await send_initial_conversation_item(openai_ws)
-
-async def send_initial_conversation_item(openai_ws):
+async def send_conversation_greetings(openai_ws):
     """Send initial conversation item if AI talks first."""
     initial_conversation_item = {
         "type": "conversation.item.create",
