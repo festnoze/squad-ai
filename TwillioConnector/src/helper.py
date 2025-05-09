@@ -1,7 +1,11 @@
 import re
 
-
 class Helper:
+    @staticmethod
+    def read_file(file_path):
+        with open(file_path, 'r', encoding='utf-8') as file:
+            return file.read()
+    
     @staticmethod
     def convert_markdown(text):
         text = re.sub(r'\*\*(.*?)\*\*', r'*\1*', text)
