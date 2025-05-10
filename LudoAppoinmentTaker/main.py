@@ -158,7 +158,6 @@ def synthesize_speech_google(text: str, language_code="fr-FR"):
     with open(filepath, "wb") as out:
         out.write(response.audio_content)
 
-    
     return filepath
 
 

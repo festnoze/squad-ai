@@ -1,5 +1,5 @@
 import httpx
-from typing import Any, Dict, Optional, AsyncGenerator
+from typing import Any, Dict, AsyncGenerator
 from api_client.request_models.user_request_model import UserRequestModel
 from api_client.request_models.conversation_request_model import ConversationRequestModel
 from api_client.request_models.query_asking_request_model import QueryAskingRequestModel, QueryNoConversationRequestModel
@@ -8,9 +8,13 @@ class StudiRAGInferenceClient:
     """
     Async client for interacting with the /rag/inference endpoints.
     """
-    def __init__(self, base_url: str = "http://localhost:8281"):
-        self.base_url = base_url.rstrip("/")
-        self.client = httpx.AsyncClient(base_url=self.base_url)
+    def __init__(self, host_base_name: str = "localhost", host_port: int = 8281, is_ssh: bool = False):
+        self.host_base_name = host_base_name
+        self.host_port = host_port
+        self.is_ssh = is_ssh
+        #
+        self.host_base_url = f"http{'s' if is_ssh else ''}://{host_base_name}:{host_port}"
+        self.client = httpx.AsyncClient(base_url=self.host_base_url)
 
     async def reinitialize(self) -> None:
         """POST /rag/inference/reinitialize: Reinitialize the service."""

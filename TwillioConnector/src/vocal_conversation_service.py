@@ -8,6 +8,9 @@ import websockets
 from fastapi import WebSocket
 from fastapi.websockets import WebSocketDisconnect
 from src.helper import Helper
+from src.api_client.studi_rag_inference_client import StudiRAGInferenceClient
+from src.api_client.request_models.user_request_model import UserRequestModel, DeviceInfoRequestModel
+from src.api_client.request_models.conversation_request_model import ConversationRequestModel
 
 # Constants moved from twilio_controller.py
 display_timing = True
@@ -32,6 +35,7 @@ class VocalConversationService:
         self.mark_queue = []
         self.response_start_timestamp_twilio = None
         self.voice_to_voice_llm_ws = None
+        self.studi_rag_inference_client = StudiRAGInferenceClient()
     
     async def initialize_llm_websocket_async(self):
         load_dotenv()
@@ -44,16 +48,25 @@ class VocalConversationService:
             additional_headers={ "Authorization": f"Bearer {llm_api_key}", "OpenAI-Beta": "realtime=v1"}
         )
     
-    async def handle_conversation_async(self):
+    async def handle_conversation_async(self, calling_phone_number: str, call_sid: str):
         """Main method to handle the WebSocket connections."""
         try:
-            await self.initialize_session()
+            await self.init_user_session(calling_phone_number, call_sid)
             await asyncio.gather(self.received_vocal_input(), self.send_vocal_output())
         finally:
             if self.voice_to_voice_llm_ws and self.voice_to_voice_llm_ws.state is websockets.State.OPEN:
                 await self.voice_to_voice_llm_ws.close()
 
-    async def initialize_session(self):
+    async def init_user_session(self, calling_phone_number: str, call_sid: str):
+        """ Initialize the user session: create user and conversation and send a welcome message """
+        user_RM = UserRequestModel(user_id=None, user_name=None, IP=calling_phone_number, device_info=DeviceInfoRequestModel(user_agent="twilio", platform="phone", app_version="", os="", browser="", is_mobile=False))
+        user = await self.studi_rag_inference_client.create_or_retrieve_user(user_RM)
+        conversation_RM = ConversationRequestModel(user_id=user['user_id'], call_sid=call_sid)
+        conversation = await self.studi_rag_inference_client.create_new_conversation(conversation_RM)
+        
+        await self.send_conversation_greetings()        
+
+    async def send_conversation_greetings(self):
         """Control initial session with OpenAI."""
         language = "fr"
         welcome_message = Helper.read_file(f"src/prompts/welcome_message.{language}.txt").format(company_name="Studi")
@@ -72,9 +85,8 @@ class VocalConversationService:
             }
         }
         await self.voice_to_voice_llm_ws.send(json.dumps(session_update))
-        await self.send_conversation_greetings()
 
-    async def send_conversation_greetings(self):
+    async def send_conversation_greetings_2(self):
         """Send initial conversation item if AI talks first."""
         initial_conversation_item = {
             "type": "conversation.item.create",
@@ -106,7 +118,8 @@ class VocalConversationService:
                     await self.voice_to_voice_llm_ws.send(json.dumps(audio_append))
                 elif data['event'] == 'start':
                     self.stream_sid = data['start']['streamSid']
-                    print(f"Incoming stream has started (stream sid: {self.stream_sid})")
+                    print(f"!!! Incoming stream has started (stream sid: {self.stream_sid}) !!!")
+                    
                     self.response_start_timestamp_twilio = None
                     self.latest_media_timestamp = 0
                     self.last_assistant_item = None

@@ -32,16 +32,22 @@ async def twilio_incoming_voice_call(request: Request):
 
     host = request.url.hostname
     connect = Connect()
-    connect.stream(url=f'wss://{host}/media-stream')
+    
+    form = await request.form()
+    from_number: str = form.get("From", "Undisclosed phone number")
+    call_sid: str = form.get("CallSid", "Undisclosed Call Sid")
+
+    connect.stream(url=f'wss://{host}/media-stream/phone/{from_number}/sid/{call_sid}')
     response.append(connect)
+    
     return HTMLResponse(content=str(response), media_type="application/xml")
 
-@twilio_router.websocket("/media-stream")
-async def handle_media_stream(websocket: WebSocket):
+@twilio_router.websocket("/media-stream/phone/{calling_phone_number}/sid/{call_sid}")
+async def handle_media_stream(websocket: WebSocket, calling_phone_number: str, call_sid: str):
     """Handle WebSocket connections between Twilio and LLM."""
-
     await websocket.accept()
+    print(f"!!! Incoming call from {calling_phone_number}")
+    print(f"!!! Call SID: {call_sid}")
     vocal_service = VocalConversationService(websocket)
     await vocal_service.initialize_llm_websocket_async()
-
-    await vocal_service.handle_conversation_async()
+    await vocal_service.handle_conversation_async(calling_phone_number, call_sid)
