@@ -1,4 +1,3 @@
-
 import os
 from dotenv import load_dotenv
 import json
@@ -34,7 +33,7 @@ class VocalConversationService:
         self.last_assistant_item = None
         self.mark_queue = []
         self.response_start_timestamp_twilio = None
-        self.voice_to_voice_llm_ws = None
+        self.voice_llm_ws = None
         self.studi_rag_inference_client = StudiRAGInferenceClient()
     
     async def initialize_llm_websocket_async(self):
@@ -43,7 +42,7 @@ class VocalConversationService:
         if not llm_api_key:
             raise ValueError('Missing the OpenAI API key. Please set it in the .env file.')
         
-        self.voice_to_voice_llm_ws = await websockets.connect(
+        self.voice_llm_ws = await websockets.connect(
             'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01',
             additional_headers={ "Authorization": f"Bearer {llm_api_key}", "OpenAI-Beta": "realtime=v1"}
         )
@@ -54,17 +53,27 @@ class VocalConversationService:
             await self.init_user_session(calling_phone_number, call_sid)
             await asyncio.gather(self.received_vocal_input(), self.send_vocal_output())
         finally:
-            if self.voice_to_voice_llm_ws and self.voice_to_voice_llm_ws.state is websockets.State.OPEN:
-                await self.voice_to_voice_llm_ws.close()
+            if self.voice_llm_ws and self.voice_llm_ws.state is websockets.State.OPEN:
+                await self.voice_llm_ws.close()
 
     async def init_user_session(self, calling_phone_number: str, call_sid: str):
         """ Initialize the user session: create user and conversation and send a welcome message """
-        user_RM = UserRequestModel(user_id=None, user_name=None, IP=calling_phone_number, device_info=DeviceInfoRequestModel(user_agent="twilio", platform="phone", app_version="", os="", browser="", is_mobile=False))
+        # Ensure user_name and IP are valid strings
+        user_name_val = "Twilio incoming call " + (calling_phone_number or "Unknown User")
+        ip_val = calling_phone_number or "Unknown IP"
+        user_RM = UserRequestModel(
+            user_id=None,
+            user_name=user_name_val,
+            IP=ip_val,
+            device_info=DeviceInfoRequestModel(user_agent="twilio", platform="phone", app_version="", os="", browser="", is_mobile=True)
+        )
         user = await self.studi_rag_inference_client.create_or_retrieve_user(user_RM)
-        conversation_RM = ConversationRequestModel(user_id=user['user_id'], call_sid=call_sid)
-        conversation = await self.studi_rag_inference_client.create_new_conversation(conversation_RM)
-        
-        await self.send_conversation_greetings()        
+        new_conversation = await self.studi_rag_inference_client.create_new_conversation(
+            ConversationRequestModel(user_id=user['id'], messages=[])
+        )
+
+        welcome_message = await self.send_conversation_greetings()
+        await self.studi_rag_inference_client.add_message_to_conversation(new_conversation['id'], welcome_message)
 
     async def send_conversation_greetings(self):
         """Control initial session with OpenAI."""
@@ -84,7 +93,8 @@ class VocalConversationService:
                 "temperature": 0.8,
             }
         }
-        await self.voice_to_voice_llm_ws.send(json.dumps(session_update))
+        await self.voice_llm_ws.send(json.dumps(session_update))
+        return welcome_message
 
     async def send_conversation_greetings_2(self):
         """Send initial conversation item if AI talks first."""
@@ -101,21 +111,21 @@ class VocalConversationService:
                 ]
             }
         }
-        await self.voice_to_voice_llm_ws.send(json.dumps(initial_conversation_item))
-        await self.voice_to_voice_llm_ws.send(json.dumps({"type": "response.create"}))
+        await self.voice_llm_ws.send(json.dumps(initial_conversation_item))
+        await self.voice_llm_ws.send(json.dumps({"type": "response.create"}))
     
     async def received_vocal_input(self):
         """Receive audio data from Twilio and send it to the OpenAI Realtime API."""
         try:
             async for message in self.twilio_websocket.iter_text():
                 data = json.loads(message)
-                if data['event'] == 'media' and self.voice_to_voice_llm_ws.state is websockets.State.OPEN:
+                if data['event'] == 'media' and self.voice_llm_ws.state is websockets.State.OPEN:
                     self.latest_media_timestamp = int(data['media']['timestamp'])
                     audio_append = {
                         "type": "input_audio_buffer.append",
                         "audio": data['media']['payload']
                     }
-                    await self.voice_to_voice_llm_ws.send(json.dumps(audio_append))
+                    await self.voice_llm_ws.send(json.dumps(audio_append))
                 elif data['event'] == 'start':
                     self.stream_sid = data['start']['streamSid']
                     print(f"!!! Incoming stream has started (stream sid: {self.stream_sid}) !!!")
@@ -133,7 +143,7 @@ class VocalConversationService:
     async def send_vocal_output(self):
         """Receive events from the OpenAI Realtime API, send audio back to Twilio."""
         try:
-            async for llm_answer_message in self.voice_to_voice_llm_ws:
+            async for llm_answer_message in self.voice_llm_ws:
                 llm_answer_json = json.loads(llm_answer_message)
                 if llm_answer_json['type'] in events_types_to_log:
                     print(f"Received event: {llm_answer_json['type']}", llm_answer_json)
@@ -187,7 +197,7 @@ class VocalConversationService:
                     "content_index": 0,
                     "audio_end_ms": elapsed_time
                 }
-                await self.voice_to_voice_llm_ws.send(json.dumps(truncate_event))
+                await self.voice_llm_ws.send(json.dumps(truncate_event))
 
             await self.twilio_websocket.send_json({
                 "event": "clear",

@@ -80,6 +80,23 @@ async def rag_query_stream_async(user_query_request_model: QueryAskingRequestMod
         print(f"Failed to handle query stream: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
     
+@inference_router.post("/conversation/add-external-message")
+async def conversation_add_external_assistant_message_async(external_question_request_model: QueryAskingRequestModel):
+    try:
+        conversation = await AvailableService.add_external_message_to_conversation_async(
+            external_question_request_model.conversation_id, 
+            external_question_request_model.user_query_content,
+            "assistant"
+        )
+        return JSONResponse(content=conversation.get_all_messages_as_json(), status_code=200)
+    
+    except ValueError as e:
+        print(f"Failed to handle query stream: {e}")
+        raise HTTPException(status_code=400, detail="Bad request")    
+    except Exception as e:
+        print(f"Failed to handle query stream: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+    
 @inference_router.post("/no-conversation/ask-question")
 async def rag_query_no_conversation_async(user_query_request_model: QueryNoConversationRequestModel):
     try:

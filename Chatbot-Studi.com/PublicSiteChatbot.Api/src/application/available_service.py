@@ -169,6 +169,15 @@ class AvailableService:
         return conversation
     
     @staticmethod
+    async def add_external_message_to_conversation_async(conversation_id:UUID, new_message:str, user_role: str = "assistant") -> Conversation:
+        conv_repo = ConversationRepository()
+        conversation = await conv_repo.get_conversation_by_id_async(conversation_id)
+        if new_message and user_role:
+            conversation.add_new_message(user_role, new_message)
+            assert await conv_repo.add_message_to_existing_conversation_async(conversation.id, conversation.last_message)
+        return conversation
+    
+    @staticmethod
     async def prepare_conversation_for_user_query_answer_async(conversation_id:UUID, user_query_content:str) -> Conversation:
         # Wait for tasks on this conversation to be finished before adding a new message
         while task_handler.is_task_ongoing(conversation_id):

@@ -44,7 +44,6 @@ class ConversationRepository:
         conversation_entity = await self.data_context.get_entity_by_id_async(
                                             entity_class= ConversationEntity,
                                             entity_id= conversation_id,
-                                            #to_join_list = [ConversationEntity.user, ConversationEntity.messages], 
                                             fails_if_not_found= fails_if_not_found)
         return ConversationConverters.convert_conversation_entity_to_model(conversation_entity)
     
