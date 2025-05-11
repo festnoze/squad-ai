@@ -50,7 +50,6 @@ agents = {}
 TWILIO_SID = os.getenv("TWILIO_SID")
 TWILIO_AUTH = os.getenv("TWILIO_AUTH")
 PUBLIC_HOST = os.getenv("PUBLIC_HOST")
-ELEVEN_API_KEY = os.getenv("ELEVENLABS_API_KEY")
 VOICE_ID = os.getenv("VOICE_ID")
 API_PORT = 8344
 TEMP_DIR = "static/audio"
@@ -100,33 +99,6 @@ def voice_webhook():
     #response.pause(length=600)  # Ne raccroche pas, laisse la ligne active
 
     return Response(str(response), mimetype="text/xml")
-
-def synthesize_speech_elevenlabs(text):
-    # Étape 1 : Synthèse vocale (format PCM WAV)
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}"
-    headers = {
-        "xi-api-key": ELEVEN_API_KEY,
-        "xi-api-language": "fr",  # 👈 C’est ce champ qui force la langue
-        "Content-Type": "application/json"
-    }
-    data = {
-        "text": text,
-        "model_id": "eleven_turbo_v2",
-        "voice_settings": {
-            "stability": 0.9,
-            "similarity_boost": 0.9
-        }
-    }
-
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as wav_file:
-        response = requests.post(url, json=data, headers=headers)
-        if response.status_code != 200:
-            raise Exception("Erreur synthèse ElevenLabs")
-        wav_file.write(response.content)
-        wav_path = wav_file.name
-
-    return wav_path
-   
 
 def synthesize_speech_google(text: str, language_code="fr-FR"):
     # Créer un client pour l'API Google Cloud Text-to-Speech

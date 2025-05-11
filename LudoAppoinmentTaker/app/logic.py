@@ -1,22 +1,20 @@
 import base64
 import os
-import io
 import uuid
 import json
 import audioop
 import asyncio
 import logging
 import wave
-import tempfile
-import requests
 from pydub import AudioSegment
 from pydub.silence import detect_nonsilent
 from google.cloud import speech, texttospeech
 from openai import OpenAI
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 from fastapi import WebSocket, WebSocketDisconnect
 from agents_graph import AgentsGraph
 from app.agents.conversation_state_model import ConversationState
+from app.text_to_speech import get_text_to_speech_provider
 
 class BusinessLogic:
     _instance = None
@@ -24,7 +22,7 @@ class BusinessLogic:
     compiled_graph = None
     
     # Client and state tracking
-    client_oa = None
+    openai_client = None
     stream_states = {}
     active_streams = {}
     active_calls = {}
@@ -43,7 +41,6 @@ class BusinessLogic:
 
         # Environment and configuration settings
         self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-        self.ELEVEN_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
         self.VOICE_ID = os.getenv("VOICE_ID", "")
         self.TEMP_DIR = "static/audio"
         self.PUBLIC_HOST = os.getenv("PUBLIC_HOST", "http://localhost:8000")
@@ -54,8 +51,8 @@ class BusinessLogic:
         os.makedirs(self.TEMP_DIR, exist_ok=True)
 
         # Initialize API clients
-        if self.client_oa is None:
-            self.client_oa = OpenAI(api_key=self.OPENAI_API_KEY)
+        if self.openai_client is None:
+            self.openai_client = OpenAI(api_key=self.OPENAI_API_KEY)
 
         if self.compiled_graph is None:
             self.init_graph()
@@ -143,12 +140,20 @@ class BusinessLogic:
         
         return stream_sid
     
-    async def handler_websocket(self, ws: WebSocket) -> None:
+    async def handler_websocket(self, ws: WebSocket, calling_phone_number: str, stream_sid: str) -> None:
         """Main WebSocket handler for Twilio streams."""
         if not self.compiled_graph:
             self.logger.error("Graph not compiled, cannot handle WebSocket connection.")
             await ws.close(code=1011, reason="Server configuration error")
             return
+
+        text = f"""
+        Bonjour. Bienvenue chez Studi, l'école 100% en ligne !
+        Je suis l'assistant virtuel Stud'IA, je prends le relais lorsque nos conseillers en formation ne sont pas présents.
+        """
+        tts_provider = get_text_to_speech_provider()
+        audio_bytes = tts_provider.synthesize_speech(text)
+        await self.send_audio_to_twilio(ws, stream_sid, audio_bytes)
 
         # Initialize audio processing variables
         audio_buffer, silence_counter_bytes, current_stream, params = self._init_stream_vars()
@@ -161,6 +166,7 @@ class BusinessLogic:
                     data = self._decode_json(msg)
                     if data is None:
                         continue
+                    self.logger.info(f"Received WebSocket message: {data}")
                 except WebSocketDisconnect as disconnect_err:
                     self.logger.info(f"WebSocket disconnected: {ws.client.host}:{ws.client.port} - Code: {disconnect_err.code}")
                     break
@@ -293,7 +299,8 @@ class BusinessLogic:
 
     async def _speak_and_send(ws, response_text, current_stream):
         try:
-            path: str = self.synthesize_speech_google(response_text)
+            tts_provider = get_text_to_speech_provider()
+            path: str = tts_provider.synthesize_speech(response_text)
             await self.send_audio_to_twilio(ws, path, current_stream)
             self.logger.info(f"Sent graph response to stream {current_stream}: '{response_text[:50]}...'")
         except Exception as e:
@@ -308,11 +315,11 @@ class BusinessLogic:
             self.logger.warning(f"Received stop for unknown or already cleaned stream: {current_stream}")
         await ws.close()
 
-    def _handle_mark_event(data, current_stream):
+    def _handle_mark_event(self, data, current_stream):
         mark_name = data.get("mark", {}).get("name")
-        BusinessLogic.logger.debug(f"Received mark event: {mark_name} for stream {current_stream}")
+        self.logger.debug(f"Received mark event: {mark_name} for stream {current_stream}")
     
-    def save_pcm_as_file(pcm_data: bytes, path: str):
+    def save_pcm_as_file(self, pcm_data: bytes, path: str):
         """Save PCM data (16-bit, 8kHz, mono) to a WAV file at the specified path."""
         with wave.open(path, "wb") as wav_file:
             wav_file.setnchannels(1)  # mono
@@ -320,21 +327,21 @@ class BusinessLogic:
             wav_file.setframerate(8000)
             wav_file.writeframes(pcm_data)
     
-    def transcribe_audio(wav_path: str, language_code: str = "fr-FR") -> str:
+    def transcribe_audio(self, wav_path: str, language_code: str = "fr-FR") -> str:
         """Transcribe audio file using Google Cloud Speech-to-Text API."""
         try:
             # First try with OpenAI Whisper if available
-            if BusinessLogic.OPENAI_API_KEY:
+            if self.OPENAI_API_KEY:
                 try:
                     with open(wav_path, "rb") as audio_file:
-                        response = BusinessLogic.client_oa.audio.transcriptions.create(
+                        response = self.openai_client.audio.transcriptions.create(
                             model="whisper-1",
                             file=audio_file,
                             language="fr"
                         )
                         return response.text
                 except Exception as whisper_err:
-                    BusinessLogic.logger.warning(f"Error with Whisper transcription, falling back to Google: {whisper_err}")
+                    self.logger.warning(f"Error with Whisper transcription, falling back to Google: {whisper_err}")
             
             # Fallback to Google Speech-to-Text
             client = speech.SpeechClient()
@@ -356,107 +363,24 @@ class BusinessLogic:
 
             return transcript
         except Exception as e:
-            BusinessLogic.logger.error(f"Error transcribing audio: {e}", exc_info=True)
+            self.logger.error(f"Error transcribing audio: {e}", exc_info=True)
             return ""
     
-    def synthesize_speech_google(text: str, language_code: str = "fr-FR") -> str:
-        """Synthesize speech using Google Cloud Text-to-Speech API."""
-        try:
-            # Ensure temp directory exists
-            os.makedirs(BusinessLogic.TEMP_DIR, exist_ok=True)
-            
-            # Try Google TTS
-            try:
-                client = texttospeech.TextToSpeechClient()
-
-                synthesis_input = texttospeech.SynthesisInput(text=text)
-                voice = texttospeech.VoiceSelectionParams(
-                    language_code=language_code,
-                    ssml_gender=texttospeech.SsmlVoiceGender.FEMALE,
-                )
-                audio_config = texttospeech.AudioConfig(
-                    audio_encoding=texttospeech.AudioEncoding.MP3
-                )
-
-                response = client.synthesize_speech(
-                    input=synthesis_input, voice=voice, audio_config=audio_config
-                )
-
-                # Save to file
-                filename = f"{uuid.uuid4()}.mp3"
-                filepath = os.path.join(BusinessLogic.TEMP_DIR, filename)
-                with open(filepath, "wb") as out:
-                    out.write(response.audio_content)
-
-                return filepath
-            except Exception as google_error:
-                BusinessLogic.logger.error(f"Google TTS failed: {google_error}. Trying ElevenLabs fallback.", exc_info=True)
-                # Try ElevenLabs as a fallback
-                return BusinessLogic.synthesize_speech_elevenlabs(text)
-                
-        except Exception as e:
-            BusinessLogic.logger.error(f"Error synthesizing speech: {e}", exc_info=True)
-            
-            # Create a default audio file as last resort
-            try:
-                from pydub import AudioSegment
-                default_audio = AudioSegment.silent(duration=500)  # 500ms of silence
-                default_filepath = os.path.join(BusinessLogic.TEMP_DIR, f"default_{uuid.uuid4()}.mp3")
-                default_audio.export(default_filepath, format="mp3")
-                BusinessLogic.logger.info(f"Using default audio file: {default_filepath}")
-                return default_filepath
-            except Exception as fallback_error:
-                BusinessLogic.logger.error(f"Failed to create fallback audio: {fallback_error}")
-                return ""
-    
-    def synthesize_speech_elevenlabs(text: str) -> str:
-        """Synthesize speech using ElevenLabs API."""
-        try:
-            if not BusinessLogic.ELEVEN_API_KEY or not BusinessLogic.VOICE_ID:
-                raise ValueError("ElevenLabs API key or Voice ID not set")
-                
-            url = f"https://api.elevenlabs.io/v1/text-to-speech/{BusinessLogic.VOICE_ID}"
-            headers = {
-                "xi-api-key": BusinessLogic.ELEVEN_API_KEY,
-                "xi-api-language": "fr",  # Force French language
-                "Content-Type": "application/json"
-            }
-            data = {
-                "text": text,
-                "model_id": "eleven_turbo_v2",
-                "voice_settings": {
-                    "stability": 0.9,
-                    "similarity_boost": 0.9
-                }
-            }
-
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as mp3_file:
-                response = requests.post(url, json=data, headers=headers)
-                if response.status_code != 200:
-                    raise Exception(f"ElevenLabs error: {response.status_code} - {response.text}")
-                    
-                mp3_file.write(response.content)
-                filepath = mp3_file.name
-                
-            # Copy to public directory
-            filename = f"{uuid.uuid4()}.mp3"
-            public_path = os.path.join(BusinessLogic.TEMP_DIR, filename)
-            with open(filepath, "rb") as src, open(public_path, "wb") as dst:
-                dst.write(src.read())
-                
-            # Remove temp file
-            os.unlink(filepath)
-            
-            return public_path
-        except Exception as e:
-            BusinessLogic.logger.error(f"Error synthesizing speech with ElevenLabs: {e}", exc_info=True)
-            return ""
-    
-    async def send_audio_to_twilio(ws: WebSocket, audio_path: str, stream_sid: str):
+    async def send_audio_to_twilio(self, ws: WebSocket, stream_sid: str, audio_bytes: bytes):
         """Convert mp3 to μ-law and send to Twilio over WebSocket."""
+        msg = {
+                    "event": "media",
+                    "streamSid": stream_sid,
+                    "media": {
+                        "payload": audio_bytes
+                    }
+                }
+
+        await ws.send_text(json.dumps(msg))
+        return True
         try:
             # Load audio and convert to appropriate format for Twilio (8kHz μ-law)
-            audio = AudioSegment.from_file(audio_path).set_frame_rate(8000).set_channels(1).set_sample_width(2)
+            audio = AudioSegment.from_raw(io.BytesIO(audio_bytes), frame_rate=8000, sample_width=2, channels=1)
             pcm_data = audio.raw_data
             ulaw_data = audioop.lin2ulaw(pcm_data, 2)  # 2 = 16 bits
 
@@ -487,8 +411,8 @@ class BusinessLogic:
             }
             await ws.send_text(json.dumps(mark_msg))
 
-            BusinessLogic.logger.info(f"Audio sent to Twilio for stream {stream_sid}")
+            self.logger.info(f"Audio sent to Twilio for stream {stream_sid}")
             return True
         except Exception as e:
-            BusinessLogic.logger.error(f"Error sending audio to Twilio: {e}", exc_info=True)
+            self.logger.error(f"Error sending audio to Twilio: {e}", exc_info=True)
             return False

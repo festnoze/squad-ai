@@ -30,11 +30,18 @@ async def voice_webhook(request: Request) -> HTMLResponse:
         logger.info(f"Call from: {from_number}, CallSid: {call_sid}")
 
         ws_scheme = "wss" if request.url.scheme == "https" else "ws"
-        ws_url = f"{ws_scheme}://{request.url.netloc}/ws"
+        ws_url = f"{ws_scheme}://{request.url.netloc}/ws/phone/{from_number}/sid/{call_sid}"
         logger.info(f"Connecting Twilio stream to WebSocket: {ws_url}")
 
         response = VoiceResponse()
+        
+        host = request.url.hostname
         connect = Connect()
+        
+        form = await request.form()
+        from_number: str = form.get("From", "Undisclosed phone number")
+        call_sid: str = form.get("CallSid", "Undisclosed Call Sid")
+        
         connect.stream(url=ws_url)
         response.append(connect)
 
@@ -46,12 +53,12 @@ async def voice_webhook(request: Request) -> HTMLResponse:
         response.say("An error occurred processing your call. Please try again later.")
         return HTMLResponse(content=str(response), media_type="application/xml", status_code=500)
 
-@router.websocket("/ws")
-async def websocket_endpoint(ws: WebSocket) -> None:
+@router.websocket("/ws/phone/{calling_phone_number}/sid/{call_sid}")
+async def websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid: str) -> None:
     await ws.accept()
     logger.info(f"WebSocket connection accepted from: {ws.client.host}:{ws.client.port}")
     try:
-        await BusinessLogic().handler_websocket(ws)
+        await BusinessLogic().handler_websocket(ws, calling_phone_number, call_sid)
     except WebSocketDisconnect:
         logger.info(f"WebSocket disconnected: {ws.client.host}:{ws.client.port}")
     except Exception as e:
@@ -60,7 +67,7 @@ async def websocket_endpoint(ws: WebSocket) -> None:
             await ws.close(code=1011)
         except RuntimeError:
             logger.error("Error closing WebSocket connection", exc_info=True)
-            
+
             pass
         
     finally:

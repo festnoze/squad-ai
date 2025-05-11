@@ -52,9 +52,9 @@ class ApiConfig:
         )
 
         logger = logging.getLogger(__name__)
-        
+
         # Initialize the BusinessLogic singleton
-        # business_logic = BusinessLogic()
+        business_logic = BusinessLogic()
         
         print('\n\n---------------------------------------------')
         print('🌐 Voice Appointment Maker API 🚀 started 🚀')
