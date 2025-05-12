@@ -5,7 +5,6 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from endpoints import router as api_router
-from logic import BusinessLogic
 
 # Configure logging for the entire application
 logging.basicConfig(
@@ -52,9 +51,6 @@ app.add_middleware(
 
 # Include API routes
 app.include_router(api_router)
-
-# Setup shared logger for BusinessLogic
-BusinessLogic.logger = logger
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
