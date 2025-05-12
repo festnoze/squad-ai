@@ -27,9 +27,9 @@ class AgentsGraph:
         CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', 'lid_api_config.yaml') # Assumes graph.py is in app/ and config is in root
         try:
             self.lead_agent_instance = LeadAgent(config_path=CONFIG_PATH)
-            self.logger.info(f"LeadAgent initialized with config: {CONFIG_PATH}")
+            self.logger.info(f"Initialize Lead Agent succeed with config: {CONFIG_PATH}")
         except Exception as e:
-            self.logger.error(f"Failed to initialize LeadAgent: {e}", exc_info=True)
+            self.logger.error(f"Failed to initialize Lead Agent: {e}", exc_info=True)
             self.lead_agent_instance = None # Handle inability to load agent
             
         self.graph = self._build_graph()
@@ -80,7 +80,7 @@ class AgentsGraph:
             self.logger.info(f"[{call_sid}] Routing to calendar_agent (returning user)")
             next_node = {"next": "calendar_agent"}
         
-        # If we have partial lead information, continue with lead agent
+        # If we have partial lead information, continue with Lead Agent
         elif state.get('agent_scratchpad', {}).get('lead_extracted_info'):
             self.logger.info(f"[{call_sid}] Routing to lead_agent (continuing lead collection)")
             next_node = {"next": "lead_agent"}
@@ -237,7 +237,7 @@ class AgentsGraph:
             
         except Exception as e:
             self.logger.error(f"[{call_sid}] Error in SF Agent node: {e}", exc_info=True)
-            # Default to lead agent in case of error
+            # Default to Lead Agent in case of error
             return {
                 "history": [("AI", "Bienvenue chez Studi. Pouvez-vous me laisser vos coordonnées afin qu'un conseiller puisse vous contacter ?")],
                 "agent_scratchpad": {"error": str(e), "next_agent_needed": "lead_agent"}
@@ -304,7 +304,7 @@ class AgentsGraph:
             self.logger.info(f"[{call_sid}] Explicit routing to: {next_agent}")
             return next_agent
         
-        # Check lead agent status
+        # Check Lead Agent status
         lead_status = state.get('agent_scratchpad', {}).get('lead_last_status')
         if lead_status:
             if lead_status == "lead_captured":

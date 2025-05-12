@@ -56,7 +56,7 @@ class OpenAITTSProvider(TextToSpeechProvider):
         try:
             resp: any = self.client.audio.speech.create(
                 model="tts-1",
-                voice="alloy",
+                voice="fable",  # OpenAI TTS voices: alloy, ash, ballad, coral, echo, fable, nova, onyx, sage, shimmer
                 input=text,
             )
             audio_bytes = resp.read()

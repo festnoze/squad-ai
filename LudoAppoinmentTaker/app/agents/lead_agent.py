@@ -9,8 +9,7 @@ logger = logging.getLogger(__name__)
 
 class LeadAgent:
     def __init__(self, config_path="lid_api_config.yaml"):
-        """Initialize the agent with YAML configuration."""
-        logger.info(f"Initializing LeadAgent with config: {config_path}")
+        """Initialize lead agent with YAML configuration."""
         try:
             # Adjust to handle paths relative to project root
             project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
@@ -35,15 +34,15 @@ class LeadAgent:
             self.request_data = []
             
         except FileNotFoundError:
-            error_msg = f"Configuration file {config_path} does not exist"
+            error_msg = f"Initialize lead agent error: Configuration file {config_path} does not exist"
             logger.error(error_msg)
             raise FileNotFoundError(error_msg)
         except yaml.YAMLError as e:
-            error_msg = f"Error in YAML file format: {str(e)}"
+            error_msg = f"Initialize lead agent error: Error in YAML file format: {str(e)}"
             logger.error(error_msg)
             raise ValueError(error_msg)
         except Exception as e:
-            error_msg = f"Error initializing agent: {str(e)}"
+            error_msg = f"Initialize lead agent error: {str(e)}"
             logger.error(error_msg)
             raise Exception(error_msg)
     
