@@ -89,7 +89,7 @@ class BusinessLogic:
         )
         
     
-    def _decode_json(message: str) -> Optional[Dict]:
+    def _decode_json(self, message: str) -> Optional[Dict]:
         """Safely decode JSON message from WebSocket."""
         try:
             return json.loads(message)
@@ -97,11 +97,11 @@ class BusinessLogic:
             self.logger.error(f"Failed to decode JSON message: {e}")
             return None
     
-    def _handle_connected_event(ws: WebSocket):
+    def _handle_connected_event(self, ws: WebSocket):
         """Handle the 'connected' event from Twilio."""
         self.logger.info("Twilio WebSocket connected")
     
-    async def _handle_start_event(ws: WebSocket, start_data: Dict) -> str:
+    async def _handle_start_event(self, ws: WebSocket, start_data: Dict) -> str:
         """Handle the 'start' event from Twilio which begins a new call."""
         call_sid = start_data.get("callSid")
         stream_sid = start_data.get("streamSid")
@@ -151,9 +151,9 @@ class BusinessLogic:
         Bonjour. Bienvenue chez Studi, l'école 100% en ligne !
         Je suis l'assistant virtuel Stud'IA, je prends le relais lorsque nos conseillers en formation ne sont pas présents.
         """
-        tts_provider = get_text_to_speech_provider()
-        audio_bytes = tts_provider.synthesize_speech(text)
-        await self.send_audio_to_twilio(ws, stream_sid, audio_bytes)
+        tts_provider = get_text_to_speech_provider(self.TEMP_DIR)
+        audio_file_path = tts_provider.synthesize_speech(text)
+        await self.send_audio_to_twilio(ws, stream_sid, audio_file_path)
 
         # Initialize audio processing variables
         audio_buffer, silence_counter_bytes, current_stream, params = self._init_stream_vars()
@@ -166,7 +166,6 @@ class BusinessLogic:
                     data = self._decode_json(msg)
                     if data is None:
                         continue
-                    self.logger.info(f"Received WebSocket message: {data}")
                 except WebSocketDisconnect as disconnect_err:
                     self.logger.info(f"WebSocket disconnected: {ws.client.host}:{ws.client.port} - Code: {disconnect_err.code}")
                     break
@@ -199,7 +198,7 @@ class BusinessLogic:
                 del self.stream_states[current_stream]
             self.logger.info(f"WebSocket handler finished for {ws.client.host}:{ws.client.port} (Stream: {current_stream})" )
     
-    async def _handle_media_event(ws, data, audio_buffer, silence_counter_bytes, params, current_stream):
+    async def _handle_media_event(self, ws, data, audio_buffer, silence_counter_bytes, params, current_stream):
         # 1. Decode audio chunk
         chunk = self._decode_audio_chunk(data, params["sample_width"])
         if chunk is None: return audio_buffer, silence_counter_bytes
@@ -231,7 +230,7 @@ class BusinessLogic:
                 await self._speak_and_send(ws, response_text, current_stream)
         return audio_buffer, silence_counter_bytes
    
-    def _decode_audio_chunk(data, sample_width):
+    def _decode_audio_chunk(self, data, sample_width):
         media_data = data.get("media", {})
         payload = media_data.get("payload")
         if not payload:
@@ -243,14 +242,14 @@ class BusinessLogic:
             self.logger.error(f"Error decoding/converting audio chunk: {decode_err}")
             return None
 
-    def _update_silence_counter(chunk, silence_counter_bytes, sample_width, silence_threshold):
+    def _update_silence_counter(self, chunk, silence_counter_bytes, sample_width, silence_threshold):
         rms: int = audioop.rms(chunk, sample_width)
         if rms < silence_threshold:
             return silence_counter_bytes + len(chunk)
         else:
             return 0
 
-    def _transcribe_buffer(buffer_to_process):
+    def _transcribe_buffer(self, buffer_to_process):
         try:
             wav_path = self.save_wav(buffer_to_process)
             transcript: str = self.transcribe_audio(wav_path)
@@ -261,7 +260,7 @@ class BusinessLogic:
             self.logger.error(f"Error during transcription: {speech_err}", exc_info=True)
             return None
     
-    async def _process_conversation(ws, current_stream, transcript):
+    async def _process_conversation(self, ws, current_stream, transcript):
         """Process user input through the conversation graph and get a response."""
         response_text = "Désolé, une erreur interne s'est produite."
         
@@ -297,7 +296,7 @@ class BusinessLogic:
             self.logger.error(f"Stream {current_stream} not found in states, cannot invoke graph.")
             return None
 
-    async def _speak_and_send(ws, response_text, current_stream):
+    async def _speak_and_send(self, ws, response_text, current_stream):
         try:
             tts_provider = get_text_to_speech_provider()
             path: str = tts_provider.synthesize_speech(response_text)
@@ -306,7 +305,7 @@ class BusinessLogic:
         except Exception as e:
             self.logger.error(f"Error sending graph response for stream {current_stream}: {e}", exc_info=True)
 
-    async def _handle_stop_event(ws, current_stream):
+    async def _handle_stop_event(self, ws, current_stream):
         self.logger.info(f"Received stop event for stream: {current_stream}")
         if current_stream in self.stream_states:
             del self.stream_states[current_stream]

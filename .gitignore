@@ -23,7 +23,8 @@ structures_descriptions*/
 *.zip
 *.rar
 *.7z
-
+*.mp3
+*.wav
 .qodo/
 
 /Include
