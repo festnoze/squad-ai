@@ -54,23 +54,23 @@ class OpenAISTTProvider(SpeechToTextProvider):
             self.openai_client = OpenAI(api_key=self.openai_api_key)
         else:
             self.openai_client = None
-            self.logger.warning("OPENAI_API_KEY not set, Whisper transcription will not be available.")
+            self.logger.warning("OPENAI_API_KEY not set, OpenAI transcription will not be available.")
 
     def transcribe_audio(self, file_name: str, language_code: str = "fr-FR") -> str:
-        """Transcribe audio file using OpenAI Whisper API."""
+        """Transcribe audio file using OpenAI STT API."""
         try:
             if not self.openai_client:
                 raise ValueError("OpenAI client not initialized - missing API key")
                 
             with open(os.path.join(self.temp_dir, file_name), "rb") as audio_file:
                 response = self.openai_client.audio.transcriptions.create(
-                    model="whisper-1",
+                    model="gpt-4o-transcribe",
                     file=audio_file,
                     language="fr"
                 )
             return response.text
         except Exception as e:
-            self.logger.error(f"Error transcribing audio with OpenAI: {e}", exc_info=True)
+            self.logger.error(f"Error transcribing audio with OpenAI model: {e}", exc_info=True)
             return ""
 
 class HybridSTTProvider(SpeechToTextProvider):
@@ -87,7 +87,7 @@ class HybridSTTProvider(SpeechToTextProvider):
             self.openai_client = OpenAI(api_key=self.openai_api_key)
         else:
             self.openai_client = None
-            self.logger.warning("OPENAI_API_KEY not set, Whisper transcription will not be available.")
+            self.logger.warning("OPENAI_API_KEY not set, OpenAI transcription will not be available.")
 
     def transcribe_audio(self, file_name: str, language_code: str = "fr-FR") -> str:
         """Transcribe audio file using Google Cloud Speech-to-Text API."""

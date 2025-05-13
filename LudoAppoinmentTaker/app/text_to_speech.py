@@ -9,7 +9,7 @@ class TextToSpeechProvider(ABC):
     temp_dir: str = None
     
     @abstractmethod
-    def synthesize_speech(self, text: str, language_code: str = "fr-FR") -> str:
+    def synthesize_speech_to_file(self, text: str) -> str:
         """Speech-to-text using specified the provider, and save it to the outputed file in temp directory"""
         pass
 
@@ -30,11 +30,11 @@ class GoogleTTSProvider(TextToSpeechProvider):
         self.client = self.google_tts.TextToSpeechClient()
         self.temp_dir = temp_dir
 
-    def synthesize_speech(self, text: str, language_code: str = "fr-FR") -> str:
+    def synthesize_speech_to_file(self, text: str) -> str:
         """Synthesize speech using Google Cloud Text-to-Speech API."""
         try:
             synthesis_input = self.google_tts.SynthesisInput(text=text)
-            voice = self.google_tts.VoiceSelectionParams(language_code=language_code, ssml_gender=self.google_tts.SsmlVoiceGender.FEMALE)
+            voice = self.google_tts.VoiceSelectionParams(language_code="fr-FR", ssml_gender=self.google_tts.SsmlVoiceGender.FEMALE)
             audio_config = self.google_tts.AudioConfig(audio_encoding=self.google_tts.AudioEncoding.MP3)
 
             response = self.client.synthesize_speech(input=synthesis_input, voice=voice, audio_config=audio_config)
@@ -52,12 +52,13 @@ class OpenAITTSProvider(TextToSpeechProvider):
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.temp_dir = temp_dir
 
-    def synthesize_speech(self, text: str, language_code: str = "fr-FR") -> str:
-        try:
+    def synthesize_speech_to_file(self, text: str) -> str:
+        try:            
             resp: any = self.client.audio.speech.create(
                 model="tts-1",
-                voice="fable",  # OpenAI TTS voices: alloy, ash, ballad, coral, echo, fable, nova, onyx, sage, shimmer
-                input=text,
+                voice="onyx",  # Better for french: fable, nova, shimmer
+                # All OpenAI TTS voices: alloy, ash, ballad, coral, echo, fable, nova, onyx, sage, shimmer
+                input=text
             )
             audio_bytes = resp.read()
             return self.save_raw_audio_stream(audio_bytes)

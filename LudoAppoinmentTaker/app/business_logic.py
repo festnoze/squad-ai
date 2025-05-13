@@ -41,8 +41,7 @@ class BusinessLogic:
         
         # Set audio processing parameters as instance variables
         self.sample_width = 2  # 16-bit PCM
-        self.speech_threshold = 200  # Threshold for silence vs. speech
-        self.max_silence_bytes = 30 * 320  # ~400ms at 8kHz (reduced for faster response)
+        self.speech_threshold = 50  # Threshold for silence vs. speech
         self.min_audio_bytes_for_processing = 6400  # Minimum buffer size = ~400ms at 8kHz
         self.max_audio_bytes_for_processing = 150000  # Maximum buffer size = ~15s at 8kHz
         self.consecutive_silence_count = 0  # Count consecutive silence chunks
@@ -124,7 +123,7 @@ class BusinessLogic:
 
         try:
             # First, send our welcome message
-            await self._speak_and_send_from_text_or_stream(welcome_text)
+            await self._speak_and_send_from_text(welcome_text)
             
             # Then invoke the graph with initial state to get the AI-generated welcome message
             updated_state = await self.compiled_graph.ainvoke(initial_state)
@@ -134,7 +133,7 @@ class BusinessLogic:
             if updated_state.get('history') and updated_state['history'][0][0] == 'AI':
                 ai_message = updated_state['history'][0][1]
                 if ai_message and ai_message.strip() != welcome_text.strip():
-                    await self._speak_and_send_from_text_or_stream(ai_message)
+                    await self._speak_and_send_from_text(ai_message)
         
         except Exception as e:
             self.logger.error(f"Error in initial graph invocation: {e}", exc_info=True)
@@ -253,26 +252,30 @@ class BusinessLogic:
             transcript = self._perform_speech_to_text_transcription(audio_data)
             if transcript is None:
                 return
-            self.logger.info(f">> Speech to text transcription: '{transcript}'")
             
             # 4. Process through conversation graph
-            response_text = "Instructions : Fait un feedback de la demande utilisateur suivante, afin de t'assurer de ta bonne comphéhension de celle-ci : " + transcript 
-            response = self.openai_client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {"role": "user", "content": response_text}
-                ],
-                stream=True
-            )
-            response_text = response
+            # Feedback the request to the user
+            spoken_text = await self.send_ask_feedback(transcript)
             
             # response_text = "Tu as dit : " + transcript
             # response_text = await self._process_conversation(transcript)
 
-            if response_text:
-                spoken_text = await self._speak_and_send_from_text_or_stream(response_text)
-                self.logger.info(f"<< Response text: '{spoken_text}'")
         return
+
+    async def send_ask_feedback(self, transcript):
+        response_text = "Instructions : Fait un feedback reformulé de façon synthétique de la demande utilisateur suivante, afin de t'assurer de ta bonne comphéhension de celle-ci : " + transcript 
+        response = self.openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "user", "content": response_text}
+            ],
+            stream=True
+        )
+        if response:
+            spoken_text = await self._speak_and_send_from_stream(response)
+            self.logger.info(f"<< Response text: '{spoken_text}'")
+            return spoken_text
+        return ""
    
     def _decode_audio_chunk(self, data):
         media_data = data.get("media", {})
@@ -292,15 +295,15 @@ class BusinessLogic:
             speech_to_noise_ratio = audioop.rms(audio_data, self.sample_width)
             if speech_to_noise_ratio < self.speech_threshold:
                 if random.random() < 0.1: # log 1/10 of the time
-                    self.logger.info(f"Audio buffer speech to noise ratio = {speech_to_noise_ratio}. Low ratio is considered silence/noise. Transcription skipped")
+                    self.logger.info(f"[Silence/Noise] Low speech/noise ratio detected: {speech_to_noise_ratio}. Transcription skipped")
                 return None
                 
-            self.logger.info(f"Audio buffer speech to noise ratio is high, to: {speech_to_noise_ratio}. Transcription processed")
+            self.logger.info(f"[Speech] High speech/noise ratio detected: {speech_to_noise_ratio}. Processing transcription.")
                 
             wav_file_name = self.save_as_wav_file(audio_data)
             transcript: str = self.stt_provider.transcribe_audio(wav_file_name)
-            self.logger.info(f"Transcript from speech: '{transcript}'")
-            self.delete_audio_file(wav_file_name)
+            self.logger.info(f">> Speech to text transcription: '{transcript}'")
+            self.delete_temp_file(wav_file_name)
             
             # Filter out known watermark text that appears during silences
             known_watermarks = [
@@ -313,7 +316,8 @@ class BusinessLogic:
                 "SousTitreur.com",
                 "Merci d'avoir regardé cette vidéo, n'hésitez pas à vous abonner à la chaîne pour ne manquer aucune de mes prochaines vidéos.",
                 "Merci d'avoir regardé cette vidéo",
-                "Merci à tous et à la prochaine"
+                "Merci à tous et à la prochaine",
+                "c'est la fin de la vidéo"
             ]
             
             # Check if transcript contains any of the known watermarks
@@ -327,11 +331,12 @@ class BusinessLogic:
                 return None
                 
             return transcript
+            
         except Exception as speech_err:
             self.logger.error(f"Error during transcription: {speech_err}", exc_info=True)
             return None
     
-    def delete_audio_file(self, file_name: str):
+    def delete_temp_file(self, file_name: str):
         file_path: str = os.path.join(self.TEMP_DIR, file_name)
         if os.path.exists(file_path):
             os.remove(file_path)
@@ -376,44 +381,36 @@ class BusinessLogic:
             self.logger.error(f"Stream {self.current_stream} not found in states, cannot invoke graph.")
             return None
 
-    async def _speak_and_send_from_text_or_stream(self, response: any):
+    async def _speak_and_send_from_stream(self, answer_stream: Stream):
         """Synthesize speech from text and send to Twilio"""
-        if not self.current_stream:
-            self.logger.error("No current stream defined (to sid), cannot send audio")
-            return
         try:
-            if isinstance(response, str):
-                await self._speak_and_send_from_text(response)
-                return response
-            elif isinstance(response, Stream):
-                full_text = ""
-                text_buffer = ""
-                for chunk in response:
-                    # Extract the content from ChatCompletionChunk
-                    if chunk.choices:
-                        delta_content = chunk.choices[0].delta.content
-                        if delta_content is not None:
-                            text_buffer += delta_content
-                            # Check if we should send this segment (after punctuation or if long enough)
-                            if len(text_buffer) > 1 and (any(punct in delta_content for punct in [".", ",", ":", "!", "?"]) or len(text_buffer.split()) > 20):
-                                await self._speak_and_send_from_text(text_buffer)
-                                full_text += text_buffer
-                                text_buffer = ""
-                # Send any remaining text
-                if text_buffer:
-                    await self._speak_and_send_from_text(text_buffer)
-                    full_text += text_buffer
-                return full_text
-            else:
-                raise ValueError(f"Invalid response type: {type(response)}")
-
+            full_text = ""
+            text_buffer = ""
+            for chunk in answer_stream:
+                if chunk.choices:
+                    delta_content = chunk.choices[0].delta.content
+                    if delta_content is not None:
+                        text_buffer += delta_content
+                        # Check if we should send this segment (after punctuation or if long enough)
+                        if len(text_buffer) > 1 and (any(punct in delta_content for punct in [".", ",", ":", "!", "?"]) or len(text_buffer.split()) > 20):
+                            await self._speak_and_send_from_text(text_buffer)
+                            full_text += text_buffer
+                            text_buffer = ""
+            
+            # Send any remaining text after the loop completes
+            if text_buffer:
+                await self._speak_and_send_from_text(text_buffer)
+                full_text += text_buffer
+            
+            return full_text
         except Exception as e:
-            self.logger.error(f"/!\\ Error sending audio to Twilio for stream {self.current_stream} in {self._speak_and_send_from_text_or_stream.__name__}: {e}", exc_info=True)
+            self.logger.error(f"/!\\ Error sending audio to Twilio in {self._speak_and_send_from_stream.__name__}: {e}", exc_info=True)
+            return ""
 
     async def _speak_and_send_from_text(self, text_buffer: str):
-        path = self.tts_provider.synthesize_speech(text_buffer)
+        path = self.tts_provider.synthesize_speech_to_file(text_buffer)
         await self.send_audio_to_twilio(path)
-        self.delete_audio_file(path)
+        self.delete_temp_file(path)
 
     async def _handle_stop_event(self):
         """Handle the stop event from Twilio which ends a call"""
@@ -531,9 +528,9 @@ class BusinessLogic:
             # Load audio and convert to appropriate format for Twilio (8kHz μ-law)
             ulaw_data = self.prepare_voice_stream(file_path=file_path, audio_bytes=audio_bytes, frame_rate=frame_rate, channels=channels, sample_width=sample_width, convert_to_mulaw=True)
             if file_path:
-                self.delete_audio_file(file_path)
-            # Send in chunks with slight delay to simulate real-time streaming
-            chunk_size = 320  # ~20ms at 8kHz
+                self.delete_temp_file(file_path)
+            
+            chunk_size = 6400  # 0.4s at 8kHz
             for i in range(0, len(ulaw_data), chunk_size):
                 chunk = ulaw_data[i:i + chunk_size]
                 payload = base64.b64encode(chunk).decode()
@@ -547,7 +544,6 @@ class BusinessLogic:
                 }
 
                 await self.websocket.send_text(json.dumps(msg))
-                await asyncio.sleep(0.02)  # 20ms for real-time simulation
 
             # Send mark to indicate end of message
             mark_msg = {

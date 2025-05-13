@@ -69,8 +69,7 @@ class VocalConversationService:
         )
         user = await self.studi_rag_inference_client.create_or_retrieve_user(user_RM)
         new_conversation = await self.studi_rag_inference_client.create_new_conversation(
-            ConversationRequestModel(user_id=user['id'], messages=[])
-        )
+            ConversationRequestModel(user_id=user['id'], messages=[]))
 
         welcome_message = await self.send_conversation_greetings()
         await self.studi_rag_inference_client.add_message_to_conversation(new_conversation['id'], welcome_message)
