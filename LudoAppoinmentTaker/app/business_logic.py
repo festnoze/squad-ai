@@ -8,6 +8,7 @@ import audioop
 import asyncio
 import logging
 import wave
+import time
 from datetime import datetime
 #
 from pydub import AudioSegment
@@ -19,6 +20,10 @@ from fastapi import WebSocket, WebSocketDisconnect
 #
 from agents_graph import AgentsGraph
 from app.agents.conversation_state_model import ConversationState
+from app.api_client.studi_rag_inference_client import StudiRAGInferenceClient
+from app.api_client.request_models.user_request_model import UserRequestModel, DeviceInfoRequestModel
+from app.api_client.request_models.conversation_request_model import ConversationRequestModel
+from app.api_client.request_models.query_asking_request_model import QueryAskingRequestModel
 from app.text_to_speech import get_text_to_speech_provider
 from app.speech_to_text import get_speech_to_text_provider
 
@@ -66,6 +71,8 @@ class BusinessLogic:
         self.tts_provider = get_text_to_speech_provider(self.TEMP_DIR)
         self.stt_provider = get_speech_to_text_provider(self.TEMP_DIR)
 
+        self.studi_rag_inference_client = StudiRAGInferenceClient()
+
         # Initialize API clients
         if self.openai_client is None:
             self.openai_client = OpenAI(api_key=self.OPENAI_API_KEY)
@@ -106,6 +113,8 @@ class BusinessLogic:
             "history": [],
             "agent_scratchpad": {}
         }
+
+        self.conversation_id = await self.init_user_and_conversation(phone_number, call_sid)
         
         # Set the current stream so the audio functions know which stream to use
         self.current_stream = stream_sid
@@ -124,6 +133,7 @@ class BusinessLogic:
         try:
             # First, send our welcome message
             await self._speak_and_send_from_text(welcome_text)
+            await self.studi_rag_inference_client.add_message_to_conversation(self.conversation_id, welcome_text)
             
             # Then invoke the graph with initial state to get the AI-generated welcome message
             updated_state = await self.compiled_graph.ainvoke(initial_state)
@@ -134,6 +144,7 @@ class BusinessLogic:
                 ai_message = updated_state['history'][0][1]
                 if ai_message and ai_message.strip() != welcome_text.strip():
                     await self._speak_and_send_from_text(ai_message)
+                    await self.studi_rag_inference_client.add_message_to_conversation(self.conversation_id, ai_message)
         
         except Exception as e:
             self.logger.error(f"Error in initial graph invocation: {e}", exc_info=True)
@@ -141,7 +152,23 @@ class BusinessLogic:
             # so we don't need to send a fallback
         
         return stream_sid
-    
+
+    async def init_user_and_conversation(self, calling_phone_number: str, call_sid: str):
+        """ Initialize the user session: create user and conversation and send a welcome message """
+        # Ensure user_name and IP are valid strings
+        user_name_val = "Twilio incoming call " + (calling_phone_number or "Unknown User")
+        ip_val = calling_phone_number or "Unknown IP"
+        user_RM = UserRequestModel(
+            user_id=None,
+            user_name=user_name_val,
+            IP=ip_val,
+            device_info=DeviceInfoRequestModel(user_agent="twilio", platform="phone", app_version="", os="", browser="", is_mobile=True)
+        )
+        user = await self.studi_rag_inference_client.create_or_retrieve_user(user_RM)
+        new_conversation = await self.studi_rag_inference_client.create_new_conversation(
+            ConversationRequestModel(user_id=user['id'], messages=[]))
+        return new_conversation['id']
+
     async def websocket_handler(self, calling_phone_number: str, call_sid: str) -> None:
         """Main WebSocket handler for Twilio streams."""
         if not self.websocket:
@@ -157,8 +184,6 @@ class BusinessLogic:
         
         # Store the caller's phone number and call SID so we can retrieve them later
         self.phones[call_sid] = calling_phone_number
-
-        # We'll send a welcome message after the stream is established
 
         try:            
             while True:
@@ -214,9 +239,8 @@ class BusinessLogic:
             # if random.random() < 0.01: 
             #     self.logger.info(f"Silent chunk #{self.consecutive_silence_count} (size: {len(chunk)}B) - Speech/noise: {speech_to_noise_ratio}")
             print(f"\rSilent chunk #{self.consecutive_silence_count:04d}- Speech/noise: {speech_to_noise_ratio:04d} (size: {len(chunk)}B) ", end="", flush=True)
-            
-        
-        # Add chunk to buffer (it's not silence)
+                    
+        # Add speech chunk to buffer (non-silent)
         if not is_silence:
             self.audio_buffer += chunk
             self.consecutive_silence_count = 0
@@ -243,23 +267,45 @@ class BusinessLogic:
             else:
                 self.logger.info(f"Processing audio for stream {self.current_stream}: Silence after speech detected. (buffer size: {len(self.audio_buffer)} bytes).")
             
-            # Save current buffer and reset
             audio_data = self.audio_buffer
             self.audio_buffer = b""
             self.silence_counter_bytes = 0
             self.consecutive_silence_count = 0
 
-            # Transcribe and process
-            transcript = self._perform_speech_to_text_transcription(audio_data)
-            if transcript is None:
+            # 4. Transcribe speech to text
+            user_query_transcript = self._perform_speech_to_text_transcription(audio_data)
+            if user_query_transcript is None:
                 return
             
-            # 4. Process through conversation graph
-            # Feedback the request to the user
-            spoken_text = await self.send_ask_feedback(transcript)
-            
-            # response_text = "Tu as dit : " + transcript
-            # response_text = await self._process_conversation(transcript)
+            # 5. Feedback the request to the user
+            #spoken_text = await self.send_ask_feedback(transcript)
+            request = QueryAskingRequestModel(
+                conversation_id=self.conversation_id,
+                user_query_content= user_query_transcript,
+                display_waiting_message=False
+            )
+            try:
+                self.logger.info(f"Sending request to RAG API for stream: {self.current_stream}")
+                start_time = time.time()
+                response = self.studi_rag_inference_client.rag_query_stream_async(request, timeout=60)
+                full_answer = ""
+                async for chunk in response:
+                    full_answer += chunk
+                    self.logger.debug(f"Received chunk: {chunk}")
+                    print(f">> RAG API response: {full_answer}", end="", flush=True)
+                    await self._speak_and_send_from_text(chunk)
+                end_time = time.time()
+                if full_answer:
+                    self.logger.info(f"Full answer gotten from RAG API in {end_time - start_time:.2f}s. : {full_answer}")
+                else:
+                    self.logger.warning(f"Empty response received from RAG API")
+            except Exception as e:
+                error_message = f"Je suis désolé, une erreur s'est produite lors de la communication avec le service."
+                self.logger.error(f"Error in RAG API communication: {str(e)}")
+                await self._speak_and_send_from_text(error_message)
+
+            # 5. Process user's query through conversation graph
+            #response_text = await self._process_conversation(transcript)
 
         return
 
@@ -356,16 +402,11 @@ class BusinessLogic:
             current_state['user_input'] = transcript
             
             try:
-                # Log the conversation for debugging
-                self.logger.info(f"User [{self.current_stream[:8]}]: '{transcript[:50]}...'")
-                
-                # Invoke the graph with the updated state
                 updated_state: ConversationState = await self.compiled_graph.ainvoke(
                     current_state,
                     {"recursion_limit": 15}  # Prevent infinite loops
                 )
                 
-                # Save the updated state
                 self.stream_states[self.current_stream] = updated_state
                 
                 # Extract the AI response from history

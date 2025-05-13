@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from endpoints import router as api_router
+from app.endpoints import router as api_router
 
 # Configure logging for the entire application
 logging.basicConfig(
