@@ -408,9 +408,8 @@ class BusinessLogic:
             return ""
 
     async def _speak_and_send_from_text(self, text_buffer: str):
-        path = self.tts_provider.synthesize_speech_to_file(text_buffer)
-        await self.send_audio_to_twilio(path)
-        self.delete_temp_file(path)
+        audio_bytes = self.tts_provider.synthesize_speech_to_bytes(text_buffer)
+        await self.send_audio_to_twilio(audio_bytes= audio_bytes)
 
     async def _handle_stop_event(self):
         """Handle the stop event from Twilio which ends a call"""
@@ -448,7 +447,7 @@ class BusinessLogic:
             wav_file.writeframes(audio_data)
         return file_name
     
-    def prepare_voice_stream(self, file_path: str=None, audio_bytes: bytes=None, frame_rate: int=8000, channels: int=1, sample_width: int=2, convert_to_mulaw: bool = False):
+    def _prepare_voice_stream(self, file_path: str=None, audio_bytes: bytes=None, frame_rate: int=8000, channels: int=1, sample_width: int=2, convert_to_mulaw: bool = False):
         if (file_path and audio_bytes) or (not file_path and not audio_bytes):
             raise ValueError("Must provide either file_path or audio_bytes, but not both.")
         
@@ -518,7 +517,7 @@ class BusinessLogic:
             self.logger.error(f"Error sending audio to Twilio: {e}", exc_info=True)
             return False
 
-    async def send_audio_to_twilio(self, file_path: str, audio_bytes: bytes=None, frame_rate: int=8000, channels: int=1, sample_width: int=2, convert_to_mulaw: bool = False):
+    async def send_audio_to_twilio(self, file_path: str=None, audio_bytes: bytes=None, frame_rate: int=8000, channels: int=1, sample_width: int=2, convert_to_mulaw: bool = False):
         """Convert mp3 to μ-law and send to Twilio over WebSocket."""
         if not self.websocket:
             self.logger.error("WebSocket not set, cannot send audio")
@@ -526,7 +525,7 @@ class BusinessLogic:
             
         try:
             # Load audio and convert to appropriate format for Twilio (8kHz μ-law)
-            ulaw_data = self.prepare_voice_stream(file_path=file_path, audio_bytes=audio_bytes, frame_rate=frame_rate, channels=channels, sample_width=sample_width, convert_to_mulaw=True)
+            ulaw_data = self._prepare_voice_stream(file_path=file_path, audio_bytes=audio_bytes, frame_rate=frame_rate, channels=channels, sample_width=sample_width, convert_to_mulaw=True)
             if file_path:
                 self.delete_temp_file(file_path)
             
