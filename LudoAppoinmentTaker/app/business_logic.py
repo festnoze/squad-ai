@@ -41,7 +41,7 @@ class BusinessLogic:
         
         # Set audio processing parameters as instance variables
         self.sample_width = 2  # 16-bit PCM
-        self.speech_threshold = 50  # Threshold for silence vs. speech
+        self.speech_threshold = 250  # Threshold for silence vs. speech
         self.min_audio_bytes_for_processing = 6400  # Minimum buffer size = ~400ms at 8kHz
         self.max_audio_bytes_for_processing = 150000  # Maximum buffer size = ~15s at 8kHz
         self.consecutive_silence_count = 0  # Count consecutive silence chunks
@@ -211,8 +211,9 @@ class BusinessLogic:
         if is_silence:
             self.consecutive_silence_count += 1
             self.silence_counter_bytes += len(chunk)            
-            if random.random() < 0.02: 
-                self.logger.info(f"Silent chunk #{self.consecutive_silence_count} (size: {len(chunk)}B) - Speech/noise: {speech_to_noise_ratio}")
+            # if random.random() < 0.01: 
+            #     self.logger.info(f"Silent chunk #{self.consecutive_silence_count} (size: {len(chunk)}B) - Speech/noise: {speech_to_noise_ratio}")
+            print(f"\rSilent chunk #{self.consecutive_silence_count:04d}- Speech/noise: {speech_to_noise_ratio:04d} (size: {len(chunk)}B) ", end="", flush=True)
             
         
         # Add chunk to buffer (it's not silence)
