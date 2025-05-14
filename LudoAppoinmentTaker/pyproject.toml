@@ -22,6 +22,7 @@ dependencies = [
     "requests>=2.32.3",
     "twilio>=9.5.2",
     "uvicorn>=0.34.2",
+    "webrtcvad>=2.0.10",
     "websockets>=15.0.1",
 ]
 

@@ -38,8 +38,8 @@ from common_tools.langchains.langchain_factory import LangChainFactory
 class AvailableService:
     inference_pipeline: RagInferencePipeline = None
     rag_service: RagService = None
-    max_conversations_by_day = 10
-    max_messages_by_conversation = 10
+    max_conversations_by_day = EnvHelper.get_max_conversations_by_day()
+    max_messages_by_conversation = EnvHelper.get_max_messages_by_conversation()
     waiting_message = "Merci de patienter un instant ... Je cherche les informations correspondant à votre question."
 
     def init(activate_print = True):
@@ -144,7 +144,7 @@ class AvailableService:
     async def create_new_conversation_async(user_id: UUID, messages: list[Message] = None) -> Conversation:
         conv_repo = ConversationRepository() # TODO: do IoC for repositories instanciation
         recent_conversation_count = await conv_repo.get_recent_conversations_count_by_user_id_async(user_id)
-        if recent_conversation_count > AvailableService.max_conversations_by_day: 
+        if AvailableService.max_conversations_by_day and recent_conversation_count > AvailableService.max_conversations_by_day: 
             raise QuotaOverloadException("You have reached the maximum number of conversations allowed per day.")
         
         new_conversation = await conv_repo.create_new_conversation_empty_async(user_id)
@@ -187,7 +187,7 @@ class AvailableService:
         conv_repo = ConversationRepository() # TODO: do IoC for repositories instanciation
         conversation = await conv_repo.get_conversation_by_id_async(conversation_id)
         if not conversation: raise ValueError(f"Conversation with ID {conversation_id} not found in database.")
-        if len(conversation.messages) > AvailableService.max_messages_by_conversation: 
+        if AvailableService.max_messages_by_conversation and len(conversation.messages) > AvailableService.max_messages_by_conversation: 
             raise QuotaOverloadException("You have reached the maximum number of messages allowed per conversation.")
         
         conversation.add_new_message("user", user_query_content)

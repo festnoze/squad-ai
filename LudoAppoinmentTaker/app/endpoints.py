@@ -34,15 +34,17 @@ async def voice_webhook(request: Request) -> HTMLResponse:
         logger.info(f"Connecting Twilio stream to WebSocket: {ws_url}")
 
         response = VoiceResponse()
-        
-        host = request.url.hostname
         connect = Connect()
         
         form = await request.form()
         from_number: str = form.get("From", "Undisclosed phone number")
         call_sid: str = form.get("CallSid", "Undisclosed Call Sid")
         
-        connect.stream(url=ws_url)
+        # Request higher quality audio from Twilio
+        connect.stream(url=ws_url, track="inbound_track", parameters={
+            "mediaEncoding": "audio/x-mulaw", 
+            "sampleRate": 16000  # Request 16kHz if possible
+        })
         response.append(connect)
 
         return HTMLResponse(content=str(response), media_type="application/xml")

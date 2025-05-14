@@ -9,6 +9,7 @@ import asyncio
 import logging
 import wave
 import time
+from uuid import UUID
 from datetime import datetime
 #
 from pydub import AudioSegment
@@ -26,6 +27,7 @@ from app.api_client.request_models.conversation_request_model import Conversatio
 from app.api_client.request_models.query_asking_request_model import QueryAskingRequestModel
 from app.text_to_speech import get_text_to_speech_provider
 from app.speech_to_text import get_speech_to_text_provider
+from app.audio_processing import AudioProcessor
 
 class BusinessLogic:
     # Class variables shared across instances
@@ -45,15 +47,15 @@ class BusinessLogic:
         self.active_calls = {}
         
         # Set audio processing parameters as instance variables
-        self.sample_width = 2  # 16-bit PCM
+        self.frame_rate = 8000  # Sample rate in Hz (8kHz is standard for telephony)
+        self.sample_width = 2    # 16-bit PCM
         self.speech_threshold = 250  # Threshold for silence vs. speech
         self.min_audio_bytes_for_processing = 6400  # Minimum buffer size = ~400ms at 8kHz
         self.max_audio_bytes_for_processing = 150000  # Maximum buffer size = ~15s at 8kHz
-        self.consecutive_silence_count = 0  # Count consecutive silence chunks
-        self.required_consecutive_silence_to_answer = 30  # Require several consecutive silent chunks
+        self.consecutive_silence_duration_ms = 0.0  # Count consecutive silence duration in milliseconds
+        self.required_silence_ms_to_answer = 800  # Require 800ms of silence to process audio
         
         self.audio_buffer = b""
-        self.silence_counter_bytes = 0
         self.current_stream = None
         self.start_time = None         
 
@@ -77,18 +79,20 @@ class BusinessLogic:
         self.google_calendar_credentials_path = os.path.join(self.project_root, self.google_calendar_credentials_filename)
         print(self.google_calendar_credentials_path)
 
+        # Create temp directory if it doesn't exist
+        os.makedirs(self.TEMP_DIR, exist_ok=True)
+
         if os.path.exists(self.google_calendar_credentials_path):
             os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = self.google_calendar_credentials_path
             self.logger.info(f"Set GOOGLE_APPLICATION_CREDENTIALS to: {self.google_calendar_credentials_path}")
         else:
             self.logger.warning(f"/!\\ Warning: Google calendar credentials file not found at {self.google_calendar_credentials_path}")
 
-
-        # Create temp directory if it doesn't exist
-        os.makedirs(self.TEMP_DIR, exist_ok=True)
-
         self.tts_provider = get_text_to_speech_provider(self.TEMP_DIR)
-        self.stt_provider = get_speech_to_text_provider(self.TEMP_DIR, provider="google")
+        self.stt_provider = get_speech_to_text_provider(self.TEMP_DIR, provider="hybrid")
+        
+        # Initialize audio processor for better quality
+        self.audio_processor = AudioProcessor(sample_width=self.sample_width, frame_rate=self.frame_rate, vad_aggressiveness=3)
 
         self.studi_rag_inference_client = StudiRAGInferenceClient()
 
@@ -183,10 +187,27 @@ class BusinessLogic:
             IP=ip_val,
             device_info=DeviceInfoRequestModel(user_agent="twilio", platform="phone", app_version="", os="", browser="", is_mobile=True)
         )
-        user = await self.studi_rag_inference_client.create_or_retrieve_user(user_RM)
-        new_conversation = await self.studi_rag_inference_client.create_new_conversation(
-            ConversationRequestModel(user_id=user['id'], messages=[]))
-        return new_conversation['id']
+        try:
+            user = await self.studi_rag_inference_client.create_or_retrieve_user(user_RM)
+            user_id = user['id']
+            
+            # Convert user_id to UUID if it's a string
+            if isinstance(user_id, str): user_id = UUID(user_id)
+                
+            # Create empty messages list
+            from app.api_client.request_models.conversation_request_model import MessageRequestModel
+            messages = []
+            
+            # Create the conversation request model
+            conversation_model = ConversationRequestModel(user_id=user_id, messages=messages)
+            
+            self.logger.info(f"Creating new conversation for user: {user_id}")
+            new_conversation = await self.studi_rag_inference_client.create_new_conversation(conversation_model)
+            return new_conversation['id']
+
+        except Exception as e:
+            self.logger.error(f"Error creating conversation: {str(e)}")
+            return str(uuid.uuid4())
 
     async def websocket_handler(self, calling_phone_number: str, call_sid: str) -> None:
         """Main WebSocket handler for Twilio streams."""
@@ -248,39 +269,38 @@ class BusinessLogic:
             self.logger.warning("Received media event without valid audio chunk")
             return
         
-        speech_to_noise_ratio = audioop.rms(chunk, self.sample_width)
-        is_silence = speech_to_noise_ratio < self.speech_threshold
+        # Use WebRTC VAD for better speech detection
+        is_silence, speech_to_noise_ratio = self.audio_processor.detect_silence_speech(
+            chunk, threshold=self.speech_threshold
+        )
 
         # 2. Silence detection before adding to buffer
+        has_speech_began = len(self.audio_buffer) > 0
+
+        # Count consecutive silence chunks in milliseconds
         if is_silence:
-            self.consecutive_silence_count += 1
-            self.silence_counter_bytes += len(chunk)            
-            # if random.random() < 0.01: 
-            #     self.logger.info(f"Silent chunk #{self.consecutive_silence_count} (size: {len(chunk)}B) - Speech/noise: {speech_to_noise_ratio}")
-            print(f"\rSilent chunk #{self.consecutive_silence_count:04d}- Speech/noise: {speech_to_noise_ratio:04d} (size: {len(chunk)}B) ", end="", flush=True)
-                    
-        # Add speech chunk to buffer (non-silent)
-        if not is_silence:
+            # Calculate duration in milliseconds: (chunk_bytes / bytes_per_sample) / samples_per_second * 1000
+            chunk_duration_ms = (len(chunk) / self.sample_width) / self.frame_rate * 1000
+            self.consecutive_silence_duration_ms += chunk_duration_ms
+            print(f"\rSilent chunk - Duration: {self.consecutive_silence_duration_ms:.1f}ms - Speech/noise: {speech_to_noise_ratio:04d} (size: {len(chunk)}B) ", end="", flush=True)
+
+        # Add speech chunk to buffer
+        if has_speech_began or not is_silence:
             self.audio_buffer += chunk
-            self.consecutive_silence_count = 0
+            self.consecutive_silence_duration_ms = 0.0
 
-            #if random.random() < 0.1:  # Log 10% of the time
             self.logger.debug(
-                    "Speech chunk (size: {len(chunk)}B) - "
-                    "Speech/noise: {speech_to_noise_ratio}, "
-                    "Audio level: RMS = {speech_to_noise_ratio}/{self.speech_threshold}, "
-                    "Silence bytes size = {self.silence_counter_bytes}, "
-                    "Consecutive silence = {self.consecutive_silence_count}, "
-                    "Buffer size = {len(self.audio_buffer)}"
-                )
+                f"Speech detected - RMS: {speech_to_noise_ratio}/{self.speech_threshold}, "
+                f"Buffer size: {len(self.audio_buffer)} bytes"
+            )
 
-        is_silence_long_enough = self.consecutive_silence_count >= self.required_consecutive_silence_to_answer 
+        is_long_silence_after_speech = has_speech_began and self.consecutive_silence_duration_ms >= self.required_silence_ms_to_answer 
         has_reach_min_speech_length = len(self.audio_buffer) >= self.min_audio_bytes_for_processing
         is_speech_too_long = len(self.audio_buffer) > self.max_audio_bytes_for_processing
         
         # 3. Process audio
         # Conditions: if buffer large enough followed by a prolonged silence, or if buffer is too large
-        if (is_silence_long_enough and has_reach_min_speech_length) or is_speech_too_long:
+        if (is_long_silence_after_speech and has_reach_min_speech_length) or is_speech_too_long:
             if is_speech_too_long:
                 self.logger.info(f"Processing audio for stream {self.current_stream}: Buffer size limit reached. (buffer size: {len(self.audio_buffer)} bytes).")
             else:
@@ -288,8 +308,7 @@ class BusinessLogic:
             
             audio_data = self.audio_buffer
             self.audio_buffer = b""
-            self.silence_counter_bytes = 0
-            self.consecutive_silence_count = 0
+            self.consecutive_silence_duration_ms = 0.0
 
             # 4. Transcribe speech to text
             user_query_transcript = self._perform_speech_to_text_transcription(audio_data)
@@ -365,8 +384,17 @@ class BusinessLogic:
                 return None
                 
             self.logger.info(f"[Speech] High speech/noise ratio detected: {speech_to_noise_ratio}. Processing transcription.")
+            
+            # Apply audio preprocessing to improve quality
+            self.logger.info("Applying audio preprocessing...")
+            processed_audio = self.audio_processor.preprocess_audio(audio_data)
+            self.logger.info(f"Audio preprocessing complete. Original size: {len(audio_data)} bytes, Processed size: {len(processed_audio)} bytes")
                 
-            wav_file_name = self.save_as_wav_file(audio_data)
+            # Save the processed audio to a file
+            wav_file_name = self.save_as_wav_file(processed_audio)
+            
+            # Transcribe using the hybrid STT provider
+            self.logger.info("Transcribing audio with hybrid STT provider...")
             transcript: str = self.stt_provider.transcribe_audio(wav_file_name)
             self.logger.info(f">> Speech to text transcription: '{transcript}'")
             #self.delete_temp_file(wav_file_name)
@@ -503,12 +531,15 @@ class BusinessLogic:
         file_name = f"{uuid.uuid4()}.wav"
         with wave.open(os.path.join(self.TEMP_DIR, file_name), "wb") as wav_file:
             wav_file.setnchannels(1)  # mono
-            wav_file.setsampwidth(2)  # 16-bit
-            wav_file.setframerate(8000)
+            wav_file.setsampwidth(self.sample_width)  # 16-bit
+            wav_file.setframerate(self.frame_rate)
             wav_file.writeframes(audio_data)
         return file_name
     
-    def _prepare_voice_stream(self, file_path: str=None, audio_bytes: bytes=None, frame_rate: int=8000, channels: int=1, sample_width: int=2, convert_to_mulaw: bool = False):
+    def _prepare_voice_stream(self, file_path: str=None, audio_bytes: bytes=None, frame_rate: int=None, channels: int=1, sample_width: int=None, convert_to_mulaw: bool = False):
+        # Use instance defaults if not specified
+        frame_rate = frame_rate or self.frame_rate
+        sample_width = sample_width or self.sample_width
         if (file_path and audio_bytes) or (not file_path and not audio_bytes):
             raise ValueError("Must provide either file_path or audio_bytes, but not both.")
         
@@ -538,11 +569,11 @@ class BusinessLogic:
             self.logger.info(f"Sending audio file {mp3_path} to stream {self.current_stream}")
             
             # Convertir en PCM mono 16-bit 8kHz
-            audio = AudioSegment.from_file(mp3_path).set_frame_rate(8000).set_channels(1).set_sample_width(2)
+            audio = AudioSegment.from_file(mp3_path).set_frame_rate(self.frame_rate).set_channels(1).set_sample_width(self.sample_width)
             pcm_data = audio.raw_data
 
             # Convertir en μ-law
-            ulaw_data = audioop.lin2ulaw(pcm_data, 2)  # 2 = 16 bits
+            ulaw_data = audioop.lin2ulaw(pcm_data, self.sample_width)  # 2 = 16 bits
 
             # Découper en petits chunks (20ms = 160 samples * 2 bytes = 320 bytes)
             chunk_size = 320
@@ -578,7 +609,10 @@ class BusinessLogic:
             self.logger.error(f"Error sending audio to Twilio: {e}", exc_info=True)
             return False
 
-    async def send_audio_to_twilio(self, file_path: str=None, audio_bytes: bytes=None, frame_rate: int=8000, channels: int=1, sample_width: int=2, convert_to_mulaw: bool = False):
+    async def send_audio_to_twilio(self, file_path: str=None, audio_bytes: bytes=None, frame_rate: int=None, channels: int=1, sample_width: int=None, convert_to_mulaw: bool = False):
+        # Use instance defaults if not specified
+        frame_rate = frame_rate or self.frame_rate
+        sample_width = sample_width or self.sample_width
         """Convert mp3 to μ-law and send to Twilio over WebSocket."""
         if not self.websocket:
             self.logger.error("WebSocket not set, cannot send audio")
