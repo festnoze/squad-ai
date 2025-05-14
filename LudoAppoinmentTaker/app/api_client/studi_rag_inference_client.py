@@ -48,7 +48,7 @@ class StudiRAGInferenceClient:
     async def add_message_to_conversation(self, conversation_id: str, new_message: str) -> Dict[str, Any]:
         """POST /rag/inference/conversation/add-message: Add a message to a conversation."""
         try:
-            request_model = QueryAskingRequestModel(conversation_id=UUID(conversation_id), user_query_content=new_message)
+            request_model = QueryAskingRequestModel(conversation_id=UUID(conversation_id), user_query_content=new_message, display_waiting_message=False)
             resp = await self.client.post("/rag/inference/conversation/add-external-message", json=request_model.to_dict())
             resp.raise_for_status()
             return resp.json()
@@ -65,15 +65,28 @@ class StudiRAGInferenceClient:
                 timeout=httpx.Timeout(timeout)
             ) as resp:
                 resp.raise_for_status()
-                async for line in resp.aiter_lines():
-                    if line:
-                        yield line
+                async for segment in self.stream_by_segment(resp):
+                    yield segment
+
         except httpx.ReadTimeout:
             yield "Je suis désolé, mais je n'ai pas pu obtenir une réponse à temps. Pouvez-vous reformuler votre question?"
         except httpx.ConnectError as exc:
             yield f"Désolé, je ne peux pas me connecter au serveur de réponses pour le moment."
         except Exception as e:
             yield f"Une erreur s'est produite lors de la récupération de la réponse: {str(e)}"
+
+    @staticmethod
+    async def stream_by_segment(response_stream):
+        text_buffer = ""
+        async for chunk in response_stream.aiter_bytes():
+            if chunk:
+                text = chunk.decode("utf-8", errors="ignore")
+                text_buffer += text
+                if len(text_buffer) > 1 and (any(punct in text for punct in [".", ",", ":", "!", "?"]) or len(text_buffer.split()) > 20):
+                    yield text_buffer
+                    text_buffer = ""
+        if text_buffer:
+            yield text_buffer
 
     async def rag_query_no_conversation_async(self, query_no_conversation_request_model: QueryNoConversationRequestModel) -> Dict[str, Any]:
         """POST /rag/inference/no-conversation/ask-question: Get RAG answer without conversation (not streamed)."""
@@ -97,9 +110,8 @@ class StudiRAGInferenceClient:
                 timeout=httpx.Timeout(timeout)
             ) as resp:
                 resp.raise_for_status()
-                async for line in resp.aiter_lines():
-                    if line:
-                        yield line
+                async for segment in self.stream_by_segment(resp):
+                    yield segment
         except httpx.ReadTimeout:
             yield "Je suis désolé, mais je n'ai pas pu obtenir une réponse à temps. Pouvez-vous reformuler votre question?"
         except httpx.ConnectError as exc:

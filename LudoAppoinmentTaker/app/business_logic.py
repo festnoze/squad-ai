@@ -54,6 +54,7 @@ class BusinessLogic:
         self.max_audio_bytes_for_processing = 150000  # Maximum buffer size = ~15s at 8kHz
         self.consecutive_silence_duration_ms = 0.0  # Count consecutive silence duration in milliseconds
         self.required_silence_ms_to_answer = 800  # Require 800ms of silence to process audio
+        self.speech_chunk_duration_ms = 400  # Duration of each audio chunk in milliseconds
         
         self.audio_buffer = b""
         self.current_stream = None
@@ -155,7 +156,7 @@ class BusinessLogic:
 
         try:
             # First, send our welcome message
-            await self._speak_and_send_from_text(welcome_text)
+            await self.speak_and_send_text(welcome_text)
             await self.studi_rag_inference_client.add_message_to_conversation(self.conversation_id, welcome_text)
             
             # Then invoke the graph with initial state to get the AI-generated welcome message
@@ -166,7 +167,7 @@ class BusinessLogic:
             if updated_state.get('history') and updated_state['history'][0][0] == 'AI':
                 ai_message = updated_state['history'][0][1]
                 if ai_message and ai_message.strip() != welcome_text.strip():
-                    await self._speak_and_send_from_text(ai_message)
+                    await self.speak_and_send_text(ai_message)
                     await self.studi_rag_inference_client.add_message_to_conversation(self.conversation_id, ai_message)
         
         except Exception as e:
@@ -320,7 +321,7 @@ class BusinessLogic:
             request = QueryAskingRequestModel(
                 conversation_id=self.conversation_id,
                 user_query_content= user_query_transcript,
-                display_waiting_message=False
+                display_waiting_message=True
             )
             try:
                 self.logger.info(f"Sending request to RAG API for stream: {self.current_stream}")
@@ -331,7 +332,7 @@ class BusinessLogic:
                     full_answer += chunk
                     self.logger.debug(f"Received chunk: {chunk}")
                     print(f">> RAG API response: {full_answer}", end="", flush=True)
-                    await self._speak_and_send_from_text(chunk)
+                    await self.speak_and_send_text(chunk)
                 end_time = time.time()
                 if full_answer:
                     self.logger.info(f"Full answer gotten from RAG API in {end_time - start_time:.2f}s. : {full_answer}")
@@ -340,14 +341,14 @@ class BusinessLogic:
             except Exception as e:
                 error_message = f"Je suis désolé, une erreur s'est produite lors de la communication avec le service."
                 self.logger.error(f"Error in RAG API communication: {str(e)}")
-                await self._speak_and_send_from_text(error_message)
+                await self.speak_and_send_text(error_message)
 
             # 5. Process user's query through conversation graph
             #response_text = await self._process_conversation(transcript)
 
         return
 
-    async def send_ask_feedback(self, transcript):
+    async def speak_and_send_ask_for_feedback(self, transcript):
         response_text = "Instructions : Fait un feedback reformulé de façon synthétique de la demande utilisateur suivante, afin de t'assurer de ta bonne comphéhension de celle-ci : " + transcript 
         response = self.openai_client.chat.completions.create(
             model="gpt-4o",
@@ -357,7 +358,7 @@ class BusinessLogic:
             stream=True
         )
         if response:
-            spoken_text = await self._speak_and_send_from_stream(response)
+            spoken_text = await self.speak_and_send_stream(response)
             self.logger.info(f"<< Response text: '{spoken_text}'")
             return spoken_text
         return ""
@@ -470,7 +471,7 @@ class BusinessLogic:
             self.logger.error(f"Stream {self.current_stream} not found in states, cannot invoke graph.")
             return None
 
-    async def _speak_and_send_from_stream(self, answer_stream: Stream):
+    async def speak_and_send_stream(self, answer_stream: Stream):
         """Synthesize speech from text and send to Twilio"""
         try:
             full_text = ""
@@ -482,23 +483,25 @@ class BusinessLogic:
                         text_buffer += delta_content
                         # Check if we should send this segment (after punctuation or if long enough)
                         if len(text_buffer) > 1 and (any(punct in delta_content for punct in [".", ",", ":", "!", "?"]) or len(text_buffer.split()) > 20):
-                            await self._speak_and_send_from_text(text_buffer)
+                            await self.speak_and_send_text(text_buffer)
                             full_text += text_buffer
                             text_buffer = ""
             
             # Send any remaining text after the loop completes
             if text_buffer:
-                await self._speak_and_send_from_text(text_buffer)
+                await self.speak_and_send_text(text_buffer)
                 full_text += text_buffer
+                # Add a small pause between chunks (100-200ms)
+                await asyncio.sleep(0.15)
             
             return full_text
         except Exception as e:
-            self.logger.error(f"/!\\ Error sending audio to Twilio in {self._speak_and_send_from_stream.__name__}: {e}", exc_info=True)
+            self.logger.error(f"/!\\ Error sending audio to Twilio in {self.speak_and_send_stream.__name__}: {e}", exc_info=True)
             return ""
 
-    async def _speak_and_send_from_text(self, text_buffer: str):
+    async def speak_and_send_text(self, text_buffer: str):
         audio_bytes = self.tts_provider.synthesize_speech_to_bytes(text_buffer)
-        await self.send_audio_to_twilio(audio_bytes= audio_bytes)
+        await self.send_audio_to_twilio(audio_bytes= audio_bytes, frame_rate=self.frame_rate, sample_width=self.sample_width)
 
     async def _handle_stop_event(self):
         """Handle the stop event from Twilio which ends a call"""
@@ -564,6 +567,10 @@ class BusinessLogic:
         if not self.current_stream:
             self.logger.error("No active stream, cannot send audio")
             return False
+
+        if not self.websocket.client_state.CONNECTED:
+            self.logger.warning("WebSocket is no longer connected, cannot send audio")
+            return False
             
         try:
             self.logger.info(f"Sending audio file {mp3_path} to stream {self.current_stream}")
@@ -610,9 +617,6 @@ class BusinessLogic:
             return False
 
     async def send_audio_to_twilio(self, file_path: str=None, audio_bytes: bytes=None, frame_rate: int=None, channels: int=1, sample_width: int=None, convert_to_mulaw: bool = False):
-        # Use instance defaults if not specified
-        frame_rate = frame_rate or self.frame_rate
-        sample_width = sample_width or self.sample_width
         """Convert mp3 to μ-law and send to Twilio over WebSocket."""
         if not self.websocket:
             self.logger.error("WebSocket not set, cannot send audio")
@@ -624,7 +628,14 @@ class BusinessLogic:
             if file_path:
                 self.delete_temp_file(file_path)
             
-            chunk_size = 6400  # 0.4s at 8kHz
+            # Calculate chunk size based on duration
+            # Formula: (duration_ms / 1000) * frame_rate * sample_width * channels
+            chunk_size = int((self.speech_chunk_duration_ms / 1000) * frame_rate * sample_width)
+            self.logger.debug(f"Using chunk size of {chunk_size} bytes for {self.speech_chunk_duration_ms}ms of audio")
+            
+            # Calculate pause duration (90% of chunk duration to ensure smooth playback)
+            pause_duration = self.speech_chunk_duration_ms / 1000 * 0.9
+            
             for i in range(0, len(ulaw_data), chunk_size):
                 chunk = ulaw_data[i:i + chunk_size]
                 payload = base64.b64encode(chunk).decode()
@@ -638,6 +649,8 @@ class BusinessLogic:
                 }
 
                 await self.websocket.send_text(json.dumps(msg))
+                # Add a small pause between chunks to avoid overwhelming the connection
+                await asyncio.sleep(pause_duration)
 
             # Send mark to indicate end of message
             mark_msg = {

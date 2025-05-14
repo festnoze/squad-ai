@@ -47,7 +47,9 @@ class ApiConfig:
             version= f"{datetime.now().strftime("%Y.%m.%d.%H%M%S")}",
             lifespan=ApiConfig.lifespan
         )
-        app.state.shutdown = lambda: None
+        async def noop_shutdown():
+            pass
+        app.state.shutdown = noop_shutdown
         
         # Include controllers as routers
         app.include_router(test_router)
