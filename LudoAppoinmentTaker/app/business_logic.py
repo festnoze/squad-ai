@@ -53,12 +53,18 @@ class BusinessLogic:
         self.min_audio_bytes_for_processing = 6400  # Minimum buffer size = ~400ms at 8kHz
         self.max_audio_bytes_for_processing = 150000  # Maximum buffer size = ~15s at 8kHz
         self.consecutive_silence_duration_ms = 0.0  # Count consecutive silence duration in milliseconds
-        self.required_silence_ms_to_answer = 800  # Require 800ms of silence to process audio
+        self.required_silence_ms_to_answer = 500  # Require 800ms of silence to process audio
         self.speech_chunk_duration_ms = 400  # Duration of each audio chunk in milliseconds
         
         self.audio_buffer = b""
         self.current_stream = None
-        self.start_time = None         
+        self.start_time = None
+        
+        # Audio streaming queue system
+        self.audio_queue = asyncio.Queue()
+        self.stream_worker_task = None
+        self.is_streaming = False
+        self.chunk_lock = asyncio.Lock()  # Lock to prevent concurrent WebSocket operations         
 
         # Environment and configuration settings
         self.VOICE_ID = os.getenv("VOICE_ID", "")
@@ -114,9 +120,140 @@ class BusinessLogic:
             self.logger.error(f"Failed to decode JSON message: {e}")
             return None
     
-    def _handle_connected_event(self):
+    async def _handle_connected_event(self):
         """Handle the 'connected' event from Twilio."""
         self.logger.info("Twilio WebSocket connected")
+        
+        # Start the streaming worker if it's not already running
+        if not self.is_streaming and not self.stream_worker_task:
+            self.is_streaming = True
+            self.stream_worker_task = asyncio.create_task(self._streaming_worker())
+            self.logger.info("Started audio streaming worker task")
+            
+    async def _streaming_worker(self):
+        """Background worker that processes the audio queue and sends to Twilio.
+        Uses cooperative yielding to avoid blocking the event loop.
+        """
+        self.logger.info("Audio streaming worker started")
+        
+        try:
+            while self.is_streaming:
+                try:
+                    # Check if there are items in the queue before waiting
+                    if self.audio_queue.empty():
+                        # Yield control to other tasks using a short sleep
+                        await asyncio.sleep(0.01)  # 10ms yield
+                        continue
+                        
+                    # Get item without blocking indefinitely
+                    audio_item = self.audio_queue.get_nowait()
+                    
+                    # Process the queue item
+                    success = await self._process_audio_queue_item(audio_item)
+                    
+                    # Mark the task as done regardless of success
+                    self.audio_queue.task_done()
+                    
+                    if not success:
+                        self.logger.warning("Error processing queue item, but continuing worker")
+                    
+                    # Yield control briefly after processing each item
+                    # This is critical to prevent blocking the event loop
+                    await asyncio.sleep(0)  # Yield control but resume immediately
+                    
+                except asyncio.QueueEmpty:
+                    # Queue was empty after all, just yield and continue
+                    await asyncio.sleep(0.01)  # 10ms yield
+                except Exception as e:
+                    self.logger.error(f"Error in streaming worker: {e}", exc_info=True)
+                    # Brief pause to avoid tight loop in error conditions
+                    await asyncio.sleep(0.01)  # 10ms yield
+        except asyncio.CancelledError:
+            self.logger.info("Audio streaming worker cancelled")
+        except Exception as e:
+            self.logger.error(f"Unexpected error in streaming worker: {e}", exc_info=True)
+        finally:
+            self.logger.info("Audio streaming worker stopped")
+            self.is_streaming = False
+            
+    async def _process_audio_queue_item(self, item):
+        """Process a single audio queue item and send it to Twilio."""
+        if not item or 'type' not in item:
+            self.logger.warning("Invalid queue item")
+            return False
+            
+        # Acquire the lock to prevent concurrent access to the WebSocket
+        async with self.chunk_lock:
+            # Check websocket is still connected before starting
+            if not self._is_websocket_connected():
+                self.logger.warning("WebSocket disconnected - dropping queue item")
+                return False
+                
+            try:
+                if item['type'] == 'audio_chunk':
+                    # Process audio chunk
+                    chunk = item.get('data')
+                    stream_sid = item.get('stream_sid')
+                    
+                    # Skip if missing required data
+                    if not chunk or not stream_sid:
+                        return False
+                        
+                    # Confirm stream_sid matches current stream
+                    if stream_sid != self.current_stream:
+                        self.logger.warning(f"Stream mismatch: queued {stream_sid} vs current {self.current_stream}")
+                        return False
+                        
+                    # Send the audio data chunk
+                    payload = base64.b64encode(chunk).decode()
+                    msg = {
+                        "event": "media",
+                        "streamSid": stream_sid,
+                        "media": {
+                            "payload": payload
+                        }
+                    }
+                    
+                    # Send with brief timeout
+                    await asyncio.wait_for(self.websocket.send_text(json.dumps(msg)), timeout=1.0)
+                    return True
+                    
+                elif item['type'] == 'mark':
+                    # Process mark event
+                    mark_name = item.get('name', 'segment')
+                    stream_sid = item.get('stream_sid')
+                    
+                    if not stream_sid:
+                        return False
+                        
+                    # Send the mark event
+                    mark_msg = {
+                        "event": "mark",
+                        "streamSid": stream_sid,
+                        "mark": {
+                            "name": mark_name
+                        }
+                    }
+                    
+                    await asyncio.wait_for(self.websocket.send_text(json.dumps(mark_msg)), timeout=1.0)
+                    return True
+                    
+                elif item['type'] == 'pause':
+                    # Just a pause, no need to send anything
+                    duration = item.get('duration', 0.2)
+                    await asyncio.sleep(duration)
+                    return True
+                    
+                else:
+                    self.logger.warning(f"Unknown queue item type: {item['type']}")
+                    return False
+                    
+            except asyncio.TimeoutError:
+                self.logger.error("Timeout sending to Twilio WebSocket")
+                return False
+            except Exception as e:
+                self.logger.error(f"Error processing queue item: {e}")
+                return False
     
     async def _handle_start_event(self, start_data: Dict) -> str:
         """Handle the 'start' event from Twilio which begins a new call."""
@@ -211,7 +348,7 @@ class BusinessLogic:
             return str(uuid.uuid4())
 
     async def websocket_handler(self, calling_phone_number: str, call_sid: str) -> None:
-        """Main WebSocket handler for Twilio streams."""
+        """Main WebSocket handler for Twilio streams with enhanced logging."""
         if not self.websocket:
             self.logger.error("WebSocket not set, cannot handle WebSocket connection.")
             return
@@ -221,47 +358,104 @@ class BusinessLogic:
             await self.websocket.close(code=1011, reason="Server configuration error")
             return
 
-        self.logger.info(f"WebSocket handler started for {self.websocket.client.host}:{self.websocket.client.port}")
+        start_time = time.time()
+        remote_addr = f"{self.websocket.client.host}:{self.websocket.client.port}"
+        self.logger.info(f"WebSocket handler started for {remote_addr}")
+        
+        # Log initial WebSocket state and attributes
+        try:
+            ws_attrs = {attr: getattr(self.websocket, attr) for attr in dir(self.websocket) 
+                       if not attr.startswith('_') and not callable(getattr(self.websocket, attr))}
+            self.logger.debug(f"Initial WebSocket state: {ws_attrs}")
+        except Exception as attr_err:
+            self.logger.debug(f"Could not log WebSocket attributes: {attr_err}")
         
         # Store the caller's phone number and call SID so we can retrieve them later
         self.phones[call_sid] = calling_phone_number
 
+        # Track activity for diagnostics
+        last_activity = time.time()
+        message_count = 0
+
         try:            
             while True:
+                # Check if the WebSocket is still connected before trying to receive
+                if not self._is_websocket_connected():
+                    self.logger.warning(f"WebSocket connectivity check failed before receive_text()")
+                    # Try to get more info about what happened
+                    idle_time = time.time() - last_activity
+                    self.logger.info(f"Connection stats: {message_count} messages processed, {idle_time:.2f}s since last activity")
+                    break
+                    
                 try:
-                    msg = await self.websocket.receive_text()
+                    # Set a reasonable timeout for receiving messages - prevents indefinite hanging
+                    # Use wait_for with a timeout of 30 seconds
+                    msg = await asyncio.wait_for(self.websocket.receive_text(), timeout=30.0)
+                    last_activity = time.time()
+                    message_count += 1
+                    
+                    # Process the message
                     data = self._decode_json(msg)
                     if data is None:
                         continue
+                        
+                except asyncio.TimeoutError:
+                    idle_time = time.time() - last_activity
+                    self.logger.warning(f"No WebSocket activity for {idle_time:.2f}s - checking connection")
+                    # Don't break - just log and let the loop continue
+                    continue
+                    
                 except WebSocketDisconnect as disconnect_err:
-                    self.logger.info(f"WebSocket disconnected: {self.websocket.client.host}:{self.websocket.client.port} - Code: {disconnect_err.code}")
+                    session_time = time.time() - start_time
+                    self.logger.info(f"WebSocket disconnected: {remote_addr} - Code: {disconnect_err.code} after {session_time:.2f}s")
+                    self.logger.info(f"Connection stats at disconnect: {message_count} messages processed")
                     break
                     
-                event = data.get("event")
-                if event == "connected":
-                    self._handle_connected_event()
-                elif event == "start":
-                    await self._handle_start_event(data.get("start", {}))
-                elif event == "media":
-                    if not self.current_stream:
-                        self.logger.warning("/!\\ Error: media event received before the start event")
-                        continue
-                    await self._handle_media_event(data)
-                elif event == "stop":
-                    await self._handle_stop_event()
-                    return
-                elif event == "mark":
-                    self._handle_mark_event(data)
-                else:
-                    self.logger.warning(f"Received unknown event type: {event}")
-
-        except Exception as e:
-            self.logger.error(f"Unhandled error in WebSocket handler: {e}", exc_info=True)
+                except RuntimeError as rt_err:
+                    # This catches specific errors like "WebSocket is not connected"
+                    self.logger.error(f"WebSocket runtime error: {rt_err}")
+                    self.logger.info(f"Connection stats at error: {message_count} messages, {time.time() - last_activity:.2f}s since activity")
+                    break
+                    
+                except Exception as recv_err:
+                    # Something else went wrong during receive
+                    self.logger.error(f"Unexpected error receiving WebSocket message: {recv_err}", exc_info=True)
+                    break
+                
+                # Process the event
+                try:    
+                    event = data.get("event")
+                    if event == "connected":
+                        self._handle_connected_event()
+                    elif event == "start":
+                        await self._handle_start_event(data.get("start", {}))
+                    elif event == "media":
+                        if not self.current_stream:
+                            self.logger.warning("/!\ Error: media event received before the start event")
+                            continue
+                        await self._handle_media_event(data)
+                    elif event == "stop":
+                        await self._handle_stop_event()
+                    else:
+                        self.logger.warning(f"Unknown event: {event}")
+                except Exception as event_err:
+                    self.logger.error(f"Error processing event '{data.get('event')}': {event_err}", exc_info=True)
+        except Exception as outer_err:
+            # Catch any errors in the main handler loop
+            self.logger.error(f"Unhandled error in WebSocket main loop: {outer_err}", exc_info=True)
         finally:
+            # Log session information on exit
+            session_duration = time.time() - start_time
+            remote_addr = f"{self.websocket.client.host}:{self.websocket.client.port}"
+            self.logger.info(f"WebSocket handler finished for {remote_addr} (Stream: {self.current_stream})")
+            self.logger.info(f"Session stats: Duration {session_duration:.2f}s, {message_count} messages processed")
+            
+            # Clean up the stream state if it wasn't already done by a stop event
             if self.current_stream and self.current_stream in self.stream_states:
                 self.logger.warning(f"Cleaning up state for stream {self.current_stream} due to handler exit/error.")
-                del self.stream_states[self.current_stream]
-            self.logger.info(f"WebSocket handler finished for {self.websocket.client.host}:{self.websocket.client.port} (Stream: {self.current_stream})" )
+                self._clean_stream_state(self.current_stream)
+            
+            self.logger.info(f"WebSocket endpoint finished for: {remote_addr} (Stream: {self.current_stream})")
     
     async def _handle_media_event(self, data):
         # 1. Decode audio chunk
@@ -331,7 +525,7 @@ class BusinessLogic:
                 async for chunk in response:
                     full_answer += chunk
                     self.logger.debug(f"Received chunk: {chunk}")
-                    print(f">> RAG API response: {full_answer}", end="", flush=True)
+                    self.logger.info(f'"" RAG API response\'s chunk: ... {chunk} ... ""')
                     await self.speak_and_send_text(chunk)
                 end_time = time.time()
                 if full_answer:
@@ -398,18 +592,15 @@ class BusinessLogic:
             self.logger.info("Transcribing audio with hybrid STT provider...")
             transcript: str = self.stt_provider.transcribe_audio(wav_file_name)
             self.logger.info(f">> Speech to text transcription: '{transcript}'")
-            #self.delete_temp_file(wav_file_name)
+            self.delete_temp_file(wav_file_name)
             
             # Filter out known watermark text that appears during silences
             known_watermarks = [
-                "Sous-titres réalisés para la communauté d'Amara.org",
-                "Sous-titres réalisés par la communauté d'Amara.org",
+                "communauté d'Amara.org",
                 "Sous-titres réalisés",
-                "Sous-titres",
                 "Amara.org",
-                "❤️ par SousTitreur.com...",
                 "SousTitreur.com",
-                "Merci d'avoir regardé cette vidéo, n'hésitez pas à vous abonner à la chaîne pour ne manquer aucune de mes prochaines vidéos.",
+                "n'hésitez pas à vous abonner",
                 "Merci d'avoir regardé cette vidéo",
                 "Merci à tous et à la prochaine",
                 "c'est la fin de la vidéo"
@@ -438,34 +629,61 @@ class BusinessLogic:
             self.logger.error(f"Error deleting temp file {file_name}: {e}")
             
     def _is_websocket_connected(self) -> bool:
-        """Check if the websocket is still connected"""
+        """Check if the websocket is still connected with enhanced monitoring"""
         if not self.websocket:
+            self.logger.debug("No websocket object available")
             return False
             
         try:
-            # First, handle the case from the old implementation that was working
-            # The client_state is an enum in some WebSocket libraries
+            # Check for common disconnection indicators
+            # 1. Check if the connection was explicitly closed
+            if hasattr(self.websocket, 'closed') and self.websocket.closed:
+                self.logger.debug("WebSocket reports closed=True")
+                return False
+                
+            # 2. Check for client_state attribute in Starlette/FastAPI WebSockets
             if hasattr(self.websocket, 'client_state'):
-                # If client_state is an attribute that contains CONNECTED as a property
+                state_str = str(self.websocket.client_state)
+                self.logger.debug(f"WebSocket client_state: {state_str}")
+                
+                # If client_state is an enum with CONNECTED attribute (Starlette) 
                 if hasattr(self.websocket.client_state, 'CONNECTED'):
-                    return True
-                # If client_state is a string
+                    is_connected = (self.websocket.client_state == self.websocket.client_state.CONNECTED)
+                    self.logger.debug(f"WebSocket CONNECTED enum check: {is_connected}")
+                    return is_connected
+                    
+                # If client_state is a string, check for 'connect' substring
                 if isinstance(self.websocket.client_state, str):
-                    return 'connect' in self.websocket.client_state.lower()
-                # Otherwise assume it's connected (we know the attribute exists)
+                    is_connected = 'connect' in state_str.lower() and 'disconnect' not in state_str.lower()
+                    self.logger.debug(f"WebSocket string state check: {is_connected} (state='{state_str}')")
+                    return is_connected
+            
+            # 3. For Twilio-specific WebSocket implementations, try additional checks
+            if hasattr(self.websocket, 'application_state'):
+                self.logger.debug(f"WebSocket application_state: {self.websocket.application_state}")
+            
+            # 4. Check transport-level connection if available
+            if hasattr(self.websocket, 'transport') and hasattr(self.websocket.transport, 'is_closing'):
+                if self.websocket.transport.is_closing():
+                    self.logger.debug("WebSocket transport is closing")
+                    return False
+            
+            # If we've made it this far without a definitive answer, try a very basic check
+            # This may not be 100% reliable but is a good fallback
+            if hasattr(self.websocket, '_send_lock'):
+                # Presence of a _send_lock often indicates an active connection
+                self.logger.debug("WebSocket has _send_lock, assuming connected")
                 return True
                 
-            # Alternative check for other WebSocket implementations
-            if hasattr(self.websocket, 'closed'):
-                return not self.websocket.closed
-                
-            # Default to assuming it's connected if we can't check
-            # This is a safe default since the connection was established
+            # Default to assuming it's connected if we can't definitively determine state
+            self.logger.debug("No definitive connection state found, assuming connected")
             return True
+            
         except Exception as e:
-            self.logger.error(f"Error checking websocket connection: {e}")
+            self.logger.warning(f"Error checking websocket connection: {e}")
+            # Log WebSocket attributes for debugging
+            self.logger.debug(f"WebSocket attributes: {[attr for attr in dir(self.websocket) if not attr.startswith('_')]}")
             # For safety, if we had an exception checking, assume connected
-            # This prevents the regression where audio wasn't being sent
             return True
     
     async def _process_conversation(self, transcript):
@@ -533,7 +751,7 @@ class BusinessLogic:
 
     async def speak_and_send_text(self, text_buffer: str):
         audio_bytes = self.tts_provider.synthesize_speech_to_bytes(text_buffer)
-        await self.send_audio_to_twilio(audio_bytes= audio_bytes, frame_rate=self.frame_rate, sample_width=self.sample_width)
+        await self.enqueue_send_audio_to_twilio(audio_bytes= audio_bytes, frame_rate=self.frame_rate, sample_width=self.sample_width)
 
     async def _handle_stop_event(self):
         """Handle the stop event from Twilio which ends a call"""
@@ -589,192 +807,122 @@ class BusinessLogic:
             return mulaw_audio
         else:
             return pcm_data
-    
-    async def send_audio_to_twilio_old(self, mp3_path):
-        """Old implementation kept for reference."""
-        if not self.websocket:
-            self.logger.error("WebSocket not set, cannot send audio")
-            return False
-        
-        if not self.current_stream:
-            self.logger.error("No active stream, cannot send audio")
-            return False
-
-        try:
-            if hasattr(self.websocket, 'client_state') and not self.websocket.client_state == 'CONNECTED':
-                self.logger.warning("WebSocket is no longer connected, cannot send audio")
-                return False
-                
-            self.logger.info(f"Sending audio file {mp3_path} to stream {self.current_stream}")
             
-            # Convert to PCM mono 16-bit 8kHz
-            audio = AudioSegment.from_file(mp3_path).set_frame_rate(self.frame_rate).set_channels(1).set_sample_width(self.sample_width)
-            pcm_data = audio.raw_data
-
-            # Convert to μ-law
-            ulaw_data = audioop.lin2ulaw(pcm_data, self.sample_width)
-
-            # Split into small chunks (20ms = 160 samples * 2 bytes = 320 bytes)
-            chunk_size = 320
-            for i in range(0, len(ulaw_data), chunk_size):
-                chunk = ulaw_data[i:i + chunk_size]
-                payload = base64.b64encode(chunk).decode()
-                
-                msg = {
-                    "event": "media",
-                    "streamSid": self.current_stream,
-                    "media": {
-                        "payload": payload
-                    }
-                }
-            
-                await self.websocket.send_text(json.dumps(msg))
-                await asyncio.sleep(0.02)  # 20ms to simulate real-time
-                
-            # Send mark to indicate end of message
-            mark_msg = {
-                "event": "mark",
-                "streamSid": self.current_stream,
-                "mark": {
-                    "name": "msg_retour"
-                }
-            }
-            
-            await self.websocket.send_text(json.dumps(mark_msg))
-            
-            self.logger.info(f"Audio sent to Twilio for stream {self.current_stream}")
-            return True
-        except Exception as e:
-            self.logger.error(f"Error sending audio to Twilio: {e}", exc_info=True)
-            return False
-            
-    async def send_audio_to_twilio(self, file_path: str=None, audio_bytes: bytes=None, frame_rate: int=None, channels: int=1, sample_width: int=None, convert_to_mulaw: bool = False):
-        """Convert audio to μ-law and send to Twilio over WebSocket with enhanced monitoring."""
+    async def enqueue_send_audio_to_twilio(self, file_path: str=None, audio_bytes: bytes=None, frame_rate: int=None, channels: int=1, sample_width: int=None, convert_to_mulaw: bool = False):
+        """Enqueue audio delivery to Twilio via the streaming worker task.
+        This decouples audio generation from WebSocket transmission for more reliable streaming.
+        Ensures non-blocking behavior by creating a separate task for queue filling.
+        """
         # Use instance defaults if not specified
         frame_rate = frame_rate or self.frame_rate
         sample_width = sample_width or self.sample_width
         
-        # Validate required parameters
-        if not self.websocket:
-            self.logger.error("WebSocket not set, cannot send audio")
-            return False
-            
+        # Basic validation
         if not self.current_stream:
             self.logger.error("No active stream, cannot send audio")
             return False
-        
-        # Check connection state
-        if not self._is_websocket_connected():
-            self.logger.warning("WebSocket is not connected, cannot send audio")
-            return False
             
-        # Start timing this operation
+        # Start a separate task to fill the queue to avoid blocking
+        enqueue_task = asyncio.create_task(
+            self._fill_audio_queue(
+                file_path=file_path, 
+                audio_bytes=audio_bytes,
+                frame_rate=frame_rate, 
+                channels=channels,
+                sample_width=sample_width, 
+                convert_to_mulaw=convert_to_mulaw
+            )
+        )
+        
+        # We don't await the task - this allows it to run concurrently
+        self.logger.debug("Started audio enqueuing task")
+        return True
+        
+    async def _fill_audio_queue(self, file_path: str=None, audio_bytes: bytes=None, frame_rate: int=None, 
+                               channels: int=1, sample_width: int=None, convert_to_mulaw: bool = False):
+        """Helper method to fill the audio queue in a separate task."""
         start_time = time.time()
-        connection_start_time = time.time()
-        chunks_sent = 0
-        total_chunks = 0
         
         try:
             # Load audio and convert to appropriate format
             ulaw_data = self._prepare_voice_stream(file_path=file_path, audio_bytes=audio_bytes, 
-                                                  frame_rate=frame_rate, channels=channels, 
-                                                  sample_width=sample_width, convert_to_mulaw=True)
+                                                 frame_rate=frame_rate, channels=channels, 
+                                                 sample_width=sample_width, convert_to_mulaw=True)
             if file_path:
                 self.delete_temp_file(file_path)
             
             # Calculate chunk size based on duration
             chunk_size = int((self.speech_chunk_duration_ms / 1000) * frame_rate * sample_width)
             
-            # Calculate pause duration (20% of chunk duration for natural gaps)
-            pause_duration = self.speech_chunk_duration_ms / 1000 * 0.2
-            
-            # Log total audio being sent
-            total_audio_ms = (len(ulaw_data) / (frame_rate * sample_width)) * 1000
+            # Calculate total audio attributes
+            total_audio_seconds = (len(ulaw_data) / (frame_rate * sample_width))
             total_chunks = len(ulaw_data) // chunk_size + (1 if len(ulaw_data) % chunk_size else 0)
             
-            self.logger.info(f"Sending {len(ulaw_data)} bytes of audio (~{total_audio_ms:.1f}ms) in {total_chunks} chunks to Twilio")
+            # Start the streaming worker if it's not already running
+            if not self.is_streaming and not self.stream_worker_task:
+                self.is_streaming = True
+                self.stream_worker_task = asyncio.create_task(self._streaming_worker())
+                self.logger.info("Started audio streaming worker task")
             
-            # Twilio connection monitor timer and chunk counter
-            last_heartbeat_time = time.time()
-            continuous_stream_duration = 0
+            # Break audio into small chunks for better handling
+            # Smaller chunks process faster and allow more fine-grained control
+            max_chunk_duration_ms = 500  # Maximum 500ms per chunk for better control
+            chunks_per_group = max(1, int(max_chunk_duration_ms / self.speech_chunk_duration_ms))
+            total_groups = (total_chunks + chunks_per_group - 1) // chunks_per_group
             
-            for i in range(0, len(ulaw_data), chunk_size):
-                # Monitor connection duration (Twilio may disconnect after ~15s of continuous audio)
-                current_duration = time.time() - last_heartbeat_time
-                continuous_stream_duration += self.speech_chunk_duration_ms / 1000
+            self.logger.info(f"-> Queueing {total_audio_seconds:.2f}s of audio splitted in {total_chunks} chunks ({total_groups} groups)")
+            
+            # Queue all audio chunks with small pauses between groups
+            chunks_queued = 0
+            
+            for group in range(total_groups):
+                group_start = group * chunks_per_group * chunk_size
+                group_end = min(group_start + (chunks_per_group * chunk_size), len(ulaw_data))
+                group_data = ulaw_data[group_start:group_end]
                 
-                # If we're sending audio for more than 10 seconds continuously, add an extra pause
-                if continuous_stream_duration > 10.0:
-                    self.logger.info(f"Adding extra safety pause after {continuous_stream_duration:.1f}s of streaming")
-                    await asyncio.sleep(0.5) # Add half-second pause to avoid Twilio timeout
-                    last_heartbeat_time = time.time()
-                    continuous_stream_duration = 0
+                # Queue a small pause between groups to help Twilio connection
+                if group > 0:
+                    await self.audio_queue.put({
+                        'type': 'pause',
+                        'duration': 0.2,  # 200ms pause between groups
+                        'stream_sid': self.current_stream
+                    })
                 
-                # Check connection before each chunk
-                if not self._is_websocket_connected():
-                    elapsed = time.time() - start_time
-                    self.logger.warning(f"WebSocket disconnected after {elapsed:.2f}s and {chunks_sent}/{total_chunks} chunks")
-                    # Important diagnostic data
-                    self.logger.warning(f"Audio stats: {chunks_sent*self.speech_chunk_duration_ms:.1f}ms sent of {total_audio_ms:.1f}ms total")
-                    return False
-                
-                # Get the current chunk and send it
-                chunk = ulaw_data[i:i + chunk_size]
-                payload = base64.b64encode(chunk).decode()
-                
-                try:
-                    msg = {
-                        "event": "media",
-                        "streamSid": self.current_stream,
-                        "media": {
-                            "payload": payload
-                        }
-                    }
-                    await self.websocket.send_text(json.dumps(msg))
-                    chunks_sent += 1
+                # Process the audio group into individual chunks
+                for i in range(0, len(group_data), chunk_size):
+                    chunk = group_data[i:i + chunk_size]
                     
-                    # Log progress at regular intervals
-                    if chunks_sent % 5 == 0 or chunks_sent == total_chunks:
-                        elapsed = time.time() - start_time
-                        progress_pct = (chunks_sent / total_chunks) * 100 if total_chunks > 0 else 0
-                        self.logger.debug(f"Audio progress: {progress_pct:.1f}% - {chunks_sent}/{total_chunks} chunks - {elapsed:.2f}s elapsed")
+                    # Queue this chunk for processing
+                    await self.audio_queue.put({
+                        'type': 'audio_chunk',
+                        'data': chunk,
+                        'stream_sid': self.current_stream
+                    })
+                    chunks_queued += 1
                     
-                    # Important: Add brief pause between chunks
-                    await asyncio.sleep(pause_duration)
+                    # Yield control after every chunk to prevent blocking
+                    await asyncio.sleep(0)
                     
-                except Exception as chunk_error:
-                    self.logger.error(f"Error sending chunk {chunks_sent+1}/{total_chunks}: {chunk_error}")
-                    if "close message has been sent" in str(chunk_error):
-                        self.logger.warning("Twilio closed the WebSocket connection - possible timeout")
-                    return False
+                    # Every N chunks, add a tiny pause (if not the last chunk)
+                    if chunks_queued % 3 == 0 and chunks_queued < total_chunks:
+                        await self.audio_queue.put({
+                            'type': 'pause',
+                            'duration': 0.05,  # 50ms mini-pause after every 3 chunks
+                            'stream_sid': self.current_stream
+                        })
             
-            # Try to send mark (but don't fail if it doesn't work)
-            try:
-                # Send mark to indicate end of message
-                mark_msg = {
-                    "event": "mark",
-                    "streamSid": self.current_stream,
-                    "mark": {
-                        "name": "msg_retour"
-                    }
-                }
-                await self.websocket.send_text(json.dumps(mark_msg))
-            except Exception as mark_error:
-                self.logger.warning(f"Could not send mark event: {mark_error}")
-                # Don't return False, we already sent the audio successfully
+            # Queue a mark after all chunks to indicate the end of this audio segment
+            await self.audio_queue.put({
+                'type': 'mark',
+                'name': 'msg_retour',
+                'stream_sid': self.current_stream
+            })
             
-            # Final success logging
-            total_time = time.time() - start_time
-            self.logger.info(f"Audio complete: {chunks_sent}/{total_chunks} chunks, {total_audio_ms:.1f}ms audio in {total_time:.2f}s")
+            # Log queue statistics
+            self.logger.info(f"Successfully queued {chunks_queued} audio chunks (~{total_audio_seconds:.2f}s)")
             return True
-        
+            
         except Exception as e:
             elapsed = time.time() - start_time
-            self.logger.error(f"Error sending audio to Twilio after {elapsed:.2f}s and {chunks_sent}/{total_chunks} chunks: {e}", exc_info=True)
-            return False
-
-            self.logger.info(f"Audio sent to Twilio for stream {self.current_stream}")
-            return True
-        except Exception as e:
-            self.logger.error(f"/!\\ Error sending audio to Twilio: {e}", exc_info=True)
+            self.logger.error(f"Error preparing audio for queue: {elapsed:.2f}s elapsed: {e}", exc_info=True)
             return False
