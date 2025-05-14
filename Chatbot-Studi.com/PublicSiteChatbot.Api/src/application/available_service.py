@@ -55,6 +55,7 @@ class AvailableService:
         if not AvailableService.inference_pipeline:
             metadata_descriptions_for_studi_public_site = MetadataDescriptionHelper.get_metadata_descriptions_for_studi_public_site(AvailableService.out_dir)
             RAGAugmentedGeneration.augmented_generation_prompt = Ressource.get_rag_augmented_generation_prompt_on_studi()
+            RAGAugmentedGeneration.augmented_generation_audio_prompt = Ressource.get_rag_augmented_generation_audio_prompt_on_studi()
             RAGPreTreatment.domain_specific_metadata_filters_validation_and_correction_async_method = StudiPublicWebsiteRagSpecificConfig.get_domain_specific_metadata_filters_validation_and_correction_async_method
             AvailableService.inference_pipeline = RagInferencePipeline(rag= AvailableService.rag_service, default_filters= StudiPublicWebsiteRagSpecificConfig.get_domain_specific_default_filters(), metadata_descriptions= metadata_descriptions_for_studi_public_site, tools= None)
             EvaluationService.init_existing_services(AvailableService.rag_service, AvailableService.inference_pipeline)
@@ -194,10 +195,10 @@ class AvailableService:
         return conversation
         
     @staticmethod
-    async def streaming_answer_to_user_query_with_RAG_async(conversation: Conversation, display_waiting_message: bool, is_stream_decoded: bool = False) -> AsyncGenerator:
+    async def streaming_answer_to_user_query_with_RAG_async(conversation: Conversation, add_waiting_message: bool, is_stream_decoded: bool = False, is_audio_query: bool = False) -> AsyncGenerator:
         # Stream the response
         all_chunks_output=[]
-        response_generator = AvailableService.rag_query_retrieval_and_augmented_generation_streaming_async(conversation, display_waiting_message, is_stream_decoded, all_chunks_output)
+        response_generator = AvailableService.rag_query_retrieval_and_augmented_generation_streaming_async(conversation, add_waiting_message, is_stream_decoded, is_audio_query, all_chunks_output)
         async for chunk in response_generator:
             yield chunk
         
@@ -210,10 +211,10 @@ class AvailableService:
                         full_answer_str)
         
     @staticmethod
-    async def answer_to_user_query_with_RAG_no_streaming_async(conversation: Conversation, display_waiting_message: bool, is_stream_decoded: bool = False) -> str:
+    async def answer_to_user_query_with_RAG_no_streaming_async(conversation: Conversation, display_waiting_message: bool, is_stream_decoded: bool = False, is_audio_query: bool = False) -> str:
         # Stream the response
         all_chunks_output=[]
-        response_generator = AvailableService.rag_query_retrieval_and_augmented_generation_streaming_async(conversation, display_waiting_message, is_stream_decoded, all_chunks_output)
+        response_generator = AvailableService.rag_query_retrieval_and_augmented_generation_streaming_async(conversation, display_waiting_message, is_stream_decoded, is_audio_query, all_chunks_output)
         async for chunk in response_generator:
             pass
         
@@ -235,7 +236,7 @@ class AvailableService:
         assert await conv_repo.add_message_to_existing_conversation_async(conversation.id, conversation.last_message)
     
     @staticmethod
-    async def rag_query_retrieval_and_augmented_generation_streaming_async(conversation_history:Conversation, display_waiting_message = True, is_stream_decoded = False, all_chunks_output: list[str] = []):
+    async def rag_query_retrieval_and_augmented_generation_streaming_async(conversation_history:Conversation, display_waiting_message = True, is_stream_decoded = False, is_audio_query = False, all_chunks_output: list[str] = []):
         if display_waiting_message:
             async for chunk in Llm.write_static_text_as_stream(AvailableService.waiting_message):
                 yield chunk
@@ -251,12 +252,12 @@ class AvailableService:
             pipeline_succeeded = False
             pipeline_ended_response = ex.message
 
-        if display_waiting_message:
+        if display_waiting_message and not is_audio_query:
             async for chunk in Llm.remove_all_previous_stream_async(True, len(AvailableService.waiting_message.split(" "))):
                 yield chunk
 
         if pipeline_succeeded:
-            augmented_generation_streaming = AvailableService.rag_query_augmented_generation_streaming_async(analysed_query, retrieved_chunks[0], is_stream_decoded, all_chunks_output)
+            augmented_generation_streaming = AvailableService.rag_query_augmented_generation_streaming_async(analysed_query, retrieved_chunks[0], is_stream_decoded, is_audio_query, all_chunks_output)
             async for chunk in augmented_generation_streaming:
                 yield chunk
         else:
@@ -265,13 +266,14 @@ class AvailableService:
             async for chunk in static_text_streaming:
                 yield chunk
 
-    async def rag_query_augmented_generation_streaming_async(analysed_query: QuestionRewritting, retrieved_chunks: list[Document], is_stream_decoded = False, all_chunks_output: list[str] = []):
+    async def rag_query_augmented_generation_streaming_async(analysed_query: QuestionRewritting, retrieved_chunks: list[Document], is_stream_decoded: bool = False, is_audio_query: bool = False, all_chunks_output: list[str] = []):
          async for chunk in RAGAugmentedGeneration.rag_augmented_answer_generation_streaming_async( 
                 AvailableService.rag_service, 
                 analysed_query.modified_question, 
                 retrieved_chunks, 
                 analysed_query, 
                 is_stream_decoded,
+                is_audio_query,
                 all_chunks_output,
                 RetrievedDocsService.format_retrieved_docs_function):
             yield chunk

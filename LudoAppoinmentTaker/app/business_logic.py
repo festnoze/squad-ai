@@ -58,18 +58,37 @@ class BusinessLogic:
         self.start_time = None         
 
         # Environment and configuration settings
-        self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
         self.VOICE_ID = os.getenv("VOICE_ID", "")
         self.TEMP_DIR = "static/audio"
         self.PUBLIC_HOST = os.getenv("PUBLIC_HOST", "http://localhost:8000")
         self.TWILIO_SID = os.getenv("TWILIO_SID", "")
         self.TWILIO_AUTH = os.getenv("TWILIO_AUTH", "")
-        
+
+        # Set OpenAI API key
+        self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+        os.environ['OPENAI_API_KEY'] = self.OPENAI_API_KEY
+
+        # Set Google Calendar credentials
+        self.project_root = os.path.dirname(os.path.dirname(__file__))
+        self.google_calendar_credentials_filename = os.getenv(
+            "GOOGLE_CALENDAR_CREDENTIALS_FILENAME", 
+            "secrets/google-calendar-credentials.json"
+        )
+        self.google_calendar_credentials_path = os.path.join(self.project_root, self.google_calendar_credentials_filename)
+        print(self.google_calendar_credentials_path)
+
+        if os.path.exists(self.google_calendar_credentials_path):
+            os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = self.google_calendar_credentials_path
+            self.logger.info(f"Set GOOGLE_APPLICATION_CREDENTIALS to: {self.google_calendar_credentials_path}")
+        else:
+            self.logger.warning(f"/!\\ Warning: Google calendar credentials file not found at {self.google_calendar_credentials_path}")
+
+
         # Create temp directory if it doesn't exist
         os.makedirs(self.TEMP_DIR, exist_ok=True)
 
         self.tts_provider = get_text_to_speech_provider(self.TEMP_DIR)
-        self.stt_provider = get_speech_to_text_provider(self.TEMP_DIR)
+        self.stt_provider = get_speech_to_text_provider(self.TEMP_DIR, provider="google")
 
         self.studi_rag_inference_client = StudiRAGInferenceClient()
 
@@ -350,7 +369,7 @@ class BusinessLogic:
             wav_file_name = self.save_as_wav_file(audio_data)
             transcript: str = self.stt_provider.transcribe_audio(wav_file_name)
             self.logger.info(f">> Speech to text transcription: '{transcript}'")
-            self.delete_temp_file(wav_file_name)
+            #self.delete_temp_file(wav_file_name)
             
             # Filter out known watermark text that appears during silences
             known_watermarks = [

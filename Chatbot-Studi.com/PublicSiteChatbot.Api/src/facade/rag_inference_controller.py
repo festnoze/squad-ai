@@ -68,9 +68,32 @@ async def rag_query_stream_async(user_query_request_model: QueryAskingRequestMod
                                                     user_query_request_model.user_query_content
                                                 )        
         response_generator = AvailableService.streaming_answer_to_user_query_with_RAG_async(
-                                                    conversation,
-                                                    user_query_request_model.display_waiting_message,
-                                                    False
+                                                    conversation=conversation,
+                                                    add_waiting_message=user_query_request_model.display_waiting_message,
+                                                    is_stream_decoded= False,
+                                                    is_audio_query= False
+                                                )
+        return StreamingResponse(response_generator, media_type="text/event-stream")
+        
+    except QuotaOverloadException as e:
+        raise HTTPException(status_code=429, detail=str(e))
+    except Exception as e:
+        print(f"Failed to handle query stream: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+    
+
+@inference_router.post("/conversation/ask-question/phone/stream")
+async def rag_query_stream_async(user_query_request_model: QueryAskingRequestModel):
+    try:
+        conversation = await AvailableService.prepare_conversation_for_user_query_answer_async(
+                                                    user_query_request_model.conversation_id,
+                                                    user_query_request_model.user_query_content
+                                                )        
+        response_generator = AvailableService.streaming_answer_to_user_query_with_RAG_async(
+                                                    conversation=conversation,
+                                                    add_waiting_message=user_query_request_model.display_waiting_message,
+                                                    is_stream_decoded= False,
+                                                    is_audio_query= True
                                                 )
         return StreamingResponse(response_generator, media_type="text/event-stream")
         
@@ -106,7 +129,7 @@ async def rag_query_no_conversation_async(user_query_request_model: QueryNoConve
         
         conversation = await AvailableService.add_message_to_user_last_conversation_or_create_one_async(user_id, user_query_request_model.query)
         
-        response = await AvailableService.answer_to_user_query_with_RAG_no_streaming_async(conversation, False, True)
+        response = await AvailableService.answer_to_user_query_with_RAG_no_streaming_async(conversation, False, True, False)
         
         return JSONResponse(content=response, status_code=200)
     
