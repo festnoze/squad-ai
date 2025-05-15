@@ -69,7 +69,7 @@ class OpenAITTSProvider(TextToSpeechProvider):
         try:            
             resp: any = self.client.audio.speech.create(
                 model="tts-1",
-                voice="onyx",  # Better for french: fable, nova, shimmer
+                voice="nova",  # Better for french: fable, nova, shimmer, onyx
                 # All OpenAI TTS voices: alloy, ash, ballad, coral, echo, fable, nova, onyx, sage, shimmer
                 input=text
             )
@@ -80,7 +80,7 @@ class OpenAITTSProvider(TextToSpeechProvider):
             self.logger.error(f"OpenAI TTS failed: {openai_error}.", exc_info=True)
             return b""
 
-def get_text_to_speech_provider(temp_dir: str, provider_name: str = "openai") -> TextToSpeechProvider:
-    if provider_name == "google": return GoogleTTSProvider(temp_dir)
-    if provider_name == "openai": return OpenAITTSProvider(temp_dir)
-    raise ValueError(f"Invalid TTS provider: {provider_name}")
+def get_text_to_speech_provider(temp_dir: str, provider: str = "openai") -> TextToSpeechProvider:
+    if provider == "google": return GoogleTTSProvider(temp_dir)
+    if provider == "openai": return OpenAITTSProvider(temp_dir)
+    raise ValueError(f"Invalid TTS provider: {provider}")

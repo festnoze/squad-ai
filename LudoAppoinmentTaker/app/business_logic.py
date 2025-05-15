@@ -95,8 +95,8 @@ class BusinessLogic:
         else:
             self.logger.warning(f"/!\\ Warning: Google calendar credentials file not found at {self.google_calendar_credentials_path}")
 
-        self.tts_provider = get_text_to_speech_provider(self.TEMP_DIR)
-        self.stt_provider = get_speech_to_text_provider(self.TEMP_DIR, provider="hybrid")
+        self.tts_provider = get_text_to_speech_provider(self.TEMP_DIR, provider="openai")
+        self.stt_provider = get_speech_to_text_provider(self.TEMP_DIR, provider="openai")
         
         # Initialize audio processor for better quality
         self.audio_processor = AudioProcessor(sample_width=self.sample_width, frame_rate=self.frame_rate, vad_aggressiveness=3)
@@ -107,8 +107,8 @@ class BusinessLogic:
         if self.openai_client is None:
             self.openai_client = OpenAI(api_key=self.OPENAI_API_KEY)
 
-        if not self.compiled_graph:
-            self.compiled_graph = AgentsGraph().graph
+        # if not self.compiled_graph:
+        #     self.compiled_graph = AgentsGraph().graph
 
         self.logger.info("BusinessLogic initialized successfully.")
     
@@ -274,43 +274,41 @@ class BusinessLogic:
             "history": [],
             "agent_scratchpad": {}
         }
-
-        self.conversation_id = await self.init_user_and_conversation(phone_number, call_sid)
-        
-        # Set the current stream so the audio functions know which stream to use
         self.current_stream = stream_sid
-        
-        # Store the state
         self.stream_states[stream_sid] = initial_state
         
-        # Send a welcome message immediately to let the user know they're connected
         welcome_text = f"""
-        Bonjour! Et bienvenue chez Studi, l'école 100% en ligne !
+        Bonjour! Bienvenue chez Studi, l'école 100% en ligne !
         Je suis l'assistant virtuel Stud'IA, je prends le relais lorsque nos conseillers en formation ne sont pas présents.
         Souhaitez-vous prendre rendez-vous avec un conseiller ou que je vous aide à trouver quelle formation pourrait vous intéresser ?
         """
         welcome_text = "Salut !"
 
-        try:
-            # First, send our welcome message
-            await self.speak_and_send_text(welcome_text)
-            await self.studi_rag_inference_client.add_message_to_conversation(self.conversation_id, welcome_text)
-            
-            # Then invoke the graph with initial state to get the AI-generated welcome message
-            updated_state = await self.compiled_graph.ainvoke(initial_state)
-            self.stream_states[stream_sid] = updated_state
-            
-            # If there's an AI message from the graph, send it after the welcome message
-            if updated_state.get('history') and updated_state['history'][0][0] == 'AI':
-                ai_message = updated_state['history'][0][1]
-                if ai_message and ai_message.strip() != welcome_text.strip():
-                    await self.speak_and_send_text(ai_message)
-                    await self.studi_rag_inference_client.add_message_to_conversation(self.conversation_id, ai_message)
+        # Firstly speak the welcome message
+        await self.speak_and_send_text_async(welcome_text)
+
+        # Retrieve the user and create a new conversation
+        self.conversation_id = await self.init_user_and_conversation(phone_number, call_sid)
+        await self.studi_rag_inference_client.add_message_to_conversation(self.conversation_id, welcome_text)
         
-        except Exception as e:
-            self.logger.error(f"Error in initial graph invocation: {e}", exc_info=True)
-            # If there was an error with the graph, we already sent our welcome message,
-            # so we don't need to send a fallback
+        #  Continue to the graph of AI agents workflow (for adaptative actions)        
+        if not self.compiled_graph:
+            self.compiled_graph = AgentsGraph().graph
+
+        if not self.compiled_graph:
+            self.logger.error("Graph not compiled, cannot handle WebSocket connection.")
+            await self.websocket.close(code=1011, reason="Server configuration error")
+            return
+
+        # updated_state = await self.compiled_graph.ainvoke(initial_state)
+        # self.stream_states[stream_sid] = updated_state
+        
+        # # If there's an AI message from the graph, send it after the welcome message
+        # if updated_state.get('history') and updated_state['history'][0][0] == 'AI':
+        #     ai_message = updated_state['history'][0][1]
+        #     if ai_message and ai_message.strip() != welcome_text.strip():
+        #         await self.speak_and_send_text_async(ai_message)
+        #         await self.studi_rag_inference_client.add_message_to_conversation(self.conversation_id, ai_message)
         
         return stream_sid
 
@@ -352,11 +350,6 @@ class BusinessLogic:
         if not self.websocket:
             self.logger.error("WebSocket not set, cannot handle WebSocket connection.")
             return
-        
-        if not self.compiled_graph:
-            self.logger.error("Graph not compiled, cannot handle WebSocket connection.")
-            await self.websocket.close(code=1011, reason="Server configuration error")
-            return
 
         start_time = time.time()
         remote_addr = f"{self.websocket.client.host}:{self.websocket.client.port}"
@@ -382,29 +375,26 @@ class BusinessLogic:
                 # Check if the WebSocket is still connected before trying to receive
                 if not self._is_websocket_connected():
                     self.logger.warning(f"WebSocket connectivity check failed before receive_text()")
-                    # Try to get more info about what happened
                     idle_time = time.time() - last_activity
                     self.logger.info(f"Connection stats: {message_count} messages processed, {idle_time:.2f}s since last activity")
                     break
-                    
+                
                 try:
                     # Set a reasonable timeout for receiving messages - prevents indefinite hanging
                     # Use wait_for with a timeout of 30 seconds
                     msg = await asyncio.wait_for(self.websocket.receive_text(), timeout=30.0)
                     last_activity = time.time()
                     message_count += 1
-                    
-                    # Process the message
                     data = self._decode_json(msg)
                     if data is None:
-                        continue
-                        
+                        continue        
+                
                 except asyncio.TimeoutError:
                     idle_time = time.time() - last_activity
                     self.logger.warning(f"No WebSocket activity for {idle_time:.2f}s - checking connection")
                     # Don't break - just log and let the loop continue
                     continue
-                    
+                
                 except WebSocketDisconnect as disconnect_err:
                     session_time = time.time() - start_time
                     self.logger.info(f"WebSocket disconnected: {remote_addr} - Code: {disconnect_err.code} after {session_time:.2f}s")
@@ -431,7 +421,7 @@ class BusinessLogic:
                         await self._handle_start_event(data.get("start", {}))
                     elif event == "media":
                         if not self.current_stream:
-                            self.logger.warning("/!\ Error: media event received before the start event")
+                            self.logger.warning("/!\\ Error: media event received before the start event")
                             continue
                         await self._handle_media_event(data)
                     elif event == "stop":
@@ -510,37 +500,45 @@ class BusinessLogic:
             if user_query_transcript is None:
                 return
             
-            # 5. Feedback the request to the user
-            #spoken_text = await self.send_ask_feedback(transcript)
-            request = QueryAskingRequestModel(
-                conversation_id=self.conversation_id,
-                user_query_content= user_query_transcript,
-                display_waiting_message=True
-            )
+            # 5. Call external service to produce the answer to the user request
             try:
                 self.logger.info(f"Sending request to RAG API for stream: {self.current_stream}")
+                
                 start_time = time.time()
-                response = self.studi_rag_inference_client.rag_query_stream_async(request, timeout=60)
-                full_answer = ""
-                async for chunk in response:
-                    full_answer += chunk
-                    self.logger.debug(f"Received chunk: {chunk}")
-                    self.logger.info(f'"" RAG API response\'s chunk: ... {chunk} ... ""')
-                    await self.speak_and_send_text(chunk)
+                response = self.external_user_request_handler(user_query_transcript, self.conversation_id)                
+                answer = await self.speak_external_user_request_response_async(response)                
                 end_time = time.time()
-                if full_answer:
-                    self.logger.info(f"Full answer gotten from RAG API in {end_time - start_time:.2f}s. : {full_answer}")
+
+                if answer:
+                    self.logger.info(f"Full answer gotten from RAG API in {end_time - start_time:.2f}s. : {answer}")
                 else:
                     self.logger.warning(f"Empty response received from RAG API")
             except Exception as e:
                 error_message = f"Je suis désolé, une erreur s'est produite lors de la communication avec le service."
                 self.logger.error(f"Error in RAG API communication: {str(e)}")
-                await self.speak_and_send_text(error_message)
+                await self.speak_and_send_text_async(error_message)
 
             # 5. Process user's query through conversation graph
             #response_text = await self._process_conversation(transcript)
 
         return
+
+    def external_user_request_handler(self, user_query, conversation_id):
+        request = QueryAskingRequestModel(
+            conversation_id=conversation_id,
+            user_query_content= user_query,
+            display_waiting_message=True
+        )
+        return self.studi_rag_inference_client.rag_query_stream_async_generator(request, timeout=60)
+
+    async def speak_external_user_request_response_async(self, response):
+        full_answer = ""
+        async for chunk in response:
+            full_answer += chunk
+            self.logger.debug(f"Received chunk: {chunk}")
+            print(f'""<< ... {chunk} ... >>""')
+            await self.speak_and_send_text_async(chunk)
+        return full_answer
 
     async def speak_and_send_ask_for_feedback(self, transcript):
         response_text = "Instructions : Fait un feedback reformulé de façon synthétique de la demande utilisateur suivante, afin de t'assurer de ta bonne comphéhension de celle-ci : " + transcript 
@@ -733,13 +731,13 @@ class BusinessLogic:
                         text_buffer += delta_content
                         # Check if we should send this segment (after punctuation or if long enough)
                         if len(text_buffer) > 1 and (any(punct in delta_content for punct in [".", ",", ":", "!", "?"]) or len(text_buffer.split()) > 20):
-                            await self.speak_and_send_text(text_buffer)
+                            await self.speak_and_send_text_async(text_buffer)
                             full_text += text_buffer
                             text_buffer = ""
             
             # Send any remaining text after the loop completes
             if text_buffer:
-                await self.speak_and_send_text(text_buffer)
+                await self.speak_and_send_text_async(text_buffer)
                 full_text += text_buffer
                 # Add a small pause between chunks (100-200ms)
                 await asyncio.sleep(0.15)
@@ -749,7 +747,7 @@ class BusinessLogic:
             self.logger.error(f"/!\\ Error sending audio to Twilio in {self.speak_and_send_stream.__name__}: {e}", exc_info=True)
             return ""
 
-    async def speak_and_send_text(self, text_buffer: str):
+    async def speak_and_send_text_async(self, text_buffer: str):
         audio_bytes = self.tts_provider.synthesize_speech_to_bytes(text_buffer)
         await self.enqueue_send_audio_to_twilio(audio_bytes= audio_bytes, frame_rate=self.frame_rate, sample_width=self.sample_width)
 

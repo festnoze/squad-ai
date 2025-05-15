@@ -14,9 +14,11 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class CalendarAgent:
-    
-    def __init__(self, first_name, last_name, email, owner_first_name, owner_last_name, owner_email, config_path: str = "calendar_agent.yaml"):
+class CalendarAgent:    
+    def __init__(self):
+        pass
+
+    def set_user_info(self, first_name, last_name, email, owner_first_name, owner_last_name, owner_email, config_path: str = "calendar_agent.yaml"):
         """
         Initialize the Calendar Agent with user information and configuration.
         
@@ -40,15 +42,15 @@ class CalendarAgent:
         self.calendar_service = self._init_google_calendar()
         self.calendar_id = self.config["google_calendar"]["calendar_id"]
 
-        self.duration = self.config["rendez_vous"].get("duration_minutes", 30)
-        self.max_slots = self.config["rendez_vous"].get("max_slots", 3)
+        self.duration = self.config["appointments"].get("duration_minutes", 30)
+        self.max_slots = self.config["appointments"].get("max_slots", 3)
         
         self.tz_name = "Europe/Paris"
         self.tz = ZoneInfo(self.tz_name)
         self.tz_offset = timezone(timedelta(hours=2))  # Adaptable si besoin
         
-        self.working_hours = self.config["rendez_vous"]["working_hours"]
-        self.days_ahead = self.config["rendez_vous"].get("days_ahead", 2)
+        self.working_hours = self.config["appointments"]["working_hours"]
+        self.days_ahead = self.config["appointments"].get("days_ahead", 2)
 
         self.available_slots = []
         self.date = ""
@@ -96,7 +98,7 @@ class CalendarAgent:
             logger.error(f"Error initializing Google Calendar service: {e}", exc_info=True)
             raise
 
-    def analyze_text(self, text):
+    def analyze_text_for_calendar_inquiry(self, text):
         """
         Analyze user input text to identify scheduling requests and handle the appointment booking flow.
         
@@ -111,7 +113,7 @@ class CalendarAgent:
         try:
             # If we already have available slots, check if the user is selecting one
             if self.available_slots:
-                return self._handle_slot_selection(text)
+                return self._handle_time_slot_selection(text)
             else:
                 # Otherwise, extract date/time preferences and find available slots
                 return self._handle_date_extraction(text)
@@ -162,7 +164,7 @@ class CalendarAgent:
             logger.error(f"Error extracting date information: {e}", exc_info=True)
             return "Je n'ai pas pu déterminer vos disponibilités. Pourriez-vous indiquer une date spécifique pour le rendez-vous?"
 
-    def _handle_slot_selection(self, text):
+    def _handle_time_slot_selection(self, text):
         """Handle the user's selection of a time slot."""
         try:
             # Try to extract a slot number from the user's response

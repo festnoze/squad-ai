@@ -1,8 +1,8 @@
 google_calendar:
-  calendar_id: ludovic.grauser@studi.fr
+  calendar_id: etienne.millerioux@studi.fr
   credentials_path: secrets/google-calendar-credentials.json
 
-rendez_vous:
+appointments:
   duration_minutes: 30
   working_hours:
     start: 09:00
