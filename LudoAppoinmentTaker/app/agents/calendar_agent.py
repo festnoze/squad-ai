@@ -15,10 +15,24 @@ import logging
 logger = logging.getLogger(__name__)
 
 class CalendarAgent:    
-    def __init__(self):
-        pass
+    def __init__(self, config_path: str = "app/agents/configs", config_filename: str = "calendar_agent.yaml"):
+        self.config_path = config_path
+        self.config_filename = config_filename
+        self.config = self._load_config()
 
-    def set_user_info(self, first_name, last_name, email, owner_first_name, owner_last_name, owner_email, config_path: str = "calendar_agent.yaml"):
+    def _load_config(self):
+        """Load YAML configuration from the specified path."""
+        try:
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            full_path = os.path.join(project_root, self.config_path, self.config_filename)
+            logger.debug(f"Loading calendar agent config from: {full_path}")
+            with open(full_path, "r") as f:
+                return yaml.safe_load(f)
+        except Exception as e:
+            logger.error(f"Error loading config from {self.config_filename}: {e}")
+            raise
+
+    def set_user_info(self, first_name, last_name, email, owner_first_name, owner_last_name, owner_email, ):
         """
         Initialize the Calendar Agent with user information and configuration.
         
@@ -32,7 +46,6 @@ class CalendarAgent:
             config_path: Path to the calendar agent configuration file
         """
         logger.info(f"Initializing CalendarAgent for: {first_name} {last_name}")
-        self.config = self._load_config(config_path)
         self.first_name = first_name
         self.last_name = last_name
         self.email = email
@@ -66,18 +79,6 @@ class CalendarAgent:
         self.model = openai_config.get('model', 'gpt-4-turbo')
         self.temperature = openai_config.get('temperature', 0.1)
         self.max_tokens = openai_config.get('max_tokens', 500)
-
-    def _load_config(self, path):
-        """Load YAML configuration from the specified path."""
-        try:
-            project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-            full_path = os.path.join(project_root, path)
-            logger.debug(f"Loading calendar agent config from: {full_path}")
-            with open(full_path, "r") as f:
-                return yaml.safe_load(f)
-        except Exception as e:
-            logger.error(f"Error loading config from {path}: {e}")
-            raise
 
     def _init_google_calendar(self):
         """Initialize Google Calendar service."""

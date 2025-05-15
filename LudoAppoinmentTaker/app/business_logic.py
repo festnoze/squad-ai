@@ -17,9 +17,9 @@ from pydub.silence import detect_nonsilent
 from google.cloud import speech, texttospeech
 from openai import OpenAI, Stream
 from typing import Dict, Optional
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 #
-from agents_graph import AgentsGraph
+from app.agents.agents_graph import AgentsGraph
 from app.agents.conversation_state_model import ConversationState
 from app.api_client.studi_rag_inference_client import StudiRAGInferenceClient
 from app.api_client.request_models.user_request_model import UserRequestModel, DeviceInfoRequestModel
@@ -28,6 +28,9 @@ from app.api_client.request_models.query_asking_request_model import QueryAsking
 from app.text_to_speech import get_text_to_speech_provider
 from app.speech_to_text import get_speech_to_text_provider
 from app.audio_processing import AudioProcessor
+# Importer les nouvelles classes pour la gestion du flux audio
+from app.audio.send_audio_queue import AudioQueueManager
+from app.audio.send_audio_twilio import TwilioAudioSender
 
 class BusinessLogic:
     # Class variables shared across instances
@@ -60,11 +63,12 @@ class BusinessLogic:
         self.current_stream = None
         self.start_time = None
         
-        # Audio streaming queue system
-        self.audio_queue = asyncio.Queue()
+        # Audio streaming queue system - utiliser une file d'attente bornée pour le contrôle de flux
+        self.audio_queue = AudioQueueManager.create_queue(maxsize=2)  # File limitée à 2 éléments max
         self.stream_worker_task = None
         self.is_streaming = False
-        self.chunk_lock = asyncio.Lock()  # Lock to prevent concurrent WebSocket operations         
+        self.chunk_lock = asyncio.Lock()  # Lock to prevent concurrent WebSocket operations
+        self.back_pressure_timeout = 5.0  # Timeout en secondes pour les opérations de back-pressure         
 
         # Environment and configuration settings
         self.VOICE_ID = os.getenv("VOICE_ID", "")
@@ -131,129 +135,44 @@ class BusinessLogic:
             self.logger.info("Started audio streaming worker task")
             
     async def _streaming_worker(self):
-        """Background worker that processes the audio queue and sends to Twilio.
-        Uses cooperative yielding to avoid blocking the event loop.
+        """Process audio from the queue and send to Twilio.
+        This worker runs continuously while self.is_streaming is True,
+        and pulls items from the audio queue to send to the Twilio WebSocket.
+        
+        Utilise la classe TwilioAudioSender pour envoyer l'audio à Twilio et 
+        implémente le contrôle de flux avec back-pressure.
         """
-        self.logger.info("Audio streaming worker started")
+        if not self.websocket:
+            self.logger.error("WebSocket is None, cannot start streaming worker")
+            self.is_streaming = False
+            return
+            
+        self.logger.info("Starting audio streaming worker with flow control")
         
         try:
-            while self.is_streaming:
-                try:
-                    # Check if there are items in the queue before waiting
-                    if self.audio_queue.empty():
-                        # Yield control to other tasks using a short sleep
-                        await asyncio.sleep(0.01)  # 10ms yield
-                        continue
-                        
-                    # Get item without blocking indefinitely
-                    audio_item = self.audio_queue.get_nowait()
-                    
-                    # Process the queue item
-                    success = await self._process_audio_queue_item(audio_item)
-                    
-                    # Mark the task as done regardless of success
-                    self.audio_queue.task_done()
-                    
-                    if not success:
-                        self.logger.warning("Error processing queue item, but continuing worker")
-                    
-                    # Yield control briefly after processing each item
-                    # This is critical to prevent blocking the event loop
-                    await asyncio.sleep(0)  # Yield control but resume immediately
-                    
-                except asyncio.QueueEmpty:
-                    # Queue was empty after all, just yield and continue
-                    await asyncio.sleep(0.01)  # 10ms yield
-                except Exception as e:
-                    self.logger.error(f"Error in streaming worker: {e}", exc_info=True)
-                    # Brief pause to avoid tight loop in error conditions
-                    await asyncio.sleep(0.01)  # 10ms yield
-        except asyncio.CancelledError:
-            self.logger.info("Audio streaming worker cancelled")
+            # Déléguer à la classe TwilioAudioSender pour gérer le streaming
+            await TwilioAudioSender.streaming_worker(
+                websocket=self.websocket,
+                audio_queue=self.audio_queue,
+                is_streaming=self.is_streaming,
+                logger=self.logger
+            )
         except Exception as e:
-            self.logger.error(f"Unexpected error in streaming worker: {e}", exc_info=True)
+            self.logger.error(f"Unhandled exception in streaming worker: {e}", exc_info=True)
         finally:
             self.logger.info("Audio streaming worker stopped")
             self.is_streaming = False
             
-    async def _process_audio_queue_item(self, item):
-        """Process a single audio queue item and send it to Twilio."""
-        if not item or 'type' not in item:
-            self.logger.warning("Invalid queue item")
-            return False
-            
-        # Acquire the lock to prevent concurrent access to the WebSocket
-        async with self.chunk_lock:
-            # Check websocket is still connected before starting
-            if not self._is_websocket_connected():
-                self.logger.warning("WebSocket disconnected - dropping queue item")
-                return False
-                
-            try:
-                if item['type'] == 'audio_chunk':
-                    # Process audio chunk
-                    chunk = item.get('data')
-                    stream_sid = item.get('stream_sid')
-                    
-                    # Skip if missing required data
-                    if not chunk or not stream_sid:
-                        return False
-                        
-                    # Confirm stream_sid matches current stream
-                    if stream_sid != self.current_stream:
-                        self.logger.warning(f"Stream mismatch: queued {stream_sid} vs current {self.current_stream}")
-                        return False
-                        
-                    # Send the audio data chunk
-                    payload = base64.b64encode(chunk).decode()
-                    msg = {
-                        "event": "media",
-                        "streamSid": stream_sid,
-                        "media": {
-                            "payload": payload
-                        }
-                    }
-                    
-                    # Send with brief timeout
-                    await asyncio.wait_for(self.websocket.send_text(json.dumps(msg)), timeout=1.0)
-                    return True
-                    
-                elif item['type'] == 'mark':
-                    # Process mark event
-                    mark_name = item.get('name', 'segment')
-                    stream_sid = item.get('stream_sid')
-                    
-                    if not stream_sid:
-                        return False
-                        
-                    # Send the mark event
-                    mark_msg = {
-                        "event": "mark",
-                        "streamSid": stream_sid,
-                        "mark": {
-                            "name": mark_name
-                        }
-                    }
-                    
-                    await asyncio.wait_for(self.websocket.send_text(json.dumps(mark_msg)), timeout=1.0)
-                    return True
-                    
-                elif item['type'] == 'pause':
-                    # Just a pause, no need to send anything
-                    duration = item.get('duration', 0.2)
-                    await asyncio.sleep(duration)
-                    return True
-                    
-                else:
-                    self.logger.warning(f"Unknown queue item type: {item['type']}")
-                    return False
-                    
-            except asyncio.TimeoutError:
-                self.logger.error("Timeout sending to Twilio WebSocket")
-                return False
-            except Exception as e:
-                self.logger.error(f"Error processing queue item: {e}")
-                return False
+    async def _process_audio_queue_item(self, item: Dict) -> bool:
+        """Process a single item from the audio queue.
+        Cette méthode délègue maintenant le traitement à TwilioAudioSender.
+        """
+        # Déléguer le traitement à la classe TwilioAudioSender
+        return await TwilioAudioSender.process_audio_queue_item(
+            websocket=self.websocket,
+            audio_item=item,
+            logger=self.logger
+        )
     
     async def _handle_start_event(self, start_data: Dict) -> str:
         """Handle the 'start' event from Twilio which begins a new call."""
@@ -443,7 +362,7 @@ class BusinessLogic:
             # Clean up the stream state if it wasn't already done by a stop event
             if self.current_stream and self.current_stream in self.stream_states:
                 self.logger.warning(f"Cleaning up state for stream {self.current_stream} due to handler exit/error.")
-                self._clean_stream_state(self.current_stream)
+                await self._clean_stream_state_async(self.current_stream)
             
             self.logger.info(f"WebSocket endpoint finished for: {remote_addr} (Stream: {self.current_stream})")
     
@@ -505,7 +424,7 @@ class BusinessLogic:
                 self.logger.info(f"Sending request to RAG API for stream: {self.current_stream}")
                 
                 start_time = time.time()
-                response = self.external_user_request_handler(user_query_transcript, self.conversation_id)                
+                response = self.external_answering_stream(user_query_transcript, self.conversation_id)                
                 answer = await self.speak_external_user_request_response_async(response)                
                 end_time = time.time()
 
@@ -523,21 +442,45 @@ class BusinessLogic:
 
         return
 
-    def external_user_request_handler(self, user_query, conversation_id):
+    def external_answering_stream(self, user_query, conversation_id):
         request = QueryAskingRequestModel(
             conversation_id=conversation_id,
             user_query_content= user_query,
             display_waiting_message=True
         )
-        return self.studi_rag_inference_client.rag_query_stream_async_generator(request, timeout=60)
+        # Ajouter une pause de 400ms entre chaque segment pour ralentir la réception des chunks du RAG
+        # Cela évite de surcharger la file d'attente audio et donne le temps à l'audio d'être envoyé
+        return self.studi_rag_inference_client.rag_answer_query_stream(
+            query_asking_request_model=request, 
+            timeout=60, 
+            pause_duration_between_chunks_ms=400
+        )
 
     async def speak_external_user_request_response_async(self, response):
+        """Traite les chunks de texte du RAG et les envoie en audio avec contrôle de flux.
+        Cette méthode utilise le mécanisme de back-pressure pour éviter de surcharger
+        la file d'attente audio quand le RAG génère des réponses plus rapidement
+        que l'audio peut être envoyé.
+        """
         full_answer = ""
+        
         async for chunk in response:
             full_answer += chunk
             self.logger.debug(f"Received chunk: {chunk}")
             print(f'""<< ... {chunk} ... >>""')
+            
+            # Attendre si la file d'attente est pleine avant d'ajouter plus d'audio
+            # Cela crée un mécanisme de back-pressure qui ralentit la génération de réponses
+            # si l'envoi audio est bloqué
+            await AudioQueueManager.wait_if_queue_full(
+                queue=self.audio_queue,
+                timeout=self.back_pressure_timeout,
+                logger=self.logger
+            )
+            
+            # Maintenant que la file est prête, synthétiser et envoyer le texte
             await self.speak_and_send_text_async(chunk)
+            
         return full_answer
 
     async def speak_and_send_ask_for_feedback(self, transcript):
@@ -751,6 +694,34 @@ class BusinessLogic:
         audio_bytes = self.tts_provider.synthesize_speech_to_bytes(text_buffer)
         await self.enqueue_send_audio_to_twilio(audio_bytes= audio_bytes, frame_rate=self.frame_rate, sample_width=self.sample_width)
 
+    async def _clean_stream_state_async(self, stream_sid: str):
+        """Nettoie les ressources associées à un stream spécifique
+        Cette méthode est appelée à la fin d'un appel ou en cas d'erreur
+        """
+        try:
+            # Arrêter le worker de streaming si en cours
+            if self.is_streaming:
+                self.is_streaming = False
+                self.logger.info(f"Stopping streaming worker for stream: {stream_sid}")
+            
+            # Nettoyer la file d'attente audio restante
+            await self._clear_audio_queue()
+            
+            # Supprimer l'état du stream s'il existe
+            if stream_sid in self.stream_states:
+                del self.stream_states[stream_sid]
+                self.logger.info(f"Removed state for stream: {stream_sid}")
+                
+            # Réinitialiser le stream courant si c'est celui qu'on nettoie
+            if self.current_stream == stream_sid:
+                self.current_stream = None
+                self.logger.info("Reset current_stream to None")
+            
+            return True
+        except Exception as e:
+            self.logger.error(f"Error in _clean_stream_state for {stream_sid}: {e}")
+            return False
+    
     async def _handle_stop_event(self):
         """Handle the stop event from Twilio which ends a call"""
         if not self.current_stream:
@@ -758,20 +729,13 @@ class BusinessLogic:
             return
             
         self.logger.info(f"Received stop event for stream: {self.current_stream}")
-        if self.current_stream in self.stream_states:
-            del self.stream_states[self.current_stream]
-            self.logger.info(f"Cleaned up state for stream {self.current_stream}")
-        else:
-            self.logger.warning(f"Received stop for unknown or already cleaned stream: {self.current_stream}")
+        await self._clean_stream_state_async(self.current_stream)
             
         if self.websocket:
             try:
                 await self.websocket.close()
             except Exception as e:
                 self.logger.error(f"Error closing websocket: {e}")
-        
-        # Reset current stream
-        self.current_stream = None
 
     def _handle_mark_event(self, data):
         mark_name = data.get("mark", {}).get("name")
@@ -836,91 +800,39 @@ class BusinessLogic:
         self.logger.debug("Started audio enqueuing task")
         return True
         
-    async def _fill_audio_queue(self, file_path: str=None, audio_bytes: bytes=None, frame_rate: int=None, 
-                               channels: int=1, sample_width: int=None, convert_to_mulaw: bool = False):
-        """Helper method to fill the audio queue in a separate task."""
-        start_time = time.time()
+    async def _clear_audio_queue(self):
+        """Vide la file d'attente audio de manière sécurisée.
+        Utilise AudioQueueManager pour le faire proprement.
+        """
+        return await AudioQueueManager.clear_audio_queue(self.audio_queue, self.logger)
         
-        try:
-            # Load audio and convert to appropriate format
-            ulaw_data = self._prepare_voice_stream(file_path=file_path, audio_bytes=audio_bytes, 
-                                                 frame_rate=frame_rate, channels=channels, 
-                                                 sample_width=sample_width, convert_to_mulaw=True)
-            if file_path:
-                self.delete_temp_file(file_path)
-            
-            # Calculate chunk size based on duration
-            chunk_size = int((self.speech_chunk_duration_ms / 1000) * frame_rate * sample_width)
-            
-            # Calculate total audio attributes
-            total_audio_seconds = (len(ulaw_data) / (frame_rate * sample_width))
-            total_chunks = len(ulaw_data) // chunk_size + (1 if len(ulaw_data) % chunk_size else 0)
-            
-            # Start the streaming worker if it's not already running
-            if not self.is_streaming and not self.stream_worker_task:
-                self.is_streaming = True
-                self.stream_worker_task = asyncio.create_task(self._streaming_worker())
-                self.logger.info("Started audio streaming worker task")
-            
-            # Break audio into small chunks for better handling
-            # Smaller chunks process faster and allow more fine-grained control
-            max_chunk_duration_ms = 500  # Maximum 500ms per chunk for better control
-            chunks_per_group = max(1, int(max_chunk_duration_ms / self.speech_chunk_duration_ms))
-            total_groups = (total_chunks + chunks_per_group - 1) // chunks_per_group
-            
-            self.logger.info(f"-> Queueing {total_audio_seconds:.2f}s of audio splitted in {total_chunks} chunks ({total_groups} groups)")
-            
-            # Queue all audio chunks with small pauses between groups
-            chunks_queued = 0
-            
-            for group in range(total_groups):
-                group_start = group * chunks_per_group * chunk_size
-                group_end = min(group_start + (chunks_per_group * chunk_size), len(ulaw_data))
-                group_data = ulaw_data[group_start:group_end]
-                
-                # Queue a small pause between groups to help Twilio connection
-                if group > 0:
-                    await self.audio_queue.put({
-                        'type': 'pause',
-                        'duration': 0.2,  # 200ms pause between groups
-                        'stream_sid': self.current_stream
-                    })
-                
-                # Process the audio group into individual chunks
-                for i in range(0, len(group_data), chunk_size):
-                    chunk = group_data[i:i + chunk_size]
-                    
-                    # Queue this chunk for processing
-                    await self.audio_queue.put({
-                        'type': 'audio_chunk',
-                        'data': chunk,
-                        'stream_sid': self.current_stream
-                    })
-                    chunks_queued += 1
-                    
-                    # Yield control after every chunk to prevent blocking
-                    await asyncio.sleep(0)
-                    
-                    # Every N chunks, add a tiny pause (if not the last chunk)
-                    if chunks_queued % 3 == 0 and chunks_queued < total_chunks:
-                        await self.audio_queue.put({
-                            'type': 'pause',
-                            'duration': 0.05,  # 50ms mini-pause after every 3 chunks
-                            'stream_sid': self.current_stream
-                        })
-            
-            # Queue a mark after all chunks to indicate the end of this audio segment
-            await self.audio_queue.put({
-                'type': 'mark',
-                'name': 'msg_retour',
-                'stream_sid': self.current_stream
-            })
-            
-            # Log queue statistics
-            self.logger.info(f"Successfully queued {chunks_queued} audio chunks (~{total_audio_seconds:.2f}s)")
-            return True
-            
-        except Exception as e:
-            elapsed = time.time() - start_time
-            self.logger.error(f"Error preparing audio for queue: {elapsed:.2f}s elapsed: {e}", exc_info=True)
-            return False
+    async def _fill_audio_queue(self, file_path: str=None, audio_bytes: bytes=None, frame_rate: int=None, 
+                                channels: int=1, sample_width: int=None, convert_to_mulaw: bool = False):
+        """Helper method to fill the audio queue in a separate task.
+        Utilise AudioQueueManager avec le mécanisme de back-pressure pour éviter de surcharger la file d'attente.
+        """
+        # Utiliser les valeurs par défaut si nécessaire
+        frame_rate = frame_rate or self.frame_rate
+        sample_width = sample_width or self.sample_width
+        
+        # Démarrer le worker de streaming s'il n'est pas déjà en cours d'exécution
+        if not self.is_streaming and not self.stream_worker_task:
+            self.is_streaming = True
+            self.stream_worker_task = asyncio.create_task(self._streaming_worker())
+            self.logger.info("Started audio streaming worker task with flow control")
+        
+        # Déléguer le remplissage de la file d'attente à AudioQueueManager
+        return await AudioQueueManager.fill_audio_queue(
+            queue=self.audio_queue,
+            file_path=file_path,
+            audio_bytes=audio_bytes,
+            frame_rate=frame_rate,
+            channels=channels,
+            sample_width=sample_width,
+            convert_to_mulaw=convert_to_mulaw,
+            stream_sid=self.current_stream,
+            chunk_duration_ms=self.speech_chunk_duration_ms,
+            temp_dir=self.TEMP_DIR,
+            logger=self.logger,
+            back_pressure_timeout=self.back_pressure_timeout
+        )

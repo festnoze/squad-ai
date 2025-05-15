@@ -1,7 +1,4 @@
-import json
 import yaml
-import os
-import requests
 from pandas_gbq import read_gbq
 from google.oauth2 import service_account
 import logging

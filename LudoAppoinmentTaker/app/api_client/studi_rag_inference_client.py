@@ -1,4 +1,5 @@
 import httpx
+import asyncio
 from uuid import UUID
 from typing import Any, Dict, AsyncGenerator
 from api_client.request_models.user_request_model import UserRequestModel
@@ -55,8 +56,14 @@ class StudiRAGInferenceClient:
         except httpx.ConnectError as exc:
             raise RuntimeError(f"Cannot connect to RAG inference server at {self.host_base_url}") from exc
 
-    async def rag_query_stream_async_generator(self, query_asking_request_model: QueryAskingRequestModel, timeout: int = 60) -> AsyncGenerator[str, None]:
-        """POST /rag/inference/conversation/ask-question/phone/stream: Stream RAG answer for a conversation."""
+    async def rag_answer_query_stream(self, query_asking_request_model: QueryAskingRequestModel, timeout: int = 60, pause_duration_between_chunks_ms: int = 0) -> AsyncGenerator[str, None]:
+        """POST /rag/inference/conversation/ask-question/phone/stream: Stream RAG answer for a conversation.
+        
+        Args:
+            query_asking_request_model: Le modèle de requête pour poser une question
+            timeout: Délai d'expiration en secondes pour la requête
+            pause_duration_between_chunks_ms: Durée de pause en millisecondes entre chaque chunk retourné (0 = pas de pause)
+        """
         try:
             async with self.client.stream(
                 "POST", 
@@ -65,7 +72,7 @@ class StudiRAGInferenceClient:
                 timeout=httpx.Timeout(timeout)
             ) as resp:
                 resp.raise_for_status()
-                async for segment in self.stream_by_segment(resp):
+                async for segment in self.stream_by_segment(resp, pause_duration_between_chunks_ms):
                     yield segment
 
         except httpx.ReadTimeout:
@@ -76,16 +83,29 @@ class StudiRAGInferenceClient:
             yield f"Une erreur s'est produite lors de la récupération de la réponse: {str(e)}"
 
     @staticmethod
-    async def stream_by_segment(response_stream):
+    async def stream_by_segment(response_stream, pause_duration_between_chunks_ms: int = 0):
+        """Traite le stream de réponse en segments et ajoute des pauses entre les segments si demandé.
+        
+        Args:
+            response_stream: Le stream de réponse du serveur RAG
+            pause_duration_between_chunks_ms: Durée de pause en millisecondes entre chaque segment
+        """
         text_buffer = ""
         async for chunk in response_stream.aiter_bytes():
             if chunk:
                 text = chunk.decode("utf-8", errors="ignore")
                 text_buffer += text
                 if len(text_buffer) > 1 and (any(punct in text for punct in [".", ",", ":", "!", "?"]) or len(text_buffer.split()) > 20):
+                    # Ajouter une pause avant de retourner le segment si durée > 0
+                    if pause_duration_between_chunks_ms > 0:
+                        await asyncio.sleep(pause_duration_between_chunks_ms / 1000)  # Convertir ms en secondes
                     yield text_buffer
                     text_buffer = ""
+        
+        # Ne pas oublier le dernier morceau de texte s'il en reste
         if text_buffer:
+            if pause_duration_between_chunks_ms > 0:
+                await asyncio.sleep(pause_duration_between_chunks_ms / 1000)
             yield text_buffer
 
     async def rag_query_no_conversation_async(self, query_no_conversation_request_model: QueryNoConversationRequestModel) -> Dict[str, Any]:
@@ -100,8 +120,14 @@ class StudiRAGInferenceClient:
         except httpx.ConnectError as exc:
             raise RuntimeError(f"Cannot connect to RAG inference server at {self.host_base_url}") from exc
 
-    async def rag_query_no_conversation_streaming_async(self, query_no_conversation_request_model: QueryNoConversationRequestModel, timeout: int = 60) -> AsyncGenerator[str, None]:
-        """POST /rag/inference/no-conversation/ask-question/stream: Stream RAG answer without conversation."""
+    async def rag_query_no_conversation_streaming_async(self, query_no_conversation_request_model: QueryNoConversationRequestModel, timeout: int = 60, pause_duration_between_chunks_ms: int = 0) -> AsyncGenerator[str, None]:
+        """POST /rag/inference/no-conversation/ask-question/stream: Stream RAG answer without conversation.
+        
+        Args:
+            query_no_conversation_request_model: Le modèle de requête
+            timeout: Délai d'expiration en secondes pour la requête
+            pause_duration_between_chunks_ms: Durée de pause en millisecondes entre chaque chunk retourné (0 = pas de pause)
+        """
         try:
             async with self.client.stream(
                 "POST", 
@@ -110,7 +136,7 @@ class StudiRAGInferenceClient:
                 timeout=httpx.Timeout(timeout)
             ) as resp:
                 resp.raise_for_status()
-                async for segment in self.stream_by_segment(resp):
+                async for segment in self.stream_by_segment(resp, pause_duration_between_chunks_ms):
                     yield segment
         except httpx.ReadTimeout:
             yield "Je suis désolé, mais je n'ai pas pu obtenir une réponse à temps. Pouvez-vous reformuler votre question?"

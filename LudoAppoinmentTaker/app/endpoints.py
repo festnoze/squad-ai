@@ -4,7 +4,7 @@ import logging
 from fastapi import APIRouter, WebSocket, Request, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from twilio.twiml.voice_response import VoiceResponse, Connect
-from business_logic import BusinessLogic
+from app.business_logic import BusinessLogic
 
 logger: logging.Logger = logging.getLogger(__name__)
 
