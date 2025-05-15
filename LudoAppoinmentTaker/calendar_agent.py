@@ -24,15 +24,15 @@ class CalendarAgent:
         self.calendar_service = self._init_google_calendar()
         self.calendar_id = self.config["google_calendar"]["calendar_id"]
 
-        self.duration = self.config["rendez_vous"].get("duration_minutes", 30)
-        self.max_slots = self.config["rendez_vous"].get("max_slots", 3)
+        self.duration = self.config["appointments"].get("duration_minutes", 30)
+        self.max_slots = self.config["appointments"].get("max_slots", 3)
         
         self.tz_name = "Europe/Paris"
         self.tz = ZoneInfo(self.tz_name)
         self.tz_offset = timezone(timedelta(hours=2))  # Adaptable si besoin
         
-        self.working_hours = self.config["rendez_vous"]["working_hours"]
-        self.days_ahead = self.config["rendez_vous"].get("days_ahead", 2)
+        self.working_hours = self.config["appointments"]["working_hours"]
+        self.days_ahead = self.config["appointments"].get("days_ahead", 2)
 
         self.available_slots = []
         self.date = ""

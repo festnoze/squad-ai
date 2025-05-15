@@ -4,34 +4,31 @@ from langgraph.graph import StateGraph, END
 #
 from app.agents.conversation_state_model import ConversationState
 
+# Safe import for agents
+from agents.lead_agent import LeadAgent
+from agents.calendar_agent import CalendarAgent
+from agents.sf_agent import SFAgent
+
 class AgentsGraph:
     def __init__(self):
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
         self.logger.info("Agents graph initialization")
         
-        # Safe import for agents
-        try:
-            from agents.lead_agent import LeadAgent
-            from agents.calendar_agent import CalendarAgent
-            from agents.sf_agent import SFAgent
-            agents_imported = True
-            self.logger.info("Agents imported successfully")
-        except ImportError as e:
-            agents_imported = False
-            self.logger.error(f"Error importing agents: {e}")
         
         # --- Agent Initialization ---
         # Determine config path relative to project root
         # (Adjust if lid_api_config.yaml is elsewhere)
         CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', 'lid_api_config.yaml') # Assumes graph.py is in app/ and config is in root
-        try:
-            self.lead_agent_instance = LeadAgent(config_path=CONFIG_PATH)
-            self.logger.info(f"Initialize Lead Agent succeed with config: {CONFIG_PATH}")
-        except Exception as e:
-            self.logger.error(f"Failed to initialize Lead Agent: {e}", exc_info=True)
-            self.lead_agent_instance = None # Handle inability to load agent
-            
+        self.lead_agent_instance = LeadAgent(config_path=CONFIG_PATH)
+        self.logger.info(f"Initialize Lead Agent succeed with config: {CONFIG_PATH}")
+        
+        self.calendar_agent_instance = CalendarAgent()
+        self.logger.info("Initialize Calendar Agent succeed")
+        
+        self.sf_agent_instance = SFAgent()
+        self.logger.info("Initialize SF Agent succeed")
+        
         self.graph = self._build_graph()
         
     def _build_graph(self):

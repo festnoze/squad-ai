@@ -55,7 +55,7 @@ class StudiRAGInferenceClient:
         except httpx.ConnectError as exc:
             raise RuntimeError(f"Cannot connect to RAG inference server at {self.host_base_url}") from exc
 
-    async def rag_query_stream_async(self, query_asking_request_model: QueryAskingRequestModel, timeout: int = 60) -> AsyncGenerator[str, None]:
+    async def rag_query_stream_async_generator(self, query_asking_request_model: QueryAskingRequestModel, timeout: int = 60) -> AsyncGenerator[str, None]:
         """POST /rag/inference/conversation/ask-question/phone/stream: Stream RAG answer for a conversation."""
         try:
             async with self.client.stream(
