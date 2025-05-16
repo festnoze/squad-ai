@@ -101,9 +101,6 @@ class BusinessLogic:
         if self.openai_client is None:
             self.openai_client = OpenAI(api_key=self.OPENAI_API_KEY)
 
-        if not self.compiled_graph:
-            self.compiled_graph = AgentsGraph().graph
-
         self.logger.info("BusinessLogic initialized successfully.")
     
     def _decode_json(self, message: str) -> Optional[Dict]:
@@ -126,6 +123,21 @@ class BusinessLogic:
         self.start_time = datetime.now()
         self.logger.info(f"Call started - CallSid: {call_sid}, StreamSid: {stream_sid}")
         
+        # Set the current stream so the audio functions know which stream to use
+        self.current_stream = stream_sid
+        
+        # Define the welcome message
+        welcome_text = f"""
+        Bonjour! Et bienvenue chez Studi, l'école 100% en ligne !
+        Je suis l'assistant virtuel Stud'IA, je prends le relais lorsque nos conseillers en formation ne sont pas présents.
+        Souhaitez-vous prendre rendez-vous avec un conseiller ou que je vous aide à trouver quelle formation pourrait vous intéresser ?
+        """
+        #welcome_text = "Salut !"
+
+        # Send the welcome audio to the user as early as possible
+        self.logger.info(f"Sending welcome speech to {call_sid}")
+        await self.speak_and_send_text(welcome_text)
+
         # Initialize conversation state for this stream
         phone_number = self.phones.get(call_sid, "Unknown")
         
@@ -137,28 +149,18 @@ class BusinessLogic:
             "history": [],
             "agent_scratchpad": {}
         }
-
+        # Now, initialize the user and conversation backend (this might take some time)
         self.conversation_id = await self.init_user_and_conversation(phone_number, call_sid)
         
-        # Set the current stream so the audio functions know which stream to use
-        self.current_stream = stream_sid
-        
-        # Store the state
+        # Store the initial state for this stream (used by graph and other handlers)
         self.stream_states[stream_sid] = initial_state
         
-        # Send a welcome message immediately to let the user know they're connected
-        welcome_text = f"""
-        Bonjour! Et bienvenue chez Studi, l'école 100% en ligne !
-        Je suis l'assistant virtuel Stud'IA, je prends le relais lorsque nos conseillers en formation ne sont pas présents.
-        Souhaitez-vous prendre rendez-vous avec un conseiller ou que je vous aide à trouver quelle formation pourrait vous intéresser ?
-        """
-        welcome_text = "Salut !"
-
         try:
-            # First, send our welcome message
-            await self.speak_and_send_text(welcome_text)
+            # Log the welcome message to our backend records
             await self.studi_rag_inference_client.add_message_to_conversation(self.conversation_id, welcome_text)
             
+            if not self.compiled_graph:
+                self.compiled_graph = AgentsGraph().graph
             # Then invoke the graph with initial state to get the AI-generated welcome message
             updated_state = await self.compiled_graph.ainvoke(initial_state)
             self.stream_states[stream_sid] = updated_state
@@ -216,11 +218,6 @@ class BusinessLogic:
             self.logger.error("WebSocket not set, cannot handle WebSocket connection.")
             return
         
-        if not self.compiled_graph:
-            self.logger.error("Graph not compiled, cannot handle WebSocket connection.")
-            await self.websocket.close(code=1011, reason="Server configuration error")
-            return
-
         self.logger.info(f"WebSocket handler started for {self.websocket.client.host}:{self.websocket.client.port}")
         
         # Store the caller's phone number and call SID so we can retrieve them later
