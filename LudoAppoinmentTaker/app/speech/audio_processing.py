@@ -9,7 +9,7 @@ from pydub.effects import normalize
 
 logger = logging.getLogger(__name__)
 
-class AudioProcessor:
+class IncomingAudioProcessing:
     """Audio processing utilities for improving speech recognition quality"""
     
     def __init__(self, sample_width=2, frame_rate=8000, channels=1, vad_aggressiveness=3):

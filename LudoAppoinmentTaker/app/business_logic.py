@@ -25,9 +25,9 @@ from app.api_client.studi_rag_inference_client import StudiRAGInferenceClient
 from app.api_client.request_models.user_request_model import UserRequestModel, DeviceInfoRequestModel
 from app.api_client.request_models.conversation_request_model import ConversationRequestModel
 from app.api_client.request_models.query_asking_request_model import QueryAskingRequestModel
-from app.text_to_speech import get_text_to_speech_provider
-from app.speech_to_text import get_speech_to_text_provider
-from app.audio_processing import AudioProcessor
+from app.speech.text_to_speech import get_text_to_speech_provider
+from app.speech.speech_to_text import get_speech_to_text_provider
+from app.speech.audio_processing import IncomingAudioProcessing
 
 class BusinessLogic:
     # Class variables shared across instances
@@ -93,7 +93,7 @@ class BusinessLogic:
         self.stt_provider = get_speech_to_text_provider(self.TEMP_DIR, provider="hybrid")
         
         # Initialize audio processor for better quality
-        self.audio_processor = AudioProcessor(sample_width=self.sample_width, frame_rate=self.frame_rate, vad_aggressiveness=3)
+        self.incoming_audio = IncomingAudioProcessing(sample_width=self.sample_width, frame_rate=self.frame_rate, vad_aggressiveness=3)
 
         self.studi_rag_inference_client = StudiRAGInferenceClient()
 
@@ -268,7 +268,7 @@ class BusinessLogic:
             return
         
         # Use WebRTC VAD for better speech detection
-        is_silence, speech_to_noise_ratio = self.audio_processor.detect_silence_speech(
+        is_silence, speech_to_noise_ratio = self.incoming_audio.detect_silence_speech(
             chunk, threshold=self.speech_threshold
         )
 
@@ -385,7 +385,7 @@ class BusinessLogic:
             
             # Apply audio preprocessing to improve quality
             self.logger.info("Applying audio preprocessing...")
-            processed_audio = self.audio_processor.preprocess_audio(audio_data)
+            processed_audio = self.incoming_audio.preprocess_audio(audio_data)
             self.logger.info(f"Audio preprocessing complete. Original size: {len(audio_data)} bytes, Processed size: {len(processed_audio)} bytes")
                 
             # Save the processed audio to a file
