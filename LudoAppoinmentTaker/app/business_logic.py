@@ -130,6 +130,7 @@ class BusinessLogic:
         
         # Update the streamSid in the audio streaming manager
         if self.audio_stream_manager:
+            # Update the streamSid in the audio sender
             self.audio_stream_manager.update_stream_sid(stream_sid)
             self.logger.info(f"Updated AudioStreamManager with stream SID: {stream_sid}")
         
@@ -230,17 +231,17 @@ class BusinessLogic:
         # Store the caller's phone number and call SID so we can retrieve them later
         self.phones[call_sid] = calling_phone_number
         
-        # Initialize the audio stream manager for throttled audio streaming
+        # Initialize the audio stream manager for throttled audio streaming with optimized parameters
         # We'll set the streamSid later when the call starts
         self.audio_stream_manager = AudioStreamManager(
             websocket=self.websocket, 
             streamSid=None,  # Will be set when the call starts
-            max_queue_size=20,
-            min_chunk_interval=0.05
+            max_queue_size=10,  # Smaller queue size for faster feedback
+            min_chunk_interval=0.02  # Faster refresh rate (20ms)
         )
         # Start the background streaming task
         self.audio_stream_manager.start_streaming()
-        self.logger.info("Audio stream manager initialized and started")
+        self.logger.info("Audio stream manager initialized and started with optimized parameters")
 
         try:            
             while True:
@@ -347,7 +348,7 @@ class BusinessLogic:
                 async for chunk in response:
                     full_answer += chunk
                     self.logger.debug(f"Received chunk: {chunk}")
-                    print(f">> RAG API response: {full_answer}", end="", flush=True)
+                    print(f"<< ... {chunk} ... >>")
                     await self.speak_and_send_text(chunk)
                 end_time = time.time()
                 if full_answer:
@@ -529,18 +530,15 @@ class BusinessLogic:
                     delta_content = chunk.choices[0].delta.content
                     if delta_content is not None:
                         text_buffer += delta_content
-                        # Check if we should send this segment (after punctuation or if long enough)
+                        # Send segment at sentense ends or max length
                         if len(text_buffer) > 1 and (any(punct in delta_content for punct in [".", ",", ":", "!", "?"]) or len(text_buffer.split()) > 20):
                             await self.speak_and_send_text(text_buffer)
                             full_text += text_buffer
                             text_buffer = ""
             
-            # Send any remaining text after the loop completes
             if text_buffer:
                 await self.speak_and_send_text(text_buffer)
                 full_text += text_buffer
-                # Add a small pause between chunks (100-200ms)
-                await asyncio.sleep(0.15)
             
             return full_text
         except Exception as e:
@@ -611,64 +609,6 @@ class BusinessLogic:
         else:
             return pcm_data
     
-    async def send_audio_to_twilio_old(self, mp3_path):
-        """Old implementation kept for reference."""
-        if not self.websocket:
-            self.logger.error("WebSocket not set, cannot send audio")
-            return False
-        
-        if not self.current_stream:
-            self.logger.error("No active stream, cannot send audio")
-            return False
-
-        try:
-            if hasattr(self.websocket, 'client_state') and not self.websocket.client_state == 'CONNECTED':
-                self.logger.warning("WebSocket is no longer connected, cannot send audio")
-                return False
-                
-            self.logger.info(f"Sending audio file {mp3_path} to stream {self.current_stream}")
-            
-            # Convert to PCM mono 16-bit 8kHz
-            audio = AudioSegment.from_file(mp3_path).set_frame_rate(self.frame_rate).set_channels(1).set_sample_width(self.sample_width)
-            pcm_data = audio.raw_data
-
-            # Convert to μ-law
-            ulaw_data = audioop.lin2ulaw(pcm_data, self.sample_width)
-
-            # Split into small chunks (20ms = 160 samples * 2 bytes = 320 bytes)
-            chunk_size = 320
-            for i in range(0, len(ulaw_data), chunk_size):
-                chunk = ulaw_data[i:i + chunk_size]
-                payload = base64.b64encode(chunk).decode()
-                
-                msg = {
-                    "event": "media",
-                    "streamSid": self.current_stream,
-                    "media": {
-                        "payload": payload
-                    }
-                }
-            
-                await self.websocket.send_text(json.dumps(msg))
-                await asyncio.sleep(0.02)  # 20ms to simulate real-time
-                
-            # Send mark to indicate end of message
-            mark_msg = {
-                "event": "mark",
-                "streamSid": self.current_stream,
-                "mark": {
-                    "name": "msg_retour"
-                }
-            }
-            
-            await self.websocket.send_text(json.dumps(mark_msg))
-            
-            self.logger.info(f"Audio sent to Twilio for stream {self.current_stream}")
-            return True
-        except Exception as e:
-            self.logger.error(f"Error sending audio to Twilio: {e}", exc_info=True)
-            return False
-            
     async def send_audio_to_twilio(self, file_path: str=None, audio_bytes: bytes=None, frame_rate: int=None, channels: int=1, sample_width: int=None, convert_to_mulaw: bool = False):
         """Convert audio to μ-law and send to Twilio using throttled streaming to prevent disconnections."""
         # Use instance defaults if not specified
@@ -691,8 +631,8 @@ class BusinessLogic:
         
         # Check if audio stream manager is initialized
         if not self.audio_stream_manager:
-            self.logger.warning("Audio stream manager not initialized, falling back to direct send")
-            return await self._send_audio_to_twilio_direct(file_path, audio_bytes, frame_rate, channels, sample_width, convert_to_mulaw)
+            self.logger.error("/!\\ Audio stream manager not initialized")
+            return False
         
         # Start timing this operation
         start_time = time.time()

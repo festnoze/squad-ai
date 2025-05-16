@@ -24,7 +24,7 @@ class TwilioAudioSender:
         
     async def send_audio_chunk(self, audio_chunk: bytes) -> bool:
         """
-        Sends an audio chunk to Twilio with optimized rate limiting.
+        Sends an audio chunk to Twilio with optimized rate limiting and prioritization.
         Returns True if successful, False otherwise.
         """
         if not audio_chunk:
@@ -38,13 +38,17 @@ class TwilioAudioSender:
             self.logger.error("WebSocket is not available")
             return False
             
+        # Track chunk size for priority handling
+        chunk_size = len(audio_chunk)
+        
         # Apply minimal rate limiting - only if we're sending too quickly
         now = time.time()
         time_since_last = now - self.last_send_time
         
-        if time_since_last < self.min_chunk_interval:
+        # Only apply rate limiting if this isn't a small chunk (prioritize small chunks)
+        if time_since_last < self.min_chunk_interval and chunk_size > 1024:
             # Calculate sleep time but use a shorter delay to reduce latency
-            sleep_time = max(0.005, self.min_chunk_interval - time_since_last)
+            sleep_time = max(0.001, self.min_chunk_interval - time_since_last) 
             await asyncio.sleep(sleep_time)
         
         # Only one thread should send at a time

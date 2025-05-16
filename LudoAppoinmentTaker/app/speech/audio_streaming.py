@@ -16,14 +16,14 @@ class AudioStreamManager:
         
     def update_stream_sid(self, streamSid: str) -> None:
         """
-        Updates the stream SID when it changes (e.g., when a new call starts)
+        Updates the stream SID when it changes (e.g., when a new call starts or ends)
+        Allows setting to None when resetting after a call ends
         """
-        if not streamSid:
-            self.logger.warning("Attempted to update streamSid with None or empty value")
-            return
-            
         self.audio_sender.streamSid = streamSid
-        self.logger.info(f"Updated stream SID to: {streamSid}")
+        if not streamSid:
+            self.logger.info("Reset stream SID to None")
+        else:
+            self.logger.info(f"Updated stream SID to: {streamSid}")
         return
         
     def start_streaming(self) -> None:
@@ -76,14 +76,27 @@ class AudioStreamManager:
         self.logger.info("Streaming worker started")
         chunks_processed = 0
         errors = 0
+        streamSid_wait_count = 0
+        max_streamSid_wait = 20  # Maximum number of attempts to wait for streamSid
         
         while self.running:
             try:
                 # Check if we have a valid streamSid before processing
                 if not self.audio_sender.streamSid:
-                    self.logger.warning("No StreamSid set in audio sender, audio won't be sent")
-                    await asyncio.sleep(0.5)
+                    streamSid_wait_count += 1
+                    if streamSid_wait_count <= max_streamSid_wait:
+                        self.logger.warning(f"Waiting for StreamSid initialization ({streamSid_wait_count}/{max_streamSid_wait})...")
+                    else:
+                        self.logger.error(f"No StreamSid set after {streamSid_wait_count} attempts, audio transmission may fail")
+                    
+                    # Short wait to check again
+                    await asyncio.sleep(0.2)
                     continue
+                    
+                # Reset counter if we now have a valid streamSid
+                if streamSid_wait_count > 0:
+                    self.logger.info(f"StreamSid now available after {streamSid_wait_count} attempts: {self.audio_sender.streamSid}")
+                    streamSid_wait_count = 0
                     
                 # Get audio chunk from queue asynchronously (with timeout to check if we should stop)
                 audio_chunk = await self.queue_manager.get_audio_chunk(timeout=0.1)
