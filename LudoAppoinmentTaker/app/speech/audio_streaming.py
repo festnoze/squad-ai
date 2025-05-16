@@ -40,7 +40,7 @@ class AudioStreamManager:
         
     async def stop_streaming(self) -> None:
         """
-        Stops the streaming process
+        Stops the streaming process and clears the queue
         """
         self.running = False
         if self.sender_task:
@@ -52,15 +52,22 @@ class AudioStreamManager:
                 self.sender_task.cancel()
             except Exception as e:
                 self.logger.error(f"Error stopping streaming worker: {e}")
-                
-        self.queue_manager.clear_queue()
+        
+        # Clear the queue asynchronously
+        await self.queue_manager.clear_queue()
+        
+        # Make sure drain event is set to unblock any waiting producers
+        if not self.queue_manager.drain_event.is_set():
+            self.queue_manager.drain_event.set()
+            
         self.logger.info("Audio streaming stopped")
         
-    def enqueue_audio(self, audio_chunk: bytes) -> bool:
+    async def enqueue_audio(self, audio_chunk: bytes) -> bool:
         """
-        Adds audio to the queue for streaming
+        Adds audio to the queue for streaming with true back-pressure.
+        This is an async method that will block until the queue has space.
         """
-        return self.queue_manager.enqueue_audio(audio_chunk)
+        return await self.queue_manager.enqueue_audio(audio_chunk)
         
     async def _streaming_worker(self) -> None:
         """
@@ -78,8 +85,8 @@ class AudioStreamManager:
                     await asyncio.sleep(0.5)
                     continue
                     
-                # Get audio chunk from queue (with timeout to check if we should stop)
-                audio_chunk = self.queue_manager.get_audio_chunk(block=True, timeout=0.1)
+                # Get audio chunk from queue asynchronously (with timeout to check if we should stop)
+                audio_chunk = await self.queue_manager.get_audio_chunk(timeout=0.1)
                 
                 if audio_chunk:
                     chunks_processed += 1

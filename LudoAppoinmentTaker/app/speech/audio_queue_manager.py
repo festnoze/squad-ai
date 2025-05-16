@@ -1,90 +1,127 @@
 import time
 import logging
+import asyncio
 from queue import Queue, Full, Empty
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, Callable
 
 class AudioQueueManager:
     """
-    Manages audio queues with back-pressure to prevent overwhelming Twilio.
-    Implements adaptive throttling based on queue pressure.
+    Manages audio queues with true back-pressure to prevent overwhelming Twilio.
+    Implements a blocking queue system that forces producers to wait when the queue is full.
     """
     def __init__(self, max_queue_size: int = 20):
         self.logger = logging.getLogger(__name__)
-        self.audio_queue = Queue(maxsize=max_queue_size)
+        self.max_queue_size = max_queue_size
+        self.audio_queue = asyncio.Queue(maxsize=max_queue_size)
         self.is_playing = False
         self.total_enqueued = 0
         self.total_dequeued = 0
+        self.total_dropped = 0
         self.last_enqueue_time = time.time()
-        self.pressure_coefficient = 0.03  # How much to slow down per queued item (in seconds)
-        self.high_pressure_threshold = 0.7  # When queue is at 70% capacity, consider it high pressure
-        self.critical_pressure_threshold = 0.9  # When queue is at 90% capacity, take more drastic measures
+        self.producer_waiting = False
+        self.consumer_waiting = False
+        self.drain_event = asyncio.Event()
+        self.drain_event.set()  # Initially not blocked
         
     def get_queue_pressure(self) -> float:
         """
         Returns a value between 0 and 1 representing how full the queue is
         """
-        return self.audio_queue.qsize() / self.audio_queue.maxsize
+        return self.audio_queue.qsize() / self.max_queue_size
     
-    def wait_if_queue_full(self, timeout: float = 2.0) -> bool:
+    async def wait_until_space_available(self, timeout: float = 5.0) -> bool:
         """
-        Implements back-pressure if the queue is too full.
-        Returns True if the wait completed without timeout, False otherwise.
+        Implements true back-pressure by having the producer wait until there's space.
+        Returns True if space became available, False if timed out.
         """
-        current_pressure = self.get_queue_pressure()
-        
-        # Apply adaptive throttling based on current queue pressure
-        if current_pressure > self.high_pressure_threshold:
-            # Calculate adaptive delay based on queue pressure
-            delay = current_pressure * self.pressure_coefficient
+        self.producer_waiting = True
+        try:
+            current_pressure = self.get_queue_pressure()
             
-            if current_pressure > self.critical_pressure_threshold:
-                # Double the delay for critical pressure
-                delay *= 2
-                self.logger.warning(f"Queue critically full ({current_pressure:.1%}), applying increased backpressure")
-            else:
-                self.logger.info(f"Queue filling up ({current_pressure:.1%}), applying backpressure")
+            if current_pressure >= 0.9:  # Near full
+                self.logger.warning(f"Queue at high capacity ({current_pressure:.1%}), producer will wait")
                 
-            # Sleep to allow the queue to drain
-            time.sleep(delay)
-            
-            # Check if we're still under pressure
-            return self.get_queue_pressure() < self.high_pressure_threshold
-        
-        return True
+                # Reset the event when we're nearing capacity
+                if self.drain_event.is_set():
+                    self.drain_event.clear()
+                
+                # Wait until the drain event is set (by the consumer when queue drains below threshold)
+                try:
+                    # Wait with timeout to prevent deadlock
+                    await asyncio.wait_for(self.drain_event.wait(), timeout=timeout)
+                    self.logger.info(f"Producer resumed after queue pressure decreased to {self.get_queue_pressure():.1%}")
+                    return True
+                except asyncio.TimeoutError:
+                    self.logger.error(f"Timed out waiting for queue to drain after {timeout}s")
+                    # Continue anyway but return False
+                    return False
+            return True
+        finally:
+            self.producer_waiting = False
     
-    def enqueue_audio(self, audio_chunk: bytes) -> bool:
+    async def enqueue_audio(self, audio_chunk: bytes) -> bool:
         """
-        Enqueues an audio chunk with adaptive throttling and back-pressure.
+        Enqueues an audio chunk with true back-pressure.
         Returns True if the chunk was successfully enqueued, False otherwise.
+        This is a blocking call that will wait until space is available in the queue.
         """
         if not audio_chunk:
             return False
             
-        # Check if we need to apply throttling
-        self.wait_if_queue_full()
+        # Wait until there's space in the queue (true back-pressure)
+        await self.wait_until_space_available()
         
-        # Use non-blocking put with timeout to avoid deadlocks
+        # Always use put (which will block if queue is full) instead of put_nowait
         try:
-            self.audio_queue.put(audio_chunk, block=True, timeout=1.0)
+            # Put with a generous timeout
+            await asyncio.wait_for(self.audio_queue.put(audio_chunk), timeout=2.0)
             self.total_enqueued += 1
             self.last_enqueue_time = time.time()
+            
+            # Log how much of the queue is utilized
+            if self.total_enqueued % 10 == 0:  # Log every 10 chunks
+                self.logger.debug(f"Queue utilization: {self.get_queue_pressure():.1%} ({self.audio_queue.qsize()}/{self.max_queue_size})")
+                
             return True
-        except Full:
-            self.logger.warning("Audio queue full, dropping chunk to prevent saturation")
+        except asyncio.TimeoutError:
+            self.logger.warning("Timed out trying to enqueue audio chunk")
+            self.total_dropped += 1
+            return False
+        except Exception as e:
+            self.logger.error(f"Error enqueuing audio chunk: {e}")
+            self.total_dropped += 1
             return False
     
-    def get_audio_chunk(self, block: bool = False, timeout: float = 0.1) -> Optional[bytes]:
+    async def get_audio_chunk(self, timeout: float = 0.1) -> Optional[bytes]:
         """
-        Gets an audio chunk from the queue.
+        Gets an audio chunk from the queue asynchronously.
         Returns the chunk if successful, None otherwise.
         """
+        self.consumer_waiting = True
         try:
-            chunk = self.audio_queue.get(block=block, timeout=timeout)
-            self.total_dequeued += 1
-            return chunk
-        except Empty:
-            self.is_playing = False
+            # Use asyncio.wait_for to implement timeout
+            try:
+                chunk = await asyncio.wait_for(self.audio_queue.get(), timeout=timeout)
+                self.total_dequeued += 1
+                
+                # CRITICAL: Signal producers when queue drains below threshold
+                # This is the key to implementing back-pressure correctly
+                current_pressure = self.get_queue_pressure()
+                if current_pressure < 0.5 and not self.drain_event.is_set():  # Once we're below 50% capacity
+                    self.logger.info(f"Queue drained to {current_pressure:.1%}, signaling producers")
+                    self.drain_event.set()  # Signal that producers can continue
+                
+                # Always acknowledge that we've processed this task
+                self.audio_queue.task_done()
+                
+                return chunk
+            except asyncio.TimeoutError:
+                return None
+        except Exception as e:
+            self.logger.error(f"Error getting audio chunk: {e}")
             return None
+        finally:
+            self.consumer_waiting = False
     
     def get_queue_stats(self) -> Dict[str, Any]:
         """
@@ -92,21 +129,36 @@ class AudioQueueManager:
         """
         return {
             "current_size": self.audio_queue.qsize(),
-            "max_size": self.audio_queue.maxsize,
+            "max_size": self.max_queue_size,
             "pressure": self.get_queue_pressure(),
             "total_enqueued": self.total_enqueued,
             "total_dequeued": self.total_dequeued,
-            "is_playing": self.is_playing
+            "total_dropped": self.total_dropped,
+            "is_playing": self.is_playing,
+            "producer_waiting": self.producer_waiting,
+            "consumer_waiting": self.consumer_waiting,
+            "drain_event_set": self.drain_event.is_set()
         }
         
-    def clear_queue(self) -> None:
+    async def clear_queue(self) -> None:
         """
-        Clears the queue completely
+        Clears the audio queue asynchronously
         """
         try:
-            while not self.audio_queue.empty():
-                self.audio_queue.get_nowait()
-            self.logger.info("Audio queue cleared")
+            while True:
+                try:
+                    # Try to get items with a short timeout
+                    chunk = await asyncio.wait_for(self.audio_queue.get(), timeout=0.01)
+                    # Mark as done
+                    self.audio_queue.task_done()
+                except asyncio.TimeoutError:
+                    # Queue is empty
+                    break
+                    
+            # Always make sure the drain event is set after clearing
+            if not self.drain_event.is_set():
+                self.drain_event.set()
+                
+            self.logger.debug("Audio queue cleared")
         except Exception as e:
             self.logger.error(f"Error clearing audio queue: {e}")
-

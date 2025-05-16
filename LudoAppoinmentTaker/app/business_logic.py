@@ -719,8 +719,9 @@ class BusinessLogic:
             for i in range(0, len(ulaw_data), chunk_size):
                 chunk = ulaw_data[i:i + chunk_size]
                 
-                # Queue the chunk for throttled sending
-                result = self.audio_stream_manager.enqueue_audio(chunk)
+                # Queue the chunk for throttled sending with true back-pressure
+                # This will block if the queue is full until space is available
+                result = await self.audio_stream_manager.enqueue_audio(chunk)
                 if result:
                     chunks_queued += 1
                 

@@ -20,6 +20,10 @@ async def audio(filename: str) -> FileResponse:
         return JSONResponse(status_code=404, content={"detail": "File not found"})
     return FileResponse(full_path)
 
+@router.api_route("/incoming-sms", methods=["GET", "POST"])
+async def twilio_incoming_sms(request: Request):
+    return HTMLResponse(content=str("Les SMS ne sont pas pris en charge pour le moment"), media_type="application/xml")
+
 @router.post("/")
 async def voice_webhook(request: Request) -> HTMLResponse:
     logger.info("Received POST request on / (voice webhook)")
