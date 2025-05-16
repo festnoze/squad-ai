@@ -13,8 +13,6 @@ from uuid import UUID
 from datetime import datetime
 #
 from pydub import AudioSegment
-from pydub.silence import detect_nonsilent
-from google.cloud import speech, texttospeech
 from openai import OpenAI, Stream
 from typing import Dict, Optional
 from fastapi import WebSocket, WebSocketDisconnect
@@ -27,7 +25,8 @@ from app.api_client.request_models.conversation_request_model import Conversatio
 from app.api_client.request_models.query_asking_request_model import QueryAskingRequestModel
 from app.speech.text_to_speech import get_text_to_speech_provider
 from app.speech.speech_to_text import get_speech_to_text_provider
-from app.speech.audio_processing import IncomingAudioProcessing
+from app.speech.incoming_audio_processing import IncomingAudioProcessing
+from app.speech.audio_streaming import AudioStreamManager
 
 class BusinessLogic:
     # Class variables shared across instances
@@ -94,6 +93,9 @@ class BusinessLogic:
         
         # Initialize audio processor for better quality
         self.incoming_audio = IncomingAudioProcessing(sample_width=self.sample_width, frame_rate=self.frame_rate, vad_aggressiveness=3)
+        
+        # Initialize the audio stream manager for throttled Twilio audio streaming
+        self.audio_stream_manager = None
 
         self.studi_rag_inference_client = StudiRAGInferenceClient()
 
@@ -125,6 +127,11 @@ class BusinessLogic:
         
         # Set the current stream so the audio functions know which stream to use
         self.current_stream = stream_sid
+        
+        # Update the streamSid in the audio streaming manager
+        if self.audio_stream_manager:
+            self.audio_stream_manager.update_stream_sid(stream_sid)
+            self.logger.info(f"Updated AudioStreamManager with stream SID: {stream_sid}")
         
         # Define the welcome message
         welcome_text = f"""
@@ -222,6 +229,18 @@ class BusinessLogic:
         
         # Store the caller's phone number and call SID so we can retrieve them later
         self.phones[call_sid] = calling_phone_number
+        
+        # Initialize the audio stream manager for throttled audio streaming
+        # We'll set the streamSid later when the call starts
+        self.audio_stream_manager = AudioStreamManager(
+            websocket=self.websocket, 
+            streamSid=None,  # Will be set when the call starts
+            max_queue_size=20,
+            min_chunk_interval=0.05
+        )
+        # Start the background streaming task
+        self.audio_stream_manager.start_streaming()
+        self.logger.info("Audio stream manager initialized and started")
 
         try:            
             while True:
@@ -551,8 +570,13 @@ class BusinessLogic:
             except Exception as e:
                 self.logger.error(f"Error closing websocket: {e}")
         
-        # Reset current stream
+        # Reset current stream and audio streaming state
         self.current_stream = None
+        
+        # Set the audio stream manager's streamSid to None
+        if self.audio_stream_manager:
+            self.audio_stream_manager.update_stream_sid(None)
+            self.logger.info("Reset AudioStreamManager stream SID as call ended")
 
     def _handle_mark_event(self, data):
         mark_name = data.get("mark", {}).get("name")
@@ -646,7 +670,7 @@ class BusinessLogic:
             return False
             
     async def send_audio_to_twilio(self, file_path: str=None, audio_bytes: bytes=None, frame_rate: int=None, channels: int=1, sample_width: int=None, convert_to_mulaw: bool = False):
-        """Convert audio to μ-law and send to Twilio over WebSocket with enhanced monitoring."""
+        """Convert audio to μ-law and send to Twilio using throttled streaming to prevent disconnections."""
         # Use instance defaults if not specified
         frame_rate = frame_rate or self.frame_rate
         sample_width = sample_width or self.sample_width
@@ -664,10 +688,80 @@ class BusinessLogic:
         if not self._is_websocket_connected():
             self.logger.warning("WebSocket is not connected, cannot send audio")
             return False
-            
+        
+        # Check if audio stream manager is initialized
+        if not self.audio_stream_manager:
+            self.logger.warning("Audio stream manager not initialized, falling back to direct send")
+            return await self._send_audio_to_twilio_direct(file_path, audio_bytes, frame_rate, channels, sample_width, convert_to_mulaw)
+        
         # Start timing this operation
         start_time = time.time()
-        connection_start_time = time.time()
+        
+        try:
+            # Load audio and convert to appropriate format
+            ulaw_data = self._prepare_voice_stream(file_path=file_path, audio_bytes=audio_bytes, 
+                                                  frame_rate=frame_rate, channels=channels, 
+                                                  sample_width=sample_width, convert_to_mulaw=True)
+            if file_path:
+                self.delete_temp_file(file_path)
+            
+            # Calculate chunk size based on duration
+            chunk_size = int((self.speech_chunk_duration_ms / 1000) * frame_rate * sample_width)
+            
+            # Log total audio being sent
+            total_audio_ms = (len(ulaw_data) / (frame_rate * sample_width)) * 1000
+            total_chunks = len(ulaw_data) // chunk_size + (1 if len(ulaw_data) % chunk_size else 0)
+            
+            self.logger.info(f"Sending {len(ulaw_data)} bytes of audio (~{total_audio_ms:.1f}ms) in {total_chunks} chunks using AudioStreamManager")
+            
+            # Split audio into chunks and queue them for throttled sending
+            chunks_queued = 0
+            for i in range(0, len(ulaw_data), chunk_size):
+                chunk = ulaw_data[i:i + chunk_size]
+                
+                # Queue the chunk for throttled sending
+                result = self.audio_stream_manager.enqueue_audio(chunk)
+                if result:
+                    chunks_queued += 1
+                
+                # Log progress at regular intervals
+                if chunks_queued % 10 == 0 or chunks_queued == total_chunks:
+                    queue_stats = self.audio_stream_manager.queue_manager.get_queue_stats()
+                    elapsed = time.time() - start_time
+                    progress_pct = (chunks_queued / total_chunks) * 100 if total_chunks > 0 else 0
+                    self.logger.debug(f"Audio queued: {progress_pct:.1f}% - {chunks_queued}/{total_chunks} chunks - Queue pressure: {queue_stats['pressure']:.1%}")
+            
+            # Try to send mark (but don't fail if it doesn't work)
+            try:
+                # Send mark to indicate end of message
+                mark_msg = {
+                    "event": "mark",
+                    "streamSid": self.current_stream,
+                    "mark": {
+                        "name": "msg_retour"
+                    }
+                }
+                await self.websocket.send_text(json.dumps(mark_msg))
+            except Exception as mark_error:
+                self.logger.warning(f"Could not send mark event: {mark_error}")
+            
+            # Final success logging
+            total_time = time.time() - start_time
+            self.logger.info(f"Audio queued: {chunks_queued}/{total_chunks} chunks, {total_audio_ms:.1f}ms audio in {total_time:.2f}s")
+            return True
+        
+        except Exception as e:
+            self.logger.error(f"Error sending audio to Twilio: {e}", exc_info=True)
+            return False
+
+    async def _send_audio_to_twilio_direct(self, file_path: str=None, audio_bytes: bytes=None, frame_rate: int=None, channels: int=1, sample_width: int=None, convert_to_mulaw: bool = False):
+        """Direct audio sending method as a fallback if AudioStreamManager is not available."""
+        # Use instance defaults if not specified
+        frame_rate = frame_rate or self.frame_rate
+        sample_width = sample_width or self.sample_width
+        
+        # Start timing this operation
+        start_time = time.time()
         chunks_sent = 0
         total_chunks = 0
         
@@ -689,7 +783,7 @@ class BusinessLogic:
             total_audio_ms = (len(ulaw_data) / (frame_rate * sample_width)) * 1000
             total_chunks = len(ulaw_data) // chunk_size + (1 if len(ulaw_data) % chunk_size else 0)
             
-            self.logger.info(f"Sending {len(ulaw_data)} bytes of audio (~{total_audio_ms:.1f}ms) in {total_chunks} chunks to Twilio")
+            self.logger.info(f"FALLBACK: Sending {len(ulaw_data)} bytes of audio (~{total_audio_ms:.1f}ms) in {total_chunks} chunks to Twilio directly")
             
             # Twilio connection monitor timer and chunk counter
             last_heartbeat_time = time.time()
@@ -745,21 +839,6 @@ class BusinessLogic:
                         self.logger.warning("Twilio closed the WebSocket connection - possible timeout")
                     return False
             
-            # Try to send mark (but don't fail if it doesn't work)
-            try:
-                # Send mark to indicate end of message
-                mark_msg = {
-                    "event": "mark",
-                    "streamSid": self.current_stream,
-                    "mark": {
-                        "name": "msg_retour"
-                    }
-                }
-                await self.websocket.send_text(json.dumps(mark_msg))
-            except Exception as mark_error:
-                self.logger.warning(f"Could not send mark event: {mark_error}")
-                # Don't return False, we already sent the audio successfully
-            
             # Final success logging
             total_time = time.time() - start_time
             self.logger.info(f"Audio complete: {chunks_sent}/{total_chunks} chunks, {total_audio_ms:.1f}ms audio in {total_time:.2f}s")
@@ -768,10 +847,4 @@ class BusinessLogic:
         except Exception as e:
             elapsed = time.time() - start_time
             self.logger.error(f"Error sending audio to Twilio after {elapsed:.2f}s and {chunks_sent}/{total_chunks} chunks: {e}", exc_info=True)
-            return False
-
-            self.logger.info(f"Audio sent to Twilio for stream {self.current_stream}")
-            return True
-        except Exception as e:
-            self.logger.error(f"/!\\ Error sending audio to Twilio: {e}", exc_info=True)
             return False
