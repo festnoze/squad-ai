@@ -2,12 +2,30 @@ import asyncio
 import logging
 import base64
 import json
+import time
+from typing import Dict, Optional, Any
 
 class TwilioAudioSender:
     """
     Classe dédiée à l'envoi d'audio à Twilio via WebSocket.
     Gère l'envoi des différents types d'items audio (audio chunks, marques, pauses).
+    
+    Au lieu d'utiliser un mécanisme de back-pressure avec une taille limitée,
+    cette classe envoie les éléments audio en se basant sur la durée des chunks précédents,
+    assurant une lecture fluide sans interruption.
     """
+    
+    # Temps d'attente en millisecondes avant la fin du chunk précédent pour commencer le prochain
+    # Augmenter cette valeur pour un meilleur chevauchement et une lecture plus fluide
+    # Une valeur négative signifie que le prochain chunk sera envoyé AVANT la fin du précédent chunk
+    SEND_TIME_BEFORE_PREVIOUS_ENDS_MS = -20  # Chevauchement des chunks pour éviter les coupures
+    
+    # Dictionnaire pour suivre les derniers chunks envoyés et leurs durées
+    last_chunk_info = {
+        'timestamp': 0,  # Quand le dernier chunk a été envoyé
+        'duration_ms': 0,  # Durée du dernier chunk en millisecondes
+        'stream_sid': None  # SID du stream actuel
+    }
     
     @staticmethod
     async def send_chunk_to_twilio(websocket, chunk_item: dict, logger=None) -> bool:
@@ -167,6 +185,7 @@ class TwilioAudioSender:
     async def process_audio_queue_item(websocket, audio_item: dict, logger=None) -> bool:
         """
         Traite un élément de la file d'attente audio et l'envoie à Twilio.
+        Utilise la durée du chunk précédent pour déterminer quand envoyer le prochain item.
         
         Args:
             websocket: La connexion WebSocket à utiliser
@@ -184,9 +203,70 @@ class TwilioAudioSender:
             logger.error(f"Invalid queue item: {audio_item}")
             return False
         
+        stream_sid = audio_item.get('stream_sid')
+        current_time = time.time() * 1000  # Convertir en ms
+        
+        # Si le stream a changé, réinitialiser les informations de suivi
+        if TwilioAudioSender.last_chunk_info['stream_sid'] != stream_sid:
+            logger.debug(f"New stream detected: {stream_sid}")
+            TwilioAudioSender.last_chunk_info['stream_sid'] = stream_sid
+            TwilioAudioSender.last_chunk_info['timestamp'] = 0
+            TwilioAudioSender.last_chunk_info['duration_ms'] = 0
+        
+        # Calculer quand nous devrions envoyer le prochain chunk
+        # Nous devons l'envoyer SEND_TIME_BEFORE_PREVIOUS_ENDS_MS ms avant la fin du précédent
+        if TwilioAudioSender.last_chunk_info['timestamp'] > 0:
+            last_chunk_end_time = TwilioAudioSender.last_chunk_info['timestamp'] + TwilioAudioSender.last_chunk_info['duration_ms']
+            next_send_time = last_chunk_end_time - TwilioAudioSender.SEND_TIME_BEFORE_PREVIOUS_ENDS_MS
+            
+            # Si le prochain temps d'envoi est dans le futur, attendre
+            wait_time_ms = next_send_time - current_time
+            if wait_time_ms > 0:
+                # Limiter le temps d'attente à un maximum raisonnable pour éviter de bloquer trop longtemps
+                wait_time_ms = min(wait_time_ms, 500)  # Maximum 500ms d'attente
+                logger.debug(f"Waiting {wait_time_ms:.2f}ms before sending next chunk")
+                await asyncio.sleep(wait_time_ms / 1000)  # Convertir en secondes
+            else:
+                # Pas besoin d'attendre, mais on donne une petite chance aux autres tâches
+                await asyncio.sleep(0.001)  # 1ms de pause pour éviter la surcharge CPU
+        
         # Envoyer le chunk à Twilio
         try:
+            send_start_time = time.time() * 1000
             success = await TwilioAudioSender.send_chunk_to_twilio(websocket, audio_item, logger)
+            
+            # Mettre à jour les informations du dernier chunk envoyé
+            if success:
+                TwilioAudioSender.last_chunk_info['timestamp'] = send_start_time
+                
+                # Calculer la durée du chunk en fonction de son type
+                if audio_item['type'] == 'audio_chunk':
+                    # Pour les chunks audio, calculer la durée basée sur la taille des données
+                    chunk_size = len(audio_item.get('data', b''))
+                    frame_rate = audio_item.get('frame_rate', 8000)  # Par défaut 8kHz
+                    sample_width = audio_item.get('sample_width', 2)  # 2 octets par échantillon pour PCM 16-bit
+                    
+                    # Durée en ms = (taille en octets / octets par échantillon) / (échantillons par seconde) * 1000
+                    # Pour les données µ-law, le sample_width est 1 octet
+                    bytes_per_sample = 1  # µ-law est toujours 1 octet par échantillon (après conversion)
+                    
+                    # Calcul précis de la durée du chunk audio
+                    chunk_duration_ms = (chunk_size / bytes_per_sample) / frame_rate * 1000
+                    
+                    # Ajouter un petit facteur de sécurité (5% de plus) pour éviter les coupures 
+                    chunk_duration_ms = chunk_duration_ms * 1.05
+                    TwilioAudioSender.last_chunk_info['duration_ms'] = chunk_duration_ms
+                    logger.debug(f"Audio chunk duration: {chunk_duration_ms:.2f}ms, size: {chunk_size} bytes")
+                elif audio_item['type'] == 'pause':
+                    # Pour les pauses, utiliser la durée spécifiée
+                    pause_duration_ms = audio_item.get('duration', 0.1) * 1000  # Convertir en ms
+                    TwilioAudioSender.last_chunk_info['duration_ms'] = pause_duration_ms
+                    logger.debug(f"Pause duration: {pause_duration_ms:.2f}ms")
+                elif audio_item['type'] == 'mark':
+                    # Les marques n'ont pas de durée
+                    TwilioAudioSender.last_chunk_info['duration_ms'] = 0
+                    logger.debug(f"Mark sent: {audio_item.get('name', 'unnamed')}")
+            
             return success
         except Exception as e:
             logger.error(f"Error processing audio queue item: {e}")
@@ -196,11 +276,11 @@ class TwilioAudioSender:
     async def streaming_worker(websocket, audio_queue: asyncio.Queue, is_streaming: bool = True, logger=None):
         """
         Worker qui traite les éléments de la file d'attente audio et les envoie à Twilio.
-        Cette méthode est conçue pour être exécutée dans une tâche asyncio séparée.
+        Utilise la durée des chunks audio pour assurer une lecture fluide sans interruption.
         
         Args:
             websocket: La connexion WebSocket à utiliser
-            audio_queue: La file d'attente contenant les éléments audio à envoyer
+            audio_queue: La file d'attente contenant les éléments audio à envoyer (taille illimitée)
             is_streaming: Flag indiquant si le streaming est actif
             logger: Logger à utiliser pour les messages
         """
@@ -213,7 +293,14 @@ class TwilioAudioSender:
         restart_count = 0
         max_restart_attempts = 3
         
-        logger.info("Starting audio streaming worker")
+        # Réinitialiser les infos de suivi des chunks au démarrage du worker
+        TwilioAudioSender.last_chunk_info = {
+            'timestamp': 0,
+            'duration_ms': 0,
+            'stream_sid': None
+        }
+        
+        logger.info("Starting audio streaming worker with timing-based flow control")
         
         while is_streaming:
             try:
@@ -235,7 +322,7 @@ class TwilioAudioSender:
                     await asyncio.sleep(0.01)  # Si timeout, juste attendre et continuer
                     continue
                 
-                # Process the queue item
+                # Process the queue item (avec la logique de timing pour assurer une lecture fluide)
                 success = await TwilioAudioSender.process_audio_queue_item(websocket, audio_item, logger)
                 
                 # Mark the task as done regardless of success
@@ -260,6 +347,14 @@ class TwilioAudioSender:
                         # Pause avant de réessayer pour donner une chance au système de se stabiliser
                         await asyncio.sleep(1.0)
                         consecutive_errors = 0
+                        
+                        # Réinitialiser les infos de suivi après une erreur
+                        TwilioAudioSender.last_chunk_info = {
+                            'timestamp': 0,
+                            'duration_ms': 0,
+                            'stream_sid': None
+                        }
+
             
             except asyncio.CancelledError:
                 logger.info("Streaming worker task cancelled")

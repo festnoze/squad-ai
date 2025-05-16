@@ -18,9 +18,8 @@ class AudioQueueManager:
     """
     DEFAULT_FRAME_RATE = 8000  # Hz
     DEFAULT_SAMPLE_WIDTH = 2   # bytes (16-bit)
-    DEFAULT_CHUNK_DURATION_MS = 20  # ms
-    DEFAULT_MAX_QUEUE_SIZE = 5  # Maximum d'éléments dans la file d'attente
-    DEFAULT_BACK_PRESSURE_TIMEOUT = 5.0  # Timeout en secondes pour attendre de la place dans la queue
+    DEFAULT_CHUNK_DURATION_MS = 200  # ms - Plus petite taille de chunk pour un audio plus fluide
+    DEFAULT_BACK_PRESSURE_TIMEOUT = 10.0  # Timeout en secondes pour attendre de la place dans la queue
     
     @staticmethod
     def save_as_wav_file(audio_data: bytes, temp_dir: str, frame_rate: int = DEFAULT_FRAME_RATE, sample_width: int = DEFAULT_SAMPLE_WIDTH):
@@ -66,7 +65,7 @@ class AudioQueueManager:
                              frame_rate: int = DEFAULT_FRAME_RATE, channels: int = 1, 
                              sample_width: int = DEFAULT_SAMPLE_WIDTH, convert_to_mulaw: bool = False,
                              stream_sid: str = None, chunk_duration_ms: int = DEFAULT_CHUNK_DURATION_MS,
-                             temp_dir: str = None, logger=None, back_pressure_timeout: float = DEFAULT_BACK_PRESSURE_TIMEOUT):
+                             temp_dir: str = None, logger=None):
         """
         Remplit la file d'attente audio avec des chunks de taille appropriée.
         Cette méthode est conçue pour être exécutée dans une tâche asyncio séparée.
@@ -114,27 +113,27 @@ class AudioQueueManager:
                 group_end = min(group_start + (chunks_per_group * chunk_size), len(ulaw_data))
                 group_data = ulaw_data[group_start:group_end]
                 
-                # Vérifier si la file est pleine
+                # Ajouter une pause entre les groupes (sans vérifier si la file est pleine)
                 if group > 0:
-                    await AudioQueueManager.wait_if_queue_full(queue, back_pressure_timeout, logger)
                     await queue.put({
                         'type': 'pause',
                         'duration': 0.2,  # 200ms pause entre les groupes
-                        'stream_sid': stream_sid
+                        'stream_sid': stream_sid,
+                        'frame_rate': frame_rate,
+                        'sample_width': sample_width
                     })
                 
                 # Traiter le groupe audio en chunks individuels
                 for i in range(0, len(group_data), chunk_size):
                     chunk = group_data[i:i + chunk_size]
                     
-                    # Vérifier si la file est pleine avant d'ajouter le chunk audio
-                    await AudioQueueManager.wait_if_queue_full(queue, back_pressure_timeout, logger)
-                    
-                    # Ajouter ce chunk à la file d'attente
+                    # Ajouter ce chunk à la file d'attente sans restriction de taille
                     await queue.put({
                         'type': 'audio_chunk',
                         'data': chunk,
-                        'stream_sid': stream_sid
+                        'stream_sid': stream_sid,
+                        'frame_rate': frame_rate,
+                        'sample_width': sample_width
                     })
                     chunks_queued += 1
                     
@@ -143,16 +142,16 @@ class AudioQueueManager:
                     
                     # Tous les N chunks, ajouter une mini pause (sauf pour le dernier chunk)
                     if chunks_queued % 3 == 0 and chunks_queued < total_chunks:
-                        # Vérifier si la file est pleine avant d'ajouter la pause
-                        await AudioQueueManager.wait_if_queue_full(queue, back_pressure_timeout, logger)
+                        # Ajouter une très petite pause tous les 3 chunks
                         await queue.put({
                             'type': 'pause',
-                            'duration': 0.05,  # 50ms mini-pause après chaque 3 chunks
-                            'stream_sid': stream_sid
+                            'duration': 0.02,  # 20ms mini-pause après chaque 3 chunks (réduit pour plus de fluidité)
+                            'stream_sid': stream_sid,
+                            'frame_rate': frame_rate,
+                            'sample_width': sample_width
                         })
             
-            # Vérifier si la file est pleine avant d'ajouter la marque finale
-            await AudioQueueManager.wait_if_queue_full(queue, back_pressure_timeout, logger)
+            # Ajouter la marque finale pour signaler la fin du message
             await queue.put({
                 'type': 'mark',
                 'name': 'msg_retour',
@@ -193,72 +192,44 @@ class AudioQueueManager:
             logger.error(f"Error in clear_audio_queue: {e}")
             return False
     
+    # Cette méthode n'est plus nécessaire car nous n'utilisons plus de file d'attente bornée
+    # et nous nous basons maintenant sur la durée des chunks audio pour contrôler le flux
+    # La méthode est conservée ici pour compatibilité mais n'a plus d'effet
     @staticmethod
     async def wait_if_queue_full(queue: asyncio.Queue, timeout: float = DEFAULT_BACK_PRESSURE_TIMEOUT, logger=None):
         """
-        Attend si la file d'attente est pleine, implémentant un mécanisme de back-pressure.
-        Renvoie True si l'attente s'est terminée avec succès, False si timeout.
-        
-        Cette fonction est cruciale pour éviter que la génération de réponse ne surcharge
-        la file d'attente audio, créant ainsi un contrôle de flux naturel.
+        Cette méthode est maintenue pour compatibilité mais n'a plus d'effet.
+        Le contrôle de flux est maintenant basé sur la durée des chunks audio, pas sur la taille de la file d'attente.
         """
-        if logger is None:
-            logger = logging.getLogger(__name__)
-        
-        # Si la file n'est pas pleine, retourner immédiatement
-        if queue.qsize() < queue.maxsize:
-            return True
-        
-        # File pleine: attendre avec timeout
-        try:
-            logger.info(f"Queue full ({queue.qsize()}/{queue.maxsize}), waiting for space (timeout: {timeout}s)")
-            start_time = time.time()
-            
-            # Attendre jusqu'à ce que la file ne soit plus pleine ou timeout
-            while queue.qsize() != 0:
-                elapsed = time.time() - start_time
-                if elapsed >= timeout:
-                    logger.warning(f"Timeout waiting for queue space after {elapsed:.2f}s")
-                    return False
-                await asyncio.sleep(0.4)
-            
-            wait_time = time.time() - start_time
-            logger.info(f"Queue has space now ({queue.qsize()}/{queue.maxsize}) after {wait_time:.2f}s wait")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error in wait_if_queue_full: {e}")
-            return False
+        # Ne fait rien, retourne simplement True
+        return True
     
+    # Cette méthode n'est plus nécessaire car nous n'utilisons plus de file d'attente bornée
+    # et nous nous basons maintenant sur la durée des chunks audio pour contrôler le flux
+    # La méthode est conservée ici pour compatibilité mais n'a plus d'effet
     @staticmethod
     @asynccontextmanager
     async def queue_flow_control(queue: asyncio.Queue, timeout: float = DEFAULT_BACK_PRESSURE_TIMEOUT, logger=None):
         """
-        Context manager pour contrôle de flux de la file d'attente.
-        Attend si la file est pleine avant de céder le contrôle au bloc with.
+        Cette méthode est maintenue pour compatibilité mais n'a plus d'effet.
+        Le contrôle de flux est maintenant basé sur la durée des chunks audio, pas sur la taille de la file d'attente.
         
         Usage:
             async with AudioQueueManager.queue_flow_control(audio_queue):
                 # Code qui ajoute des éléments à la file
                 await audio_queue.put(item)
         """
-        if logger is None:
-            logger = logging.getLogger(__name__)
-            
-        success = await AudioQueueManager.wait_if_queue_full(queue, timeout, logger)
-        if not success:
-            logger.warning("Continuing despite queue being full - might cause delays")
-            
         try:
-            # Céder le contrôle au bloc with
-            yield success
+            # Céder le contrôle au bloc with sans attente
+            yield True
         finally:
             # Rien à faire à la sortie du bloc with
             pass
             
     @staticmethod
-    def create_queue(maxsize: int = DEFAULT_MAX_QUEUE_SIZE) -> asyncio.Queue:
+    def create_queue(maxsize: int = 0) -> asyncio.Queue:
         """
-        Crée une file d'attente avec une taille maximale limitée pour le contrôle de flux.
+        Crée une file d'attente sans limite de taille (maxsize=0).
+        Le contrôle de flux est maintenant basé sur la durée des chunks audio, pas sur la taille de la file.
         """
-        return asyncio.Queue(maxsize=maxsize)
+        return asyncio.Queue(maxsize=0)

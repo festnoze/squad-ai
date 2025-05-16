@@ -63,12 +63,11 @@ class BusinessLogic:
         self.current_stream = None
         self.start_time = None
         
-        # Audio streaming queue system - utiliser une file d'attente bornée pour le contrôle de flux
-        self.audio_queue = AudioQueueManager.create_queue(maxsize=2)  # File limitée à 2 éléments max
+        # Audio streaming queue system - utilise une file d'attente sans limite mais avec contrôle par durée
+        self.audio_queue = AudioQueueManager.create_queue()  # File sans limite de taille
         self.stream_worker_task = None
         self.is_streaming = False
-        self.chunk_lock = asyncio.Lock()  # Lock to prevent concurrent WebSocket operations
-        self.back_pressure_timeout = 5.0  # Timeout en secondes pour les opérations de back-pressure         
+        self.chunk_lock = asyncio.Lock()  # Lock to prevent concurrent WebSocket operations         
 
         # Environment and configuration settings
         self.VOICE_ID = os.getenv("VOICE_ID", "")
@@ -201,7 +200,7 @@ class BusinessLogic:
         Je suis l'assistant virtuel Stud'IA, je prends le relais lorsque nos conseillers en formation ne sont pas présents.
         Souhaitez-vous prendre rendez-vous avec un conseiller ou que je vous aide à trouver quelle formation pourrait vous intéresser ?
         """
-        welcome_text = "Salut !"
+        #welcome_text = "Salut !"
 
         # Firstly speak the welcome message
         await self.speak_and_send_text_async(welcome_text)
@@ -453,14 +452,14 @@ class BusinessLogic:
         return self.studi_rag_inference_client.rag_answer_query_stream(
             query_asking_request_model=request, 
             timeout=60, 
-            pause_duration_between_chunks_ms=400
+            pause_duration_between_chunks_ms=300
         )
 
     async def speak_external_user_request_response_async(self, response):
-        """Traite les chunks de texte du RAG et les envoie en audio avec contrôle de flux.
-        Cette méthode utilise le mécanisme de back-pressure pour éviter de surcharger
-        la file d'attente audio quand le RAG génère des réponses plus rapidement
-        que l'audio peut être envoyé.
+        """Traite les chunks de texte du RAG et les envoie en audio.
+        
+        Cette méthode convertit les segments de texte en audio et les met dans la file d'attente.
+        Le contrôle de flux est maintenant basé sur la durée des chunks audio avec TwilioAudioSender.
         """
         full_answer = ""
         
@@ -469,16 +468,8 @@ class BusinessLogic:
             self.logger.debug(f"Received chunk: {chunk}")
             print(f'""<< ... {chunk} ... >>""')
             
-            # Attendre si la file d'attente est pleine avant d'ajouter plus d'audio
-            # Cela crée un mécanisme de back-pressure qui ralentit la génération de réponses
-            # si l'envoi audio est bloqué
-            await AudioQueueManager.wait_if_queue_full(
-                queue=self.audio_queue,
-                timeout=self.back_pressure_timeout,
-                logger=self.logger
-            )
-            
-            # Maintenant que la file est prête, synthétiser et envoyer le texte
+            # Synthétiser et envoyer le texte directement sans vérifier la taille de la file
+            # Le contrôle de flux se fait maintenant dans TwilioAudioSender basé sur la durée des chunks
             await self.speak_and_send_text_async(chunk)
             
         return full_answer
@@ -809,7 +800,8 @@ class BusinessLogic:
     async def _fill_audio_queue(self, file_path: str=None, audio_bytes: bytes=None, frame_rate: int=None, 
                                 channels: int=1, sample_width: int=None, convert_to_mulaw: bool = False):
         """Helper method to fill the audio queue in a separate task.
-        Utilise AudioQueueManager avec le mécanisme de back-pressure pour éviter de surcharger la file d'attente.
+        Utilise AudioQueueManager pour découper et envoyer les chunks audio.
+        Le contrôle de flux est maintenant géré par TwilioAudioSender en fonction des durées.
         """
         # Utiliser les valeurs par défaut si nécessaire
         frame_rate = frame_rate or self.frame_rate
@@ -819,7 +811,7 @@ class BusinessLogic:
         if not self.is_streaming and not self.stream_worker_task:
             self.is_streaming = True
             self.stream_worker_task = asyncio.create_task(self._streaming_worker())
-            self.logger.info("Started audio streaming worker task with flow control")
+            self.logger.info("Started audio streaming worker with timing-based flow control")
         
         # Déléguer le remplissage de la file d'attente à AudioQueueManager
         return await AudioQueueManager.fill_audio_queue(
@@ -833,6 +825,5 @@ class BusinessLogic:
             stream_sid=self.current_stream,
             chunk_duration_ms=self.speech_chunk_duration_ms,
             temp_dir=self.TEMP_DIR,
-            logger=self.logger,
-            back_pressure_timeout=self.back_pressure_timeout
+            logger=self.logger
         )
