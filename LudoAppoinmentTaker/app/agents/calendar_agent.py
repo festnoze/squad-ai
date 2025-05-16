@@ -14,9 +14,25 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class CalendarAgent:
-    
-    def __init__(self, first_name, last_name, email, owner_first_name, owner_last_name, owner_email, config_path: str = "calendar_agent.yaml"):
+class CalendarAgent:    
+    def __init__(self, config_path: str = "app/agents/configs", config_filename: str = "calendar_agent.yaml"):
+        self.config_path = config_path
+        self.config_filename = config_filename
+        self.config = self._load_config()
+
+    def _load_config(self):
+        """Load YAML configuration from the specified path."""
+        try:
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            full_path = os.path.join(project_root, self.config_path, self.config_filename)
+            logger.debug(f"Loading calendar agent config from: {full_path}")
+            with open(full_path, "r") as f:
+                return yaml.safe_load(f)
+        except Exception as e:
+            logger.error(f"Error loading config from {self.config_filename}: {e}")
+            raise
+
+    def set_user_info(self, first_name, last_name, email, owner_first_name, owner_last_name, owner_email, ):
         """
         Initialize the Calendar Agent with user information and configuration.
         
@@ -30,7 +46,6 @@ class CalendarAgent:
             config_path: Path to the calendar agent configuration file
         """
         logger.info(f"Initializing CalendarAgent for: {first_name} {last_name}")
-        self.config = self._load_config(config_path)
         self.first_name = first_name
         self.last_name = last_name
         self.email = email
@@ -40,15 +55,15 @@ class CalendarAgent:
         self.calendar_service = self._init_google_calendar()
         self.calendar_id = self.config["google_calendar"]["calendar_id"]
 
-        self.duration = self.config["rendez_vous"].get("duration_minutes", 30)
-        self.max_slots = self.config["rendez_vous"].get("max_slots", 3)
+        self.duration = self.config["appointments"].get("duration_minutes", 30)
+        self.max_slots = self.config["appointments"].get("max_slots", 3)
         
         self.tz_name = "Europe/Paris"
         self.tz = ZoneInfo(self.tz_name)
         self.tz_offset = timezone(timedelta(hours=2))  # Adaptable si besoin
         
-        self.working_hours = self.config["rendez_vous"]["working_hours"]
-        self.days_ahead = self.config["rendez_vous"].get("days_ahead", 2)
+        self.working_hours = self.config["appointments"]["working_hours"]
+        self.days_ahead = self.config["appointments"].get("days_ahead", 2)
 
         self.available_slots = []
         self.date = ""
@@ -64,18 +79,6 @@ class CalendarAgent:
         self.model = openai_config.get('model', 'gpt-4-turbo')
         self.temperature = openai_config.get('temperature', 0.1)
         self.max_tokens = openai_config.get('max_tokens', 500)
-
-    def _load_config(self, path):
-        """Load YAML configuration from the specified path."""
-        try:
-            project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-            full_path = os.path.join(project_root, path)
-            logger.debug(f"Loading calendar agent config from: {full_path}")
-            with open(full_path, "r") as f:
-                return yaml.safe_load(f)
-        except Exception as e:
-            logger.error(f"Error loading config from {path}: {e}")
-            raise
 
     def _init_google_calendar(self):
         """Initialize Google Calendar service."""
@@ -96,7 +99,7 @@ class CalendarAgent:
             logger.error(f"Error initializing Google Calendar service: {e}", exc_info=True)
             raise
 
-    def analyze_text(self, text):
+    def analyze_text_for_calendar_inquiry(self, text):
         """
         Analyze user input text to identify scheduling requests and handle the appointment booking flow.
         
@@ -111,7 +114,7 @@ class CalendarAgent:
         try:
             # If we already have available slots, check if the user is selecting one
             if self.available_slots:
-                return self._handle_slot_selection(text)
+                return self._handle_time_slot_selection(text)
             else:
                 # Otherwise, extract date/time preferences and find available slots
                 return self._handle_date_extraction(text)
@@ -162,7 +165,7 @@ class CalendarAgent:
             logger.error(f"Error extracting date information: {e}", exc_info=True)
             return "Je n'ai pas pu déterminer vos disponibilités. Pourriez-vous indiquer une date spécifique pour le rendez-vous?"
 
-    def _handle_slot_selection(self, text):
+    def _handle_time_slot_selection(self, text):
         """Handle the user's selection of a time slot."""
         try:
             # Try to extract a slot number from the user's response

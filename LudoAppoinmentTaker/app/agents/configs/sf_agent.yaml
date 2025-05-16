@@ -1,0 +1,3 @@
+sf_data:
+  credentials_path: secrets/salesforce-credentials.json
+
