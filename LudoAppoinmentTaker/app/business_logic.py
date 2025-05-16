@@ -29,8 +29,8 @@ from app.text_to_speech import get_text_to_speech_provider
 from app.speech_to_text import get_speech_to_text_provider
 from app.audio_processing import AudioProcessor
 # Importer les nouvelles classes pour la gestion du flux audio
-from app.audio.send_audio_queue import AudioQueueManager
-from app.audio.send_audio_twilio import TwilioAudioSender
+from app.audio.send_text_queue import TextQueueManager
+from app.audio.send_text_twilio import TwilioTextSender
 
 class BusinessLogic:
     # Class variables shared across instances
@@ -63,8 +63,8 @@ class BusinessLogic:
         self.current_stream = None
         self.start_time = None
         
-        # Audio streaming queue system - utilise une file d'attente sans limite mais avec contrôle par durée
-        self.audio_queue = AudioQueueManager.create_queue()  # File sans limite de taille
+        # Système de gestion du texte à envoyer - remplace l'ancienne file d'attente audio
+        self.text_queue = TextQueueManager(logger=self.logger)
         self.stream_worker_task = None
         self.is_streaming = False
         self.chunk_lock = asyncio.Lock()  # Lock to prevent concurrent WebSocket operations         
@@ -131,14 +131,14 @@ class BusinessLogic:
         if not self.is_streaming and not self.stream_worker_task:
             self.is_streaming = True
             self.stream_worker_task = asyncio.create_task(self._streaming_worker())
-            self.logger.info("Started audio streaming worker task")
+            self.logger.info("Started text streaming worker")
             
     async def _streaming_worker(self):
-        """Process audio from the queue and send to Twilio.
+        """Process text from the queue and send to Twilio.
         This worker runs continuously while self.is_streaming is True,
-        and pulls items from the audio queue to send to the Twilio WebSocket.
+        and pulls items from the text queue to send to the Twilio WebSocket.
         
-        Utilise la classe TwilioAudioSender pour envoyer l'audio à Twilio et 
+        Utilise la classe TwilioTextSender pour envoyer le texte à Twilio et 
         implémente le contrôle de flux avec back-pressure.
         """
         if not self.websocket:
@@ -146,32 +146,26 @@ class BusinessLogic:
             self.is_streaming = False
             return
             
-        self.logger.info("Starting audio streaming worker with flow control")
+        self.logger.info("Starting text streaming worker with flow control")
         
         try:
-            # Déléguer à la classe TwilioAudioSender pour gérer le streaming
-            await TwilioAudioSender.streaming_worker(
+            # Déléguer à la classe TwilioTextSender pour gérer le streaming
+            await TwilioTextSender.process_text_to_audio(
                 websocket=self.websocket,
-                audio_queue=self.audio_queue,
+                text_queue=self.text_queue,
+                tts_provider=self.tts_provider,
+                stream_sid=self.current_stream,
                 is_streaming=self.is_streaming,
                 logger=self.logger
             )
         except Exception as e:
             self.logger.error(f"Unhandled exception in streaming worker: {e}", exc_info=True)
         finally:
-            self.logger.info("Audio streaming worker stopped")
+            self.logger.info("Text streaming worker stopped")
             self.is_streaming = False
             
-    async def _process_audio_queue_item(self, item: Dict) -> bool:
-        """Process a single item from the audio queue.
-        Cette méthode délègue maintenant le traitement à TwilioAudioSender.
-        """
-        # Déléguer le traitement à la classe TwilioAudioSender
-        return await TwilioAudioSender.process_audio_queue_item(
-            websocket=self.websocket,
-            audio_item=item,
-            logger=self.logger
-        )
+    # Cette méthode n'est plus nécessaire avec le nouveau système basé sur le texte
+    # Le traitement est entièrement géré par TwilioTextSender.process_text_to_audio
     
     async def _handle_start_event(self, start_data: Dict) -> str:
         """Handle the 'start' event from Twilio which begins a new call."""
@@ -205,6 +199,8 @@ class BusinessLogic:
         # Firstly speak the welcome message
         await self.speak_and_send_text_async(welcome_text)
 
+        await asyncio.sleep(5)
+        
         # Retrieve the user and create a new conversation
         self.conversation_id = await self.init_user_and_conversation(phone_number, call_sid)
         await self.studi_rag_inference_client.add_message_to_conversation(self.conversation_id, welcome_text)
@@ -459,7 +455,7 @@ class BusinessLogic:
         """Traite les chunks de texte du RAG et les envoie en audio.
         
         Cette méthode convertit les segments de texte en audio et les met dans la file d'attente.
-        Le contrôle de flux est maintenant basé sur la durée des chunks audio avec TwilioAudioSender.
+        Le contrôle de flux est maintenant basé sur la durée des chunks audio avec TwilioTextSender.
         """
         full_answer = ""
         
@@ -469,7 +465,7 @@ class BusinessLogic:
             print(f'""<< ... {chunk} ... >>""')
             
             # Synthétiser et envoyer le texte directement sans vérifier la taille de la file
-            # Le contrôle de flux se fait maintenant dans TwilioAudioSender basé sur la durée des chunks
+            # Le contrôle de flux se fait maintenant dans TwilioTextSender basé sur la durée des chunks
             await self.speak_and_send_text_async(chunk)
             
         return full_answer
@@ -682,8 +678,8 @@ class BusinessLogic:
             return ""
 
     async def speak_and_send_text_async(self, text_buffer: str):
-        audio_bytes = self.tts_provider.synthesize_speech_to_bytes(text_buffer)
-        await self.enqueue_send_audio_to_twilio(audio_bytes= audio_bytes, frame_rate=self.frame_rate, sample_width=self.sample_width)
+        """Ajoute le texte à la file d'attente pour synthèse et envoi à Twilio"""
+        await self.enqueue_send_text_to_twilio(text_buffer)
 
     async def _clean_stream_state_async(self, stream_sid: str):
         """Nettoie les ressources associées à un stream spécifique
@@ -695,8 +691,9 @@ class BusinessLogic:
                 self.is_streaming = False
                 self.logger.info(f"Stopping streaming worker for stream: {stream_sid}")
             
-            # Nettoyer la file d'attente audio restante
-            await self._clear_audio_queue()
+            # Nettoyer la file d'attente de texte restante
+            self.text_queue.clear()
+            self.logger.info("Text queue cleared")
             
             # Supprimer l'état du stream s'il existe
             if stream_sid in self.stream_states:
@@ -761,69 +758,34 @@ class BusinessLogic:
         else:
             return pcm_data
             
-    async def enqueue_send_audio_to_twilio(self, file_path: str=None, audio_bytes: bytes=None, frame_rate: int=None, channels: int=1, sample_width: int=None, convert_to_mulaw: bool = False):
-        """Enqueue audio delivery to Twilio via the streaming worker task.
-        This decouples audio generation from WebSocket transmission for more reliable streaming.
-        Ensures non-blocking behavior by creating a separate task for queue filling.
-        """
-        # Use instance defaults if not specified
-        frame_rate = frame_rate or self.frame_rate
-        sample_width = sample_width or self.sample_width
+    async def enqueue_send_text_to_twilio(self, text_buffer: str) -> bool:
+        """Ajoute du texte à la file d'attente TextQueueManager pour traitement et envoi.
+        Cette méthode remplace l'ancienne enqueue_send_audio_to_twilio.
         
-        # Basic validation
+        Args:
+            text_buffer: Le texte à synthétiser et envoyer
+            
+        Returns:
+            bool: True si l'opération a réussi, False sinon
+        """
+        # Vérification de base
         if not self.current_stream:
-            self.logger.error("No active stream, cannot send audio")
+            self.logger.error("No active stream, cannot send text")
             return False
             
-        # Start a separate task to fill the queue to avoid blocking
-        enqueue_task = asyncio.create_task(
-            self._fill_audio_queue(
-                file_path=file_path, 
-                audio_bytes=audio_bytes,
-                frame_rate=frame_rate, 
-                channels=channels,
-                sample_width=sample_width, 
-                convert_to_mulaw=convert_to_mulaw
-            )
-        )
-        
-        # We don't await the task - this allows it to run concurrently
-        self.logger.debug("Started audio enqueuing task")
-        return True
-        
-    async def _clear_audio_queue(self):
-        """Vide la file d'attente audio de manière sécurisée.
-        Utilise AudioQueueManager pour le faire proprement.
-        """
-        return await AudioQueueManager.clear_audio_queue(self.audio_queue, self.logger)
-        
-    async def _fill_audio_queue(self, file_path: str=None, audio_bytes: bytes=None, frame_rate: int=None, 
-                                channels: int=1, sample_width: int=None, convert_to_mulaw: bool = False):
-        """Helper method to fill the audio queue in a separate task.
-        Utilise AudioQueueManager pour découper et envoyer les chunks audio.
-        Le contrôle de flux est maintenant géré par TwilioAudioSender en fonction des durées.
-        """
-        # Utiliser les valeurs par défaut si nécessaire
-        frame_rate = frame_rate or self.frame_rate
-        sample_width = sample_width or self.sample_width
-        
         # Démarrer le worker de streaming s'il n'est pas déjà en cours d'exécution
         if not self.is_streaming and not self.stream_worker_task:
             self.is_streaming = True
             self.stream_worker_task = asyncio.create_task(self._streaming_worker())
-            self.logger.info("Started audio streaming worker with timing-based flow control")
+            self.logger.info("Started text streaming worker")
         
-        # Déléguer le remplissage de la file d'attente à AudioQueueManager
-        return await AudioQueueManager.fill_audio_queue(
-            queue=self.audio_queue,
-            file_path=file_path,
-            audio_bytes=audio_bytes,
-            frame_rate=frame_rate,
-            channels=channels,
-            sample_width=sample_width,
-            convert_to_mulaw=convert_to_mulaw,
-            stream_sid=self.current_stream,
-            chunk_duration_ms=self.speech_chunk_duration_ms,
-            temp_dir=self.TEMP_DIR,
-            logger=self.logger
-        )
+        # Ajouter le texte à la file d'attente
+        await self.text_queue.add_text(text_buffer)
+        self.logger.debug(f"Text added to queue: '{text_buffer[:60]}...' ({len(text_buffer)} chars)")
+        
+        return True
+        
+    # Cette méthode n'est plus nécessaire, nous utilisons désormais text_queue.clear() directement
+        
+    # Cette méthode n'est plus nécessaire avec le nouveau système basé sur le texte
+    # Le traitement du texte est géré par TwilioTextSender.process_text_to_audio
