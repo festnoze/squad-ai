@@ -86,7 +86,7 @@ class BusinessLogic:
             os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = self.google_calendar_credentials_path
             self.logger.info(f"Set GOOGLE_APPLICATION_CREDENTIALS to: {self.google_calendar_credentials_path}")
         else:
-            self.logger.warning(f"/!\\ Warning: Google calendar credentials file not found at {self.google_calendar_credentials_path}")
+            self.logger.error(f"/!\\ Google calendar credentials file not found at {self.google_calendar_credentials_path}")
 
         self.tts_provider = get_text_to_speech_provider(self.TEMP_DIR)
         self.stt_provider = get_speech_to_text_provider(self.TEMP_DIR, provider="hybrid")
@@ -261,7 +261,7 @@ class BusinessLogic:
                     await self._handle_start_event(data.get("start", {}))
                 elif event == "media":
                     if not self.current_stream:
-                        self.logger.warning("/!\\ Error: media event received before the start event")
+                        self.logger.error("/!\\ media event received before the start event")
                         continue
                     await self._handle_media_event(data)
                 elif event == "stop":
@@ -552,7 +552,7 @@ class BusinessLogic:
     async def _handle_stop_event(self):
         """Handle the stop event from Twilio which ends a call"""
         if not self.current_stream:
-            self.logger.warning("Received stop event but no active stream")
+            self.logger.error("Received stop event but no active stream")
             return
             
         self.logger.info(f"Received stop event for stream: {self.current_stream}")
@@ -560,7 +560,7 @@ class BusinessLogic:
             del self.stream_states[self.current_stream]
             self.logger.info(f"Cleaned up state for stream {self.current_stream}")
         else:
-            self.logger.warning(f"Received stop for unknown or already cleaned stream: {self.current_stream}")
+            self.logger.error(f"Received stop for unknown or already cleaned stream: {self.current_stream}")
             
         if self.websocket:
             try:
@@ -693,99 +693,4 @@ class BusinessLogic:
         
         except Exception as e:
             self.logger.error(f"Error sending audio to Twilio: {e}", exc_info=True)
-            return False
-
-    async def _send_audio_to_twilio_direct(self, file_path: str=None, audio_bytes: bytes=None, frame_rate: int=None, channels: int=1, sample_width: int=None, convert_to_mulaw: bool = False):
-        """Direct audio sending method as a fallback if AudioStreamManager is not available."""
-        # Use instance defaults if not specified
-        frame_rate = frame_rate or self.frame_rate
-        sample_width = sample_width or self.sample_width
-        
-        # Start timing this operation
-        start_time = time.time()
-        chunks_sent = 0
-        total_chunks = 0
-        
-        try:
-            # Load audio and convert to appropriate format
-            ulaw_data = self._prepare_voice_stream(file_path=file_path, audio_bytes=audio_bytes, 
-                                                  frame_rate=frame_rate, channels=channels, 
-                                                  sample_width=sample_width, convert_to_mulaw=True)
-            if file_path:
-                self.delete_temp_file(file_path)
-            
-            # Calculate chunk size based on duration
-            chunk_size = int((self.speech_chunk_duration_ms / 1000) * frame_rate * sample_width)
-            
-            # Calculate pause duration (20% of chunk duration for natural gaps)
-            pause_duration = self.speech_chunk_duration_ms / 1000 * 0.2
-            
-            # Log total audio being sent
-            total_audio_ms = (len(ulaw_data) / (frame_rate * sample_width)) * 1000
-            total_chunks = len(ulaw_data) // chunk_size + (1 if len(ulaw_data) % chunk_size else 0)
-            
-            self.logger.info(f"FALLBACK: Sending {len(ulaw_data)} bytes of audio (~{total_audio_ms:.1f}ms) in {total_chunks} chunks to Twilio directly")
-            
-            # Twilio connection monitor timer and chunk counter
-            last_heartbeat_time = time.time()
-            continuous_stream_duration = 0
-            
-            for i in range(0, len(ulaw_data), chunk_size):
-                # Monitor connection duration (Twilio may disconnect after ~15s of continuous audio)
-                current_duration = time.time() - last_heartbeat_time
-                continuous_stream_duration += self.speech_chunk_duration_ms / 1000
-                
-                # If we're sending audio for more than 10 seconds continuously, add an extra pause
-                if continuous_stream_duration > 10.0:
-                    self.logger.info(f"Adding extra safety pause after {continuous_stream_duration:.1f}s of streaming")
-                    await asyncio.sleep(0.5) # Add half-second pause to avoid Twilio timeout
-                    last_heartbeat_time = time.time()
-                    continuous_stream_duration = 0
-                
-                # Check connection before each chunk
-                if not self._is_websocket_connected():
-                    elapsed = time.time() - start_time
-                    self.logger.warning(f"WebSocket disconnected after {elapsed:.2f}s and {chunks_sent}/{total_chunks} chunks")
-                    # Important diagnostic data
-                    self.logger.warning(f"Audio stats: {chunks_sent*self.speech_chunk_duration_ms:.1f}ms sent of {total_audio_ms:.1f}ms total")
-                    return False
-                
-                # Get the current chunk and send it
-                chunk = ulaw_data[i:i + chunk_size]
-                payload = base64.b64encode(chunk).decode()
-                
-                try:
-                    msg = {
-                        "event": "media",
-                        "streamSid": self.current_stream,
-                        "media": {
-                            "payload": payload
-                        }
-                    }
-                    await self.websocket.send_text(json.dumps(msg))
-                    chunks_sent += 1
-                    
-                    # Log progress at regular intervals
-                    if chunks_sent % 5 == 0 or chunks_sent == total_chunks:
-                        elapsed = time.time() - start_time
-                        progress_pct = (chunks_sent / total_chunks) * 100 if total_chunks > 0 else 0
-                        self.logger.debug(f"Audio progress: {progress_pct:.1f}% - {chunks_sent}/{total_chunks} chunks - {elapsed:.2f}s elapsed")
-                    
-                    # Important: Add brief pause between chunks
-                    await asyncio.sleep(pause_duration)
-                    
-                except Exception as chunk_error:
-                    self.logger.error(f"Error sending chunk {chunks_sent+1}/{total_chunks}: {chunk_error}")
-                    if "close message has been sent" in str(chunk_error):
-                        self.logger.warning("Twilio closed the WebSocket connection - possible timeout")
-                    return False
-            
-            # Final success logging
-            total_time = time.time() - start_time
-            self.logger.info(f"Audio complete: {chunks_sent}/{total_chunks} chunks, {total_audio_ms:.1f}ms audio in {total_time:.2f}s")
-            return True
-        
-        except Exception as e:
-            elapsed = time.time() - start_time
-            self.logger.error(f"Error sending audio to Twilio after {elapsed:.2f}s and {chunks_sent}/{total_chunks} chunks: {e}", exc_info=True)
             return False
