@@ -13,11 +13,11 @@ from uuid import UUID
 from datetime import datetime
 #
 from pydub import AudioSegment
-from openai import OpenAI, Stream
+from openai import OpenAI
 from typing import Dict, Optional
 from fastapi import WebSocket, WebSocketDisconnect
 #
-from agents_graph import AgentsGraph
+from agents.agents_graph import AgentsGraph
 from app.agents.conversation_state_model import ConversationState
 from app.api_client.studi_rag_inference_client import StudiRAGInferenceClient
 from app.api_client.request_models.user_request_model import UserRequestModel, DeviceInfoRequestModel
@@ -28,7 +28,7 @@ from app.speech.speech_to_text import get_speech_to_text_provider
 from app.speech.incoming_audio_processing import IncomingAudioProcessing
 from app.speech.audio_streaming import AudioStreamManager
 
-class BusinessLogic:
+class ConversationHandler:
     # Class variables shared across instances
     compiled_graph = None # LangGraph workflow compilation
     phones: Dict[str, str] = {}  # Map call_sid to phone numbers
@@ -45,6 +45,9 @@ class BusinessLogic:
         self.active_streams = {}
         self.active_calls = {}
         
+        # Flag to track if welcome message is still being played
+        self.welcome_message_playing = False
+        
         # Set audio processing parameters as instance variables
         self.frame_rate = 8000  # Sample rate in Hz (8kHz is standard for telephony)
         self.sample_width = 2    # 16-bit PCM
@@ -52,8 +55,8 @@ class BusinessLogic:
         self.min_audio_bytes_for_processing = 6400  # Minimum buffer size = ~400ms at 8kHz
         self.max_audio_bytes_for_processing = 150000  # Maximum buffer size = ~15s at 8kHz
         self.consecutive_silence_duration_ms = 0.0  # Count consecutive silence duration in milliseconds
-        self.required_silence_ms_to_answer = 800  # Require 800ms of silence to process audio
-        self.speech_chunk_duration_ms = 400  # Duration of each audio chunk in milliseconds
+        self.required_silence_ms_to_answer = 300  # Require 300ms of silence to process audio
+        self.speech_chunk_duration_ms = 500  # Duration of each audio chunk in milliseconds
         
         self.audio_buffer = b""
         self.current_stream = None
@@ -104,14 +107,97 @@ class BusinessLogic:
             self.openai_client = OpenAI(api_key=self.OPENAI_API_KEY)
 
         self.logger.info("BusinessLogic initialized successfully.")
-    
-    def _decode_json(self, message: str) -> Optional[Dict]:
-        """Safely decode JSON message from WebSocket."""
+
+    async def init_user_and_conversation(self, calling_phone_number: str, call_sid: str):
+        """ Initialize the user session: create user and conversation and send a welcome message """
+        # Ensure user_name and IP are valid strings
+        user_name_val = "Twilio incoming call " + (calling_phone_number or "Unknown User")
+        ip_val = calling_phone_number or "Unknown IP"
+        user_RM = UserRequestModel(
+            user_id=None,
+            user_name=user_name_val,
+            IP=ip_val,
+            device_info=DeviceInfoRequestModel(user_agent="twilio", platform="phone", app_version="", os="", browser="", is_mobile=True)
+        )
         try:
-            return json.loads(message)
-        except json.JSONDecodeError as e:
-            self.logger.error(f"Failed to decode JSON message: {e}")
-            return None
+            user = await self.studi_rag_inference_client.create_or_retrieve_user(user_RM)
+            user_id = user['id']
+            
+            # Convert user_id to UUID if it's a string
+            if isinstance(user_id, str): user_id = UUID(user_id)
+                
+            # Create empty messages list
+            from app.api_client.request_models.conversation_request_model import MessageRequestModel
+            messages = []
+            
+            # Create the conversation request model
+            conversation_model = ConversationRequestModel(user_id=user_id, messages=messages)
+            
+            self.logger.info(f"Creating new conversation for user: {user_id}")
+            new_conversation = await self.studi_rag_inference_client.create_new_conversation(conversation_model)
+            return new_conversation['id']
+
+        except Exception as e:
+            self.logger.error(f"Error creating conversation: {str(e)}")
+            return str(uuid.uuid4())
+
+    async def run_async(self, calling_phone_number: str, call_sid: str) -> None:
+        """Main method: handle a full audio conversation with I/O Twilio streams on a WebSocket."""
+        if not self.websocket:
+            self.logger.error("WebSocket not set, cannot handle WebSocket connection.")
+            return
+        
+        self.logger.info(f"WebSocket handler started for {self.websocket.client.host}:{self.websocket.client.port}")
+        
+        # Store the caller's phone number and call SID so we can retrieve them later
+        self.phones[call_sid] = calling_phone_number
+        
+        # Initialize the audio stream manager for throttled audio streaming with optimized parameters
+        # We'll set the streamSid later when the call starts
+        self.audio_stream_manager = AudioStreamManager(
+            websocket=self.websocket, 
+            streamSid=None,  # Will be set when the call starts
+            max_queue_size=10,  # Smaller queue size for faster feedback
+            min_chunk_interval=0.02  # Faster refresh rate (20ms)
+        )
+        # Start the background streaming task
+        self.audio_stream_manager.start_streaming()
+        self.logger.info("Audio stream manager initialized and started with optimized parameters")
+
+        # Main loop to handle WebSocket events
+        try:            
+            while True:
+                try:
+                    msg = await self.websocket.receive_text()
+                    data = json.loads(msg)
+                    if data is None:
+                        continue
+                except WebSocketDisconnect as disconnect_err:
+                    self.logger.info(f"WebSocket disconnected: {self.websocket.client.host}:{self.websocket.client.port} - Code: {disconnect_err.code}")
+                    break
+                    
+                event = data.get("event")
+                if event == "connected":
+                    self._handle_connected_event()
+                elif event == "start":
+                    await self._handle_start_event(data.get("start", {}))
+                elif event == "media":
+                    await self._handle_media_event(data)
+                elif event == "stop":
+                    await self._handle_stop_event()
+                    return
+                elif event == "mark":
+                    self._handle_mark_event(data)
+                else:
+                    self.logger.warning(f"Received unknown event type: {event}")
+
+        except Exception as e:
+            self.logger.error(f"Unhandled error in WebSocket handler: {e}", exc_info=True)
+        finally:
+            if self.current_stream and self.current_stream in self.stream_states:
+                self.logger.warning(f"Cleaning up state for stream {self.current_stream} due to handler exit/error.")
+                del self.stream_states[self.current_stream]
+            self.logger.info(f"WebSocket handler finished for {self.websocket.client.host}:{self.websocket.client.port} (Stream: {self.current_stream})" )
     
     def _handle_connected_event(self):
         """Handle the 'connected' event from Twilio."""
@@ -136,15 +222,18 @@ class BusinessLogic:
         
         # Define the welcome message
         welcome_text = f"""
-        Bonjour! Et bienvenue chez Studi, l'école 100% en ligne !
-        Je suis l'assistant virtuel Stud'IA, je prends le relais lorsque nos conseillers en formation ne sont pas présents.
-        Souhaitez-vous prendre rendez-vous avec un conseiller ou que je vous aide à trouver quelle formation pourrait vous intéresser ?
+        Bienvenue chez Studi !
+        Je suis l'assistant virtuel Stud'IA, je prends le relais lorsque nos conseillers ne sont pas présents.
+        Puis-je vous aider à choisir votre formation ? Ou a prendre rendez-vous avec un conseiller en formation ?
         """
         #welcome_text = "Salut !"
 
         # Send the welcome audio to the user as early as possible
         self.logger.info(f"Sending welcome speech to {call_sid}")
+        self.welcome_message_playing = True
         await self.speak_and_send_text(welcome_text)
+        self.welcome_message_playing = False
+        self.logger.info("Welcome message completed, now listening for user speech")
 
         # Initialize conversation state for this stream
         phone_number = self.phones.get(call_sid, "Unknown")
@@ -187,104 +276,21 @@ class BusinessLogic:
         
         return stream_sid
 
-    async def init_user_and_conversation(self, calling_phone_number: str, call_sid: str):
-        """ Initialize the user session: create user and conversation and send a welcome message """
-        # Ensure user_name and IP are valid strings
-        user_name_val = "Twilio incoming call " + (calling_phone_number or "Unknown User")
-        ip_val = calling_phone_number or "Unknown IP"
-        user_RM = UserRequestModel(
-            user_id=None,
-            user_name=user_name_val,
-            IP=ip_val,
-            device_info=DeviceInfoRequestModel(user_agent="twilio", platform="phone", app_version="", os="", browser="", is_mobile=True)
-        )
-        try:
-            user = await self.studi_rag_inference_client.create_or_retrieve_user(user_RM)
-            user_id = user['id']
-            
-            # Convert user_id to UUID if it's a string
-            if isinstance(user_id, str): user_id = UUID(user_id)
-                
-            # Create empty messages list
-            from app.api_client.request_models.conversation_request_model import MessageRequestModel
-            messages = []
-            
-            # Create the conversation request model
-            conversation_model = ConversationRequestModel(user_id=user_id, messages=messages)
-            
-            self.logger.info(f"Creating new conversation for user: {user_id}")
-            new_conversation = await self.studi_rag_inference_client.create_new_conversation(conversation_model)
-            return new_conversation['id']
-
-        except Exception as e:
-            self.logger.error(f"Error creating conversation: {str(e)}")
-            return str(uuid.uuid4())
-
-    async def websocket_handler(self, calling_phone_number: str, call_sid: str) -> None:
-        """Main WebSocket handler for Twilio streams."""
-        if not self.websocket:
-            self.logger.error("WebSocket not set, cannot handle WebSocket connection.")
+    async def _handle_media_event(self, data):
+        
+        if not self.current_stream:
+            self.logger.error("/!\\ 'media event' received before the 'start event'")
             return
         
-        self.logger.info(f"WebSocket handler started for {self.websocket.client.host}:{self.websocket.client.port}")
-        
-        # Store the caller's phone number and call SID so we can retrieve them later
-        self.phones[call_sid] = calling_phone_number
-        
-        # Initialize the audio stream manager for throttled audio streaming with optimized parameters
-        # We'll set the streamSid later when the call starts
-        self.audio_stream_manager = AudioStreamManager(
-            websocket=self.websocket, 
-            streamSid=None,  # Will be set when the call starts
-            max_queue_size=10,  # Smaller queue size for faster feedback
-            min_chunk_interval=0.02  # Faster refresh rate (20ms)
-        )
-        # Start the background streaming task
-        self.audio_stream_manager.start_streaming()
-        self.logger.info("Audio stream manager initialized and started with optimized parameters")
-
-        try:            
-            while True:
-                try:
-                    msg = await self.websocket.receive_text()
-                    data = self._decode_json(msg)
-                    if data is None:
-                        continue
-                except WebSocketDisconnect as disconnect_err:
-                    self.logger.info(f"WebSocket disconnected: {self.websocket.client.host}:{self.websocket.client.port} - Code: {disconnect_err.code}")
-                    break
-                    
-                event = data.get("event")
-                if event == "connected":
-                    self._handle_connected_event()
-                elif event == "start":
-                    await self._handle_start_event(data.get("start", {}))
-                elif event == "media":
-                    if not self.current_stream:
-                        self.logger.error("/!\\ media event received before the start event")
-                        continue
-                    await self._handle_media_event(data)
-                elif event == "stop":
-                    await self._handle_stop_event()
-                    return
-                elif event == "mark":
-                    self._handle_mark_event(data)
-                else:
-                    self.logger.warning(f"Received unknown event type: {event}")
-
-        except Exception as e:
-            self.logger.error(f"Unhandled error in WebSocket handler: {e}", exc_info=True)
-        finally:
-            if self.current_stream and self.current_stream in self.stream_states:
-                self.logger.warning(f"Cleaning up state for stream {self.current_stream} due to handler exit/error.")
-                del self.stream_states[self.current_stream]
-            self.logger.info(f"WebSocket handler finished for {self.websocket.client.host}:{self.websocket.client.port} (Stream: {self.current_stream})" )
-    
-    async def _handle_media_event(self, data):
         # 1. Decode audio chunk
         chunk = self._decode_audio_chunk(data)
         if chunk is None: 
             self.logger.warning("Received media event without valid audio chunk")
+            return
+            
+        # Skip speech processing if welcome message is still playing
+        if self.welcome_message_playing:
+            self.logger.debug("Welcome message still playing, skipping audio processing")
             return
         
         # Use WebRTC VAD for better speech detection
@@ -338,18 +344,24 @@ class BusinessLogic:
             request = QueryAskingRequestModel(
                 conversation_id=self.conversation_id,
                 user_query_content= user_query_transcript,
-                display_waiting_message=True
+                display_waiting_message=False
             )
             try:
                 self.logger.info(f"Sending request to RAG API for stream: {self.current_stream}")
                 start_time = time.time()
                 response = self.studi_rag_inference_client.rag_query_stream_async(request, timeout=60)
+                #await self.speak_and_send_ask_for_feedback_async(user_query_transcript)
+                await self.speak_and_send_text("Vous avez demandé : " + user_query_transcript + ". Laisser moi un instant pour rechercher des informations à ce sujet.")
+                
+                #full_answer = await self.speak_and_send_stream_async(response)
+                
                 full_answer = ""
                 async for chunk in response:
                     full_answer += chunk
                     self.logger.debug(f"Received chunk: {chunk}")
                     print(f"<< ... {chunk} ... >>")
                     await self.speak_and_send_text(chunk)
+                
                 end_time = time.time()
                 if full_answer:
                     self.logger.info(f"Full answer gotten from RAG API in {end_time - start_time:.2f}s. : {full_answer}")
@@ -365,7 +377,7 @@ class BusinessLogic:
 
         return
 
-    async def speak_and_send_ask_for_feedback(self, transcript):
+    async def speak_and_send_ask_for_feedback_async(self, transcript):
         response_text = "Instructions : Fait un feedback reformulé de façon synthétique de la demande utilisateur suivante, afin de t'assurer de ta bonne comphéhension de celle-ci : " + transcript 
         response = self.openai_client.chat.completions.create(
             model="gpt-4o",
@@ -375,7 +387,7 @@ class BusinessLogic:
             stream=True
         )
         if response:
-            spoken_text = await self.speak_and_send_stream(response)
+            spoken_text = await self.speak_and_send_stream_async(response)
             self.logger.info(f"<< Response text: '{spoken_text}'")
             return spoken_text
         return ""
@@ -424,7 +436,7 @@ class BusinessLogic:
                 "Sous-titres réalisés",
                 "Sous-titres",
                 "Amara.org",
-                "❤️ par SousTitreur.com...",
+                " par SousTitreur.com...",
                 "SousTitreur.com",
                 "Merci d'avoir regardé cette vidéo, n'hésitez pas à vous abonner à la chaîne pour ne manquer aucune de mes prochaines vidéos.",
                 "Merci d'avoir regardé cette vidéo",
@@ -520,7 +532,7 @@ class BusinessLogic:
             self.logger.error(f"Stream {self.current_stream} not found in states, cannot invoke graph.")
             return None
 
-    async def speak_and_send_stream(self, answer_stream: Stream):
+    async def speak_and_send_stream_async(self, answer_stream):
         """Synthesize speech from text and send to Twilio"""
         try:
             full_text = ""
@@ -542,7 +554,7 @@ class BusinessLogic:
             
             return full_text
         except Exception as e:
-            self.logger.error(f"/!\\ Error sending audio to Twilio in {self.speak_and_send_stream.__name__}: {e}", exc_info=True)
+            self.logger.error(f"/!\\ Error sending audio to Twilio in {self.speak_and_send_stream_async.__name__}: {e}", exc_info=True)
             return ""
 
     async def speak_and_send_text(self, text_buffer: str):

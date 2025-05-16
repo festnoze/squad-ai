@@ -4,7 +4,7 @@ import logging
 from fastapi import APIRouter, WebSocket, Request, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from twilio.twiml.voice_response import VoiceResponse, Connect
-from business_logic import BusinessLogic
+from conversation_handler import ConversationHandler
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -64,9 +64,9 @@ async def websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid:
     await ws.accept()
     logger.info(f"WebSocket connection accepted from: {ws.client.host}:{ws.client.port}")
     try:
-        # Create a new BusinessLogic instance for this WebSocket connection
-        logic = BusinessLogic(websocket=ws)
-        await logic.websocket_handler(calling_phone_number, call_sid)
+        # Create a new ConversationHandler instance for this WebSocket connection
+        conversation_on_websocket = ConversationHandler(websocket=ws)
+        await conversation_on_websocket.run_async(calling_phone_number, call_sid)
     except WebSocketDisconnect:
         logger.info(f"WebSocket disconnected: {ws.client.host}:{ws.client.port}")
     except Exception as e:

@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 #
 from app import endpoints
-from app.business_logic import BusinessLogic
+from app.conversation_handler import ConversationHandler
 
 class ApiConfig:
     @asynccontextmanager
