@@ -1,10 +1,13 @@
+from operator import call
 import os
 import logging
 
 from fastapi import APIRouter, WebSocket, Request, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from twilio.twiml.voice_response import VoiceResponse, Connect
-from conversation_handler import ConversationHandler
+#
+from app.conversation_handler import ConversationHandler
+from app.communication_type_enum import CommType
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -22,43 +25,12 @@ async def audio(filename: str) -> FileResponse:
 
 @router.api_route("/incoming-sms", methods=["GET", "POST"])
 async def twilio_incoming_sms(request: Request):
-    return HTMLResponse(content=str("Les SMS ne sont pas pris en charge pour le moment"), media_type="application/xml")
+    return await handle_incoming_call_or_sms(request, CommType.SMS)
 
 @router.post("/")
 async def voice_webhook(request: Request) -> HTMLResponse:
-    logger.info("Received POST request on / (voice webhook)")
-    try:
-        form = await request.form()
-        from_number: str = form.get("From", "Unknown From")
-        call_sid: str = form.get("CallSid", "Unknown CallSid")
-        logger.info(f"Call from: {from_number}, CallSid: {call_sid}")
-
-        ws_scheme = "wss" if request.url.scheme == "https" else "ws"
-        ws_url = f"{ws_scheme}://{request.url.netloc}/ws/phone/{from_number}/sid/{call_sid}"
-        logger.info(f"Connecting Twilio stream to WebSocket: {ws_url}")
-
-        response = VoiceResponse()
-        connect = Connect()
-        
-        form = await request.form()
-        from_number: str = form.get("From", "Undisclosed phone number")
-        call_sid: str = form.get("CallSid", "Undisclosed Call Sid")
-        
-        # Request higher quality audio from Twilio
-        connect.stream(url=ws_url, track="inbound_track", parameters={
-            "mediaEncoding": "audio/x-mulaw", 
-            "sampleRate": 16000  # Request 16kHz if possible
-        })
-        response.append(connect)
-
-        return HTMLResponse(content=str(response), media_type="application/xml")
-
-    except Exception as e:
-        logger.error(f"Error processing voice webhook: {e}", exc_info=True)
-        response = VoiceResponse()
-        response.say("An error occurred processing your call. Please try again later.")
-        return HTMLResponse(content=str(response), media_type="application/xml", status_code=500)
-
+    return await handle_incoming_call_or_sms(request, CommType.CALL)
+    
 @router.websocket("/ws/phone/{calling_phone_number}/sid/{call_sid}")
 async def websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid: str) -> None:
     await ws.accept()
@@ -76,6 +48,63 @@ async def websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid:
         except RuntimeError:
             logger.error("Error closing WebSocket connection", exc_info=True)
             pass
-        
     finally:
         logger.info(f"WebSocket endpoint finished for: {ws.client.host}:{ws.client.port}")
+
+@staticmethod
+async def handle_incoming_call_or_sms(request: Request, comm_type: CommType) -> HTMLResponse:
+    logger.info("Received POST request on / (voice webhook)")
+    try:
+        form = await request.form()
+        from_number: str = form.get("From", "Unknown From")
+        call_sid: str = form.get("CallSid", "Unknown CallSid")
+        logger.info(f"Call from: {from_number}, CallSid: {call_sid}")
+
+        if comm_type == CommType.CALL:
+            ws_scheme = "wss" if request.url.scheme == "https" else "ws"
+            ws_url = f"{ws_scheme}://{request.url.netloc}/ws/phone/{from_number}/sid/{call_sid}"
+            logger.info(f"Connecting Twilio stream to WebSocket: {ws_url}")
+
+            response = VoiceResponse()
+            connect = Connect()
+            
+            form = await request.form()
+            from_number: str = form.get("From", "Undisclosed phone number")
+            call_sid: str = form.get("CallSid", "Undisclosed Call Sid")
+            
+            # Request higher quality audio from Twilio
+            connect.stream(url=ws_url, track="inbound_track", parameters={
+                "mediaEncoding": "audio/x-mulaw", 
+                "sampleRate": 16000  # Request 16kHz if possible
+            })
+            response.append(connect)
+            return HTMLResponse(content=str(response), media_type="application/xml")
+
+        elif comm_type == CommType.SMS:
+            body = form.get("Body", "")
+            
+            logger.info(f"Received SMS from {from_number}: {body}")
+            
+            # Create a TwiML response to send back an SMS
+            from twilio.twiml.messaging_response import MessagingResponse
+            response = MessagingResponse()
+            response.message("Merci pour votre message. Un conseiller vous contactera prochainement.")
+            return HTMLResponse(content=str(response), media_type="application/xml")  
+        else:
+            raise ValueError(f"Unknown communication type: {comm_type}")
+                      
+    except Exception as e:
+        if comm_type == CommType.CALL:
+            logger.error(f"Error processing voice webhook: {e}", exc_info=True)
+            response = VoiceResponse()
+            response.say("An error occurred processing your call. Please try again later.")
+            return HTMLResponse(content=str(response), media_type="application/xml", status_code=500)
+        elif comm_type == CommType.SMS:
+            logger.error(f"Error processing SMS webhook: {e}", exc_info=True)
+            response = MessagingResponse()
+            response.message("Une erreur s'est produite. Veuillez réessayer plus tard.")
+            return HTMLResponse(content=str(response), media_type="application/xml", status_code=500)
+        else:
+            logger.error(f"Unknown communication type: {comm_type}")
+            return JSONResponse(status_code=400, content={"detail": "Unknown communication type"})
+

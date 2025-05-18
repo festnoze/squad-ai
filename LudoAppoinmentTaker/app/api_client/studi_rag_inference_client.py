@@ -1,6 +1,6 @@
 import httpx
 from uuid import UUID
-from typing import Any, Dict, AsyncGenerator
+from typing import Any, Dict, AsyncGenerator, Optional
 from api_client.request_models.user_request_model import UserRequestModel
 from api_client.request_models.conversation_request_model import ConversationRequestModel
 from api_client.request_models.query_asking_request_model import QueryAskingRequestModel, QueryNoConversationRequestModel
@@ -55,8 +55,16 @@ class StudiRAGInferenceClient:
         except httpx.ConnectError as exc:
             raise RuntimeError(f"Cannot connect to RAG inference server at {self.host_base_url}") from exc
 
-    async def rag_query_stream_async(self, query_asking_request_model: QueryAskingRequestModel, timeout: int = 60) -> AsyncGenerator[str, None]:
-        """POST /rag/inference/conversation/ask-question/phone/stream: Stream RAG answer for a conversation."""
+    async def rag_query_stream_async(self, query_asking_request_model: QueryAskingRequestModel, timeout: int = 60, interrupt_flag=None) -> AsyncGenerator[str, None]:
+        """
+        POST /rag/inference/conversation/ask-question/phone/stream: Stream RAG answer for a conversation.
+        
+        Args:
+            query_asking_request_model: Model containing the query data
+            timeout: Request timeout in seconds
+            interrupt_flag: Mutable object (like a dict {"interrupted": False}) that can be modified externally
+                            to interrupt the streaming
+        """
         try:
             async with self.client.stream(
                 "POST", 
@@ -65,7 +73,7 @@ class StudiRAGInferenceClient:
                 timeout=httpx.Timeout(timeout)
             ) as resp:
                 resp.raise_for_status()
-                async for segment in self.stream_by_segment(resp):
+                async for segment in self.stream_by_segment(resp, interrupt_flag):
                     yield segment
 
         except httpx.ReadTimeout:
@@ -76,16 +84,25 @@ class StudiRAGInferenceClient:
             yield f"Une erreur s'est produite lors de la récupération de la réponse: {str(e)}"
 
     @staticmethod
-    async def stream_by_segment(response_stream):
+    async def stream_by_segment(response_stream: httpx.Response, interrupt_flag: Optional[Dict[str, bool]] = None):
+        """Process the response stream byte by byte and yield segments"""
         text_buffer = ""
         async for chunk in response_stream.aiter_bytes():
+            is_interupted = interrupt_flag and interrupt_flag.get("interrupted", False)
+            # First check if streaming should be interrupted
+            if is_interupted:
+                break
+                
             if chunk:
                 text = chunk.decode("utf-8", errors="ignore")
                 text_buffer += text
-                if len(text_buffer) > 1 and (any(punct in text for punct in [".", ",", ":", "!", "?"]) or len(text_buffer.split()) > 20):
+                # Yield when we have a complete thought or enough words
+                if len(text_buffer.split()) > 10 or len(text_buffer) > 100:
                     yield text_buffer
                     text_buffer = ""
-        if text_buffer:
+        
+        # Only yield remaining text if not interrupted and there's something to yield
+        if text_buffer and not is_interupted:
             yield text_buffer
 
     async def rag_query_no_conversation_async(self, query_no_conversation_request_model: QueryNoConversationRequestModel) -> Dict[str, Any]:

@@ -17,7 +17,7 @@ from openai import OpenAI
 from typing import Dict, Optional
 from fastapi import WebSocket, WebSocketDisconnect
 #
-from agents.agents_graph import AgentsGraph
+from app.agents.agents_graph import AgentsGraph
 from app.agents.conversation_state_model import ConversationState
 from app.api_client.studi_rag_inference_client import StudiRAGInferenceClient
 from app.api_client.request_models.user_request_model import UserRequestModel, DeviceInfoRequestModel
@@ -43,10 +43,9 @@ class ConversationHandler:
         self.openai_client = None
         self.stream_states = {}
         self.active_streams = {}
-        self.active_calls = {}
-        
-        # Flag to track if welcome message is still being played
-        self.welcome_message_playing = False
+        # Flags to track speaking state
+        self.is_speaking = False  # Flag to track if system is currently speaking
+        self.rag_interrupt_flag = {"interrupted": False}  # Flag to interrupt RAG streaming
         
         # Set audio processing parameters as instance variables
         self.frame_rate = 8000  # Sample rate in Hz (8kHz is standard for telephony)
@@ -157,8 +156,8 @@ class ConversationHandler:
         self.audio_stream_manager = AudioStreamManager(
             websocket=self.websocket, 
             streamSid=None,  # Will be set when the call starts
-            max_queue_size=10,  # Smaller queue size for faster feedback
-            min_chunk_interval=0.02  # Faster refresh rate (20ms)
+            max_queue_size=5,  # Smaller queue size for faster feedback
+            min_chunk_interval=0.05  # Faster refresh rate (20ms)
         )
         # Start the background streaming task
         self.audio_stream_manager.start_streaming()
@@ -228,12 +227,13 @@ class ConversationHandler:
         """
         #welcome_text = "Salut !"
 
-        # Send the welcome audio to the user as early as possible
         self.logger.info(f"Sending welcome speech to {call_sid}")
-        self.welcome_message_playing = True
-        await self.speak_and_send_text(welcome_text)
-        self.welcome_message_playing = False
-        self.logger.info("Welcome message completed, now listening for user speech")
+        
+        duration = await self.speak_and_send_text(welcome_text)
+        
+        # Wait until the welcome message is finished playing
+        # await asyncio.sleep(duration / 1000)
+        # self.logger.info("Welcome message completed, now listening for user speech")
 
         # Initialize conversation state for this stream
         phone_number = self.phones.get(call_sid, "Unknown")
@@ -287,11 +287,27 @@ class ConversationHandler:
         if chunk is None: 
             self.logger.warning("Received media event without valid audio chunk")
             return
+                        
+        # First, update the speaking state based on the queue status
+        self.update_is_speaking_state()
+        
+        # Check for speech while system is speaking (interruption detection)
+        if self.is_speaking:
+            # Check if this chunk contains speech - use a lower threshold to detect speech earlier
+            is_silence, speech_to_noise_ratio = self.incoming_audio.detect_silence_speech(
+                chunk, threshold=self.speech_threshold * 0.8  # More sensitive detection while speaking
+            )
             
-        # Skip speech processing if welcome message is still playing
-        if self.welcome_message_playing:
-            self.logger.debug("Welcome message still playing, skipping audio processing")
-            return
+            # If user is speaking while system is speaking, stop system speech
+            # Use a lower threshold multiplier (1.2x instead of 1.5x) for quicker interruption
+            if not is_silence and speech_to_noise_ratio > self.speech_threshold * 1.2:
+                self.logger.info(f"Speech interruption detected (level: {speech_to_noise_ratio}), stopping system speech")
+                await self.stop_speaking()
+                # Reset buffer to clear any previous speech before interruption
+                self.audio_buffer = b""
+                self.consecutive_silence_duration_ms = 0.0
+                # Add a message to the logs so we can track interruptions
+                print(f"\r>>> USER INTERRUPTED - Speech detected while system was speaking ({speech_to_noise_ratio})")
         
         # Use WebRTC VAD for better speech detection
         is_silence, speech_to_noise_ratio = self.incoming_audio.detect_silence_speech(
@@ -301,22 +317,23 @@ class ConversationHandler:
         # 2. Silence detection before adding to buffer
         has_speech_began = len(self.audio_buffer) > 0
 
-        # Count consecutive silence chunks in milliseconds
+        # Count consecutive silence chunks duration
         if is_silence:
-            # Calculate duration in milliseconds: (chunk_bytes / bytes_per_sample) / samples_per_second * 1000
+            # Calculate duration
             chunk_duration_ms = (len(chunk) / self.sample_width) / self.frame_rate * 1000
             self.consecutive_silence_duration_ms += chunk_duration_ms
-            print(f"\rSilent chunk - Duration: {self.consecutive_silence_duration_ms:.1f}ms - Speech/noise: {speech_to_noise_ratio:04d} (size: {len(chunk)}B) ", end="", flush=True)
+            msg = f"\rSilent chunk - Duration: {self.consecutive_silence_duration_ms:.1f}ms - Speech/noise: {speech_to_noise_ratio:04d} (size: {len(chunk)} bytes)."
+            print(msg, end="", flush=True)
 
         # Add speech chunk to buffer
         if has_speech_began or not is_silence:
             self.audio_buffer += chunk
             self.consecutive_silence_duration_ms = 0.0
 
-            self.logger.debug(
-                f"Speech detected - RMS: {speech_to_noise_ratio}/{self.speech_threshold}, "
-                f"Buffer size: {len(self.audio_buffer)} bytes"
-            )
+            if(random.randint(0, 100) < 1): # Log every 1%
+                self.logger.debug(
+                    f"Speech detected - RMS: {speech_to_noise_ratio}/{self.speech_threshold}, "
+                    f"Buffer size: {len(self.audio_buffer)} bytes")
 
         is_long_silence_after_speech = has_speech_began and self.consecutive_silence_duration_ms >= self.required_silence_ms_to_answer 
         has_reach_min_speech_length = len(self.audio_buffer) >= self.min_audio_bytes_for_processing
@@ -334,6 +351,9 @@ class ConversationHandler:
             self.audio_buffer = b""
             self.consecutive_silence_duration_ms = 0.0
 
+            # Waiting message
+            #await self.speak_and_send_text("Très bien, je vais traiter votre demande.")
+
             # 4. Transcribe speech to text
             user_query_transcript = self._perform_speech_to_text_transcription(audio_data)
             if user_query_transcript is None:
@@ -348,25 +368,44 @@ class ConversationHandler:
             )
             try:
                 self.logger.info(f"Sending request to RAG API for stream: {self.current_stream}")
-                start_time = time.time()
-                response = self.studi_rag_inference_client.rag_query_stream_async(request, timeout=60)
+                # Reset the interrupt flag before starting new streaming
+                self.rag_interrupt_flag = {"interrupted": False}
+                response = self.studi_rag_inference_client.rag_query_stream_async(request, timeout=60, interrupt_flag=self.rag_interrupt_flag)
                 #await self.speak_and_send_ask_for_feedback_async(user_query_transcript)
-                await self.speak_and_send_text("Vous avez demandé : " + user_query_transcript + ". Laisser moi un instant pour rechercher des informations à ce sujet.")
-                
-                #full_answer = await self.speak_and_send_stream_async(response)
+                await self.speak_and_send_text("OK. Vous avez demandé : " + user_query_transcript + ". Laisser moi un instant pour rechercher des informations à ce sujet.")
                 
                 full_answer = ""
+                was_interrupted = False
                 async for chunk in response:
+                    # Vérifier si on a été interrompu entre les chunks
+                    if not self.is_speaking:
+                        was_interrupted = True
+                        self.logger.info("Speech interrupted while processing RAG response")
+                        break
+                        
                     full_answer += chunk
                     self.logger.debug(f"Received chunk: {chunk}")
                     print(f"<< ... {chunk} ... >>")
+                    
+                    # Sauvegarder l'état de parole avant de parler
+                    speaking_before = self.is_speaking
                     await self.speak_and_send_text(chunk)
+                    
+                    # Vérifier si on a été interrompu pendant qu'on parlait
+                    if speaking_before and not self.is_speaking:
+                        was_interrupted = True
+                        self.logger.info("Speech interrupted during RAG response chunk")
+                        break
                 
+                # Loguer les résultats du traitement RAG
                 end_time = time.time()
-                if full_answer:
-                    self.logger.info(f"Full answer gotten from RAG API in {end_time - start_time:.2f}s. : {full_answer}")
+                if was_interrupted:
+                    self.logger.info(f"RAG streaming was interrupted")
+                elif full_answer:
+                    self.logger.info(f"Full answer received from RAG API in {end_time - start_time:.2f}s: {full_answer[:100]}...")
                 else:
                     self.logger.warning(f"Empty response received from RAG API")
+                
             except Exception as e:
                 error_message = f"Je suis désolé, une erreur s'est produite lors de la communication avec le service."
                 self.logger.error(f"Error in RAG API communication: {str(e)}")
@@ -497,58 +536,43 @@ class ConversationHandler:
             # This prevents the regression where audio wasn't being sent
             return True
     
-    async def _process_conversation(self, transcript):
-        """Process user input through the conversation graph and get a response."""
-        response_text = "Désolé, une erreur interne s'est produite."
-        
-        if not self.current_stream:
-            self.logger.error("No active stream, cannot process conversation")
-            return response_text
-        
-        if self.current_stream in self.stream_states:
-            # Get current state and update with user input
-            current_state = self.stream_states[self.current_stream]
-            current_state['user_input'] = transcript
-            
-            try:
-                updated_state: ConversationState = await self.compiled_graph.ainvoke(
-                    current_state,
-                    {"recursion_limit": 15}  # Prevent infinite loops
-                )
-                
-                self.stream_states[self.current_stream] = updated_state
-                
-                # Extract the AI response from history
-                if updated_state.get('history') and updated_state['history'][-1][0] == 'AI':
-                    response_text = updated_state['history'][-1][1]
-                    self.logger.info(f"AI [{self.current_stream[:8]}]: '{response_text[:50]}...'")
-                else:
-                    self.logger.warning(f"No AI response found in history after graph invocation.")
-            except Exception as graph_err:
-                self.logger.error(f"Error invoking graph: {graph_err}", exc_info=True)
-            
-            return response_text
-        else:
-            self.logger.error(f"Stream {self.current_stream} not found in states, cannot invoke graph.")
-            return None
-
     async def speak_and_send_stream_async(self, answer_stream):
         """Synthesize speech from text and send to Twilio"""
         try:
+            # Mark the start of speech activity
+            self.is_speaking = True
+            self.logger.info("Starting streaming speech generation")
+            
             full_text = ""
             text_buffer = ""
+            # Flag to track if speech was interrupted
+            was_interrupted = False
+            
             for chunk in answer_stream:
+                # Check if we've been interrupted - if so, stop processing further chunks
+                if was_interrupted or self.is_speaking:
+                    self.logger.info("Stream processing stopped due to interruption")
+                    break
+                    
                 if chunk.choices:
                     delta_content = chunk.choices[0].delta.content
                     if delta_content is not None:
                         text_buffer += delta_content
-                        # Send segment at sentense ends or max length
+                        # Send segment at sentence ends or max length
                         if len(text_buffer) > 1 and (any(punct in delta_content for punct in [".", ",", ":", "!", "?"]) or len(text_buffer.split()) > 20):
+                            # If speaking is interrupted during this call, remember that
+                            speaking_before = self.is_speaking
                             await self.speak_and_send_text(text_buffer)
+                            if speaking_before and not self.is_speaking:
+                                # Speech was interrupted during this segment
+                                was_interrupted = True
+                                break
+                                
                             full_text += text_buffer
                             text_buffer = ""
             
-            if text_buffer:
+            # Only send remaining text if we weren't interrupted
+            if text_buffer and not was_interrupted:
                 await self.speak_and_send_text(text_buffer)
                 full_text += text_buffer
             
@@ -557,9 +581,28 @@ class ConversationHandler:
             self.logger.error(f"/!\\ Error sending audio to Twilio in {self.speak_and_send_stream_async.__name__}: {e}", exc_info=True)
             return ""
 
+    def update_is_speaking_state(self):
+        """
+        Updates the speaking state based on the audio queue status
+        This provides a more accurate representation of when audio is actually being sent
+        """
+        is_sending_audio = self.audio_stream_manager.is_actively_sending()
+        
+        if is_sending_audio != self.is_speaking:
+            if is_sending_audio:
+                self.is_speaking = True
+                self.logger.debug("Speaking state activated - Audio queue has items")
+            else:
+                self.logger.debug("Speaking state deactivated - Audio queue empty")
+                self.is_speaking = False
+    
     async def speak_and_send_text(self, text_buffer: str):
+        self.is_speaking = True        
         audio_bytes = self.tts_provider.synthesize_speech_to_bytes(text_buffer)
-        await self.send_audio_to_twilio(audio_bytes= audio_bytes, frame_rate=self.frame_rate, sample_width=self.sample_width)
+        await self.send_audio_to_twilio(audio_bytes=audio_bytes, frame_rate=self.frame_rate, sample_width=self.sample_width)
+        
+        duration_ms = (len(audio_bytes) / (self.frame_rate * self.sample_width)) * 1000
+        return duration_ms
 
     async def _handle_stop_event(self):
         """Handle the stop event from Twilio which ends a call"""
@@ -620,6 +663,21 @@ class ConversationHandler:
             return mulaw_audio
         else:
             return pcm_data
+    
+    async def stop_speaking(self):
+        """Stop any ongoing speech and clear audio queue and interrupt RAG streaming"""
+        if self.is_speaking:
+            # Interrupt RAG streaming if it's active
+            if hasattr(self, 'rag_interrupt_flag'):
+                self.rag_interrupt_flag["interrupted"] = True
+                self.logger.info("RAG streaming interrupted due to speech interruption")
+                
+            if self.audio_stream_manager:
+                await self.audio_stream_manager.clear_audio_queue()
+                self.logger.info("Cleared audio queue due to speech interruption")
+            self.is_speaking = False
+            return True  # Speech was stopped
+        return False  # No speech was ongoing
     
     async def send_audio_to_twilio(self, file_path: str=None, audio_bytes: bytes=None, frame_rate: int=None, channels: int=1, sample_width: int=None, convert_to_mulaw: bool = False):
         """Convert audio to μ-law and send to Twilio using throttled streaming to prevent disconnections."""

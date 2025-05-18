@@ -1,15 +1,14 @@
 import time
 import logging
 import asyncio
-from queue import Queue, Full, Empty
-from typing import Dict, Optional, Any, Callable
+from typing import Optional
 
 class AudioQueueManager:
     """
     Manages audio queues with true back-pressure to prevent overwhelming Twilio.
     Implements a blocking queue system that forces producers to wait when the queue is full.
     """
-    def __init__(self, max_queue_size: int = 20):
+    def __init__(self, max_queue_size: int = 10):
         self.logger = logging.getLogger(__name__)
         self.max_queue_size = max_queue_size
         self.audio_queue = asyncio.Queue(maxsize=max_queue_size)
@@ -123,7 +122,15 @@ class AudioQueueManager:
         finally:
             self.consumer_waiting = False
     
-    def get_queue_stats(self) -> Dict[str, Any]:
+    def is_actively_sending(self) -> bool:
+        """
+        Returns True if there are items in the queue still being processed
+        or if we're actively playing audio
+        """
+        is_speaking = self.audio_queue.qsize() > 0 or self.is_playing
+        return is_speaking
+    
+    def get_queue_stats(self) -> dict[str, any]:
         """
         Returns statistics about the queue for monitoring
         """
@@ -137,7 +144,8 @@ class AudioQueueManager:
             "is_playing": self.is_playing,
             "producer_waiting": self.producer_waiting,
             "consumer_waiting": self.consumer_waiting,
-            "drain_event_set": self.drain_event.is_set()
+            "drain_event_set": self.drain_event.is_set(),
+            "is_actively_sending": self.is_actively_sending()
         }
         
     async def clear_queue(self) -> None:

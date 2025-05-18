@@ -7,7 +7,7 @@ class AudioStreamManager:
     """
     Manages the complete audio streaming process, combining queue management and sending.
     """
-    def __init__(self, websocket: any, streamSid: str = None, max_queue_size: int = 20, min_chunk_interval: float = 0.05):
+    def __init__(self, websocket: any, streamSid: str = None, max_queue_size: int = 10, min_chunk_interval: float = 0.05):
         self.logger = logging.getLogger(__name__)
         self.queue_manager = AudioQueueManager(max_queue_size=max_queue_size)
         self.audio_sender = TwilioAudioSender(websocket, streamSid=streamSid, min_chunk_interval=min_chunk_interval)
@@ -68,6 +68,32 @@ class AudioStreamManager:
         This is an async method that will block until the queue has space.
         """
         return await self.queue_manager.enqueue_audio(audio_chunk)
+        
+    async def clear_audio_queue(self) -> None:
+        """
+        Clears the audio queue without stopping the streaming worker.
+        Used for interruption handling to immediately stop sending audio.
+        """
+        # Clear the queue asynchronously
+        await self.queue_manager.clear_queue()
+        
+        # Make sure drain event is set to unblock any waiting producers
+        if not self.queue_manager.drain_event.is_set():
+            self.queue_manager.drain_event.set()
+            
+        self.logger.info("Audio queue cleared for interruption")
+        
+    def is_actively_sending(self) -> bool:
+        """
+        Returns whether audio is currently being sent or queued for sending
+        Used to track if the system is speaking for interruption detection
+        """
+        # Check if we have a queue manager
+        if not hasattr(self, 'queue_manager'):
+            return False
+            
+        # Check if there are items in the queue
+        return self.queue_manager.is_actively_sending()
         
     async def _streaming_worker(self) -> None:
         """
