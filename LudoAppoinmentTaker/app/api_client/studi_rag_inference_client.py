@@ -45,7 +45,16 @@ class StudiRAGInferenceClient:
         except httpx.ConnectError as exc:
             raise RuntimeError(f"Cannot connect to RAG inference server at {self.host_base_url}") from exc
 
-    async def add_message_to_conversation(self, conversation_id: str, new_message: str) -> Dict[str, Any]:
+    async def get_user_last_conversation(self, user_id: UUID) -> Dict[str, Any]:
+        """GET /rag/inference/conversation/last/user/{user_id}: Get the last conversation for a user."""
+        try:
+            resp = await self.client.get(f"/rag/inference/conversation/last/user/{str(user_id)}")
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.ConnectError as exc:
+            raise RuntimeError(f"Cannot connect to RAG inference server at {self.host_base_url}") from exc
+
+    async def add_external_ai_message_to_conversation(self, conversation_id: str, new_message: str) -> Dict[str, Any]:
         """POST /rag/inference/conversation/add-message: Add a message to a conversation."""
         try:
             request_model = QueryAskingRequestModel(conversation_id=UUID(conversation_id), user_query_content=new_message, display_waiting_message=False)

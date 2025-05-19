@@ -28,7 +28,7 @@ from app.speech.speech_to_text import get_speech_to_text_provider
 from app.speech.incoming_audio_processing import IncomingAudioProcessing
 from app.speech.audio_streaming import AudioStreamManager
 
-class ConversationHandler:
+class IncomingPhoneCallHandler:
     # Class variables shared across instances
     compiled_graph = None # LangGraph workflow compilation
     phones: Dict[str, str] = {}  # Map call_sid to phone numbers
@@ -37,7 +37,7 @@ class ConversationHandler:
         # Instance variables
         self.websocket = websocket
         self.logger = logging.getLogger(__name__)
-        self.logger.info("BusinessLogic logger started")
+        self.logger.info("IncomingPhoneCallHandler logger started")
         
         # State tracking for this instance
         self.openai_client = None
@@ -105,9 +105,9 @@ class ConversationHandler:
         if self.openai_client is None:
             self.openai_client = OpenAI(api_key=self.OPENAI_API_KEY)
 
-        self.logger.info("BusinessLogic initialized successfully.")
+        self.logger.info("IncomingPhoneCallHandler initialized successfully.")
 
-    async def init_user_and_conversation(self, calling_phone_number: str, call_sid: str):
+    async def init_user_and_new_conversation_upon_phone_call(self, calling_phone_number: str, call_sid: str):
         """ Initialize the user session: create user and conversation and send a welcome message """
         # Ensure user_name and IP are valid strings
         user_name_val = "Twilio incoming call " + (calling_phone_number or "Unknown User")
@@ -126,7 +126,6 @@ class ConversationHandler:
             if isinstance(user_id, str): user_id = UUID(user_id)
                 
             # Create empty messages list
-            from app.api_client.request_models.conversation_request_model import MessageRequestModel
             messages = []
             
             # Create the conversation request model
@@ -140,7 +139,7 @@ class ConversationHandler:
             self.logger.error(f"Error creating conversation: {str(e)}")
             return str(uuid.uuid4())
 
-    async def run_async(self, calling_phone_number: str, call_sid: str) -> None:
+    async def handle_ongoing_call_async(self, calling_phone_number: str, call_sid: str) -> None:
         """Main method: handle a full audio conversation with I/O Twilio streams on a WebSocket."""
         if not self.websocket:
             self.logger.error("WebSocket not set, cannot handle WebSocket connection.")
@@ -247,14 +246,14 @@ class ConversationHandler:
             "agent_scratchpad": {}
         }
         # Now, initialize the user and conversation backend (this might take some time)
-        self.conversation_id = await self.init_user_and_conversation(phone_number, call_sid)
+        self.conversation_id = await self.init_user_and_new_conversation_upon_phone_call(phone_number, call_sid)
         
         # Store the initial state for this stream (used by graph and other handlers)
         self.stream_states[stream_sid] = initial_state
         
         try:
             # Log the welcome message to our backend records
-            await self.studi_rag_inference_client.add_message_to_conversation(self.conversation_id, welcome_text)
+            await self.studi_rag_inference_client.add_external_ai_message_to_conversation(self.conversation_id, welcome_text)
             
             if not self.compiled_graph:
                 self.compiled_graph = AgentsGraph().graph
@@ -267,7 +266,7 @@ class ConversationHandler:
                 ai_message = updated_state['history'][0][1]
                 if ai_message and ai_message.strip() != welcome_text.strip():
                     await self.speak_and_send_text(ai_message)
-                    await self.studi_rag_inference_client.add_message_to_conversation(self.conversation_id, ai_message)
+                    await self.studi_rag_inference_client.add_external_ai_message_to_conversation(self.conversation_id, ai_message)
         
         except Exception as e:
             self.logger.error(f"Error in initial graph invocation: {e}", exc_info=True)
@@ -361,16 +360,15 @@ class ConversationHandler:
             
             # 5. Feedback the request to the user
             #spoken_text = await self.send_ask_feedback(transcript)
-            request = QueryAskingRequestModel(
-                conversation_id=self.conversation_id,
-                user_query_content= user_query_transcript,
-                display_waiting_message=False
-            )
             try:
                 self.logger.info(f"Sending request to RAG API for stream: {self.current_stream}")
-                # Reset the interrupt flag before starting new streaming
-                self.rag_interrupt_flag = {"interrupted": False}
-                response = self.studi_rag_inference_client.rag_query_stream_async(request, timeout=60, interrupt_flag=self.rag_interrupt_flag)
+                rag_query_RM = QueryAskingRequestModel(
+                    conversation_id=self.conversation_id,
+                    user_query_content= user_query_transcript,
+                    display_waiting_message=False
+                )
+                self.rag_interrupt_flag = {"interrupted": False} # Reset the interrupt flag before starting new streaming
+                response = self.studi_rag_inference_client.rag_query_stream_async(rag_query_RM, timeout=60, interrupt_flag=self.rag_interrupt_flag)
                 #await self.speak_and_send_ask_for_feedback_async(user_query_transcript)
                 await self.speak_and_send_text("OK. Vous avez demandé : " + user_query_transcript + ". Laisser moi un instant pour rechercher des informations à ce sujet.")
                 

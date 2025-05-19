@@ -9,7 +9,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 #
 from app import endpoints
-from app.conversation_handler import ConversationHandler
+from app.incoming_phone_call_handler import IncomingPhoneCallHandler
 
 class ApiConfig:
     @asynccontextmanager
