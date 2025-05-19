@@ -313,8 +313,7 @@ class IncomingPhoneCallHandler:
         
         return stream_sid
 
-    async def _handle_media_event(self, data):
-        
+    async def _handle_media_event(self, data):        
         if not self.current_stream:
             self.logger.error("/!\\ 'media event' received before the 'start event'")
             return
@@ -339,7 +338,7 @@ class IncomingPhoneCallHandler:
             # Use a lower threshold multiplier (1.2x instead of 1.5x) for quicker interruption
             if not is_silence and speech_to_noise_ratio > self.speech_threshold * 1.2:
                 self.logger.info(f"Speech interruption detected (level: {speech_to_noise_ratio}), stopping system speech")
-                await self.stop_speaking()
+                await self._stop_speaking()
                 # Reset buffer to clear any previous speech before interruption
                 self.audio_buffer = b""
                 self.consecutive_silence_duration_ms = 0.0
@@ -502,7 +501,7 @@ class IncomingPhoneCallHandler:
             self.logger.info("Transcribing audio with hybrid STT provider...")
             transcript: str = self.stt_provider.transcribe_audio(wav_file_name)
             self.logger.info(f">> Speech to text transcription: '{transcript}'")
-            self.delete_temp_file(wav_file_name)
+            self._delete_temp_file(wav_file_name)
             
             # Filter out known watermark text that appears during silences
             known_watermarks = [
@@ -533,7 +532,7 @@ class IncomingPhoneCallHandler:
             self.logger.error(f"Error during transcription: {speech_err}", exc_info=True)
             return None
     
-    def delete_temp_file(self, file_name: str):
+    def _delete_temp_file(self, file_name: str):
         try:
             os.remove(os.path.join(self.TEMP_DIR, file_name))
         except Exception as e:
@@ -754,7 +753,7 @@ class IncomingPhoneCallHandler:
         else:
             return pcm_data
     
-    async def stop_speaking(self):
+    async def _stop_speaking(self):
         """Stop any ongoing speech and clear audio queue and interrupt RAG streaming"""
         if self.is_speaking:
             # Interrupt RAG streaming if it's active
@@ -770,17 +769,11 @@ class IncomingPhoneCallHandler:
         return False  # No speech was ongoing
     
     async def send_audio_to_twilio(self, file_path: str=None, audio_bytes: bytes=None, frame_rate: int=None, channels: int=1, sample_width: int=None, convert_to_mulaw: bool = False):
-        """Convert audio to μ-law and send to Twilio using throttled streaming to prevent disconnections."""
+        """Convert audio to μ-law and send to Twilio using throttled streaming to prevent disconnections."""        
+        
         # Use instance defaults if not specified
         frame_rate = frame_rate or self.frame_rate
         sample_width = sample_width or self.sample_width
-        
-        Args:
-            text_buffer: Le texte à synthétiser et envoyer
-            
-        Returns:
-            bool: True si l'opération a réussi, False sinon
-        """
         # Vérification de base
         if not self.current_stream:
             self.logger.error("No active stream, cannot send text")
