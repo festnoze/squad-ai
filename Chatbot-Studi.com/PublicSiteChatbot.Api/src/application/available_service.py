@@ -154,6 +154,14 @@ class AvailableService:
                 new_conv.add_new_message(message.role, message.content)
                 assert await conv_repo.add_message_to_existing_conversation_async(new_conv.id, new_conv.last_message)
         return new_conv
+
+    @staticmethod
+    async def get_user_last_conversation_async(user_id: UUID) -> Conversation:
+        conv_repo = ConversationRepository() # TODO: do IoC for repositories instanciation
+        conversations = await conv_repo.get_all_user_conversations_async(user_id)
+        if any(conversations):
+            return conversations[-1]
+        return None
     
     @staticmethod
     async def add_message_to_user_last_conversation_or_create_one_async(user_id:UUID, new_message:str) -> Conversation:

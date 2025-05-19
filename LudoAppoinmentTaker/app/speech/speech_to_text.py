@@ -116,7 +116,7 @@ class HybridSTTProvider(SpeechToTextProvider):
 
         # Fallback to OpenAI transcription
         if openai_client:
-            transcript = OpenAISTTProvider.transcribe_audio_static(openai_client, speech, client, temp_dir, file_name, language_code)
+            transcript = OpenAISTTProvider.transcribe_audio_static(openai_client, temp_dir, file_name, language_code)
             return transcript
         return ""
 

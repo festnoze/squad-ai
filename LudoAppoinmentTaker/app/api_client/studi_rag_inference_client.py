@@ -1,7 +1,7 @@
 import httpx
 import asyncio
 from uuid import UUID
-from typing import Any, Dict, AsyncGenerator
+from typing import Any, Dict, AsyncGenerator, Optional
 from api_client.request_models.user_request_model import UserRequestModel
 from api_client.request_models.conversation_request_model import ConversationRequestModel
 from api_client.request_models.query_asking_request_model import QueryAskingRequestModel, QueryNoConversationRequestModel
@@ -46,7 +46,16 @@ class StudiRAGInferenceClient:
         except httpx.ConnectError as exc:
             raise RuntimeError(f"Cannot connect to RAG inference server at {self.host_base_url}") from exc
 
-    async def add_message_to_conversation(self, conversation_id: str, new_message: str) -> Dict[str, Any]:
+    async def get_user_last_conversation(self, user_id: UUID) -> Dict[str, Any]:
+        """GET /rag/inference/conversation/last/user/{user_id}: Get the last conversation for a user."""
+        try:
+            resp = await self.client.get(f"/rag/inference/conversation/last/user/{str(user_id)}")
+            resp.raise_for_status()
+            return resp.json()
+        except httpx.ConnectError as exc:
+            raise RuntimeError(f"Cannot connect to RAG inference server at {self.host_base_url}") from exc
+
+    async def add_external_ai_message_to_conversation(self, conversation_id: str, new_message: str) -> Dict[str, Any]:
         """POST /rag/inference/conversation/add-message: Add a message to a conversation."""
         try:
             request_model = QueryAskingRequestModel(conversation_id=UUID(conversation_id), user_query_content=new_message, display_waiting_message=False)
@@ -56,13 +65,15 @@ class StudiRAGInferenceClient:
         except httpx.ConnectError as exc:
             raise RuntimeError(f"Cannot connect to RAG inference server at {self.host_base_url}") from exc
 
-    async def rag_answer_query_stream(self, query_asking_request_model: QueryAskingRequestModel, timeout: int = 60, pause_duration_between_chunks_ms: int = 0) -> AsyncGenerator[str, None]:
-        """POST /rag/inference/conversation/ask-question/phone/stream: Stream RAG answer for a conversation.
+    async def rag_query_stream_async(self, query_asking_request_model: QueryAskingRequestModel, timeout: int = 60, interrupt_flag=None) -> AsyncGenerator[str, None]:
+        """
+        POST /rag/inference/conversation/ask-question/phone/stream: Stream RAG answer for a conversation.
         
         Args:
-            query_asking_request_model: Le modèle de requête pour poser une question
-            timeout: Délai d'expiration en secondes pour la requête
-            pause_duration_between_chunks_ms: Durée de pause en millisecondes entre chaque chunk retourné (0 = pas de pause)
+            query_asking_request_model: Model containing the query data
+            timeout: Request timeout in seconds
+            interrupt_flag: Mutable object (like a dict {"interrupted": False}) that can be modified externally
+                            to interrupt the streaming
         """
         try:
             async with self.client.stream(
@@ -72,7 +83,7 @@ class StudiRAGInferenceClient:
                 timeout=httpx.Timeout(timeout)
             ) as resp:
                 resp.raise_for_status()
-                async for segment in self.stream_by_segment(resp, pause_duration_between_chunks_ms):
+                async for segment in self.stream_by_segment(resp, interrupt_flag):
                     yield segment
 
         except httpx.ReadTimeout:
@@ -83,29 +94,25 @@ class StudiRAGInferenceClient:
             yield f"Une erreur s'est produite lors de la récupération de la réponse: {str(e)}"
 
     @staticmethod
-    async def stream_by_segment(response_stream, pause_duration_between_chunks_ms: int = 0):
-        """Traite le stream de réponse en segments et ajoute des pauses entre les segments si demandé.
-        
-        Args:
-            response_stream: Le stream de réponse du serveur RAG
-            pause_duration_between_chunks_ms: Durée de pause en millisecondes entre chaque segment
-        """
+    async def stream_by_segment(response_stream: httpx.Response, interrupt_flag: Optional[Dict[str, bool]] = None):
+        """Process the response stream byte by byte and yield segments"""
         text_buffer = ""
         async for chunk in response_stream.aiter_bytes():
+            is_interupted = interrupt_flag and interrupt_flag.get("interrupted", False)
+            # First check if streaming should be interrupted
+            if is_interupted:
+                break
+                
             if chunk:
                 text = chunk.decode("utf-8", errors="ignore")
                 text_buffer += text
-                if len(text_buffer) > 1 and (any(punct in text for punct in [".", ",", ":", "!", "?"]) or len(text_buffer.split()) > 20):
-                    # Ajouter une pause avant de retourner le segment si durée > 0
-                    if pause_duration_between_chunks_ms > 0:
-                        await asyncio.sleep(pause_duration_between_chunks_ms / 1000)  # Convertir ms en secondes
+                # Yield when we have a complete thought or enough words
+                if len(text_buffer.split()) > 10 or len(text_buffer) > 100:
                     yield text_buffer
                     text_buffer = ""
         
-        # Ne pas oublier le dernier morceau de texte s'il en reste
-        if text_buffer:
-            if pause_duration_between_chunks_ms > 0:
-                await asyncio.sleep(pause_duration_between_chunks_ms / 1000)
+        # Only yield remaining text if not interrupted and there's something to yield
+        if text_buffer and not is_interupted:
             yield text_buffer
 
     async def rag_query_no_conversation_async(self, query_no_conversation_request_model: QueryNoConversationRequestModel) -> Dict[str, Any]:

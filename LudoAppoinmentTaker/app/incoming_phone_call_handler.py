@@ -13,9 +13,7 @@ from uuid import UUID
 from datetime import datetime
 #
 from pydub import AudioSegment
-from pydub.silence import detect_nonsilent
-from google.cloud import speech, texttospeech
-from openai import OpenAI, Stream
+from openai import OpenAI
 from typing import Dict, Optional
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
 #
@@ -25,14 +23,12 @@ from app.api_client.studi_rag_inference_client import StudiRAGInferenceClient
 from app.api_client.request_models.user_request_model import UserRequestModel, DeviceInfoRequestModel
 from app.api_client.request_models.conversation_request_model import ConversationRequestModel
 from app.api_client.request_models.query_asking_request_model import QueryAskingRequestModel
-from app.text_to_speech import get_text_to_speech_provider
-from app.speech_to_text import get_speech_to_text_provider
-from app.audio_processing import AudioProcessor
-# Importer les nouvelles classes pour la gestion du flux audio
-from app.audio.send_text_queue import TextQueueManager
-from app.audio.send_text_twilio import TwilioTextSender
+from app.speech.text_to_speech import get_text_to_speech_provider
+from app.speech.speech_to_text import get_speech_to_text_provider
+from app.speech.incoming_audio_processing import IncomingAudioProcessing
+from app.speech.audio_streaming import AudioStreamManager
 
-class BusinessLogic:
+class IncomingPhoneCallHandler:
     # Class variables shared across instances
     compiled_graph = None # LangGraph workflow compilation
     phones: Dict[str, str] = {}  # Map call_sid to phone numbers
@@ -41,13 +37,15 @@ class BusinessLogic:
         # Instance variables
         self.websocket = websocket
         self.logger = logging.getLogger(__name__)
-        self.logger.info("BusinessLogic logger started")
+        self.logger.info("IncomingPhoneCallHandler logger started")
         
         # State tracking for this instance
         self.openai_client = None
         self.stream_states = {}
         self.active_streams = {}
-        self.active_calls = {}
+        # Flags to track speaking state
+        self.is_speaking = False  # Flag to track if system is currently speaking
+        self.rag_interrupt_flag = {"interrupted": False}  # Flag to interrupt RAG streaming
         
         # Set audio processing parameters as instance variables
         self.frame_rate = 8000  # Sample rate in Hz (8kHz is standard for telephony)
@@ -56,8 +54,8 @@ class BusinessLogic:
         self.min_audio_bytes_for_processing = 6400  # Minimum buffer size = ~400ms at 8kHz
         self.max_audio_bytes_for_processing = 150000  # Maximum buffer size = ~15s at 8kHz
         self.consecutive_silence_duration_ms = 0.0  # Count consecutive silence duration in milliseconds
-        self.required_silence_ms_to_answer = 500  # Require 800ms of silence to process audio
-        self.speech_chunk_duration_ms = 400  # Duration of each audio chunk in milliseconds
+        self.required_silence_ms_to_answer = 300  # Require 300ms of silence to process audio
+        self.speech_chunk_duration_ms = 500  # Duration of each audio chunk in milliseconds
         
         self.audio_buffer = b""
         self.current_stream = None
@@ -96,13 +94,16 @@ class BusinessLogic:
             os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = self.google_calendar_credentials_path
             self.logger.info(f"Set GOOGLE_APPLICATION_CREDENTIALS to: {self.google_calendar_credentials_path}")
         else:
-            self.logger.warning(f"/!\\ Warning: Google calendar credentials file not found at {self.google_calendar_credentials_path}")
+            self.logger.error(f"/!\\ Google calendar credentials file not found at {self.google_calendar_credentials_path}")
 
         self.tts_provider = get_text_to_speech_provider(self.TEMP_DIR, provider="openai")
         self.stt_provider = get_speech_to_text_provider(self.TEMP_DIR, provider="openai")
         
         # Initialize audio processor for better quality
-        self.audio_processor = AudioProcessor(sample_width=self.sample_width, frame_rate=self.frame_rate, vad_aggressiveness=3)
+        self.incoming_audio = IncomingAudioProcessing(sample_width=self.sample_width, frame_rate=self.frame_rate, vad_aggressiveness=3)
+        
+        # Initialize the audio stream manager for throttled Twilio audio streaming
+        self.audio_stream_manager = None
 
         self.studi_rag_inference_client = StudiRAGInferenceClient()
 
@@ -110,123 +111,9 @@ class BusinessLogic:
         if self.openai_client is None:
             self.openai_client = OpenAI(api_key=self.OPENAI_API_KEY)
 
-        # if not self.compiled_graph:
-        #     self.compiled_graph = AgentsGraph().graph
+        self.logger.info("IncomingPhoneCallHandler initialized successfully.")
 
-        self.logger.info("BusinessLogic initialized successfully.")
-    
-    def _decode_json(self, message: str) -> Optional[Dict]:
-        """Safely decode JSON message from WebSocket."""
-        try:
-            return json.loads(message)
-        except json.JSONDecodeError as e:
-            self.logger.error(f"Failed to decode JSON message: {e}")
-            return None
-    
-    async def _handle_connected_event(self):
-        """Handle the 'connected' event from Twilio."""
-        self.logger.info("Twilio WebSocket connected")
-        
-        # Start the streaming worker if it's not already running
-        if not self.is_streaming and not self.stream_worker_task:
-            self.is_streaming = True
-            self.stream_worker_task = asyncio.create_task(self._streaming_worker())
-            self.logger.info("Started text streaming worker")
-            
-    async def _streaming_worker(self):
-        """Process text from the queue and send to Twilio.
-        This worker runs continuously while self.is_streaming is True,
-        and pulls items from the text queue to send to the Twilio WebSocket.
-        
-        Utilise la classe TwilioTextSender pour envoyer le texte à Twilio et 
-        implémente le contrôle de flux avec back-pressure.
-        """
-        if not self.websocket:
-            self.logger.error("WebSocket is None, cannot start streaming worker")
-            self.is_streaming = False
-            return
-            
-        self.logger.info("Starting text streaming worker with flow control")
-        
-        try:
-            # Déléguer à la classe TwilioTextSender pour gérer le streaming
-            await TwilioTextSender.process_text_to_audio(
-                websocket=self.websocket,
-                text_queue=self.text_queue,
-                tts_provider=self.tts_provider,
-                stream_sid=self.current_stream,
-                is_streaming=self.is_streaming,
-                logger=self.logger
-            )
-        except Exception as e:
-            self.logger.error(f"Unhandled exception in streaming worker: {e}", exc_info=True)
-        finally:
-            self.logger.info("Text streaming worker stopped")
-            self.is_streaming = False
-            
-    # Cette méthode n'est plus nécessaire avec le nouveau système basé sur le texte
-    # Le traitement est entièrement géré par TwilioTextSender.process_text_to_audio
-    
-    async def _handle_start_event(self, start_data: Dict) -> str:
-        """Handle the 'start' event from Twilio which begins a new call."""
-        call_sid = start_data.get("callSid")
-        stream_sid = start_data.get("streamSid")
-        
-        self.start_time = datetime.now()
-        self.logger.info(f"Call started - CallSid: {call_sid}, StreamSid: {stream_sid}")
-        
-        # Initialize conversation state for this stream
-        phone_number = self.phones.get(call_sid, "Unknown")
-        
-        # Create initial state for the graph
-        initial_state: ConversationState = {
-            "call_sid": call_sid,
-            "caller_phone": phone_number,
-            "user_input": "",
-            "history": [],
-            "agent_scratchpad": {}
-        }
-        self.current_stream = stream_sid
-        self.stream_states[stream_sid] = initial_state
-        
-        welcome_text = f"""
-        Bonjour! Bienvenue chez Studi, l'école 100% en ligne !
-        Je suis l'assistant virtuel Stud'IA, je prends le relais lorsque nos conseillers en formation ne sont pas présents.
-        Souhaitez-vous prendre rendez-vous avec un conseiller ou que je vous aide à trouver quelle formation pourrait vous intéresser ?
-        """
-        #welcome_text = "Salut !"
-
-        # Firstly speak the welcome message
-        await self.speak_and_send_text_async(welcome_text)
-
-        await asyncio.sleep(5)
-        
-        # Retrieve the user and create a new conversation
-        self.conversation_id = await self.init_user_and_conversation(phone_number, call_sid)
-        await self.studi_rag_inference_client.add_message_to_conversation(self.conversation_id, welcome_text)
-        
-        #  Continue to the graph of AI agents workflow (for adaptative actions)        
-        if not self.compiled_graph:
-            self.compiled_graph = AgentsGraph().graph
-
-        if not self.compiled_graph:
-            self.logger.error("Graph not compiled, cannot handle WebSocket connection.")
-            await self.websocket.close(code=1011, reason="Server configuration error")
-            return
-
-        # updated_state = await self.compiled_graph.ainvoke(initial_state)
-        # self.stream_states[stream_sid] = updated_state
-        
-        # # If there's an AI message from the graph, send it after the welcome message
-        # if updated_state.get('history') and updated_state['history'][0][0] == 'AI':
-        #     ai_message = updated_state['history'][0][1]
-        #     if ai_message and ai_message.strip() != welcome_text.strip():
-        #         await self.speak_and_send_text_async(ai_message)
-        #         await self.studi_rag_inference_client.add_message_to_conversation(self.conversation_id, ai_message)
-        
-        return stream_sid
-
-    async def init_user_and_conversation(self, calling_phone_number: str, call_sid: str):
+    async def init_user_and_new_conversation_upon_phone_call(self, calling_phone_number: str, call_sid: str):
         """ Initialize the user session: create user and conversation and send a welcome message """
         # Ensure user_name and IP are valid strings
         user_name_val = "Twilio incoming call " + (calling_phone_number or "Unknown User")
@@ -245,7 +132,6 @@ class BusinessLogic:
             if isinstance(user_id, str): user_id = UUID(user_id)
                 
             # Create empty messages list
-            from app.api_client.request_models.conversation_request_model import MessageRequestModel
             messages = []
             
             # Create the conversation request model
@@ -259,15 +145,13 @@ class BusinessLogic:
             self.logger.error(f"Error creating conversation: {str(e)}")
             return str(uuid.uuid4())
 
-    async def websocket_handler(self, calling_phone_number: str, call_sid: str) -> None:
-        """Main WebSocket handler for Twilio streams with enhanced logging."""
+    async def handle_ongoing_call_async(self, calling_phone_number: str, call_sid: str) -> None:
+        """Main method: handle a full audio conversation with I/O Twilio streams on a WebSocket."""
         if not self.websocket:
             self.logger.error("WebSocket not set, cannot handle WebSocket connection.")
             return
-
-        start_time = time.time()
-        remote_addr = f"{self.websocket.client.host}:{self.websocket.client.port}"
-        self.logger.info(f"WebSocket handler started for {remote_addr}")
+        
+        self.logger.info(f"WebSocket handler started for {self.websocket.client.host}:{self.websocket.client.port}")
         
         # Log initial WebSocket state and attributes
         try:
@@ -279,11 +163,20 @@ class BusinessLogic:
         
         # Store the caller's phone number and call SID so we can retrieve them later
         self.phones[call_sid] = calling_phone_number
+        
+        # Initialize the audio stream manager for throttled audio streaming with optimized parameters
+        # We'll set the streamSid later when the call starts
+        self.audio_stream_manager = AudioStreamManager(
+            websocket=self.websocket, 
+            streamSid=None,  # Will be set when the call starts
+            max_queue_size=5,  # Smaller queue size for faster feedback
+            min_chunk_interval=0.05  # Faster refresh rate (20ms)
+        )
+        # Start the background streaming task
+        self.audio_stream_manager.start_streaming()
+        self.logger.info("Audio stream manager initialized and started with optimized parameters")
 
-        # Track activity for diagnostics
-        last_activity = time.time()
-        message_count = 0
-
+        # Main loop to handle WebSocket events
         try:            
             while True:
                 # Check if the WebSocket is still connected before trying to receive
@@ -294,12 +187,8 @@ class BusinessLogic:
                     break
                 
                 try:
-                    # Set a reasonable timeout for receiving messages - prevents indefinite hanging
-                    # Use wait_for with a timeout of 30 seconds
-                    msg = await asyncio.wait_for(self.websocket.receive_text(), timeout=30.0)
-                    last_activity = time.time()
-                    message_count += 1
-                    data = self._decode_json(msg)
+                    msg = await self.websocket.receive_text()
+                    data = json.loads(msg)
                     if data is None:
                         continue        
                 
@@ -315,38 +204,23 @@ class BusinessLogic:
                     self.logger.info(f"Connection stats at disconnect: {message_count} messages processed")
                     break
                     
-                except RuntimeError as rt_err:
-                    # This catches specific errors like "WebSocket is not connected"
-                    self.logger.error(f"WebSocket runtime error: {rt_err}")
-                    self.logger.info(f"Connection stats at error: {message_count} messages, {time.time() - last_activity:.2f}s since activity")
-                    break
-                    
-                except Exception as recv_err:
-                    # Something else went wrong during receive
-                    self.logger.error(f"Unexpected error receiving WebSocket message: {recv_err}", exc_info=True)
-                    break
-                
-                # Process the event
-                try:    
-                    event = data.get("event")
-                    if event == "connected":
-                        self._handle_connected_event()
-                    elif event == "start":
-                        await self._handle_start_event(data.get("start", {}))
-                    elif event == "media":
-                        if not self.current_stream:
-                            self.logger.warning("/!\\ Error: media event received before the start event")
-                            continue
-                        await self._handle_media_event(data)
-                    elif event == "stop":
-                        await self._handle_stop_event()
-                    else:
-                        self.logger.warning(f"Unknown event: {event}")
-                except Exception as event_err:
-                    self.logger.error(f"Error processing event '{data.get('event')}': {event_err}", exc_info=True)
-        except Exception as outer_err:
-            # Catch any errors in the main handler loop
-            self.logger.error(f"Unhandled error in WebSocket main loop: {outer_err}", exc_info=True)
+                event = data.get("event")
+                if event == "connected":
+                    self._handle_connected_event()
+                elif event == "start":
+                    await self._handle_start_event(data.get("start", {}))
+                elif event == "media":
+                    await self._handle_media_event(data)
+                elif event == "stop":
+                    await self._handle_stop_event()
+                    return
+                elif event == "mark":
+                    self._handle_mark_event(data)
+                else:
+                    self.logger.warning(f"Received unknown event type: {event}")
+
+        except Exception as e:
+            self.logger.error(f"Unhandled error in WebSocket handler: {e}", exc_info=True)
         finally:
             # Log session information on exit
             session_duration = time.time() - start_time
@@ -361,37 +235,142 @@ class BusinessLogic:
             
             self.logger.info(f"WebSocket endpoint finished for: {remote_addr} (Stream: {self.current_stream})")
     
+    def _handle_connected_event(self):
+        """Handle the 'connected' event from Twilio."""
+        self.logger.info("Twilio WebSocket connected")
+    
+    async def _handle_start_event(self, start_data: Dict) -> str:
+        """Handle the 'start' event from Twilio which begins a new call."""
+        call_sid = start_data.get("callSid")
+        stream_sid = start_data.get("streamSid")
+        
+        self.start_time = datetime.now()
+        self.logger.info(f"Call started - CallSid: {call_sid}, StreamSid: {stream_sid}")
+        
+        # Set the current stream so the audio functions know which stream to use
+        self.current_stream = stream_sid
+        
+        # Update the streamSid in the audio streaming manager
+        if self.audio_stream_manager:
+            # Update the streamSid in the audio sender
+            self.audio_stream_manager.update_stream_sid(stream_sid)
+            self.logger.info(f"Updated AudioStreamManager with stream SID: {stream_sid}")
+        
+        # Define the welcome message
+        welcome_text = f"""
+        Bienvenue chez Studi !
+        Je suis l'assistant virtuel Stud'IA, je prends le relais lorsque nos conseillers ne sont pas présents.
+        Puis-je vous aider à choisir votre formation ? Ou a prendre rendez-vous avec un conseiller en formation ?
+        """
+        #welcome_text = "Salut !"
+
+        self.logger.info(f"Sending welcome speech to {call_sid}")
+        
+        duration = await self.speak_and_send_text(welcome_text)
+        
+        # Wait until the welcome message is finished playing
+        # await asyncio.sleep(duration / 1000)
+        # self.logger.info("Welcome message completed, now listening for user speech")
+
+        # Initialize conversation state for this stream
+        phone_number = self.phones.get(call_sid, "Unknown")
+        
+        # Create initial state for the graph
+        initial_state: ConversationState = {
+            "call_sid": call_sid,
+            "caller_phone": phone_number,
+            "user_input": "",
+            "history": [],
+            "agent_scratchpad": {}
+        }
+        # Now, initialize the user and conversation backend (this might take some time)
+        self.conversation_id = await self.init_user_and_new_conversation_upon_phone_call(phone_number, call_sid)
+        
+        # Store the initial state for this stream (used by graph and other handlers)
+        self.stream_states[stream_sid] = initial_state
+        
+        try:
+            # Log the welcome message to our backend records
+            await self.studi_rag_inference_client.add_external_ai_message_to_conversation(self.conversation_id, welcome_text)
+            
+            if not self.compiled_graph:
+                self.compiled_graph = AgentsGraph().graph
+            # Then invoke the graph with initial state to get the AI-generated welcome message
+            updated_state = await self.compiled_graph.ainvoke(initial_state)
+            self.stream_states[stream_sid] = updated_state
+            
+            # If there's an AI message from the graph, send it after the welcome message
+            if updated_state.get('history') and updated_state['history'][0][0] == 'AI':
+                ai_message = updated_state['history'][0][1]
+                if ai_message and ai_message.strip() != welcome_text.strip():
+                    await self.speak_and_send_text(ai_message)
+                    await self.studi_rag_inference_client.add_external_ai_message_to_conversation(self.conversation_id, ai_message)
+        
+        except Exception as e:
+            self.logger.error(f"Error in initial graph invocation: {e}", exc_info=True)
+            # If there was an error with the graph, we already sent our welcome message,
+            # so we don't need to send a fallback
+        
+        return stream_sid
+
     async def _handle_media_event(self, data):
+        
+        if not self.current_stream:
+            self.logger.error("/!\\ 'media event' received before the 'start event'")
+            return
+        
         # 1. Decode audio chunk
         chunk = self._decode_audio_chunk(data)
         if chunk is None: 
             self.logger.warning("Received media event without valid audio chunk")
             return
+                        
+        # First, update the speaking state based on the queue status
+        self.update_is_speaking_state()
+        
+        # Check for speech while system is speaking (interruption detection)
+        if self.is_speaking:
+            # Check if this chunk contains speech - use a lower threshold to detect speech earlier
+            is_silence, speech_to_noise_ratio = self.incoming_audio.detect_silence_speech(
+                chunk, threshold=self.speech_threshold * 0.8  # More sensitive detection while speaking
+            )
+            
+            # If user is speaking while system is speaking, stop system speech
+            # Use a lower threshold multiplier (1.2x instead of 1.5x) for quicker interruption
+            if not is_silence and speech_to_noise_ratio > self.speech_threshold * 1.2:
+                self.logger.info(f"Speech interruption detected (level: {speech_to_noise_ratio}), stopping system speech")
+                await self.stop_speaking()
+                # Reset buffer to clear any previous speech before interruption
+                self.audio_buffer = b""
+                self.consecutive_silence_duration_ms = 0.0
+                # Add a message to the logs so we can track interruptions
+                print(f"\r>>> USER INTERRUPTED - Speech detected while system was speaking ({speech_to_noise_ratio})")
         
         # Use WebRTC VAD for better speech detection
-        is_silence, speech_to_noise_ratio = self.audio_processor.detect_silence_speech(
+        is_silence, speech_to_noise_ratio = self.incoming_audio.detect_silence_speech(
             chunk, threshold=self.speech_threshold
         )
 
         # 2. Silence detection before adding to buffer
         has_speech_began = len(self.audio_buffer) > 0
 
-        # Count consecutive silence chunks in milliseconds
+        # Count consecutive silence chunks duration
         if is_silence:
-            # Calculate duration in milliseconds: (chunk_bytes / bytes_per_sample) / samples_per_second * 1000
+            # Calculate duration
             chunk_duration_ms = (len(chunk) / self.sample_width) / self.frame_rate * 1000
             self.consecutive_silence_duration_ms += chunk_duration_ms
-            print(f"\rSilent chunk - Duration: {self.consecutive_silence_duration_ms:.1f}ms - Speech/noise: {speech_to_noise_ratio:04d} (size: {len(chunk)}B) ", end="", flush=True)
+            msg = f"\rSilent chunk - Duration: {self.consecutive_silence_duration_ms:.1f}ms - Speech/noise: {speech_to_noise_ratio:04d} (size: {len(chunk)} bytes)."
+            print(msg, end="", flush=True)
 
         # Add speech chunk to buffer
         if has_speech_began or not is_silence:
             self.audio_buffer += chunk
             self.consecutive_silence_duration_ms = 0.0
 
-            self.logger.debug(
-                f"Speech detected - RMS: {speech_to_noise_ratio}/{self.speech_threshold}, "
-                f"Buffer size: {len(self.audio_buffer)} bytes"
-            )
+            if(random.randint(0, 100) < 1): # Log every 1%
+                self.logger.debug(
+                    f"Speech detected - RMS: {speech_to_noise_ratio}/{self.speech_threshold}, "
+                    f"Buffer size: {len(self.audio_buffer)} bytes")
 
         is_long_silence_after_speech = has_speech_began and self.consecutive_silence_duration_ms >= self.required_silence_ms_to_answer 
         has_reach_min_speech_length = len(self.audio_buffer) >= self.min_audio_bytes_for_processing
@@ -409,24 +388,60 @@ class BusinessLogic:
             self.audio_buffer = b""
             self.consecutive_silence_duration_ms = 0.0
 
+            # Waiting message
+            #await self.speak_and_send_text("Très bien, je vais traiter votre demande.")
+
             # 4. Transcribe speech to text
             user_query_transcript = self._perform_speech_to_text_transcription(audio_data)
             if user_query_transcript is None:
                 return
             
-            # 5. Call external service to produce the answer to the user request
+            # 5. Feedback the request to the user
+            #spoken_text = await self.send_ask_feedback(transcript)
             try:
                 self.logger.info(f"Sending request to RAG API for stream: {self.current_stream}")
+                rag_query_RM = QueryAskingRequestModel(
+                    conversation_id=self.conversation_id,
+                    user_query_content= user_query_transcript,
+                    display_waiting_message=False
+                )
+                self.rag_interrupt_flag = {"interrupted": False} # Reset the interrupt flag before starting new streaming
+                response = self.studi_rag_inference_client.rag_query_stream_async(rag_query_RM, timeout=60, interrupt_flag=self.rag_interrupt_flag)
+                #await self.speak_and_send_ask_for_feedback_async(user_query_transcript)
+                await self.speak_and_send_text("OK. Vous avez demandé : " + user_query_transcript + ". Laisser moi un instant pour rechercher des informations à ce sujet.")
                 
-                start_time = time.time()
-                response = self.external_answering_stream(user_query_transcript, self.conversation_id)                
-                answer = await self.speak_external_user_request_response_async(response)                
+                full_answer = ""
+                was_interrupted = False
+                async for chunk in response:
+                    # Vérifier si on a été interrompu entre les chunks
+                    if not self.is_speaking:
+                        was_interrupted = True
+                        self.logger.info("Speech interrupted while processing RAG response")
+                        break
+                        
+                    full_answer += chunk
+                    self.logger.debug(f"Received chunk: {chunk}")
+                    print(f"<< ... {chunk} ... >>")
+                    
+                    # Sauvegarder l'état de parole avant de parler
+                    speaking_before = self.is_speaking
+                    await self.speak_and_send_text(chunk)
+                    
+                    # Vérifier si on a été interrompu pendant qu'on parlait
+                    if speaking_before and not self.is_speaking:
+                        was_interrupted = True
+                        self.logger.info("Speech interrupted during RAG response chunk")
+                        break
+                
+                # Loguer les résultats du traitement RAG
                 end_time = time.time()
-
-                if answer:
-                    self.logger.info(f"Full answer gotten from RAG API in {end_time - start_time:.2f}s. : {answer}")
+                if was_interrupted:
+                    self.logger.info(f"RAG streaming was interrupted")
+                elif full_answer:
+                    self.logger.info(f"Full answer received from RAG API in {end_time - start_time:.2f}s: {full_answer[:100]}...")
                 else:
                     self.logger.warning(f"Empty response received from RAG API")
+                
             except Exception as e:
                 error_message = f"Je suis désolé, une erreur s'est produite lors de la communication avec le service."
                 self.logger.error(f"Error in RAG API communication: {str(e)}")
@@ -437,40 +452,7 @@ class BusinessLogic:
 
         return
 
-    def external_answering_stream(self, user_query, conversation_id):
-        request = QueryAskingRequestModel(
-            conversation_id=conversation_id,
-            user_query_content= user_query,
-            display_waiting_message=True
-        )
-        # Ajouter une pause de 400ms entre chaque segment pour ralentir la réception des chunks du RAG
-        # Cela évite de surcharger la file d'attente audio et donne le temps à l'audio d'être envoyé
-        return self.studi_rag_inference_client.rag_answer_query_stream(
-            query_asking_request_model=request, 
-            timeout=60, 
-            pause_duration_between_chunks_ms=300
-        )
-
-    async def speak_external_user_request_response_async(self, response):
-        """Traite les chunks de texte du RAG et les envoie en audio.
-        
-        Cette méthode convertit les segments de texte en audio et les met dans la file d'attente.
-        Le contrôle de flux est maintenant basé sur la durée des chunks audio avec TwilioTextSender.
-        """
-        full_answer = ""
-        
-        async for chunk in response:
-            full_answer += chunk
-            self.logger.debug(f"Received chunk: {chunk}")
-            print(f'""<< ... {chunk} ... >>""')
-            
-            # Synthétiser et envoyer le texte directement sans vérifier la taille de la file
-            # Le contrôle de flux se fait maintenant dans TwilioTextSender basé sur la durée des chunks
-            await self.speak_and_send_text_async(chunk)
-            
-        return full_answer
-
-    async def speak_and_send_ask_for_feedback(self, transcript):
+    async def speak_and_send_ask_for_feedback_async(self, transcript):
         response_text = "Instructions : Fait un feedback reformulé de façon synthétique de la demande utilisateur suivante, afin de t'assurer de ta bonne comphéhension de celle-ci : " + transcript 
         response = self.openai_client.chat.completions.create(
             model="gpt-4o",
@@ -480,7 +462,7 @@ class BusinessLogic:
             stream=True
         )
         if response:
-            spoken_text = await self.speak_and_send_stream(response)
+            spoken_text = await self.speak_and_send_stream_async(response)
             self.logger.info(f"<< Response text: '{spoken_text}'")
             return spoken_text
         return ""
@@ -510,7 +492,7 @@ class BusinessLogic:
             
             # Apply audio preprocessing to improve quality
             self.logger.info("Applying audio preprocessing...")
-            processed_audio = self.audio_processor.preprocess_audio(audio_data)
+            processed_audio = self.incoming_audio.preprocess_audio(audio_data)
             self.logger.info(f"Audio preprocessing complete. Original size: {len(audio_data)} bytes, Processed size: {len(processed_audio)} bytes")
                 
             # Save the processed audio to a file
@@ -527,6 +509,7 @@ class BusinessLogic:
                 "communauté d'Amara.org",
                 "Sous-titres réalisés",
                 "Amara.org",
+                " par SousTitreur.com...",
                 "SousTitreur.com",
                 "n'hésitez pas à vous abonner",
                 "Merci d'avoir regardé cette vidéo",
@@ -614,72 +597,73 @@ class BusinessLogic:
             # For safety, if we had an exception checking, assume connected
             return True
     
-    async def _process_conversation(self, transcript):
-        """Process user input through the conversation graph and get a response."""
-        response_text = "Désolé, une erreur interne s'est produite."
-        
-        if not self.current_stream:
-            self.logger.error("No active stream, cannot process conversation")
-            return response_text
-        
-        if self.current_stream in self.stream_states:
-            # Get current state and update with user input
-            current_state = self.stream_states[self.current_stream]
-            current_state['user_input'] = transcript
-            
-            try:
-                updated_state: ConversationState = await self.compiled_graph.ainvoke(
-                    current_state,
-                    {"recursion_limit": 15}  # Prevent infinite loops
-                )
-                
-                self.stream_states[self.current_stream] = updated_state
-                
-                # Extract the AI response from history
-                if updated_state.get('history') and updated_state['history'][-1][0] == 'AI':
-                    response_text = updated_state['history'][-1][1]
-                    self.logger.info(f"AI [{self.current_stream[:8]}]: '{response_text[:50]}...'")
-                else:
-                    self.logger.warning(f"No AI response found in history after graph invocation.")
-            except Exception as graph_err:
-                self.logger.error(f"Error invoking graph: {graph_err}", exc_info=True)
-            
-            return response_text
-        else:
-            self.logger.error(f"Stream {self.current_stream} not found in states, cannot invoke graph.")
-            return None
-
-    async def speak_and_send_stream(self, answer_stream: Stream):
+    async def speak_and_send_stream_async(self, answer_stream):
         """Synthesize speech from text and send to Twilio"""
         try:
+            # Mark the start of speech activity
+            self.is_speaking = True
+            self.logger.info("Starting streaming speech generation")
+            
             full_text = ""
             text_buffer = ""
+            # Flag to track if speech was interrupted
+            was_interrupted = False
+            
             for chunk in answer_stream:
+                # Check if we've been interrupted - if so, stop processing further chunks
+                if was_interrupted or self.is_speaking:
+                    self.logger.info("Stream processing stopped due to interruption")
+                    break
+                    
                 if chunk.choices:
                     delta_content = chunk.choices[0].delta.content
                     if delta_content is not None:
                         text_buffer += delta_content
-                        # Check if we should send this segment (after punctuation or if long enough)
+                        # Send segment at sentence ends or max length
                         if len(text_buffer) > 1 and (any(punct in delta_content for punct in [".", ",", ":", "!", "?"]) or len(text_buffer.split()) > 20):
-                            await self.speak_and_send_text_async(text_buffer)
+                            # If speaking is interrupted during this call, remember that
+                            speaking_before = self.is_speaking
+                            await self.speak_and_send_text(text_buffer)
+                            if speaking_before and not self.is_speaking:
+                                # Speech was interrupted during this segment
+                                was_interrupted = True
+                                break
+                                
                             full_text += text_buffer
                             text_buffer = ""
             
-            # Send any remaining text after the loop completes
-            if text_buffer:
-                await self.speak_and_send_text_async(text_buffer)
+            # Only send remaining text if we weren't interrupted
+            if text_buffer and not was_interrupted:
+                await self.speak_and_send_text(text_buffer)
                 full_text += text_buffer
-                # Add a small pause between chunks (100-200ms)
-                await asyncio.sleep(0.15)
             
             return full_text
         except Exception as e:
-            self.logger.error(f"/!\\ Error sending audio to Twilio in {self.speak_and_send_stream.__name__}: {e}", exc_info=True)
+            self.logger.error(f"/!\\ Error sending audio to Twilio in {self.speak_and_send_stream_async.__name__}: {e}", exc_info=True)
             return ""
 
-    async def speak_and_send_text_async(self, text_buffer: str):
-        """Ajoute le texte à la file d'attente pour synthèse et envoi à Twilio"""
-        await self.enqueue_send_text_to_twilio(text_buffer)
+    def update_is_speaking_state(self):
+        """
+        Updates the speaking state based on the audio queue status
+        This provides a more accurate representation of when audio is actually being sent
+        """
+        is_sending_audio = self.audio_stream_manager.is_actively_sending()
+        
+        if is_sending_audio != self.is_speaking:
+            if is_sending_audio:
+                self.is_speaking = True
+                self.logger.debug("Speaking state activated - Audio queue has items")
+            else:
+                self.logger.debug("Speaking state deactivated - Audio queue empty")
+                self.is_speaking = False
+    
+    async def speak_and_send_text(self, text_buffer: str):
+        self.is_speaking = True        
+        audio_bytes = self.tts_provider.synthesize_speech_to_bytes(text_buffer)
+        await self.send_audio_to_twilio(audio_bytes=audio_bytes, frame_rate=self.frame_rate, sample_width=self.sample_width)
+        
+        duration_ms = (len(audio_bytes) / (self.frame_rate * self.sample_width)) * 1000
+        return duration_ms
 
     async def _clean_stream_state_async(self, stream_sid: str):
         """Nettoie les ressources associées à un stream spécifique
@@ -713,17 +697,29 @@ class BusinessLogic:
     async def _handle_stop_event(self):
         """Handle the stop event from Twilio which ends a call"""
         if not self.current_stream:
-            self.logger.warning("Received stop event but no active stream")
+            self.logger.error("Received stop event but no active stream")
             return
             
         self.logger.info(f"Received stop event for stream: {self.current_stream}")
-        await self._clean_stream_state_async(self.current_stream)
+        if self.current_stream in self.stream_states:
+            del self.stream_states[self.current_stream]
+            self.logger.info(f"Cleaned up state for stream {self.current_stream}")
+        else:
+            self.logger.error(f"Received stop for unknown or already cleaned stream: {self.current_stream}")
             
         if self.websocket:
             try:
                 await self.websocket.close()
             except Exception as e:
                 self.logger.error(f"Error closing websocket: {e}")
+        
+        # Reset current stream and audio streaming state
+        self.current_stream = None
+        
+        # Set the audio stream manager's streamSid to None
+        if self.audio_stream_manager:
+            self.audio_stream_manager.update_stream_sid(None)
+            self.logger.info("Reset AudioStreamManager stream SID as call ended")
 
     def _handle_mark_event(self, data):
         mark_name = data.get("mark", {}).get("name")
@@ -757,10 +753,27 @@ class BusinessLogic:
             return mulaw_audio
         else:
             return pcm_data
-            
-    async def enqueue_send_text_to_twilio(self, text_buffer: str) -> bool:
-        """Ajoute du texte à la file d'attente TextQueueManager pour traitement et envoi.
-        Cette méthode remplace l'ancienne enqueue_send_audio_to_twilio.
+    
+    async def stop_speaking(self):
+        """Stop any ongoing speech and clear audio queue and interrupt RAG streaming"""
+        if self.is_speaking:
+            # Interrupt RAG streaming if it's active
+            if hasattr(self, 'rag_interrupt_flag'):
+                self.rag_interrupt_flag["interrupted"] = True
+                self.logger.info("RAG streaming interrupted due to speech interruption")
+                
+            if self.audio_stream_manager:
+                await self.audio_stream_manager.clear_audio_queue()
+                self.logger.info("Cleared audio queue due to speech interruption")
+            self.is_speaking = False
+            return True  # Speech was stopped
+        return False  # No speech was ongoing
+    
+    async def send_audio_to_twilio(self, file_path: str=None, audio_bytes: bytes=None, frame_rate: int=None, channels: int=1, sample_width: int=None, convert_to_mulaw: bool = False):
+        """Convert audio to μ-law and send to Twilio using throttled streaming to prevent disconnections."""
+        # Use instance defaults if not specified
+        frame_rate = frame_rate or self.frame_rate
+        sample_width = sample_width or self.sample_width
         
         Args:
             text_buffer: Le texte à synthétiser et envoyer
@@ -772,20 +785,74 @@ class BusinessLogic:
         if not self.current_stream:
             self.logger.error("No active stream, cannot send text")
             return False
+        
+        # Check connection state
+        if not self._is_websocket_connected():
+            self.logger.warning("WebSocket is not connected, cannot send audio")
+            return False
+        
+        # Check if audio stream manager is initialized
+        if not self.audio_stream_manager:
+            self.logger.error("/!\\ Audio stream manager not initialized")
+            return False
+        
+        # Start timing this operation
+        start_time = time.time()
+        
+        try:
+            # Load audio and convert to appropriate format
+            ulaw_data = self._prepare_voice_stream(file_path=file_path, audio_bytes=audio_bytes, 
+                                                  frame_rate=frame_rate, channels=channels, 
+                                                  sample_width=sample_width, convert_to_mulaw=True)
+            if file_path:
+                self.delete_temp_file(file_path)
             
-        # Démarrer le worker de streaming s'il n'est pas déjà en cours d'exécution
-        if not self.is_streaming and not self.stream_worker_task:
-            self.is_streaming = True
-            self.stream_worker_task = asyncio.create_task(self._streaming_worker())
-            self.logger.info("Started text streaming worker")
+            # Calculate chunk size based on duration
+            chunk_size = int((self.speech_chunk_duration_ms / 1000) * frame_rate * sample_width)
+            
+            # Log total audio being sent
+            total_audio_ms = (len(ulaw_data) / (frame_rate * sample_width)) * 1000
+            total_chunks = len(ulaw_data) // chunk_size + (1 if len(ulaw_data) % chunk_size else 0)
+            
+            self.logger.info(f"Sending {len(ulaw_data)} bytes of audio (~{total_audio_ms:.1f}ms) in {total_chunks} chunks using AudioStreamManager")
+            
+            # Split audio into chunks and queue them for throttled sending
+            chunks_queued = 0
+            for i in range(0, len(ulaw_data), chunk_size):
+                chunk = ulaw_data[i:i + chunk_size]
+                
+                # Queue the chunk for throttled sending with true back-pressure
+                # This will block if the queue is full until space is available
+                result = await self.audio_stream_manager.enqueue_audio(chunk)
+                if result:
+                    chunks_queued += 1
+                
+                # Log progress at regular intervals
+                if chunks_queued % 10 == 0 or chunks_queued == total_chunks:
+                    queue_stats = self.audio_stream_manager.queue_manager.get_queue_stats()
+                    elapsed = time.time() - start_time
+                    progress_pct = (chunks_queued / total_chunks) * 100 if total_chunks > 0 else 0
+                    self.logger.debug(f"Audio queued: {progress_pct:.1f}% - {chunks_queued}/{total_chunks} chunks - Queue pressure: {queue_stats['pressure']:.1%}")
+            
+            # Try to send mark (but don't fail if it doesn't work)
+            try:
+                # Send mark to indicate end of message
+                mark_msg = {
+                    "event": "mark",
+                    "streamSid": self.current_stream,
+                    "mark": {
+                        "name": "msg_retour"
+                    }
+                }
+                await self.websocket.send_text(json.dumps(mark_msg))
+            except Exception as mark_error:
+                self.logger.warning(f"Could not send mark event: {mark_error}")
+            
+            # Final success logging
+            total_time = time.time() - start_time
+            self.logger.info(f"Audio queued: {chunks_queued}/{total_chunks} chunks, {total_audio_ms:.1f}ms audio in {total_time:.2f}s")
+            return True
         
-        # Ajouter le texte à la file d'attente
-        await self.text_queue.add_text(text_buffer)
-        self.logger.debug(f"Text added to queue: '{text_buffer[:60]}...' ({len(text_buffer)} chars)")
-        
-        return True
-        
-    # Cette méthode n'est plus nécessaire, nous utilisons désormais text_queue.clear() directement
-        
-    # Cette méthode n'est plus nécessaire avec le nouveau système basé sur le texte
-    # Le traitement du texte est géré par TwilioTextSender.process_text_to_audio
+        except Exception as e:
+            self.logger.error(f"Error sending audio to Twilio: {e}", exc_info=True)
+            return False

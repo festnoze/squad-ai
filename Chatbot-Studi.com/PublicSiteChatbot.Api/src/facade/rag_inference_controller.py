@@ -58,7 +58,19 @@ async def create_new_conversation(conversation: ConversationRequestModel):
     except Exception as e:
         print(f"Failed to create conversation: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-    
+
+@inference_router.get("/conversation/last/user/{user_id}")
+async def get_user_last_conversation(user_id: str):
+    try:
+        user_id_uuid = UUID(user_id)
+        last_conv = await AvailableService.get_user_last_conversation_async(user_id_uuid)
+        if last_conv:
+            return JSONResponse(content={"id": str(last_conv.id), "messages": last_conv.get_all_messages_as_json()},status_code=200)
+        else:
+            return JSONResponse(content={"id": None, "messages": []},status_code=200)
+    except Exception as e:
+        print(f"Failed to get last user conversation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @inference_router.post("/conversation/ask-question/stream")
 async def rag_query_stream_async(user_query_request_model: QueryAskingRequestModel):
