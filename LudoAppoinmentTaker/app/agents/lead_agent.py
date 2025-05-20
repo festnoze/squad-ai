@@ -8,7 +8,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 class LeadAgent:
-    def __init__(self, config_path="app/agents/lid_api_config.yaml"):
+    def __init__(self, config_path="app/agents/configs/lid_api_config.yaml"):
         """Initialize lead agent with YAML configuration."""
         try:
             # Adjust to handle paths relative to project root

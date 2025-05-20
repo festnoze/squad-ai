@@ -18,9 +18,14 @@ class TwilioAudioSender:
         self.is_sending = False
         self.send_lock = threading.Lock()
         self.total_bytes_sent = 0
+        self.bytes_sent = 0  # Alias for total_bytes_sent for consistency with stats API
         self.chunks_sent = 0
         self.consecutive_errors = 0
         self.max_consecutive_errors = 5
+        self.last_chunk_time = 0
+        self.avg_chunk_size = 0
+        self.start_time = time.time()
+        self.total_send_duration = 0
         
     async def send_audio_chunk(self, audio_chunk: bytes) -> bool:
         """
@@ -77,10 +82,25 @@ class TwilioAudioSender:
                 json_message = json.dumps(media_message)
                 await self.websocket.send_text(json_message)
                 
-                # Update metrics
-                self.last_send_time = time.time()
+                # Update metrics with enhanced tracking
+                now = time.time()
+                self.last_send_time = now
+                self.last_chunk_time = now
                 self.total_bytes_sent += chunk_size
+                self.bytes_sent = self.total_bytes_sent  # Update alias
                 self.chunks_sent += 1
+                
+                # Calculate running average chunk size
+                self.avg_chunk_size = self.total_bytes_sent / self.chunks_sent
+                
+                # Track total duration of sending
+                self.total_send_duration = now - self.start_time
+                
+                # Log detailed metrics periodically
+                if self.chunks_sent % 10 == 0:
+                    self.logger.debug(f"Audio metrics: {self.chunks_sent} chunks sent, " +
+                                     f"{self.total_bytes_sent/1024:.1f} KB total, " +
+                                     f"{self.avg_chunk_size:.1f} bytes avg size")
                 
                 # Reset error counter on success
                 if self.consecutive_errors > 0:
@@ -105,6 +125,28 @@ class TwilioAudioSender:
                 return False
             finally:
                 self.is_sending = False
+                
+    def get_sender_stats(self) -> dict:
+        """
+        Get comprehensive statistics about the audio sending process.
+        
+        Returns:
+            Dictionary with detailed statistics about audio chunks sent
+        """
+        now = time.time()
+        return {
+            'chunks_sent': self.chunks_sent,
+            'bytes_sent': self.total_bytes_sent,
+            'bytes_sent_kb': round(self.total_bytes_sent / 1024, 2),
+            'avg_chunk_size': round(self.avg_chunk_size, 2),
+            'consecutive_errors': self.consecutive_errors,
+            'is_sending': self.is_sending,
+            'last_chunk_time': self.last_chunk_time,
+            'time_since_last_chunk': round(now - self.last_chunk_time, 3) if self.last_chunk_time > 0 else 0,
+            'total_duration': round(now - self.start_time, 2),
+            'send_duration': round(self.total_send_duration, 2),
+            'stream_sid': self.streamSid or 'None'
+        }
                 
     def get_sending_stats(self) -> dict[str, any]:
         """

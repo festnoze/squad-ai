@@ -13,15 +13,11 @@ class AgentsGraph:
     def __init__(self):
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
+
         self.logger.info("Agents graph initialization")
-        
-        
-        # --- Agent Initialization ---
-        # Determine config path relative to project root
-        # (Adjust if lid_api_config.yaml is elsewhere)
-        CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', 'lid_api_config.yaml') # Assumes graph.py is in app/ and config is in root
-        self.lead_agent_instance = LeadAgent(config_path=CONFIG_PATH)
-        self.logger.info(f"Initialize Lead Agent succeed with config: {CONFIG_PATH}")
+        lid_config_file_path = os.path.join(os.path.dirname(__file__), 'configs', 'lid_api_config.yaml')
+        self.lead_agent_instance = LeadAgent(config_path=lid_config_file_path)
+        self.logger.info(f"Initialize Lead Agent succeed with config: {lid_config_file_path}")
         
         self.calendar_agent_instance = CalendarAgent()
         self.logger.info("Initialize Calendar Agent succeed")
