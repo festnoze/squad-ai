@@ -1,25 +1,26 @@
 import logging
 import asyncio
+#
 from app.speech.text_queue_manager import TextQueueManager
 from app.speech.text_processing import ProcessText
 from app.speech.twilio_audio_sender import TwilioAudioSender
-from typing import Optional, Tuple
+from app.speech.text_to_speech import TextToSpeechProvider
 
 class AudioStreamManager:
-
-
     """
     Manages the complete audio streaming process using a text-based approach.
     Text is queued, then processed into speech in small chunks for better responsiveness.
     """
-    def __init__(self, websocket: any, tts_provider: any, streamSid: str = None, min_chunk_interval: float = 0.05):
-        self.logger = logging.getLogger(__name__)
+    def __init__(self, websocket: any, tts_provider: TextToSpeechProvider, streamSid: str = None, min_chunk_interval: float = 0.05):
         self.text_queue_manager = TextQueueManager()
-        self.audio_sender = TwilioAudioSender(websocket, streamSid=streamSid, min_chunk_interval=min_chunk_interval)
-        self.tts_provider = tts_provider  # Text-to-speech provider for converting text to audio
+        self.audio_sender : TwilioAudioSender = TwilioAudioSender(websocket, streamSid=streamSid, min_chunk_interval=min_chunk_interval)
+        self.logger = logging.getLogger(__name__)
+        self.tts_provider : TextToSpeechProvider = tts_provider  # Text-to-speech provider for converting text to audio
         self.sender_task = None
         self.frame_rate = 24000  # Default frame rate, can be updated as needed
         self.sample_width = 2    # Default sample width, can be updated as needed
+        self.max_words_by_stream_chunk = 10
+        self.max_chars_by_stream_chunk = 100
         
     def update_stream_sid(self, streamSid: str) -> None:
         """
@@ -33,32 +34,33 @@ class AudioStreamManager:
             self.logger.info(f"Updated stream SID to: {streamSid}")
         return
         
-    def start_streaming(self) -> None:
+    def run_background_streaming_worker(self) -> None:
         """
         Starts the streaming process in a background task
         """
-        if self.audio_sender.is_sending:
-            self.logger.warning("Streaming is already running")
+        if self.audio_sender.is_sending or self.sender_task is not None:
+            self.logger.error("Streaming is already running")
             return
             
-        self.sender_task = asyncio.create_task(self._streaming_worker())
+        self.sender_task = asyncio.create_task(self._background_streaming_worker())
         self.logger.info("Audio streaming started")
         
-    async def stop_streaming(self) -> None:
+    async def stop_background_streaming_worker(self) -> None:
         """
         Stops the streaming process and clears the text queue
         """
         self.audio_sender.is_sending = False
         if self.sender_task:
             try:
-                # Wait for the task to complete with a timeout
                 await asyncio.wait_for(self.sender_task, timeout=2.0)
             except asyncio.TimeoutError:
                 self.logger.warning("Streaming worker did not stop in time, cancelling")
                 self.sender_task.cancel()
             except Exception as e:
                 self.logger.error(f"Error stopping streaming worker: {e}")
-        
+            finally:
+                self.sender_task = None
+
         # Clear the text queue asynchronously
         await self.text_queue_manager.clear_queue()
         self.logger.info("Text-to-speech streaming stopped")
@@ -107,20 +109,21 @@ class AudioStreamManager:
             'is_actively_sending': self.is_actively_sending()
         }
         
-    async def _streaming_worker(self):
-        """Worker that processes texts from the queue and sends audio to the websocket"""
-        self.logger.info("Text-to-speech streaming worker started")
+    async def _background_streaming_worker(self):
+        """Background worker that continuously processes texts from the queue and sends audio to the websocket"""
+        self.logger.info("Background TTS and audio streaming worker started")
         text_chunks_processed = 0
         errors = 0
         streamSid_wait_count = 0
         max_streamSid_wait = 20  # Maximum number of attempts to wait for streamSid
         last_chunk_end_time = 0  # Track timing for natural speech flow (in ms)
         
-        self.audio_sender.is_sending = True
-        
-        while self.audio_sender.is_sending:
+        while True:
+            if not self.is_actively_sending():
+                await asyncio.sleep(0.1)
+                continue
+
             try:
-                # Check if we have a valid streamSid before processing
                 if not self.audio_sender.streamSid:
                     streamSid_wait_count += 1
                     if streamSid_wait_count <= max_streamSid_wait:
@@ -128,84 +131,173 @@ class AudioStreamManager:
                     else:
                         self.logger.error(f"No StreamSid set after {streamSid_wait_count} attempts, audio transmission may fail")
                     
-                    # Short wait to check again
                     await asyncio.sleep(0.2)
                     continue
                     
-                # Reset counter if we now have a valid streamSid
                 if streamSid_wait_count > 0:
                     self.logger.info(f"StreamSid now available after {streamSid_wait_count} attempts: {self.audio_sender.streamSid}")
                     streamSid_wait_count = 0
                 
-                # Get a chunk of text from the queue
-                text_chunk, estimated_duration = await self.text_queue_manager.get_text_chunk()
-                
-                if text_chunk:
-                    # Process this text into optimal chunks for natural speech
-                    speech_chunks = ProcessText.chunk_text_by_sized_sentences(text_chunk, max_words_by_sentence=25, max_chars_by_sentence=150)
-                    
-                    for chunk in speech_chunks:
-                        # Skip empty chunks
-                        if not chunk:
-                            continue
-                            
-                        # Check if we should stop
-                        if not self.audio_sender.is_sending:
-                            break
-                            
-                        # Calculate timing for this chunk
-                        start_time, end_time = ProcessText.calculate_speech_timing(
-                            chunk, 
-                            previous_chunk_end_time=last_chunk_end_time,
-                            min_gap=0.05  # 50ms minimum gap between chunks
-                        )
-                        
-                        text_chunks_processed += 1
-                        chunk_len = len(chunk)
-                        self.logger.debug(f"Processing speech chunk #{text_chunks_processed}: '{chunk}' ({chunk_len} chars)")
-                        
-                        try:
-                            # Synthesize speech from this chunk
-                            audio_bytes = self.tts_provider.synthesize_speech_to_bytes(chunk)
-                            
-                            # Send the audio to Twilio
-                            result = await self.audio_sender.send_audio_chunk(audio_bytes)
-                            
-                            if result:
-                                self.logger.debug(f"Successfully sent text chunk #{text_chunks_processed} as audio")
-                            else:
-                                self.logger.warning(f"Failed to send audio for text chunk #{text_chunks_processed}")
-                                errors += 1
+                # Process this text into optimal chunks for natural speech
+                speech_chunk = await self.text_queue_manager.get_next_text_chunk()
                                 
-                                if errors > 5 and errors % 5 == 0:
-                                    self.logger.error(f"Multiple audio sending errors: {errors} chunks failed")
-                            
-                            # Update the last chunk end time
-                            last_chunk_end_time = end_time
-                            
-                            # Log progress periodically
-                            if text_chunks_processed % 10 == 0:
-                                self.logger.debug(
-                                    f"Processed {text_chunks_processed} chunks, total duration: {last_chunk_end_time/1000:.2f} seconds"
-                                )
-                        except Exception as e:
-                            self.logger.error(f"Error synthesizing or sending speech: {e}")
-                            errors += 1
-                            continue
+                if not speech_chunk:
+                    continue
+
+                # Calculate timing for this chunk
+                start_time, end_time = ProcessText.calculate_speech_timing(
+                    speech_chunk, 
+                    previous_chunk_end_time=last_chunk_end_time,
+                    min_gap=0.05  # 50ms minimum gap between chunks
+                )
+                
+                text_chunks_processed += 1
+                chunk_len = len(speech_chunk)
+                self.logger.debug(f"Processing speech chunk #{text_chunks_processed}: '{speech_chunk}' ({chunk_len} chars)")
+                
+                try:
+                    # Synthesize speech from this chunk
+                    audio_bytes = self.tts_provider.synthesize_speech_to_bytes(speech_chunk)
+                    
+                    # Send the audio to Twilio
+                    result = await self.audio_sender.send_audio_chunk(audio_bytes)
+                    
+                    if result:
+                        self.logger.debug(f"Successfully sent text chunk #{text_chunks_processed} as audio")
+                    else:
+                        self.logger.warning(f"Failed to send audio for text chunk #{text_chunks_processed}")
+                        errors += 1
                         
-                        # Wait for a natural pause between chunks (helps create more natural rhythm)
-                        await asyncio.sleep(0.05)  
-                else:
-                    # No text to process, sleep a bit to reduce CPU usage
-                    await asyncio.sleep(0.1)
+                        if errors > 5 and errors % 5 == 0:
+                            self.logger.error(f"Multiple audio sending errors: {errors} chunks failed")
+                    
+                    # Update the last chunk end time
+                    last_chunk_end_time = end_time
+                    
+                    # Log progress periodically
+                    if text_chunks_processed % 10 == 0:
+                        self.logger.debug(
+                            f"Processed {text_chunks_processed} chunks, total duration: {last_chunk_end_time/1000:.2f} seconds"
+                        )
+                except Exception as e:
+                    self.logger.error(f"Error synthesizing or sending speech: {e}")
+                    errors += 1
+                    continue
+                
+                # Wait for a natural pause between chunks (helps create more natural rhythm)
+                await asyncio.sleep(0.05)
                     
             except Exception as e:
                 self.logger.error(f"Error in streaming worker: {e}", exc_info=True)
                 errors += 1
                 await asyncio.sleep(0.5)  # Sleep a bit longer on error
                 
-        self.logger.info(f"Text-to-speech streaming worker stopped. Processed {text_chunks_processed} chunks with {errors} errors.")
+                
+    async def chunk_text_by_sentences_size_async(self) -> list[str]:
+        """
+        Split text into chunks at natural sentence boundaries.
         
+        Args:
+            text: The text to split
+            max_words_by_sentence: Maximum number of words per chunk
+            max_chars_by_sentence: Maximum number of characters per chunk
+            
+        Returns:
+            A list of text chunks
+        """
+        text = await self.text_queue_manager.get_next_text_chunk()
+
+        if not text:
+            return []
+        
+        # Phase 1: Extract individual sentences
+        sentences = []
+        
+        # Find all sentences ending with punctuation
+        # This pattern keeps the sentence-ending punctuation with the sentence
+        pattern = r'[^.!?]+[.!?]'
+        matches = re.findall(pattern, text)
+        
+        # Process matches to get clean sentences
+        for match in matches:
+            # Remove leading/trailing whitespace
+            clean_match = match.strip()
+            if clean_match:  # Only add non-empty matches
+                sentences.append(clean_match)
+        
+        # Check if there's any text left after the last punctuation
+        if matches:
+            last_match = matches[-1]
+            last_match_end = text.rfind(last_match) + len(last_match)
+            remaining_text = text[last_match_end:].strip()
+            if remaining_text:
+                sentences.append(remaining_text)
+        # If no matches were found but there's text, treat the whole text as one sentence
+        elif text.strip():
+            sentences.append(text.strip())
+        
+        # Phase 2: Process sentences into appropriately sized chunks
+        chunks = []
+        current_chunk = ""
+        
+        for sentence in sentences:
+            # Case 1: Sentence is too long by itself - split by words/chars
+            if len(sentence.split()) > max_words_by_stream_chunk or len(sentence) > max_chars_by_stream_chunk:
+                # First add any existing chunk
+                if current_chunk:
+                    chunks.append(current_chunk.strip())
+                    current_chunk = ""
+                    
+                # Then split the long sentence
+                words = sentence.split()
+                current_word_chunk = ""
+                
+                for word in words:
+                    # If a single word exceeds max_chars, split the word itself
+                    if len(word) > max_chars_by_stream_chunk:
+                        # First add any existing word chunk
+                        if current_word_chunk:
+                            chunks.append(current_word_chunk.strip())
+                            current_word_chunk = ""
+                        
+                        # Split the long word into character chunks
+                        for i in range(0, len(word), max_chars_by_stream_chunk):
+                            char_chunk = word[i:i+max_chars_by_stream_chunk]
+                            chunks.append(char_chunk)
+                    
+                    # Check if adding this word would exceed limits
+                    elif current_word_chunk and (len(current_word_chunk.split()) + 1 > max_words_by_stream_chunk or 
+                                              len(current_word_chunk) + len(word) + 1 > max_chars_by_stream_chunk):
+                        chunks.append(current_word_chunk.strip())
+                        current_word_chunk = word
+                    else:
+                        current_word_chunk += " " + word if current_word_chunk else word
+                
+                # Add remaining word chunk if any
+                if current_word_chunk:
+                    # Check if we need to add ending punctuation
+                    if re.search(r'[.!?]$', sentence) and not re.search(r'[.!?]$', current_word_chunk):
+                        punctuation = re.search(r'[.!?]$', sentence).group(0)
+                        current_word_chunk = current_word_chunk.rstrip() + punctuation
+                    chunks.append(current_word_chunk.strip())
+            
+            # Case 2: Adding this sentence would make the chunk too long - start a new chunk
+            elif current_chunk and (len(current_chunk.split()) + len(sentence.split()) > max_words_by_stream_chunk or 
+                                    len(current_chunk) + len(sentence) + 1 > max_chars_by_stream_chunk):  # +1 for the space
+                chunks.append(current_chunk.strip())
+                current_chunk = sentence
+            
+            # Case 3: This sentence can be added to the current chunk
+            else:
+                current_chunk += " " + sentence if current_chunk else sentence
+        
+        # Add the last chunk if there is one
+        if current_chunk:
+            chunks.append(current_chunk.strip())
+        
+        return chunks
+
+
     def get_streaming_stats(self) -> dict[str, any]:
         """
         Returns statistics about the streaming process for monitoring

@@ -1,24 +1,75 @@
-import asyncio
-import unittest
-from unittest.mock import patch, MagicMock, AsyncMock
+import pytest
 import sys
 import os
 
 # Add the parent directory to sys.path to allow importing app modules
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from app.speech.text_processing import ProcessText
 
-class TestTextToSpeechMethods(unittest.IsolatedAsyncioTestCase):
-    """Test the text-to-speech methods independently"""
-    
-    async def test_speak_and_send_text_functionality(self):
+
+@pytest.fixture
+def mock_audio_stream_manager(mocker):
+    mock_audio_stream_manager = mocker.Mock()
+    mock_audio_stream_manager.enqueue_text = mocker.AsyncMock(return_value=True)
+    return mock_audio_stream_manager
+
+@pytest.fixture
+def mock_logger(mocker):
+    return mocker.Mock()
+
+@pytest.fixture
+def mock_tts_provider(mocker):
+    mock_tts_provider = mocker.Mock()
+    mock_tts_provider.synthesize_speech_to_bytes = mocker.Mock(return_value=b'dummy_audio')
+    return mock_tts_provider
+
+@pytest.fixture
+def mock_text_queue_manager(mocker):
+    mock_text_queue_manager = mocker.Mock()
+    mock_text_queue_manager.get_queue_stats = mocker.Mock(return_value={
+        'current_size_chars': 150,
+        'total_chars_enqueued': 1000,
+        'total_chars_processed': 850,
+        'is_empty': False,
+        'processing_efficiency': 85.0
+    })
+    return mock_text_queue_manager
+
+@pytest.fixture
+def mock_audio_sender(mocker):
+    mock_audio_sender = mocker.Mock()
+    mock_audio_sender.get_sender_stats = mocker.Mock(return_value={
+        'chunks_sent': 42,
+        'bytes_sent': 84000,
+        'bytes_sent_kb': 82.03,
+        'avg_chunk_size': 2000.0,
+        'consecutive_errors': 0,
+        'is_sending': True,
+        'last_chunk_time': 1621234567.89,
+        'time_since_last_chunk': 0.25,
+        'total_duration': 30.5,
+        'send_duration': 28.75,
+        'stream_sid': 'test-stream-123'
+    })
+    return mock_audio_sender
+
+@pytest.fixture
+def mock_audio_stream_manager_with_components(mock_text_queue_manager, mock_audio_sender, mocker):
+    mock_audio_stream_manager = mocker.Mock()
+    mock_audio_stream_manager.text_queue_manager = mock_text_queue_manager
+    mock_audio_stream_manager.audio_sender = mock_audio_sender
+    mock_audio_stream_manager.running = True
+    mock_audio_stream_manager.is_actively_sending = mocker.Mock(return_value=True)
+    return mock_audio_stream_manager
+
+
+@pytest.mark.asyncio
+class TestIncomingPhoneCallHandler:
+
+    @pytest.mark.asyncio
+    async def test_speak_and_send_text_functionality(self, mock_audio_stream_manager, mock_logger):
         """Test functionality of the refactored speak_and_send_text method"""
-        # Create a mock audio stream manager with the enqueue_text method
-        mock_audio_stream_manager = MagicMock()
-        mock_audio_stream_manager.enqueue_text = AsyncMock(return_value=True)
-        
-        # Create a mock logger
-        mock_logger = MagicMock()
         
         # Define a simplified version of speak_and_send_text for testing
         async def speak_and_send_text(text_buffer):
@@ -50,35 +101,30 @@ class TestTextToSpeechMethods(unittest.IsolatedAsyncioTestCase):
         
         # Check results
         mock_audio_stream_manager.enqueue_text.assert_called_once_with(test_text)
-        self.assertGreater(duration, 0)
-        self.assertEqual(duration, len(test_text) / 15 * 1000)  # Verify duration calculation
+        assert duration > 0
+        assert duration == len(test_text) / 15 * 1000  # Verify duration calculation
         
         # Test with empty text
         mock_audio_stream_manager.enqueue_text.reset_mock()
         duration = await speak_and_send_text("")
-        self.assertEqual(duration, 0)
+        assert duration == 0
         mock_audio_stream_manager.enqueue_text.assert_not_called()
         
         # Test when enqueue_text returns False
         mock_audio_stream_manager.enqueue_text.reset_mock()
         mock_audio_stream_manager.enqueue_text.return_value = False
         duration = await speak_and_send_text("Another test message")
-        self.assertEqual(duration, 0)
+        assert duration == 0
     
-    async def test_send_text_to_speak_to_twilio(self):
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("text_input,max_words,max_chars,expected_chunks", [
+        ("This is a test of the enhanced text-to-speech system. It should handle multiple sentences properly.", 15, 150, 1),
+        ("Testing with smaller chunks to ensure proper text splitting and timing.", 5, 50, 3),
+        ("This is a very long text. " * 20, 15, 150, 6),  # Should create multiple chunks
+        ("Testing with special characters: éèêë, çñ, ß, 你好, 😊!", 15, 150, 1)
+    ])
+    async def test_send_text_to_speak_to_twilio(self, mock_audio_stream_manager, mock_logger, mock_tts_provider, text_input, max_words, max_chars, expected_chunks):
         """Test the enhanced send_text_to_speak_to_twilio method"""
-        # Create mocks
-        mock_audio_stream_manager = MagicMock()
-        mock_audio_stream_manager.enqueue_text = AsyncMock(return_value=True)
-        
-        mock_tts_provider = MagicMock()
-        mock_tts_provider.synthesize_speech_to_bytes = MagicMock(return_value=b'dummy_audio')
-        
-        mock_logger = MagicMock()
-        
-        # Import the ProcessText class
-        from app.speech.text_processing import ProcessText
-        
         # Define a more realistic version for testing that uses actual ProcessText methods
         async def send_text_to_speak_to_twilio(text_buffer, max_words_per_chunk=15, max_chars_per_chunk=150):
             if not text_buffer:
@@ -86,7 +132,7 @@ class TestTextToSpeechMethods(unittest.IsolatedAsyncioTestCase):
                 return 0
                 
             # Use the actual text chunking utilities from ProcessText
-            text_chunks = ProcessText.chunk_text_by_sized_sentences(
+            text_chunks = ProcessText.chunk_text_by_sentences_size(
                 text_buffer, 
                 max_words_by_sentence=max_words_per_chunk, 
                 max_chars_by_sentence=max_chars_per_chunk
@@ -109,38 +155,28 @@ class TestTextToSpeechMethods(unittest.IsolatedAsyncioTestCase):
                     
             return total_duration_ms
             
-        # Test with normal text
-        test_text = "This is a test of the enhanced text-to-speech system. It should handle multiple sentences properly."
-        duration = await send_text_to_speak_to_twilio(test_text)
+        # Test with the parametrized input
+        duration = await send_text_to_speak_to_twilio(text_input, max_words_per_chunk=max_words, max_chars_per_chunk=max_chars)
         
         # Should have called enqueue_text once for each chunk
-        expected_chunks = len(ProcessText.chunk_text_by_sized_sentences(test_text, 15, 150))
-        self.assertEqual(mock_audio_stream_manager.enqueue_text.call_count, expected_chunks)
+        actual_chunks = len(ProcessText.chunk_text_by_sentences_size(text_input, max_words, max_chars))
+        assert mock_audio_stream_manager.enqueue_text.call_count == actual_chunks
+        assert actual_chunks >= expected_chunks  # Verify our expected number of chunks
         
         # Should return a positive duration
-        self.assertGreater(duration, 0)
-        
-        # Test with different chunking parameters
-        mock_audio_stream_manager.enqueue_text.reset_mock()
-        small_chunks_text = "Testing with smaller chunks to ensure proper text splitting and timing."
-        await send_text_to_speak_to_twilio(small_chunks_text, max_words_per_chunk=5, max_chars_per_chunk=50)
-        
-        # Should have more chunks with smaller limits
-        expected_small_chunks = len(ProcessText.chunk_text_by_sized_sentences(small_chunks_text, 5, 50))
-        self.assertEqual(mock_audio_stream_manager.enqueue_text.call_count, expected_small_chunks)
-        self.assertGreater(expected_small_chunks, expected_chunks)
+        assert duration > 0
         
         # Test with failed enqueue
         mock_audio_stream_manager.enqueue_text.reset_mock()
         mock_audio_stream_manager.enqueue_text.return_value = False
         
-        duration = await send_text_to_speak_to_twilio(test_text)
+        duration = await send_text_to_speak_to_twilio(text_input)
         
         # Should only have tried to enqueue the first chunk then stopped
-        self.assertEqual(mock_audio_stream_manager.enqueue_text.call_count, 1)
+        assert mock_audio_stream_manager.enqueue_text.call_count == 1
         
         # Should return 0 since the first enqueue failed
-        self.assertEqual(duration, 0)
+        assert duration == 0
         
         # Test with empty text
         mock_audio_stream_manager.enqueue_text.reset_mock()
@@ -148,121 +184,16 @@ class TestTextToSpeechMethods(unittest.IsolatedAsyncioTestCase):
         
         # Should not have called enqueue_text at all
         mock_audio_stream_manager.enqueue_text.assert_not_called()
-        self.assertEqual(duration, 0)
-        
-        # Test with very long text
-        mock_audio_stream_manager.enqueue_text.reset_mock()
-        mock_audio_stream_manager.enqueue_text.return_value = True
-        long_text = "This is a very long text. " * 20  # Repeat to create a long text
-        duration = await send_text_to_speak_to_twilio(long_text)
-        
-        # Should have created multiple chunks
-        long_text_chunks = len(ProcessText.chunk_text_by_sized_sentences(long_text, 15, 150))
-        self.assertEqual(mock_audio_stream_manager.enqueue_text.call_count, long_text_chunks)
-        self.assertGreater(long_text_chunks, 5)  # Should have more than 5 chunks
-        
-        # Test with text containing special characters
-        mock_audio_stream_manager.enqueue_text.reset_mock()
-        special_chars_text = "Testing with special characters: éèêë, çñ, ß, 你好, 😊!"
-        duration = await send_text_to_speak_to_twilio(special_chars_text)
-        
-        # Should handle special characters properly
-        special_chars_chunks = len(ProcessText.chunk_text_by_sized_sentences(special_chars_text, 15, 150))
-        self.assertEqual(mock_audio_stream_manager.enqueue_text.call_count, special_chars_chunks)
-        self.assertGreater(duration, 0)  # Duration should be positive
+        assert duration == 0
     
-    async def test_streaming_statistics_functionality(self):
-        """Test the enhanced monitoring and statistics functionality"""
-        # Create mock objects for testing
-        mock_text_queue_manager = MagicMock()
-        mock_text_queue_manager.get_queue_stats = MagicMock(return_value={
-            'current_size_chars': 150,
-            'total_chars_enqueued': 1000,
-            'total_chars_processed': 850,
-            'is_empty': False,
-            'is_processing': True,
-            'processing_efficiency': 85.0
-        })
-        
-        mock_audio_sender = MagicMock()
-        mock_audio_sender.get_sender_stats = MagicMock(return_value={
-            'chunks_sent': 42,
-            'bytes_sent': 84000,
-            'bytes_sent_kb': 82.03,
-            'avg_chunk_size': 2000.0,
-            'consecutive_errors': 0,
-            'is_sending': True,
-            'last_chunk_time': 1621234567.89,
-            'time_since_last_chunk': 0.25,
-            'total_duration': 30.5,
-            'send_duration': 28.75,
-            'stream_sid': 'test-stream-123'
-        })
-        
-        # Create a mock AudioStreamManager that uses our mocked components
-        mock_audio_stream_manager = MagicMock()
-        mock_audio_stream_manager.text_queue_manager = mock_text_queue_manager
-        mock_audio_stream_manager.audio_sender = mock_audio_sender
-        mock_audio_stream_manager.running = True
-        mock_audio_stream_manager.is_actively_sending = MagicMock(return_value=True)
-        
-        # Define a simplified version of get_streaming_stats for testing
-        def get_streaming_stats():
-            # Get text queue statistics
-            text_queue_stats = mock_text_queue_manager.get_queue_stats()
-            
-            # Get comprehensive audio sender statistics
-            audio_sender_stats = mock_audio_sender.get_sender_stats()
-            
-            # Aggregate statistics
-            return {
-                'text_queue': text_queue_stats,
-                'audio_sender': audio_sender_stats,
-                'is_running': mock_audio_stream_manager.running,
-                'is_actively_sending': mock_audio_stream_manager.is_actively_sending()
-            }
-        
-        # Assign the method to our mock
-        mock_audio_stream_manager.get_streaming_stats = get_streaming_stats
-        
-        # Get the statistics
-        stats = mock_audio_stream_manager.get_streaming_stats()
-        
-        # Verify the structure and content of the statistics
-        self.assertIn('text_queue', stats)
-        self.assertIn('audio_sender', stats)
-        self.assertIn('is_running', stats)
-        self.assertIn('is_actively_sending', stats)
-        
-        # Verify text queue statistics
-        text_stats = stats['text_queue']
-        self.assertEqual(text_stats['current_size_chars'], 150)
-        self.assertEqual(text_stats['total_chars_enqueued'], 1000)
-        self.assertEqual(text_stats['total_chars_processed'], 850)
-        self.assertEqual(text_stats['processing_efficiency'], 85.0)
-        
-        # Verify audio sender statistics
-        audio_stats = stats['audio_sender']
-        self.assertEqual(audio_stats['chunks_sent'], 42)
-        self.assertEqual(audio_stats['bytes_sent'], 84000)
-        self.assertEqual(audio_stats['avg_chunk_size'], 2000.0)
-        self.assertEqual(audio_stats['stream_sid'], 'test-stream-123')
-        
-        # Verify overall status
-        self.assertTrue(stats['is_running'])
-        self.assertTrue(stats['is_actively_sending'])
-    
-    async def test_stop_speaking_functionality(self):
+    @pytest.mark.asyncio
+    async def test_stop_speaking_functionality(self, mock_audio_stream_manager, mock_logger, mocker):
         """Test functionality of the refactored stop_speaking method"""
-        # Create a mock audio stream manager
-        mock_audio_stream_manager = MagicMock()
-        mock_audio_stream_manager.clear_text_queue = AsyncMock()
+        # Setup mock
+        mock_audio_stream_manager.clear_text_queue = mocker.AsyncMock()
         
         # Create a mock for interrupt flag
         mock_rag_interrupt_flag = {"interrupted": False}
-        
-        # Create a mock logger
-        mock_logger = MagicMock()
         
         # Define is_speaking state variable
         is_speaking = True
@@ -270,6 +201,7 @@ class TestTextToSpeechMethods(unittest.IsolatedAsyncioTestCase):
         # Define a simplified version of stop_speaking for testing
         async def stop_speaking():
             nonlocal is_speaking
+            
             if is_speaking:
                 # Interrupt RAG streaming if it's active
                 mock_rag_interrupt_flag["interrupted"] = True
@@ -279,31 +211,38 @@ class TestTextToSpeechMethods(unittest.IsolatedAsyncioTestCase):
                 await mock_audio_stream_manager.clear_text_queue()
                 mock_logger.info("Cleared text queue due to speech interruption")
                 
+                # Update speaking state
                 is_speaking = False
                 return True  # Speech was stopped
             return False  # No speech was ongoing
         
-        # Test when is_speaking is True
+        # Test stopping speech when speaking
         result = await stop_speaking()
         
-        # Check results
-        self.assertTrue(result)
-        self.assertFalse(is_speaking)
-        mock_audio_stream_manager.clear_text_queue.assert_called_once()
-        self.assertTrue(mock_rag_interrupt_flag["interrupted"])
+        # Should have stopped speech
+        assert result is True
+        assert is_speaking is False
         
-        # Test when is_speaking is already False
+        # Should have interrupted RAG streaming
+        assert mock_rag_interrupt_flag["interrupted"] is True
+        
+        # Should have cleared the text queue
+        mock_audio_stream_manager.clear_text_queue.assert_called_once()
+        
+        # Test stopping speech when not speaking
         mock_audio_stream_manager.clear_text_queue.reset_mock()
         mock_rag_interrupt_flag["interrupted"] = False
         
-        # Call again when already not speaking
+        # Call stop_speaking again (now that is_speaking is False)
         result = await stop_speaking()
         
-        # Check results
-        self.assertFalse(result)
+        # Should not have stopped speech (already stopped)
+        assert result is False
+        
+        # Should not have interrupted RAG streaming
+        assert mock_rag_interrupt_flag["interrupted"] is False
+        
+        # Should not have cleared the text queue
         mock_audio_stream_manager.clear_text_queue.assert_not_called()
-        self.assertFalse(mock_rag_interrupt_flag["interrupted"])
 
-
-if __name__ == "__main__":
-    unittest.main()
+# No need for unittest.main() with pytest

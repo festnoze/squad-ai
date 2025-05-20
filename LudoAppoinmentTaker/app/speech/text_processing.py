@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 class ProcessText:
     @staticmethod
-    def chunk_text_by_sized_sentences(text: str, max_words_by_sentence: int = 10, max_chars_by_sentence: int = 100) -> list[str]:
+    def chunk_text_by_sentences_size(text: str, max_words_by_sentence: int = 10, max_chars_by_sentence: int = 100) -> list[str]:
         """
         Split text into chunks at natural sentence boundaries.
         
@@ -141,7 +141,7 @@ class ProcessText:
         duration_ms = (effective_chars / chars_per_second) * 1000
         
         # Enforce minimum duration
-        return max(duration_ms, 100.0)  # At least 100ms
+        return max(duration_ms, 50.0)  # At least 50ms
 
     @staticmethod
     def calculate_speech_timing(

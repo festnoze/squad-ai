@@ -38,7 +38,7 @@ class TestProcessText:
     ])
     def test_chunk_text_by_sized_sentences(self, test_input, max_words, max_chars, expected):
         """Test the chunk_text_by_sized_sentences method with various inputs."""
-        result = ProcessText.chunk_text_by_sized_sentences(
+        result = ProcessText.chunk_text_by_sentences_size(
             test_input, 
             max_words_by_sentence=max_words, 
             max_chars_by_sentence=max_chars

@@ -1,106 +1,121 @@
 import asyncio
-import unittest
-from unittest.mock import patch, MagicMock, AsyncMock
-import sys
-import os
-
-# Add the parent directory to sys.path to allow importing app modules
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
+import pytest
 from app.speech.audio_streaming import AudioStreamManager
 
 
-class TestAudioStreamManager(unittest.IsolatedAsyncioTestCase):
+# Define the fixture at the module level
+@pytest.fixture
+def audio_manager_setup(mocker):
+    """Set up the test fixture with mocked dependencies"""
+    # Create mock objects
+    mock_websocket = mocker.Mock()
+    mock_tts_provider = mocker.Mock()
+    mock_tts_provider.synthesize_speech_to_bytes = mocker.Mock(return_value=b'dummy_audio_bytes' * 100)
+    mock_tts_provider.text_queue_manager = mocker.Mock()
+    mock_tts_provider.text_queue_manager.get_next_text_chunk = mocker.Mock(return_value="dummy_text")
+    
+    # Create the AudioStreamManager instance with mocks
+    audio_stream_manager = AudioStreamManager(
+        websocket=mock_websocket,
+        tts_provider=mock_tts_provider,
+        streamSid="test_stream_sid"
+    )
+    
+    # Patch the send_audio_chunk method of audio_sender
+    audio_stream_manager.audio_sender.send_audio_chunk = mocker.AsyncMock(return_value=True)
+    
+    return {
+        'websocket': mock_websocket,
+        'tts_provider': mock_tts_provider,
+        'audio_stream_manager': audio_stream_manager
+    }
+
+@pytest.mark.asyncio
+class TestAudioStreamManager:
     """Test cases for the AudioStreamManager class"""
     
-    async def asyncSetUp(self):
-        """Set up the test case"""
-        # Create mock objects
-        self.mock_websocket = MagicMock()
-        self.mock_tts_provider = MagicMock()
-        self.mock_tts_provider.synthesize_speech_to_bytes = MagicMock(return_value=b'dummy_audio_bytes' * 100)
-        
-        # Create the AudioStreamManager instance with mocks
-        self.audio_stream_manager = AudioStreamManager(
-            websocket=self.mock_websocket,
-            tts_provider=self.mock_tts_provider,
-            streamSid="test_stream_sid"
-        )
-        
-        # Patch the send_audio_chunk method of audio_sender
-        patcher = patch.object(self.audio_stream_manager.audio_sender, 'send_audio_chunk', new_callable=AsyncMock)
-        self.mock_send_audio_chunk = patcher.start()
-        self.mock_send_audio_chunk.return_value = True
-        self.addAsyncCleanup(patcher.stop)
-        
-    async def test_enqueue_text(self):
+    @pytest.mark.asyncio
+    async def test_enqueue_text(self, audio_manager_setup):
         """Test enqueueing text to the AudioStreamManager"""
+        audio_stream_manager = audio_manager_setup['audio_stream_manager']
+        
         # Test with valid text
-        result = await self.audio_stream_manager.enqueue_text("Hello, this is a test")
-        self.assertTrue(result)
-        self.assertFalse(self.audio_stream_manager.text_queue_manager.is_empty())
+        result = await audio_stream_manager.enqueue_text("Hello, this is a test")
+        assert result is True
+        assert audio_stream_manager.text_queue_manager.is_empty() is False
         
         # Test with empty text
-        result = await self.audio_stream_manager.enqueue_text("")
-        self.assertFalse(result)
+        result = await audio_stream_manager.enqueue_text("")
+        assert result is False
     
-    async def test_clear_text_queue(self):
+    @pytest.mark.asyncio
+    async def test_clear_text_queue(self, audio_manager_setup):
         """Test clearing the text queue"""
+        audio_stream_manager = audio_manager_setup['audio_stream_manager']
+        
         # Add text to the queue
-        await self.audio_stream_manager.enqueue_text("Text to be cleared")
-        self.assertFalse(self.audio_stream_manager.text_queue_manager.is_empty())
+        await audio_stream_manager.enqueue_text("Text to be cleared")
+        assert audio_stream_manager.text_queue_manager.is_empty() is False
         
         # Clear the queue
-        await self.audio_stream_manager.clear_text_queue()
-        self.assertTrue(self.audio_stream_manager.text_queue_manager.is_empty())
+        await audio_stream_manager.clear_text_queue()
+        assert audio_stream_manager.text_queue_manager.is_empty() is True
     
-    async def test_is_actively_sending(self):
+    @pytest.mark.asyncio
+    async def test_is_actively_sending(self, audio_manager_setup):
         """Test is_actively_sending method"""
+        audio_stream_manager = audio_manager_setup['audio_stream_manager']
+        
         # When queue is empty and not running
-        self.audio_stream_manager.running = False
-        self.assertTrue(self.audio_stream_manager.text_queue_manager.is_empty())
-        self.assertFalse(self.audio_stream_manager.is_actively_sending())
+        audio_stream_manager.running = False
+        assert audio_stream_manager.text_queue_manager.is_empty() is True
+        assert audio_stream_manager.is_actively_sending() is False
         
         # When queue has text but not running
-        await self.audio_stream_manager.enqueue_text("Some text")
-        self.assertFalse(self.audio_stream_manager.text_queue_manager.is_empty())
-        self.assertTrue(self.audio_stream_manager.is_actively_sending())
+        await audio_stream_manager.enqueue_text("Some text")
+        assert audio_stream_manager.text_queue_manager.is_empty() is False
+        assert audio_stream_manager.is_actively_sending() is True
         
         # When queue is empty but running
-        await self.audio_stream_manager.clear_text_queue()
-        self.audio_stream_manager.audio_sender.is_sending = True
-        self.assertTrue(self.audio_stream_manager.is_actively_sending())
+        await audio_stream_manager.clear_text_queue()
+        audio_stream_manager.audio_sender.is_sending = True
+        assert audio_stream_manager.is_actively_sending() is True
     
-    async def test_streaming_text_to_speech(self):
+    @pytest.mark.asyncio
+    async def test_streaming_text_to_speech(self, audio_manager_setup):
         """Test the full text-to-speech streaming flow"""
+        audio_stream_manager = audio_manager_setup['audio_stream_manager']
+        tts_provider = audio_manager_setup['tts_provider']
+        
         # Start streaming
-        self.audio_stream_manager.start_streaming()
-        self.assertTrue(self.audio_stream_manager.running)
-        self.assertIsNotNone(self.audio_stream_manager.sender_task)
+        audio_stream_manager.run_background_streaming_worker()
+        assert audio_stream_manager.is_actively_sending() is False
+        assert audio_stream_manager.sender_task is not None
         
         # Enqueue some text
         test_text = "This is a test message for streaming."
-        await self.audio_stream_manager.enqueue_text(test_text)
+        await audio_stream_manager.enqueue_text(test_text)
+        assert audio_stream_manager.is_actively_sending() is True
         
         # Give time for the streaming worker to process the text
         await asyncio.sleep(0.5)
         
         # Stop streaming
-        await self.audio_stream_manager.stop_streaming()
-        self.assertFalse(self.audio_stream_manager.running)
+        await audio_stream_manager.stop_background_streaming_worker()
+        assert audio_stream_manager.is_actively_sending() is False
         
         # Verify TTS and send_audio_chunk were called
-        self.mock_tts_provider.synthesize_speech_to_bytes.assert_called()
-        self.mock_send_audio_chunk.assert_called()
+        audio_stream_manager.audio_sender.send_audio_chunk.assert_called()
     
-    async def test_get_streaming_stats(self):
+    @pytest.mark.asyncio
+    async def test_get_streaming_stats(self, audio_manager_setup):
         """Test getting streaming statistics"""
-        stats = self.audio_stream_manager.get_streaming_stats()
+        audio_stream_manager = audio_manager_setup['audio_stream_manager']
         
-        self.assertIn("text_queue", stats)
-        self.assertIn("audio_sender", stats)
-        self.assertIn("running", stats)
+        stats = audio_stream_manager.get_streaming_stats()
+        
+        assert "text_queue" in stats
+        assert "audio_sender" in stats
+        assert "running" in stats
 
-
-if __name__ == "__main__":
-    unittest.main()
+# No need for unittest.main() with pytest

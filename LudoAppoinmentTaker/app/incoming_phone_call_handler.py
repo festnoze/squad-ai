@@ -161,7 +161,7 @@ class IncomingPhoneCallHandler:
             min_chunk_interval=0.05  # Faster refresh rate (20ms)
         )
         # Start the background streaming task
-        self.audio_stream_manager.start_streaming()
+        self.audio_stream_manager.run_background_streaming_worker()
         self.logger.info("Audio stream manager initialized and started with optimized parameters")
 
         # Main loop to handle WebSocket events
@@ -631,50 +631,22 @@ class IncomingPhoneCallHandler:
         total_duration_ms = 0
         
         # Use the text chunking utilities for better speech chunking
-        text_chunks = ProcessText.chunk_text_by_sized_sentences(text_buffer, max_words_per_chunk, max_chars_per_chunk)
+        text_chunks = ProcessText.chunk_text_by_sentences_size(text_buffer, max_words_per_chunk, max_chars_per_chunk)
         
         # Optimize timing between chunks for more natural speech
-        timed_chunks = ProcessText.optimize_speech_timing(text_chunks)
+        #timed_chunks = ProcessText.optimize_speech_timing(text_chunks)
         
         self.logger.info(f"Processing text into {len(text_chunks)} optimized chunks for speech")
         
-        # Check if audio stream manager is initialized
-        if not self.audio_stream_manager:
-            self.logger.warning("Audio stream manager not initialized, using direct synthesis fallback")
-            
-            # Process each chunk with appropriate timing
-            for chunk_text, start_time, end_time in timed_chunks:
-                audio_bytes = self.tts_provider.synthesize_speech_to_bytes(chunk_text)
-                await self.send_audio_to_twilio_async(audio_bytes=audio_bytes, frame_rate=self.frame_rate, sample_width=self.sample_width)
-                
-                # Use the exact timing from our optimization
-                chunk_duration = end_time - start_time
-                total_duration_ms += chunk_duration
-                
-                # Add a small natural pause between chunks
-                await asyncio.sleep(0.1)
-                
-            return total_duration_ms
-        
         # Use streaming approach with audio stream manager
-        for chunk_text, _, end_time in timed_chunks:
+        for chunk_text in text_chunks:
             result = await self.audio_stream_manager.enqueue_text(chunk_text)
             
             if result:
-                # Update total duration based on optimized timing
-                total_duration_ms = end_time  # Last chunk's end time is the total duration
                 self.logger.debug(f"Enqueued chunk: '{chunk_text[:20]}...' ({len(chunk_text)} chars)")
             else:
-                self.logger.error(f"Failed to enqueue text chunk: '{chunk_text[:20]}...'")
-                # Don't try to enqueue more if one fails
+                self.logger.error(f"/!\\ Failed to enqueue text chunk: '{chunk_text[:20]}...'")
                 break
-                
-        if total_duration_ms > 0:
-            self.logger.info(f"Successfully enqueued {len(text_chunks)} chunks for streaming, estimated duration: {total_duration_ms/1000:.2f} seconds")
-        else:
-            self.logger.error("Failed to enqueue any text chunks for streaming")
-            
-        return total_duration_ms
         
     async def speak_and_send_text_async(self, text_buffer: str):
         """
