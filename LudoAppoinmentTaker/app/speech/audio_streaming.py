@@ -21,6 +21,7 @@ class AudioStreamManager:
         self.sample_width = 2    # Default sample width, can be updated as needed
         self.max_words_by_stream_chunk = 10
         self.max_chars_by_stream_chunk = 100
+        self.ask_to_stop_streaming_worker = False
         
     def update_stream_sid(self, streamSid: str) -> None:
         """
@@ -33,82 +34,7 @@ class AudioStreamManager:
         else:
             self.logger.info(f"Updated stream SID to: {streamSid}")
         return
-        
-    def run_background_streaming_worker(self) -> None:
-        """
-        Starts the streaming process in a background task
-        """
-        if self.audio_sender.is_sending or self.sender_task is not None:
-            self.logger.error("Streaming is already running")
-            return
-            
-        self.sender_task = asyncio.create_task(self._background_streaming_worker())
-        self.logger.info("Audio streaming started")
-        
-    async def stop_background_streaming_worker(self) -> None:
-        """
-        Stops the streaming process and clears the text queue
-        """
-        self.audio_sender.is_sending = False
-        if self.sender_task:
-            try:
-                await asyncio.wait_for(self.sender_task, timeout=2.0)
-            except asyncio.TimeoutError:
-                self.logger.warning("Streaming worker did not stop in time, cancelling")
-                self.sender_task.cancel()
-            except Exception as e:
-                self.logger.error(f"Error stopping streaming worker: {e}")
-            finally:
-                self.sender_task = None
-
-        # Clear the text queue asynchronously
-        await self.text_queue_manager.clear_queue()
-        self.logger.info("Text-to-speech streaming stopped")
-        
-    async def enqueue_text(self, text: str) -> bool:
-        """
-        Adds text to the queue for speech synthesis and streaming.
-        Returns True if the text was successfully enqueued.
-        """
-        return await self.text_queue_manager.enqueue_text(text)
-        
-    async def clear_text_queue(self) -> None:
-        """
-        Clears the text queue without stopping the streaming worker.
-        Used for interruption handling to immediately stop processing text.
-        """
-        # Clear the queue asynchronously
-        await self.text_queue_manager.clear_queue()
-        self.logger.info("Text queue cleared for interruption")
-        
-    def is_actively_sending(self) -> bool:
-        """
-        Check if the audio stream manager is actively sending audio
-        """
-        # Consider both the text queue and the audio sender status
-        return not self.text_queue_manager.is_empty() or self.audio_sender.is_sending
-        
-    def get_streaming_stats(self) -> dict:
-        """
-        Get comprehensive statistics about the text and audio streaming process.
-        
-        Returns:
-            Dictionary with detailed statistics about text queue and audio processing
-        """
-        # Get text queue statistics
-        text_queue_stats = self.text_queue_manager.get_queue_stats()
-        
-        # Get comprehensive audio sender statistics
-        audio_sender_stats = self.audio_sender.get_sender_stats()
-        
-        # Aggregate statistics
-        return {
-            'text_queue': text_queue_stats,
-            'audio_sender': audio_sender_stats,
-            'is_running': self.audio_sender.is_sending,
-            'is_actively_sending': self.is_actively_sending()
-        }
-        
+         
     async def _background_streaming_worker(self):
         """Background worker that continuously processes texts from the queue and sends audio to the websocket"""
         self.logger.info("Background TTS and audio streaming worker started")
@@ -119,7 +45,11 @@ class AudioStreamManager:
         last_chunk_end_time = 0  # Track timing for natural speech flow (in ms)
         
         while True:
-            if not self.is_actively_sending():
+            if self.ask_to_stop_streaming_worker:
+                self.logger.info("Stopping audio streaming worker asked")
+                break
+            
+            if not self.is_sending_speech():
                 await asyncio.sleep(0.1)
                 continue
 
@@ -191,8 +121,77 @@ class AudioStreamManager:
                 self.logger.error(f"Error in streaming worker: {e}", exc_info=True)
                 errors += 1
                 await asyncio.sleep(0.5)  # Sleep a bit longer on error
-                
-                
+                       
+    def run_background_streaming_worker(self) -> None:
+        """
+        Starts the streaming process in a background task
+        """
+        if self.audio_sender.is_sending or self.sender_task is not None:
+            self.logger.error("Streaming is already running")
+            return
+            
+        self.ask_to_stop_streaming_worker = False
+        self.sender_task = asyncio.create_task(self._background_streaming_worker())
+        self.logger.info("Audio streaming started")
+        
+    async def stop_background_streaming_worker_async(self) -> None:
+        """
+        Stops the streaming process and clears the text queue
+        """
+        self.audio_sender.is_sending = False
+        await self.text_queue_manager.clear_queue()
+
+        # Stop the background streaming worker
+        if self.sender_task:
+            try:
+                self.ask_to_stop_streaming_worker = True
+                await asyncio.wait_for(self.sender_task, timeout=2.0)
+            except asyncio.TimeoutError:
+                self.logger.warning("Streaming worker did not stop in time, cancelling")
+                self.sender_task.cancel()
+            except Exception as e:
+                self.logger.error(f"Error stopping streaming worker: {e}")
+            finally:
+                self.sender_task = None
+
+        self.logger.info("Audio streaming worker stopped")
+        
+    async def enqueue_text(self, text: str) -> bool:
+        """
+        Adds text to the queue for speech synthesis and streaming.
+        Returns True if the text was successfully enqueued.
+        """
+        return await self.text_queue_manager.enqueue_text(text)
+        
+    async def clear_text_queue(self) -> None:
+        await self.text_queue_manager.clear_queue()
+        self.logger.info("Text queue cleared for interruption")
+        
+    def is_sending_speech(self) -> bool:
+        """Check if the audio stream manager is actively sending audio"""
+        # Consider both the text queue and the audio sender status
+        return not self.text_queue_manager.is_empty() or self.audio_sender.is_sending
+        
+    def get_streaming_stats(self) -> dict:
+        """
+        Get comprehensive statistics about the text and audio streaming process.
+        
+        Returns:
+            Dictionary with detailed statistics about text queue and audio processing
+        """
+        # Get text queue statistics
+        text_queue_stats = self.text_queue_manager.get_queue_stats()
+        
+        # Get comprehensive audio sender statistics
+        audio_sender_stats = self.audio_sender.get_sender_stats()
+        
+        # Aggregate statistics
+        return {
+            'text_queue': text_queue_stats,
+            'audio_sender': audio_sender_stats,
+            'is_sending_speech': self.is_sending_speech()
+        }
+            
     async def chunk_text_by_sentences_size_async(self) -> list[str]:
         """
         Split text into chunks at natural sentence boundaries.
@@ -296,17 +295,3 @@ class AudioStreamManager:
             chunks.append(current_chunk.strip())
         
         return chunks
-
-
-    def get_streaming_stats(self) -> dict[str, any]:
-        """
-        Returns statistics about the streaming process for monitoring
-        """
-        queue_stats = self.text_queue_manager.get_queue_stats()
-        sender_stats = self.audio_sender.get_sending_stats()
-        
-        return {
-            "text_queue": queue_stats,
-            "audio_sender": sender_stats,
-            "running": self.audio_sender.is_sending
-        }

@@ -1,32 +1,66 @@
 import io
+import os
 import wave
+import base64
+import random
 import logging
 import webrtcvad
 import audioop
-from typing import Tuple
+import asyncio
+import uuid
+from uuid import UUID
+from datetime import datetime
+from typing import Dict, Any, Optional, Tuple, List
 from pydub import AudioSegment
 from pydub.effects import normalize
+from openai import OpenAI
 
-logger = logging.getLogger(__name__)
+from app.api_client.request_models.user_request_model import UserRequestModel, DeviceInfoRequestModel
+from app.api_client.request_models.conversation_request_model import ConversationRequestModel
+from app.api_client.request_models.query_asking_request_model import QueryAskingRequestModel
+from app.agents.conversation_state_model import ConversationState
 
 class IncomingAudioProcessing:
-    """Audio processing utilities for improving speech recognition quality"""
+    """Audio processing utilities for improving speech recognition quality and handling Twilio events"""
+    
+    # Voice settings
+    VOICE_ID = "alloy"
+    
+    # Temporary directory for audio files
+    TEMP_DIR = "./temp"
     
     def __init__(self, sample_width=2, frame_rate=8000, channels=1, vad_aggressiveness=3):
-        """
-        Initialize the audio processor
-        
-        Args:
-            sample_width: Sample width in bytes (2 = 16-bit PCM)
-            frame_rate: Sample rate in Hz
-            channels: Number of audio channels
-            vad_aggressiveness: WebRTC VAD aggressiveness (0-3, 3 is most aggressive)
-        """
+        self.logger = logging.getLogger(__name__)
         self.sample_width = sample_width
         self.frame_rate = frame_rate
         self.channels = channels
         self.vad = webrtcvad.Vad(vad_aggressiveness)
-        logger.info(f"Initialized AudioProcessor with VAD aggressiveness {vad_aggressiveness}")
+        self.logger.info(f"Initialized IncomingAudioProcessing with VAD aggressiveness {vad_aggressiveness}")
+        
+        # State tracking
+        self.start_time = None
+        self.current_stream = None
+        self.conversation_id = None
+        self.stream_states = {}
+        self.phones = {}  # Map call_sid to phone numbers
+        self.audio_stream_manager = None
+        self.studi_rag_inference_client = None
+        self.compiled_graph = None
+        self.openai_client = None
+        self.stt_provider = None
+        self.rag_interrupt_flag = {"interrupted": False}
+        self.is_speaking = False
+        
+        # Audio processing parameters
+        self.audio_buffer = b""
+        self.consecutive_silence_duration_ms = 0.0
+        self.speech_threshold = 250  # RMS threshold for speech detection
+        self.required_silence_ms_to_answer = 1000  # ms of silence to trigger transcript
+        self.min_audio_bytes_for_processing = 1000  # Minimum buffer size to process
+        self.max_audio_bytes_for_processing = 200000  # Maximum buffer size to process
+        
+        # Create temp directory if it doesn't exist
+        os.makedirs(self.TEMP_DIR, exist_ok=True)
     
     def is_speech(self, audio_chunk: bytes, frame_duration_ms=30) -> bool:
         """
@@ -57,7 +91,7 @@ class IncomingAudioProcessing:
         try:
             return self.vad.is_speech(audio_chunk, self.frame_rate)
         except Exception as e:
-            logger.error(f"VAD error: {e}")
+            self.logger.error(f"VAD error: {e}")
             # Fallback to RMS-based detection
             rms = audioop.rms(audio_chunk, self.sample_width)
             return rms > 250  # Default threshold
@@ -101,7 +135,7 @@ class IncomingAudioProcessing:
                 
             return processed_audio
         except Exception as e:
-            logger.error(f"Audio preprocessing error: {e}")
+            self.logger.error(f"Audio preprocessing error: {e}")
             # Return original data if processing fails
             return audio_data
     
@@ -132,3 +166,375 @@ class IncomingAudioProcessing:
         # RMS-based detection (fallback)
         is_silence = speech_to_noise_ratio < threshold
         return is_silence, speech_to_noise_ratio
+        
+    async def handle_incoming_websocket_start_event_async(self, call_sid: str, stream_sid: str) -> str:
+        """Handle the 'start' event from Twilio which begins a new call."""
+        
+        self.start_time = datetime.now()
+        self.logger.info(f"Call started - CallSid: {call_sid}, StreamSid: {stream_sid}")
+        
+        # Set the current stream so the audio functions know which stream to use
+        self.current_stream = stream_sid
+        
+        # Update the streamSid in the audio streaming manager
+        if self.audio_stream_manager:
+            # Update the streamSid in the audio sender
+            self.audio_stream_manager.update_stream_sid(stream_sid)
+            self.logger.info(f"Updated AudioStreamManager with stream SID: {stream_sid}")
+        
+        # Define the welcome message
+        welcome_text = """
+            Bienvenue chez Studi !
+            Je suis l'assistant virtuel Stud'IA, je prends le relais lorsque nos conseillers ne sont pas présents.
+            Puis-je vous aider à choisir votre formation ? Ou a prendre rendez-vous avec un conseiller en formation ?"""
+        #welcome_text = "Salut !"
+
+        # Play welcome message with enhanced text-to-speech
+        self.logger.info(f"Playing welcome message with voice ID: {self.VOICE_ID}")
+        await self.audio_stream_manager.enqueue_text(welcome_text)
+        
+        # Initialize conversation state for this stream
+        phone_number = self.phones.get(call_sid, "Unknown")
+        
+        # Create initial state for the graph
+        initial_state: ConversationState = {
+            "call_sid": call_sid,
+            "caller_phone": phone_number,
+            "user_input": "",
+            "history": [],
+            "agent_scratchpad": {}
+        }
+        # Now, initialize the user and conversation backend (this might take some time)
+        self.conversation_id = await self.init_user_and_new_conversation_upon_phone_call_async(phone_number, call_sid)
+        
+        # Store the initial state for this stream (used by graph and other handlers)
+        self.stream_states[stream_sid] = initial_state
+        
+        try:
+            # Log the welcome message to our backend records
+            await self.studi_rag_inference_client.add_external_ai_message_to_conversation(self.conversation_id, welcome_text)
+            
+            # # Then invoke the graph with initial state to get the AI-generated welcome message
+            # updated_state = await self.compiled_graph.ainvoke(initial_state)
+            # self.stream_states[stream_sid] = updated_state
+            
+            # # If there's an AI message from the graph, send it after the welcome message
+            # if updated_state.get('history') and updated_state['history'][0][0] == 'AI':
+            #     ai_message = updated_state['history'][0][1]
+            #     if ai_message and ai_message.strip() != welcome_text.strip():
+            #         await self.speak_and_send_text(ai_message)
+            #         await self.studi_rag_inference_client.add_external_ai_message_to_conversation(self.conversation_id, ai_message)
+        
+        except Exception as e:
+            self.logger.error(f"Error in initial graph invocation: {e}", exc_info=True)
+            # If there was an error with the graph, we already sent our welcome message,
+            # so we don't need to send a fallback
+        
+        return stream_sid
+
+    async def handle_incoming_websocket_media_event_async(self, audio_data: dict) -> None:        
+        if not self.current_stream:
+            self.logger.error("/!\\ 'media event' received before the 'start event'")
+            return
+        
+        # 1. Decode audio chunk
+        chunk = self._decode_audio_chunk(audio_data)
+        if chunk is None: 
+            self.logger.warning("Received media event without valid audio chunk")
+            return
+                        
+        # First, update the speaking state based on the queue status
+        await self.update_is_speaking_state_async()
+        
+        # Check for speech while system is speaking (interruption detection)
+        if self.is_speaking:
+            # Check if this chunk contains speech - use a lower threshold to detect speech earlier
+            is_silence, speech_to_noise_ratio = self.detect_silence_speech(
+                chunk, threshold=self.speech_threshold * 0.8  # More sensitive detection while speaking
+            )
+            
+            # If user is speaking while system is speaking, stop system speech
+            # Use a lower threshold multiplier (1.2x instead of 1.5x) for quicker interruption
+            if not is_silence and speech_to_noise_ratio > self.speech_threshold * 1.2:
+                self.logger.info(f"Speech interruption detected (level: {speech_to_noise_ratio}), stopping system speech")
+                await self.stop_speaking_async()
+                # Reset buffer to clear any previous speech before interruption
+                self.audio_buffer = b""
+                self.consecutive_silence_duration_ms = 0.0
+                # Add a message to the logs so we can track interruptions
+                print(f"\r>>> USER INTERRUPTED - Speech detected while system was speaking ({speech_to_noise_ratio})")
+        
+        # Use WebRTC VAD for better speech detection
+        is_silence, speech_to_noise_ratio = self.detect_silence_speech(
+            chunk, threshold=self.speech_threshold
+        )
+
+        # 2. Silence detection before adding to buffer
+        has_speech_began = len(self.audio_buffer) > 0
+
+        # Count consecutive silence chunks duration
+        if is_silence:
+            # Calculate duration
+            chunk_duration_ms = (len(chunk) / self.sample_width) / self.frame_rate * 1000
+            self.consecutive_silence_duration_ms += chunk_duration_ms
+            msg = f"\rSilent chunk - Duration: {self.consecutive_silence_duration_ms:.1f}ms - Speech/noise: {speech_to_noise_ratio:04d} (size: {len(chunk)} bytes)."
+            print(msg, end="", flush=True)
+
+        # Add speech chunk to buffer
+        if has_speech_began or not is_silence:
+            self.audio_buffer += chunk
+            self.consecutive_silence_duration_ms = 0.0
+
+            if(random.randint(0, 100) < 1): # Log every 1%
+                self.logger.debug(
+                    f"Speech detected - RMS: {speech_to_noise_ratio}/{self.speech_threshold}, "
+                    f"Buffer size: {len(self.audio_buffer)} bytes")
+
+        is_long_silence_after_speech = has_speech_began and self.consecutive_silence_duration_ms >= self.required_silence_ms_to_answer 
+        has_reach_min_speech_length = len(self.audio_buffer) >= self.min_audio_bytes_for_processing
+        is_speech_too_long = len(self.audio_buffer) > self.max_audio_bytes_for_processing
+        
+        # 3. Process audio
+        # Conditions: if buffer large enough followed by a prolonged silence, or if buffer is too large
+        if (is_long_silence_after_speech and has_reach_min_speech_length) or is_speech_too_long:
+            if is_speech_too_long:
+                self.logger.info(f"Process incoming audio: Buffer size limit reached. (buffer size: {len(self.audio_buffer)} bytes).")
+            else:
+                self.logger.info(f"Process incoming audio: Silence after speech detected. (buffer size: {len(self.audio_buffer)} bytes).")
+            
+            audio_data = self.audio_buffer
+            self.audio_buffer = b""
+            self.consecutive_silence_duration_ms = 0.0
+
+            # Waiting message
+            #await self.speak_and_send_text("Très bien, je vais traiter votre demande.")
+
+            # 4. Transcribe speech to text
+            user_query_transcript = self._perform_speech_to_text_transcription(audio_data)
+            if user_query_transcript is None:
+                return
+            
+            # 5. Feedback the request to the user
+            #spoken_text = await self.send_ask_feedback(transcript)
+            try:
+                self.logger.info(f"Sending request to RAG API for stream: {self.current_stream}")
+                rag_query_RM = QueryAskingRequestModel(
+                    conversation_id=self.conversation_id,
+                    user_query_content= user_query_transcript,
+                    display_waiting_message=False
+                )
+                self.rag_interrupt_flag = {"interrupted": False} # Reset the interrupt flag before starting new streaming
+                response = self.studi_rag_inference_client.rag_query_stream_async(rag_query_RM, timeout=60, interrupt_flag=self.rag_interrupt_flag)
+                # Use enhanced text-to-speech method for acknowledgment
+                acknowledgment_text = f"OK. Vous avez demandé : {user_query_transcript}. Laissez-moi un instant pour rechercher des informations à ce sujet."
+                await self.audio_stream_manager.enqueue_text(acknowledgment_text)
+                
+                full_answer = ""
+                was_interrupted = False
+                async for chunk in response:
+                    # Vérifier si on a été interrompu entre les chunks
+                    if not self.is_speaking:
+                        was_interrupted = True
+                        self.logger.info("Speech interrupted while processing RAG response")
+                        break
+                        
+                    full_answer += chunk
+                    self.logger.debug(f"Received chunk: {chunk}")
+                    print(f"<< ... {chunk} ... >>")
+                    
+                    # Sauvegarder l'état de parole avant de parler
+                    speaking_before = self.is_speaking
+                    
+                    # Use the enhanced text processing for better speech quality
+                    # Using smaller chunks for RAG responses to be more responsive
+                    await self.audio_stream_manager.enqueue_text(chunk)
+                    
+                    # Vérifier si on a été interrompu pendant qu'on parlait
+                    if speaking_before and not self.is_speaking:
+                        was_interrupted = True
+                        self.logger.info("Speech interrupted during RAG response chunk")
+                        break
+                
+                # Loguer les résultats du traitement RAG
+                end_time = time.time()
+                if was_interrupted:
+                    self.logger.info(f"RAG streaming was interrupted")
+                elif full_answer:
+                    self.logger.info(f"Full answer received from RAG API in {end_time - start_time:.2f}s: {full_answer[:100]}...")
+                else:
+                    self.logger.warning(f"Empty response received from RAG API")
+                
+            except Exception as e:
+                error_message = f"Je suis désolé, une erreur s'est produite lors de la communication avec le service."
+                self.logger.error(f"Error in RAG API communication: {str(e)}")
+                # Use enhanced text-to-speech for error messages too
+                await self.audio_stream_manager.enqueue_text(error_message)
+
+            # 5 bis. Process user's query through conversation graph
+            #response_text = await self._process_conversation(transcript)
+
+        return
+    
+    async def init_user_and_new_conversation_upon_phone_call_async(self, calling_phone_number: str, call_sid: str):
+        """ Initialize the user session: create user and conversation"""
+        user_name_val = "Twilio incoming call " + (calling_phone_number or "Unknown User")
+        ip_val = calling_phone_number or "Unknown IP"
+        user_RM = UserRequestModel(
+            user_id=None,
+            user_name=user_name_val,
+            IP=ip_val,
+            device_info=DeviceInfoRequestModel(user_agent="twilio", platform="phone", app_version="", os="", browser="", is_mobile=True)
+        )
+        try:
+            user = await self.studi_rag_inference_client.create_or_retrieve_user(user_RM)
+            user_id = user['id']
+            
+            # Convert user_id to UUID if it's a string
+            if isinstance(user_id, str): user_id = UUID(user_id)
+                
+            # Create empty messages list
+            messages = []
+            
+            # Create the conversation request model
+            conversation_model = ConversationRequestModel(user_id=user_id, messages=messages)
+            
+            self.logger.info(f"Creating new conversation for user: {user_id}")
+            new_conversation = await self.studi_rag_inference_client.create_new_conversation(conversation_model)
+            return new_conversation['id']
+
+        except Exception as e:
+            self.logger.error(f"Error creating conversation: {str(e)}")
+            return str(uuid.uuid4())
+
+    def _decode_audio_chunk(self, data : dict):
+        media_data = data.get("media", {})
+        payload = media_data.get("payload")
+        if not payload:
+            self.logger.warning("Received media event without payload")
+            return None
+        try:
+            return audioop.ulaw2lin(base64.b64decode(payload), self.sample_width)
+        except Exception as decode_err:
+            self.logger.error(f"Error decoding/converting audio chunk: {decode_err}")
+            return None
+
+    def _perform_speech_to_text_transcription(self, audio_data: bytes):
+        try:
+            # Check if the audio buffer has a high enough speech to noise ratio
+            speech_to_noise_ratio = audioop.rms(audio_data, self.sample_width)
+            if speech_to_noise_ratio < self.speech_threshold:
+                if random.random() < 0.1: # log 1/10 of the time
+                    self.logger.info(f"[Silence/Noise] Low speech/noise ratio detected: {speech_to_noise_ratio}. Transcription skipped")
+                return None
+                
+            self.logger.info(f"[Speech] High speech/noise ratio detected: {speech_to_noise_ratio}. Processing transcription.")
+            
+            # Apply audio preprocessing to improve quality
+            self.logger.info("Applying audio preprocessing...")
+            processed_audio = self.preprocess_audio(audio_data)
+            self.logger.info(f"Audio preprocessing complete. Original size: {len(audio_data)} bytes, Processed size: {len(processed_audio)} bytes")
+                
+            # Save the processed audio to a file
+            wav_file_name = self.save_as_wav_file(processed_audio)
+            
+            # Transcribe using the hybrid STT provider
+            self.logger.info("Transcribing audio with hybrid STT provider...")
+            transcript: str = self.stt_provider.transcribe_audio(wav_file_name)
+            self.logger.info(f">> Speech to text transcription: '{transcript}'")
+            #self.delete_temp_file(wav_file_name)
+            
+            # Filter out known watermark text that appears during silences
+            known_watermarks = [
+                "Sous-titres réalisés para la communauté d'Amara.org",
+                "Sous-titres réalisés par la communauté d'Amara.org",
+                "Sous-titres réalisés",
+                "Sous-titres",
+                "Amara.org",
+                " par SousTitreur.com...",
+                "SousTitreur.com",
+                "Merci d'avoir regardé cette vidéo, n'hésitez pas à vous abonner à la chaîne pour ne manquer aucune de mes prochaines vidéos.",
+                "Merci d'avoir regardé cette vidéo",
+                "Merci à tous et à la prochaine",
+                "c'est la fin de la vidéo"
+            ]
+            
+            # Check if transcript contains any of the known watermarks
+            if any(watermark.lower() in transcript.lower() for watermark in known_watermarks):
+                self.logger.warning(f"!!! Detected watermark in transcript, ignoring: '{transcript}'")
+                return None
+                
+            # If transcript is too short, it might be noise
+            if len(transcript.strip()) < 2:
+                self.logger.info(f"Transcript too short, ignoring: '{transcript}'")
+                return None
+                
+            return transcript
+            
+        except Exception as speech_err:
+            self.logger.error(f"Error during transcription: {speech_err}", exc_info=True)
+            return None
+    
+    def delete_temp_file(self, file_name: str):
+        try:
+            os.remove(os.path.join(self.TEMP_DIR, file_name))
+        except Exception as e:
+            self.logger.error(f"Error deleting temp file {file_name}: {e}")
+
+    async def speak_and_send_ask_for_feedback_async(self, transcript):
+        response_text = "Instructions : Fait un feedback reformulé de façon synthétique de la demande utilisateur suivante, afin de t'assurer de ta bonne comphéhension de celle-ci : " + transcript 
+        response = self.openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "user", "content": response_text}
+            ],
+            stream=True
+        )
+        if response:
+            spoken_text = await self.speak_and_send_stream_async(response)
+            self.logger.info(f"<< Response text: '{spoken_text}'")
+            return spoken_text
+        return ""
+    
+    def save_as_wav_file(self, audio_data: bytes):
+        """Save PCM data (16-bit, 8kHz, mono) to a WAV file at the specified path."""
+        file_name = f"{uuid.uuid4()}.wav"
+        with wave.open(os.path.join(self.TEMP_DIR, file_name), "wb") as wav_file:
+            wav_file.setnchannels(1)  # mono
+            wav_file.setsampwidth(self.sample_width)  # 16-bit
+            wav_file.setframerate(self.frame_rate)
+            wav_file.writeframes(audio_data)
+        return file_name
+            
+    async def update_is_speaking_state_async(self):
+        """
+        Updates the speaking state based on the text queue status
+        This provides a more accurate representation of when audio is actually being sent
+        """
+        if hasattr(self, 'audio_stream_manager') and self.audio_stream_manager:
+            is_sending_audio = self.audio_stream_manager.is_actively_sending()
+            if is_sending_audio != self.is_speaking:
+                if is_sending_audio:
+                    self.is_speaking = True
+                    # Log more detailed stats about the text queue
+                    stats = self.audio_stream_manager.get_streaming_stats()
+                    text_stats = stats['text_queue']
+                    logger.debug(f"Speaking started - Text queue: {text_stats['current_size_chars']} chars, " +
+                                 f"{text_stats['total_chars_processed']} chars processed so far")
+                else:
+                    self.is_speaking = False
+                    logger.debug("Speaking stopped - Text queue empty")
+    
+    async def stop_speaking_async(self):
+        """Stop any ongoing speech and clear text queue and interrupt RAG streaming"""
+        if self.is_speaking:
+            # Interrupt RAG streaming with its tag if it's active
+            if hasattr(self, 'rag_interrupt_flag'):
+                self.rag_interrupt_flag["interrupted"] = True
+                logger.info("RAG streaming interrupted due to speech interruption")
+                
+            if self.audio_stream_manager:
+                await self.audio_stream_manager.clear_text_queue()
+                logger.info("Cleared text queue due to speech interruption")
+            self.is_speaking = False
+            return True  # Speech was stopped
+        return False  # No speech was ongoing

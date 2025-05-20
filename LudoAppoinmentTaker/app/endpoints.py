@@ -67,8 +67,8 @@ async def websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid:
     await ws.accept()
     logger.info(f"WebSocket connection accepted from: {ws.client.host}:{ws.client.port}")
     try:
-        incoming_phone_call_handler = incoming_phone_call_handler_factory.get_new_incoming_phone_call_handler(websocket=ws)
-        await incoming_phone_call_handler.handle_ongoing_call_async(calling_phone_number, call_sid)
+        call_handler = incoming_phone_call_handler_factory.get_new_incoming_phone_call_handler(websocket=ws)
+        await call_handler.handle_call_websocket_events_async(calling_phone_number, call_sid)
     except WebSocketDisconnect:
         logger.info(f"WebSocket disconnected: {ws.client.host}:{ws.client.port}")
     except Exception as e:
@@ -79,6 +79,7 @@ async def websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid:
             logger.error("Error closing WebSocket connection", exc_info=True)
             pass
     finally:
+        await call_handler.audio_stream_manager.stop_background_streaming_worker_async()
         logger.info(f"WebSocket endpoint finished for: {ws.client.host}:{ws.client.port}")
 
 
