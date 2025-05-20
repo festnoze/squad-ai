@@ -14,7 +14,8 @@ from datetime import datetime
 #
 from pydub import AudioSegment
 from openai import OpenAI
-from typing import Dict, Optional
+from typing import Dict, Any, Optional, Tuple, List
+from app.speech.text_processing import ProcessText
 from fastapi import WebSocket, WebSocketDisconnect
 #
 from app.agents.agents_graph import AgentsGraph
@@ -105,11 +106,12 @@ class IncomingPhoneCallHandler:
         if self.openai_client is None:
             self.openai_client = OpenAI(api_key=self.OPENAI_API_KEY)
 
+        self.compiled_graph = AgentsGraph().graph
+
         self.logger.info("IncomingPhoneCallHandler initialized successfully.")
 
     async def init_user_and_new_conversation_upon_phone_call(self, calling_phone_number: str, call_sid: str):
-        """ Initialize the user session: create user and conversation and send a welcome message """
-        # Ensure user_name and IP are valid strings
+        """ Initialize the user session: create user and conversation"""
         user_name_val = "Twilio incoming call " + (calling_phone_number or "Unknown User")
         ip_val = calling_phone_number or "Unknown IP"
         user_RM = UserRequestModel(
@@ -150,12 +152,12 @@ class IncomingPhoneCallHandler:
         # Store the caller's phone number and call SID so we can retrieve them later
         self.phones[call_sid] = calling_phone_number
         
-        # Initialize the audio stream manager for throttled audio streaming with optimized parameters
+        # Initialize the audio stream manager for text-based TTS streaming with optimized parameters
         # We'll set the streamSid later when the call starts
         self.audio_stream_manager = AudioStreamManager(
-            websocket=self.websocket, 
+            websocket=self.websocket,
+            tts_provider=self.tts_provider,  # Add TTS provider for text-to-speech conversion
             streamSid=None,  # Will be set when the call starts
-            max_queue_size=5,  # Smaller queue size for faster feedback
             min_chunk_interval=0.05  # Faster refresh rate (20ms)
         )
         # Start the background streaming task
@@ -219,16 +221,10 @@ class IncomingPhoneCallHandler:
             self.logger.info(f"Updated AudioStreamManager with stream SID: {stream_sid}")
         
         # Define the welcome message
-        welcome_text = f"""
-        Bienvenue chez Studi !
-        Je suis l'assistant virtuel Stud'IA, je prends le relais lorsque nos conseillers ne sont pas présents.
-        Puis-je vous aider à choisir votre formation ? Ou a prendre rendez-vous avec un conseiller en formation ?
-        """
-        #welcome_text = "Salut !"
-
-        self.logger.info(f"Sending welcome speech to {call_sid}")
-        
-        duration = await self.speak_and_send_text(welcome_text)
+        welcome_text = "Bonjour, je suis Ludo, l'assistant virtuel de Studi. Comment puis-je vous aider aujourd'hui?"
+        # Play welcome message with enhanced text-to-speech
+        self.logger.info(f"Playing welcome message with voice ID: {self.VOICE_ID}")
+        duration = await self.send_text_to_speak_to_twilio(welcome_text, max_words_per_chunk=10, max_chars_per_chunk=100)
         
         # Wait until the welcome message is finished playing
         # await asyncio.sleep(duration / 1000)
@@ -255,18 +251,16 @@ class IncomingPhoneCallHandler:
             # Log the welcome message to our backend records
             await self.studi_rag_inference_client.add_external_ai_message_to_conversation(self.conversation_id, welcome_text)
             
-            if not self.compiled_graph:
-                self.compiled_graph = AgentsGraph().graph
-            # Then invoke the graph with initial state to get the AI-generated welcome message
-            updated_state = await self.compiled_graph.ainvoke(initial_state)
-            self.stream_states[stream_sid] = updated_state
+            # # Then invoke the graph with initial state to get the AI-generated welcome message
+            # updated_state = await self.compiled_graph.ainvoke(initial_state)
+            # self.stream_states[stream_sid] = updated_state
             
-            # If there's an AI message from the graph, send it after the welcome message
-            if updated_state.get('history') and updated_state['history'][0][0] == 'AI':
-                ai_message = updated_state['history'][0][1]
-                if ai_message and ai_message.strip() != welcome_text.strip():
-                    await self.speak_and_send_text(ai_message)
-                    await self.studi_rag_inference_client.add_external_ai_message_to_conversation(self.conversation_id, ai_message)
+            # # If there's an AI message from the graph, send it after the welcome message
+            # if updated_state.get('history') and updated_state['history'][0][0] == 'AI':
+            #     ai_message = updated_state['history'][0][1]
+            #     if ai_message and ai_message.strip() != welcome_text.strip():
+            #         await self.speak_and_send_text(ai_message)
+            #         await self.studi_rag_inference_client.add_external_ai_message_to_conversation(self.conversation_id, ai_message)
         
         except Exception as e:
             self.logger.error(f"Error in initial graph invocation: {e}", exc_info=True)
@@ -288,7 +282,7 @@ class IncomingPhoneCallHandler:
             return
                         
         # First, update the speaking state based on the queue status
-        self.update_is_speaking_state()
+        await self.update_is_speaking_state_async()
         
         # Check for speech while system is speaking (interruption detection)
         if self.is_speaking:
@@ -301,7 +295,7 @@ class IncomingPhoneCallHandler:
             # Use a lower threshold multiplier (1.2x instead of 1.5x) for quicker interruption
             if not is_silence and speech_to_noise_ratio > self.speech_threshold * 1.2:
                 self.logger.info(f"Speech interruption detected (level: {speech_to_noise_ratio}), stopping system speech")
-                await self.stop_speaking()
+                await self.stop_speaking_async()
                 # Reset buffer to clear any previous speech before interruption
                 self.audio_buffer = b""
                 self.consecutive_silence_duration_ms = 0.0
@@ -369,8 +363,9 @@ class IncomingPhoneCallHandler:
                 )
                 self.rag_interrupt_flag = {"interrupted": False} # Reset the interrupt flag before starting new streaming
                 response = self.studi_rag_inference_client.rag_query_stream_async(rag_query_RM, timeout=60, interrupt_flag=self.rag_interrupt_flag)
-                #await self.speak_and_send_ask_for_feedback_async(user_query_transcript)
-                await self.speak_and_send_text("OK. Vous avez demandé : " + user_query_transcript + ". Laisser moi un instant pour rechercher des informations à ce sujet.")
+                # Use enhanced text-to-speech method for acknowledgment
+                acknowledgment_text = f"OK. Vous avez demandé : {user_query_transcript}. Laissez-moi un instant pour rechercher des informations à ce sujet."
+                await self.send_text_to_speak_to_twilio(acknowledgment_text, max_words_per_chunk=10, max_chars_per_chunk=100)
                 
                 full_answer = ""
                 was_interrupted = False
@@ -387,7 +382,10 @@ class IncomingPhoneCallHandler:
                     
                     # Sauvegarder l'état de parole avant de parler
                     speaking_before = self.is_speaking
-                    await self.speak_and_send_text(chunk)
+                    
+                    # Use the enhanced text processing for better speech quality
+                    # Using smaller chunks for RAG responses to be more responsive
+                    await self.send_text_to_speak_to_twilio(chunk, max_words_per_chunk=6, max_chars_per_chunk=75)
                     
                     # Vérifier si on a été interrompu pendant qu'on parlait
                     if speaking_before and not self.is_speaking:
@@ -407,7 +405,8 @@ class IncomingPhoneCallHandler:
             except Exception as e:
                 error_message = f"Je suis désolé, une erreur s'est produite lors de la communication avec le service."
                 self.logger.error(f"Error in RAG API communication: {str(e)}")
-                await self.speak_and_send_text(error_message)
+                # Use enhanced text-to-speech for error messages too
+                await self.send_text_to_speak_to_twilio(error_message, max_words_per_chunk=8, max_chars_per_chunk=100)
 
             # 5. Process user's query through conversation graph
             #response_text = await self._process_conversation(transcript)
@@ -560,10 +559,14 @@ class IncomingPhoneCallHandler:
                         if len(text_buffer) > 1 and (any(punct in delta_content for punct in [".", ",", ":", "!", "?"]) or len(text_buffer.split()) > 20):
                             # If speaking is interrupted during this call, remember that
                             speaking_before = self.is_speaking
-                            await self.speak_and_send_text(text_buffer)
+                            
+                            # Use our enhanced text-to-speech method for better speech quality
+                            await self.send_text_to_speak_to_twilio(text_buffer, max_words_per_chunk=8, max_chars_per_chunk=80)
+                            
                             if speaking_before and not self.is_speaking:
                                 # Speech was interrupted during this segment
                                 was_interrupted = True
+                                self.logger.info("Speech was interrupted during streaming, stopping further processing")
                                 break
                                 
                             full_text += text_buffer
@@ -571,36 +574,122 @@ class IncomingPhoneCallHandler:
             
             # Only send remaining text if we weren't interrupted
             if text_buffer and not was_interrupted:
-                await self.speak_and_send_text(text_buffer)
+                self.logger.info(f"Processing final text chunk in stream: {len(text_buffer)} chars")
+                await self.send_text_to_speak_to_twilio(text_buffer, max_words_per_chunk=8, max_chars_per_chunk=80)
                 full_text += text_buffer
+                
+                # Log timing stats if audio stream manager is available
+                if self.audio_stream_manager:
+                    stats = self.audio_stream_manager.get_streaming_stats()
+                    self.logger.info(f"Stream complete - Text stats: {stats['text_queue']['current_size_chars']} chars queued, " +
+                                    f"chunks processed: {stats['audio_sender']['chunks_sent']}")
             
             return full_text
         except Exception as e:
             self.logger.error(f"/!\\ Error sending audio to Twilio in {self.speak_and_send_stream_async.__name__}: {e}", exc_info=True)
             return ""
 
-    def update_is_speaking_state(self):
+    async def update_is_speaking_state_async(self):
         """
-        Updates the speaking state based on the audio queue status
+        Updates the speaking state based on the text queue status
         This provides a more accurate representation of when audio is actually being sent
         """
-        is_sending_audio = self.audio_stream_manager.is_actively_sending()
+        if hasattr(self, 'audio_stream_manager') and self.audio_stream_manager:
+            is_sending_audio = self.audio_stream_manager.is_actively_sending()
+            if is_sending_audio != self.is_speaking:
+                if is_sending_audio:
+                    self.is_speaking = True
+                    # Log more detailed stats about the text queue
+                    stats = self.audio_stream_manager.get_streaming_stats()
+                    text_stats = stats['text_queue']
+                    self.logger.debug(f"Speaking started - Text queue: {text_stats['current_size_chars']} chars, " +
+                                     f"{text_stats['total_chars_processed']} chars processed so far")
+
+    async def send_text_to_speak_to_twilio(self, text_buffer: str, max_words_per_chunk: int = 15, max_chars_per_chunk: int = 150) -> float:
+        """
+        Enhanced version that processes text more intelligently for speech synthesis and streaming.
+        Uses advanced text chunking and timing optimization for more natural speech.
         
-        if is_sending_audio != self.is_speaking:
-            if is_sending_audio:
-                self.is_speaking = True
-                self.logger.debug("Speaking state activated - Audio queue has items")
+        Args:
+            text_buffer: The text to synthesize and send
+            max_words_per_chunk: Maximum words per chunk for processing
+            max_chars_per_chunk: Maximum characters per chunk
+            
+        Returns:
+            Estimated total duration in milliseconds
+        """
+        if not text_buffer:
+            self.logger.warning("Empty text buffer provided to send_text_to_speak_to_twilio")
+            return 0
+            
+        self.is_speaking = True
+        total_duration_ms = 0
+        
+        # Use the text chunking utilities for better speech chunking
+        text_chunks = ProcessText.chunk_text_by_sized_sentences(text_buffer, max_words_per_chunk, max_chars_per_chunk)
+        
+        # Optimize timing between chunks for more natural speech
+        timed_chunks = ProcessText.optimize_speech_timing(text_chunks)
+        
+        self.logger.info(f"Processing text into {len(text_chunks)} optimized chunks for speech")
+        
+        # Check if audio stream manager is initialized
+        if not self.audio_stream_manager:
+            self.logger.warning("Audio stream manager not initialized, using direct synthesis fallback")
+            
+            # Process each chunk with appropriate timing
+            for chunk_text, start_time, end_time in timed_chunks:
+                audio_bytes = self.tts_provider.synthesize_speech_to_bytes(chunk_text)
+                await self.send_audio_to_twilio(audio_bytes=audio_bytes, frame_rate=self.frame_rate, sample_width=self.sample_width)
+                
+                # Use the exact timing from our optimization
+                chunk_duration = end_time - start_time
+                total_duration_ms += chunk_duration
+                
+                # Add a small natural pause between chunks
+                await asyncio.sleep(0.1)
+                
+            return total_duration_ms
+        
+        # Use streaming approach with audio stream manager
+        for chunk_text, _, end_time in timed_chunks:
+            result = await self.audio_stream_manager.enqueue_text(chunk_text)
+            
+            if result:
+                # Update total duration based on optimized timing
+                total_duration_ms = end_time  # Last chunk's end time is the total duration
+                self.logger.debug(f"Enqueued chunk: '{chunk_text[:20]}...' ({len(chunk_text)} chars)")
             else:
-                self.logger.debug("Speaking state deactivated - Audio queue empty")
-                self.is_speaking = False
-    
-    async def speak_and_send_text(self, text_buffer: str):
-        self.is_speaking = True        
-        audio_bytes = self.tts_provider.synthesize_speech_to_bytes(text_buffer)
-        await self.send_audio_to_twilio(audio_bytes=audio_bytes, frame_rate=self.frame_rate, sample_width=self.sample_width)
+                self.logger.error(f"Failed to enqueue text chunk: '{chunk_text[:20]}...'")
+                # Don't try to enqueue more if one fails
+                break
+                
+        if total_duration_ms > 0:
+            self.logger.info(f"Successfully enqueued {len(text_chunks)} chunks for streaming, estimated duration: {total_duration_ms/1000:.2f} seconds")
+        else:
+            self.logger.error("Failed to enqueue any text chunks for streaming")
+            
+        return total_duration_ms
         
-        duration_ms = (len(audio_bytes) / (self.frame_rate * self.sample_width)) * 1000
-        return duration_ms
+    async def speak_and_send_text(self, text_buffer: str):
+        """
+        Legacy method that now uses the enhanced send_text_to_speak_to_twilio method.
+        Kept for backward compatibility.
+        
+        Args:
+            text_buffer: The text to synthesize and send
+            
+        Returns:
+            Estimated duration in milliseconds
+        """
+        self.logger.debug(f"Using enhanced text processing for '{text_buffer[:30]}...'")
+        
+        # Use our enhanced method with default parameters
+        return await self.send_text_to_speak_to_twilio(
+            text_buffer=text_buffer,
+            max_words_per_chunk=15,
+            max_chars_per_chunk=150
+        )
 
     async def _handle_stop_event(self):
         """Handle the stop event from Twilio which ends a call"""
@@ -662,8 +751,8 @@ class IncomingPhoneCallHandler:
         else:
             return pcm_data
     
-    async def stop_speaking(self):
-        """Stop any ongoing speech and clear audio queue and interrupt RAG streaming"""
+    async def stop_speaking_async(self):
+        """Stop any ongoing speech and clear text queue and interrupt RAG streaming"""
         if self.is_speaking:
             # Interrupt RAG streaming if it's active
             if hasattr(self, 'rag_interrupt_flag'):
@@ -671,8 +760,8 @@ class IncomingPhoneCallHandler:
                 self.logger.info("RAG streaming interrupted due to speech interruption")
                 
             if self.audio_stream_manager:
-                await self.audio_stream_manager.clear_audio_queue()
-                self.logger.info("Cleared audio queue due to speech interruption")
+                await self.audio_stream_manager.clear_text_queue()
+                self.logger.info("Cleared text queue due to speech interruption")
             self.is_speaking = False
             return True  # Speech was stopped
         return False  # No speech was ongoing
@@ -727,18 +816,20 @@ class IncomingPhoneCallHandler:
             for i in range(0, len(ulaw_data), chunk_size):
                 chunk = ulaw_data[i:i + chunk_size]
                 
-                # Queue the chunk for throttled sending with true back-pressure
-                # This will block if the queue is full until space is available
-                result = await self.audio_stream_manager.enqueue_audio(chunk)
+                # Convert audio chunk directly to text for backward compatibility
+                # This is needed during the transition period until all code is updated
+                # to use the new text-based approach directly
+                audio_text = f"<audio_binary:{len(chunk)}>"  # Placeholder text representing audio
+                result = await self.audio_stream_manager.enqueue_text(audio_text)
                 if result:
                     chunks_queued += 1
                 
                 # Log progress at regular intervals
                 if chunks_queued % 10 == 0 or chunks_queued == total_chunks:
-                    queue_stats = self.audio_stream_manager.queue_manager.get_queue_stats()
+                    queue_stats = self.audio_stream_manager.get_streaming_stats()['text_queue']
                     elapsed = time.time() - start_time
                     progress_pct = (chunks_queued / total_chunks) * 100 if total_chunks > 0 else 0
-                    self.logger.debug(f"Audio queued: {progress_pct:.1f}% - {chunks_queued}/{total_chunks} chunks - Queue pressure: {queue_stats['pressure']:.1%}")
+                    self.logger.debug(f"Audio queued: {progress_pct:.1f}% - {chunks_queued}/{total_chunks} chunks - Queue size: {queue_stats['current_size_chars']} chars")
             
             # Try to send mark (but don't fail if it doesn't work)
             try:
@@ -762,3 +853,20 @@ class IncomingPhoneCallHandler:
         except Exception as e:
             self.logger.error(f"Error sending audio to Twilio: {e}", exc_info=True)
             return False
+
+class IncomingPhoneCallHandlerFactory:
+    def __init__(self):
+        self.build_new_incoming_phone_call_handler()
+
+    def build_new_incoming_phone_call_handler(self):
+        self.incoming_phone_call_handler = IncomingPhoneCallHandler(websocket=None)
+
+    def get_new_incoming_phone_call_handler(self, websocket: WebSocket):
+        if not self.incoming_phone_call_handler:
+            self.build_new_incoming_phone_call_handler()
+        incoming_phone_call_handler_to_return = self.incoming_phone_call_handler
+        incoming_phone_call_handler_to_return.websocket = websocket
+        self.incoming_phone_call_handler = None
+        #self.build_new_incoming_phone_call_handler()
+        return incoming_phone_call_handler_to_return
+    

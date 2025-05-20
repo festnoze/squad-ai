@@ -1,18 +1,19 @@
 import os
 import logging
-import re
 from fastapi import APIRouter, WebSocket, Request, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from twilio.twiml.voice_response import VoiceResponse, Connect
 from twilio.twiml.messaging_response import MessagingResponse
 #
-from app.incoming_phone_call_handler import IncomingPhoneCallHandler
+from app.incoming_phone_call_handler import IncomingPhoneCallHandlerFactory
 from app.incoming_sms_handler import IncomingSMSHandler
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 router = APIRouter()
 static_audio_path: str = "static/audio/"
+
+incoming_phone_call_handler_factory = IncomingPhoneCallHandlerFactory()
 
 @staticmethod
 async def _extract_request_data_async(request: Request) -> tuple:
@@ -66,8 +67,7 @@ async def websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid:
     await ws.accept()
     logger.info(f"WebSocket connection accepted from: {ws.client.host}:{ws.client.port}")
     try:
-        # Create a new IncomingPhoneCallHandler instance for this WebSocket connection
-        incoming_phone_call_handler = IncomingPhoneCallHandler(websocket=ws)
+        incoming_phone_call_handler = incoming_phone_call_handler_factory.get_new_incoming_phone_call_handler(websocket=ws)
         await incoming_phone_call_handler.handle_ongoing_call_async(calling_phone_number, call_sid)
     except WebSocketDisconnect:
         logger.info(f"WebSocket disconnected: {ws.client.host}:{ws.client.port}")
