@@ -116,6 +116,8 @@ class AudioStreamManager:
         max_streamSid_wait = 20  # Maximum number of attempts to wait for streamSid
         last_chunk_end_time = 0  # Track timing for natural speech flow (in ms)
         
+        self.audio_sender.is_sending = True
+        
         while self.audio_sender.is_sending:
             try:
                 # Check if we have a valid streamSid before processing
