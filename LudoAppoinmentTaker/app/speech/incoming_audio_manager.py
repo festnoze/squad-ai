@@ -31,7 +31,7 @@ class IncomingAudioManager:
     VOICE_ID = "alloy"
     
     # Temporary directory for audio files
-    TEMP_DIR = "./temp"
+    TEMP_DIR = "./static/audio"
     
     def __init__(self, websocket: any, studi_rag_inference_client : StudiRAGInferenceClient, tts_provider: TextToSpeechProvider, stt_provider: SpeechToTextProvider, streamSid: str = None, min_chunk_interval: float = 0.05, sample_width=2, frame_rate=8000, channels=1, vad_aggressiveness=3):
         self.logger = logging.getLogger(__name__)
@@ -452,12 +452,12 @@ class IncomingAudioManager:
             self.logger.info(f"Audio preprocessing complete. Original size: {len(audio_data)} bytes, Processed size: {len(processed_audio)} bytes")
                 
             # Save the processed audio to a file
-            audio_file_name = self.save_as_wav_file(processed_audio)
-            is_audio_file_to_delete = True
+            wav_audio_filename = self.save_as_wav_file(processed_audio)
+            is_audio_file_to_delete = False #True
             
             # Transcribe using the hybrid STT provider
             self.logger.info("Transcribing audio with hybrid STT provider...")
-            transcript: str = self.stt_provider.transcribe_audio(audio_file_name)
+            transcript: str = self.stt_provider.transcribe_audio(wav_audio_filename)
             self.logger.info(f">> Speech to text transcription: '{transcript}'")
             
             # Filter out known watermark text that appears during silences
@@ -491,7 +491,7 @@ class IncomingAudioManager:
             return None
         finally:
             if is_audio_file_to_delete:
-                self._delete_temp_file(audio_file_name)
+                self._delete_temp_file(wav_audio_filename)
     
     def _delete_temp_file(self, file_name: str):
         try:

@@ -4,6 +4,7 @@ import threading
 import asyncio
 import json
 import base64
+import audioop
 
 class TwilioAudioSender:
     """
@@ -80,8 +81,18 @@ class TwilioAudioSender:
                 if chunk_size > 8192:  # If chunk is unusually large
                     self.logger.warning(f"Large audio chunk detected: {chunk_size} bytes")
                 
-                # Encode the chunk for Twilio using base64
-                payload = base64.b64encode(audio_chunk).decode('utf-8')
+                # Convert 16-bit PCM to 8-bit μ-law (Twilio expects μ-law for raw audio streams)
+                # The audio_chunk is expected to be 16-bit linear PCM here.
+                # Sample width is 2 for 16-bit PCM.
+                try:
+                    mulaw_audio_chunk = audioop.lin2ulaw(audio_chunk, 2) 
+                except audioop.error as e:
+                    self.logger.error(f"Error converting PCM to μ-law: {e}. Chunk len: {len(audio_chunk)}")
+                    # Send raw PCM as a fallback, though it might not play correctly
+                    mulaw_audio_chunk = audio_chunk 
+                
+                # Encode the μ-law chunk for Twilio using base64
+                payload = base64.b64encode(mulaw_audio_chunk).decode('utf-8')
                 
                 # Create Media message for Twilio with the correct streamSid
                 media_message = {

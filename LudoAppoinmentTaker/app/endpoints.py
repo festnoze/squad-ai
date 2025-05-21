@@ -11,7 +11,6 @@ from app.incoming_sms_handler import IncomingSMSHandler
 logger: logging.Logger = logging.getLogger(__name__)
 
 router = APIRouter()
-static_audio_path: str = "static/audio/"
 
 phone_call_websocket_events_handler_factory = PhoneCallWebsocketEventsHandlerFactory()
 
@@ -125,14 +124,4 @@ async def handle_incoming_sms_async(request: Request) -> HTMLResponse:
 @router.api_route("/incoming-sms", methods=["GET", "POST"])
 async def twilio_incoming_sms(request: Request):
     return await handle_incoming_sms_async(request)
-
-# ========= Read static audio endpoint ========= #
-@router.get("/audio/{filename}")
-async def audio(filename: str) -> FileResponse:
-    full_path = os.path.abspath(os.path.join(static_audio_path, filename))
-    if not full_path.startswith(os.path.abspath(static_audio_path)):
-        return JSONResponse(status_code=404, content={"detail": "Not Found"})
-    if not os.path.exists(full_path):
-        return JSONResponse(status_code=404, content={"detail": "File not found"})
-    return FileResponse(full_path)
     
