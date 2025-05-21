@@ -189,7 +189,7 @@ class IncomingAudioManager:
     async def handle_incoming_websocket_start_event_async(self, call_sid: str, stream_sid: str) -> str:
         """Handle the 'start' event from Twilio which begins a new call."""
         
-        self.start_time = datetime.now()
+        self.start_time = time.time()
         self.logger.info(f"Call started - CallSid: {call_sid}, StreamSid: {stream_sid}")
         
         # Set the current stream so the audio functions know which stream to use

@@ -55,62 +55,41 @@ class ProcessText:
         
         # Phase 2: Process sentences into appropriately sized chunks
         chunks = []
-        current_chunk = ""
-        
+
         for sentence in sentences:
-            # Case 1: Sentence is too long by itself - split by words/chars
+            # If the sentence itself is too long, split it
             if len(sentence.split()) > max_words_by_sentence or len(sentence) > max_chars_by_sentence:
-                # First add any existing chunk
-                if current_chunk:
-                    chunks.append(current_chunk.strip())
-                    current_chunk = ""
-                    
-                # Then split the long sentence
                 words = sentence.split()
                 current_word_chunk = ""
-                
                 for word in words:
                     # If a single word exceeds max_chars, split the word itself
                     if len(word) > max_chars_by_sentence:
-                        # First add any existing word chunk
-                        if current_word_chunk:
+                        if current_word_chunk: # Add any preceding part of the word chunk
                             chunks.append(current_word_chunk.strip())
                             current_word_chunk = ""
-                        
                         # Split the long word into character chunks
                         for i in range(0, len(word), max_chars_by_sentence):
                             char_chunk = word[i:i+max_chars_by_sentence]
                             chunks.append(char_chunk)
-                    
-                    # Check if adding this word would exceed limits
-                    elif current_word_chunk and (len(current_word_chunk.split()) + 1 > max_words_by_sentence or 
-                                              len(current_word_chunk) + len(word) + 1 > max_chars_by_sentence):
+                    # Check if adding this word would exceed limits for the current_word_chunk
+                    elif current_word_chunk and \
+                         (len(current_word_chunk.split()) + 1 > max_words_by_sentence or \
+                          len(current_word_chunk) + len(word) + 1 > max_chars_by_sentence):
                         chunks.append(current_word_chunk.strip())
                         current_word_chunk = word
                     else:
                         current_word_chunk += " " + word if current_word_chunk else word
-                
-                # Add remaining word chunk if any
+            
+                # Add any remaining part of the sentence after word splitting
                 if current_word_chunk:
-                    # Check if we need to add ending punctuation
+                    # Preserve original sentence punctuation if it was split
                     if re.search(r'[.!?]$', sentence) and not re.search(r'[.!?]$', current_word_chunk):
                         punctuation = re.search(r'[.!?]$', sentence).group(0)
                         current_word_chunk = current_word_chunk.rstrip() + punctuation
                     chunks.append(current_word_chunk.strip())
-            
-            # Case 2: Adding this sentence would make the chunk too long - start a new chunk
-            elif current_chunk and (len(current_chunk.split()) + len(sentence.split()) > max_words_by_sentence or 
-                                    len(current_chunk) + len(sentence) + 1 > max_chars_by_sentence):  # +1 for the space
-                chunks.append(current_chunk.strip())
-                current_chunk = sentence
-            
-            # Case 3: This sentence can be added to the current chunk
             else:
-                current_chunk += " " + sentence if current_chunk else sentence
-        
-        # Add the last chunk if there is one
-        if current_chunk:
-            chunks.append(current_chunk.strip())
+                # Sentence fits within limits, add it as its own chunk
+                chunks.append(sentence.strip())
         
         return chunks
 

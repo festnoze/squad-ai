@@ -5,11 +5,11 @@ class TestProcessText:
     """Test cases for the ProcessText class methods."""
     
     @pytest.mark.parametrize("test_input,max_words,max_chars,expected", [
-        # Test case 1: Simple sentence splitting
+        # Test case 1: Simple case of sentence splitting
         (
-            "This is a test. This is another test.",
-            10, 100,
-            ["This is a test. This is another test."]
+            "This is a test. This is another test! This is a new test ? end",
+            15, 100,
+            ["This is a test.", "This is another test!", "This is a new test ?", "end"]
         ),
         # Test case 2: Long sentence splitting
         (
@@ -32,8 +32,14 @@ class TestProcessText:
         # Test case 5: Single word exceeding character limit
         (
             "Supercalifragilisticexpialidocious",
-            10, 10,
+            100, 10,
             ["Supercalif", "ragilistic", "expialidoc", "ious"]
+        ),
+        # Test case 6: Sentence exceeding character limit
+        (
+            "This one is a very long sentence of more than one hundred characters that should be split into multiple chunks based on the specified character limit.",
+            100, 100,
+            ["This one is a very long sentence of more than one hundred characters that should be split into", "multiple chunks based on the specified character limit."]
         ),
     ])
     def test_chunk_text_by_sized_sentences(self, test_input, max_words, max_chars, expected):

@@ -31,7 +31,7 @@ class TextQueueManager:
             self.logger.debug(f"Enqueued {len(text)} characters. Queue length: {len(self.text_queue)} characters")
             return True
             
-    async def get_next_text_chunk(self, max_words_by_sentence: int = 10, max_chars_by_sentence: int = 100) -> Optional[str]:
+    async def get_next_text_chunk(self, max_words_by_sentence: int = 15, max_chars_by_sentence: int = 120) -> Optional[str]:
         """
         Gets a chunk of text from the queue.
         Returns a tuple of (text_chunk, estimated_duration_ms)
