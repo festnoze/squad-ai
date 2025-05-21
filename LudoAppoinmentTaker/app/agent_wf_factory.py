@@ -1,2 +1,0 @@
-from app.incoming_phone_call_handler import IncomingPhoneCallHandler
-

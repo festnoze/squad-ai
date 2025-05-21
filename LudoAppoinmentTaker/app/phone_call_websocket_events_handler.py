@@ -2,37 +2,21 @@ import base64
 import io
 import os
 import json
-import uuid
-import random
-import audioop
-import asyncio
 import logging
-import wave
-import time
-from uuid import UUID
-from datetime import datetime
 #
-from pydub import AudioSegment
 from openai import OpenAI
-from typing import Dict, Any, Optional, Tuple, List
-from app.speech.text_processing import ProcessText
 from fastapi import WebSocket, WebSocketDisconnect
 #
-from app.agents.agents_graph import AgentsGraph
-from app.agents.conversation_state_model import ConversationState
-from app.api_client.studi_rag_inference_client import StudiRAGInferenceClient
-from app.api_client.request_models.user_request_model import UserRequestModel, DeviceInfoRequestModel
-from app.api_client.request_models.conversation_request_model import ConversationRequestModel
-from app.api_client.request_models.query_asking_request_model import QueryAskingRequestModel
 from app.speech.text_to_speech import get_text_to_speech_provider
 from app.speech.speech_to_text import get_speech_to_text_provider
+from app.agents.agents_graph import AgentsGraph
+from app.api_client.studi_rag_inference_client import StudiRAGInferenceClient
 from app.speech.incoming_audio_processing import IncomingAudioProcessing
-from app.speech.audio_streaming import AudioStreamManager
 
-class IncomingPhoneCallHandler:
+class PhoneCallWebsocketEventsHandler:
     # Class variables shared across instances
     compiled_graph = None # LangGraph workflow compilation
-    phones: Dict[str, str] = {}  # Map call_sid to phone numbers
+    phones: dict[str, str] = {}  # Map call_sid to phone numbers
     
     def __init__(self, websocket: WebSocket = None):
         # Instance variables
@@ -91,16 +75,20 @@ class IncomingPhoneCallHandler:
         else:
             self.logger.error(f"/!\\ Google calendar credentials file not found at {self.google_calendar_credentials_path}")
 
+        # Initialize dependencies
         self.tts_provider = get_text_to_speech_provider(self.TEMP_DIR)
         self.stt_provider = get_speech_to_text_provider(self.TEMP_DIR, provider="hybrid")
         
-        # Initialize audio processor for better quality
-        self.incoming_audio = IncomingAudioProcessing(sample_width=self.sample_width, frame_rate=self.frame_rate, vad_aggressiveness=3)
-        
-        # Initialize the audio stream manager for throttled Twilio audio streaming
-        self.audio_stream_manager = None
-
         self.studi_rag_inference_client = StudiRAGInferenceClient()
+        self.audio_processing = IncomingAudioProcessing(
+                                    websocket=self.websocket, 
+                                    studi_rag_inference_client=self.studi_rag_inference_client, 
+                                    tts_provider=self.tts_provider, 
+                                    streamSid=None, 
+                                    min_chunk_interval=0.05, 
+                                    sample_width=self.sample_width, 
+                                    frame_rate=self.frame_rate, 
+                                    vad_aggressiveness=3)
 
         # Initialize API clients
         if self.openai_client is None:
@@ -110,7 +98,11 @@ class IncomingPhoneCallHandler:
 
         self.logger.info("IncomingPhoneCallHandler initialized successfully.")
 
-    async def handle_call_websocket_events_async(self, calling_phone_number: str, call_sid: str) -> None:
+    def set_websocket(self, websocket: WebSocket):
+        self.websocket = websocket
+        self.audio_processing.set_websocket(websocket)
+
+    async def handle_websocket_events_async(self, calling_phone_number: str, call_sid: str) -> None:
         """Main method: handle a full audio conversation with I/O Twilio streams on a WebSocket."""
         if not self.websocket:
             self.logger.error("WebSocket not set, cannot handle WebSocket connection.")
@@ -121,16 +113,8 @@ class IncomingPhoneCallHandler:
         # Store the caller's phone number and call SID so we can retrieve them later
         self.phones[call_sid] = calling_phone_number
         
-        # Initialize the audio stream manager for text-based TTS streaming with optimized parameters
-        # We'll set the streamSid later when the call starts
-        self.audio_stream_manager = AudioStreamManager(
-            websocket=self.websocket,
-            tts_provider=self.tts_provider,  # Add TTS provider for text-to-speech conversion
-            streamSid=None,  # Will be set when the call starts
-            min_chunk_interval=0.05  # Faster refresh rate (20ms)
-        )
-        # Start the background streaming task
-        self.audio_stream_manager.run_background_streaming_worker()
+        self.audio_processing.set_stream_sid(call_sid)
+        self.audio_processing.run_background_streaming_worker()
         self.logger.info("Audio stream manager initialized and started with optimized parameters")
 
         # Main loop to handle WebSocket events
@@ -163,6 +147,7 @@ class IncomingPhoneCallHandler:
         except Exception as e:
             self.logger.error(f"Unhandled error in WebSocket handler: {e}", exc_info=True)
         finally:
+            await self.audio_processing.stop_background_streaming_worker_async()
             if self.current_stream and self.current_stream in self.stream_states:
                 self.logger.warning(f"Cleaning up state for stream {self.current_stream} due to handler exit/error.")
                 del self.stream_states[self.current_stream]
@@ -172,46 +157,33 @@ class IncomingPhoneCallHandler:
         """Handle the 'connected' event from Twilio."""
         self.logger.info("Twilio WebSocket connected")
     
-    async def _handle_start_event_async(self, start_data: Dict) -> str:
+    async def _handle_start_event_async(self, start_data: dict) -> str:
         """Handle the 'start' event from Twilio which begins a new call."""
         call_sid = start_data.get("callSid")
         stream_sid = start_data.get("streamSid")
-        await self.incoming_audio.handle_incoming_websocket_media_event_async(call_sid, stream_sid)
+        await self.audio_processing.handle_incoming_websocket_start_event_async(call_sid, stream_sid)
         return stream_sid
 
     async def _handle_media_event_async(self, media_data: dict) -> None:
         """Handle the 'media' event from Twilio which contains audio data."""
-        await self.incoming_audio.handle_incoming_websocket_media_event_async(media_data)
+        await self.audio_processing.handle_incoming_websocket_media_event_async(media_data)
             
     def _is_websocket_connected(self) -> bool:
         """Check if the websocket is still connected"""
         if not self.websocket:
-            return False
-            
+            return False            
         try:
-            # First, handle the case from the old implementation that was working
-            # The client_state is an enum in some WebSocket libraries
             if hasattr(self.websocket, 'client_state'):
-                # If client_state is an attribute that contains CONNECTED as a property
                 if hasattr(self.websocket.client_state, 'CONNECTED'):
                     return True
-                # If client_state is a string
                 if isinstance(self.websocket.client_state, str):
                     return 'connect' in self.websocket.client_state.lower()
-                # Otherwise assume it's connected (we know the attribute exists)
                 return True
-                
-            # Alternative check for other WebSocket implementations
             if hasattr(self.websocket, 'closed'):
                 return not self.websocket.closed
-                
-            # Default to assuming it's connected if we can't check
-            # This is a safe default since the connection was established
             return True
         except Exception as e:
             self.logger.error(f"Error checking websocket connection: {e}")
-            # For safety, if we had an exception checking, assume connected
-            # This prevents the regression where audio wasn't being sent
             return True
    
     async def _handle_stop_event_async(self):
@@ -233,31 +205,26 @@ class IncomingPhoneCallHandler:
             except Exception as e:
                 self.logger.error(f"Error closing websocket: {e}")
         
-        # Reset current stream and audio streaming state
         self.current_stream = None
-        
-        # Set the audio stream manager's streamSid to None
-        if self.audio_stream_manager:
-            self.audio_stream_manager.update_stream_sid(None)
-            self.logger.info("Reset AudioStreamManager stream SID as call ended")
+        self.audio_processing.set_stream_sid(None)
+        self.logger.info("Reset AudioProcessing stream SID as call ended")
 
     def _handle_mark_event(self, data):
         mark_name = data.get("mark", {}).get("name")
         self.logger.debug(f"Received mark event: {mark_name} for stream {self.current_stream}")
 
-class IncomingPhoneCallHandlerFactory:
+class PhoneCallWebsocketEventsHandlerFactory:
     def __init__(self):
-        self.build_new_incoming_phone_call_handler()
+        self.build_new_phone_call_websocket_events_handler()
 
-    def build_new_incoming_phone_call_handler(self):
-        self.incoming_phone_call_handler = IncomingPhoneCallHandler(websocket=None)
+    def build_new_phone_call_websocket_events_handler(self, websocket: WebSocket = None):
+        self.phone_call_websocket_events_handler = PhoneCallWebsocketEventsHandler(websocket=websocket)
 
-    def get_new_incoming_phone_call_handler(self, websocket: WebSocket):
-        if not self.incoming_phone_call_handler:
-            self.build_new_incoming_phone_call_handler()
-        incoming_phone_call_handler_to_return = self.incoming_phone_call_handler
-        incoming_phone_call_handler_to_return.websocket = websocket
-        self.incoming_phone_call_handler = None
-        #self.build_new_incoming_phone_call_handler()
-        return incoming_phone_call_handler_to_return
+    def get_new_phone_call_websocket_events_handler(self, websocket: WebSocket):
+        if not self.phone_call_websocket_events_handler:
+            self.build_new_phone_call_websocket_events_handler()
+        built_phone_call_websocket_events_handler = self.phone_call_websocket_events_handler
+        built_phone_call_websocket_events_handler.set_websocket(websocket)
+        self.phone_call_websocket_events_handler = None
+        return built_phone_call_websocket_events_handler
     

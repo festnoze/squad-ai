@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from twilio.twiml.voice_response import VoiceResponse, Connect
 from twilio.twiml.messaging_response import MessagingResponse
 #
-from app.incoming_phone_call_handler import IncomingPhoneCallHandlerFactory
+from app.phone_call_websocket_events_handler import PhoneCallWebsocketEventsHandlerFactory
 from app.incoming_sms_handler import IncomingSMSHandler
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -13,7 +13,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 router = APIRouter()
 static_audio_path: str = "static/audio/"
 
-incoming_phone_call_handler_factory = IncomingPhoneCallHandlerFactory()
+phone_call_websocket_events_handler_factory = PhoneCallWebsocketEventsHandlerFactory()
 
 @staticmethod
 async def _extract_request_data_async(request: Request) -> tuple:
@@ -67,8 +67,8 @@ async def websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid:
     await ws.accept()
     logger.info(f"WebSocket connection accepted from: {ws.client.host}:{ws.client.port}")
     try:
-        call_handler = incoming_phone_call_handler_factory.get_new_incoming_phone_call_handler(websocket=ws)
-        await call_handler.handle_call_websocket_events_async(calling_phone_number, call_sid)
+        call_handler = phone_call_websocket_events_handler_factory.get_new_phone_call_websocket_events_handler(websocket=ws)
+        await call_handler.handle_websocket_events_async(calling_phone_number, call_sid)
     except WebSocketDisconnect:
         logger.info(f"WebSocket disconnected: {ws.client.host}:{ws.client.port}")
     except Exception as e:
@@ -79,7 +79,6 @@ async def websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid:
             logger.error("Error closing WebSocket connection", exc_info=True)
             pass
     finally:
-        await call_handler.audio_stream_manager.stop_background_streaming_worker_async()
         logger.info(f"WebSocket endpoint finished for: {ws.client.host}:{ws.client.port}")
 
 

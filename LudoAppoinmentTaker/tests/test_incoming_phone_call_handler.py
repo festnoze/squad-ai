@@ -6,6 +6,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from app.speech.text_processing import ProcessText
+from app.speech.audio_streaming import AudioStreamManager
 
 
 @pytest.fixture
@@ -56,11 +57,10 @@ def mock_audio_sender(mocker):
 
 @pytest.fixture
 def mock_audio_stream_manager_with_components(mock_text_queue_manager, mock_audio_sender, mocker):
-    mock_audio_stream_manager = mocker.Mock()
+    mock_audio_stream_manager: AudioStreamManager = mocker.Mock(spec=AudioStreamManager)
     mock_audio_stream_manager.text_queue_manager = mock_text_queue_manager
     mock_audio_stream_manager.audio_sender = mock_audio_sender
-    mock_audio_stream_manager.running = True
-    mock_audio_stream_manager.is_actively_sending = mocker.Mock(return_value=True)
+    mock_audio_stream_manager.is_sending_speech = mocker.Mock(return_value=True)
     return mock_audio_stream_manager
 
 

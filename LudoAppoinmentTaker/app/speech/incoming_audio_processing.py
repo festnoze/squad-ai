@@ -10,15 +10,18 @@ import asyncio
 import uuid
 from uuid import UUID
 from datetime import datetime
-from typing import Dict, Any, Optional, Tuple, List
 from pydub import AudioSegment
 from pydub.effects import normalize
 from openai import OpenAI
-
+from fastapi import WebSocket
+#
 from app.api_client.request_models.user_request_model import UserRequestModel, DeviceInfoRequestModel
 from app.api_client.request_models.conversation_request_model import ConversationRequestModel
 from app.api_client.request_models.query_asking_request_model import QueryAskingRequestModel
 from app.agents.conversation_state_model import ConversationState
+from app.speech.audio_streaming import AudioStreamManager
+from app.speech.text_to_speech import TextToSpeechProvider
+from app.api_client.studi_rag_inference_client import StudiRAGInferenceClient
 
 class IncomingAudioProcessing:
     """Audio processing utilities for improving speech recognition quality and handling Twilio events"""
@@ -29,8 +32,10 @@ class IncomingAudioProcessing:
     # Temporary directory for audio files
     TEMP_DIR = "./temp"
     
-    def __init__(self, sample_width=2, frame_rate=8000, channels=1, vad_aggressiveness=3):
+    def __init__(self, websocket: any, studi_rag_inference_client : StudiRAGInferenceClient, tts_provider: TextToSpeechProvider, streamSid: str = None, min_chunk_interval: float = 0.05, sample_width=2, frame_rate=8000, channels=1, vad_aggressiveness=3):
         self.logger = logging.getLogger(__name__)
+        self.studi_rag_inference_client = studi_rag_inference_client
+        self.audio_stream_manager = AudioStreamManager(websocket, tts_provider, streamSid, min_chunk_interval)
         self.sample_width = sample_width
         self.frame_rate = frame_rate
         self.channels = channels
@@ -43,8 +48,6 @@ class IncomingAudioProcessing:
         self.conversation_id = None
         self.stream_states = {}
         self.phones = {}  # Map call_sid to phone numbers
-        self.audio_stream_manager = None
-        self.studi_rag_inference_client = None
         self.compiled_graph = None
         self.openai_client = None
         self.stt_provider = None
@@ -61,6 +64,21 @@ class IncomingAudioProcessing:
         
         # Create temp directory if it doesn't exist
         os.makedirs(self.TEMP_DIR, exist_ok=True)
+
+    def run_background_streaming_worker(self) -> None:
+        """Start the audio output streaming worker"""
+        self.audio_stream_manager.run_background_streaming_worker()
+
+    async def stop_background_streaming_worker_async(self) -> None:
+        """Stop the audio output streaming worker"""
+        await self.audio_stream_manager.stop_background_streaming_worker_async()
+
+    def set_websocket(self, websocket: WebSocket):
+        self.websocket = websocket
+        self.audio_stream_manager.set_websocket(websocket)
+
+    def set_stream_sid(self, stream_sid: str) -> None:
+        self.audio_stream_manager.update_stream_sid(stream_sid)
     
     def is_speech(self, audio_chunk: bytes, frame_duration_ms=30) -> bool:
         """
@@ -139,7 +157,7 @@ class IncomingAudioProcessing:
             # Return original data if processing fails
             return audio_data
     
-    def detect_silence_speech(self, audio_data: bytes, threshold=250) -> Tuple[bool, int]:
+    def detect_silence_speech(self, audio_data: bytes, threshold=250) -> tuple[bool, int]:
         """
         Detect silence vs speech using both VAD and RMS
         
@@ -176,11 +194,8 @@ class IncomingAudioProcessing:
         # Set the current stream so the audio functions know which stream to use
         self.current_stream = stream_sid
         
-        # Update the streamSid in the audio streaming manager
-        if self.audio_stream_manager:
-            # Update the streamSid in the audio sender
-            self.audio_stream_manager.update_stream_sid(stream_sid)
-            self.logger.info(f"Updated AudioStreamManager with stream SID: {stream_sid}")
+        self.audio_stream_manager.update_stream_sid(stream_sid)
+        self.logger.info(f"Updated AudioStreamManager with stream SID: {stream_sid}")
         
         # Define the welcome message
         welcome_text = """
@@ -510,19 +525,18 @@ class IncomingAudioProcessing:
         Updates the speaking state based on the text queue status
         This provides a more accurate representation of when audio is actually being sent
         """
-        if hasattr(self, 'audio_stream_manager') and self.audio_stream_manager:
-            is_sending_audio = self.audio_stream_manager.is_actively_sending()
-            if is_sending_audio != self.is_speaking:
-                if is_sending_audio:
-                    self.is_speaking = True
-                    # Log more detailed stats about the text queue
-                    stats = self.audio_stream_manager.get_streaming_stats()
-                    text_stats = stats['text_queue']
-                    logger.debug(f"Speaking started - Text queue: {text_stats['current_size_chars']} chars, " +
-                                 f"{text_stats['total_chars_processed']} chars processed so far")
-                else:
-                    self.is_speaking = False
-                    logger.debug("Speaking stopped - Text queue empty")
+        is_sending_audio = self.audio_stream_manager.is_sending_speech()
+        if is_sending_audio != self.is_speaking:
+            if is_sending_audio:
+                self.is_speaking = True
+                # Log more detailed stats about the text queue
+                stats = self.audio_stream_manager.get_streaming_stats()
+                text_stats = stats['text_queue']
+                self.logger.debug(f"Speaking started - Text queue: {text_stats['current_size_chars']} chars, " +
+                                f"{text_stats['total_chars_processed']} chars processed so far")
+            else:
+                self.is_speaking = False
+                self.logger.debug("Speaking stopped - Text queue empty")
     
     async def stop_speaking_async(self):
         """Stop any ongoing speech and clear text queue and interrupt RAG streaming"""
@@ -530,11 +544,10 @@ class IncomingAudioProcessing:
             # Interrupt RAG streaming with its tag if it's active
             if hasattr(self, 'rag_interrupt_flag'):
                 self.rag_interrupt_flag["interrupted"] = True
-                logger.info("RAG streaming interrupted due to speech interruption")
+                self.logger.info("RAG streaming interrupted due to speech interruption")
                 
-            if self.audio_stream_manager:
-                await self.audio_stream_manager.clear_text_queue()
-                logger.info("Cleared text queue due to speech interruption")
+            await self.audio_stream_manager.clear_text_queue()
+            self.logger.info("Cleared text queue due to speech interruption")
             self.is_speaking = False
             return True  # Speech was stopped
         return False  # No speech was ongoing

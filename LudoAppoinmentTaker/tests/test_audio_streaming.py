@@ -62,8 +62,8 @@ class TestAudioStreamManager:
         assert audio_stream_manager.text_queue_manager.is_empty() is True
     
     @pytest.mark.asyncio
-    async def test_is_actively_sending(self, fixture):
-        """Test is_actively_sending method"""
+    async def test_is_sending_speech(self, fixture):
+        """Test is_sending_speech method"""
         audio_stream_manager: AudioStreamManager = fixture['audio_stream_manager']
         
         # When queue is empty and not running

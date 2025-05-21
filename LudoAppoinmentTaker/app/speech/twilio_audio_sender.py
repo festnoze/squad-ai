@@ -39,9 +39,23 @@ class TwilioAudioSender:
             self.logger.error("No streamSid provided, cannot send audio to Twilio")
             return False
             
+        # More detailed debugging for WebSocket state
         if not self.websocket:
-            self.logger.error("WebSocket is not available")
+            self.logger.error("/!\\ WebSocket is not setted in TwilioAudioSender (None)")
             return False
+            
+        # Check WebSocket connection status
+        try:
+            websocket_state = getattr(self.websocket, 'client_state', 'unknown')
+            websocket_closed = getattr(self.websocket, 'closed', None)
+            self.logger.debug(f"WebSocket state: {websocket_state}, closed: {websocket_closed}")
+            
+            # Additional check for WebSocket connection
+            if hasattr(self.websocket, 'closed') and self.websocket.closed:
+                self.logger.error("/!\\ WebSocket is closed but object exists")
+                return False
+        except Exception as e:
+            self.logger.error(f"Error checking WebSocket state: {e}")
             
         # Track chunk size for priority handling
         chunk_size = len(audio_chunk)

@@ -1,15 +1,14 @@
 import logging
+from starlette.responses import Response as StarletteResponse
+from contextlib import asynccontextmanager
+from datetime import datetime
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, StreamingResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.responses import Response as StarletteResponse
-from contextlib import asynccontextmanager
-from datetime import datetime
 #
 from app import endpoints
-from app.incoming_phone_call_handler import IncomingPhoneCallHandler
 
 class ApiConfig:
     @asynccontextmanager

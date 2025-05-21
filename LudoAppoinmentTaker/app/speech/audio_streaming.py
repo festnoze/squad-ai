@@ -1,5 +1,6 @@
 import logging
 import asyncio
+from fastapi import WebSocket
 #
 from app.speech.text_queue_manager import TextQueueManager
 from app.speech.text_processing import ProcessText
@@ -22,7 +23,12 @@ class AudioStreamManager:
         self.max_words_by_stream_chunk = 10
         self.max_chars_by_stream_chunk = 100
         self.ask_to_stop_streaming_worker = False
-        
+        self.websocket = websocket
+
+    def set_websocket(self, websocket: WebSocket):
+        self.websocket = websocket
+        self.audio_sender.websocket = websocket
+
     def update_stream_sid(self, streamSid: str) -> None:
         """
         Updates the stream SID when it changes (e.g., when a new call starts or ends)
