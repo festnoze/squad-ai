@@ -3,7 +3,6 @@ import requests
 import time
 import json
 import datetime
-from typing import Optional
 
 
 class SalesforceEventManager:
@@ -74,9 +73,9 @@ class SalesforceEventManager:
             print(f"Authentication error: {str(e)}")
             return False
     
-    def create_event(self, subject: str, start_datetime: str, duration_minutes: int = 60, description: Optional[str] = None, 
-                   location: Optional[str] = None, owner_id: Optional[str] = None, 
-                   what_id: Optional[str] = None, who_id: Optional[str] = None) -> Optional[str]:
+    def create_event(self, subject: str, start_datetime: str, duration_minutes: int = 60, description: str | None = None, 
+                   location: str | None = None, owner_id: str | None = None, 
+                   what_id: str | None = None, who_id: str | None = None) -> str | None:
         """Create an event in Salesforce and return the event ID if successful
         
         Args:
@@ -156,7 +155,7 @@ class SalesforceEventManager:
             print(f"Error creating event: {str(e)}")
             return None
 
-    def _calculate_end_datetime(self, start_datetime: str, duration_minutes: int) -> Optional[str]:
+    def _calculate_end_datetime(self, start_datetime: str, duration_minutes: int) -> str | None:
         try:
             # Parse the ISO format datetime string
             start_dt = datetime.datetime.fromisoformat(start_datetime.replace('Z', '+00:00'))
@@ -169,6 +168,81 @@ class SalesforceEventManager:
             print(f"Error parsing start_datetime: {e}")
             print("Make sure start_datetime is in ISO format (e.g., '2025-05-20T14:00:00Z')")
             return None
+            
+    def get_events(self, start_datetime: str, end_datetime: str, owner_id: str | None = None) -> list | None:
+        """Get events from Salesforce calendar between specified start and end datetimes
+        
+        Args:
+            start_datetime: Start date and time in ISO format (e.g., '2025-05-20T14:00:00Z')
+            end_datetime: End date and time in ISO format (e.g., '2025-05-20T15:00:00Z')
+            owner_id: Optional Salesforce ID to filter events by owner
+            
+        Returns:
+            List of events if successful, None otherwise
+        """
+        if not self._access_token or not self._instance_url:
+            print("Error: Not authenticated. Call authenticate() first.")
+            return None
+            
+        print("Retrieving events...")
+        
+        # Prepare headers
+        headers = {
+            'Authorization': f'Bearer {self._access_token}',
+            'Content-Type': 'application/json'
+        }
+        
+        # Build SOQL query
+        query = "SELECT Id, Subject, Description, StartDateTime, EndDateTime, Location, OwnerId, WhatId, WhoId "
+        query += "FROM Event "
+        query += f"WHERE StartDateTime >= {start_datetime} AND EndDateTime <= {end_datetime} "
+        
+        # Add owner filter if specified
+        if owner_id:
+            query += f"AND OwnerId = '{owner_id}' "
+            
+        query += "ORDER BY StartDateTime ASC "
+        
+        # URL encode the query
+        encoded_query = requests.utils.quote(query)
+        print(f"SOQL Query: {query}")
+        
+        # Create query URL
+        url_query = f"{self._instance_url}/services/data/{self._version_api}/query/?q={encoded_query}"
+        
+        # Send request
+        try:
+            resp = requests.get(url_query, headers=headers)
+            
+            if resp.status_code == 200:
+                data = resp.json()
+                events = data.get('records', [])
+                total_size = data.get('totalSize', 0)
+                print(f"Retrieved {total_size} events")
+                
+                # Handle pagination if needed
+                next_records_url = data.get('nextRecordsUrl')
+                while next_records_url:
+                    next_url = f"{self._instance_url}{next_records_url}"
+                    resp = requests.get(next_url, headers=headers)
+                    if resp.status_code == 200:
+                        next_data = resp.json()
+                        events.extend(next_data.get('records', []))
+                        next_records_url = next_data.get('nextRecordsUrl')
+                    else:
+                        print(f"Error retrieving additional events: {resp.status_code}")
+                        break
+                return events
+            else:
+                print(f"Error retrieving events: {resp.status_code}")
+                try:
+                    print(json.dumps(resp.json(), indent=2, ensure_ascii=False))
+                except:
+                    print(resp.text)
+                return None
+        except Exception as e:
+            print(f"Error retrieving events: {str(e)}")
+            return None
 
 # Example usage
 if __name__ == "__main__":
@@ -180,17 +254,56 @@ if __name__ == "__main__":
         is_sandbox=True
     )
     
-    # Authenticate and create the event
+    # Authenticate with Salesforce
     if event_manager.authenticate():
-        event_id = event_manager.create_event(
-            subject='Réunion de démonstration prise rendez-vous avec Twilio',
-            description='Présentation des nouvelles fonctionnalités à un CdP.',
-            start_datetime='2025-05-20T14:00:00Z',
-            duration_minutes=30,
-            location='Salle de conférence Alpha',
-            owner_id='005Aa00000K990ZIAR',
-            what_id='006Aa00000Ii3XoIAJ'  # Related to (Account, Opportunity, etc.)
-            # who_id=''  # Associated with (Contact, Lead)
+        # # 1- Create a new event
+        # event_id = event_manager.create_event(
+        #     subject='Réunion de démonstration prise rendez-vous avec Twilio',
+        #     description='Présentation des nouvelles fonctionnalités à un CdP.',
+        #     start_datetime='2025-05-24T15:00:00Z',
+        #     duration_minutes=30,
+        #     location='Salle de conférence B',
+        #     owner_id='005Aa00000K990ZIAR',
+        #     what_id='006Aa00000Ii3XoIAJ'  # Related to (Account, Opportunity, etc.)
+        #     # who_id=''  # Associated with (Contact, Lead)
+        # )
+        # if event_id:
+        #     print(f"Event created with ID: {event_id}")
+            
+        # 2- Get events for a specific time period
+        today = datetime.datetime.now(datetime.timezone.utc)
+        next_week = today + datetime.timedelta(days=7)
+        
+        # Format dates in ISO format for Salesforce
+        today_str = today.isoformat().replace('+00:00', 'Z')
+        next_week_str = next_week.isoformat().replace('+00:00', 'Z')
+        owner_id = '005Aa00000K990ZIAR'
+
+        print(f"\nGetting events from {today_str} to {next_week_str}...")
+        events = event_manager.get_events(
+            start_datetime=today_str,
+            end_datetime=next_week_str,
+            # Optionally filter by owner
+            owner_id=owner_id
         )
-        if event_id:
-            print(f"Event created with ID: {event_id}")
+        
+        if events:
+            today = today.strftime('%d/%m/%Y')
+            next_week = next_week.strftime('%d/%m/%Y')
+            
+            print(f"=> {len(events)} événements trouvés dans le calendrier Salesforce de '{owner_id}' entre {today} et {next_week} :")
+            for event in events:
+                # Format dates as dd/mm/YYYY HH:MM
+                start = datetime.datetime.fromisoformat(event['StartDateTime'].replace('Z', '+00:00'))
+                end = datetime.datetime.fromisoformat(event['EndDateTime'].replace('Z', '+00:00'))
+                
+                # Check if start and end dates are the same
+                if start.date() != end.date():
+                    raise ValueError(f"Event spans multiple days: {event['Subject']} starts on {start.date()} and ends on {end.date()}")
+                
+                date_str = start.strftime('%d/%m/%Y')
+                start_time_str = start.strftime('%Hh%M')
+                end_time_str = end.strftime('%Hh%M')
+                print(f'  - Le {date_str}, de {start_time_str} à {end_time_str} : "{event["Subject"]}".\n     Description: {event["Description"]}\n')
+        else:
+            print("No events found or error occurred.")

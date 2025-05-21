@@ -27,6 +27,36 @@ class TextToSpeechProvider(ABC):
             out.write(raw_audio_data)
         return filepath
 
+    def convert_mp3_to_PCM_bytes_in_UTF_8(mp3_bytes: bytes) -> bytes:
+        if not mp3_bytes:
+            logger.warning("No MP3 bytes provided to convert")
+            return b""
+            
+        try:
+            # Load MP3 from bytes
+            audio = AudioSegment.from_file(io.BytesIO(mp3_bytes), format="mp3")
+            
+            # Convert to the format Twilio expects:
+            # - 8kHz sample rate (Twilio requirement)
+            # - Mono channel
+            # - 16-bit signed PCM (little-endian)
+            audio = audio.set_frame_rate(8000).set_channels(1)
+            
+            # Export as raw PCM bytes
+            buffer = io.BytesIO()
+            audio.export(buffer, format="raw", parameters=["-f", "s16le"])
+            
+            # Get the raw PCM bytes
+            buffer.seek(0)
+            pcm_bytes = buffer.read()
+            
+            logger.debug(f"Converted {len(mp3_bytes)} bytes of MP3 to {len(pcm_bytes)} bytes of PCM")
+            return pcm_bytes
+            
+        except Exception as e:
+            logger.error(f"Error converting MP3 to PCM: {e}")
+            return b""
+
 class GoogleTTSProvider(TextToSpeechProvider):
     def __init__(self, temp_dir: str):
         from google.cloud import texttospeech as google_tts
@@ -47,7 +77,7 @@ class GoogleTTSProvider(TextToSpeechProvider):
             audio_config = self.google_tts.AudioConfig(audio_encoding=self.google_tts.AudioEncoding.MP3)
 
             response = self.client.synthesize_speech(input=synthesis_input, voice=voice, audio_config=audio_config)
-            return response.audio_content
+            return self.convert_mp3_to_PCM_bytes_in_UTF_8(response.audio_content)
 
         except Exception as google_error:
             self.logger.error(f"Google TTS failed: {google_error}.", exc_info=True)
@@ -74,7 +104,7 @@ class OpenAITTSProvider(TextToSpeechProvider):
                 input=text
             )
             audio_bytes = resp.read()
-            return audio_bytes
+            return self.convert_mp3_to_PCM_bytes_in_UTF_8(audio_bytes)
 
         except Exception as openai_error:
             self.logger.error(f"OpenAI TTS failed: {openai_error}.", exc_info=True)

@@ -92,11 +92,11 @@ class OutgoingAudioManager:
                 self.logger.debug(f"Processing speech chunk #{text_chunks_processed}: '{speech_chunk}' ({chunk_len} chars)")
                 
                 try:
-                    # Synthesize speech from this chunk
-                    audio_bytes = self.tts_provider.synthesize_speech_to_bytes(speech_chunk)
+                    # Synthesize speech from this chunk (returns MP3 format)
+                    pcm_bytes = self.tts_provider.synthesize_speech_to_bytes(speech_chunk)
                     
-                    # Send the audio to Twilio
-                    result = await self.audio_sender.send_audio_chunk(audio_bytes)
+                    # Send the converted PCM audio to Twilio
+                    result = await self.audio_sender.send_audio_chunk(pcm_bytes)
                     
                     if result:
                         self.logger.debug(f"Successfully sent text chunk #{text_chunks_processed} as audio")
