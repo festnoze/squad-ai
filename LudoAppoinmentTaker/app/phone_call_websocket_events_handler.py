@@ -84,6 +84,7 @@ class PhoneCallWebsocketEventsHandler:
                                     websocket=self.websocket, 
                                     studi_rag_inference_client=self.studi_rag_inference_client, 
                                     tts_provider=self.tts_provider, 
+                                    stt_provider=self.stt_provider,
                                     streamSid=None, 
                                     min_chunk_interval=0.05, 
                                     sample_width=self.sample_width, 

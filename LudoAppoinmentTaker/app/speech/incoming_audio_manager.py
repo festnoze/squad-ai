@@ -21,6 +21,7 @@ from app.api_client.request_models.query_asking_request_model import QueryAsking
 from app.agents.conversation_state_model import ConversationState
 from app.speech.outgoing_audio_manager import OutgoingAudioManager
 from app.speech.text_to_speech import TextToSpeechProvider
+from app.speech.speech_to_text import SpeechToTextProvider
 from app.api_client.studi_rag_inference_client import StudiRAGInferenceClient
 
 class IncomingAudioManager:
@@ -32,7 +33,7 @@ class IncomingAudioManager:
     # Temporary directory for audio files
     TEMP_DIR = "./temp"
     
-    def __init__(self, websocket: any, studi_rag_inference_client : StudiRAGInferenceClient, tts_provider: TextToSpeechProvider, streamSid: str = None, min_chunk_interval: float = 0.05, sample_width=2, frame_rate=8000, channels=1, vad_aggressiveness=3):
+    def __init__(self, websocket: any, studi_rag_inference_client : StudiRAGInferenceClient, tts_provider: TextToSpeechProvider, stt_provider: SpeechToTextProvider, streamSid: str = None, min_chunk_interval: float = 0.05, sample_width=2, frame_rate=8000, channels=1, vad_aggressiveness=3):
         self.logger = logging.getLogger(__name__)
         self.studi_rag_inference_client = studi_rag_inference_client
         self.audio_stream_manager = OutgoingAudioManager(websocket, tts_provider, streamSid, min_chunk_interval)
@@ -50,7 +51,7 @@ class IncomingAudioManager:
         self.phones = {}  # Map call_sid to phone numbers
         self.compiled_graph = None
         self.openai_client = None
-        self.stt_provider = None
+        self.stt_provider = stt_provider
         self.rag_interrupt_flag = {"interrupted": False}
         self.is_speaking = False
         
@@ -434,6 +435,7 @@ class IncomingAudioManager:
             return None
 
     def _perform_speech_to_text_transcription(self, audio_data: bytes):
+        is_audio_file_to_delete = False
         try:
             # Check if the audio buffer has a high enough speech to noise ratio
             speech_to_noise_ratio = audioop.rms(audio_data, self.sample_width)
@@ -450,13 +452,13 @@ class IncomingAudioManager:
             self.logger.info(f"Audio preprocessing complete. Original size: {len(audio_data)} bytes, Processed size: {len(processed_audio)} bytes")
                 
             # Save the processed audio to a file
-            wav_file_name = self.save_as_wav_file(processed_audio)
+            audio_file_name = self.save_as_wav_file(processed_audio)
+            is_audio_file_to_delete = True
             
             # Transcribe using the hybrid STT provider
             self.logger.info("Transcribing audio with hybrid STT provider...")
-            transcript: str = self.stt_provider.transcribe_audio(wav_file_name)
+            transcript: str = self.stt_provider.transcribe_audio(audio_file_name)
             self.logger.info(f">> Speech to text transcription: '{transcript}'")
-            #self.delete_temp_file(wav_file_name)
             
             # Filter out known watermark text that appears during silences
             known_watermarks = [
@@ -481,15 +483,17 @@ class IncomingAudioManager:
             # If transcript is too short, it might be noise
             if len(transcript.strip()) < 2:
                 self.logger.info(f"Transcript too short, ignoring: '{transcript}'")
-                return None
-                
+                return None                
             return transcript
-            
+        
         except Exception as speech_err:
             self.logger.error(f"Error during transcription: {speech_err}", exc_info=True)
             return None
+        finally:
+            if is_audio_file_to_delete:
+                self._delete_temp_file(audio_file_name)
     
-    def delete_temp_file(self, file_name: str):
+    def _delete_temp_file(self, file_name: str):
         try:
             os.remove(os.path.join(self.TEMP_DIR, file_name))
         except Exception as e:
