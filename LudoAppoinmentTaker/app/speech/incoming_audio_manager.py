@@ -19,11 +19,11 @@ from app.api_client.request_models.user_request_model import UserRequestModel, D
 from app.api_client.request_models.conversation_request_model import ConversationRequestModel
 from app.api_client.request_models.query_asking_request_model import QueryAskingRequestModel
 from app.agents.conversation_state_model import ConversationState
-from app.speech.audio_streaming import AudioStreamManager
+from app.speech.outgoing_audio_manager import OutgoingAudioManager
 from app.speech.text_to_speech import TextToSpeechProvider
 from app.api_client.studi_rag_inference_client import StudiRAGInferenceClient
 
-class IncomingAudioProcessing:
+class IncomingAudioManager:
     """Audio processing utilities for improving speech recognition quality and handling Twilio events"""
     
     # Voice settings
@@ -35,7 +35,7 @@ class IncomingAudioProcessing:
     def __init__(self, websocket: any, studi_rag_inference_client : StudiRAGInferenceClient, tts_provider: TextToSpeechProvider, streamSid: str = None, min_chunk_interval: float = 0.05, sample_width=2, frame_rate=8000, channels=1, vad_aggressiveness=3):
         self.logger = logging.getLogger(__name__)
         self.studi_rag_inference_client = studi_rag_inference_client
-        self.audio_stream_manager = AudioStreamManager(websocket, tts_provider, streamSid, min_chunk_interval)
+        self.audio_stream_manager = OutgoingAudioManager(websocket, tts_provider, streamSid, min_chunk_interval)
         self.sample_width = sample_width
         self.frame_rate = frame_rate
         self.channels = channels
@@ -195,7 +195,7 @@ class IncomingAudioProcessing:
         self.current_stream = stream_sid
         
         self.audio_stream_manager.update_stream_sid(stream_sid)
-        self.logger.info(f"Updated AudioStreamManager with stream SID: {stream_sid}")
+        self.logger.info(f"Updated OutgoingAudioManager with stream SID: {stream_sid}")
         
         # Define the welcome message
         welcome_text = """

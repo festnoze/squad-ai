@@ -7,7 +7,7 @@ from app.speech.text_processing import ProcessText
 from app.speech.twilio_audio_sender import TwilioAudioSender
 from app.speech.text_to_speech import TextToSpeechProvider
 
-class AudioStreamManager:
+class OutgoingAudioManager:
     """
     Manages the complete audio streaming process using a text-based approach.
     Text is queued, then processed into speech in small chunks for better responsiveness.

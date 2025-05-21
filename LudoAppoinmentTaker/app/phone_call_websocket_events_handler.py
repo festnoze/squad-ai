@@ -11,7 +11,7 @@ from app.speech.text_to_speech import get_text_to_speech_provider
 from app.speech.speech_to_text import get_speech_to_text_provider
 from app.agents.agents_graph import AgentsGraph
 from app.api_client.studi_rag_inference_client import StudiRAGInferenceClient
-from app.speech.incoming_audio_processing import IncomingAudioProcessing
+from app.speech.incoming_audio_manager import IncomingAudioManager
 
 class PhoneCallWebsocketEventsHandler:
     # Class variables shared across instances
@@ -80,7 +80,7 @@ class PhoneCallWebsocketEventsHandler:
         self.stt_provider = get_speech_to_text_provider(self.TEMP_DIR, provider="hybrid")
         
         self.studi_rag_inference_client = StudiRAGInferenceClient()
-        self.audio_processing = IncomingAudioProcessing(
+        self.audio_processing = IncomingAudioManager(
                                     websocket=self.websocket, 
                                     studi_rag_inference_client=self.studi_rag_inference_client, 
                                     tts_provider=self.tts_provider, 
