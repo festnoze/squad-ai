@@ -174,9 +174,13 @@ class OutgoingAudioManager:
         self.logger.info("Text queue cleared for interruption")
         
     def is_sending_speech(self) -> bool:
-        """Check if the audio stream manager is actively sending audio"""
-        # Consider both the text queue and the audio sender status
-        return not self.text_queue_manager.is_empty() or self.audio_sender.is_sending
+        """Check if the audio stream manager is actively sending audio or has significant text queued."""
+        MIN_CHARS_FOR_INTERRUPTIBLE_SPEECH = 15  # Threshold for text length to be considered interruptible speech
+        has_significant_text_queued = (
+            not self.text_queue_manager.is_empty() and
+            len(self.text_queue_manager.text_queue) > MIN_CHARS_FOR_INTERRUPTIBLE_SPEECH
+        )
+        return has_significant_text_queued or self.audio_sender.is_sending
         
     def get_streaming_stats(self) -> dict:
         """

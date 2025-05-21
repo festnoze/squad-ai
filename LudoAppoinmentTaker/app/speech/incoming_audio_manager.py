@@ -6,7 +6,7 @@ import random
 import logging
 import webrtcvad
 import audioop
-import asyncio
+import time
 import uuid
 from uuid import UUID
 from datetime import datetime
@@ -199,10 +199,10 @@ class IncomingAudioManager:
         self.logger.info(f"Updated OutgoingAudioManager with stream SID: {stream_sid}")
         
         # Define the welcome message
-        welcome_text = """
-            Bienvenue chez Studi !
-            Je suis l'assistant virtuel Stud'IA, je prends le relais lorsque nos conseillers ne sont pas présents.
-            Puis-je vous aider à choisir votre formation ? Ou a prendre rendez-vous avec un conseiller en formation ?"""
+        welcome_text = """\
+            Bonjour !
+            Je suis l'assistante virtuelle 'Studia', je suis là pour t'aider en l'absence de nos conseillers.
+            Souhaites-tu que je t'aide à trouver ta formation ou prendre rendez-vous avec un conseiller en formation ?"""
         #welcome_text = "Salut !"
 
         # Play welcome message with enhanced text-to-speech
@@ -349,8 +349,7 @@ class IncomingAudioManager:
                 was_interrupted = False
                 async for chunk in response:
                     # Vérifier si on a été interrompu entre les chunks
-                    if not self.is_speaking:
-                        was_interrupted = True
+                    if was_interrupted:
                         self.logger.info("Speech interrupted while processing RAG response")
                         break
                         
@@ -376,7 +375,7 @@ class IncomingAudioManager:
                 if was_interrupted:
                     self.logger.info(f"RAG streaming was interrupted")
                 elif full_answer:
-                    self.logger.info(f"Full answer received from RAG API in {end_time - start_time:.2f}s: {full_answer[:100]}...")
+                    self.logger.info(f"Full answer received from RAG API in {end_time - self.start_time:.2f}s: {full_answer[:100]}...")
                 else:
                     self.logger.warning(f"Empty response received from RAG API")
                 
