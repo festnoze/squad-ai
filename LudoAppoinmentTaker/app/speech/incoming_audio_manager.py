@@ -36,7 +36,7 @@ class IncomingAudioManager:
     def __init__(self, websocket: any, studi_rag_inference_api_client : StudiRAGInferenceApiClient, tts_provider: TextToSpeechProvider, stt_provider: SpeechToTextProvider, streamSid: str = None, min_chunk_interval: float = 0.05, sample_width=2, frame_rate=8000, channels=1, vad_aggressiveness=3):
         self.logger = logging.getLogger(__name__)
         self.studi_rag_inference_api_client = studi_rag_inference_api_client
-        self.audio_stream_manager = OutgoingAudioManager(websocket, tts_provider, streamSid, min_chunk_interval, sample_width, frame_rate, channels)
+        self.audio_stream_manager : OutgoingAudioManager = OutgoingAudioManager(websocket, tts_provider, streamSid, min_chunk_interval, sample_width, frame_rate, channels)
         self.sample_width = sample_width
         self.frame_rate = frame_rate
         self.channels = channels
@@ -200,9 +200,9 @@ class IncomingAudioManager:
         
         # Define the welcome message
         welcome_text = """\
-            Bonjour !
-            Je suis l'assistante virtuelle 'Studia', je suis là pour t'aider en l'absence de nos conseillers.
-            Souhaites-tu que je t'aide à trouver ta formation ou prendre rendez-vous avec un conseiller en formation ?"""
+            Bonjour,
+            Je suis Stud'ia, l'assistante virtuelle de Studi, je suis là pour t'aider en l'absence de nos conseillers.
+            Je peux t'aider à trouver ta formation, ou simplement prendre rendez-vous avec un conseiller ?"""
         #welcome_text = "Salut !"
 
         # Play welcome message with enhanced text-to-speech

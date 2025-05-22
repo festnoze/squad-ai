@@ -95,10 +95,10 @@ class OutgoingAudioManager:
                 
                 try:
                     # Synthesize speech from this chunk (returns MP3 format)
-                    pcm_bytes = self.tts_provider.synthesize_speech_to_bytes(speech_chunk)
+                    speech_bytes = self.tts_provider.synthesize_speech_to_bytes(speech_chunk)
                     
                     # Send the converted PCM audio to Twilio
-                    result = await self.audio_sender.send_audio_chunk(pcm_bytes)
+                    result = await self.audio_sender.send_audio_chunk(speech_bytes)
                     
                     if result:
                         self.logger.debug(f"Successfully sent text chunk #{text_chunks_processed} as audio")
@@ -167,7 +167,6 @@ class OutgoingAudioManager:
     async def enqueue_text(self, text: str) -> bool:
         """
         Adds text to the queue for speech synthesis and streaming.
-        Returns True if the text was successfully enqueued.
         """
         return await self.text_queue_manager.enqueue_text(text)
         
@@ -202,107 +201,3 @@ class OutgoingAudioManager:
             'audio_sender': audio_sender_stats,
             'is_sending_speech': self.is_sending_speech()
         }
-            
-    async def chunk_text_by_sentences_size_async(self) -> list[str]:
-        """
-        Split text into chunks at natural sentence boundaries.
-        
-        Args:
-            text: The text to split
-            max_words_by_sentence: Maximum number of words per chunk
-            max_chars_by_sentence: Maximum number of characters per chunk
-            
-        Returns:
-            A list of text chunks
-        """
-        text = await self.text_queue_manager.get_next_text_chunk()
-
-        if not text:
-            return []
-        
-        # Phase 1: Extract individual sentences
-        sentences = []
-        
-        # Find all sentences ending with punctuation
-        # This pattern keeps the sentence-ending punctuation with the sentence
-        pattern = r'[^.!?]+[.!?]'
-        matches = re.findall(pattern, text)
-        
-        # Process matches to get clean sentences
-        for match in matches:
-            # Remove leading/trailing whitespace
-            clean_match = match.strip()
-            if clean_match:  # Only add non-empty matches
-                sentences.append(clean_match)
-        
-        # Check if there's any text left after the last punctuation
-        if matches:
-            last_match = matches[-1]
-            last_match_end = text.rfind(last_match) + len(last_match)
-            remaining_text = text[last_match_end:].strip()
-            if remaining_text:
-                sentences.append(remaining_text)
-        # If no matches were found but there's text, treat the whole text as one sentence
-        elif text.strip():
-            sentences.append(text.strip())
-        
-        # Phase 2: Process sentences into appropriately sized chunks
-        chunks = []
-        current_chunk = ""
-        
-        for sentence in sentences:
-            # Case 1: Sentence is too long by itself - split by words/chars
-            if len(sentence.split()) > max_words_by_stream_chunk or len(sentence) > max_chars_by_stream_chunk:
-                # First add any existing chunk
-                if current_chunk:
-                    chunks.append(current_chunk.strip())
-                    current_chunk = ""
-                    
-                # Then split the long sentence
-                words = sentence.split()
-                current_word_chunk = ""
-                
-                for word in words:
-                    # If a single word exceeds max_chars, split the word itself
-                    if len(word) > max_chars_by_stream_chunk:
-                        # First add any existing word chunk
-                        if current_word_chunk:
-                            chunks.append(current_word_chunk.strip())
-                            current_word_chunk = ""
-                        
-                        # Split the long word into character chunks
-                        for i in range(0, len(word), max_chars_by_stream_chunk):
-                            char_chunk = word[i:i+max_chars_by_stream_chunk]
-                            chunks.append(char_chunk)
-                    
-                    # Check if adding this word would exceed limits
-                    elif current_word_chunk and (len(current_word_chunk.split()) + 1 > max_words_by_stream_chunk or 
-                                              len(current_word_chunk) + len(word) + 1 > max_chars_by_stream_chunk):
-                        chunks.append(current_word_chunk.strip())
-                        current_word_chunk = word
-                    else:
-                        current_word_chunk += " " + word if current_word_chunk else word
-                
-                # Add remaining word chunk if any
-                if current_word_chunk:
-                    # Check if we need to add ending punctuation
-                    if re.search(r'[.!?]$', sentence) and not re.search(r'[.!?]$', current_word_chunk):
-                        punctuation = re.search(r'[.!?]$', sentence).group(0)
-                        current_word_chunk = current_word_chunk.rstrip() + punctuation
-                    chunks.append(current_word_chunk.strip())
-            
-            # Case 2: Adding this sentence would make the chunk too long - start a new chunk
-            elif current_chunk and (len(current_chunk.split()) + len(sentence.split()) > max_words_by_stream_chunk or 
-                                    len(current_chunk) + len(sentence) + 1 > max_chars_by_stream_chunk):  # +1 for the space
-                chunks.append(current_chunk.strip())
-                current_chunk = sentence
-            
-            # Case 3: This sentence can be added to the current chunk
-            else:
-                current_chunk += " " + sentence if current_chunk else sentence
-        
-        # Add the last chunk if there is one
-        if current_chunk:
-            chunks.append(current_chunk.strip())
-        
-        return chunks
