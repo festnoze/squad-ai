@@ -1,309 +1,250 @@
-import jwt
-import requests
-import time
-import json
+import random
 import datetime
+import json # Added for pretty printing schema
+from salesforce_api_client import SalesforceApiClient
 
-
-class SalesforceEventManager:
-    def __init__(self, client_id: str, username: str, private_key_file: str, is_sandbox: bool = True):
-        self._client_id = client_id
-        self._username = username
-        self._private_key_file = private_key_file
-        self._is_sandbox = is_sandbox
-        
-        # API settings
-        self._auth_domain = 'test.salesforce.com' if is_sandbox else 'login.salesforce.com'
-        self._auth_url = f'https://{self._auth_domain}/services/oauth2/token'
-        self._version_api = 'v60.0'
-        
-        # Auth results
-        self._access_token = None
-        self._instance_url = None
+# --- Action Handler Functions ---
+def handle_create_event(client: SalesforceApiClient):
+    print("\n--- Create New Event ---")
+    subject = input("Enter event subject: ")
+    start_date_str = input("Enter start date (YYYY-MM-DD): ")
+    start_time_str = input("Enter start time (HH:MM in 24h format, UTC): ")
+    try:
+        duration_minutes = int(input("Enter duration in minutes (default 60): ") or 60)
+    except ValueError:
+        print("Invalid duration, using 60 minutes.")
+        duration_minutes = 60
     
+    description = input("Enter event description (optional): ")
+    location = input("Enter event location (optional): ")
+    # For demo, using a fixed owner_id and what_id. You might want to prompt for these.
+    owner_id = '005Aa00000K990ZIAR' # Example Owner ID
+    what_id = '006Aa00000Ii3XoIAJ'  # Example What ID (e.g., an Account or Opportunity)
 
+    try:
+        start_datetime_dt = datetime.datetime.strptime(f"{start_date_str}T{start_time_str}:00", "%Y-%m-%dT%H:%M:%S")
+        # Ensure the datetime is timezone-aware (UTC)
+        start_datetime_dt = start_datetime_dt.replace(tzinfo=datetime.timezone.utc)
+        start_datetime_iso = start_datetime_dt.isoformat().replace('+00:00', 'Z')
+    except ValueError:
+        print("Invalid date/time format. Please use YYYY-MM-DD and HH:MM.")
+        return
+
+    event_id = client.create_event(
+        subject=subject,
+        description=description,
+        start_datetime=start_datetime_iso,
+        duration_minutes=duration_minutes,
+        location=location,
+        owner_id=owner_id,
+        what_id=what_id
+    )
+    if event_id:
+        print(f"Event created successfully with ID: {event_id}")
+    else:
+        print("Failed to create event.")
+
+def handle_get_events(client: SalesforceApiClient):
+    print("\n--- Get Events for a Period ---")
+    start_date_str = input("Enter start date for period (YYYY-MM-DD, UTC): ")
+    end_date_str = input("Enter end date for period (YYYY-MM-DD, UTC): ")
+    owner_id_filter = input("Enter Owner ID to filter by (optional, e.g., 005Aa00000K990ZIAR): ") or None
+
+    try:
+        # Ensure the datetime is timezone-aware (UTC) at the beginning of the day
+        start_dt = datetime.datetime.strptime(start_date_str, "%Y-%m-%d").replace(tzinfo=datetime.timezone.utc)
+        start_datetime_iso = start_dt.isoformat().replace('+00:00', 'Z')
+        # Ensure the datetime is timezone-aware (UTC) at the end of the day
+        end_dt = datetime.datetime.strptime(end_date_str + "T23:59:59", "%Y-%m-%dT%H:%M:%S").replace(tzinfo=datetime.timezone.utc)
+        end_datetime_iso = end_dt.isoformat().replace('+00:00', 'Z')
+    except ValueError:
+        print("Invalid date format. Please use YYYY-MM-DD.")
+        return
+
+    print(f"\nGetting events from {start_datetime_iso} to {end_datetime_iso}...")
+    events = client.get_events(
+        start_datetime=start_datetime_iso,
+        end_datetime=end_datetime_iso,
+        owner_id=owner_id_filter
+    )
     
-    def authenticate(self) -> bool:
-        """Authenticate with Salesforce using JWT and return success status"""
-        print("Authenticating via JWT...")
+    if events:
+        print(f"=> {len(events)} events found:")
+        for event in events:
+            start = datetime.datetime.fromisoformat(event['StartDateTime'].replace('Z', '+00:00'))
+            end = datetime.datetime.fromisoformat(event['EndDateTime'].replace('Z', '+00:00'))
+            date_str = start.strftime('%d/%m/%Y')
+            start_time_str = start.strftime('%Hh%M')
+            end_time_str = end.strftime('%Hh%M')
+            print(f'  - On {date_str}, from {start_time_str} to {end_time_str}: "{event.get("Subject", "N/A")}". Description: {event.get("Description", "N/A")}')
+    elif events == []: # Explicitly check for empty list vs None (error)
+        print("No events found for the specified period.")
+    else:
+        print("Error occurred while retrieving events or no events found.")
+
+def handle_get_person_by_phone(client: SalesforceApiClient):
+    print("\n--- Get Person by Phone Number ---")
+    phone_to_search = input("Enter phone number to search (e.g., +15551234567): ")
+    if not phone_to_search:
+        print("Phone number cannot be empty.")
+        return
+    person_info = client.get_person_by_phone(phone_to_search)
+
+    if person_info:
+        print(f"Found person of type: {person_info['type']}")
+        person_data = person_info['data']
+        owner_detail = person_data.get('Owner', {})
+        owner_name = owner_detail.get('Name', 'N/A') if isinstance(owner_detail, dict) else 'N/A'
         
-        # Read private key
-        try:
-            with open(self._private_key_file, 'r') as f:
-                private_key = f.read()
-        except FileNotFoundError:
-            print(f"Error: Private key file '{self._private_key_file}' not found")
-            return False
-        
-        # Create JWT payload
-        payload = {
-            'iss': self._client_id,
-            'sub': self._username,
-            'aud': f'https://{self._auth_domain}',
-            'exp': int(time.time()) + 300
-        }
-        
-        # Encode JWT
-        jwt_token = jwt.encode(payload, private_key, algorithm='RS256')
-        
-        # Prepare authentication request
-        params = {
-            'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-            'assertion': jwt_token
-        }
-        
-        # Send authentication request
-        try:
-            resp = requests.post(self._auth_url, data=params)
-            if resp.status_code != 200:
-                print(f"Authentication error: {resp.status_code}")
-                try:
-                    print(resp.json())
-                except:
-                    print(resp.text)
-                return False
-            
-            # Store authentication results
-            data = resp.json()
-            self._access_token = data['access_token']
-            self._instance_url = data['instance_url']
-            print("Authentication successful!")
-            return True
-        except Exception as e:
-            print(f"Authentication error: {str(e)}")
-            return False
+        print(f"  ID: {person_data.get('Id')}")
+        print(f"  Name: {person_data.get('FirstName', '')} {person_data.get('LastName', '')}")
+        print(f"  Email: {person_data.get('Email')}")
+        print(f"  Phone: {person_data.get('Phone')}")
+        print(f"  Mobile: {person_data.get('MobilePhone')}")
+        print(f"  Owner: {owner_name}")
+
+        if person_info['type'] == 'Contact':
+            account_detail = person_data.get('Account', {})
+            account_name = account_detail.get('Name', 'N/A') if isinstance(account_detail, dict) else 'N/A'
+            print(f"  Account: {account_name}")
+        elif person_info['type'] == 'Lead':
+            print(f"  Company: {person_data.get('Company')}")
+            print(f"  Status: {person_data.get('Status')}")
+    else:
+        print(f"No person found with phone number: {phone_to_search}")
+
+def handle_discover_database(client: SalesforceApiClient):
+    print("\n--- Discover Database Schema ---")
+    sobjects_input = input("Enter SObject names to describe (comma-separated, e.g., Account,Contact,Lead) or leave blank for a default list: ")
     
-    def create_event(self, subject: str, start_datetime: str, duration_minutes: int = 60, description: str | None = None, 
-                   location: str | None = None, owner_id: str | None = None, 
-                   what_id: str | None = None, who_id: str | None = None) -> str | None:
-        """Create an event in Salesforce and return the event ID if successful
-        
-        Args:
-            subject: The subject/title of the event
-            start_datetime: Start date and time in ISO format (e.g., '2025-05-20T14:00:00Z')
-            duration_minutes: Duration of the event in minutes (default: 60)
-            description: Optional description of the event
-            location: Optional location of the event
-            owner_id: Optional Salesforce ID of the event owner
-            what_id: Optional ID of related object (Account, Opportunity, etc.)
-            who_id: Optional ID of associated person (Contact, Lead)
-            
-        Returns:
-            The ID of the created event if successful, None otherwise
-        """
-        if not self._access_token or not self._instance_url:
-            print("Error: Not authenticated. Call authenticate() first.")
-            return None
-        
-        if not subject or not start_datetime:
-            print("Error: Required event fields (subject, start_datetime) are missing")
-            return None
-            
-        end_datetime = self._calculate_end_datetime(start_datetime, duration_minutes)
-        if not end_datetime:
-            print("Error: Invalid start_datetime or duration_minutes")
-            return None
-        
-        print("Creating the Event...")
-        
-        # Prepare headers
-        headers = {
-            'Authorization': f'Bearer {self._access_token}',
-            'Content-Type': 'application/json'
-        }
-        
-        # Prepare event payload
-        payload_event = {
-            'Subject': subject,
-            'StartDateTime': start_datetime,
-            'EndDateTime': end_datetime
-        }
-        
-        # Add optional fields if they exist
-        if description:
-            payload_event['Description'] = description
-        if location:
-            payload_event['Location'] = location
-        if owner_id:
-            payload_event['OwnerId'] = owner_id
-        if what_id:
-            payload_event['WhatId'] = what_id
-        if who_id:
-            payload_event['WhoId'] = who_id
-        
-        # Create event URL
-        url_creation_event = f"{self._instance_url}/services/data/{self._version_api}/sobjects/Event/"
-        
-        # Send request
-        try:
-            resp_event = requests.post(url_creation_event, headers=headers, data=json.dumps(payload_event))
-            
-            if resp_event.status_code == 201:
-                event_id = resp_event.json().get('id')
-                print("Event created successfully!")
-                print(f"ID: {event_id}")
-                print(f"{self._instance_url}/lightning/r/Event/{event_id}/view")
-                return event_id
-            else:
-                print(f"Error while creating the Event: {resp_event.status_code}")
-                try:
-                    print(json.dumps(resp_event.json(), indent=2, ensure_ascii=False))
-                except:
-                    print(resp_event.text)
-                return None
-        except Exception as e:
-            print(f"Error creating event: {str(e)}")
-            return None
+    default_sobjects = ['Account', 'Contact', 'Lead', 'Opportunity', 'Event', 'User']
+    sobjects_to_describe = [s.strip() for s in sobjects_input.split(',') if s.strip()] if sobjects_input else default_sobjects
 
-    def _calculate_end_datetime(self, start_datetime: str, duration_minutes: int) -> str | None:
-        try:
-            # Parse the ISO format datetime string
-            start_dt = datetime.datetime.fromisoformat(start_datetime.replace('Z', '+00:00'))
-            # Add the duration in minutes
-            end_dt = start_dt + datetime.timedelta(minutes=duration_minutes)
-            # Convert back to ISO format string
-            end_datetime = end_dt.isoformat().replace('+00:00', 'Z')
-            return end_datetime
-        except ValueError as e:
-            print(f"Error parsing start_datetime: {e}")
-            print("Make sure start_datetime is in ISO format (e.g., '2025-05-20T14:00:00Z')")
-            return None
-            
-    def get_events(self, start_datetime: str, end_datetime: str, owner_id: str | None = None) -> list | None:
-        """Get events from Salesforce calendar between specified start and end datetimes
-        
-        Args:
-            start_datetime: Start date and time in ISO format (e.g., '2025-05-20T14:00:00Z')
-            end_datetime: End date and time in ISO format (e.g., '2025-05-20T15:00:00Z')
-            owner_id: Optional Salesforce ID to filter events by owner
-            
-        Returns:
-            List of events if successful, None otherwise
-        """
-        if not self._access_token or not self._instance_url:
-            print("Error: Not authenticated. Call authenticate() first.")
-            return None
-            
-        print("Retrieving events...")
-        
-        # Prepare headers
-        headers = {
-            'Authorization': f'Bearer {self._access_token}',
-            'Content-Type': 'application/json'
-        }
-        
-        # Build SOQL query
-        query = "SELECT Id, Subject, Description, StartDateTime, EndDateTime, Location, OwnerId, WhatId, WhoId "
-        query += "FROM Event "
-        query += f"WHERE StartDateTime >= {start_datetime} AND EndDateTime <= {end_datetime} "
-        
-        # Add owner filter if specified
-        if owner_id:
-            query += f"AND OwnerId = '{owner_id}' "
-            
-        query += "ORDER BY StartDateTime ASC "
-        
-        # URL encode the query
-        encoded_query = requests.utils.quote(query)
-        print(f"SOQL Query: {query}")
-        
-        # Create query URL
-        url_query = f"{self._instance_url}/services/data/{self._version_api}/query/?q={encoded_query}"
-        
-        # Send request
-        try:
-            resp = requests.get(url_query, headers=headers)
-            
-            if resp.status_code == 200:
-                data = resp.json()
-                events = data.get('records', [])
-                total_size = data.get('totalSize', 0)
-                print(f"Retrieved {total_size} events")
-                
-                # Handle pagination if needed
-                next_records_url = data.get('nextRecordsUrl')
-                while next_records_url:
-                    next_url = f"{self._instance_url}{next_records_url}"
-                    resp = requests.get(next_url, headers=headers)
-                    if resp.status_code == 200:
-                        next_data = resp.json()
-                        events.extend(next_data.get('records', []))
-                        next_records_url = next_data.get('nextRecordsUrl')
-                    else:
-                        print(f"Error retrieving additional events: {resp.status_code}")
-                        break
-                return events
-            else:
-                print(f"Error retrieving events: {resp.status_code}")
-                try:
-                    print(json.dumps(resp.json(), indent=2, ensure_ascii=False))
-                except:
-                    print(resp.text)
-                return None
-        except Exception as e:
-            print(f"Error retrieving events: {str(e)}")
-            return None
+    if not sobjects_to_describe:
+        print("No SObjects specified for discovery. Using default list.")
+        sobjects_to_describe = default_sobjects
 
-# Example usage
-if __name__ == "__main__":
-    # Initialize the manager with credentials
-    event_manager = SalesforceEventManager(
+    print(f"\nDiscovering database schema for: {', '.join(sobjects_to_describe)}...")
+    schema_data = client.discover_database(sobjects_to_describe=sobjects_to_describe)
+
+    if schema_data:
+        print("Schema discovered. Summary:")
+        for sobject_name, data in schema_data.items():
+            if 'fields' in data:
+                print(f"  SObject: {sobject_name}")
+                print(f"    Fields found: {len(data['fields'])}")
+                if 'Id' in data['fields']:
+                    id_field = data['fields']['Id']
+                    print(f"      Id: {id_field.get('type')}, PK: {id_field.get('is_primary_key')}")
+                common_name_field_key = next((key for key in ['Name', 'Subject'] if key in data['fields']), None)
+                if common_name_field_key:
+                     field_detail = data['fields'][common_name_field_key]
+                     print(f"      {field_detail.get('label')}: {field_detail.get('type')}, Label: '{field_detail.get('label')}'")       
+            elif 'error' in data:
+                print(f"  SObject: {sobject_name} - Error: {data['error']}")
+        
+        save_schema = input("Save full schema to salesforce_schema.json? (yes/no): ").lower()
+        if save_schema == 'yes':
+            try:
+                with open('salesforce_schema.json', 'w') as f:
+                    json.dump(schema_data, f, indent=2)
+                print("Full schema saved to salesforce_schema.json")
+            except Exception as e:
+                print(f"Error saving schema: {e}")
+    else:
+        print("Could not retrieve database schema.")
+
+def handle_get_leads(client: SalesforceApiClient):
+    print("\n--- Get Leads by Details ---")
+    email = input("Enter email to search (optional): ") or None
+    first_name = input("Enter first name (optional, best with last name): ") or None
+    last_name = input("Enter last name (optional, best with first name): ") or None
+    company = input("Enter company name (optional): ") or None
+
+    if not any([email, first_name, last_name, company]):
+        print("Please provide at least one search criterion for leads.")
+        return
+
+    leads = client.get_leads_by_details(email=email, first_name=first_name, last_name=last_name, company_name=company)
+    if leads is not None:
+        if leads:
+            print(f"Found {len(leads)} Lead(s):")
+            for lead in leads:
+                print(f"  Lead ID: {lead.get('Id')}, Name: {lead.get('FirstName')} {lead.get('LastName')}, Company: {lead.get('Company')}, Status: {lead.get('Status')}")
+        else:
+            print("No Leads found matching criteria.")
+    else:
+        print("Error occurred while searching for Leads.")
+
+def handle_get_opportunities_for_lead(client: SalesforceApiClient):
+    print("\n--- Get Opportunities for Lead ---")
+    lead_id = input("Enter Lead ID to find related Opportunities: ")
+    if not lead_id:
+        print("Lead ID cannot be empty.")
+        return
+
+    opportunities = client.get_opportunities_for_lead(lead_id=lead_id)
+    if opportunities is not None:
+        if opportunities:
+            print(f"Found {len(opportunities)} Opportunity(s) related to Lead ID '{lead_id}':")
+            for opp in opportunities:
+                account_detail = opp.get('Account', {})
+                account_name = account_detail.get('Name', 'N/A') if isinstance(account_detail, dict) else 'N/A'
+                print(f"  Opp ID: {opp.get('Id')}, Name: {opp.get('Name')}, Stage: {opp.get('StageName')}, Account: {account_name}")
+        else:
+            print(f"No Opportunities found directly related to Lead ID '{lead_id}'.")
+    else:
+        print(f"Error occurred while searching for Opportunities for Lead ID '{lead_id}'.")
+
+def main():
+    print("Initializing Salesforce API Client...")
+    api_client = SalesforceApiClient(
         client_id='3MVG9IKwJOi7clC2.8QIzh9BkM6NhU53bup6EUfFQiXJ01nh.l2YJKF5vbNWqPkFEdjgzAXIqK3U1p2WCBUD3',
-        username='etienne.millerioux@studi.fr',#'axel.montzamir@studi.fr',
+        username='etienne.millerioux@studi.fr',
         private_key_file='server.key',
         is_sandbox=True
     )
     
-    # Authenticate with Salesforce
-    if event_manager.authenticate():
-        # # 1- Create a new event
-        # event_id = event_manager.create_event(
-        #     subject='Réunion de démonstration prise rendez-vous avec Twilio',
-        #     description='Présentation des nouvelles fonctionnalités à un CdP.',
-        #     start_datetime='2025-05-24T15:00:00Z',
-        #     duration_minutes=30,
-        #     location='Salle de conférence B',
-        #     owner_id='005Aa00000K990ZIAR',
-        #     what_id='006Aa00000Ii3XoIAJ'  # Related to (Account, Opportunity, etc.)
-        #     # who_id=''  # Associated with (Contact, Lead)
-        # )
-        # if event_id:
-        #     print(f"Event created with ID: {event_id}")
-            
-        # 2- Get events for a specific time period
-        today = datetime.datetime.now(datetime.timezone.utc)
-        next_week = today + datetime.timedelta(days=7)
-        
-        # Format dates in ISO format for Salesforce
-        today_str = today.isoformat().replace('+00:00', 'Z')
-        next_week_str = next_week.isoformat().replace('+00:00', 'Z')
-        owner_id = '005Aa00000K990ZIAR'
+    # The SalesforceApiClient's __init__ method calls authenticate().
+    # We check if authentication was successful by inspecting _access_token.
+    if not api_client._access_token: # Accessing a protected member for this check
+         print("CRITICAL: Salesforce authentication failed during client initialization. Exiting.")
+         print("Please check your credentials, private key, and Salesforce connected app settings.")
+         return
+    print("Salesforce client authenticated successfully.")
 
-        print(f"\nGetting events from {today_str} to {next_week_str}...")
-        events = event_manager.get_events(
-            start_datetime=today_str,
-            end_datetime=next_week_str,
-            # Optionally filter by owner
-            owner_id=owner_id
-        )
+    actions = {
+        "1": ("Create New Event", handle_create_event),
+        "2": ("Get Events for a Period", handle_get_events),
+        "3": ("Get Person by Phone Number", handle_get_person_by_phone),
+        "4": ("Discover Database Schema", handle_discover_database),
+        "5": ("Get Leads by Details", handle_get_leads),
+        "6": ("Get Opportunities for a Lead", handle_get_opportunities_for_lead),
+        "0": ("Exit", None)
+    }
+
+    while True:
+        print("\n--- Salesforce API Client Actions ---")
+        for key, (description, _) in actions.items():
+            print(f"{key}: {description}")
         
-        if events:
-            today = today.strftime('%d/%m/%Y')
-            next_week = next_week.strftime('%d/%m/%Y')
-            
-            print(f"=> {len(events)} événements trouvés dans le calendrier Salesforce de '{owner_id}' entre {today} et {next_week} :")
-            for event in events:
-                # Format dates as dd/mm/YYYY HH:MM
-                start = datetime.datetime.fromisoformat(event['StartDateTime'].replace('Z', '+00:00'))
-                end = datetime.datetime.fromisoformat(event['EndDateTime'].replace('Z', '+00:00'))
-                
-                # Check if start and end dates are the same
-                if start.date() != end.date():
-                    raise ValueError(f"Event spans multiple days: {event['Subject']} starts on {start.date()} and ends on {end.date()}")
-                
-                date_str = start.strftime('%d/%m/%Y')
-                start_time_str = start.strftime('%Hh%M')
-                end_time_str = end.strftime('%Hh%M')
-                print(f'  - Le {date_str}, de {start_time_str} à {end_time_str} : "{event["Subject"]}".\n     Description: {event["Description"]}\n')
+        choice = input("Enter your choice: ")
+        
+        if choice == "0":
+            print("Exiting.")
+            break
+        
+        action_tuple = actions.get(choice)
+        if action_tuple:
+            _, handler_function = action_tuple
+            if handler_function:
+                try:
+                    handler_function(api_client)
+                except Exception as e:
+                    print(f"An error occurred while executing action '{action_tuple[0]}': {e}")
+                    # Optionally, add more detailed error logging or traceback here
         else:
-            print("No events found or error occurred.")
+            print("Invalid choice. Please try again.")
+
+if __name__ == "__main__":
+    main()
