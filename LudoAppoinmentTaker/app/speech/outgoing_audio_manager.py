@@ -12,7 +12,7 @@ class OutgoingAudioManager:
     Manages the complete audio streaming process using a text-based approach.
     Text is queued, then processed into speech in small chunks for better responsiveness.
     """
-    def __init__(self, websocket: any, tts_provider: TextToSpeechProvider, streamSid: str = None, min_chunk_interval: float = 0.05):
+    def __init__(self, websocket: any, tts_provider: TextToSpeechProvider, streamSid: str = None, min_chunk_interval: float = 0.05, min_chars_for_interruptible_speech: int = 15):
         self.text_queue_manager = TextQueueManager()
         self.audio_sender : TwilioAudioSender = TwilioAudioSender(websocket, streamSid=streamSid, min_chunk_interval=min_chunk_interval)
         self.logger = logging.getLogger(__name__)
@@ -24,6 +24,7 @@ class OutgoingAudioManager:
         self.max_chars_by_stream_chunk = 100
         self.ask_to_stop_streaming_worker = False
         self.websocket = websocket
+        self.min_chars_for_interruptible_speech = min_chars_for_interruptible_speech
 
     def set_websocket(self, websocket: WebSocket):
         self.websocket = websocket
@@ -175,10 +176,9 @@ class OutgoingAudioManager:
         
     def is_sending_speech(self) -> bool:
         """Check if the audio stream manager is actively sending audio or has significant text queued."""
-        MIN_CHARS_FOR_INTERRUPTIBLE_SPEECH = 15  # Threshold for text length to be considered interruptible speech
         has_significant_text_queued = (
             not self.text_queue_manager.is_empty() and
-            len(self.text_queue_manager.text_queue) > MIN_CHARS_FOR_INTERRUPTIBLE_SPEECH
+            len(self.text_queue_manager.text_queue) > self.min_chars_for_interruptible_speech
         )
         return has_significant_text_queued or self.audio_sender.is_sending
         

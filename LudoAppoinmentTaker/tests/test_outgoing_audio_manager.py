@@ -72,7 +72,7 @@ class TestOutgoingAudioManager:
         assert outgoing_audio_manager.is_sending_speech() is False
         
         # When queue has text but not running
-        await outgoing_audio_manager.enqueue_text("Some text")
+        await outgoing_audio_manager.enqueue_text("Text longer than min_chars_for_interruptible_speech value")
         assert outgoing_audio_manager.text_queue_manager.is_empty() is False
         assert outgoing_audio_manager.is_sending_speech() is True
         
