@@ -18,7 +18,6 @@ class SalesforceApiClient:
         self._auth_url = f'https://{self.subdomain}.{salesforce_domain}/services/oauth2/token'
         self._version_api = 'v60.0'
         
-        # Auth results
         self._access_token = None
         self._instance_url = None
         self.authenticate()
@@ -500,16 +499,16 @@ class SalesforceApiClient:
         if company_name:
             conditions.append(f"Company = '{company_name}'")
 
-        # if len(conditions) == 1: # Only IsConverted = false, no other criteria
-        #     print("Error: At least one search criterion (email, full name, or company) must be provided for get_leads_by_details.")
-        #     return None # Or an empty list if that's preferred for bad input
+        if len(conditions) == 1: # Only IsConverted = false, no other criteria
+            print("Error: At least one search criterion (email, full name, or company) must be provided for get_leads_by_details.")
+            return None # Or an empty list if that's preferred for bad input
 
-        query_filter = " AND ".join(f"({c})" for c in conditions)
+        query_filter = " AND " + " AND ".join(f"({c})" for c in conditions[1:])
         
         soql_query = (
             "SELECT Id, FirstName, LastName, Email, Company, Status, Owner.Name, CreatedDate "
             "FROM Lead "
-            f"WHERE {query_filter} "
+            f"WHERE {conditions[0]} {query_filter} "
             "ORDER BY CreatedDate DESC LIMIT 200" # Added LIMIT for safety
         )
         
@@ -521,7 +520,7 @@ class SalesforceApiClient:
         else: # Query successful, but no records found (e.g. response_data['records'] is empty list)
             return []
 
-    def get_opportunities_for_lead(self, lead_id: str | None = None) -> list[dict] | None:
+    def get_opportunities_for_lead(self, lead_id: str) -> list[dict] | None:
         """
         Retrieve Opportunities related to a specific Lead, primarily if converted.
         Args:
@@ -534,12 +533,12 @@ class SalesforceApiClient:
             print("Error: Not authenticated. Call authenticate() first.") 
             return None
 
-        conditions = ""
-        if lead_id:
-            conditions = f"WHERE Id = '{lead_id}'"
+        if not lead_id:
+            print("Error: lead_id must be provided.")
+            return None
 
         # Step 1: Get Lead conversion details
-        lead_info_soql = f"SELECT Id, IsConverted, ConvertedOpportunityId, ConvertedAccountId FROM Lead {conditions} ORDER BY CreatedDate DESC LIMIT 200"
+        lead_info_soql = f"SELECT Id, IsConverted, ConvertedOpportunityId, ConvertedAccountId FROM Lead WHERE Id = '{lead_id}'"
         lead_response = self._query_salesforce(lead_info_soql)
 
         if not lead_response or lead_response.get('records') is None:

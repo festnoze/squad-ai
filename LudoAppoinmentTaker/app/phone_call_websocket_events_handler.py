@@ -10,7 +10,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 from app.speech.text_to_speech import get_text_to_speech_provider
 from app.speech.speech_to_text import get_speech_to_text_provider
 from app.agents.agents_graph import AgentsGraph
-from app.api_client.studi_rag_inference_client import StudiRAGInferenceClient
+from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
 from app.speech.incoming_audio_manager import IncomingAudioManager
 
 class PhoneCallWebsocketEventsHandler:
@@ -34,7 +34,7 @@ class PhoneCallWebsocketEventsHandler:
         
         # Set audio processing parameters as instance variables
         self.frame_rate = 8000  # Sample rate in Hz (8kHz is standard for telephony)
-        self.sample_width = 2    # 16-bit PCM
+        self.sample_width = 2    # mu-law in 16 bits
         self.speech_threshold = 250  # Threshold for silence vs. speech
         self.min_audio_bytes_for_processing = 6400  # Minimum buffer size = ~400ms at 8kHz
         self.max_audio_bytes_for_processing = 150000  # Maximum buffer size = ~15s at 8kHz
@@ -79,10 +79,10 @@ class PhoneCallWebsocketEventsHandler:
         self.tts_provider = get_text_to_speech_provider(self.TEMP_DIR)
         self.stt_provider = get_speech_to_text_provider(self.TEMP_DIR, provider="hybrid")
         
-        self.studi_rag_inference_client = StudiRAGInferenceClient()
+        self.studi_rag_inference_api_client = StudiRAGInferenceApiClient()
         self.audio_processing = IncomingAudioManager(
                                     websocket=self.websocket, 
-                                    studi_rag_inference_client=self.studi_rag_inference_client, 
+                                    studi_rag_inference_api_client=self.studi_rag_inference_api_client, 
                                     tts_provider=self.tts_provider, 
                                     stt_provider=self.stt_provider,
                                     streamSid=None, 

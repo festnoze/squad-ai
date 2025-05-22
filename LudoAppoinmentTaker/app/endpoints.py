@@ -43,7 +43,7 @@ async def handle_incoming_call_async(request: Request) -> HTMLResponse:
         # Request higher quality audio from Twilio
         connect.stream(url=ws_url, track="inbound_track", parameters={
             "mediaEncoding": "audio/x-mulaw", 
-            "sampleRate": 16000  # Request 16kHz if possible
+            "sampleRate": 8000  # Request 8kHz if possible
         })
         response.append(connect)
         return HTMLResponse(content=str(response), media_type="application/xml")

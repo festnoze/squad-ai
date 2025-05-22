@@ -22,7 +22,7 @@ from app.agents.conversation_state_model import ConversationState
 from app.speech.outgoing_audio_manager import OutgoingAudioManager
 from app.speech.text_to_speech import TextToSpeechProvider
 from app.speech.speech_to_text import SpeechToTextProvider
-from app.api_client.studi_rag_inference_client import StudiRAGInferenceClient
+from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
 
 class IncomingAudioManager:
     """Audio processing utilities for improving speech recognition quality and handling Twilio events"""
@@ -33,10 +33,10 @@ class IncomingAudioManager:
     # Temporary directory for audio files
     TEMP_DIR = "./static/audio"
     
-    def __init__(self, websocket: any, studi_rag_inference_client : StudiRAGInferenceClient, tts_provider: TextToSpeechProvider, stt_provider: SpeechToTextProvider, streamSid: str = None, min_chunk_interval: float = 0.05, sample_width=2, frame_rate=8000, channels=1, vad_aggressiveness=3):
+    def __init__(self, websocket: any, studi_rag_inference_api_client : StudiRAGInferenceApiClient, tts_provider: TextToSpeechProvider, stt_provider: SpeechToTextProvider, streamSid: str = None, min_chunk_interval: float = 0.05, sample_width=2, frame_rate=8000, channels=1, vad_aggressiveness=3):
         self.logger = logging.getLogger(__name__)
-        self.studi_rag_inference_client = studi_rag_inference_client
-        self.audio_stream_manager = OutgoingAudioManager(websocket, tts_provider, streamSid, min_chunk_interval)
+        self.studi_rag_inference_api_client = studi_rag_inference_api_client
+        self.audio_stream_manager = OutgoingAudioManager(websocket, tts_provider, streamSid, min_chunk_interval, sample_width, frame_rate, channels)
         self.sample_width = sample_width
         self.frame_rate = frame_rate
         self.channels = channels
@@ -228,7 +228,7 @@ class IncomingAudioManager:
         
         try:
             # Log the welcome message to our backend records
-            await self.studi_rag_inference_client.add_external_ai_message_to_conversation(self.conversation_id, welcome_text)
+            await self.studi_rag_inference_api_client.add_external_ai_message_to_conversation(self.conversation_id, welcome_text)
             
             # # Then invoke the graph with initial state to get the AI-generated welcome message
             # updated_state = await self.compiled_graph.ainvoke(initial_state)
@@ -239,7 +239,7 @@ class IncomingAudioManager:
             #     ai_message = updated_state['history'][0][1]
             #     if ai_message and ai_message.strip() != welcome_text.strip():
             #         await self.speak_and_send_text(ai_message)
-            #         await self.studi_rag_inference_client.add_external_ai_message_to_conversation(self.conversation_id, ai_message)
+            #         await self.studi_rag_inference_api_client.add_external_ai_message_to_conversation(self.conversation_id, ai_message)
         
         except Exception as e:
             self.logger.error(f"Error in initial graph invocation: {e}", exc_info=True)
@@ -340,7 +340,7 @@ class IncomingAudioManager:
                     display_waiting_message=False
                 )
                 self.rag_interrupt_flag = {"interrupted": False} # Reset the interrupt flag before starting new streaming
-                response = self.studi_rag_inference_client.rag_query_stream_async(rag_query_RM, timeout=60, interrupt_flag=self.rag_interrupt_flag)
+                response = self.studi_rag_inference_api_client.rag_query_stream_async(rag_query_RM, timeout=60, interrupt_flag=self.rag_interrupt_flag)
                 # Use enhanced text-to-speech method for acknowledgment
                 acknowledgment_text = f"OK. Vous avez demandé : {user_query_transcript}. Laissez-moi un instant pour rechercher des informations à ce sujet."
                 await self.audio_stream_manager.enqueue_text(acknowledgment_text)
@@ -401,7 +401,7 @@ class IncomingAudioManager:
             device_info=DeviceInfoRequestModel(user_agent="twilio", platform="phone", app_version="", os="", browser="", is_mobile=True)
         )
         try:
-            user = await self.studi_rag_inference_client.create_or_retrieve_user(user_RM)
+            user = await self.studi_rag_inference_api_client.create_or_retrieve_user(user_RM)
             user_id = user['id']
             
             # Convert user_id to UUID if it's a string
@@ -414,7 +414,7 @@ class IncomingAudioManager:
             conversation_model = ConversationRequestModel(user_id=user_id, messages=messages)
             
             self.logger.info(f"Creating new conversation for user: {user_id}")
-            new_conversation = await self.studi_rag_inference_client.create_new_conversation(conversation_model)
+            new_conversation = await self.studi_rag_inference_api_client.create_new_conversation(conversation_model)
             return new_conversation['id']
 
         except Exception as e:

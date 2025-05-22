@@ -12,14 +12,15 @@ class OutgoingAudioManager:
     Manages the complete audio streaming process using a text-based approach.
     Text is queued, then processed into speech in small chunks for better responsiveness.
     """
-    def __init__(self, websocket: any, tts_provider: TextToSpeechProvider, streamSid: str = None, min_chunk_interval: float = 0.05, min_chars_for_interruptible_speech: int = 15):
+    def __init__(self, websocket: any, tts_provider: TextToSpeechProvider, streamSid: str = None, min_chunk_interval: float = 0.05, min_chars_for_interruptible_speech: int = 15, sample_width=1, frame_rate=8000, channels=1):
         self.text_queue_manager = TextQueueManager()
         self.audio_sender : TwilioAudioSender = TwilioAudioSender(websocket, streamSid=streamSid, min_chunk_interval=min_chunk_interval)
         self.logger = logging.getLogger(__name__)
         self.tts_provider : TextToSpeechProvider = tts_provider  # Text-to-speech provider for converting text to audio
         self.sender_task = None
-        self.frame_rate = 24000  # Default frame rate, can be updated as needed
-        self.sample_width = 2    # Default sample width, can be updated as needed
+        self.frame_rate = frame_rate   # mu-law in 8/16kHz
+        self.sample_width = sample_width    # mu-law in 8/16 bits
+        self.channels = channels
         self.max_words_by_stream_chunk = 10
         self.max_chars_by_stream_chunk = 100
         self.ask_to_stop_streaming_worker = False

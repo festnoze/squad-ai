@@ -50,6 +50,10 @@ def handle_get_events(client: SalesforceApiClient):
     end_date_str = input("Enter end date for period (YYYY-MM-DD, UTC): ")
     owner_id_filter = input("Enter Owner ID to filter by (optional, e.g., 005Aa00000K990ZIAR): ") or None
 
+    if not start_date_str: start_date_str = (datetime.datetime.now() - datetime.timedelta(days=7)).strftime("%Y-%m-%d")
+    if not end_date_str: end_date_str = datetime.datetime.now().strftime("%Y-%m-%d")
+    if not owner_id_filter: owner_id_filter = None
+
     try:
         # Ensure the datetime is timezone-aware (UTC) at the beginning of the day
         start_dt = datetime.datetime.strptime(start_date_str, "%Y-%m-%d").replace(tzinfo=datetime.timezone.utc)
@@ -161,9 +165,9 @@ def handle_get_leads(client: SalesforceApiClient):
     last_name = input("Enter last name (optional, best with first name): ") or None
     company = input("Enter company name (optional): ") or None
 
-    if not any([email, first_name, last_name, company]):
-        print("Please provide at least one search criterion for leads.")
-        return
+    # if not any([email, first_name, last_name, company]):
+    #     print("Please provide at least one search criterion for leads.")
+    #     return
 
     leads = client.get_leads_by_details(email=email, first_name=first_name, last_name=last_name, company_name=company)
     if leads is not None:
@@ -179,9 +183,6 @@ def handle_get_leads(client: SalesforceApiClient):
 def handle_get_opportunities_for_lead(client: SalesforceApiClient):
     print("\n--- Get Opportunities for Lead ---")
     lead_id = input("Enter Lead ID to find related Opportunities: ")
-    if not lead_id:
-        print("Lead ID cannot be empty.")
-        return
 
     opportunities = client.get_opportunities_for_lead(lead_id=lead_id)
     if opportunities is not None:
@@ -201,7 +202,7 @@ def main():
     api_client = SalesforceApiClient(
         client_id='3MVG9IKwJOi7clC2.8QIzh9BkM6NhU53bup6EUfFQiXJ01nh.l2YJKF5vbNWqPkFEdjgzAXIqK3U1p2WCBUD3',
         username='etienne.millerioux@studi.fr',
-        private_key_file='server.key',
+        private_key_file='salesforce_server_private.key',
         is_sandbox=True
     )
     

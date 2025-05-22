@@ -5,7 +5,7 @@ from api_client.request_models.user_request_model import UserRequestModel
 from api_client.request_models.conversation_request_model import ConversationRequestModel
 from api_client.request_models.query_asking_request_model import QueryAskingRequestModel, QueryNoConversationRequestModel
 
-class StudiRAGInferenceClient:
+class StudiRAGInferenceApiClient:
     """
     Async client for interacting with the /rag/inference endpoints.
     """
