@@ -34,7 +34,8 @@ class PhoneCallWebsocketEventsHandler:
         
         # Set audio processing parameters as instance variables
         self.frame_rate = 8000  # Sample rate in Hz (8kHz is standard for telephony)
-        self.sample_width = 2    # mu-law in 16 bits
+        self.sample_width = 2   # mu-law in 16 bits
+        self.channels = 1       # Mono channel audio
         self.speech_threshold = 250  # Threshold for silence vs. speech
         self.min_audio_bytes_for_processing = 6400  # Minimum buffer size = ~400ms at 8kHz
         self.max_audio_bytes_for_processing = 150000  # Maximum buffer size = ~15s at 8kHz
@@ -76,8 +77,8 @@ class PhoneCallWebsocketEventsHandler:
             self.logger.error(f"/!\\ Google calendar credentials file not found at {self.google_calendar_credentials_path}")
 
         # Initialize dependencies
-        self.tts_provider = get_text_to_speech_provider(self.TEMP_DIR)
-        self.stt_provider = get_speech_to_text_provider(self.TEMP_DIR, provider="hybrid")
+        self.tts_provider = get_text_to_speech_provider(self.TEMP_DIR, provider_name="openai", frame_rate=self.frame_rate, channels=self.channels, sample_width=self.sample_width)
+        self.stt_provider = get_speech_to_text_provider(self.TEMP_DIR, provider_name="hybrid", language_code="fr-FR", frame_rate=self.frame_rate)
         
         self.studi_rag_inference_api_client = StudiRAGInferenceApiClient()
         self.audio_processing = IncomingAudioManager(

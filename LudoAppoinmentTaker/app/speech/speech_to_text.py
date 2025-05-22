@@ -7,30 +7,33 @@ class SpeechToTextProvider(ABC):
     logger: logging.Logger = None
     openai_api_key: str = os.getenv("OPENAI_API_KEY")
     temp_dir: str = ""
+    language_code: str = "fr-FR"
+    frame_rate: int = 8000
     
     @abstractmethod
-    def transcribe_audio(self, file_name: str, language_code: str = "fr-FR") -> str:
+    def transcribe_audio(self, file_name: str) -> str:
         """Transcribe audio file to text using the specified provider"""
         pass
 
 class GoogleSTTProvider(SpeechToTextProvider):
-    def __init__(self, temp_dir: str):
+    def __init__(self, temp_dir: str, language_code: str = "fr-FR", frame_rate: int = 8000):
         from google.cloud import speech
         self.speech = speech
         self.logger = logging.getLogger(__name__)
         self.google_client = self.speech.SpeechClient()
         self.temp_dir = temp_dir
-
-    def transcribe_audio(self, file_name: str, language_code: str = "fr-FR") -> str:
+        self.language_code = language_code
+        self.frame_rate = frame_rate
+    def transcribe_audio(self, file_name: str) -> str:
         """Transcribe audio file using Google STT API."""
         try:
-            return GoogleSTTProvider.transcribe_audio_static(self.temp_dir, self.speech, self.google_client, file_name, language_code)
+            return GoogleSTTProvider.transcribe_audio_static(self.temp_dir, self.speech, self.google_client, file_name, self.language_code, self.frame_rate)
         except Exception as e:
             self.logger.error(f"Error transcribing audio with Google: {e}", exc_info=True)
             return ""
     
     @staticmethod
-    def transcribe_audio_static(temp_dir: str, speech, client, file_name: str, language_code: str = "fr-FR") -> str:
+    def transcribe_audio_static(temp_dir: str, speech, client, file_name: str, language_code: str, frame_rate: int) -> str:
         """Transcribe audio file using Google Cloud Speech-to-Text API."""
         
         with open(os.path.join(temp_dir, file_name), "rb") as audio_file:
@@ -39,7 +42,7 @@ class GoogleSTTProvider(SpeechToTextProvider):
         audio = speech.RecognitionAudio(content=content)
         config = speech.RecognitionConfig(
             encoding=speech.RecognitionConfig.AudioEncoding.LINEAR16,
-            sample_rate_hertz=8000,
+            sample_rate_hertz=frame_rate,
             language_code=language_code,
             use_enhanced=True,
             model="phone_call"  # Specialized model for phone audio
@@ -54,26 +57,28 @@ class GoogleSTTProvider(SpeechToTextProvider):
         return transcript
 
 class OpenAISTTProvider(SpeechToTextProvider):
-    def __init__(self, temp_dir: str):
+    def __init__(self, temp_dir: str, language_code: str = "fr-FR", frame_rate: int = 8000):
         from openai import OpenAI
         self.logger = logging.getLogger(__name__)
         self.temp_dir = temp_dir
+        self.language_code = language_code
+        self.frame_rate = frame_rate
         if self.openai_api_key:
             self.openai_client = OpenAI(api_key=self.openai_api_key)
         else:
             self.openai_client = None
             self.logger.warning("OPENAI_API_KEY not set, OpenAI transcription will not be available.")
 
-    def transcribe_audio(self, file_name: str, language_code: str = "fr-FR") -> str:
+    def transcribe_audio(self, file_name: str) -> str:
         """Transcribe audio file using OpenAI STT API."""
         try:
-            return OpenAISTTProvider.transcribe_audio_static(self.openai_client, self.temp_dir, file_name, language_code)
+            return OpenAISTTProvider.transcribe_audio_static(self.openai_client, self.temp_dir, file_name, self.language_code, self.frame_rate)
         except Exception as e:
             self.logger.error(f"Error transcribing audio with OpenAI: {e}", exc_info=True)
             return ""
     
     @staticmethod
-    def transcribe_audio_static(openai_client, temp_dir: str, file_name: str, language_code: str = "fr-FR") -> str:
+    def transcribe_audio_static(openai_client, temp_dir: str, file_name: str, language_code: str, frame_rate: int) -> str:
         """Transcribe audio file using OpenAI STT API."""
         if not openai_client:
             raise ValueError("OpenAI client not initialized - missing API key")
@@ -86,7 +91,7 @@ class OpenAISTTProvider(SpeechToTextProvider):
         return response.text
 
 class HybridSTTProvider(SpeechToTextProvider):
-    def __init__(self, temp_dir: str):
+    def __init__(self, temp_dir: str, language_code: str = "fr-FR", frame_rate: int = 8000):
         from google.cloud import speech
         from openai import OpenAI
         self.google_speech = speech
@@ -94,35 +99,37 @@ class HybridSTTProvider(SpeechToTextProvider):
         self.temp_dir = temp_dir
         self.google_client = self.google_speech.SpeechClient()
         self.openai_client = None
+        self.language_code = language_code
+        self.frame_rate = frame_rate
         if not self.openai_api_key:
             self.logger.warning("OPENAI_API_KEY not set, OpenAI transcription will not be available.")
         else:
             self.openai_client = OpenAI(api_key=self.openai_api_key)
 
-    def transcribe_audio(self, file_name: str, language_code: str = "fr-FR") -> str:
+    def transcribe_audio(self, file_name: str) -> str:
         try:
-            return HybridSTTProvider.transcribe_audio_static(self.openai_client, self.google_speech, self.google_client, self.temp_dir, file_name, language_code)
+            return HybridSTTProvider.transcribe_audio_static(self.openai_client, self.google_speech, self.google_client, self.temp_dir, file_name, self.language_code, self.frame_rate)
         except Exception as e:
             self.logger.error(f"Error transcribing audio with HybridSTTProvider: {e}", exc_info=True)
             return ""
     
     @staticmethod
-    def transcribe_audio_static(openai_client, speech, client, temp_dir: str, file_name: str, language_code: str = "fr-FR") -> str:
+    def transcribe_audio_static(openai_client, speech, client, temp_dir: str, file_name: str, language_code: str, frame_rate: int) -> str:
         """Transcribe audio file using OpenAI STT API, fallback to Google Cloud Speech-to-Text API."""
         # Try Google transcription first
-        transcript = GoogleSTTProvider.transcribe_audio_static(temp_dir, speech, client, file_name, language_code)
+        transcript = GoogleSTTProvider.transcribe_audio_static(temp_dir, speech, client, file_name, language_code, frame_rate)
         if transcript:
             return transcript
 
         # Fallback to OpenAI transcription
         if openai_client:
-            transcript = OpenAISTTProvider.transcribe_audio_static(openai_client, temp_dir, file_name, language_code)
+            transcript = OpenAISTTProvider.transcribe_audio_static(openai_client, temp_dir, file_name, language_code, frame_rate)
             return transcript
         return ""
 
-def get_speech_to_text_provider(temp_dir: str, provider: str = "openai") -> SpeechToTextProvider:
+def get_speech_to_text_provider(temp_dir: str, provider_name: str = "openai", language_code: str = "fr-FR", frame_rate: int = 8000) -> SpeechToTextProvider:
     """Factory function to get the appropriate speech-to-text provider"""
-    if provider == "hybrid": return HybridSTTProvider(temp_dir)
-    if provider == "google": return GoogleSTTProvider(temp_dir)
-    if provider == "openai": return OpenAISTTProvider(temp_dir)
-    raise ValueError(f"Invalid STT provider: {provider}")
+    if provider_name == "hybrid": return HybridSTTProvider(temp_dir, language_code=language_code, frame_rate=frame_rate)
+    if provider_name == "google": return GoogleSTTProvider(temp_dir, language_code=language_code, frame_rate=frame_rate)
+    if provider_name == "openai": return OpenAISTTProvider(temp_dir, language_code=language_code, frame_rate=frame_rate)
+    raise ValueError(f"Invalid STT provider: {provider_name}")
