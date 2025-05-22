@@ -1,16 +1,35 @@
 import random
 import jwt
-import requests
+import httpx
+import urllib.parse
 import time
 import json
 import datetime
+from common_tools.helpers.execute_helper import Execute
+from common_tools.helpers.file_helper import file
 
 class SalesforceApiClient:
-    def __init__(self, client_id: str, username: str, private_key_file: str, is_sandbox: bool = True):
-        self._client_id = client_id
-        self._username = username
-        self._private_key_file = private_key_file
-        self._is_sandbox = is_sandbox
+    _client_id = '3MVG9IKwJOi7clC2.8QIzh9BkM6NhU53bup6EUfFQiXJ01nh.l2YJKF5vbNWqPkFEdjgzAXIqK3U1p2WCBUD3'
+    _username = 'etienne.millerioux@studi.fr'
+    _private_key_file = 'salesforce_server_private.key'
+    _is_sandbox = True
+
+    @classmethod
+    async def create_instance_async(cls, client_id: str = None, username: str = None, private_key_file: str = None, is_sandbox: bool = True) -> 'SalesforceApiClient':
+        """
+        Factory create an authenticated SalesforceApiClient instance.
+        """
+        client = cls(client_id, username, private_key_file, is_sandbox)
+        Execute.async_wrapper_to_sync(client.authenticate_async)
+        return client
+
+    
+    def __init__(self, client_id: str = None, username: str = None, private_key_file: str = None, is_sandbox: bool = True):
+
+        self._client_id = client_id or self._client_id
+        self._username = username or self._username
+        self._private_key_file = private_key_file or self._private_key_file
+        self._is_sandbox = is_sandbox or self._is_sandbox
         
         # API settings
         salesforce_domain = 'salesforce.com'
@@ -20,13 +39,13 @@ class SalesforceApiClient:
         
         self._access_token = None
         self._instance_url = None
-        self.authenticate()
+        self.is_authenticated = False
+            
+    async def authenticate_async(self) -> bool:
+        """Authenticate with Salesforce using JWT and return success status (asynchronous)"""
+        print("Authenticating via JWT (async)...")
     
-    def authenticate(self) -> bool:
-        """Authenticate with Salesforce using JWT and return success status"""
-        print("Authenticating via JWT...")
-        
-        # Read private key
+        # Read private key (synchronous file I/O - consider aiofiles for fully async)
         try:
             with open(self._private_key_file, 'r') as f:
                 private_key = f.read()
@@ -39,7 +58,7 @@ class SalesforceApiClient:
             'iss': self._client_id,
             'sub': self._username,
             'aud': self._auth_url,
-            'exp': int(time.time()) + 300
+            'exp': int(time.time()) + 300  # 5 minutes expiration
         }
         
         # Encode JWT
@@ -52,27 +71,35 @@ class SalesforceApiClient:
         }
         
         # Send authentication request
-        try:
-            resp = requests.post(self._auth_url, data=params)
-            if resp.status_code != 200:
-                print(f"Authentication error: {resp.status_code}")
+        # For long-running apps, consider creating httpx.AsyncClient once and reusing it.
+        async with httpx.AsyncClient() as client:
+            try:
+                resp = await client.post(self._auth_url, data=params)
+                resp.raise_for_status()  # Raises HTTPStatusError for 4xx/5xx responses
+                
+                # Store authentication results
+                data = resp.json()
+                self._access_token = data['access_token']
+                self._instance_url = data['instance_url']
+                print("Authentication successful!")
+                self.is_authenticated = True
+                return True
+            except httpx.HTTPStatusError as http_err:
+                print(f"Authentication HTTP error: {http_err} - Status: {http_err.response.status_code}")
                 try:
-                    print(resp.json())
-                except:
-                    print(resp.text)
+                    print(http_err.response.json())
+                except json.JSONDecodeError:
+                    print(http_err.response.text)
                 return False
-            
-            # Store authentication results
-            data = resp.json()
-            self._access_token = data['access_token']
-            self._instance_url = data['instance_url']
-            print("Authentication successful!")
-            return True
-        except Exception as e:
-            print(f"Authentication error: {str(e)}")
-            return False
-    
-    def create_event(self, subject: str, start_datetime: str, duration_minutes: int = 60, description: str | None = None, 
+            except httpx.RequestError as req_err:
+                print(f"Authentication request error: {str(req_err)}")
+                return False
+            except Exception as e:
+                print(f"Generic authentication error: {str(e)}")
+                return False
+
+
+    async def create_event(self, subject: str, start_datetime: str, duration_minutes: int = 60, description: str | None = None, 
                    location: str | None = None, owner_id: str | None = None, 
                    what_id: str | None = None, who_id: str | None = None) -> str | None:
         """Create an event in Salesforce and return the event ID if successful
@@ -90,8 +117,8 @@ class SalesforceApiClient:
         Returns:
             The ID of the created event if successful, None otherwise
         """
-        if not self._access_token or not self._instance_url:
-            print("Error: Not authenticated. Call authenticate() first.")
+        if not self.is_authenticated:
+            print("Error: Not authenticated. Call await self.authenticate() first.")
             return None
         
         if not subject or not start_datetime:
@@ -134,25 +161,26 @@ class SalesforceApiClient:
         url_creation_event = f"{self._instance_url}/services/data/{self._version_api}/sobjects/Event/"
         
         # Send request
-        try:
-            resp_event = requests.post(url_creation_event, headers=headers, data=json.dumps(payload_event))
-            
-            if resp_event.status_code == 201:
-                event_id = resp_event.json().get('id')
-                print("Event created successfully!")
-                print(f"ID: {event_id}")
-                print(f"{self._instance_url}/lightning/r/Event/{event_id}/view")
-                return event_id
-            else:
-                print(f"Error while creating the Event: {resp_event.status_code}")
-                try:
-                    print(json.dumps(resp_event.json(), indent=2, ensure_ascii=False))
-                except:
-                    print(resp_event.text)
+        async with httpx.AsyncClient() as client:
+            try:
+                resp_event = await client.post(url_creation_event, headers=headers, data=json.dumps(payload_event))
+                
+                if resp_event.status_code == 201:
+                    event_id = resp_event.json().get('id')
+                    print("Event created successfully!")
+                    print(f"ID: {event_id}")
+                    print(f"{self._instance_url}/lightning/r/Event/{event_id}/view")
+                    return event_id
+                else:
+                    print(f"Error while creating the Event: {resp_event.status_code}")
+                    try:
+                        print(json.dumps(resp_event.json(), indent=2, ensure_ascii=False))
+                    except:
+                        print(resp_event.text)
+                    return None
+            except Exception as e:
+                print(f"Error creating event: {str(e)}")
                 return None
-        except Exception as e:
-            print(f"Error creating event: {str(e)}")
-            return None
 
     def _calculate_end_datetime(self, start_datetime: str, duration_minutes: int) -> str | None:
         try:
@@ -168,7 +196,7 @@ class SalesforceApiClient:
             print("Make sure start_datetime is in ISO format (e.g., '2025-05-20T14:00:00Z')")
             return None
             
-    def get_events(self, start_datetime: str, end_datetime: str, owner_id: str | None = None) -> list | None:
+    async def get_events(self, start_datetime: str, end_datetime: str, owner_id: str | None = None) -> list | None:
         """Get events from Salesforce calendar between specified start and end datetimes
         
         Args:
@@ -180,7 +208,7 @@ class SalesforceApiClient:
             List of events if successful, None otherwise
         """
         if not self._access_token or not self._instance_url:
-            print("Error: Not authenticated. Call authenticate() first.")
+            print("Error: Not authenticated. Call await self.authenticate() first.")
             return None
             
         print("Retrieving events...")
@@ -203,49 +231,50 @@ class SalesforceApiClient:
         query += "ORDER BY StartDateTime ASC "
         
         # URL encode the query
-        encoded_query = requests.utils.quote(query)
+        encoded_query = urllib.parse.quote(query)
         print(f"SOQL Query: {query}")
         
         # Create query URL
         url_query = f"{self._instance_url}/services/data/{self._version_api}/query/?q={encoded_query}"
         
         # Send request
-        try:
-            resp = requests.get(url_query, headers=headers)
-            
-            if resp.status_code == 200:
-                data = resp.json()
-                events = data.get('records', [])
-                total_size = data.get('totalSize', 0)
-                print(f"Retrieved {total_size} events")
+        async with httpx.AsyncClient() as client:
+            try:
+                resp = await client.get(url_query, headers=headers)
                 
-                # Handle pagination if needed
-                next_records_url = data.get('nextRecordsUrl')
-                while next_records_url:
-                    next_url = f"{self._instance_url}{next_records_url}"
-                    resp = requests.get(next_url, headers=headers)
-                    if resp.status_code == 200:
-                        next_data = resp.json()
-                        events.extend(next_data.get('records', []))
-                        next_records_url = next_data.get('nextRecordsUrl')
-                    else:
-                        print(f"Error retrieving additional events: {resp.status_code}")
-                        break
-                return events
-            else:
-                print(f"Error retrieving events: {resp.status_code}")
-                try:
-                    print(json.dumps(resp.json(), indent=2, ensure_ascii=False))
-                except:
-                    print(resp.text)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    events = data.get('records', [])
+                    total_size = data.get('totalSize', 0)
+                    print(f"Retrieved {total_size} events")
+                    
+                    # Handle pagination if needed
+                    next_records_url = data.get('nextRecordsUrl')
+                    while next_records_url:
+                        next_url = f"{self._instance_url}{next_records_url}"
+                        resp = await client.get(next_url, headers=headers)
+                        if resp.status_code == 200:
+                            next_data = resp.json()
+                            events.extend(next_data.get('records', []))
+                            next_records_url = next_data.get('nextRecordsUrl')
+                        else:
+                            print(f"Error retrieving additional events: {resp.status_code}")
+                            break
+                    return events
+                else:
+                    print(f"Error retrieving events: {resp.status_code}")
+                    try:
+                        print(json.dumps(resp.json(), indent=2, ensure_ascii=False))
+                    except:
+                        print(resp.text)
+                    return None
+            except Exception as e:
+                print(f"Error retrieving events: {str(e)}")
                 return None
-        except Exception as e:
-            print(f"Error retrieving events: {str(e)}")
-            return None
 
-    def get_person_by_phone(self, phone_number: str) -> dict | None:
+    async def get_person_by_phone(self, phone_number: str) -> dict | None:
         """
-        Retrieve a Contact or Lead from Salesforce by phone number.
+        Retrieve a Contact or Lead from Salesforce by phone number (asynchronous).
         Searches Contacts first, then non-converted Leads if no Contact is found.
 
         Args:
@@ -256,7 +285,7 @@ class SalesforceApiClient:
             or None if no matching record is found.
         """
         if not self._access_token or not self._instance_url:
-            print("Error: Not authenticated. Call authenticate() first.")
+            print("Error: Not authenticated. Call await self.authenticate() first.")
             return None
 
         headers = {
@@ -264,68 +293,74 @@ class SalesforceApiClient:
             'Content-Type': 'application/json'
         }
 
-        # --- Try to find a Contact ---
-        contact_query = (
-            "SELECT Id, FirstName, LastName, Email, Phone, MobilePhone, Account.Id, Account.Name, Owner.Id, Owner.Name "
-            "FROM Contact "
-            f"WHERE Phone = '{phone_number}' OR MobilePhone = '{phone_number}' "
-            "LIMIT 1"
-        )
-        print(f"SOQL Query (Contact): {contact_query}")
-        encoded_contact_query = requests.utils.quote(contact_query)
-        url_contact_query = f"{self._instance_url}/services/data/{self._version_api}/query/?q={encoded_contact_query}"
+        # For long-running apps, consider creating httpx.AsyncClient once and reusing it.
+        async with httpx.AsyncClient() as client:
+            # --- Try to find a Contact ---
+            contact_query = (
+                "SELECT Id, FirstName, LastName, Email, Phone, MobilePhone, Account.Id, Account.Name, Owner.Id, Owner.Name "
+                "FROM Contact "
+                f"WHERE Phone = '{phone_number}' OR MobilePhone = '{phone_number}' "
+                "LIMIT 1"
+            )
+            print(f"SOQL Query (Contact): {contact_query}")
+            encoded_contact_query = urllib.parse.quote(contact_query)
+            url_contact_query = f"{self._instance_url}/services/data/{self._version_api}/query/?q={encoded_contact_query}"
 
-        try:
-            resp = requests.get(url_contact_query, headers=headers)
-            resp.raise_for_status() 
-            data = resp.json()
-            records = data.get('records', [])
-            if records:
-                contact_data = records[0]
-                print(f"Found Contact: {contact_data.get('Id')} - {contact_data.get('FirstName')} {contact_data.get('LastName')}")
-                return {'type': 'Contact', 'data': contact_data}
-        except requests.exceptions.HTTPError as http_err:
-            print(f"HTTP error querying Contact: {http_err} - {resp.status_code}")
             try:
-                print(json.dumps(resp.json(), indent=2, ensure_ascii=False))
-            except json.JSONDecodeError:
-                print(resp.text)
-        except Exception as e:
-            print(f"Exception querying Contact: {str(e)}")
+                resp = await client.get(url_contact_query, headers=headers)
+                resp.raise_for_status()
+                data = resp.json()
+                records = data.get('records', [])
+                if records:
+                    contact_data = records[0]
+                    print(f"Found Contact: {contact_data.get('Id')} - {contact_data.get('FirstName')} {contact_data.get('LastName')}")
+                    return {'type': 'Contact', 'data': contact_data}
+            except httpx.HTTPStatusError as http_err:
+                print(f"HTTP error querying Contact: {http_err} - Status: {http_err.response.status_code}")
+                try:
+                    print(json.dumps(http_err.response.json(), indent=2, ensure_ascii=False))
+                except json.JSONDecodeError:
+                    print(http_err.response.text)
+            except httpx.RequestError as req_err:
+                print(f"Request error querying Contact: {str(req_err)}")
+            except Exception as e:
+                print(f"Generic exception querying Contact: {str(e)}")
 
-        # --- If no Contact found, try to find a Lead ---
-        lead_query = (
-            "SELECT Id, FirstName, LastName, Email, Phone, MobilePhone, Company, Owner.Id, Owner.Name, Status, IsConverted "
-            "FROM Lead "
-            f"WHERE (Phone = '{phone_number}' OR MobilePhone = '{phone_number}') AND IsConverted = false "
-            "LIMIT 1"
-        )
-        print(f"SOQL Query (Lead): {lead_query}")
-        encoded_lead_query = requests.utils.quote(lead_query)
-        url_lead_query = f"{self._instance_url}/services/data/{self._version_api}/query/?q={encoded_lead_query}"
+            # --- If no Contact found, try to find a Lead ---
+            lead_query = (
+                "SELECT Id, FirstName, LastName, Email, Phone, MobilePhone, Company, Owner.Id, Owner.Name, Status, IsConverted "
+                "FROM Lead "
+                f"WHERE (Phone = '{phone_number}' OR MobilePhone = '{phone_number}') AND IsConverted = false "
+                "LIMIT 1"
+            )
+            print(f"SOQL Query (Lead): {lead_query}")
+            encoded_lead_query = urllib.parse.quote(lead_query)
+            url_lead_query = f"{self._instance_url}/services/data/{self._version_api}/query/?q={encoded_lead_query}"
 
-        try:
-            resp = requests.get(url_lead_query, headers=headers)
-            resp.raise_for_status()
-            data = resp.json()
-            records = data.get('records', [])
-            if records:
-                lead_data = records[0]
-                print(f"Found Lead: {lead_data.get('Id')} - {lead_data.get('FirstName')} {lead_data.get('LastName')}")
-                return {'type': 'Lead', 'data': lead_data}
-        except requests.exceptions.HTTPError as http_err:
-            print(f"HTTP error querying Lead: {http_err} - {resp.status_code}")
             try:
-                print(json.dumps(resp.json(), indent=2, ensure_ascii=False))
-            except json.JSONDecodeError:
-                print(resp.text)
-        except Exception as e:
-            print(f"Exception querying Lead: {str(e)}")
+                resp = await client.get(url_lead_query, headers=headers)
+                resp.raise_for_status()
+                data = resp.json()
+                records = data.get('records', [])
+                if records:
+                    lead_data = records[0]
+                    print(f"Found Lead: {lead_data.get('Id')} - {lead_data.get('FirstName')} {lead_data.get('LastName')}")
+                    return {'type': 'Lead', 'data': lead_data}
+            except httpx.HTTPStatusError as http_err:
+                print(f"HTTP error querying Lead: {http_err} - Status: {http_err.response.status_code}")
+                try:
+                    print(json.dumps(http_err.response.json(), indent=2, ensure_ascii=False))
+                except json.JSONDecodeError:
+                    print(http_err.response.text)
+            except httpx.RequestError as req_err:
+                print(f"Request error querying Lead: {str(req_err)}")
+            except Exception as e:
+                print(f"Generic exception querying Lead: {str(e)}")
             
-        print(f"No Contact or non-converted Lead found for phone number: {phone_number}")
-        return None
+            print(f"No Contact or non-converted Lead found for phone number: {phone_number}")
+            return None
 
-    def discover_database(self, sobjects_to_describe: list[str] | None = None) -> dict | None:
+    async def discover_database(self, sobjects_to_describe: list[str] | None = None) -> dict | None:
         """
         Discovers the schema of Salesforce SObjects.
 

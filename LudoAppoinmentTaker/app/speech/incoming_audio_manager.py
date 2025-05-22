@@ -23,6 +23,7 @@ from app.speech.outgoing_audio_manager import OutgoingAudioManager
 from app.speech.text_to_speech import TextToSpeechProvider
 from app.speech.speech_to_text import SpeechToTextProvider
 from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
+from app.agents.agents_graph import AgentsGraph
 
 class IncomingAudioManager:
     """Audio processing utilities for improving speech recognition quality and handling Twilio events"""
@@ -49,7 +50,7 @@ class IncomingAudioManager:
         self.conversation_id = None
         self.stream_states = {}
         self.phones = {}  # Map call_sid to phone numbers
-        self.compiled_graph = None
+        self.compiled_graph : AgentsGraph = None
         self.openai_client = None
         self.stt_provider = stt_provider
         self.rag_interrupt_flag = {"interrupted": False}
@@ -197,18 +198,7 @@ class IncomingAudioManager:
         
         self.audio_stream_manager.update_stream_sid(stream_sid)
         self.logger.info(f"Updated OutgoingAudioManager with stream SID: {stream_sid}")
-        
-        # Define the welcome message
-        welcome_text = """\
-            Bonjour,
-            Je suis Stud'ia, l'assistante virtuelle de Studi, je suis là pour t'aider en l'absence de nos conseillers.
-            Je peux t'aider à trouver ta formation, ou simplement prendre rendez-vous avec un conseiller ?"""
-        #welcome_text = "Salut !"
-
-        # Play welcome message with enhanced text-to-speech
-        self.logger.info(f"Playing welcome message with voice ID: {self.VOICE_ID}")
-        await self.audio_stream_manager.enqueue_text(welcome_text)
-        
+                
         # Initialize conversation state for this stream
         phone_number = self.phones.get(call_sid, "Unknown")
         
@@ -220,26 +210,22 @@ class IncomingAudioManager:
             "history": [],
             "agent_scratchpad": {}
         }
-        # Now, initialize the user and conversation backend (this might take some time)
-        self.conversation_id = await self.init_user_and_new_conversation_upon_phone_call_async(phone_number, call_sid)
         
         # Store the initial state for this stream (used by graph and other handlers)
         self.stream_states[stream_sid] = initial_state
         
         try:
-            # Log the welcome message to our backend records
-            await self.studi_rag_inference_api_client.add_external_ai_message_to_conversation(self.conversation_id, welcome_text)
             
-            # # Then invoke the graph with initial state to get the AI-generated welcome message
-            # updated_state = await self.compiled_graph.ainvoke(initial_state)
-            # self.stream_states[stream_sid] = updated_state
+            # Then invoke the graph with initial state to get the AI-generated welcome message
+            updated_state = await self.compiled_graph.ainvoke(initial_state)
+            self.stream_states[stream_sid] = updated_state
             
-            # # If there's an AI message from the graph, send it after the welcome message
-            # if updated_state.get('history') and updated_state['history'][0][0] == 'AI':
-            #     ai_message = updated_state['history'][0][1]
-            #     if ai_message and ai_message.strip() != welcome_text.strip():
-            #         await self.speak_and_send_text(ai_message)
-            #         await self.studi_rag_inference_api_client.add_external_ai_message_to_conversation(self.conversation_id, ai_message)
+            # If there's an AI message from the graph, send it after the welcome message
+            if updated_state.get('history') and updated_state['history'][0][0] == 'AI':
+                ai_message = updated_state['history'][0][1]
+                if ai_message and ai_message.strip() != welcome_text.strip():
+                    await self.speak_and_send_text(ai_message)
+                    await self.studi_rag_inference_api_client.add_external_ai_message_to_conversation(self.conversation_id, ai_message)
         
         except Exception as e:
             self.logger.error(f"Error in initial graph invocation: {e}", exc_info=True)

@@ -10,8 +10,10 @@ from fastapi import WebSocket, WebSocketDisconnect
 from app.speech.text_to_speech import get_text_to_speech_provider
 from app.speech.speech_to_text import get_speech_to_text_provider
 from app.agents.agents_graph import AgentsGraph
-from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
 from app.speech.incoming_audio_manager import IncomingAudioManager
+#
+from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
+from app.api_client.salesforce_api_client import SalesforceApiClient
 
 class PhoneCallWebsocketEventsHandler:
     # Class variables shared across instances
@@ -81,6 +83,8 @@ class PhoneCallWebsocketEventsHandler:
         self.stt_provider = get_speech_to_text_provider(self.TEMP_DIR, provider_name="hybrid", language_code="fr-FR", frame_rate=self.frame_rate)
         
         self.studi_rag_inference_api_client = StudiRAGInferenceApiClient()
+        self.salesforce_api_client = SalesforceApiClient()
+        
         self.audio_processing = IncomingAudioManager(
                                     websocket=self.websocket, 
                                     studi_rag_inference_api_client=self.studi_rag_inference_api_client, 
@@ -96,7 +100,7 @@ class PhoneCallWebsocketEventsHandler:
         if self.openai_client is None:
             self.openai_client = OpenAI(api_key=self.OPENAI_API_KEY)
 
-        self.compiled_graph = AgentsGraph().graph
+        self.compiled_graph = AgentsGraph(self.studi_rag_inference_api_client, self.salesforce_api_client).graph
 
         self.logger.info("IncomingPhoneCallHandler initialized successfully.")
 

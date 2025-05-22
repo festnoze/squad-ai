@@ -1,20 +1,28 @@
 import logging
 import os
 from langgraph.graph import StateGraph, END
-#
+
+# Models
 from app.agents.conversation_state_model import ConversationState
 
-# Safe import for agents
+# Agents
 from agents.lead_agent import LeadAgent
 from agents.calendar_agent import CalendarAgent
 from agents.sf_agent import SFAgent
 
+# Clients
+from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
+from app.api_client.salesforce_api_client import SalesforceApiClient
+
 class AgentsGraph:
-    def __init__(self):
+    def __init__(self, studi_rag_inference_api_client : StudiRAGInferenceApiClient, salesforce_api_client : SalesforceApiClient):
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
-
         self.logger.info("Agents graph initialization")
+        
+        self.studi_rag_inference_api_client = studi_rag_inference_api_client
+        self.salesforce_api_client = salesforce_api_client
+        
         lid_config_file_path = os.path.join(os.path.dirname(__file__), 'configs', 'lid_api_config.yaml')
         self.lead_agent_instance = LeadAgent(config_path=lid_config_file_path)
         self.logger.info(f"Initialize Lead Agent succeed with config: {lid_config_file_path}")
@@ -32,12 +40,25 @@ class AgentsGraph:
         self.logger.info("Agents graph ongoing creation.")
 
         # Add nodes
-        workflow.add_node("route_initial_query", self.route_initial_query)
+        workflow.add_node("router", self.router)
+        workflow.add_node("initialization", self.initialization)
         workflow.add_node("lead_agent", self.lead_agent_node)
         workflow.add_node("sf_agent", self.sf_agent_node)
         workflow.add_node("calendar_agent", self.calendar_agent_node)
 
-        workflow.set_entry_point("route_initial_query")
+        workflow.set_entry_point("router")
+
+        workflow.add_conditional_edges(
+            "router",
+            self.decide_next_step,
+            {
+                "initialization": "initialization",
+                "lead_agent": "lead_agent",
+                "sf_agent": "sf_agent",
+                "calendar_agent": "calendar_agent",
+                END: END
+            }
+        )
 
         # Define transitions
         # After each agent runs, decide where to go next (or end)
@@ -45,13 +66,12 @@ class AgentsGraph:
             "lead_agent",
             self.decide_next_step,
             {
-                "calendar_agent": "calendar_agent", # Route if needed
-                "sf_agent": "sf_agent", # Route if needed
-                END: END # Route to END based on decide_next_step logic
+                "calendar_agent": "calendar_agent",
+                "sf_agent": "sf_agent",
+                END: END
             }
         )
 
-        # Compile the graph
         # Add checkpointer if state needs to be persisted (e.g., using SQLite)
         # checkpointer = MemorySaver() # Example using in-memory checkpointer
         # app_graph = workflow.compile(checkpointer=checkpointer)
@@ -60,35 +80,83 @@ class AgentsGraph:
         self.logger.info("Agents graph compiled successfully.")
         return app_graph
 
-    async def route_initial_query(self, state: ConversationState) -> dict:
+    async def router(self, state: ConversationState) -> dict:
+        if not state.get('agent_scratchpad', {}).get('conversation_id') or not state.get('agent_scratchpad', {}).get('user_input'):
+            return {"next": "initialization"}
+        elif not state.get('agent_scratchpad', {}).get('sf_account_info'):
+            return {"next": "sf_agent"}
+        elif not state.get('agent_scratchpad', {}).get('lead_extracted_info'):
+            return {"next": "lead_agent"}
+        elif not state.get('agent_scratchpad', {}).get('calendar_extracted_info'):
+            return {"next": "calendar_agent"}
+        else:
+            return {"next": "lead_agent"}
+
+    async def initialize_backend_conversation(self, state: ConversationState) -> dict:
+        if not state.get('agent_scratchpad', {}).get('conversation_id'): 
+            self.logger.info(f"Initializing conversation for {phone_number}")     
+            # Retrieve or create the user and a new conversation into the backend API (this might take some time)
+            conversation_id = await self.init_user_and_new_conversation_upon_phone_call_async(phone_number, call_sid)
+            
+            # Log the welcome message to our backend records
+            
+            # Define the welcome message
+            welcome_text = """\
+                Bonjour, je suis Stud'ia, l'assistante virtuelle de Studi. Je suis là pour t'aider en l'absence de nos conseillers.
+                Je peux t'aider à explorer nos formations. Sinon, je peux prendre un rendez-vous avec un conseiller pour toi."""
+            #welcome_text = "Salut !"
+            await self.studi_rag_inference_api_client.add_external_ai_message_to_conversation(conversation_id, welcome_text)
+
+            if state.get('agent_scratchpad') is None: state['agent_scratchpad'] = {}
+            state['agent_scratchpad']['conversation_id'] = conversation_id
+            self.logger.info(f"[{call_sid}] Stored conversation_id: {conversation_id} in agent_scratchpad")
+
+            self.logger.info(f"[{call_sid}] Routing initial query: {state.get('user_input', '')}")
+            return {"next": "initialization"}
+    
+    async def retrieve_saleforce_account_info(self, state: ConversationState) -> dict:
+        if not state.get('agent_scratchpad', {}).get('sf_account_info'):
+            self.logger.info(f"Initializing SF Agent")
+            call_sid = state.get('call_sid', 'N/A')
+            phone_number = state.get('caller_phone', 'N/A')
+            sf_account_info = self.salesforce_api_client.get_person_by_phone(phone_number)
+            if sf_account_info:
+                state['agent_scratchpad']['sf_account_info'] = sf_account_info
+                self.logger.info(f"[{call_sid}] Stored sf_account_info: {sf_account_info} in agent_scratchpad")
+            return {"next": "sf_agent"}
+    
+    async def initialization(self, state: ConversationState) -> dict:
         """Determines the first agent to handle the query based on the conversation state."""
         call_sid = state.get('call_sid', 'N/A')
-        self.logger.info(f"[{call_sid}] Routing initial query: {state.get('user_input', '')}")
+        phone_number = state.get('caller_phone', 'N/A')
+
         
-        # Create a dictionary for the next node
-        next_node = {}
+
+        if not state.get('agent_scratchpad', {}).get('sf_account_info'):
+            self.logger.info(f"Initializing SF Agent")
+            return {"next": "sf_agent"}
         
+        if not state.get('agent_scratchpad', {}).get('user_input'):
+            return {"next": "END"}
+
         # Check if this is a returning user with SF info
         if state.get('agent_scratchpad', {}).get('sf_account_info'):
             self.logger.info(f"[{call_sid}] Routing to calendar_agent (returning user)")
-            next_node = {"next": "calendar_agent"}
-        
-        # If we have partial lead information, continue with Lead Agent
-        elif state.get('agent_scratchpad', {}).get('lead_extracted_info'):
-            self.logger.info(f"[{call_sid}] Routing to lead_agent (continuing lead collection)")
-            next_node = {"next": "lead_agent"}
-        
-        # Check phone number to route to SF lookup
-        elif state.get('caller_phone'):
-            self.logger.info(f"[{call_sid}] Routing to sf_agent for account lookup")
-            next_node = {"next": "sf_agent"}
-        
-        # Default: Start with Lead Agent
-        else:
-            self.logger.info(f"[{call_sid}] Default routing to lead_agent")
-            next_node = {"next": "lead_agent"}
+            return {"next": "calendar_agent"}
             
-        return next_node
+        # If we have partial lead information, continue with Lead Agent
+        if state.get('agent_scratchpad', {}).get('lead_extracted_info'):
+            self.logger.info(f"[{call_sid}] Routing to lead_agent (continuing lead collection)")
+            return {"next": "lead_agent"}
+            
+        # Check phone number to route to SF lookup
+        if state.get('caller_phone'):
+            self.logger.info(f"[{call_sid}] Routing to sf_agent for account lookup")
+            return {"next": "sf_agent"}
+            
+        # Default: Start with Lead Agent
+        self.logger.info(f"[{call_sid}] Default routing to lead_agent")
+        return {"next": "lead_agent"}
 
     async def lead_agent_node(self, state: ConversationState) -> dict:
         """Handles lead qualification and information gathering using LeadAgent."""
