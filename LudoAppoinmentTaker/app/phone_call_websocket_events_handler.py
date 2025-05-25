@@ -97,21 +97,23 @@ class PhoneCallWebsocketEventsHandler:
                                     channels=self.channels
                                 )
 
+        self.compiled_graph = AgentsGraph(
+                                    self.outgoing_audio_processing,
+                                    self.studi_rag_inference_api_client,
+                                    self.salesforce_api_client
+                                ).graph
+
         self.incoming_audio_processing = IncomingAudioManager(
                                     outgoing_audio_processing=self.outgoing_audio_processing,
-                                    studi_rag_inference_api_client=self.studi_rag_inference_api_client,
-                                    salesforce_api_client=self.salesforce_api_client,
-                                    tts_provider=self.tts_provider,
+                                    stt_provider=self.stt_provider,
+                                    compiled_graph=self.compiled_graph,
                                     sample_width=self.sample_width,
                                     frame_rate=self.frame_rate,
                                     vad_aggressiveness=3
                                 )
 
-        # Initialize API clients
         if self.openai_client is None:
             self.openai_client = OpenAI(api_key=self.OPENAI_API_KEY)
-
-        self.compiled_graph = AgentsGraph(self.studi_rag_inference_api_client, self.salesforce_api_client).graph
 
         self.logger.info("IncomingPhoneCallHandler initialized successfully.")
 
@@ -120,7 +122,7 @@ class PhoneCallWebsocketEventsHandler:
         self.incoming_audio_processing.set_websocket(websocket)
         self.outgoing_audio_processing.set_websocket(websocket)
 
-    async def handle_websocket_events_async(self, calling_phone_number: str, call_sid: str) -> None:
+    async def handle_all_websocket_receieved_events_async(self, calling_phone_number: str, call_sid: str) -> None:
         """Main method: handle a full audio conversation with I/O Twilio streams on a WebSocket."""
         if not self.websocket:
             self.logger.error("WebSocket not set, cannot handle WebSocket connection.")

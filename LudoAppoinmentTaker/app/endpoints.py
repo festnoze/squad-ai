@@ -67,7 +67,7 @@ async def websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid:
     logger.info(f"WebSocket connection accepted from: {ws.client.host}:{ws.client.port}")
     try:
         call_handler = phone_call_websocket_events_handler_factory.get_new_phone_call_websocket_events_handler(websocket=ws)
-        await call_handler.handle_websocket_events_async(calling_phone_number, call_sid)
+        await call_handler.handle_all_websocket_receieved_events_async(calling_phone_number, call_sid)
     except WebSocketDisconnect:
         logger.info(f"WebSocket disconnected: {ws.client.host}:{ws.client.port}")
     except Exception as e:

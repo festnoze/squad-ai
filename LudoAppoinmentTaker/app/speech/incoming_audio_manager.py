@@ -8,22 +8,13 @@ import webrtcvad
 import audioop
 import time
 import uuid
-from uuid import UUID
-from datetime import datetime
 from pydub import AudioSegment
 from pydub.effects import normalize
-from openai import OpenAI
 from fastapi import WebSocket
 #
-from app.api_client.request_models.user_request_model import UserRequestModel, DeviceInfoRequestModel
-from app.api_client.request_models.conversation_request_model import ConversationRequestModel
-from app.api_client.request_models.query_asking_request_model import QueryAskingRequestModel
 from app.agents.conversation_state_model import ConversationState
 from app.speech.outgoing_audio_manager import OutgoingAudioManager
-from app.speech.text_to_speech import TextToSpeechProvider
 from app.speech.speech_to_text import SpeechToTextProvider
-from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
-from app.api_client.salesforce_api_client import SalesforceApiClient
 from app.agents.agents_graph import AgentsGraph
 
 class IncomingAudioManager:
@@ -35,26 +26,24 @@ class IncomingAudioManager:
     # Temporary directory for audio files
     TEMP_DIR = "./static/audio"
     
-    def __init__(self, outgoing_audio_processing: OutgoingAudioManager, studi_rag_inference_api_client : StudiRAGInferenceApiClient, salesforce_api_client : SalesforceApiClient, tts_provider: TextToSpeechProvider, sample_width=2, frame_rate=8000, channels=1, vad_aggressiveness=3):
+    def __init__(self, stt_provider: SpeechToTextProvider,outgoing_audio_processing: OutgoingAudioManager, compiled_graph : AgentsGraph, sample_width=2, frame_rate=8000, channels=1, vad_aggressiveness=3):
         self.logger = logging.getLogger(__name__)
-        self.studi_rag_inference_api_client = studi_rag_inference_api_client
-        self.salesforce_api_client = salesforce_api_client
+        self.stt_provider : SpeechToTextProvider = stt_provider
         self.outgoing_audio_processing : OutgoingAudioManager = outgoing_audio_processing
         self.sample_width = sample_width
         self.frame_rate = frame_rate
         self.channels = channels
         self.vad = webrtcvad.Vad(vad_aggressiveness)
         self.logger.info(f"Initialized IncomingAudioProcessing with VAD aggressiveness {vad_aggressiveness}")
-        
+        self.stream_sid = None
+
         # State tracking
         self.start_time = None
-        self.current_stream = None
         self.conversation_id = None
         self.stream_states = {}
         self.phones = {}  # Map call_sid to phone numbers
-        self.compiled_graph : AgentsGraph = None
+        self.compiled_graph : AgentsGraph = compiled_graph
         self.openai_client = None
-        self.stt_provider = stt_provider
         self.rag_interrupt_flag = {"interrupted": False}
         self.is_speaking = False
         
@@ -73,7 +62,9 @@ class IncomingAudioManager:
         self.websocket = websocket
 
     def set_stream_sid(self, stream_sid: str) -> None:
-        self.outgoing_audio_processing.update_stream_sid(stream_sid)
+        self.stream_sid = stream_sid
+        self.outgoing_audio_processing.update_stream_sid(stream_sid)        
+        self.logger.info(f"Updated Incoming / Outgoing AudioManagers to stream SID: {stream_sid}")
     
     def is_speech(self, audio_chunk: bytes, frame_duration_ms=30) -> bool:
         """
@@ -185,12 +176,7 @@ class IncomingAudioManager:
         
         self.start_time = time.time()
         self.logger.info(f"Call started - CallSid: {call_sid}, StreamSid: {stream_sid}")
-        
-        # Set the current stream so the audio functions know which stream to use
-        self.current_stream = stream_sid
-        
-        self.outgoing_audio_processing.update_stream_sid(stream_sid)
-        self.logger.info(f"Updated OutgoingAudioManager with stream SID: {stream_sid}")
+        self.set_stream_sid(stream_sid)
                 
         # Initialize conversation state for this stream
         phone_number = self.phones.get(call_sid, "Unknown")
@@ -212,13 +198,13 @@ class IncomingAudioManager:
             updated_state = await self.compiled_graph.ainvoke(initial_state)
             self.stream_states[stream_sid] = updated_state
             
-            # If there's an AI message from the graph, send it after the welcome message
-            if updated_state.get('history') and updated_state['history'][0][0] == 'AI':
-                ai_message = updated_state['history'][0][1]
-                first_word = ai_message.split()[0] if ai_message else ""
-                if ai_message and ai_message != first_word:
-                    await self.outgoing_audio_processing.enqueue_text(ai_message)
-                    await self.studi_rag_inference_api_client.add_external_ai_message_to_conversation(self.conversation_id, ai_message)
+            # # If there's an AI message from the graph, send it after the welcome message
+            # if updated_state.get('history') and updated_state['history'][0][0] == 'AI':
+            #     ai_message = updated_state['history'][0][1]
+            #     first_word = ai_message.split()[0] if ai_message else ""
+            #     if ai_message and ai_message != first_word:
+            #         await self.outgoing_audio_processing.enqueue_text(ai_message)
+            #         await self.studi_rag_inference_api_client.add_external_ai_message_to_conversation(self.conversation_id, ai_message)
 
         except Exception as e:
             self.logger.error(f"Error in initial graph invocation: {e}", exc_info=True)
@@ -226,7 +212,7 @@ class IncomingAudioManager:
         return stream_sid
 
     async def handle_incoming_websocket_media_event_async(self, audio_data: dict) -> None:        
-        if not self.current_stream:
+        if not self.stream_sid:
             self.logger.error("/!\\ 'media event' received before the 'start event'")
             return
         
@@ -270,7 +256,7 @@ class IncomingAudioManager:
             # Calculate duration
             chunk_duration_ms = (len(chunk) / self.sample_width) / self.frame_rate * 1000
             self.consecutive_silence_duration_ms += chunk_duration_ms
-            msg = f"\rSilent chunk - Duration: {self.consecutive_silence_duration_ms:.1f}ms - Speech/noise: {speech_to_noise_ratio:04d} (size: {len(chunk)} bytes)."
+            msg = f"\rConsecutive silent chunks - Duration: {self.consecutive_silence_duration_ms:.1f}ms - Speech/noise: {speech_to_noise_ratio:04d} (size: {len(chunk)} bytes)."
             print(msg, end="", flush=True)
 
         # Add speech chunk to buffer
@@ -307,12 +293,8 @@ class IncomingAudioManager:
             if user_query_transcript is None:
                 return
             self.logger.info(f"Sending incoming user query to agents graph. Transcription: '{user_query_transcript}'")  
-                        
-            # 5. Give to the user a feedback of the transcript for acknowledgment
-            feedback_text = f"Très bien. Vous avez demandé : \"{user_query_transcript}\". Un instant, j'analyse votre demande."
-            await self.outgoing_audio_processing.enqueue_text(feedback_text)
 
-            # 6. Send the user query to the agents graph
+            # 5. Send the user query to the agents graph
             await self.send_user_query_to_agents_graph_async(user_query_transcript)
 
         return
@@ -435,9 +417,9 @@ class IncomingAudioManager:
         file_name = f"{uuid.uuid4()}.wav"
         with wave.open(os.path.join(self.TEMP_DIR, file_name), "wb") as wav_file:
             wav_file.setnchannels(1)  # mono
-            wav_file.setsampwidth(self.sample_width)  # 16-bit
-            wav_file.setframerate(self.frame_rate)
-            wav_file.writeframes(audio_data)
+            wav_file.setsampwidth(self.sample_width)  # 8 or 16-bit
+            wav_file.setframerate(self.frame_rate) # 8kHz?
+            wav_file.writeframes(audio_data) # PCM data
         return file_name
             
     async def update_is_speaking_state_async(self):

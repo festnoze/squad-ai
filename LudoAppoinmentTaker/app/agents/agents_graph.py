@@ -19,15 +19,18 @@ from agents.sf_agent import SFAgent
 # Clients
 from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
 from app.api_client.salesforce_api_client import SalesforceApiClient
+from app.speech.outgoing_audio_manager import OutgoingAudioManager
 
 class AgentsGraph:
-    def __init__(self, studi_rag_inference_api_client : StudiRAGInferenceApiClient, salesforce_api_client : SalesforceApiClient):
+    def __init__(self, outgoing_audio_processing : OutgoingAudioManager, studi_rag_inference_api_client : StudiRAGInferenceApiClient, salesforce_api_client : SalesforceApiClient):
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
         self.logger.info("Agents graph initialization")
         
         self.studi_rag_inference_api_client = studi_rag_inference_api_client
         self.salesforce_api_client = salesforce_api_client
+
+        self.outgoing_audio_processing = outgoing_audio_processing
         
         lid_config_file_path = os.path.join(os.path.dirname(__file__), 'configs', 'lid_api_config.yaml')
         self.lead_agent_instance = LeadAgent(config_path=lid_config_file_path)
@@ -51,7 +54,7 @@ class AgentsGraph:
         workflow.add_node("lead_agent", self.lead_agent_node)
         workflow.add_node("sf_agent", self.sf_agent_node)
         workflow.add_node("calendar_agent", self.calendar_agent_node)
-        workflow.add_node("rag_course_agent", self.rag_course_agent_node)
+        workflow.add_node("rag_course_agent", self.query_rag_api_about_trainings_agent_node)
 
         workflow.set_entry_point("router")
 
@@ -91,6 +94,11 @@ class AgentsGraph:
     async def router(self, state: ConversationState) -> dict:
         if not state.get('agent_scratchpad', None):
             state['agent_scratchpad'] = {}
+        if state.get('user_input', None):
+            user_input = state.get('user_input')
+            feedback_text = f"Très bien. Vous avez demandé : \"{user_input}\". Un instant, j'analyse votre demande."
+            await self.outgoing_audio_processing.enqueue_text(feedback_text)
+
         if not state.get('agent_scratchpad', {}).get('conversation_id') or not state.get('agent_scratchpad', None).get('user_input'):
             state['agent_scratchpad']["next_agent_needed"] = "initialization"
         elif not state.get('agent_scratchpad', {}).get('sf_account_info'):
@@ -103,22 +111,24 @@ class AgentsGraph:
             state['agent_scratchpad']["next_agent_needed"] = "initialization"
         return state
 
-    async def initialize_backend_conversation(self, state: ConversationState) -> dict:        
+    async def send_welcome_message_and_init_backend_conversation(self, state: ConversationState) -> dict:        
         self.logger.info(f"Initializing conversation for {state.get('caller_phone')}")     
-        # Retrieve or create the user and a new conversation into the backend API (this might take some time)
-        conversation_id = await self.init_user_and_new_conversation_in_backend_api_async(state.get('caller_phone'), state.get('call_sid'))
         
         welcome_text = """\
             Bonjour, je suis Stud'ia, l'assistante virtuelle de Studi. Je suis là pour t'aider en l'absence de nos conseillers.
             Je peux t'aider à explorer nos formations. Sinon, je peux prendre un rendez-vous avec un conseiller pour toi."""
         #welcome_text = "Salut !"
-        await self.studi_rag_inference_api_client.add_external_ai_message_to_conversation(conversation_id, welcome_text)
+        await self.outgoing_audio_processing.enqueue_text(welcome_text)
 
-        if state.get('agent_scratchpad') is None: state['agent_scratchpad'] = {}
+        # Retrieve or create the user and a new conversation into the backend API & add welcome msg to it.
+        conversation_id = await self.init_user_and_new_conversation_in_backend_api_async(state.get('caller_phone'), state.get('call_sid'))
+        messages = await self.studi_rag_inference_api_client.add_external_ai_message_to_conversation(conversation_id, welcome_text)
+        state['history'] = messages
+        
+        if state.get('agent_scratchpad') is None: 
+            state['agent_scratchpad'] = {}
         state['agent_scratchpad']['conversation_id'] = conversation_id
-        self.logger.info(f"Stored conversation_id: {conversation_id} in agent_scratchpad")
-
-        self.logger.info(f"Routing initial query: {state.get('user_input', '')}")
+        self.logger.info(f"Created conversation of id: {conversation_id}, sent welcome message.")
         return {"next": "initialization"}
       
     async def init_user_and_new_conversation_in_backend_api_async(self, calling_phone_number: str, call_sid: str):
@@ -148,6 +158,7 @@ class AgentsGraph:
         call_sid = state.get('call_sid', 'N/A')
         phone_number = state.get('caller_phone', 'N/A')
         sf_account_info = await self.salesforce_api_client.get_person_by_phone_async(phone_number)
+        leads_info = await self.salesforce_api_client.get_leads_by_details_async(phone_number)
         state['agent_scratchpad']['sf_account_info'] = sf_account_info
         self.logger.info(f"[{call_sid}] Stored sf_account_info: {sf_account_info} in agent_scratchpad")
     
@@ -157,7 +168,7 @@ class AgentsGraph:
         phone_number = state.get('caller_phone', 'N/A')
 
         if not state.get('agent_scratchpad', {}).get('conversation_id') or not state.get('agent_scratchpad', {}).get('sf_account_info'):
-            initialize_task = asyncio.create_task(self.initialize_backend_conversation(state))
+            initialize_task = asyncio.create_task(self.send_welcome_message_and_init_backend_conversation(state))
             salesforce_task = asyncio.create_task(self.retrieve_saleforce_account_info(state))
             await asyncio.gather(initialize_task, salesforce_task)
 
@@ -271,7 +282,7 @@ class AgentsGraph:
             }
 
         except Exception as e:
-            self.logger.error(f"[{call_sid}] Error in Lead Agent node: {e}", exc_info=True)
+            self.logger.error(f"[{call_sid[-4:]}] Error in Lead Agent node: {e}", exc_info=True)
             response_text = "Je rencontre un problème pour traiter votre demande."
             # Include the error in the scratchpad for debugging if needed
             error_scratchpad = state.get('agent_scratchpad', {})
@@ -326,7 +337,7 @@ class AgentsGraph:
             }
             
         except Exception as e:
-            self.logger.error(f"[{call_sid}] Error in SF Agent node: {e}", exc_info=True)
+            self.logger.error(f"[{call_sid[-4:]}] Error in SF Agent node: {e}", exc_info=True)
             # Default to Lead Agent in case of error
             return {
                 "history": [("AI", "Bienvenue chez Studi. Pouvez-vous me laisser vos coordonnées afin qu'un conseiller puisse vous contacter ?")],
@@ -377,7 +388,7 @@ class AgentsGraph:
             }
             
         except Exception as e:
-            self.logger.error(f"[{call_sid}] Error in Calendar Agent node: {e}", exc_info=True)
+            self.logger.error(f"[{call_sid[-4:]}] Error in Calendar Agent node: {e}", exc_info=True)
             return {
                 "history": [("Human", user_input), ("AI", "Je rencontre un problème pour gérer votre rendez-vous. Pourriez-vous réessayer plus tard ?")],
                 "agent_scratchpad": {"error": str(e)}
@@ -386,41 +397,41 @@ class AgentsGraph:
     async def decide_next_step(self, state: ConversationState) -> str:
         """Determines the next node to visit based on the current state."""
         call_sid = state.get('call_sid', 'N/A')
-        self.logger.info(f"[{call_sid}] Deciding next step")
+        self.logger.info(f"[~{call_sid[-4:]}] Deciding next step")
         
         # Check if next agent is explicitly specified
         next_agent = state.get('agent_scratchpad', {}).get('next_agent_needed')
         if next_agent:
-            self.logger.info(f"[{call_sid}] Explicit routing to: {next_agent}")
+            self.logger.info(f"[~{call_sid[-4:]}] Explicit routing to: {next_agent}")
             return next_agent
         
         # Check Lead Agent status
         lead_status = state.get('agent_scratchpad', {}).get('lead_last_status')
         if lead_status:
             if lead_status == "lead_captured":
-                self.logger.info(f"[{call_sid}] Lead captured, ending conversation.")
+                self.logger.info(f"[~{call_sid[-4:]}] Lead captured, ending conversation.")
                 return END
             elif lead_status == "api_error":
-                self.logger.warning(f"[{call_sid}] API error occurred, ending conversation.")
+                self.logger.warning(f"[~{call_sid[-4:]}] API error occurred, ending conversation.")
                 return END
             elif lead_status == "ask_user_for_info":
-                self.logger.info(f"[{call_sid}] Need more lead info from user, ending graph run.")
+                self.logger.info(f"[~{call_sid[-4:]}] Need more lead info from user, ending graph run.")
                 return END
         
         # Check calendar agent status
         if state.get('agent_scratchpad', {}).get('appointment_created'):
-            self.logger.info(f"[{call_sid}] Appointment created, ending conversation.")
+            self.logger.info(f"[~{call_sid[-4:]}] Appointment created, ending conversation.")
             return END
         
         # Default behavior
-        self.logger.info(f"[{call_sid}] No specific routing condition met, ending graph run.")
+        self.logger.info(f"[~{call_sid[-4:]}] No specific routing condition met, ending graph run.")
         return END
 
-    async def rag_course_agent_node(self, state: ConversationState) -> dict:
+    async def query_rag_api_about_trainings_agent_node(self, state: ConversationState) -> dict:
         """Handle the course agent node."""
         call_sid = state.get('call_sid', 'N/A')
         user_query = state.get('user_input', '')
-        self.logger.info(f"> Ongoing RAG query on training course information. User request: '{user_query}' for: [{call_sid}].")
+        self.logger.info(f"> Ongoing RAG query on training course information. User request: '{user_query}' for: [{call_sid[-4:]}].")
 
         try:
             self.rag_interrupt_flag = {"interrupted": False} # Reset the interrupt flag before starting new streaming
