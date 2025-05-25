@@ -192,7 +192,7 @@ class SalesforceApiClient:
         Returns:
             List of events if successful, None otherwise
         """
-        if not self._access_token or not self._instance_url:
+        if not self.is_authenticated:
             print("Error: Not authenticated. Call await self.authenticate() first.")
             return None
             
@@ -269,7 +269,7 @@ class SalesforceApiClient:
             A dictionary containing the person's type ('Contact' or 'Lead') and data,
             or None if no matching record is found.
         """
-        if not self._access_token or not self._instance_url:
+        if not self.is_authenticated:
             print("Error: Not authenticated. Call await self.authenticate() first.")
             return None
 

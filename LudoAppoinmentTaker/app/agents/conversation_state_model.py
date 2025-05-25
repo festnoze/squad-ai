@@ -6,4 +6,4 @@ class ConversationState(TypedDict):
     call_sid: str
     user_input: str
     history: Annotated[Sequence[tuple[str, str]], operator.add]
-    agent_scratchpad: Dict[str, Any] 
+    agent_scratchpad: Dict[str, Any]

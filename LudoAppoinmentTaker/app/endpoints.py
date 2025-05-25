@@ -25,7 +25,7 @@ async def _extract_request_data_async(request: Request) -> tuple:
 
 # ========= Incoming phone call logic ========= #
 @staticmethod
-async def handle_incoming_call_async(request: Request) -> HTMLResponse:
+async def create_incoming_call_websocket_async(request: Request) -> HTMLResponse:
     """Handle incoming phone calls from Twilio"""
     logger.info("Received POST request for voice webhook")
     try:
@@ -58,7 +58,7 @@ async def handle_incoming_call_async(request: Request) -> HTMLResponse:
 # ========= Incoming phone call endpoint ========= #
 @router.post("/")
 async def voice_webhook(request: Request) -> HTMLResponse:
-    return await handle_incoming_call_async(request)
+    return await create_incoming_call_websocket_async(request)
     
 # ========= Incoming phone call WebSocket endpoint ========= #
 @router.websocket("/ws/phone/{calling_phone_number}/sid/{call_sid}")

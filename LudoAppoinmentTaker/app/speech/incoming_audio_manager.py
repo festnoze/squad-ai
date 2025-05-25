@@ -35,11 +35,11 @@ class IncomingAudioManager:
     # Temporary directory for audio files
     TEMP_DIR = "./static/audio"
     
-    def __init__(self, websocket: any, studi_rag_inference_api_client : StudiRAGInferenceApiClient, salesforce_api_client : SalesforceApiClient, tts_provider: TextToSpeechProvider, stt_provider: SpeechToTextProvider, streamSid: str = None, min_chunk_interval: float = 0.05, sample_width=2, frame_rate=8000, channels=1, vad_aggressiveness=3):
+    def __init__(self, outgoing_audio_processing: OutgoingAudioManager, studi_rag_inference_api_client : StudiRAGInferenceApiClient, salesforce_api_client : SalesforceApiClient, tts_provider: TextToSpeechProvider, sample_width=2, frame_rate=8000, channels=1, vad_aggressiveness=3):
         self.logger = logging.getLogger(__name__)
         self.studi_rag_inference_api_client = studi_rag_inference_api_client
         self.salesforce_api_client = salesforce_api_client
-        self.audio_stream_manager : OutgoingAudioManager = OutgoingAudioManager(websocket, tts_provider, streamSid, min_chunk_interval, sample_width, frame_rate, channels)
+        self.outgoing_audio_processing : OutgoingAudioManager = outgoing_audio_processing
         self.sample_width = sample_width
         self.frame_rate = frame_rate
         self.channels = channels
@@ -69,24 +69,11 @@ class IncomingAudioManager:
         # Create temp directory if it doesn't exist
         os.makedirs(self.TEMP_DIR, exist_ok=True)
 
-    def start_background_streaming_worker(self, compiled_graph: AgentsGraph | None = None) -> None:
-        """Start the audio output streaming worker"""
-        self.audio_stream_manager.run_background_streaming_worker()
-        if compiled_graph:
-            self.compiled_graph = compiled_graph
-        else:
-            self.compiled_graph = AgentsGraph(self.studi_rag_inference_api_client, self.salesforce_api_client).graph
-
-    async def stop_background_streaming_worker_async(self) -> None:
-        """Stop the audio output streaming worker"""
-        await self.audio_stream_manager.stop_background_streaming_worker_async()
-
     def set_websocket(self, websocket: WebSocket):
         self.websocket = websocket
-        self.audio_stream_manager.set_websocket(websocket)
 
     def set_stream_sid(self, stream_sid: str) -> None:
-        self.audio_stream_manager.update_stream_sid(stream_sid)
+        self.outgoing_audio_processing.update_stream_sid(stream_sid)
     
     def is_speech(self, audio_chunk: bytes, frame_duration_ms=30) -> bool:
         """
@@ -202,7 +189,7 @@ class IncomingAudioManager:
         # Set the current stream so the audio functions know which stream to use
         self.current_stream = stream_sid
         
-        self.audio_stream_manager.update_stream_sid(stream_sid)
+        self.outgoing_audio_processing.update_stream_sid(stream_sid)
         self.logger.info(f"Updated OutgoingAudioManager with stream SID: {stream_sid}")
                 
         # Initialize conversation state for this stream
@@ -230,7 +217,7 @@ class IncomingAudioManager:
                 ai_message = updated_state['history'][0][1]
                 first_word = ai_message.split()[0] if ai_message else ""
                 if ai_message and ai_message != first_word:
-                    await self.audio_stream_manager.enqueue_text(ai_message)
+                    await self.outgoing_audio_processing.enqueue_text(ai_message)
                     await self.studi_rag_inference_api_client.add_external_ai_message_to_conversation(self.conversation_id, ai_message)
 
         except Exception as e:
@@ -319,66 +306,37 @@ class IncomingAudioManager:
             user_query_transcript = self._perform_speech_to_text_transcription(audio_data)
             if user_query_transcript is None:
                 return
-            
-            # 5. Feedback the request to the user
-            #spoken_text = await self.send_ask_feedback(transcript)
-            try:
-                self.logger.info(f"Sending request to RAG API for stream: {self.current_stream}")
-                rag_query_RM = QueryAskingRequestModel(
-                    conversation_id=self.conversation_id,
-                    user_query_content= user_query_transcript,
-                    display_waiting_message=False
-                )
-                self.rag_interrupt_flag = {"interrupted": False} # Reset the interrupt flag before starting new streaming
-                response = self.studi_rag_inference_api_client.rag_query_stream_async(rag_query_RM, timeout=60, interrupt_flag=self.rag_interrupt_flag)
-                # Use enhanced text-to-speech method for acknowledgment
-                acknowledgment_text = f"OK. Vous avez demandé : {user_query_transcript}. Laissez-moi un instant pour rechercher des informations à ce sujet."
-                await self.audio_stream_manager.enqueue_text(acknowledgment_text)
-                
-                full_answer = ""
-                was_interrupted = False
-                async for chunk in response:
-                    # Vérifier si on a été interrompu entre les chunks
-                    if was_interrupted:
-                        self.logger.info("Speech interrupted while processing RAG response")
-                        break
+            self.logger.info(f"Sending incoming user query to agents graph. Transcription: '{user_query_transcript}'")  
                         
-                    full_answer += chunk
-                    self.logger.debug(f"Received chunk: {chunk}")
-                    print(f"<< ... {chunk} ... >>")
-                    
-                    # Sauvegarder l'état de parole avant de parler
-                    speaking_before = self.is_speaking
-                    
-                    # Use the enhanced text processing for better speech quality
-                    # Using smaller chunks for RAG responses to be more responsive
-                    await self.audio_stream_manager.enqueue_text(chunk)
-                    
-                    # Vérifier si on a été interrompu pendant qu'on parlait
-                    if speaking_before and not self.is_speaking:
-                        was_interrupted = True
-                        self.logger.info("Speech interrupted during RAG response chunk")
-                        break
-                
-                # Loguer les résultats du traitement RAG
-                end_time = time.time()
-                if was_interrupted:
-                    self.logger.info(f"RAG streaming was interrupted")
-                elif full_answer:
-                    self.logger.info(f"Full answer received from RAG API in {end_time - self.start_time:.2f}s: {full_answer[:100]}...")
-                else:
-                    self.logger.warning(f"Empty response received from RAG API")
-                
-            except Exception as e:
-                error_message = f"Je suis désolé, une erreur s'est produite lors de la communication avec le service."
-                self.logger.error(f"Error in RAG API communication: {str(e)}")
-                # Use enhanced text-to-speech for error messages too
-                await self.audio_stream_manager.enqueue_text(error_message)
+            # 5. Give to the user a feedback of the transcript for acknowledgment
+            feedback_text = f"Très bien. Vous avez demandé : \"{user_query_transcript}\". Un instant, j'analyse votre demande."
+            await self.outgoing_audio_processing.enqueue_text(feedback_text)
 
-            # 5 bis. Process user's query through conversation graph
-            #response_text = await self._process_conversation(transcript)
+            # 6. Send the user query to the agents graph
+            await self.send_user_query_to_agents_graph_async(user_query_transcript)
 
         return
+
+    async def send_user_query_to_agents_graph_async(self, user_query : str):
+        try:
+            # Get the current state
+            if self.stream_sid in self.stream_states:
+                current_state : ConversationState= self.stream_states[self.stream_sid]
+            else:
+                current_state : ConversationState = {
+                    "call_sid": self.call_sid,
+                    "caller_phone": self.phone_number,
+                    "user_input": user_query,
+                    "history": [], #TODO: Add history
+                    "agent_scratchpad": {}
+                }
+                self.stream_states[self.stream_sid] = current_state
+                        
+            # Invoke the graph with current state to get the AI-generated welcome message
+            updated_state = await self.compiled_graph.ainvoke(current_state)
+            self.stream_states[self.stream_sid] = updated_state
+        except Exception as e:
+            self.logger.error(f"Error in user query to agents graph: {e}", exc_info=True)
 
     def _decode_audio_chunk(self, data : dict):
         media_data = data.get("media", {})
@@ -487,12 +445,12 @@ class IncomingAudioManager:
         Updates the speaking state based on the text queue status
         This provides a more accurate representation of when audio is actually being sent
         """
-        is_sending_audio = self.audio_stream_manager.is_sending_speech()
+        is_sending_audio = self.outgoing_audio_processing.is_sending_speech()
         if is_sending_audio != self.is_speaking:
             if is_sending_audio:
                 self.is_speaking = True
                 # Log more detailed stats about the text queue
-                stats = self.audio_stream_manager.get_streaming_stats()
+                stats = self.outgoing_audio_processing.get_streaming_stats()
                 text_stats = stats['text_queue']
                 self.logger.debug(f"Speaking started - Text queue: {text_stats['current_size_chars']} chars, " +
                                 f"{text_stats['total_chars_processed']} chars processed so far")
@@ -508,7 +466,7 @@ class IncomingAudioManager:
                 self.rag_interrupt_flag["interrupted"] = True
                 self.logger.info("RAG streaming interrupted due to speech interruption")
                 
-            await self.audio_stream_manager.clear_text_queue()
+            await self.outgoing_audio_processing.clear_text_queue()
             self.logger.info("Cleared text queue due to speech interruption")
             self.is_speaking = False
             return True  # Speech was stopped

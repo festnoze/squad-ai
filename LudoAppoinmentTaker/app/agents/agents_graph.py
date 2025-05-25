@@ -1,13 +1,15 @@
 import logging
 import os
+import uuid
+import asyncio
 from uuid import UUID
 from langgraph.graph import StateGraph, END
-import asyncio
 
 # Models
 from app.agents.conversation_state_model import ConversationState
 from app.api_client.request_models.user_request_model import UserRequestModel, DeviceInfoRequestModel
 from app.api_client.request_models.conversation_request_model import ConversationRequestModel
+from app.api_client.request_models.query_asking_request_model import QueryAskingRequestModel
 
 # Agents
 from agents.lead_agent import LeadAgent
@@ -49,6 +51,7 @@ class AgentsGraph:
         workflow.add_node("lead_agent", self.lead_agent_node)
         workflow.add_node("sf_agent", self.sf_agent_node)
         workflow.add_node("calendar_agent", self.calendar_agent_node)
+        workflow.add_node("rag_course_agent", self.rag_course_agent_node)
 
         workflow.set_entry_point("router")
 
@@ -60,6 +63,7 @@ class AgentsGraph:
                 "lead_agent": "lead_agent",
                 "sf_agent": "sf_agent",
                 "calendar_agent": "calendar_agent",
+                "rag_course_agent": "rag_course_agent",
                 END: END
             }
         )
@@ -411,3 +415,61 @@ class AgentsGraph:
         # Default behavior
         self.logger.info(f"[{call_sid}] No specific routing condition met, ending graph run.")
         return END
+
+    async def rag_course_agent_node(self, state: ConversationState) -> dict:
+        """Handle the course agent node."""
+        call_sid = state.get('call_sid', 'N/A')
+        user_query = state.get('user_input', '')
+        self.logger.info(f"> Ongoing RAG query on training course information. User request: '{user_query}' for: [{call_sid}].")
+
+        try:
+            self.rag_interrupt_flag = {"interrupted": False} # Reset the interrupt flag before starting new streaming
+
+            rag_query_RM = QueryAskingRequestModel(
+                conversation_id=self.conversation_id,
+                user_query_content= user_query_transcript,
+                display_waiting_message=False
+            )
+            response = self.studi_rag_inference_api_client.rag_query_stream_async(rag_query_RM, timeout=60, interrupt_flag=self.rag_interrupt_flag)
+
+            full_answer = ""
+            was_interrupted = False
+            async for chunk in response:
+                # Vérifier si on a été interrompu entre les chunks
+                if was_interrupted:
+                    self.logger.info("Speech interrupted while processing RAG response")
+                    break
+                    
+                full_answer += chunk
+                self.logger.debug(f"Received chunk: {chunk}")
+                print(f"<< ... {chunk} ... >>")
+                
+                # Sauvegarder l'état de parole avant de parler
+                speaking_before = self.is_speaking
+                
+                # Use the enhanced text processing for better speech quality
+                # Using smaller chunks for RAG responses to be more responsive
+                await self.outgoing_audio_processing.enqueue_text(chunk)
+                
+                # Vérifier si on a été interrompu pendant qu'on parlait
+                if speaking_before and not self.is_speaking:
+                    was_interrupted = True
+                    self.logger.info("Speech interrupted during RAG response chunk")
+                    break
+                
+            # Loguer les résultats du traitement RAG
+            end_time = time.time()
+            if was_interrupted:
+                self.logger.info(f"RAG streaming was interrupted")
+            elif full_answer:
+                self.logger.info(f"Full answer received from RAG API in {end_time - self.start_time:.2f}s: {full_answer[:100]}...")
+            else:
+                self.logger.warning(f"Empty response received from RAG API")
+                
+        except Exception as e:
+            error_message = f"Je suis désolé, une erreur s'est produite lors de la communication avec le service."
+            self.logger.error(f"Error in RAG API communication: {str(e)}")
+            # Use enhanced text-to-speech for error messages too
+            await self.outgoing_audio_processing.enqueue_text(error_message)
+
+        return state
