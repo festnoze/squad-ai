@@ -1,9 +1,11 @@
 import json
 import yaml
+import uuid
+from uuid import UUID
 import os
 import requests
-from openai import OpenAI
 import logging
+from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
@@ -268,3 +270,40 @@ class LeadAgent:
         except Exception as e:
             logger.error(f"Error sending request: {e}", exc_info=True)
             raise
+
+    def _get_new_lead_dict(self, email, lastName, firstName, phone, domain, birthdate, training_course_name):
+        #  {
+        #     "firstName": self.extracted_info.get("firstName", ""),
+        #     "lastName": self.extracted_info.get("lastName", ""),
+        #     "email": self.extracted_info.get("email", ""),
+        #     "phone": self.extracted_info.get("phone", ""),
+        #     "trainingInterest": self.extracted_info.get("trainingInterest", "")
+        # }
+        training_course_id = self._get_training_course_by_name(training_course_name)['id']
+
+        new_lead = {
+            "email" : email,
+            "nom" : lastName,
+            "prenom" : firstName,
+            "tel" : phone,
+            "thematique" : domain,
+            "ecole" : "studi",
+            "formulaire" : "Callbot - Graduate Développeur Flutter",
+            "url" : "",
+            "pays" : "FR",
+            "birthdate" : birthdate,
+            "utm_campaign" : training_course_name,
+            "utm_source" : "callbot",
+            "utm_medium" : "CORE_PKL_None",
+            "utm_content" : "",
+            "request_host" : "data_ia.studi.fr",
+            "request_url" : "callbot", 
+            "consentement" : "yes",
+            "training_course_id" : training_course_id
+        }
+        return new_lead
+
+    def _get_training_course_by_name(self, training_course_name) -> UUID:
+        name_hash = uuid.uuid5(uuid.NAMESPACE_DNS, training_course_name)
+        return name_hash
+        

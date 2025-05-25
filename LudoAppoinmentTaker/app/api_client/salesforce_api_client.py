@@ -98,8 +98,7 @@ class SalesforceApiClient:
                 print(f"Generic authentication error: {str(e)}")
                 return False
 
-
-    async def create_event(self, subject: str, start_datetime: str, duration_minutes: int = 60, description: str | None = None, 
+    async def create_event_async(self, subject: str, start_datetime: str, duration_minutes: int = 60, description: str | None = None, 
                    location: str | None = None, owner_id: str | None = None, 
                    what_id: str | None = None, who_id: str | None = None) -> str | None:
         """Create an event in Salesforce and return the event ID if successful
@@ -182,21 +181,7 @@ class SalesforceApiClient:
                 print(f"Error creating event: {str(e)}")
                 return None
 
-    def _calculate_end_datetime(self, start_datetime: str, duration_minutes: int) -> str | None:
-        try:
-            # Parse the ISO format datetime string
-            start_dt = datetime.datetime.fromisoformat(start_datetime.replace('Z', '+00:00'))
-            # Add the duration in minutes
-            end_dt = start_dt + datetime.timedelta(minutes=duration_minutes)
-            # Convert back to ISO format string
-            end_datetime = end_dt.isoformat().replace('+00:00', 'Z')
-            return end_datetime
-        except ValueError as e:
-            print(f"Error parsing start_datetime: {e}")
-            print("Make sure start_datetime is in ISO format (e.g., '2025-05-20T14:00:00Z')")
-            return None
-            
-    async def get_events(self, start_datetime: str, end_datetime: str, owner_id: str | None = None) -> list | None:
+    async def get_events_async(self, start_datetime: str, end_datetime: str, owner_id: str | None = None) -> list | None:
         """Get events from Salesforce calendar between specified start and end datetimes
         
         Args:
@@ -272,7 +257,7 @@ class SalesforceApiClient:
                 print(f"Error retrieving events: {str(e)}")
                 return None
 
-    async def get_person_by_phone(self, phone_number: str) -> dict | None:
+    async def get_person_by_phone_async(self, phone_number: str) -> dict | None:
         """
         Retrieve a Contact or Lead from Salesforce by phone number (asynchronous).
         Searches Contacts first, then non-converted Leads if no Contact is found.
@@ -360,7 +345,7 @@ class SalesforceApiClient:
             print(f"No Contact or non-converted Lead found for phone number: {phone_number}")
             return None
 
-    async def discover_database(self, sobjects_to_describe: list[str] | None = None) -> dict | None:
+    async def discover_database_async(self, sobjects_to_describe: list[str] | None = None, include_fields: bool = True) -> dict | None:
         """
         Discovers the schema of Salesforce SObjects.
 
@@ -372,6 +357,8 @@ class SalesforceApiClient:
                                   If None, attempts to describe all accessible SObjects.
                                   Warning: Describing all SObjects can be very slow and
                                   consume a significant number of API calls.
+            include_fields: If True (default), includes all fields for each SObject.
+                            If False, only includes primary key (Id) and foreign key fields.
 
         Returns:
             A dictionary where keys are SObject names. Each value is a dictionary
@@ -439,18 +426,19 @@ class SalesforceApiClient:
                     is_pk = (field_name == 'Id')
                     is_fk = field.get('type') == 'reference' and bool(field.get('referenceTo'))
                     
-                    fields_info[field_name] = {
-                        'label': field.get('label'),
-                        'type': field.get('type'),
-                        'length': field.get('length', 0) if field.get('type') in ['string', 'textarea', 'phone', 'url', 'email', 'picklist', 'multipicklist', 'combobox', 'id', 'reference'] else None,
-                        'precision': field.get('precision') if field.get('type') in ['currency', 'double', 'percent', 'int', 'long'] else None,
-                        'scale': field.get('scale') if field.get('type') in ['currency', 'double', 'percent'] else None,
-                        'nillable': field.get('nillable'),
-                        'custom': field.get('custom'),
-                        'is_primary_key': is_pk,
-                        'is_foreign_key': is_fk,
-                        'references_to': field.get('referenceTo', []) if is_fk else []
-                    }
+                    if include_fields or is_pk or is_fk:
+                        fields_info[field_name] = {
+                            'label': field.get('label'),
+                            'type': field.get('type'),
+                            'length': field.get('length', 0) if field.get('type') in ['string', 'textarea', 'phone', 'url', 'email', 'picklist', 'multipicklist', 'combobox', 'id', 'reference'] else None,
+                            'precision': field.get('precision') if field.get('type') in ['currency', 'double', 'percent', 'int', 'long'] else None,
+                            'scale': field.get('scale') if field.get('type') in ['currency', 'double', 'percent'] else None,
+                            'nillable': field.get('nillable'),
+                            'custom': field.get('custom'),
+                            'is_primary_key': is_pk,
+                            'is_foreign_key': is_fk,
+                            'references_to': field.get('referenceTo', []) if is_fk else []
+                        }
                 schema[s_name] = {'fields': fields_info}
                 
                 # Brief pause to avoid hitting rate limits too hard
@@ -469,6 +457,22 @@ class SalesforceApiClient:
         
         return schema
 
+    ## Internal helpers ##
+
+    def _calculate_end_datetime(self, start_datetime: str, duration_minutes: int) -> str | None:
+        try:
+            # Parse the ISO format datetime string
+            start_dt = datetime.datetime.fromisoformat(start_datetime.replace('Z', '+00:00'))
+            # Add the duration in minutes
+            end_dt = start_dt + datetime.timedelta(minutes=duration_minutes)
+            # Convert back to ISO format string
+            end_datetime = end_dt.isoformat().replace('+00:00', 'Z')
+            return end_datetime
+        except ValueError as e:
+            print(f"Error parsing start_datetime: {e}")
+            print("Make sure start_datetime is in ISO format (e.g., '2025-05-20T14:00:00Z')")
+            return None
+            
     def _query_salesforce(self, soql_query: str) -> dict | None:
         """Helper method to execute a SOQL query and return the full JSON response.
 

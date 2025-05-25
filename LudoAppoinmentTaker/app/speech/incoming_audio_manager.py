@@ -23,6 +23,7 @@ from app.speech.outgoing_audio_manager import OutgoingAudioManager
 from app.speech.text_to_speech import TextToSpeechProvider
 from app.speech.speech_to_text import SpeechToTextProvider
 from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
+from app.api_client.salesforce_api_client import SalesforceApiClient
 from app.agents.agents_graph import AgentsGraph
 
 class IncomingAudioManager:
@@ -34,9 +35,10 @@ class IncomingAudioManager:
     # Temporary directory for audio files
     TEMP_DIR = "./static/audio"
     
-    def __init__(self, websocket: any, studi_rag_inference_api_client : StudiRAGInferenceApiClient, tts_provider: TextToSpeechProvider, stt_provider: SpeechToTextProvider, streamSid: str = None, min_chunk_interval: float = 0.05, sample_width=2, frame_rate=8000, channels=1, vad_aggressiveness=3):
+    def __init__(self, websocket: any, studi_rag_inference_api_client : StudiRAGInferenceApiClient, salesforce_api_client : SalesforceApiClient, tts_provider: TextToSpeechProvider, stt_provider: SpeechToTextProvider, streamSid: str = None, min_chunk_interval: float = 0.05, sample_width=2, frame_rate=8000, channels=1, vad_aggressiveness=3):
         self.logger = logging.getLogger(__name__)
         self.studi_rag_inference_api_client = studi_rag_inference_api_client
+        self.salesforce_api_client = salesforce_api_client
         self.audio_stream_manager : OutgoingAudioManager = OutgoingAudioManager(websocket, tts_provider, streamSid, min_chunk_interval, sample_width, frame_rate, channels)
         self.sample_width = sample_width
         self.frame_rate = frame_rate
@@ -67,9 +69,13 @@ class IncomingAudioManager:
         # Create temp directory if it doesn't exist
         os.makedirs(self.TEMP_DIR, exist_ok=True)
 
-    def run_background_streaming_worker(self) -> None:
+    def start_background_streaming_worker(self, compiled_graph: AgentsGraph | None = None) -> None:
         """Start the audio output streaming worker"""
         self.audio_stream_manager.run_background_streaming_worker()
+        if compiled_graph:
+            self.compiled_graph = compiled_graph
+        else:
+            self.compiled_graph = AgentsGraph(self.studi_rag_inference_api_client, self.salesforce_api_client).graph
 
     async def stop_background_streaming_worker_async(self) -> None:
         """Stop the audio output streaming worker"""
@@ -214,8 +220,7 @@ class IncomingAudioManager:
         # Store the initial state for this stream (used by graph and other handlers)
         self.stream_states[stream_sid] = initial_state
         
-        try:
-            
+        try:            
             # Then invoke the graph with initial state to get the AI-generated welcome message
             updated_state = await self.compiled_graph.ainvoke(initial_state)
             self.stream_states[stream_sid] = updated_state
@@ -223,15 +228,14 @@ class IncomingAudioManager:
             # If there's an AI message from the graph, send it after the welcome message
             if updated_state.get('history') and updated_state['history'][0][0] == 'AI':
                 ai_message = updated_state['history'][0][1]
-                if ai_message and ai_message.strip() != welcome_text.strip():
-                    await self.speak_and_send_text(ai_message)
+                first_word = ai_message.split()[0] if ai_message else ""
+                if ai_message and ai_message != first_word:
+                    await self.audio_stream_manager.enqueue_text(ai_message)
                     await self.studi_rag_inference_api_client.add_external_ai_message_to_conversation(self.conversation_id, ai_message)
-        
+
         except Exception as e:
             self.logger.error(f"Error in initial graph invocation: {e}", exc_info=True)
-            # If there was an error with the graph, we already sent our welcome message,
-            # so we don't need to send a fallback
-        
+            
         return stream_sid
 
     async def handle_incoming_websocket_media_event_async(self, audio_data: dict) -> None:        
@@ -375,37 +379,6 @@ class IncomingAudioManager:
             #response_text = await self._process_conversation(transcript)
 
         return
-    
-    async def init_user_and_new_conversation_upon_phone_call_async(self, calling_phone_number: str, call_sid: str):
-        """ Initialize the user session: create user and conversation"""
-        user_name_val = "Twilio incoming call " + (calling_phone_number or "Unknown User")
-        ip_val = calling_phone_number or "Unknown IP"
-        user_RM = UserRequestModel(
-            user_id=None,
-            user_name=user_name_val,
-            IP=ip_val,
-            device_info=DeviceInfoRequestModel(user_agent="twilio", platform="phone", app_version="", os="", browser="", is_mobile=True)
-        )
-        try:
-            user = await self.studi_rag_inference_api_client.create_or_retrieve_user(user_RM)
-            user_id = user['id']
-            
-            # Convert user_id to UUID if it's a string
-            if isinstance(user_id, str): user_id = UUID(user_id)
-                
-            # Create empty messages list
-            messages = []
-            
-            # Create the conversation request model
-            conversation_model = ConversationRequestModel(user_id=user_id, messages=messages)
-            
-            self.logger.info(f"Creating new conversation for user: {user_id}")
-            new_conversation = await self.studi_rag_inference_api_client.create_new_conversation(conversation_model)
-            return new_conversation['id']
-
-        except Exception as e:
-            self.logger.error(f"Error creating conversation: {str(e)}")
-            return str(uuid.uuid4())
 
     def _decode_audio_chunk(self, data : dict):
         media_data = data.get("media", {})

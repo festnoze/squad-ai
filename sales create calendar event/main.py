@@ -129,7 +129,7 @@ def handle_discover_database(client: SalesforceApiClient):
         sobjects_to_describe = default_sobjects
 
     print(f"\nDiscovering database schema for: {', '.join(sobjects_to_describe)}...")
-    schema_data = client.discover_database(sobjects_to_describe=sobjects_to_describe)
+    schema_data = client.discover_database(sobjects_to_describe=sobjects_to_describe, include_fields=False)
 
     if schema_data:
         print("Schema discovered. Summary:")

@@ -1,9 +1,13 @@
 import logging
 import os
+from uuid import UUID
 from langgraph.graph import StateGraph, END
+import asyncio
 
 # Models
 from app.agents.conversation_state_model import ConversationState
+from app.api_client.request_models.user_request_model import UserRequestModel, DeviceInfoRequestModel
+from app.api_client.request_models.conversation_request_model import ConversationRequestModel
 
 # Agents
 from agents.lead_agent import LeadAgent
@@ -81,62 +85,83 @@ class AgentsGraph:
         return app_graph
 
     async def router(self, state: ConversationState) -> dict:
-        if not state.get('agent_scratchpad', {}).get('conversation_id') or not state.get('agent_scratchpad', {}).get('user_input'):
-            return {"next": "initialization"}
+        if not state.get('agent_scratchpad', None):
+            state['agent_scratchpad'] = {}
+        if not state.get('agent_scratchpad', {}).get('conversation_id') or not state.get('agent_scratchpad', None).get('user_input'):
+            state['agent_scratchpad']["next_agent_needed"] = "initialization"
         elif not state.get('agent_scratchpad', {}).get('sf_account_info'):
-            return {"next": "sf_agent"}
+            state['agent_scratchpad']["next_agent_needed"] = "sf_agent"
         elif not state.get('agent_scratchpad', {}).get('lead_extracted_info'):
-            return {"next": "lead_agent"}
+            state['agent_scratchpad']["next_agent_needed"] = "lead_agent"
         elif not state.get('agent_scratchpad', {}).get('calendar_extracted_info'):
-            return {"next": "calendar_agent"}
+            state['agent_scratchpad']["next_agent_needed"] = "calendar_agent"
         else:
-            return {"next": "lead_agent"}
+            state['agent_scratchpad']["next_agent_needed"] = "initialization"
+        return state
 
-    async def initialize_backend_conversation(self, state: ConversationState) -> dict:
-        if not state.get('agent_scratchpad', {}).get('conversation_id'): 
-            self.logger.info(f"Initializing conversation for {phone_number}")     
-            # Retrieve or create the user and a new conversation into the backend API (this might take some time)
-            conversation_id = await self.init_user_and_new_conversation_upon_phone_call_async(phone_number, call_sid)
-            
-            # Log the welcome message to our backend records
-            
-            # Define the welcome message
-            welcome_text = """\
-                Bonjour, je suis Stud'ia, l'assistante virtuelle de Studi. Je suis là pour t'aider en l'absence de nos conseillers.
-                Je peux t'aider à explorer nos formations. Sinon, je peux prendre un rendez-vous avec un conseiller pour toi."""
-            #welcome_text = "Salut !"
-            await self.studi_rag_inference_api_client.add_external_ai_message_to_conversation(conversation_id, welcome_text)
+    async def initialize_backend_conversation(self, state: ConversationState) -> dict:        
+        self.logger.info(f"Initializing conversation for {state.get('caller_phone')}")     
+        # Retrieve or create the user and a new conversation into the backend API (this might take some time)
+        conversation_id = await self.init_user_and_new_conversation_in_backend_api_async(state.get('caller_phone'), state.get('call_sid'))
+        
+        welcome_text = """\
+            Bonjour, je suis Stud'ia, l'assistante virtuelle de Studi. Je suis là pour t'aider en l'absence de nos conseillers.
+            Je peux t'aider à explorer nos formations. Sinon, je peux prendre un rendez-vous avec un conseiller pour toi."""
+        #welcome_text = "Salut !"
+        await self.studi_rag_inference_api_client.add_external_ai_message_to_conversation(conversation_id, welcome_text)
 
-            if state.get('agent_scratchpad') is None: state['agent_scratchpad'] = {}
-            state['agent_scratchpad']['conversation_id'] = conversation_id
-            self.logger.info(f"[{call_sid}] Stored conversation_id: {conversation_id} in agent_scratchpad")
+        if state.get('agent_scratchpad') is None: state['agent_scratchpad'] = {}
+        state['agent_scratchpad']['conversation_id'] = conversation_id
+        self.logger.info(f"Stored conversation_id: {conversation_id} in agent_scratchpad")
 
-            self.logger.info(f"[{call_sid}] Routing initial query: {state.get('user_input', '')}")
-            return {"next": "initialization"}
+        self.logger.info(f"Routing initial query: {state.get('user_input', '')}")
+        return {"next": "initialization"}
+      
+    async def init_user_and_new_conversation_in_backend_api_async(self, calling_phone_number: str, call_sid: str):
+        """ Initialize the user session in the backend API: create user and conversation"""
+        user_name_val = "Twilio incoming call " + (calling_phone_number or "Unknown User")
+        ip_val = calling_phone_number or "Unknown IP"
+        user_RM = UserRequestModel(
+            user_id=None,
+            user_name=user_name_val,
+            IP=ip_val,
+            device_info=DeviceInfoRequestModel(user_agent="twilio", platform="phone", app_version="", os="", browser="", is_mobile=True)
+        )
+        try:
+            user = await self.studi_rag_inference_api_client.create_or_retrieve_user(user_RM)
+            user_id = UUID(user['id'])
+            new_conversation = ConversationRequestModel(user_id=user_id, messages=[])
+            self.logger.info(f"Creating new conversation for user: {user_id}")
+            new_conversation = await self.studi_rag_inference_api_client.create_new_conversation(new_conversation)
+            return new_conversation['id']
+
+        except Exception as e:
+            self.logger.error(f"Error creating conversation: {str(e)}")
+            return str(uuid.uuid4())
     
-    async def retrieve_saleforce_account_info(self, state: ConversationState) -> dict:
-        if not state.get('agent_scratchpad', {}).get('sf_account_info'):
-            self.logger.info(f"Initializing SF Agent")
-            call_sid = state.get('call_sid', 'N/A')
-            phone_number = state.get('caller_phone', 'N/A')
-            sf_account_info = self.salesforce_api_client.get_person_by_phone(phone_number)
-            if sf_account_info:
-                state['agent_scratchpad']['sf_account_info'] = sf_account_info
-                self.logger.info(f"[{call_sid}] Stored sf_account_info: {sf_account_info} in agent_scratchpad")
-            return {"next": "sf_agent"}
+    async def retrieve_saleforce_account_info(self, state: ConversationState) -> dict:        
+        self.logger.info(f"Initializing SF Agent")
+        call_sid = state.get('call_sid', 'N/A')
+        phone_number = state.get('caller_phone', 'N/A')
+        sf_account_info = await self.salesforce_api_client.get_person_by_phone_async(phone_number)
+        state['agent_scratchpad']['sf_account_info'] = sf_account_info
+        self.logger.info(f"[{call_sid}] Stored sf_account_info: {sf_account_info} in agent_scratchpad")
     
     async def initialization(self, state: ConversationState) -> dict:
         """Determines the first agent to handle the query based on the conversation state."""
         call_sid = state.get('call_sid', 'N/A')
         phone_number = state.get('caller_phone', 'N/A')
 
-        
+        if not state.get('agent_scratchpad', {}).get('conversation_id') or not state.get('agent_scratchpad', {}).get('sf_account_info'):
+            initialize_task = asyncio.create_task(self.initialize_backend_conversation(state))
+            salesforce_task = asyncio.create_task(self.retrieve_saleforce_account_info(state))
+            await asyncio.gather(initialize_task, salesforce_task)
 
         if not state.get('agent_scratchpad', {}).get('sf_account_info'):
-            self.logger.info(f"Initializing SF Agent")
+            return {"next": "lead_agent"}
+        elif state.get('agent_scratchpad', {}).get('user_input'):
             return {"next": "sf_agent"}
-        
-        if not state.get('agent_scratchpad', {}).get('user_input'):
+        else:
             return {"next": "END"}
 
         # Check if this is a returning user with SF info

@@ -87,7 +87,8 @@ class PhoneCallWebsocketEventsHandler:
         
         self.audio_processing = IncomingAudioManager(
                                     websocket=self.websocket, 
-                                    studi_rag_inference_api_client=self.studi_rag_inference_api_client, 
+                                    studi_rag_inference_api_client=self.studi_rag_inference_api_client,
+                                    salesforce_api_client=self.salesforce_api_client,
                                     tts_provider=self.tts_provider, 
                                     stt_provider=self.stt_provider,
                                     streamSid=None, 
@@ -120,7 +121,7 @@ class PhoneCallWebsocketEventsHandler:
         self.phones[call_sid] = calling_phone_number
         
         self.audio_processing.set_stream_sid(call_sid)
-        self.audio_processing.run_background_streaming_worker()
+        self.audio_processing.start_background_streaming_worker(self.compiled_graph)
         self.logger.info("Audio stream manager initialized and started with optimized parameters")
 
         # Main loop to handle WebSocket events
@@ -220,6 +221,8 @@ class PhoneCallWebsocketEventsHandler:
         self.logger.debug(f"Received mark event: {mark_name} for stream {self.current_stream}")
 
 class PhoneCallWebsocketEventsHandlerFactory:
+    phone_call_websocket_events_handler : PhoneCallWebsocketEventsHandler = None
+    
     def __init__(self):
         self.build_new_phone_call_websocket_events_handler()
 
@@ -228,8 +231,9 @@ class PhoneCallWebsocketEventsHandlerFactory:
 
     def get_new_phone_call_websocket_events_handler(self, websocket: WebSocket):
         if not self.phone_call_websocket_events_handler:
-            self.build_new_phone_call_websocket_events_handler()
+            self.build_new_phone_call_websocket_events_handler(websocket=None)
         built_phone_call_websocket_events_handler = self.phone_call_websocket_events_handler
+        # Set the websocket for the handler: whatever its new or old
         built_phone_call_websocket_events_handler.set_websocket(websocket)
         self.phone_call_websocket_events_handler = None
         return built_phone_call_websocket_events_handler

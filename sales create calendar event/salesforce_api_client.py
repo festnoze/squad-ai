@@ -326,7 +326,8 @@ class SalesforceApiClient:
         print(f"No Contact or non-converted Lead found for phone number: {phone_number}")
         return None
 
-    def discover_database(self, sobjects_to_describe: list[str] | None = None) -> dict | None:
+    
+    def discover_database(self, sobjects_to_describe: list[str] | None = None, include_fields: bool = True) -> dict | None:
         """
         Discovers the schema of Salesforce SObjects.
 
@@ -338,6 +339,8 @@ class SalesforceApiClient:
                                   If None, attempts to describe all accessible SObjects.
                                   Warning: Describing all SObjects can be very slow and
                                   consume a significant number of API calls.
+            include_fields: If True (default), includes all fields for each SObject.
+                            If False, only includes primary key (Id) and foreign key fields.
 
         Returns:
             A dictionary where keys are SObject names. Each value is a dictionary
@@ -405,18 +408,19 @@ class SalesforceApiClient:
                     is_pk = (field_name == 'Id')
                     is_fk = field.get('type') == 'reference' and bool(field.get('referenceTo'))
                     
-                    fields_info[field_name] = {
-                        'label': field.get('label'),
-                        'type': field.get('type'),
-                        'length': field.get('length', 0) if field.get('type') in ['string', 'textarea', 'phone', 'url', 'email', 'picklist', 'multipicklist', 'combobox', 'id', 'reference'] else None,
-                        'precision': field.get('precision') if field.get('type') in ['currency', 'double', 'percent', 'int', 'long'] else None,
-                        'scale': field.get('scale') if field.get('type') in ['currency', 'double', 'percent'] else None,
-                        'nillable': field.get('nillable'),
-                        'custom': field.get('custom'),
-                        'is_primary_key': is_pk,
-                        'is_foreign_key': is_fk,
-                        'references_to': field.get('referenceTo', []) if is_fk else []
-                    }
+                    if include_fields or is_pk or is_fk:
+                        fields_info[field_name] = {
+                            'label': field.get('label'),
+                            'type': field.get('type'),
+                            'length': field.get('length', 0) if field.get('type') in ['string', 'textarea', 'phone', 'url', 'email', 'picklist', 'multipicklist', 'combobox', 'id', 'reference'] else None,
+                            'precision': field.get('precision') if field.get('type') in ['currency', 'double', 'percent', 'int', 'long'] else None,
+                            'scale': field.get('scale') if field.get('type') in ['currency', 'double', 'percent'] else None,
+                            'nillable': field.get('nillable'),
+                            'custom': field.get('custom'),
+                            'is_primary_key': is_pk,
+                            'is_foreign_key': is_fk,
+                            'references_to': field.get('referenceTo', []) if is_fk else []
+                        }
                 schema[s_name] = {'fields': fields_info}
                 
                 # Brief pause to avoid hitting rate limits too hard
@@ -434,7 +438,6 @@ class SalesforceApiClient:
                 schema[s_name] = {'error': f'Failed to describe: {str(e_desc)}'}
         
         return schema
-
     def _query_salesforce(self, soql_query: str) -> dict | None:
         """Helper method to execute a SOQL query and return the full JSON response.
 
