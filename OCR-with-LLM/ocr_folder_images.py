@@ -12,6 +12,8 @@ class OCRFolderImages:
                 self.folder: Path = Path(folder)
                 self.out: Path = self.folder / "html"
                 self.out.mkdir(exist_ok=True)
+                self.page_img_out_dir = self.out / "page_images"
+                self.page_img_out_dir.mkdir(exist_ok=True)
                 self.tmp: Path = Path(tempfile.mkdtemp())
                 
                 openai_api_key = os.getenv("OPENAI_API_KEY", None)
@@ -19,35 +21,52 @@ class OCRFolderImages:
                         raise ValueError("'OPENAI_API_KEY' environment variable is nowhere to be found.")
                 self.llm: ChatOpenAI = ChatOpenAI(model_name="gpt-4o", temperature=0, max_tokens=4096, api_key=openai_api_key)
 
-        def process_all_folder_images(self) -> None:
+        def process_all_folder_images(self, title_backup: str) -> None:
                 imgs: list[Path] = sorted([p for p in self.folder.glob("*") if p.suffix.lower() in {".png", ".jpg", ".jpeg"}])
                 print(f"\rFound {len(imgs)} image(s) to process in '{self.folder}'.", end="")
-                for idx, img in enumerate(imgs, 1):
-                        print(f"\r[Image {idx}/{len(imgs)}] Processing: {img.name}", end="")
-                        elements: list[dict[str, any]] = self._get_elements(img)
-                        print(f"\r  - Detected {len(elements)} element(s) in {img.name}", end="")
-                        pages_by_image: list[tuple[Path, list[dict[str, any]]]] = self._split_by_pages_in_image(elements, img)
-                        for page_path_and_items in pages_by_image:
-                                html_name: str = f"{self.counter}.html"
-                                self._render_page(page_path_and_items[0], page_path_and_items[1], html_name)
-                                print(f"\r    - Rendered page to: \"{html_name}\".", end="")
-                                self.pages.append(html_name)
-                                self.counter += 1
-                        print(f"\r[Image {idx}/{len(imgs)}] Finished processing {img.name}\n", end="")
+                title = title_backup
+
+                # Try to extract title from first image
+                if imgs and any(imgs):
+                        try:
+                            extracted_title = self._extract_image(0, imgs[0])
+                            if extracted_title:
+                                    title = extracted_title
+                        except Exception as e:
+                                print(f"\n\n\n/!\\ Error parsing LLM response for title: {e}")
+                
+
+                # Process images
+                print("\r\nProcessing images...", end="")
+                for index, image_path in enumerate(imgs, 1):
+                        self._extract_image(index, image_path)
                 print("\rBuilding index page...", end="")
-                self._build_index()
+                self._build_index(title)
                 print("\rBuilding viewer page...", end="")
-                self._build_viewer()
+                self._build_viewer(title)
                 shutil.rmtree(self.tmp, ignore_errors=True)
                 print("\rAll processing complete. Temporary files cleaned up.")
 
-        def _get_elements(self, img_path: Path) -> list[dict[str, any]]:
-                img_content = base64.b64encode(img_path.read_bytes()).decode('utf-8')
+        def _extract_image(self, index: int, image_path: Path) -> None:
+                print(f"\r[Image {index}/{sum(1 for _ in self.folder.glob('*'))}] Processing: {image_path.name}", end="")
+                elements: list[dict[str, any]] = self._get_elements(image_path)
+                print(f"\r  - Detected {len(elements)} element(s) in {image_path.name}", end="")
+                pages_by_image: list[tuple[Path, list[dict[str, any]]]] = self._split_by_pages_in_image(elements, image_path)
+                for page_path_and_items in pages_by_image:
+                        html_name: str = f"{self.counter}.html"
+                        self._render_page(page_path_and_items[0], page_path_and_items[1], html_name)
+                        print(f"\r    - Rendered page to: \"{html_name}\".", end="")
+                        self.pages.append(html_name)
+                        self.counter += 1
+                print(f"\r[Image {index}/{sum(1 for _ in self.folder.glob('*'))}] Finished processing {image_path.name}\n", end="")
+
+        def _get_elements(self, image_path: Path) -> list[dict[str, any]]:
+                img_content = base64.b64encode(image_path.read_bytes()).decode('utf-8')
                 msg: list[any] = [
                         SystemMessage(content="You are a vision model"),
                         HumanMessage(content=[
-                                {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_content}"}},
-                                {"type": "text", "text": "Transcribe all text exactly as it appears, letter by letter. Do not correct, modify, or normalize any words, even if you do not recognize them. Split text on natural line breaks and return a JSON array `elements` where each element has {type:text|table|image,bbox:[x1,y1,x2,y2],text?}."}
+                            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_content}"}},
+                            {"type": "text", "text": "Transcribe carefully all text from the image, exactly as it appears, letter by letter. Do not correct, modify, or normalize any words, even if you do not recognize them. Split text on natural line breaks and return a JSON array `elements` where each element has {type:text|table|image,bbox:[x1,y1,x2,y2],text?}.\nTake care of transcribing tables and included images correctly. Do not include any title or external context in the transcribed text output."}
                         ])
                 ]
                 resp: str = self.llm.invoke(msg, response_format={"type": "json_object"}).content
@@ -106,27 +125,33 @@ class OCRFolderImages:
                 img: Image.Image = Image.open(img_path)
                 w0, h0 = img.size
                 blocks: list[str] = []
+                img_counter_for_page = 0
                 for el in elements:
                     x1, y1, x2, y2 = el["bbox"]
                     w, h = x2 - x1, y2 - y1
                     if el["type"] == "image":
                         crop = img.crop((x1, y1, x2, y2))
-                        b64 = base64.b64encode(crop.tobytes()).decode()
-                        blocks.append(f'<div class="element" style="margin-bottom:10px;"><img src="data:image/png;base64,{b64}" style="max-width:100%;"></div>')
+                        page_number_str = Path(html_name).stem
+                        img_filename = f"page{page_number_str}_img{img_counter_for_page}.png"
+                        img_save_path = self.page_img_out_dir / img_filename
+                        crop.save(img_save_path)
+                        img_src_relative_path = f"page_images/{img_filename}" # Relative to html file in self.out
+                        blocks.append(f'<div class="element" style="margin-bottom:10px;"><img src="{img_src_relative_path}" style="max-width:100%;"></div>')
+                        img_counter_for_page += 1
                     else:
                         lines = ''.join(f'<p>{l}</p>' for l in el["text"].splitlines() if l.strip())
                         blocks.append(f'<div class="element" style="margin-bottom:10px;">{lines}</div>')
                 tpl = Template("""<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;font-family:Arial;padding:20px;} .content{max-width:100%;}</style></head><body><div class="content">{{b|safe}}</div></body></html>""")
                 (self.out / html_name).write_text(tpl.render(b=''.join(blocks), w=w0, h=h0), encoding="utf-8")
 
-        def _build_index(self) -> None:
+        def _build_index(self, title: str) -> None:
                 # Links in 0.html should still allow viewer.html to load page X
                 # So, href="viewer.html?p=..." is correct, or simply make them load page X directly in current viewer
                 links = ''.join(f'<li><a href="javascript:void(0);" onclick="window.parent.loadPage(\'{Path(n).stem}\')">Page {Path(n).stem}</a></li>' for n in self.pages)
-                summary_html_content = f'<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{{font-family:Arial,sans-serif;padding:20px;}} ul{{list-style-type:none;padding:0;}} li a{{text-decoration:none;color:#007bff;display:block;padding:8px 0;}} li a:hover{{color:#0056b3;}} h1{{margin-top:0;}}</style></head><body><h1>Sommaire</h1><ul>{links}</ul></body></html>'
+                summary_html_content = f'<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{{font-family:Arial,sans-serif;padding:20px;}} ul{{list-style-type:none;padding:0;}} li a{{text-decoration:none;color:#007bff;display:block;padding:8px 0;}} li a:hover{{color:#0056b3;}} h1{{margin-top:0;}}</style></head><body><h1>{title}</h1><ul>{links}</ul></body></html>'
                 (self.out / "0.html").write_text(summary_html_content, encoding="utf-8")
 
-        def _build_viewer(self) -> None:
+        def _build_viewer(self, title: str) -> None:
                 # Determine max_page_number by scanning the output directory for N.html files (N > 0)
                 content_page_numbers: list[int] = []
                 if self.out.exists():
@@ -258,7 +283,7 @@ class OCRFolderImages:
                     }};
                 </script></head>
                 <body>
-                    <h1 style="text-align: center; margin-top: 10px; margin-bottom: 0; font-size: 28px;">Livre Dr Tan</h1>
+                    <h1 style="text-align: center; margin-top: 10px; margin-bottom: 0; font-size: 28px;">{title}</h1>
                     <div id="bar">
                         <button onclick="loadPage(0)" title="Home">🏠</button>
                         <button onclick=\"navigatePage(-1)\" title=\"Previous\">◀</button>
