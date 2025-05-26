@@ -1,12 +1,12 @@
-import random
 import jwt
 import httpx
 import urllib.parse
+import logging
 import time
 import json
 import datetime
-from common_tools.helpers.execute_helper import Execute
-from common_tools.helpers.file_helper import file
+import asyncio
+import os
 
 class SalesforceApiClient:
     _client_id = '3MVG9IKwJOi7clC2.8QIzh9BkM6NhU53bup6EUfFQiXJ01nh.l2YJKF5vbNWqPkFEdjgzAXIqK3U1p2WCBUD3'
@@ -14,18 +14,8 @@ class SalesforceApiClient:
     _private_key_file = 'salesforce_server_private.key'
     _is_sandbox = True
 
-    @classmethod
-    async def create_instance_async(cls, client_id: str = None, username: str = None, private_key_file: str = None, is_sandbox: bool = True) -> 'SalesforceApiClient':
-        """
-        Factory create an authenticated SalesforceApiClient instance.
-        """
-        client = cls(client_id, username, private_key_file, is_sandbox)
-        Execute.async_wrapper_to_sync(client.authenticate_async)
-        return client
-
-    
     def __init__(self, client_id: str = None, username: str = None, private_key_file: str = None, is_sandbox: bool = True):
-
+        self.logger = logging.getLogger(__name__)
         self._client_id = client_id or self._client_id
         self._username = username or self._username
         self._private_key_file = private_key_file or self._private_key_file
@@ -39,18 +29,22 @@ class SalesforceApiClient:
         
         self._access_token = None
         self._instance_url = None
-        self.is_authenticated = False
+        self.authenticate() # Eager authentication on initialization
             
-    async def authenticate_async(self) -> bool:
-        """Authenticate with Salesforce using JWT and return success status (asynchronous)"""
-        print("Authenticating via JWT (async)...")
+    def authenticate(self) -> bool:
+        """Authenticate with Salesforce using JWT and return success status"""
+        print("Authenticating via JWT...")
     
-        # Read private key (synchronous file I/O - consider aiofiles for fully async)
+        # Read private key
         try:
-            with open(self._private_key_file, 'r') as f:
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            key_path = os.path.join(script_dir, self._private_key_file)
+            with open(key_path, 'r') as f:
                 private_key = f.read()
         except FileNotFoundError:
-            print(f"Error: Private key file '{self._private_key_file}' not found")
+            self.logger.error(f"Error: Private key file '{self._private_key_file}' not found")
+            self._access_token = None
+            self._instance_url = None
             return False
         
         # Create JWT payload
@@ -71,32 +65,45 @@ class SalesforceApiClient:
         }
         
         # Send authentication request
-        # For long-running apps, consider creating httpx.AsyncClient once and reusing it.
-        async with httpx.AsyncClient() as client:
+        with httpx.Client() as client:
             try:
-                resp = await client.post(self._auth_url, data=params)
-                resp.raise_for_status()  # Raises HTTPStatusError for 4xx/5xx responses
+                response = client.post(self._auth_url, data=params)
+                response.raise_for_status()
                 
-                # Store authentication results
-                data = resp.json()
-                self._access_token = data['access_token']
-                self._instance_url = data['instance_url']
-                print("Authentication successful!")
-                self.is_authenticated = True
-                return True
-            except httpx.HTTPStatusError as http_err:
-                print(f"Authentication HTTP error: {http_err} - Status: {http_err.response.status_code}")
-                try:
-                    print(http_err.response.json())
-                except json.JSONDecodeError:
-                    print(http_err.response.text)
-                return False
-            except httpx.RequestError as req_err:
-                print(f"Authentication request error: {str(req_err)}")
+                # Process response
+                auth_data = response.json()
+                self._access_token = auth_data.get('access_token')
+                self._instance_url = auth_data.get('instance_url')
+                
+                if self._access_token and self._instance_url:
+                    print("Authentication successful.")
+                    return True
+                else:
+                    error_msg = "Authentication completed but access_token or instance_url is missing."
+                    if not self._access_token:
+                        error_msg += " Access token is missing."
+                    if not self._instance_url:
+                        error_msg += " Instance URL is missing."
+                    print(error_msg)
+                    self._access_token = None # Ensure clean state
+                    self._instance_url = None
+                    return False
+                
+            except httpx.HTTPStatusError as e:
+                print(f"Authentication HTTP error: {e.response.status_code} - {e.response.text}")
+                self._access_token = None 
+                self._instance_url = None
                 return False
             except Exception as e:
-                print(f"Generic authentication error: {str(e)}")
+                print(f"Authentication error: {str(e)}")
+                self._access_token = None 
+                self._instance_url = None
                 return False
+
+    async def _ensure_authenticated_async(self):
+        if not self._access_token or not self._instance_url:
+            if not self.authenticate():
+                raise Exception("Salesforce authentication failed. Cannot proceed with API call.")
 
     async def create_event_async(self, subject: str, start_datetime: str, duration_minutes: int = 60, description: str | None = None, 
                    location: str | None = None, owner_id: str | None = None, 
@@ -115,11 +122,8 @@ class SalesforceApiClient:
             
         Returns:
             The ID of the created event if successful, None otherwise
-        """
-        if not self.is_authenticated:
-            print("Error: Not authenticated. Call await self.authenticate() first.")
-            return None
-        
+        """        
+        await self._ensure_authenticated_async()
         if not subject or not start_datetime:
             print("Error: Required event fields (subject, start_datetime) are missing")
             return None
@@ -192,10 +196,7 @@ class SalesforceApiClient:
         Returns:
             List of events if successful, None otherwise
         """
-        if not self.is_authenticated:
-            print("Error: Not authenticated. Call await self.authenticate() first.")
-            return None
-            
+        await self._ensure_authenticated_async()
         print("Retrieving events...")
         
         # Prepare headers
@@ -269,10 +270,7 @@ class SalesforceApiClient:
             A dictionary containing the person's type ('Contact' or 'Lead') and data,
             or None if no matching record is found.
         """
-        if not self.is_authenticated:
-            print("Error: Not authenticated. Call await self.authenticate() first.")
-            return None
-
+        await self._ensure_authenticated_async()
         headers = {
             'Authorization': f'Bearer {self._access_token}',
             'Content-Type': 'application/json'
@@ -366,94 +364,93 @@ class SalesforceApiClient:
             if describing that SObject failed. Returns None if the initial SObject
             list cannot be fetched.
         """
-        if not self._access_token or not self._instance_url:
-            print("Error: Not authenticated. Call authenticate() first.")
-            return None
+        await self._ensure_authenticated_async()
 
         headers = {'Authorization': f'Bearer {self._access_token}'}
         schema = {}
 
-        # 1. Get list of all SObjects metadata for URLs
-        all_sobjects_url = f"{self._instance_url}/services/data/{self._version_api}/sobjects/"
-        try:
-            print("Fetching list of all SObjects...")
-            resp = requests.get(all_sobjects_url, headers=headers)
-            resp.raise_for_status()
-            all_sobjects_data = resp.json()
-        except requests.exceptions.HTTPError as http_err_main:
-            print(f"HTTP error getting SObject list: {http_err_main} - Status: {resp.status_code if 'resp' in locals() else 'N/A'}")
-            try: print(json.dumps(resp.json(), indent=2))
-            except: print(resp.text if 'resp' in locals() else "No response text.")
-            return None
-        except Exception as e_main:
-            print(f"Error fetching SObject list: {str(e_main)}")
-            return None
-
-        # Determine the list of SObjects to describe
-        target_sobjects_info = []
-        all_sobjects_metadata_list = all_sobjects_data.get('sobjects', [])
-
-        if sobjects_to_describe:
-            s_name_to_url_map = {s_info['name']: s_info['urls']['describe'] 
-                                 for s_info in all_sobjects_metadata_list 
-                                 if 'name' in s_info and 'urls' in s_info and 'describe' in s_info['urls']}
-            for s_name in sobjects_to_describe:
-                if s_name in s_name_to_url_map:
-                    target_sobjects_info.append({'name': s_name, 'describe_url_path': s_name_to_url_map[s_name]})
-                else: # Fallback to constructing the URL if not found (e.g. object not in global list, or list was partial)
-                    target_sobjects_info.append({'name': s_name, 'describe_url_path': f"/services/data/{self._version_api}/sobjects/{s_name}/describe/"})
-            print(f"Will describe {len(target_sobjects_info)} specified SObjects: {', '.join(s_name for s_name in sobjects_to_describe)}")
-        else:
-            target_sobjects_info = [{'name': s_info['name'], 'describe_url_path': s_info['urls']['describe']}
-                                   for s_info in all_sobjects_metadata_list
-                                   if 'name' in s_info and 'urls' in s_info and 'describe' in s_info['urls']]
-            print(f"Found {len(target_sobjects_info)} SObjects. Describing all can be very slow and consume many API calls.")
-
-        total_objects_to_describe = len(target_sobjects_info)
-        for i, sobject_item in enumerate(target_sobjects_info):
-            s_name = sobject_item['name']
-            describe_url = f"{self._instance_url}{sobject_item['describe_url_path']}"
-            
-            print(f"Describing SObject {i+1}/{total_objects_to_describe}: {s_name}...")
+        async with httpx.AsyncClient() as client:
+            # 1. Get list of all SObjects metadata for URLs
+            all_sobjects_url = f"{self._instance_url}/services/data/{self._version_api}/sobjects/"
             try:
-                desc_resp = requests.get(describe_url, headers=headers)
-                desc_resp.raise_for_status()
-                s_description = desc_resp.json()
-                
-                fields_info = {}
-                for field in s_description.get('fields', []):
-                    field_name = field.get('name')
-                    is_pk = (field_name == 'Id')
-                    is_fk = field.get('type') == 'reference' and bool(field.get('referenceTo'))
-                    
-                    if include_fields or is_pk or is_fk:
-                        fields_info[field_name] = {
-                            'label': field.get('label'),
-                            'type': field.get('type'),
-                            'length': field.get('length', 0) if field.get('type') in ['string', 'textarea', 'phone', 'url', 'email', 'picklist', 'multipicklist', 'combobox', 'id', 'reference'] else None,
-                            'precision': field.get('precision') if field.get('type') in ['currency', 'double', 'percent', 'int', 'long'] else None,
-                            'scale': field.get('scale') if field.get('type') in ['currency', 'double', 'percent'] else None,
-                            'nillable': field.get('nillable'),
-                            'custom': field.get('custom'),
-                            'is_primary_key': is_pk,
-                            'is_foreign_key': is_fk,
-                            'references_to': field.get('referenceTo', []) if is_fk else []
-                        }
-                schema[s_name] = {'fields': fields_info}
-                
-                # Brief pause to avoid hitting rate limits too hard
-                if total_objects_to_describe > 10 and i < total_objects_to_describe - 1:
-                    time.sleep(0.2) # 200ms delay
+                print("Fetching list of all SObjects...")
+                resp = await client.get(all_sobjects_url, headers=headers)
+                resp.raise_for_status()
+                all_sobjects_data = resp.json()
+            except httpx.HTTPStatusError as http_err_main:
+                print(f"HTTP error getting SObject list: {http_err_main} - Status: {http_err_main.response.status_code}")
+                try: print(json.dumps(http_err_main.response.json(), indent=2))
+                except: print(http_err_main.response.text)
+                return None
+            except Exception as e_main:
+                print(f"Error fetching SObject list: {str(e_main)}")
+                return None
 
-            except requests.exceptions.HTTPError as http_err_desc:
-                error_detail = "Unknown error"
-                try: error_detail = json.dumps(desc_resp.json(), indent=2)
-                except: error_detail = desc_resp.text if 'desc_resp' in locals() and hasattr(desc_resp, 'text') else "No response text."
-                print(f"HTTP error describing SObject {s_name}: {http_err_desc} - Status: {desc_resp.status_code if 'desc_resp' in locals() else 'N/A'}. Details: {error_detail[:500]}")
-                schema[s_name] = {'error': f'Failed to describe: {str(http_err_desc)}'}
-            except Exception as e_desc:
-                print(f"Error describing SObject {s_name}: {str(e_desc)}")
-                schema[s_name] = {'error': f'Failed to describe: {str(e_desc)}'}
+            # Determine the list of SObjects to describe
+            target_sobjects_info = []
+            all_sobjects_metadata_list = all_sobjects_data.get('sobjects', [])
+
+            if sobjects_to_describe:
+                s_name_to_url_map = {s_info['name']: s_info['urls']['describe'] 
+                                     for s_info in all_sobjects_metadata_list 
+                                     if 'name' in s_info and 'urls' in s_info and 'describe' in s_info['urls']}
+                for s_name in sobjects_to_describe:
+                    if s_name in s_name_to_url_map:
+                        target_sobjects_info.append({'name': s_name, 'describe_url_path': s_name_to_url_map[s_name]})
+                    else: # Fallback to constructing the URL if not found (e.g. object not in global list, or list was partial)
+                        target_sobjects_info.append({'name': s_name, 'describe_url_path': f"/services/data/{self._version_api}/sobjects/{s_name}/describe/"})
+                print(f"Will describe {len(target_sobjects_info)} specified SObjects: {', '.join(s_name for s_name in sobjects_to_describe)}")
+            else:
+                target_sobjects_info = [{'name': s_info['name'], 'describe_url_path': s_info['urls']['describe']}
+                                       for s_info in all_sobjects_metadata_list
+                                       if 'name' in s_info and 'urls' in s_info and 'describe' in s_info['urls']]
+                print(f"Found {len(target_sobjects_info)} SObjects. Describing all can be very slow and consume many API calls.")
+
+            total_objects_to_describe = len(target_sobjects_info)
+            for i, sobject_item in enumerate(target_sobjects_info):
+                s_name = sobject_item['name']
+                describe_url = f"{self._instance_url}{sobject_item['describe_url_path']}"
+                
+                print(f"Describing SObject {i+1}/{total_objects_to_describe}: {s_name}...")
+                try:
+                    desc_resp = await client.get(describe_url, headers=headers)
+                    desc_resp.raise_for_status()
+                    s_description = desc_resp.json()
+                    
+                    fields_info = {}
+                    for field in s_description.get('fields', []):
+                        field_name = field.get('name')
+                        is_pk = (field_name == 'Id')
+                        is_fk = field.get('type') == 'reference' and bool(field.get('referenceTo'))
+                        
+                        if include_fields or is_pk or is_fk:
+                            fields_info[field_name] = {
+                                'label': field.get('label'),
+                                'type': field.get('type'),
+                                'length': field.get('length', 0) if field.get('type') in ['string', 'textarea', 'phone', 'url', 'email', 'picklist', 'multipicklist', 'combobox', 'id', 'reference'] else None,
+                                'precision': field.get('precision') if field.get('type') in ['currency', 'double', 'percent', 'int', 'long'] else None,
+                                'scale': field.get('scale') if field.get('type') in ['currency', 'double', 'percent'] else None,
+                                'nillable': field.get('nillable'),
+                                'custom': field.get('custom'),
+                                'is_primary_key': is_pk,
+                                'is_foreign_key': is_fk,
+                                'references_to': field.get('referenceTo', []) if is_fk else []
+                            }
+                    schema[s_name] = {'fields': fields_info}
+                    
+                    # Brief pause to avoid hitting rate limits too hard
+                    if total_objects_to_describe > 10 and i < total_objects_to_describe - 1:
+                        await asyncio.sleep(0.2) # 200ms delay
+
+                except httpx.HTTPStatusError as http_err_desc:
+                    error_detail = "Unknown error"
+                    try: error_detail = json.dumps(http_err_desc.response.json(), indent=2)
+                    except: error_detail = http_err_desc.response.text
+                    print(f"HTTP error describing SObject {s_name}: {http_err_desc} - Status: {http_err_desc.response.status_code}. Details: {error_detail[:500]}")
+                    schema[s_name] = {'error': f'Failed to describe: {str(http_err_desc)}'}
+                except Exception as e_desc:
+                    print(f"Error describing SObject {s_name}: {str(e_desc)}")
+                    schema[s_name] = {'error': f'Failed to describe: {str(e_desc)}'}
         
         return schema
 
@@ -473,7 +470,7 @@ class SalesforceApiClient:
             print("Make sure start_datetime is in ISO format (e.g., '2025-05-20T14:00:00Z')")
             return None
             
-    def _query_salesforce(self, soql_query: str) -> dict | None:
+    async def _query_salesforce(self, soql_query: str) -> dict | None:
         """Helper method to execute a SOQL query and return the full JSON response.
 
         Args:
@@ -483,36 +480,38 @@ class SalesforceApiClient:
             The full JSON response dictionary from Salesforce (includes 'records',
             'totalSize', 'done', 'nextRecordsUrl'), or None if an error occurs.
         """
+        # Authentication should be ensured by the public calling method using _ensure_authenticated
         if not self._access_token or not self._instance_url:
-            # This should ideally be checked before calling _query_salesforce by public methods
-            print("Error: Not authenticated. Call authenticate() first.") 
+             # This state should ideally not be reached if _ensure_authenticated was called.
+            print("Critical Error: _query_salesforce called without prior successful authentication.")
             return None
 
         headers = {'Authorization': f'Bearer {self._access_token}'}
-        encoded_query = requests.utils.quote(soql_query)
+        encoded_query = urllib.parse.quote(soql_query)
         url_query = f"{self._instance_url}/services/data/{self._version_api}/query/?q={encoded_query}"
         
         # print(f"Executing SOQL: {soql_query}") # Verbose, enable for deep debugging
-        try:
-            resp = requests.get(url_query, headers=headers)
-            resp.raise_for_status() # Will raise HTTPError for 4xx/5xx status codes
-            return resp.json()
-        except requests.exceptions.HTTPError as http_err:
-            error_message = f"SOQL Query HTTP error: {http_err} - Status: {resp.status_code if 'resp' in locals() else 'N/A'}. Query: {soql_query}"
-            print(error_message)
-            try: 
-                error_details = resp.json()
-                print(json.dumps(error_details, indent=2))
-            except json.JSONDecodeError:
-                print(f"Response text: {resp.text if 'resp' in locals() else 'No response text available.'}")
-            return None
-        except Exception as e:
-            print(f"SOQL Query general error: {str(e)}. Query: {soql_query}")
-            return None
+        async with httpx.AsyncClient() as client:
+            try:
+                resp = await client.get(url_query, headers=headers)
+                resp.raise_for_status() # Will raise HTTPStatusError for 4xx/5xx status codes
+                return resp.json()
+            except httpx.HTTPStatusError as http_err:
+                error_message = f"SOQL Query HTTP error: {http_err} - Status: {http_err.response.status_code}. Query: {soql_query}"
+                print(error_message)
+                try: 
+                    error_details = http_err.response.json()
+                    print(json.dumps(error_details, indent=2, ensure_ascii=False))
+                except json.JSONDecodeError:
+                    print(f"Response text: {http_err.response.text}")
+                return None
+            except Exception as e:
+                print(f"SOQL Query general error: {str(e)}. Query: {soql_query}")
+                return None
 
-    def get_leads_by_details(self, email: str | None = None, first_name: str | None = None, last_name: str | None = None, company_name: str | None = None) -> list[dict] | None:
+    async def get_leads_by_details_async(self, email: str | None = None, first_name: str | None = None, last_name: str | None = None, company_name: str | None = None) -> list[dict] | None:
         """
-        Retrieve active (non-converted) Leads based on email, name, or company.
+        Retrieve active (non-converted) Leads based on email, name, or company (asynchronous).
         Args:
             email: Email address to search for.
             first_name: First name to search for (requires last_name for effective name search).
@@ -522,9 +521,7 @@ class SalesforceApiClient:
             A list of matching Lead dictionaries, or None if a query error occurs.
             Returns an empty list if no matches are found but the query was successful.
         """
-        if not self._access_token or not self._instance_url: # Initial auth check for the public method
-            print("Error: Not authenticated. Call authenticate() first.") 
-            return None
+        await self._ensure_authenticated_async()
 
         conditions = ["IsConverted = false"]
         if email:
@@ -539,7 +536,7 @@ class SalesforceApiClient:
             conditions.append(f"Company = '{company_name}'")
 
         if len(conditions) == 1: # Only IsConverted = false, no other criteria
-            print("Error: At least one search criterion (email, full name, or company) must be provided for get_leads_by_details.")
+            print("Error: At least one search criterion (email, full name, or company) must be provided for get_leads_by_details_async.")
             return None # Or an empty list if that's preferred for bad input
 
         query_filter = " AND " + " AND ".join(f"({c})" for c in conditions[1:])
@@ -551,7 +548,7 @@ class SalesforceApiClient:
             "ORDER BY CreatedDate DESC LIMIT 200" # Added LIMIT for safety
         )
         
-        response_data = self._query_salesforce(soql_query)
+        response_data = await self._query_salesforce(soql_query)
         if response_data and response_data.get('records') is not None:
             return response_data['records']
         elif response_data is None: # Error occurred in _query_salesforce
@@ -559,18 +556,16 @@ class SalesforceApiClient:
         else: # Query successful, but no records found (e.g. response_data['records'] is empty list)
             return []
 
-    def get_opportunities_for_lead(self, lead_id: str) -> list[dict] | None:
+    async def get_opportunities_for_lead_async(self, lead_id: str) -> list[dict] | None:
         """
-        Retrieve Opportunities related to a specific Lead, primarily if converted.
+        Retrieve Opportunities related to a specific Lead, primarily if converted (asynchronous).
         Args:
             lead_id: The ID of the Salesforce Lead.
         Returns:
             A list of Opportunity dictionaries. Prioritizes ConvertedOpportunityId,
             then searches by ConvertedAccountId. Returns None on error, empty list if no related Opps found.
         """
-        if not self._access_token or not self._instance_url:
-            print("Error: Not authenticated. Call authenticate() first.") 
-            return None
+        await self._ensure_authenticated_async()
 
         if not lead_id:
             print("Error: lead_id must be provided.")
@@ -578,7 +573,7 @@ class SalesforceApiClient:
 
         # Step 1: Get Lead conversion details
         lead_info_soql = f"SELECT Id, IsConverted, ConvertedOpportunityId, ConvertedAccountId FROM Lead WHERE Id = '{lead_id}'"
-        lead_response = self._query_salesforce(lead_info_soql)
+        lead_response = await self._query_salesforce(lead_info_soql)
 
         if not lead_response or lead_response.get('records') is None:
             # _query_salesforce would have printed an error if lead_response is None
@@ -606,7 +601,10 @@ class SalesforceApiClient:
             print(f"Lead '{lead_id}' is not converted, or no ConvertedOpportunityId/ConvertedAccountId found. No direct Opportunities from conversion.")
             return []
 
-        opp_response = self._query_salesforce(opportunity_soql)
+        if not opportunity_soql: # Should not happen if logic above is correct, but as a safeguard.
+            return []
+
+        opp_response = await self._query_salesforce(opportunity_soql)
         if opp_response and opp_response.get('records') is not None:
             return opp_response['records']
         elif opp_response is None: # Error in _query_salesforce
