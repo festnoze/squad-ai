@@ -1,0 +1,6 @@
+pillow 
+jinja2 
+beautifulsoup4 
+langchain-openai
+langchain-community
+langchain
