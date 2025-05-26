@@ -66,7 +66,7 @@ class OCRFolderImages:
                         SystemMessage(content="You are a vision model"),
                         HumanMessage(content=[
                             {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{img_content}"}},
-                            {"type": "text", "text": "Transcribe carefully all text from the image, exactly as it appears, letter by letter. Do not correct, modify, or normalize any words, even if you do not recognize them. Split text on natural line breaks and return a JSON array `elements` where each element has {type:text|table|image,bbox:[x1,y1,x2,y2],text?}.\nTake care of transcribing tables and included images correctly. Do not include any title or external context in the transcribed text output."}
+                            {"type": "text", "text": "Analyze this image and extract all elements. Transcribe text exactly as it appears, letter by letter without corrections. For diagrams, charts, illustrations or any non-textual elements, identify them as 'image' type with precise bounding boxes.\n\nReturn a JSON array `elements` where each element has:\n- type: 'text', 'table', or 'image'\n- bbox: [x1,y1,x2,y2] with precise coordinates\n- text: transcribed content (for text elements only)\n\nIMPORTANT: Be very careful with non-textual elements like diagrams, illustrations, or charts - mark them as 'image' type with accurate bounding boxes. Even small diagrams or figures must be identified.\n\nDo not include any document title or external context in the transcribed output."}
                         ])
                 ]
                 resp: str = self.llm.invoke(msg, response_format={"type": "json_object"}).content
@@ -130,14 +130,23 @@ class OCRFolderImages:
                     x1, y1, x2, y2 = el["bbox"]
                     w, h = x2 - x1, y2 - y1
                     if el["type"] == "image":
-                        crop = img.crop((x1, y1, x2, y2))
-                        page_number_str = Path(html_name).stem
-                        img_filename = f"page{page_number_str}_img{img_counter_for_page}.png"
-                        img_save_path = self.page_img_out_dir / img_filename
-                        crop.save(img_save_path)
-                        img_src_relative_path = f"page_images/{img_filename}" # Relative to html file in self.out
-                        blocks.append(f'<div class="element" style="margin-bottom:10px;"><img src="{img_src_relative_path}" style="max-width:100%;"></div>')
-                        img_counter_for_page += 1
+                        # Validate that the bounding box has reasonable dimensions (minimum size check)
+                        min_dimension_pixels = 50  # Minimum image dimension threshold
+                        if (x2 - x1) >= min_dimension_pixels and (y2 - y1) >= min_dimension_pixels:
+                            # Ensure coordinates are within image bounds
+                            x1, y1 = max(0, x1), max(0, y1)
+                            x2, y2 = min(w0, x2), min(h0, y2)
+                            
+                            crop = img.crop((x1, y1, x2, y2))
+                            page_number_str = Path(html_name).stem
+                            img_filename = f"page{page_number_str}_img{img_counter_for_page}.png"
+                            img_save_path = self.page_img_out_dir / img_filename
+                            crop.save(img_save_path)
+                            img_src_relative_path = f"page_images/{img_filename}" # Relative to html file in self.out
+                            blocks.append(f'<div class="element" style="margin-bottom:10px;"><img src="{img_src_relative_path}" style="max-width:100%;"></div>')
+                            img_counter_for_page += 1
+                        else:
+                            print(f"\r  - Skipping too small image element: {x1},{y1},{x2},{y2}", end="")
                     else:
                         lines = ''.join(f'<p>{l}</p>' for l in el["text"].splitlines() if l.strip())
                         blocks.append(f'<div class="element" style="margin-bottom:10px;">{lines}</div>')
