@@ -1,23 +1,29 @@
 from advanced_image_processor import AdvancedImageProcessor
 import os
 from pathlib import Path
-
-api_key = os.getenv("OPENAI_API_KEY")
-if not api_key:
-    raise ValueError("Please set the OPENAI_API_KEY environment variable.")
+import json
+import shutil
 
 sub_folder_to_process = "images_to_ocr"
 current_folder = os.path.dirname(os.path.abspath(__file__))
 img_folder = Path(os.path.join(current_folder, sub_folder_to_process))
 html_folder = img_folder / "html"
+output_file = img_folder / "advanced_ocr_results.json"
+
+title = "La Stratégie des Douze Points Magiques de Dr Tan"
+
 # Clean up any existing HTML folder before processing
 if html_folder.exists():
-    import shutil
     print(f"Removing existing HTML output folder: {html_folder}")
     shutil.rmtree(html_folder)
 
+if output_file.exists():
+    print(f"Removing existing output file: {output_file}")
+    output_file.unlink()
 
 if list(img_folder.glob("*.png")) or list(img_folder.glob("*.jpg")) or list(img_folder.glob("*.jpeg")):
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key: raise ValueError("Please set the OPENAI_API_KEY environment variable.")
     processor = AdvancedImageProcessor(folder_path=str(img_folder), openai_api_key=api_key)
     
     # Process the folder to extract text and tables from images
@@ -25,15 +31,12 @@ if list(img_folder.glob("*.png")) or list(img_folder.glob("*.jpg")) or list(img_
     all_results = processor.process_folder()
 
     # Save results to JSON
-    output_file = img_folder / "advanced_ocr_results.json"
-    import json
     with open(output_file, 'w', encoding='utf-8') as f:
         json.dump(all_results, f, ensure_ascii=False, indent=4)
     print(f"\nResults saved to {output_file}")
     
     # Generate HTML pages from the results
     print("\n=== Generating HTML Pages ===\n")
-    title = f"OCR Results for {img_folder.name}"
     html_dir = processor.render_html_pages(title=title)
     viewer_path = html_dir / "viewer.html"
     
