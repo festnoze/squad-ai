@@ -26,8 +26,8 @@ class AdvancedImageProcessor:
 
         self.llm = ChatOpenAI(
             model_name="gpt-4o",
-            temperature=0,
-            max_tokens=4096,
+            temperature=0.0,
+            max_tokens=16000,
             api_key=openai_api_key
         )
 
@@ -80,7 +80,11 @@ class AdvancedImageProcessor:
                     )
                 ]
             )
-            return response.content
+            result = response.content
+            result = result.replace("```markdown\n", "").replace("```plaintext\n", "").replace("```", "")
+            result = result.replace("Here is the extracted text from the image:", "").replace("Voici le texte extrait de l'image :", "")
+            
+            return result
         except Exception as e:
             print(f"Error extracting text with LLM: {e}")
             return ""
@@ -104,7 +108,11 @@ class AdvancedImageProcessor:
                     )
                 ]
             )
-            return response.content
+            result = response.content
+            result = result.replace("```markdown\n", "").replace("```plaintext\n", "").replace("```", "")
+            result = result.replace("Here is the extracted table from the image:", "").replace("Voici le tableau extrait de l'image :", "")
+            
+            return result        
         except Exception as e:
             print(f"Error extracting table with LLM: {e}")
             return ""
@@ -471,9 +479,23 @@ class AdvancedImageProcessor:
                                 table_html += '</table></div>'
                                 blocks.append(f'<div class="element" style="margin-bottom:10px;">{table_html}</div>')
                             else:
-                                # Regular text content
-                                lines = ''.join(f'<p>{l}</p>' for l in content.splitlines() if l.strip())
-                                blocks.append(f'<div class="element" style="margin-bottom:10px;">{lines}</div>')
+                                # # Regular text content
+                                # lines = ''.join(f'<p>{l}</p>' for l in content.splitlines() if l.strip())
+                                # blocks.append(f'<div class="element" style="margin-bottom:10px;">{lines}</div>')
+                                paragraphs = []
+                                current_para = []
+                                for line in content.splitlines():
+                                    if line.strip():
+                                        current_para.append(line.strip())
+                                    elif current_para:  # Empty line and we have content
+                                        paragraphs.append(' '.join(current_para))
+                                        current_para = []
+                                
+                                if current_para:  # Add the last paragraph if exists
+                                    paragraphs.append(' '.join(current_para))
+                                
+                                formatted_content = ''.join(f'<p>{p}</p>' for p in paragraphs)
+                                blocks.append(f'<div class="element" style="margin-bottom:10px;">{formatted_content}</div>')
             
             # Create the HTML page using template
             tpl = Template("""<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{margin:0;font-family:Arial;padding:20px;} .content{max-width:100%;}</style></head><body><div class="content">{{b|safe}}</div></body></html>""")
