@@ -157,7 +157,7 @@ class AdvancedImageProcessor:
 
             # Extract directly all text and tables from the full image
             # Add a tuple with: (task coroutine, image index, target type, field name)
-            all_extraction_tasks.append((self._extract_whole_image_with_llm(image_pil.copy()), len(self.results), "whole", "content"))
+            #to activate to add whole image OCR : analysis all_extraction_tasks.append((self._extract_whole_image_with_llm(image_pil.copy()), len(self.results), "whole", "content"))
 
             # Perform layout analysis
             layout_out, _ = self.layout_parser.parse(image_pil.copy())
@@ -219,7 +219,7 @@ class AdvancedImageProcessor:
 
         # Execute extraction tasks in batches
         print(f"\nPrepared {len(all_extraction_tasks)} LLM extraction tasks. Processing in batches...")
-        batch_size = 20  # Maximum number of parallel calls
+        batch_size = 50  # Maximum number of parallel calls
         
         # Process all extraction tasks in batches
         batch_start = time.time()
@@ -292,7 +292,7 @@ class AdvancedImageProcessor:
             image_path = Path(result["image_path"])
             html_name = f"{i+1}.html"  # Start with page 1
             self.html_pages.append(html_name)
-            self._render_page(image_path, html_name, result["elements"], result["whole"], mode="both")
+            self._render_page(image_path, html_name, result["elements"], None, mode="elements")
             print(f"Rendered HTML page {i+1}/{len(self.results)}: {html_name}")
             
         # Build index and viewer pages
