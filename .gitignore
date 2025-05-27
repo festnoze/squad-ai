@@ -29,6 +29,7 @@ structures_descriptions*/
 
 images_to_ocr/
 venv/
+venv*/
 
 /Include
 /Lib
