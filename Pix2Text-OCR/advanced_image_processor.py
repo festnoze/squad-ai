@@ -27,9 +27,14 @@ class AdvancedImageProcessor:
         self.llm = ChatOpenAI(
             model_name="gpt-4o",
             temperature=0.0,
-            max_tokens=16000,
+            max_tokens=4096,
             api_key=openai_api_key
         )
+        # Track token usage and cost
+        self.token_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+        self.cost_per_1k_prompt_tokens = 0.01  # $0.01 per 1K prompt tokens for GPT-4o
+        self.cost_per_1k_completion_tokens = 0.03  # $0.03 per 1K completion tokens for GPT-4o
+        self.total_cost = 0.0
 
         device = select_device(None)  # Auto-select device ('cpu', 'cuda', etc.)
         self.layout_parser = DocXLayoutParser.from_config(config=None, device=device)
@@ -82,8 +87,11 @@ class AdvancedImageProcessor:
             )
             result = response.content
             result = result.replace("```markdown\n", "").replace("```plaintext\n", "").replace("```", "")
-            result = result.replace("Here is the extracted text from the image:", "").replace("Voici le texte extrait de l'image :", "")
-            
+            result = result.replace("The image does not contain any text.", "").replace("Here is the extracted text from the image:", "").replace("Voici le texte extrait de l'image :", "").replace("Sure, here is the extracted text from the image:", "")
+            # Filter out text containing variations of document title to avoid duplicates
+            title_fragments = ["La Stratégie des", "Douze Points", "Magiques", "Dr Tan"]
+            if len([fragment for fragment in title_fragments if fragment in result]) >= 2 and len(result) < 100:
+                result = ""
             return result
         except Exception as e:
             print(f"Error extracting text with LLM: {e}")
@@ -141,7 +149,7 @@ class AdvancedImageProcessor:
             print(f"Error extracting text with LLM: {e}")
             return ""
 
-    async def process_folder_async(self) -> List[Dict[str, Any]]:
+    async def process_folder_async(self, mode :str = "elements") -> List[Dict[str, Any]]:
         self.results = []
         image_files = sorted([
             p for p in self.folder_path.glob("*") 
@@ -165,60 +173,64 @@ class AdvancedImageProcessor:
 
             # Extract directly all text and tables from the full image
             # Add a tuple with: (task coroutine, image index, target type, field name)
-            #to activate to add whole image OCR : analysis all_extraction_tasks.append((self._extract_whole_image_with_llm(image_pil.copy()), len(self.results), "whole", "content"))
+            #to activate to add whole image OCR : 
+            if mode == "whole" or mode == "both":
+                all_extraction_tasks.append((self._extract_whole_image_with_llm(image_pil.copy()), len(self.results), "whole", "content"))
 
-            # Perform layout analysis
-            layout_out, _ = self.layout_parser.parse(image_pil.copy())
-            
-            print(f"  Layout analysis found {len(layout_out)} elements.")
-
-            # Prepare elements data and extraction tasks
-            image_elements_data = []
-            for el_idx, element_info in enumerate(layout_out):
-                element_type = element_info['type']
-                box_coords_list = box2list(element_info['position'])
-                pil_crop_box = (box_coords_list[0], box_coords_list[1], box_coords_list[2], box_coords_list[3])
+            #to activate to add element OCR :
+            image_elements_data = [] 
+            if mode == "elements" or mode == "both":
+                # Perform layout analysis
+                layout_out, _ = self.layout_parser.parse(image_pil.copy())
                 
-                cropped_image_pil = image_pil.crop(pil_crop_box)
-                element_data = {
-                    "id": el_idx,
-                    "type": element_type.name, 
-                    "box_pix2text": box_coords_list,
-                    "content_llm": None,
-                    "content_pix2text_table_ocr": None
-                }
+                print(f"  Layout analysis found {len(layout_out)} elements.")
 
-                # Create extraction tasks based on element type
-                if element_type in (ElementType.TEXT, ElementType.TITLE, ElementType.FORMULA):
-                    print(f"    Preparing text extraction for element {el_idx} ({element_type.name})...")
-                    # Add to extraction tasks list without awaiting
-                    # Add a tuple with: (task coroutine, mapping index, target type, field name)
-                    all_extraction_tasks.append((self._extract_text_with_llm(cropped_image_pil), len(all_elements_mapping), "element", "content_llm"))
-                
-                elif element_type == ElementType.TABLE:
-                    print(f"    Preparing table extraction for element {el_idx} ({element_type.name})...")
-                    # Process TableOCR (synchronous) immediately
-                    try:
-                        table_recognition_result = self.table_ocr.recognize(cropped_image_pil.copy(), out_markdown=True)
-                        element_data["content_pix2text_table_ocr"] = table_recognition_result.get('markdown', '')
-                    except Exception as e:
-                        print(f"      Error with Pix2Text TableOCR: {e}")
-                        element_data["content_pix2text_table_ocr"] = f"Error: {e}"
+                # Prepare elements data and extraction tasks
+                for el_idx, element_info in enumerate(layout_out):
+                    element_type = element_info['type']
+                    box_coords_list = box2list(element_info['position'])
+                    pil_crop_box = (box_coords_list[0], box_coords_list[1], box_coords_list[2], box_coords_list[3])
+                    
+                    cropped_image_pil = image_pil.crop(pil_crop_box)
+                    element_data = {
+                        "id": el_idx,
+                        "type": element_type.name, 
+                        "box_pix2text": box_coords_list,
+                        "content_llm": None,
+                        "content_pix2text_table_ocr": None
+                    }
 
-                    # Add LLM table extraction to tasks list
-                    # Add a tuple with: (task coroutine, mapping index, target type, field name)
-                    all_extraction_tasks.append((self._extract_table_with_llm(cropped_image_pil), len(all_elements_mapping), "element", "content_llm"))
-                
-                elif element_type == ElementType.FIGURE:
-                    print(f"    Element {el_idx} is a FIGURE. Skipping LLM extraction for now.")
-                    element_data["content_llm"] = "Figure - no text/table extraction performed."
-                
-                else:
-                    print(f"    Element {el_idx} is of type {element_type.name}. Skipping LLM extraction.")
+                    # Create extraction tasks based on element type
+                    if element_type in (ElementType.TEXT, ElementType.TITLE, ElementType.FORMULA):
+                        print(f"    Preparing text extraction for element {el_idx} ({element_type.name})...")
+                        # Add to extraction tasks list without awaiting
+                        # Add a tuple with: (task coroutine, mapping index, target type, field name)
+                        all_extraction_tasks.append((self._extract_text_with_llm(cropped_image_pil), len(all_elements_mapping), "element", "content_llm"))
+                    
+                    elif element_type == ElementType.TABLE:
+                        print(f"    Preparing table extraction for element {el_idx} ({element_type.name})...")
+                        # Process TableOCR (synchronous) immediately
+                        try:
+                            table_recognition_result = self.table_ocr.recognize(cropped_image_pil.copy(), out_markdown=True)
+                            element_data["content_pix2text_table_ocr"] = table_recognition_result.get('markdown', '')
+                        except Exception as e:
+                            print(f"      Error with Pix2Text TableOCR: {e}")
+                            element_data["content_pix2text_table_ocr"] = f"Error: {e}"
 
-                image_elements_data.append(element_data)
-                all_elements_mapping.append((len(self.results), len(image_elements_data) - 1))
-            
+                        # Add LLM table extraction to tasks list
+                        # Add a tuple with: (task coroutine, mapping index, target type, field name)
+                        all_extraction_tasks.append((self._extract_table_with_llm(cropped_image_pil), len(all_elements_mapping), "element", "content_llm"))
+                    
+                    elif element_type == ElementType.FIGURE:
+                        print(f"    Element {el_idx} is a FIGURE. Skipping LLM extraction for now.")
+                        element_data["content_llm"] = "Figure - no text/table extraction performed."
+                    
+                    else:
+                        print(f"    Element {el_idx} is of type {element_type.name}. Skipping LLM extraction.")
+
+                    image_elements_data.append(element_data)
+                    all_elements_mapping.append((len(self.results), len(image_elements_data) - 1))
+                
             self.results.append({
                 "image_path": str(image_path),
                 "elements": image_elements_data,
@@ -260,12 +272,12 @@ class AdvancedImageProcessor:
         print("\nAll images and elements processed.")
         return self.results
 
-    def process_folder(self) -> List[Dict[str, Any]]:
+    def process_folder(self, mode:str = "elements") -> List[Dict[str, Any]]:
         """Synchronous wrapper for process_folder_async"""
         loop = asyncio.get_event_loop()
-        return loop.run_until_complete(self.process_folder_async())
+        return loop.run_until_complete(self.process_folder_async(mode=mode))
         
-    def render_html_pages(self, title: str = None) -> Path:
+    def render_html_pages(self, title: str = None, mode:str = "elements") -> Path:
         """Generate HTML pages from the results of process_folder()
         
         Args:
@@ -300,7 +312,9 @@ class AdvancedImageProcessor:
             image_path = Path(result["image_path"])
             html_name = f"{i+1}.html"  # Start with page 1
             self.html_pages.append(html_name)
-            self._render_page(image_path, html_name, result["elements"], None, mode="elements")
+            whole_result = result.get("whole")
+            elements_result = result.get("elements")
+            self._render_page(image_path, html_name, elements_result, whole_result, mode=mode)
             print(f"Rendered HTML page {i+1}/{len(self.results)}: {html_name}")
             
         # Build index and viewer pages
@@ -443,9 +457,12 @@ class AdvancedImageProcessor:
                         if (x2 - x1) >= min_dimension_pixels and (y2 - y1) >= min_dimension_pixels:
                             crop = img.crop((x1, y1, x2, y2))
                             page_number_str = Path(html_name).stem
-                            img_filename = f"page{page_number_str}_img{img_counter_for_page}.png"
-                            img_save_path = self.page_img_out_dir / img_filename
-                            crop.save(img_save_path)
+                            img_filename_jpg = f"page{page_number_str}_img{img_counter_for_page}.jpg"
+                            
+                            # img_save_path = self.page_img_out_dir / img_filename
+                            # crop.save(img_save_path)
+                            img_filename = self._save_compressed_file(crop, self.page_img_out_dir, img_filename_jpg)
+                            
                             img_src_relative_path = f"page_images/{img_filename}"
                             blocks.append(f'<div class="element" style="margin-bottom:10px;"><img src="{img_src_relative_path}" style="max-width:100%;"></div>')
                             img_counter_for_page += 1
@@ -467,8 +484,7 @@ class AdvancedImageProcessor:
                                         cells = line.split('|')[1:-1]  # Remove first and last empty cells
                                         if all(c.strip().startswith(':--') or c.strip() == '--' for c in cells):
                                             in_header = False
-                                            continue
-                                        
+                                            continue                                        
                                         row_tag = 'th' if in_header else 'td'
                                         table_html += '<tr>'
                                         for cell in cells:
@@ -757,3 +773,21 @@ class AdvancedImageProcessor:
             <div id="container"><iframe id="frame"></iframe></div>
         </body></html>'''
         (self.html_out_dir / "viewer.html").write_text(viewer_html, encoding="utf-8")
+
+    def _save_compressed_file(self, crop: Image.Image, page_img_out_dir:str, img_filename_jpg: str):
+        img_save_path_jpg = page_img_out_dir / img_filename_jpg
+        current_img_filename = img_filename_jpg # Assume JPG success initially
+
+        try:
+            temp_crop_for_jpeg = crop.copy() # Work on a copy for conversion to avoid altering original crop if PNG fallback is needed
+            if temp_crop_for_jpeg.mode in ('RGBA', 'LA') or \
+                (temp_crop_for_jpeg.mode == 'P' and 'transparency' in temp_crop_for_jpeg.info):
+                temp_crop_for_jpeg = temp_crop_for_jpeg.convert('RGB')
+            temp_crop_for_jpeg.save(img_save_path_jpg, format='JPEG', quality=85, optimize=True)
+            return current_img_filename
+        except OSError as e:
+            print(f"Warning: Could not save {img_filename_jpg} as JPEG ({e}). Falling back to PNG.")
+            current_img_filename = f"{img_filename_jpg.split('.')[0]}.png" # Revert to .png
+            img_save_path_png = page_img_out_dir / current_img_filename
+            crop.save(img_save_path_png, format='PNG') # Save original crop as PNG
+            return current_img_filename

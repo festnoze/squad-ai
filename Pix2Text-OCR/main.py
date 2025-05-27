@@ -28,7 +28,8 @@ if list(img_folder.glob("*.png")) or list(img_folder.glob("*.jpg")) or list(img_
     
     # Process the folder to extract text and tables from images
     print("\n=== Processing Images ===\n")
-    all_results = processor.process_folder()
+    mode = "elements" # "whole" # "elements" # "both"
+    all_results = processor.process_folder(mode=mode)
 
     # Save results to JSON
     with open(output_file, 'w', encoding='utf-8') as f:
@@ -37,7 +38,7 @@ if list(img_folder.glob("*.png")) or list(img_folder.glob("*.jpg")) or list(img_
     
     # Generate HTML pages from the results
     print("\n=== Generating HTML Pages ===\n")
-    html_dir = processor.render_html_pages(title=title)
+    html_dir = processor.render_html_pages(title=title, mode=mode)
     viewer_path = html_dir / "viewer.html"
     
     # Print the path to the viewer HTML file
