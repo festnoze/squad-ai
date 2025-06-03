@@ -1,9 +1,10 @@
-from typing import TypedDict, Dict, Any, Annotated, Sequence
+from typing import TypedDict, Annotated, Sequence
 import operator
 
-class ConversationState(TypedDict):
+class PhoneConversationState(TypedDict):
     """Represents the state of the conversation at any point."""
     call_sid: str
+    caller_phone: str
     user_input: str
     history: Annotated[Sequence[tuple[str, str]], operator.add]
-    agent_scratchpad: Dict[str, Any]
+    agent_scratchpad: dict[str, any]

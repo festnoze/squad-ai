@@ -12,7 +12,7 @@ from pydub import AudioSegment
 from pydub.effects import normalize
 from fastapi import WebSocket
 #
-from app.agents.conversation_state_model import ConversationState
+from app.agents.phone_conversation_state_model import PhoneConversationState
 from app.speech.outgoing_audio_manager import OutgoingAudioManager
 from app.speech.speech_to_text import SpeechToTextProvider
 from app.agents.agents_graph import AgentsGraph
@@ -41,7 +41,7 @@ class IncomingAudioManager:
         self.start_time = None
         self.conversation_id = None
         self.stream_states = {}
-        self.phones = {}  # Map call_sid to phone numbers
+        self.phones_by_call_sid = {}  # Map call_sid to phone numbers
         self.compiled_graph : AgentsGraph = compiled_graph
         self.openai_client = None
         self.rag_interrupt_flag = {"interrupted": False}
@@ -65,6 +65,10 @@ class IncomingAudioManager:
         self.stream_sid = stream_sid
         self.outgoing_audio_processing.update_stream_sid(stream_sid)        
         self.logger.info(f"Updated Incoming / Outgoing AudioManagers to stream SID: {stream_sid}")
+
+    def set_phone_number(self, phone_number: str, stream_sid: str) -> None:
+        self.phone_number = phone_number
+        self.phones_by_call_sid[stream_sid] = phone_number
     
     def is_speech(self, audio_chunk: bytes, frame_duration_ms=30) -> bool:
         """
@@ -174,21 +178,23 @@ class IncomingAudioManager:
     async def handle_incoming_websocket_start_event_async(self, call_sid: str, stream_sid: str) -> str:
         """Handle the 'start' event from Twilio which begins a new call."""
         
+        phone_number = self.phones_by_call_sid.get(call_sid)
+        if phone_number is None:
+            self.logger.error(f"Phone number not found for call SID: {call_sid}")
+            return None
         self.start_time = time.time()
-        self.logger.info(f"Call started - CallSid: {call_sid}, StreamSid: {stream_sid}")
+        self.logger.info(f"--- Call started --- \nPhone number: {phone_number}, CallSid: {call_sid}, StreamSid: {stream_sid}.")
         self.set_stream_sid(stream_sid)
-                
-        # Initialize conversation state for this stream
-        phone_number = self.phones.get(call_sid, "Unknown")
+        self.set_phone_number(phone_number, stream_sid)
         
         # Create initial state for the graph
-        initial_state: ConversationState = {
-            "call_sid": call_sid,
-            "caller_phone": phone_number,
-            "user_input": "",
-            "history": [],
-            "agent_scratchpad": {}
-        }
+        initial_state: PhoneConversationState = PhoneConversationState(
+            call_sid=call_sid,
+            caller_phone=phone_number,
+            user_input="",
+            history=[],
+            agent_scratchpad={}
+        )
         
         # Store the initial state for this stream (used by graph and other handlers)
         self.stream_states[stream_sid] = initial_state
@@ -303,9 +309,9 @@ class IncomingAudioManager:
         try:
             # Get the current state
             if self.stream_sid in self.stream_states:
-                current_state : ConversationState= self.stream_states[self.stream_sid]
+                current_state : PhoneConversationState= self.stream_states[self.stream_sid]
             else:
-                current_state : ConversationState = {
+                current_state : PhoneConversationState = {
                     "call_sid": self.call_sid,
                     "caller_phone": self.phone_number,
                     "user_input": user_query,

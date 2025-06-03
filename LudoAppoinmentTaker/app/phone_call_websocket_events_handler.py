@@ -134,6 +134,8 @@ class PhoneCallWebsocketEventsHandler:
         self.phones[call_sid] = calling_phone_number
         
         self.incoming_audio_processing.set_stream_sid(call_sid)
+        self.incoming_audio_processing.set_phone_number(calling_phone_number, call_sid)
+
         self.outgoing_audio_processing.run_background_streaming_worker()
         self.logger.info("Audio stream manager initialized and started with optimized parameters")
 

@@ -10,7 +10,6 @@
             "type": "debugpy",
             "request": "launch",
             "program": "main.py",
-            "args": ["--folder", "images_to_ocr"],
             "console": "integratedTerminal"
         }
     ]

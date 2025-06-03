@@ -6,7 +6,7 @@ from uuid import UUID
 from langgraph.graph import StateGraph, END
 
 # Models
-from app.agents.conversation_state_model import ConversationState
+from app.agents.phone_conversation_state_model import PhoneConversationState
 from app.api_client.request_models.user_request_model import UserRequestModel, DeviceInfoRequestModel
 from app.api_client.request_models.conversation_request_model import ConversationRequestModel
 from app.api_client.request_models.query_asking_request_model import QueryAskingRequestModel
@@ -45,7 +45,7 @@ class AgentsGraph:
         self.graph = self._build_graph()
         
     def _build_graph(self):
-        workflow = StateGraph(ConversationState)
+        workflow = StateGraph(PhoneConversationState)
         self.logger.info("Agents graph ongoing creation.")
 
         # Add nodes
@@ -91,7 +91,7 @@ class AgentsGraph:
         self.logger.info("Agents graph compiled successfully.")
         return app_graph
 
-    async def router(self, state: ConversationState) -> dict:
+    async def router(self, state: PhoneConversationState) -> dict:
         if not state.get('agent_scratchpad', None):
             state['agent_scratchpad'] = {}
         if state.get('user_input', None):
@@ -111,7 +111,7 @@ class AgentsGraph:
             state['agent_scratchpad']["next_agent_needed"] = "initialization"
         return state
 
-    async def send_welcome_message_and_init_backend_conversation(self, state: ConversationState) -> dict:        
+    async def send_welcome_message_and_init_backend_conversation(self, state: PhoneConversationState) -> dict:        
         self.logger.info(f"Initializing conversation for {state.get('caller_phone')}")     
         
         welcome_text = """\
@@ -153,7 +153,7 @@ class AgentsGraph:
             self.logger.error(f"Error creating conversation: {str(e)}")
             return str(uuid.uuid4())
     
-    async def retrieve_saleforce_account_info(self, state: ConversationState) -> dict:        
+    async def retrieve_saleforce_account_info(self, state: PhoneConversationState) -> dict:        
         self.logger.info(f"Initializing SF Agent")
         call_sid = state.get('call_sid', 'N/A')
         phone_number = state.get('caller_phone', 'N/A')
@@ -162,7 +162,7 @@ class AgentsGraph:
         state['agent_scratchpad']['sf_account_info'] = sf_account_info
         self.logger.info(f"[{call_sid}] Stored sf_account_info: {sf_account_info} in agent_scratchpad")
     
-    async def initialization(self, state: ConversationState) -> dict:
+    async def initialization(self, state: PhoneConversationState) -> dict:
         """Determines the first agent to handle the query based on the conversation state."""
         call_sid = state.get('call_sid', 'N/A')
         phone_number = state.get('caller_phone', 'N/A')
@@ -179,6 +179,7 @@ class AgentsGraph:
         else:
             return {"next": "END"}
 
+        # TODO: Following is bypassed
         # Check if this is a returning user with SF info
         if state.get('agent_scratchpad', {}).get('sf_account_info'):
             self.logger.info(f"[{call_sid}] Routing to calendar_agent (returning user)")
@@ -198,7 +199,7 @@ class AgentsGraph:
         self.logger.info(f"[{call_sid}] Default routing to lead_agent")
         return {"next": "lead_agent"}
 
-    async def lead_agent_node(self, state: ConversationState) -> dict:
+    async def lead_agent_node(self, state: PhoneConversationState) -> dict:
         """Handles lead qualification and information gathering using LeadAgent."""
         call_sid = state.get('call_sid', 'N/A')
         self.logger.info(f"[{call_sid}] Entering Lead Agent node")
@@ -289,7 +290,7 @@ class AgentsGraph:
             error_scratchpad['error'] = str(e)
             return {"history": [("Human", user_input), ("AI", response_text)], "agent_scratchpad": error_scratchpad}
 
-    async def sf_agent_node(self, state: ConversationState) -> dict:
+    async def sf_agent_node(self, state: PhoneConversationState) -> dict:
         """Handles Salesforce account lookup using SFAgent."""
         call_sid = state.get('call_sid', 'N/A')
         phone = state.get('caller_phone', '')
@@ -344,7 +345,7 @@ class AgentsGraph:
                 "agent_scratchpad": {"error": str(e), "next_agent_needed": "lead_agent"}
             }
 
-    async def calendar_agent_node(self, state: ConversationState) -> dict:
+    async def calendar_agent_node(self, state: PhoneConversationState) -> dict:
         """Handles calendar operations using CalendarAgent."""
         call_sid = state.get('call_sid', 'N/A')
         user_input = state.get('user_input', '')
@@ -394,7 +395,7 @@ class AgentsGraph:
                 "agent_scratchpad": {"error": str(e)}
             }
 
-    async def decide_next_step(self, state: ConversationState) -> str:
+    async def decide_next_step(self, state: PhoneConversationState) -> str:
         """Determines the next node to visit based on the current state."""
         call_sid = state.get('call_sid', 'N/A')
         self.logger.info(f"[~{call_sid[-4:]}] Deciding next step")
@@ -427,7 +428,7 @@ class AgentsGraph:
         self.logger.info(f"[~{call_sid[-4:]}] No specific routing condition met, ending graph run.")
         return END
 
-    async def query_rag_api_about_trainings_agent_node(self, state: ConversationState) -> dict:
+    async def query_rag_api_about_trainings_agent_node(self, state: PhoneConversationState) -> dict:
         """Handle the course agent node."""
         call_sid = state.get('call_sid', 'N/A')
         user_query = state.get('user_input', '')

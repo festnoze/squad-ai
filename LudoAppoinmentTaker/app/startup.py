@@ -1,8 +1,12 @@
 import os
 from app.api_config import ApiConfig
+import shutil
 
-# Empty logs and temporary audio files
-os.system("rm -rf outputs/logs/*")
-os.system("rm -rf static/audio/*")
+# Clear logs and temporary audio files
+for folder in ["outputs/logs", "static/audio"]:
+    if os.path.exists(folder):
+        shutil.rmtree(folder)
+    os.makedirs(folder, exist_ok=True)
 
+# Start the app
 app = ApiConfig.create_app()

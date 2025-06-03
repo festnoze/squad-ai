@@ -1,4 +1,3 @@
-import random
 import datetime
 import json # Added for pretty printing schema
 from salesforce_api_client import SalesforceApiClient
@@ -80,7 +79,10 @@ def handle_get_events(client: SalesforceApiClient):
             date_str = start.strftime('%d/%m/%Y')
             start_time_str = start.strftime('%Hh%M')
             end_time_str = end.strftime('%Hh%M')
-            print(f'  - On {date_str}, from {start_time_str} to {end_time_str}: "{event.get("Subject", "N/A")}". Description: {event.get("Description", "N/A")}')
+            owner_id = event.get('OwnerId')
+            what_id = event.get('WhatId')
+            who_id = event.get('WhoId')
+            print(f'  - On {date_str}, from {start_time_str} to {end_time_str}: "{event.get("Subject", "N/A")}". Description: {event.get("Description", "N/A")}. Owner ID: {owner_id}. What ID: {what_id}. Who ID: {who_id}')
     elif events == []: # Explicitly check for empty list vs None (error)
         print("No events found for the specified period.")
     else:

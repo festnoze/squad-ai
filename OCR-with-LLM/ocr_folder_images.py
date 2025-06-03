@@ -35,7 +35,6 @@ class OCRFolderImages:
                         except Exception as e:
                                 print(f"\n\n\n/!\\ Error parsing LLM response for title: {e}")
                 
-
                 # Process images
                 print("\r\nProcessing images...", end="")
                 for index, image_path in enumerate(imgs, 1):

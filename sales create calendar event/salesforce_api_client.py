@@ -1,9 +1,10 @@
-import random
 import jwt
 import requests
 import time
 import json
 import datetime
+import httpx
+import asyncio
 
 class SalesforceApiClient:
     def __init__(self, client_id: str, username: str, private_key_file: str, is_sandbox: bool = True):
@@ -21,6 +22,7 @@ class SalesforceApiClient:
         # Auth results
         self._access_token = None
         self._instance_url = None
+        self._async_client = httpx.AsyncClient() # Added for async operations
         self.authenticate()
     
     def authenticate(self) -> bool:
@@ -168,6 +170,270 @@ class SalesforceApiClient:
             print(f"Error parsing start_datetime: {e}")
             print("Make sure start_datetime is in ISO format (e.g., '2025-05-20T14:00:00Z')")
             return None
+
+    async def _authenticate_async(self) -> bool:
+        """Asynchronously authenticate with Salesforce using JWT and return success status"""
+        print("Authenticating asynchronously via JWT...")
+        try:
+            with open(self._private_key_file, 'r') as f:
+                private_key = f.read()
+        except FileNotFoundError:
+            print(f"Error: Private key file '{self._private_key_file}' not found")
+            return False
+        
+        payload = {
+            'iss': self._client_id,
+            'sub': self._username,
+            'aud': self._auth_url,
+            'exp': int(time.time()) + 300
+        }
+        
+        jwt_token = jwt.encode(payload, private_key, algorithm='RS256')
+        
+        params = {
+            'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+            'assertion': jwt_token
+        }
+        
+        try:
+            async with self._async_client as client:
+                resp = await client.post(self._auth_url, data=params)
+            
+            if resp.status_code != 200:
+                print(f"Async authentication error: {resp.status_code}")
+                try:
+                    print(await resp.json())
+                except:
+                    print(await resp.text())
+                return False
+            
+            data = resp.json()
+            self._access_token = data['access_token']
+            self._instance_url = data['instance_url']
+            print("Async authentication successful!")
+            return True
+        except Exception as e:
+            print(f"Async authentication error: {str(e)}")
+            return False
+
+    async def _ensure_authenticated_async(self) -> bool:
+        """Ensure the client is authenticated, calling _authenticate_async if needed."""
+        if not self._access_token or not self._instance_url:
+            print("Not authenticated or token expired, attempting async authentication...")
+            if not await self._authenticate_async():
+                return False
+        return True
+
+    async def _create_sobject_async(self, sobject_name: str, payload: dict) -> str | None:
+        """Generic helper to create an sObject asynchronously."""
+        if not await self._ensure_authenticated_async():
+            print(f"Error: Authentication failed, cannot create {sobject_name}.")
+            return None
+
+        headers = {
+            'Authorization': f'Bearer {self._access_token}',
+            'Content-Type': 'application/json'
+        }
+        url = f"{self._instance_url}/services/data/{self._version_api}/sobjects/{sobject_name}/"
+
+        print(f"Creating {sobject_name} with payload: {json.dumps(payload)}")
+        try:
+            async with self._async_client as client:
+                resp = await client.post(url, headers=headers, json=payload)
+            
+            if resp.status_code == 201: # Created
+                created_id = resp.json().get('id')
+                print(f"{sobject_name} created successfully! ID: {created_id}")
+                return created_id
+            else:
+                print(f"Error creating {sobject_name}: {resp.status_code}")
+                try:
+                    error_details = await resp.json()
+                    print(json.dumps(error_details, indent=2, ensure_ascii=False))
+                except:
+                    print(await resp.text())
+                return None
+        except Exception as e:
+            print(f"Exception creating {sobject_name}: {str(e)}")
+            return None
+
+    async def _create_account_async(self, first_name: str, last_name: str, person_email: str, phone: str | None = None, record_type_id: str | None = None) -> str | None:
+        """Creates a Person Account."""
+        payload = {
+            'FirstName': first_name,
+            'LastName': last_name,
+            'PersonEmail': person_email,
+        }
+        if phone: payload['Phone'] = phone
+        # For Person Accounts, 'Name' is auto-populated. For business accounts, 'Name' would be explicit.
+        # Assuming Person Account model here. If RecordTypeId for Person Account is known and required:
+        if record_type_id: payload['RecordTypeId'] = record_type_id
+        return await self._create_sobject_async('Account', payload)
+
+    async def _create_contact_async(self, account_id: str, last_name: str, first_name: str, email: str, phone: str | None = None, birthdate: str | None = None) -> str | None:
+        """Creates a Contact linked to an Account."""
+        payload = {
+            'AccountId': account_id,
+            'LastName': last_name,
+            'FirstName': first_name,
+            'Email': email,
+        }
+        if phone: payload['Phone'] = phone
+        if birthdate: payload['Birthdate'] = birthdate # Expected format YYYY-MM-DD
+        return await self._create_sobject_async('Contact', payload)
+
+    async def _create_lead_async(self, company: str, last_name: str, first_name: str, email: str, phone: str | None = None, 
+                                 lead_source: str | None = None, country: str | None = None, thematique: str | None = None,
+                                 ecole: str | None = None, formulaire: str | None = None, url: str | None = None,
+                                 utm_campaign: str | None = None, utm_source: str | None = None, utm_medium: str | None = None, utm_content: str | None = None,
+                                 request_host: str | None = None, request_path: str | None = None, # Changed from request_url to request_path
+                                 consentement: str | None = None, training_course_id: str | None = None) -> str | None:
+        """Creates a Lead."""
+        payload = {
+            'Company': company, # 'ecole' can be used here or a specific company name
+            'LastName': last_name,
+            'FirstName': first_name,
+            'Email': email,
+        }
+        if phone: payload['Phone'] = phone
+        if lead_source: payload['LeadSource'] = lead_source # Standard field, map 'formulaire' here if appropriate
+        if country: payload['Country'] = country
+        
+        # Custom fields - ensure API names are correct for your Salesforce org
+        if thematique: payload['Thematique__c'] = thematique
+        if ecole: payload['Ecole__c'] = ecole # Specific custom field for school if 'Company' is different
+        if formulaire: payload['Formulaire__c'] = formulaire # Specific custom field for form name
+        if url: payload['Origin_URL__c'] = url
+        if utm_campaign: payload['UTM_Campaign__c'] = utm_campaign
+        if utm_source: payload['UTM_Source__c'] = utm_source
+        if utm_medium: payload['UTM_Medium__c'] = utm_medium
+        if utm_content: payload['UTM_Content__c'] = utm_content
+        if request_host: payload['Request_Host__c'] = request_host
+        if request_path: payload['Request_Path__c'] = request_path
+        if consentement: payload['Consentement__c'] = consentement
+        if training_course_id: payload['Training_Course_ID__c'] = training_course_id
+        
+        return await self._create_sobject_async('Lead', payload)
+
+    async def _create_opportunity_async(self, account_id: str, name: str, stage_name: str, close_date: str, 
+                                      contact_id: str | None = None, amount: float | None = None, 
+                                      thematique: str | None = None, ecole: str | None = None, 
+                                      formulaire: str | None = None, training_course_id: str | None = None) -> str | None:
+        """Creates an Opportunity."""
+        payload = {
+            'AccountId': account_id,
+            'Name': name,
+            'StageName': stage_name, # E.g., 'Prospecting', 'Closed Won'
+            'CloseDate': close_date, # Expected format YYYY-MM-DD
+        }
+        if contact_id: payload['ContactId'] = contact_id # Primary contact for the opportunity
+        if amount: payload['Amount'] = amount
+        
+        # Custom fields - ensure API names are correct
+        if thematique: payload['Thematique__c'] = thematique
+        if ecole: payload['Ecole__c'] = ecole
+        if formulaire: payload['Formulaire__c'] = formulaire
+        if training_course_id: payload['Training_Course_ID__c'] = training_course_id
+        # Consider mapping training_course_id to CORE_Main_Product_Interest__c if Product2 setup allows
+
+        return await self._create_sobject_async('Opportunity', payload)
+
+    async def create_sales_journey_async(self,
+                                         email: str, nom: str, prenom: str, tel: str,
+                                         thematique: str, ecole: str, formulaire: str, pays: str,
+                                         utm_source: str, utm_medium: str, consentement: str, training_course_id: str,
+                                         opportunity_stage_name: str, opportunity_close_date: str, # YYYY-MM-DD
+                                         url: str | None = None, birthdate: str | None = None, # YYYY-MM-DD
+                                         utm_campaign: str | None = None, utm_content: str | None = None,
+                                         request_host: str | None = None, request_url_path: str | None = None, # path part of the URL
+                                         account_name_override: str | None = None, # Not used if Person Account is default
+                                         lead_company_override: str | None = None,
+                                         opportunity_name_override: str | None = None,
+                                         opportunity_amount: float | None = None,
+                                         account_record_type_id: str | None = None) -> dict:
+        """ 
+        Orchestrates the creation of Account (Person Account), Contact, Lead, and Opportunity.
+        Returns a dictionary with the IDs of created records.
+        Dates (opportunity_close_date, birthdate) should be in 'YYYY-MM-DD' format.
+        """
+        results = {
+            'account_id': None,
+            'contact_id': None,
+            'lead_id': None,
+            'opportunity_id': None
+        }
+
+        # 1. Create Account (Person Account)
+        # For Person Accounts, LastName is required. FirstName is recommended.
+        # The Account Name is typically auto-generated from FirstName and LastName for Person Accounts.
+        account_id = await self._create_account_async(
+            first_name=prenom, 
+            last_name=nom, 
+            person_email=email, 
+            phone=tel,
+            record_type_id=account_record_type_id
+        )
+        if not account_id:
+            print("Failed to create Account. Aborting sales journey.")
+            return results
+        results['account_id'] = account_id
+
+        # 2. Create Contact
+        contact_id = await self._create_contact_async(
+            account_id=account_id,
+            last_name=nom,
+            first_name=prenom,
+            email=email,
+            phone=tel,
+            birthdate=birthdate
+        )
+        if not contact_id:
+            print("Failed to create Contact.") # Continue with Lead and Opp if Contact fails
+        results['contact_id'] = contact_id
+
+        # 3. Create Lead
+        lead_company = lead_company_override if lead_company_override else ecole
+        lead_id = await self._create_lead_async(
+            company=lead_company,
+            last_name=nom,
+            first_name=prenom,
+            email=email,
+            phone=tel,
+            lead_source=formulaire, # Or map to a specific LeadSource picklist value
+            country=pays,
+            thematique=thematique,
+            ecole=ecole,
+            formulaire=formulaire,
+            url=url,
+            utm_campaign=utm_campaign,
+            utm_source=utm_source,
+            utm_medium=utm_medium,
+            utm_content=utm_content,
+            request_host=request_host,
+            request_path=request_url_path,
+            consentement=consentement,
+            training_course_id=training_course_id
+        )
+        results['lead_id'] = lead_id # Store lead_id even if None
+
+        # 4. Create Opportunity
+        opp_name = opportunity_name_override if opportunity_name_override else f"{prenom} {nom} - {thematique}"
+        opportunity_id = await self._create_opportunity_async(
+            account_id=account_id,
+            name=opp_name,
+            stage_name=opportunity_stage_name,
+            close_date=opportunity_close_date,
+            contact_id=contact_id, # Link the contact created earlier if successful
+            amount=opportunity_amount,
+            thematique=thematique,
+            ecole=ecole,
+            formulaire=formulaire,
+            training_course_id=training_course_id
+        )
+        results['opportunity_id'] = opportunity_id # Store opp_id even if None
+        
+        print(f"Sales journey creation process finished. Results: {results}")
+        return results
             
     def get_events(self, start_datetime: str, end_datetime: str, owner_id: str | None = None) -> list | None:
         """Get events from Salesforce calendar between specified start and end datetimes
