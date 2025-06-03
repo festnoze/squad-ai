@@ -2,11 +2,11 @@
 
 Suivez pas à pas la procédure ci-après : 
 
-1. **Créer le package "common_tools"** : (*préalable : pip install setuptools wheel build*)
+1. Ouvrir le projet **"common_tools"**
 
-2. Incrémenter la version du package en modifiant la valeur de **version** dans le fichier  **setup.py** .
-   
-   Puis lancer la commande :
+2. *(optionnel)* Incrémenter la version du package en modifiant la valeur de **version** dans le fichier  **setup.py**. Sinon, laisser la commande auto-incrémenter la version.
+
+3. **Création du package "common_tools"** : (*préalable : pip install setuptools wheel build*) en lancant la commande :
 
 ```bash
 .\libs_build.bat
@@ -21,15 +21,15 @@ python -m build CommonTools
 
 3. **Copier le package "common_tools"** :
    
-   - copier le fichier "*common_tools-0.x.x-py3-none-any.whl*" du dossier "*dist*"  de common_tools, vers le dossier "*wheels*" du front.
+   - copier le fichier "*common_tools-0.x.x-py3-none-any.whl*" du dossier "*dist*"  de common_tools, vers le dossier "*wheels*" du projet client.
    
    - Vérifier dans `requirements_docker.txt` que la bonne version du package est spécifiée.
 
 4. **Créer l'image docker de l'API** :
    
-   A la racine du projet, créer et configurer le fichier : **Dockerfile** et copier : **docker_create.bat** et **requirements_docker.txt** (avec la version correspondante de common_tools dans 'wheels'). Nota : aussi créer un **requirements_common.txt** et faire que **requirements.txt** appele ce dernier.
+   - **[La 1ère fois <u>uniquement</u>]** Création de la configuration : A la racine du projet, créer et configurer le fichier : **Dockerfile** et copier : **docker_create.bat** et **requirements_docker.txt** (avec la version correspondante de common_tools dans 'wheels'). *Nota : *aussi créer un **requirements_common.txt** et faire que **requirements.txt** appele ce dernier.
    
-   Puis, en admin., à la racine du projet, lancer le script:
+   - Se connecter en administrateur, à la racine du projet, lancer le script:
    
    ```bash
    .\docker_create.bat
@@ -64,7 +64,6 @@ docker run -d --name studi-website-rag-api --network my_network -p 8281:8281 rag
 - 'rag_studi_public_website_xxx_0.10' est le nom de l'image docker à partir de laquelle créer le container.
   
   ---
-  
 
    **5.3. <u>Tester</u> le bon fonctionnement**
       Chaque API expose un endpoint "/ping" qui permet de test son bon fonctionnement, et renvoie "pong" en cas de réussite.

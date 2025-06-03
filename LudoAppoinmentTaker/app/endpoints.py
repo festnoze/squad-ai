@@ -1,18 +1,18 @@
 import os
 import logging
-import re
 from fastapi import APIRouter, WebSocket, Request, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from twilio.twiml.voice_response import VoiceResponse, Connect
 from twilio.twiml.messaging_response import MessagingResponse
 #
-from app.incoming_phone_call_handler import IncomingPhoneCallHandler
+from app.phone_call_websocket_events_handler import PhoneCallWebsocketEventsHandlerFactory
 from app.incoming_sms_handler import IncomingSMSHandler
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 router = APIRouter()
-static_audio_path: str = "static/audio/"
+
+phone_call_websocket_events_handler_factory = PhoneCallWebsocketEventsHandlerFactory()
 
 @staticmethod
 async def _extract_request_data_async(request: Request) -> tuple:
@@ -25,7 +25,7 @@ async def _extract_request_data_async(request: Request) -> tuple:
 
 # ========= Incoming phone call logic ========= #
 @staticmethod
-async def handle_incoming_call_async(request: Request) -> HTMLResponse:
+async def create_incoming_call_websocket_async(request: Request) -> HTMLResponse:
     """Handle incoming phone calls from Twilio"""
     logger.info("Received POST request for voice webhook")
     try:
@@ -43,7 +43,7 @@ async def handle_incoming_call_async(request: Request) -> HTMLResponse:
         # Request higher quality audio from Twilio
         connect.stream(url=ws_url, track="inbound_track", parameters={
             "mediaEncoding": "audio/x-mulaw", 
-            "sampleRate": 16000  # Request 16kHz if possible
+            "sampleRate": 8000  # Request 8kHz if possible
         })
         response.append(connect)
         return HTMLResponse(content=str(response), media_type="application/xml")
@@ -58,7 +58,7 @@ async def handle_incoming_call_async(request: Request) -> HTMLResponse:
 # ========= Incoming phone call endpoint ========= #
 @router.post("/")
 async def voice_webhook(request: Request) -> HTMLResponse:
-    return await handle_incoming_call_async(request)
+    return await create_incoming_call_websocket_async(request)
     
 # ========= Incoming phone call WebSocket endpoint ========= #
 @router.websocket("/ws/phone/{calling_phone_number}/sid/{call_sid}")
@@ -66,9 +66,8 @@ async def websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid:
     await ws.accept()
     logger.info(f"WebSocket connection accepted from: {ws.client.host}:{ws.client.port}")
     try:
-        # Create a new IncomingPhoneCallHandler instance for this WebSocket connection
-        incoming_phone_call_handler = IncomingPhoneCallHandler(websocket=ws)
-        await incoming_phone_call_handler.handle_ongoing_call_async(calling_phone_number, call_sid)
+        call_handler = phone_call_websocket_events_handler_factory.get_new_phone_call_websocket_events_handler(websocket=ws)
+        await call_handler.handle_all_websocket_receieved_events_async(calling_phone_number, call_sid)
     except WebSocketDisconnect:
         logger.info(f"WebSocket disconnected: {ws.client.host}:{ws.client.port}")
     except Exception as e:
@@ -80,6 +79,7 @@ async def websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid:
             pass
     finally:
         logger.info(f"WebSocket endpoint finished for: {ws.client.host}:{ws.client.port}")
+        phone_call_websocket_events_handler_factory.build_new_phone_call_websocket_events_handler(websocket=None)
 
 
 # ========= Incoming SMS logic ========= #
@@ -125,14 +125,4 @@ async def handle_incoming_sms_async(request: Request) -> HTMLResponse:
 @router.api_route("/incoming-sms", methods=["GET", "POST"])
 async def twilio_incoming_sms(request: Request):
     return await handle_incoming_sms_async(request)
-
-# ========= Read static audio endpoint ========= #
-@router.get("/audio/{filename}")
-async def audio(filename: str) -> FileResponse:
-    full_path = os.path.abspath(os.path.join(static_audio_path, filename))
-    if not full_path.startswith(os.path.abspath(static_audio_path)):
-        return JSONResponse(status_code=404, content={"detail": "Not Found"})
-    if not os.path.exists(full_path):
-        return JSONResponse(status_code=404, content={"detail": "File not found"})
-    return FileResponse(full_path)
     

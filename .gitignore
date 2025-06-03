@@ -27,6 +27,10 @@ structures_descriptions*/
 *.wav
 .qodo/
 
+images_to_ocr/
+venv/
+venv*/
+
 /Include
 /Lib
 Lib/

@@ -1,27 +1,40 @@
 import logging
 import os
+import uuid
+import asyncio
+from uuid import UUID
 from langgraph.graph import StateGraph, END
-#
-from app.agents.conversation_state_model import ConversationState
 
-# Safe import for agents
+# Models
+from app.agents.phone_conversation_state_model import PhoneConversationState
+from app.api_client.request_models.user_request_model import UserRequestModel, DeviceInfoRequestModel
+from app.api_client.request_models.conversation_request_model import ConversationRequestModel
+from app.api_client.request_models.query_asking_request_model import QueryAskingRequestModel
+
+# Agents
 from agents.lead_agent import LeadAgent
 from agents.calendar_agent import CalendarAgent
 from agents.sf_agent import SFAgent
 
+# Clients
+from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
+from app.api_client.salesforce_api_client import SalesforceApiClient
+from app.speech.outgoing_audio_manager import OutgoingAudioManager
+
 class AgentsGraph:
-    def __init__(self):
+    def __init__(self, outgoing_audio_processing : OutgoingAudioManager, studi_rag_inference_api_client : StudiRAGInferenceApiClient, salesforce_api_client : SalesforceApiClient):
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
         self.logger.info("Agents graph initialization")
         
+        self.studi_rag_inference_api_client = studi_rag_inference_api_client
+        self.salesforce_api_client = salesforce_api_client
+
+        self.outgoing_audio_processing = outgoing_audio_processing
         
-        # --- Agent Initialization ---
-        # Determine config path relative to project root
-        # (Adjust if lid_api_config.yaml is elsewhere)
-        CONFIG_PATH = os.path.join(os.path.dirname(__file__), '..', 'lid_api_config.yaml') # Assumes graph.py is in app/ and config is in root
-        self.lead_agent_instance = LeadAgent(config_path=CONFIG_PATH)
-        self.logger.info(f"Initialize Lead Agent succeed with config: {CONFIG_PATH}")
+        lid_config_file_path = os.path.join(os.path.dirname(__file__), 'configs', 'lid_api_config.yaml')
+        self.lead_agent_instance = LeadAgent(config_path=lid_config_file_path)
+        self.logger.info(f"Initialize Lead Agent succeed with config: {lid_config_file_path}")
         
         self.calendar_agent_instance = CalendarAgent()
         self.logger.info("Initialize Calendar Agent succeed")
@@ -32,16 +45,31 @@ class AgentsGraph:
         self.graph = self._build_graph()
         
     def _build_graph(self):
-        workflow = StateGraph(ConversationState)
+        workflow = StateGraph(PhoneConversationState)
         self.logger.info("Agents graph ongoing creation.")
 
         # Add nodes
-        workflow.add_node("route_initial_query", self.route_initial_query)
+        workflow.add_node("router", self.router)
+        workflow.add_node("initialization", self.initialization)
         workflow.add_node("lead_agent", self.lead_agent_node)
         workflow.add_node("sf_agent", self.sf_agent_node)
         workflow.add_node("calendar_agent", self.calendar_agent_node)
+        workflow.add_node("rag_course_agent", self.query_rag_api_about_trainings_agent_node)
 
-        workflow.set_entry_point("route_initial_query")
+        workflow.set_entry_point("router")
+
+        workflow.add_conditional_edges(
+            "router",
+            self.decide_next_step,
+            {
+                "initialization": "initialization",
+                "lead_agent": "lead_agent",
+                "sf_agent": "sf_agent",
+                "calendar_agent": "calendar_agent",
+                "rag_course_agent": "rag_course_agent",
+                END: END
+            }
+        )
 
         # Define transitions
         # After each agent runs, decide where to go next (or end)
@@ -49,13 +77,12 @@ class AgentsGraph:
             "lead_agent",
             self.decide_next_step,
             {
-                "calendar_agent": "calendar_agent", # Route if needed
-                "sf_agent": "sf_agent", # Route if needed
-                END: END # Route to END based on decide_next_step logic
+                "calendar_agent": "calendar_agent",
+                "sf_agent": "sf_agent",
+                END: END
             }
         )
 
-        # Compile the graph
         # Add checkpointer if state needs to be persisted (e.g., using SQLite)
         # checkpointer = MemorySaver() # Example using in-memory checkpointer
         # app_graph = workflow.compile(checkpointer=checkpointer)
@@ -64,37 +91,115 @@ class AgentsGraph:
         self.logger.info("Agents graph compiled successfully.")
         return app_graph
 
-    async def route_initial_query(self, state: ConversationState) -> dict:
+    async def router(self, state: PhoneConversationState) -> dict:
+        if not state.get('agent_scratchpad', None):
+            state['agent_scratchpad'] = {}
+        if state.get('user_input', None):
+            user_input = state.get('user_input')
+            feedback_text = f"Très bien. Vous avez demandé : \"{user_input}\". Un instant, j'analyse votre demande."
+            await self.outgoing_audio_processing.enqueue_text(feedback_text)
+
+        if not state.get('agent_scratchpad', {}).get('conversation_id') or not state.get('agent_scratchpad', None).get('user_input'):
+            state['agent_scratchpad']["next_agent_needed"] = "initialization"
+        elif not state.get('agent_scratchpad', {}).get('sf_account_info'):
+            state['agent_scratchpad']["next_agent_needed"] = "sf_agent"
+        elif not state.get('agent_scratchpad', {}).get('lead_extracted_info'):
+            state['agent_scratchpad']["next_agent_needed"] = "lead_agent"
+        elif not state.get('agent_scratchpad', {}).get('calendar_extracted_info'):
+            state['agent_scratchpad']["next_agent_needed"] = "calendar_agent"
+        else:
+            state['agent_scratchpad']["next_agent_needed"] = "initialization"
+        return state
+
+    async def send_welcome_message_and_init_backend_conversation(self, state: PhoneConversationState) -> dict:        
+        self.logger.info(f"Initializing conversation for {state.get('caller_phone')}")     
+        
+        welcome_text = """\
+            Bonjour, je suis Stud'ia, l'assistante virtuelle de Studi. Je suis là pour t'aider en l'absence de nos conseillers.
+            Je peux t'aider à explorer nos formations. Sinon, je peux prendre un rendez-vous avec un conseiller pour toi."""
+        #welcome_text = "Salut !"
+        await self.outgoing_audio_processing.enqueue_text(welcome_text)
+
+        # Retrieve or create the user and a new conversation into the backend API & add welcome msg to it.
+        conversation_id = await self.init_user_and_new_conversation_in_backend_api_async(state.get('caller_phone'), state.get('call_sid'))
+        messages = await self.studi_rag_inference_api_client.add_external_ai_message_to_conversation(conversation_id, welcome_text)
+        state['history'] = messages
+        
+        if state.get('agent_scratchpad') is None: 
+            state['agent_scratchpad'] = {}
+        state['agent_scratchpad']['conversation_id'] = conversation_id
+        self.logger.info(f"Created conversation of id: {conversation_id}, sent welcome message.")
+        return {"next": "initialization"}
+      
+    async def init_user_and_new_conversation_in_backend_api_async(self, calling_phone_number: str, call_sid: str):
+        """ Initialize the user session in the backend API: create user and conversation"""
+        user_name_val = "Twilio incoming call " + (calling_phone_number or "Unknown User")
+        ip_val = calling_phone_number or "Unknown IP"
+        user_RM = UserRequestModel(
+            user_id=None,
+            user_name=user_name_val,
+            IP=ip_val,
+            device_info=DeviceInfoRequestModel(user_agent="twilio", platform="phone", app_version="", os="", browser="", is_mobile=True)
+        )
+        try:
+            user = await self.studi_rag_inference_api_client.create_or_retrieve_user(user_RM)
+            user_id = UUID(user['id'])
+            new_conversation = ConversationRequestModel(user_id=user_id, messages=[])
+            self.logger.info(f"Creating new conversation for user: {user_id}")
+            new_conversation = await self.studi_rag_inference_api_client.create_new_conversation(new_conversation)
+            return new_conversation['id']
+
+        except Exception as e:
+            self.logger.error(f"Error creating conversation: {str(e)}")
+            return str(uuid.uuid4())
+    
+    async def retrieve_saleforce_account_info(self, state: PhoneConversationState) -> dict:        
+        self.logger.info(f"Initializing SF Agent")
+        call_sid = state.get('call_sid', 'N/A')
+        phone_number = state.get('caller_phone', 'N/A')
+        sf_account_info = await self.salesforce_api_client.get_person_by_phone_async(phone_number)
+        leads_info = await self.salesforce_api_client.get_leads_by_details_async(phone_number)
+        state['agent_scratchpad']['sf_account_info'] = sf_account_info
+        self.logger.info(f"[{call_sid}] Stored sf_account_info: {sf_account_info} in agent_scratchpad")
+    
+    async def initialization(self, state: PhoneConversationState) -> dict:
         """Determines the first agent to handle the query based on the conversation state."""
         call_sid = state.get('call_sid', 'N/A')
-        self.logger.info(f"[{call_sid}] Routing initial query: {state.get('user_input', '')}")
-        
-        # Create a dictionary for the next node
-        next_node = {}
-        
+        phone_number = state.get('caller_phone', 'N/A')
+
+        if not state.get('agent_scratchpad', {}).get('conversation_id') or not state.get('agent_scratchpad', {}).get('sf_account_info'):
+            initialize_task = asyncio.create_task(self.send_welcome_message_and_init_backend_conversation(state))
+            salesforce_task = asyncio.create_task(self.retrieve_saleforce_account_info(state))
+            await asyncio.gather(initialize_task, salesforce_task)
+
+        if not state.get('agent_scratchpad', {}).get('sf_account_info'):
+            return {"next": "lead_agent"}
+        elif state.get('agent_scratchpad', {}).get('user_input'):
+            return {"next": "sf_agent"}
+        else:
+            return {"next": "END"}
+
+        # TODO: Following is bypassed
         # Check if this is a returning user with SF info
         if state.get('agent_scratchpad', {}).get('sf_account_info'):
             self.logger.info(f"[{call_sid}] Routing to calendar_agent (returning user)")
-            next_node = {"next": "calendar_agent"}
-        
-        # If we have partial lead information, continue with Lead Agent
-        elif state.get('agent_scratchpad', {}).get('lead_extracted_info'):
-            self.logger.info(f"[{call_sid}] Routing to lead_agent (continuing lead collection)")
-            next_node = {"next": "lead_agent"}
-        
-        # Check phone number to route to SF lookup
-        elif state.get('caller_phone'):
-            self.logger.info(f"[{call_sid}] Routing to sf_agent for account lookup")
-            next_node = {"next": "sf_agent"}
-        
-        # Default: Start with Lead Agent
-        else:
-            self.logger.info(f"[{call_sid}] Default routing to lead_agent")
-            next_node = {"next": "lead_agent"}
+            return {"next": "calendar_agent"}
             
-        return next_node
+        # If we have partial lead information, continue with Lead Agent
+        if state.get('agent_scratchpad', {}).get('lead_extracted_info'):
+            self.logger.info(f"[{call_sid}] Routing to lead_agent (continuing lead collection)")
+            return {"next": "lead_agent"}
+            
+        # Check phone number to route to SF lookup
+        if state.get('caller_phone'):
+            self.logger.info(f"[{call_sid}] Routing to sf_agent for account lookup")
+            return {"next": "sf_agent"}
+            
+        # Default: Start with Lead Agent
+        self.logger.info(f"[{call_sid}] Default routing to lead_agent")
+        return {"next": "lead_agent"}
 
-    async def lead_agent_node(self, state: ConversationState) -> dict:
+    async def lead_agent_node(self, state: PhoneConversationState) -> dict:
         """Handles lead qualification and information gathering using LeadAgent."""
         call_sid = state.get('call_sid', 'N/A')
         self.logger.info(f"[{call_sid}] Entering Lead Agent node")
@@ -178,14 +283,14 @@ class AgentsGraph:
             }
 
         except Exception as e:
-            self.logger.error(f"[{call_sid}] Error in Lead Agent node: {e}", exc_info=True)
+            self.logger.error(f"[{call_sid[-4:]}] Error in Lead Agent node: {e}", exc_info=True)
             response_text = "Je rencontre un problème pour traiter votre demande."
             # Include the error in the scratchpad for debugging if needed
             error_scratchpad = state.get('agent_scratchpad', {})
             error_scratchpad['error'] = str(e)
             return {"history": [("Human", user_input), ("AI", response_text)], "agent_scratchpad": error_scratchpad}
 
-    async def sf_agent_node(self, state: ConversationState) -> dict:
+    async def sf_agent_node(self, state: PhoneConversationState) -> dict:
         """Handles Salesforce account lookup using SFAgent."""
         call_sid = state.get('call_sid', 'N/A')
         phone = state.get('caller_phone', '')
@@ -233,14 +338,14 @@ class AgentsGraph:
             }
             
         except Exception as e:
-            self.logger.error(f"[{call_sid}] Error in SF Agent node: {e}", exc_info=True)
+            self.logger.error(f"[{call_sid[-4:]}] Error in SF Agent node: {e}", exc_info=True)
             # Default to Lead Agent in case of error
             return {
                 "history": [("AI", "Bienvenue chez Studi. Pouvez-vous me laisser vos coordonnées afin qu'un conseiller puisse vous contacter ?")],
                 "agent_scratchpad": {"error": str(e), "next_agent_needed": "lead_agent"}
             }
 
-    async def calendar_agent_node(self, state: ConversationState) -> dict:
+    async def calendar_agent_node(self, state: PhoneConversationState) -> dict:
         """Handles calendar operations using CalendarAgent."""
         call_sid = state.get('call_sid', 'N/A')
         user_input = state.get('user_input', '')
@@ -284,41 +389,99 @@ class AgentsGraph:
             }
             
         except Exception as e:
-            self.logger.error(f"[{call_sid}] Error in Calendar Agent node: {e}", exc_info=True)
+            self.logger.error(f"[{call_sid[-4:]}] Error in Calendar Agent node: {e}", exc_info=True)
             return {
                 "history": [("Human", user_input), ("AI", "Je rencontre un problème pour gérer votre rendez-vous. Pourriez-vous réessayer plus tard ?")],
                 "agent_scratchpad": {"error": str(e)}
             }
 
-    async def decide_next_step(self, state: ConversationState) -> str:
+    async def decide_next_step(self, state: PhoneConversationState) -> str:
         """Determines the next node to visit based on the current state."""
         call_sid = state.get('call_sid', 'N/A')
-        self.logger.info(f"[{call_sid}] Deciding next step")
+        self.logger.info(f"[~{call_sid[-4:]}] Deciding next step")
         
         # Check if next agent is explicitly specified
         next_agent = state.get('agent_scratchpad', {}).get('next_agent_needed')
         if next_agent:
-            self.logger.info(f"[{call_sid}] Explicit routing to: {next_agent}")
+            self.logger.info(f"[~{call_sid[-4:]}] Explicit routing to: {next_agent}")
             return next_agent
         
         # Check Lead Agent status
         lead_status = state.get('agent_scratchpad', {}).get('lead_last_status')
         if lead_status:
             if lead_status == "lead_captured":
-                self.logger.info(f"[{call_sid}] Lead captured, ending conversation.")
+                self.logger.info(f"[~{call_sid[-4:]}] Lead captured, ending conversation.")
                 return END
             elif lead_status == "api_error":
-                self.logger.warning(f"[{call_sid}] API error occurred, ending conversation.")
+                self.logger.warning(f"[~{call_sid[-4:]}] API error occurred, ending conversation.")
                 return END
             elif lead_status == "ask_user_for_info":
-                self.logger.info(f"[{call_sid}] Need more lead info from user, ending graph run.")
+                self.logger.info(f"[~{call_sid[-4:]}] Need more lead info from user, ending graph run.")
                 return END
         
         # Check calendar agent status
         if state.get('agent_scratchpad', {}).get('appointment_created'):
-            self.logger.info(f"[{call_sid}] Appointment created, ending conversation.")
+            self.logger.info(f"[~{call_sid[-4:]}] Appointment created, ending conversation.")
             return END
         
         # Default behavior
-        self.logger.info(f"[{call_sid}] No specific routing condition met, ending graph run.")
+        self.logger.info(f"[~{call_sid[-4:]}] No specific routing condition met, ending graph run.")
         return END
+
+    async def query_rag_api_about_trainings_agent_node(self, state: PhoneConversationState) -> dict:
+        """Handle the course agent node."""
+        call_sid = state.get('call_sid', 'N/A')
+        user_query = state.get('user_input', '')
+        self.logger.info(f"> Ongoing RAG query on training course information. User request: '{user_query}' for: [{call_sid[-4:]}].")
+
+        try:
+            self.rag_interrupt_flag = {"interrupted": False} # Reset the interrupt flag before starting new streaming
+
+            rag_query_RM = QueryAskingRequestModel(
+                conversation_id=self.conversation_id,
+                user_query_content= user_query_transcript,
+                display_waiting_message=False
+            )
+            response = self.studi_rag_inference_api_client.rag_query_stream_async(rag_query_RM, timeout=60, interrupt_flag=self.rag_interrupt_flag)
+
+            full_answer = ""
+            was_interrupted = False
+            async for chunk in response:
+                # Vérifier si on a été interrompu entre les chunks
+                if was_interrupted:
+                    self.logger.info("Speech interrupted while processing RAG response")
+                    break
+                    
+                full_answer += chunk
+                self.logger.debug(f"Received chunk: {chunk}")
+                print(f"<< ... {chunk} ... >>")
+                
+                # Sauvegarder l'état de parole avant de parler
+                speaking_before = self.is_speaking
+                
+                # Use the enhanced text processing for better speech quality
+                # Using smaller chunks for RAG responses to be more responsive
+                await self.outgoing_audio_processing.enqueue_text(chunk)
+                
+                # Vérifier si on a été interrompu pendant qu'on parlait
+                if speaking_before and not self.is_speaking:
+                    was_interrupted = True
+                    self.logger.info("Speech interrupted during RAG response chunk")
+                    break
+                
+            # Loguer les résultats du traitement RAG
+            end_time = time.time()
+            if was_interrupted:
+                self.logger.info(f"RAG streaming was interrupted")
+            elif full_answer:
+                self.logger.info(f"Full answer received from RAG API in {end_time - self.start_time:.2f}s: {full_answer[:100]}...")
+            else:
+                self.logger.warning(f"Empty response received from RAG API")
+                
+        except Exception as e:
+            error_message = f"Je suis désolé, une erreur s'est produite lors de la communication avec le service."
+            self.logger.error(f"Error in RAG API communication: {str(e)}")
+            # Use enhanced text-to-speech for error messages too
+            await self.outgoing_audio_processing.enqueue_text(error_message)
+
+        return state

@@ -1,0 +1,1604 @@
+{
+  "Account": {
+    "fields": {
+      "Id": {
+        "label": "ID du compte",
+        "type": "id",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": false,
+        "custom": false,
+        "is_primary_key": true,
+        "is_foreign_key": false,
+        "references_to": []
+      },
+      "MasterRecordId": {
+        "label": "ID d'enregistrement principal",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Account"
+        ]
+      },
+      "RecordTypeId": {
+        "label": "ID du type d'enregistrement",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "RecordType"
+        ]
+      },
+      "ParentId": {
+        "label": "ID du compte principal",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Account"
+        ]
+      },
+      "OwnerId": {
+        "label": "ID du propri\u00e9taire",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": false,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "User"
+        ]
+      },
+      "CreatedById": {
+        "label": "ID cr\u00e9\u00e9 par",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": false,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "User"
+        ]
+      },
+      "LastModifiedById": {
+        "label": "ID derni\u00e8re modification par",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": false,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "User"
+        ]
+      },
+      "PersonContactId": {
+        "label": "ID du contact",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Contact"
+        ]
+      },
+      "PersonIndividualId": {
+        "label": "ID d'individu",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Individual"
+        ]
+      },
+      "OperatingHoursId": {
+        "label": "ID d'heure ouvrables",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "OperatingHours"
+        ]
+      },
+      "CORE_TECH_LastLFABuffer__c": {
+        "label": "Dernier lead du buffer d'acquisition",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "CORE_LeadAcquisitionBuffer__c"
+        ]
+      },
+      "STUDI_Tuteur__c": {
+        "label": "Tuteur",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Account"
+        ]
+      },
+      "CORE_Region_agent_manager__c": {
+        "label": "Propri\u00e9taire B2B",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "User"
+        ]
+      },
+      "STUDI_Num_IDCC__c": {
+        "label": "N\u00b0 IDCC",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "STUDI_Convention_collective__c"
+        ]
+      },
+      "CORE_Business_Account__pc": {
+        "label": "Entreprise",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Account"
+        ]
+      }
+    }
+  },
+  "Contact": {
+    "fields": {
+      "Id": {
+        "label": "ID du contact",
+        "type": "id",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": false,
+        "custom": false,
+        "is_primary_key": true,
+        "is_foreign_key": false,
+        "references_to": []
+      },
+      "MasterRecordId": {
+        "label": "ID d'enregistrement principal",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Contact"
+        ]
+      },
+      "AccountId": {
+        "label": "ID du compte",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Account"
+        ]
+      },
+      "RecordTypeId": {
+        "label": "ID du type d'enregistrement",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "RecordType"
+        ]
+      },
+      "ReportsToId": {
+        "label": "ID du responsable hi\u00e9rarchique",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Contact"
+        ]
+      },
+      "OwnerId": {
+        "label": "ID du propri\u00e9taire",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": false,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "User"
+        ]
+      },
+      "CreatedById": {
+        "label": "ID cr\u00e9\u00e9 par",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": false,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "User"
+        ]
+      },
+      "LastModifiedById": {
+        "label": "ID derni\u00e8re modification par",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": false,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "User"
+        ]
+      },
+      "IndividualId": {
+        "label": "ID d'individu",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Individual"
+        ]
+      },
+      "CORE_Business_Account__c": {
+        "label": "Entreprise",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Account"
+        ]
+      }
+    }
+  },
+  "Lead": {
+    "fields": {
+      "Id": {
+        "label": "ID de piste",
+        "type": "id",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": false,
+        "custom": false,
+        "is_primary_key": true,
+        "is_foreign_key": false,
+        "references_to": []
+      },
+      "MasterRecordId": {
+        "label": "ID d'enregistrement principal",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Lead"
+        ]
+      },
+      "OwnerId": {
+        "label": "ID du propri\u00e9taire",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": false,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Group",
+          "User"
+        ]
+      },
+      "ConvertedAccountId": {
+        "label": "ID du compte converti",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Account"
+        ]
+      },
+      "ConvertedContactId": {
+        "label": "ID du contact converti",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Contact"
+        ]
+      },
+      "ConvertedOpportunityId": {
+        "label": "ID de l'opportunit\u00e9 converti",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Opportunity"
+        ]
+      },
+      "CreatedById": {
+        "label": "ID cr\u00e9\u00e9 par",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": false,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "User"
+        ]
+      },
+      "LastModifiedById": {
+        "label": "ID derni\u00e8re modification par",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": false,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "User"
+        ]
+      },
+      "IndividualId": {
+        "label": "ID d'individu",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Individual"
+        ]
+      }
+    }
+  },
+  "Opportunity": {
+    "fields": {
+      "Id": {
+        "label": "ID de l'opportunit\u00e9",
+        "type": "id",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": false,
+        "custom": false,
+        "is_primary_key": true,
+        "is_foreign_key": false,
+        "references_to": []
+      },
+      "AccountId": {
+        "label": "ID du compte",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Account"
+        ]
+      },
+      "RecordTypeId": {
+        "label": "ID du type d'enregistrement",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "RecordType"
+        ]
+      },
+      "CampaignId": {
+        "label": "ID de campagne",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Campaign"
+        ]
+      },
+      "Pricebook2Id": {
+        "label": "ID du catalogue de prix",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Pricebook2"
+        ]
+      },
+      "OwnerId": {
+        "label": "ID du propri\u00e9taire",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": false,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "User"
+        ]
+      },
+      "CreatedById": {
+        "label": "ID cr\u00e9\u00e9 par",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": false,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "User"
+        ]
+      },
+      "LastModifiedById": {
+        "label": "ID derni\u00e8re modification par",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": false,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "User"
+        ]
+      },
+      "ContactId": {
+        "label": "ID du contact",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Contact"
+        ]
+      },
+      "SyncedQuoteId": {
+        "label": "ID de devis",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Quote"
+        ]
+      },
+      "ContractId": {
+        "label": "ID du contrat",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Contract"
+        ]
+      },
+      "LastAmountChangedHistoryId": {
+        "label": "ID de l'historique des opportunit\u00e9s",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "OpportunityHistory"
+        ]
+      },
+      "LastCloseDateChangedHistoryId": {
+        "label": "ID de l'historique des opportunit\u00e9s",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "OpportunityHistory"
+        ]
+      },
+      "CORE_Business_Unit_Before_Re_Orientation__c": {
+        "label": "BU avant la r\u00e9orientation",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "CORE_Business_Unit__c"
+        ]
+      },
+      "CORE_Main_Product_Interest__c": {
+        "label": "Produit principal",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Product2"
+        ]
+      },
+      "CORE_New_Owner__c": {
+        "label": "Nouveau propri\u00e9taire",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "User"
+        ]
+      },
+      "CORE_OPP_Application_Reviewer_1__c": {
+        "label": "Charg\u00e9 d'admission",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "User"
+        ]
+      },
+      "CORE_OPP_Application_Reviewer_2__c": {
+        "label": "Examinateur 2",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "User"
+        ]
+      },
+      "CORE_OPP_Business_Unit__c": {
+        "label": "BU",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "CORE_Business_Unit__c"
+        ]
+      },
+      "CORE_OPP_Curriculum__c": {
+        "label": "Cursus",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "CORE_Curriculum__c"
+        ]
+      },
+      "CORE_OPP_Division__c": {
+        "label": "Division",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "CORE_Division__c"
+        ]
+      },
+      "CORE_First_Reached_by__c": {
+        "label": "First Reached by",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "User"
+        ]
+      },
+      "CORE_OPP_Intake__c": {
+        "label": "Intake",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "CORE_Intake__c"
+        ]
+      },
+      "CORE_OPP_Level__c": {
+        "label": "Niveau",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "CORE_Level__c"
+        ]
+      },
+      "CORE_OPP_Parent_Opportunity__c": {
+        "label": "Opportunit\u00e9 parent",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Opportunity"
+        ]
+      },
+      "CORE_OPP_Prerequisite_Diploma__c": {
+        "label": "Dipl\u00f4me du candidat",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "CORE_Academic_Diploma_History__c"
+        ]
+      },
+      "CORE_OPP_Selection_Test_Teacher__c": {
+        "label": "Enseignant du test de s\u00e9lection",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "User"
+        ]
+      },
+      "CORE_OPP_Study_Area__c": {
+        "label": "Study area",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "CORE_Study_Area__c"
+        ]
+      },
+      "CORE_OPP_Business_Hours__c": {
+        "label": "Heures de travail",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "BusinessHours"
+        ]
+      },
+      "CORE_First_owner__c": {
+        "label": "Premier owner",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "User"
+        ]
+      },
+      "CORE_OPP_Retail_Agency__c": {
+        "label": "Agence de vente au d\u00e9tail",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Account"
+        ]
+      },
+      "CORE_Re_registered_opportunity__c": {
+        "label": "Opportunit\u00e9 r\u00e9enregistr\u00e9e",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Opportunity"
+        ]
+      },
+      "CORE_RetailAgencyBusinessContact__c": {
+        "label": "Retail Agency Business Contact",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Contact"
+        ]
+      },
+      "STUDI_Previous_Owner__c": {
+        "label": "Previous Owner",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "User"
+        ]
+      },
+      "CORE_Selling_Business_unit1__c": {
+        "label": "Selling Business unit",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "CORE_Business_Unit__c"
+        ]
+      },
+      "CORE_OPP_Retail_Agency2__c": {
+        "label": "Retail Agency 2",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Account"
+        ]
+      },
+      "STUDI_AC_Owner__c": {
+        "label": "Assistant Commercial Attitr\u00e9",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "User"
+        ]
+      },
+      "STUDI_Produit_appel_offres_opportunite__c": {
+        "label": "Produit de l'appel d'offres",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "STUDI_Product_AO__c"
+        ]
+      },
+      "CORE_Contract__c": {
+        "label": "Contract",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "CORE_Contract__c"
+        ]
+      },
+      "STUDI_Charge_de_sourcing__c": {
+        "label": "Charg\u00e9 de sourcing",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "User"
+        ]
+      }
+    }
+  },
+  "Event": {
+    "fields": {
+      "Id": {
+        "label": "ID de l'activit\u00e9",
+        "type": "id",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": false,
+        "custom": false,
+        "is_primary_key": true,
+        "is_foreign_key": false,
+        "references_to": []
+      },
+      "RecordTypeId": {
+        "label": "ID du type d'enregistrement d'\u00e9v\u00e9nement",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "RecordType"
+        ]
+      },
+      "WhoId": {
+        "label": "ID de nom",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Contact",
+          "Lead"
+        ]
+      },
+      "WhatId": {
+        "label": "ID d'associ\u00e9 \u00e0",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Account",
+          "AppointmentCategory",
+          "AppointmentInvitation",
+          "Asset",
+          "AssetRelationship",
+          "AssignedResource",
+          "CORE_Academic_Diploma_History__c",
+          "CORE_Candidate_to_place__c",
+          "CORE_Change_Interest_History__c",
+          "CORE_Contract__c",
+          "CORE_Opportunity_Funder__c",
+          "COR_OCC_Field_tracking__c",
+          "CalculationMatrix",
+          "CalculationMatrixVersion",
+          "CalculationProcedure",
+          "CalculationProcedureVersion",
+          "Campaign",
+          "Case",
+          "CommSubscriptionConsent",
+          "ContactRequest",
+          "Contract",
+          "EngagementAttendee",
+          "EngagementInteraction",
+          "EngagementTopic",
+          "ExpressionSet",
+          "ExpressionSetVersion",
+          "Image",
+          "ListEmail",
+          "Location",
+          "OB_Archiver__ArchiveLog__c",
+          "OperatingHoursHoliday",
+          "Opportunity",
+          "Order",
+          "PartyConsent",
+          "ProcessException",
+          "Product2",
+          "Quote",
+          "RecordAlert",
+          "ResourceAbsence",
+          "ServiceAppointment",
+          "ServiceResource",
+          "Shift",
+          "Solution",
+          "Waitlist",
+          "WaitlistParticipant",
+          "echosign_dev1__Agreement_Type__c",
+          "et4ae5__Triggered_Send_Execution__c"
+        ]
+      },
+      "AccountId": {
+        "label": "ID du compte",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Account"
+        ]
+      },
+      "OwnerId": {
+        "label": "Attribu\u00e9 \u00e0 l'ID",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": false,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Calendar",
+          "User"
+        ]
+      },
+      "CreatedById": {
+        "label": "ID cr\u00e9\u00e9 par",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": false,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "User"
+        ]
+      },
+      "LastModifiedById": {
+        "label": "ID derni\u00e8re modification par",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": false,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "User"
+        ]
+      },
+      "RecurrenceActivityId": {
+        "label": "R\u00e9currence - ID d'activit\u00e9",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Event"
+        ]
+      },
+      "ServiceAppointmentId": {
+        "label": "ID de rendez-vous de service",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "ServiceAppointment"
+        ]
+      },
+      "CORE_Business_Unit__c": {
+        "label": "BU",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "CORE_Business_Unit__c"
+        ]
+      },
+      "CORE_Curriculum__c": {
+        "label": "CV",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "CORE_Curriculum__c"
+        ]
+      },
+      "CORE_Division__c": {
+        "label": "Division",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "CORE_Division__c"
+        ]
+      },
+      "CORE_FLEX_HistoConversation__c": {
+        "label": "Conversation historique",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "CORE_FLEX_HistoConversation__c"
+        ]
+      },
+      "CORE_Call_Distribution__c": {
+        "label": "Call Distribution",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "CORE_Call_Distribution__c"
+        ]
+      },
+      "CORE_Intake__c": {
+        "label": "Admission",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "CORE_Intake__c"
+        ]
+      },
+      "CORE_Level__c": {
+        "label": "Niveau",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "CORE_Level__c"
+        ]
+      },
+      "CORE_Point_of_contact__c": {
+        "label": "Point de contact d'acquisition",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "CORE_Point_of_Contact__c"
+        ]
+      },
+      "CORE_Study_Area__c": {
+        "label": "Sous fili\u00e8re",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "CORE_Study_Area__c"
+        ]
+      },
+      "CORE_Business_Hours__c": {
+        "label": "Heures de travail",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "BusinessHours"
+        ]
+      },
+      "CORE_Campaign__c": {
+        "label": "Campagne",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Campaign"
+        ]
+      },
+      "CORE_Opportunity_Origin__c": {
+        "label": "Origine de l'opportunit\u00e9",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Opportunity"
+        ]
+      },
+      "CORE_Completed_by__c": {
+        "label": "Termin\u00e9 par",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "User"
+        ]
+      },
+      "CORE_PAccount_Origin__c": {
+        "label": "Origine du compte de la personne",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Account"
+        ]
+      },
+      "CORE_Product__c": {
+        "label": "Produit",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": true,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Product2"
+        ]
+      }
+    }
+  },
+  "User": {
+    "fields": {
+      "Id": {
+        "label": "ID d'utilisateur",
+        "type": "id",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": false,
+        "custom": false,
+        "is_primary_key": true,
+        "is_foreign_key": false,
+        "references_to": []
+      },
+      "UserRoleId": {
+        "label": "ID de r\u00f4le",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "UserRole"
+        ]
+      },
+      "ProfileId": {
+        "label": "ID de profil",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": false,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Profile"
+        ]
+      },
+      "DelegatedApproverId": {
+        "label": "ID de l'approbateur d\u00e9l\u00e9gu\u00e9",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Group",
+          "User"
+        ]
+      },
+      "ManagerId": {
+        "label": "ID du responsable",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "User"
+        ]
+      },
+      "CreatedById": {
+        "label": "ID cr\u00e9\u00e9 par",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": false,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "User"
+        ]
+      },
+      "LastModifiedById": {
+        "label": "ID derni\u00e8re modification par",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": false,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "User"
+        ]
+      },
+      "ContactId": {
+        "label": "ID du contact",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Contact"
+        ]
+      },
+      "AccountId": {
+        "label": "ID du compte",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Account"
+        ]
+      },
+      "CallCenterId": {
+        "label": "ID de centre d'appels",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "CallCenter"
+        ]
+      },
+      "IndividualId": {
+        "label": "ID d'individu",
+        "type": "reference",
+        "length": 18,
+        "precision": null,
+        "scale": null,
+        "nillable": true,
+        "custom": false,
+        "is_primary_key": false,
+        "is_foreign_key": true,
+        "references_to": [
+          "Individual"
+        ]
+      }
+    }
+  }
+}
