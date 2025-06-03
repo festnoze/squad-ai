@@ -44,7 +44,7 @@ class OutgoingAudioManager(OutgoingManager):
             self.logger.info(f"Updated stream SID to: {streamSid}")
         return
          
-    async def _background_streaming_worker(self):
+    async def _background_streaming_worker(self) -> None:
         """Background worker that continuously processes texts from the queue and sends audio to the websocket"""
         self.logger.info("Background TTS and audio streaming worker started")
         text_chunks_processed = 0

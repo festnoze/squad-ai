@@ -44,7 +44,7 @@ class OutgoingTextManager(OutgoingManager):
         else:
             self.logger.debug("Empty text received, not queueing for output.")
 
-    async def _send_text_worker(self):
+    async def _background_streaming_worker(self):
         """Worker task to process the queue and send text."""
         while self.is_active or not self._text_queue.empty():
             try:
@@ -56,7 +56,7 @@ class OutgoingTextManager(OutgoingManager):
                         await self.websocket.send_text(text_to_send)
                     except Exception as e_ws:
                         self.logger.error(f"Error sending text via WebSocket: {e_ws}")
-                        await self.stop() # Stop manager if WebSocket fails critically
+                        await self.stop_background_streaming_worker_async() # Stop manager if WebSocket fails critically
                         return
                 else:
                     self.logger.warning("WebSocket not available or not connected, cannot send text.")
@@ -77,18 +77,17 @@ class OutgoingTextManager(OutgoingManager):
                 await asyncio.sleep(0.1)
         self.logger.info("Send text worker finished.")
 
-    async def start(self) -> None:
-        await super().start()
+    async def run_background_streaming_worker(self) -> None:
+        await super().run_background_streaming_worker()
         if self._processing_task is None or self._processing_task.done():
-            self._processing_task = asyncio.create_task(self._send_text_worker())
+            self._processing_task = asyncio.create_task(self._background_streaming_worker())
             self.logger.info("Send text worker task started.")
         else:
             self.logger.info("Send text worker task already running.")
 
-
-    async def stop(self) -> None:
+    async def stop_background_streaming_worker_async(self) -> None:
         self.logger.info("Stopping OutgoingTextManager...")
-        await super().stop()
+        await super().stop_background_streaming_worker_async()
 
         if not self._text_queue.empty():
             self.logger.info("Waiting for text queue to empty...")

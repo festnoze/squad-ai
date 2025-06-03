@@ -79,7 +79,8 @@ async def websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid:
             pass
     finally:
         logger.info(f"WebSocket endpoint finished for: {ws.client.host}:{ws.client.port}")
-        phone_call_websocket_events_handler_factory.build_new_phone_call_websocket_events_handler(websocket=None)
+        # Pre-build a new handler for the next call
+        phone_call_websocket_events_handler_factory.build_new_phone_call_websocket_events_handler()
 
 
 # ========= Incoming SMS logic ========= #

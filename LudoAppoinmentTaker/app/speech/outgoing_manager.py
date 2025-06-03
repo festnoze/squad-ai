@@ -18,21 +18,26 @@ class OutgoingManager(abc.ABC):
         self.is_running = False
     
     @abc.abstractmethod
-    def queue_data(self, data: any) -> None:
+    def enqueue_text(self, text: str) -> None:
         """
-        Queue data for delivery.
+        Queue text for delivery.
         
         Args:
-            data: Data to be queued (text, audio bytes, etc.)
+            text: Text to be queued for output
         """
         pass
     
     @abc.abstractmethod
-    def start(self) -> None:
+    def run_background_streaming_worker(self) -> None:
         """Start the data delivery process."""
         self.is_running = True
     
     @abc.abstractmethod
-    def stop(self) -> None:
+    def stop_background_streaming_worker_async(self) -> None:
         """Stop the data delivery process."""
         self.is_running = False
+
+    @abc.abstractmethod
+    def _background_streaming_worker(self) -> None:
+        """Worker task to process the queue and send data."""
+        pass
