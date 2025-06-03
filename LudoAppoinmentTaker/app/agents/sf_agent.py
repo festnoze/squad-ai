@@ -2,23 +2,25 @@ import yaml
 from pandas_gbq import read_gbq
 from google.oauth2 import service_account
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
-class SFAgent:
-    
-    def __init__(self, config_path: str = "sf_agent.yaml"):
+class SFAgent:    
+    def __init__(self, config_path: str = "app/agents/configs/sf_agent.yaml"):
         self.config = self._load_config(config_path)
         self.credentials = self.config["sf_data"]["credentials_path"]
         self.account = None
         logger.info(f"SFAgent initialized with credentials path: {self.credentials}")
 
-    def _load_config(self, path):
+    def _load_config(self, file_path):
         try:
-            with open(path, "r") as f:
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+            full_path = os.path.join(project_root, file_path)
+            with open(full_path, "r") as f:
                 return yaml.safe_load(f)
         except Exception as e:
-            logger.error(f"Error loading config from {path}: {e}")
+            logger.error(f"Error loading SalesForce configuration file from: '{file_path}': {e}")
             raise
 
     def get_account_info(self, tel):

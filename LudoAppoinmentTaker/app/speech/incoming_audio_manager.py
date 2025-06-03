@@ -8,28 +8,31 @@ import webrtcvad
 import audioop
 import time
 import uuid
+import logging
+import abc
 from pydub import AudioSegment
 from pydub.effects import normalize
 from fastapi import WebSocket
 #
 from app.agents.phone_conversation_state_model import PhoneConversationState
-from app.speech.outgoing_audio_manager import OutgoingAudioManager
+from app.speech.outgoing_manager import OutgoingManager
 from app.speech.speech_to_text import SpeechToTextProvider
 from app.agents.agents_graph import AgentsGraph
+from app.speech.incoming_manager import IncomingManager
 
-class IncomingAudioManager:
+class IncomingAudioManager(IncomingManager):
     """Audio processing utilities for improving speech recognition quality and handling Twilio events"""
     
     # Voice settings
     VOICE_ID = "alloy"
     
     # Temporary directory for audio files
-    TEMP_DIR = "./static/audio"
-    
-    def __init__(self, stt_provider: SpeechToTextProvider,outgoing_audio_processing: OutgoingAudioManager, compiled_graph : AgentsGraph, sample_width=2, frame_rate=8000, channels=1, vad_aggressiveness=3):
+    TEMP_DIR = "./static/audio"# c:\Dev\squad-ai\LudoAppoinmentTaker\app\speech\outgoing_manager.py    
+
+    def __init__(self, stt_provider: SpeechToTextProvider,outgoing_audio_processing: OutgoingManager, compiled_graph : AgentsGraph, sample_width=2, frame_rate=8000, channels=1, vad_aggressiveness=3):
         self.logger = logging.getLogger(__name__)
         self.stt_provider : SpeechToTextProvider = stt_provider
-        self.outgoing_audio_processing : OutgoingAudioManager = outgoing_audio_processing
+        self.outgoing_audio_processing : OutgoingManager = outgoing_audio_processing
         self.sample_width = sample_width
         self.frame_rate = frame_rate
         self.channels = channels

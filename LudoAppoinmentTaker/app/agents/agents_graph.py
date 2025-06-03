@@ -19,10 +19,10 @@ from agents.sf_agent import SFAgent
 # Clients
 from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
 from app.api_client.salesforce_api_client import SalesforceApiClient
-from app.speech.outgoing_audio_manager import OutgoingAudioManager
+from app.speech.outgoing_manager import OutgoingManager
 
 class AgentsGraph:
-    def __init__(self, outgoing_audio_processing : OutgoingAudioManager, studi_rag_inference_api_client : StudiRAGInferenceApiClient, salesforce_api_client : SalesforceApiClient):
+    def __init__(self, outgoing_manager: OutgoingManager, studi_rag_inference_api_client: StudiRAGInferenceApiClient, salesforce_api_client: SalesforceApiClient):
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
         self.logger.info("Agents graph initialization")
@@ -30,7 +30,7 @@ class AgentsGraph:
         self.studi_rag_inference_api_client = studi_rag_inference_api_client
         self.salesforce_api_client = salesforce_api_client
 
-        self.outgoing_audio_processing = outgoing_audio_processing
+        self.outgoing_manager = outgoing_manager
         
         lid_config_file_path = os.path.join(os.path.dirname(__file__), 'configs', 'lid_api_config.yaml')
         self.lead_agent_instance = LeadAgent(config_path=lid_config_file_path)
@@ -97,7 +97,7 @@ class AgentsGraph:
         if state.get('user_input', None):
             user_input = state.get('user_input')
             feedback_text = f"Très bien. Vous avez demandé : \"{user_input}\". Un instant, j'analyse votre demande."
-            await self.outgoing_audio_processing.enqueue_text(feedback_text)
+            await self.outgoing_manager.queue_data(feedback_text)
 
         if not state.get('agent_scratchpad', {}).get('conversation_id') or not state.get('agent_scratchpad', None).get('user_input'):
             state['agent_scratchpad']["next_agent_needed"] = "initialization"
@@ -159,7 +159,8 @@ class AgentsGraph:
         phone_number = state.get('caller_phone', 'N/A')
         sf_account_info = await self.salesforce_api_client.get_person_by_phone_async(phone_number)
         leads_info = await self.salesforce_api_client.get_leads_by_details_async(phone_number)
-        state['agent_scratchpad']['sf_account_info'] = sf_account_info
+        state['agent_scratchpad']['sf_account_info'] = sf_account_info if sf_account_info else {}
+        state['agent_scratchpad']['sf_leads_info'] = leads_info if leads_info else {}
         self.logger.info(f"[{call_sid}] Stored sf_account_info: {sf_account_info} in agent_scratchpad")
     
     async def initialization(self, state: PhoneConversationState) -> dict:
@@ -167,14 +168,15 @@ class AgentsGraph:
         call_sid = state.get('call_sid', 'N/A')
         phone_number = state.get('caller_phone', 'N/A')
 
-        if not state.get('agent_scratchpad', {}).get('conversation_id') or not state.get('agent_scratchpad', {}).get('sf_account_info'):
+        if state.get('agent_scratchpad', {}).get('conversation_id', None) is None\
+        or state.get('agent_scratchpad', {}).get('sf_account_info', None) is None:
             initialize_task = asyncio.create_task(self.send_welcome_message_and_init_backend_conversation(state))
             salesforce_task = asyncio.create_task(self.retrieve_saleforce_account_info(state))
             await asyncio.gather(initialize_task, salesforce_task)
 
-        if not state.get('agent_scratchpad', {}).get('sf_account_info'):
-            return {"next": "lead_agent"}
-        elif state.get('agent_scratchpad', {}).get('user_input'):
+        if state.get('agent_scratchpad', {}).get('sf_account_info', None) is None:
+            return {"next": "router"}
+        elif state.get('agent_scratchpad', {}).get('user_input', None):
             return {"next": "sf_agent"}
         else:
             return {"next": "END"}
@@ -302,7 +304,7 @@ class AgentsGraph:
         
         try:
             # Initialize SFAgent and look up account
-            sf_agent = SFAgent("sf_agent.yaml")
+            sf_agent = SFAgent()
             account_info = sf_agent.get_account_info(phone)
             
             updated_scratchpad = state.get('agent_scratchpad', {})
