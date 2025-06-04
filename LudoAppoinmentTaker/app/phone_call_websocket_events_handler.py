@@ -100,12 +100,13 @@ class PhoneCallWebsocketEventsHandler:
         self.compiled_graph = AgentsGraph(
                                     self.outgoing_audio_processing,
                                     self.studi_rag_inference_api_client,
-                                    self.salesforce_api_client
+                                    self.salesforce_api_client,
+                                    call_sid=None
                                 ).graph
 
         self.incoming_audio_processing = IncomingAudioManager(
-                                    outgoing_audio_processing=self.outgoing_audio_processing,
                                     stt_provider=self.stt_provider,
+                                    outgoing_manager=self.outgoing_audio_processing,
                                     compiled_graph=self.compiled_graph,
                                     sample_width=self.sample_width,
                                     frame_rate=self.frame_rate,
@@ -131,8 +132,8 @@ class PhoneCallWebsocketEventsHandler:
         self.logger.info(f"WebSocket handler started for {self.websocket.client.host}:{self.websocket.client.port}")
         
         # Store the caller's phone number and call SID so we can retrieve them later
+        self.call_sid = call_sid
         self.phones[call_sid] = calling_phone_number
-        
         self.incoming_audio_processing.set_stream_sid(call_sid)
         self.incoming_audio_processing.set_phone_number(calling_phone_number, call_sid)
 
