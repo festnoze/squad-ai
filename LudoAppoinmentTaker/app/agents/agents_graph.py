@@ -12,9 +12,9 @@ from app.api_client.request_models.conversation_request_model import Conversatio
 from app.api_client.request_models.query_asking_request_model import QueryAskingRequestModel
 
 # Agents
-from agents.lead_agent import LeadAgent
-from agents.calendar_agent import CalendarAgent
-from agents.sf_agent import SFAgent
+from app.agents.lead_agent import LeadAgent
+from app.agents.calendar_agent import CalendarAgent
+from app.agents.sf_agent import SFAgent
 
 # Clients
 from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient

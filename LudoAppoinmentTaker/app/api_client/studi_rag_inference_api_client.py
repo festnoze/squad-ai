@@ -2,9 +2,9 @@ import httpx
 import asyncio
 from uuid import UUID
 from typing import Any, Dict, AsyncGenerator, Optional
-from api_client.request_models.user_request_model import UserRequestModel
-from api_client.request_models.conversation_request_model import ConversationRequestModel
-from api_client.request_models.query_asking_request_model import QueryAskingRequestModel, QueryNoConversationRequestModel
+from app.api_client.request_models.user_request_model import UserRequestModel
+from app.api_client.request_models.conversation_request_model import ConversationRequestModel
+from app.api_client.request_models.query_asking_request_model import QueryAskingRequestModel, QueryNoConversationRequestModel
 
 class StudiRAGInferenceApiClient:
     """

@@ -17,3 +17,11 @@ class IncomingManager(abc.ABC):
         Args: data: Raw data to process (audio bytes, text string, etc.)
         """
         pass
+
+    @abc.abstractmethod
+    def set_stream_sid(self, stream_sid: str) -> None:
+        pass
+
+    @abc.abstractmethod
+    def set_phone_number(self, phone_number: str, stream_sid: str) -> None:
+        pass

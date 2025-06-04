@@ -41,3 +41,11 @@ class OutgoingManager(abc.ABC):
     def _background_streaming_worker(self) -> None:
         """Worker task to process the queue and send data."""
         pass
+
+    @abc.abstractmethod
+    def update_stream_sid(self, streamSid: str) -> None:
+        """
+        Updates the stream SID when it changes (e.g., when a new call starts or ends)
+        Allows setting to None when resetting after a call ends
+        """
+        pass

@@ -113,6 +113,13 @@ class OutgoingTextManager(OutgoingManager):
                 break
         logger.info(f"Text streaming stopped and queue cleared for call {self.call_sid}. Queue size: {self.text_queue.qsize()}")
 
+    def update_stream_sid(self, streamSid: str) -> None:
+        """
+        Updates the stream SID when it changes (e.g., when a new call starts or ends)
+        Allows setting to None when resetting after a call ends
+        """
+        self.call_sid = streamSid
+
     async def cleanup(self):
         """
         Perform any cleanup operations.
