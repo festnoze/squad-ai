@@ -190,21 +190,24 @@ class IncomingAudioManager(IncomingManager):
         self.set_stream_sid(stream_sid)
         self.set_phone_number(phone_number, stream_sid)
         
-        # Create initial state for the graph
-        initial_state: PhoneConversationState = PhoneConversationState(
-            call_sid=call_sid,
-            caller_phone=phone_number,
-            user_input="",
-            history=[],
-            agent_scratchpad={}
-        )
+        # Get or Create the state for the graph
+        if stream_sid in self.stream_states:
+            current_state = self.stream_states[stream_sid]
+        else:
+            current_state: PhoneConversationState = PhoneConversationState(
+                call_sid=call_sid,
+                caller_phone=phone_number,
+                user_input="",
+                history=[],
+                agent_scratchpad={}
+            )
         
         # Store the initial state for this stream (used by graph and other handlers)
-        self.stream_states[stream_sid] = initial_state
+        self.stream_states[stream_sid] = current_state
         
         try:            
             # Then invoke the graph with initial state to get the AI-generated welcome message
-            updated_state = await self.compiled_graph.ainvoke(initial_state)
+            updated_state = await self.compiled_graph.ainvoke(current_state)
             self.stream_states[stream_sid] = updated_state
             
             # # If there's an AI message from the graph, send it after the welcome message
@@ -250,7 +253,7 @@ class IncomingAudioManager(IncomingManager):
                 self.audio_buffer = b""
                 self.consecutive_silence_duration_ms = 0.0
                 # Add a message to the logs so we can track interruptions
-                print(f"\r>>> USER INTERRUPTED - Speech detected while system was speaking ({speech_to_noise_ratio})")
+                print(f"\r>>> USER INTERRUPTION - Incoming speech while system was speaking ({speech_to_noise_ratio})")
         
         # Use WebRTC VAD for better speech detection
         is_silence, speech_to_noise_ratio = self.detect_silence_speech(
@@ -275,7 +278,7 @@ class IncomingAudioManager(IncomingManager):
 
             if(random.randint(0, 100) < 1): # Log every 1%
                 self.logger.debug(
-                    f"Speech detected - RMS: {speech_to_noise_ratio}/{self.speech_threshold}, "
+                    f"\nSpeech detected - RMS: {speech_to_noise_ratio}/{self.speech_threshold}, "
                     f"Buffer size: {len(self.audio_buffer)} bytes")
 
         is_long_silence_after_speech = has_speech_began and self.consecutive_silence_duration_ms >= self.required_silence_ms_to_answer 
@@ -286,9 +289,9 @@ class IncomingAudioManager(IncomingManager):
         # Conditions: if buffer large enough followed by a prolonged silence, or if buffer is too large
         if (is_long_silence_after_speech and has_reach_min_speech_length) or is_speech_too_long:
             if is_speech_too_long:
-                self.logger.info(f"Process incoming audio: Buffer size limit reached. (buffer size: {len(self.audio_buffer)} bytes).")
+                self.logger.info(f"\nProcess incoming audio: [Buffer size limit reached]. (buffer size: {len(self.audio_buffer)} bytes).\n")
             else:
-                self.logger.info(f"Process incoming audio: Silence after speech detected. (buffer size: {len(self.audio_buffer)} bytes).")
+                self.logger.info(f"\nProcess incoming audio: [Silence after speech detected]. (buffer size: {len(self.audio_buffer)} bytes).\n")
             
             audio_data = self.audio_buffer
             self.audio_buffer = b""

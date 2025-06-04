@@ -343,6 +343,57 @@ class SalesforceApiClient:
             self.logger.info(f"No Contact or non-converted Lead found for phone number: {phone_number}")
             return None
 
+
+    async def get_persons_async(self) -> list[dict]:
+        """
+        Retrieve lestest Contacts and Leads from Salesforce (asynchronous).
+
+        Returns:
+            A list of dictionaries containing the person's type ('Contact' or 'Lead') and data.
+        """
+        await self._ensure_authenticated_async()
+        headers = {
+            'Authorization': f'Bearer {self._access_token}',
+            'Content-Type': 'application/json'
+        }
+
+        # For long-running apps, consider creating httpx.AsyncClient once and reusing it.
+        async with httpx.AsyncClient() as client:
+            # --- Try to find a Contact ---
+            contact_query = (
+                "SELECT Id, FirstName, LastName, Email, Phone, MobilePhone, Account.Id, Account.Name, Owner.Id, Owner.Name "
+                "FROM Contact "
+                "WHERE Id != null "
+                "ORDER BY Id DESC "
+                "LIMIT 10"
+            )
+            self.logger.info(f"SOQL Query (Contact): {contact_query}")
+            encoded_contact_query = urllib.parse.quote(contact_query)
+            url_contact_query = f"{self._instance_url}/services/data/{self._version_api}/query/?q={encoded_contact_query}"
+
+            try:
+                resp = await client.get(url_contact_query, headers=headers)
+                resp.raise_for_status()
+                data = resp.json()
+                records = data.get('records', [])
+                all_contacts = []
+                for record in records:
+                    self.logger.info(f"Found Contact: {record.get('Id')} - {record.get('FirstName')} {record.get('LastName')}")
+                    all_contacts.append(record)
+                return all_contacts
+            except httpx.HTTPStatusError as http_err:
+                self.logger.info(f"HTTP error querying Contact: {http_err} - Status: {http_err.response.status_code}")
+                try:
+                    self.logger.info(json.dumps(http_err.response.json(), indent=2, ensure_ascii=False))
+                except json.JSONDecodeError:
+                    self.logger.info(http_err.response.text)
+            except httpx.RequestError as req_err:
+                self.logger.info(f"Request error querying Contact: {str(req_err)}")
+            except Exception as e:
+                self.logger.info(f"Generic exception querying Contact: {str(e)}")
+            
+            return None
+
     async def discover_database_async(self, sobjects_to_describe: list[str] | None = None, include_fields: bool = True) -> dict | None:
         """
         Discovers the schema of Salesforce SObjects.

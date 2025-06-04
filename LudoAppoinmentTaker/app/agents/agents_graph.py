@@ -49,40 +49,42 @@ class AgentsGraph:
         workflow = StateGraph(PhoneConversationState)
         self.logger.info(f"[{self.call_sid}] Agents graph ongoing creation.")
 
-        # Add nodes
+        # Add nodes & fixed edges
+        workflow.set_entry_point("router")
+
         workflow.add_node("router", self.router)
-        workflow.add_node("initialization", self.initialization)
+        workflow.add_node("conversation_starter", self.send_begin_of_welcome_message_node)
+        workflow.add_edge("conversation_starter", "init_conversation")
+        workflow.add_node("init_conversation", self.init_conversation_node)
+        workflow.add_edge("init_conversation", "user_identification")
+        workflow.add_node("user_identification", self.user_identification_node)
+        workflow.add_edge("user_identification", "conversation_starter_end")
+        workflow.add_node("conversation_starter_end", self.send_end_of_welcome_message_node)
+
+        workflow.add_node("wait_for_user_input", self.wait_for_user_input_node)
+        workflow.add_edge("wait_for_user_input", END)
+
         workflow.add_node("lead_agent", self.lead_agent_node)
-        workflow.add_node("sf_agent", self.sf_agent_node)
         workflow.add_node("calendar_agent", self.calendar_agent_node)
         workflow.add_node("rag_course_agent", self.query_rag_api_about_trainings_agent_node)
 
-        workflow.set_entry_point("router")
-
+        # Add conditional edges
         workflow.add_conditional_edges(
             "router",
             self.decide_next_step,
             {
-                "initialization": "initialization",
+                "conversation_starter": "conversation_starter",
                 "lead_agent": "lead_agent",
-                "sf_agent": "sf_agent",
+                "user_identification": "user_identification",
                 "calendar_agent": "calendar_agent",
                 "rag_course_agent": "rag_course_agent",
                 END: END
             }
         )
 
-        # Define transitions
-        # After each agent runs, decide where to go next (or end)
-        workflow.add_conditional_edges(
-            "lead_agent",
-            self.decide_next_step,
-            {
-                "calendar_agent": "calendar_agent",
-                "sf_agent": "sf_agent",
-                END: END
-            }
-        )
+        workflow.add_edge("user_identification", END)
+        workflow.add_edge("calendar_agent", END)
+        workflow.add_edge("rag_course_agent", END)
 
         # Add checkpointer if state needs to be persisted (e.g., using SQLite)
         # checkpointer = MemorySaver() # Example using in-memory checkpointer
@@ -101,38 +103,94 @@ class AgentsGraph:
             feedback_text = f"Très bien. Vous avez demandé : \"{user_input}\". Un instant, j'analyse votre demande."
             await self.outgoing_manager.enqueue_text(feedback_text)
 
-        if not state.get('agent_scratchpad', {}).get('conversation_id') or not state.get('agent_scratchpad', None).get('user_input'):
-            state['agent_scratchpad']["next_agent_needed"] = "initialization"
+        if not state.get('agent_scratchpad', {}).get('conversation_id'):
+            state['agent_scratchpad']["next_agent_needed"] = "conversation_starter"
+        elif not state.get('agent_scratchpad', None).get('user_input'):
+            state['agent_scratchpad']["next_agent_needed"] = "wait_for_user_input"
         elif not state.get('agent_scratchpad', {}).get('sf_account_info'):
-            state['agent_scratchpad']["next_agent_needed"] = "sf_agent"
+            state['agent_scratchpad']["next_agent_needed"] = "user_identification"
         elif not state.get('agent_scratchpad', {}).get('lead_extracted_info'):
             state['agent_scratchpad']["next_agent_needed"] = "lead_agent"
         elif not state.get('agent_scratchpad', {}).get('calendar_extracted_info'):
             state['agent_scratchpad']["next_agent_needed"] = "calendar_agent"
         else:
-            state['agent_scratchpad']["next_agent_needed"] = "initialization"
+            state['agent_scratchpad']["next_agent_needed"] = "conversation_starter"
         return state
 
-    async def send_welcome_message_and_init_backend_conversation(self, state: PhoneConversationState) -> dict:        
-        self.logger.info(f"Initializing conversation for {state.get('caller_phone')}")     
+    async def send_begin_of_welcome_message_node(self, state: PhoneConversationState) -> dict:
+        """Send the begin of welcome message to the user"""
+        call_sid = state.get('call_sid', 'N/A')
+        phone_number = state.get('caller_phone', 'N/A')
+        welcome_text = "Bonjour, je suis Stud'ia, l'assistante virtuelle de Studi. Je suis là pour t'aider en l'absence de nos conseillers."
         
-        welcome_text = """\
-            Bonjour, je suis Stud'ia, l'assistante virtuelle de Studi. Je suis là pour t'aider en l'absence de nos conseillers.
-            Je peux t'aider à explorer nos formations. Sinon, je peux prendre un rendez-vous avec un conseiller pour toi."""
-        #welcome_text = "Salut !"
         await self.outgoing_manager.enqueue_text(welcome_text)
+        self.logger.info(f"[{call_sid}] Sent begin of welcome message to {phone_number}")
 
-        # Retrieve or create the user and a new conversation into the backend API & add welcome msg to it.
+        state['history'] = [("AI", welcome_text)]
+        return state
+
+    async def init_conversation_node(self, state: PhoneConversationState) -> dict:
+        """Initializes the conversation in the backend API."""
+        if state.get('agent_scratchpad', {}).get('conversation_id', None) is not None:
+            return state
+        
+        self.logger.info(f"User and a new conversation init. in RAG API for caller: {state.get('caller_phone')}") 
         conversation_id = await self.init_user_and_new_conversation_in_backend_api_async(state.get('caller_phone'), state.get('call_sid'))
-        messages = await self.studi_rag_inference_api_client.add_external_ai_message_to_conversation(conversation_id, welcome_text)
-        state['history'] = messages
+
+        for msg in state.get('history', []):
+            await self.studi_rag_inference_api_client.add_external_ai_message_to_conversation(conversation_id, msg[1])
+        
+        # messages = await self.studi_rag_inference_api_client.add_external_ai_message_to_conversation(conversation_id, welcome_text)
+        # state['history'] = messages
         
         if state.get('agent_scratchpad') is None: 
             state['agent_scratchpad'] = {}
         state['agent_scratchpad']['conversation_id'] = conversation_id
         self.logger.info(f"Created conversation of id: {conversation_id}, sent welcome message.")
-        return {"next": "initialization"}
-      
+        return state
+
+    async def user_identification_node(self, state: PhoneConversationState) -> dict:        
+        self.logger.info(f"Initializing SF Agent")
+        call_sid = state.get('call_sid', 'N/A')
+        phone_number = state.get('caller_phone', 'N/A')
+        #accounts = await self.salesforce_api_client.get_persons_async()
+        sf_account_info = await self.salesforce_api_client.get_person_by_phone_async(phone_number)
+        leads_info = await self.salesforce_api_client.get_leads_by_details_async(phone_number)
+        state['agent_scratchpad']['sf_account_info'] = sf_account_info.get('data', {}) if sf_account_info else {}
+        state['agent_scratchpad']['sf_leads_info'] = leads_info.get('data', {}) if leads_info else {}
+        self.logger.info(f"[{call_sid}] Stored sf_account_info: {sf_account_info.get('data', {})} in agent_scratchpad")
+        return state
+
+    async def send_end_of_welcome_message_node(self, state: PhoneConversationState) -> dict:
+        """Send the end of welcome message to the user"""
+        call_sid = state.get('call_sid', 'N/A')
+        phone_number = state.get('caller_phone', 'N/A')
+
+        sf_account = state.get('agent_scratchpad', {}).get('sf_account_info', {})
+        leads_info = state.get('agent_scratchpad', {}).get('sf_leads_info', {})
+        
+        if sf_account:
+            first_name = sf_account.get('FirstName', '')
+            last_name = sf_account.get('LastName', '')
+            owner_first_name = sf_account.get('Owner', {}).get('Name', '')
+            
+            end_welcome_text = f"""
+            Merci de nous contacter à nouveau {first_name} {last_name}. 
+            Votre conseiller, {owner_first_name}, qui vous accompagne d'habitude, n'est pas actuellement disponible.
+            Je vous propose de prendre un rendez-vous avec {owner_first_name} afin de vous permettre d'échanger directement avec lui.
+            Avez-vous un jour ou un moment de la journée qui vous convient le mieux pour ce rendez-vous ?
+            """
+        else:
+            end_welcome_text = "Je peux t'aider à explorer nos formations, ou prendre rendez-vous avec un conseiller pour toi."
+                
+        await self.outgoing_manager.enqueue_text(end_welcome_text)
+        self.logger.info(f"[{call_sid}] Sent end of welcome message to {phone_number}")
+        return state
+    
+    async def wait_for_user_input_node(self, state: PhoneConversationState) -> dict:
+        """Wait for user input"""
+        return state
+    
     async def init_user_and_new_conversation_in_backend_api_async(self, calling_phone_number: str, call_sid: str):
         """ Initialize the user session in the backend API: create user and conversation"""
         user_name_val = "Twilio incoming call " + (calling_phone_number or "Unknown User")
@@ -154,54 +212,6 @@ class AgentsGraph:
         except Exception as e:
             self.logger.error(f"Error creating conversation: {str(e)}")
             return str(uuid.uuid4())
-    
-    async def retrieve_saleforce_account_info(self, state: PhoneConversationState) -> dict:        
-        self.logger.info(f"Initializing SF Agent")
-        call_sid = state.get('call_sid', 'N/A')
-        phone_number = state.get('caller_phone', 'N/A')
-        sf_account_info = await self.salesforce_api_client.get_person_by_phone_async(phone_number)
-        leads_info = await self.salesforce_api_client.get_leads_by_details_async(phone_number)
-        state['agent_scratchpad']['sf_account_info'] = sf_account_info if sf_account_info else {}
-        state['agent_scratchpad']['sf_leads_info'] = leads_info if leads_info else {}
-        self.logger.info(f"[{call_sid}] Stored sf_account_info: {sf_account_info} in agent_scratchpad")
-    
-    async def initialization(self, state: PhoneConversationState) -> dict:
-        """Determines the first agent to handle the query based on the conversation state."""
-        call_sid = state.get('call_sid', 'N/A')
-        phone_number = state.get('caller_phone', 'N/A')
-
-        if state.get('agent_scratchpad', {}).get('conversation_id', None) is None\
-        or state.get('agent_scratchpad', {}).get('sf_account_info', None) is None:
-            initialize_task = asyncio.create_task(self.send_welcome_message_and_init_backend_conversation(state))
-            salesforce_task = asyncio.create_task(self.retrieve_saleforce_account_info(state))
-            await asyncio.gather(initialize_task, salesforce_task)
-
-        if state.get('agent_scratchpad', {}).get('sf_account_info', None) is None:
-            return {"next": "router"}
-        elif state.get('agent_scratchpad', {}).get('user_input', None):
-            return {"next": "sf_agent"}
-        else:
-            return {"next": "END"}
-
-        # TODO: Following is bypassed
-        # Check if this is a returning user with SF info
-        if state.get('agent_scratchpad', {}).get('sf_account_info'):
-            self.logger.info(f"[{call_sid}] Routing to calendar_agent (returning user)")
-            return {"next": "calendar_agent"}
-            
-        # If we have partial lead information, continue with Lead Agent
-        if state.get('agent_scratchpad', {}).get('lead_extracted_info'):
-            self.logger.info(f"[{call_sid}] Routing to lead_agent (continuing lead collection)")
-            return {"next": "lead_agent"}
-            
-        # Check phone number to route to SF lookup
-        if state.get('caller_phone'):
-            self.logger.info(f"[{call_sid}] Routing to sf_agent for account lookup")
-            return {"next": "sf_agent"}
-            
-        # Default: Start with Lead Agent
-        self.logger.info(f"[{call_sid}] Default routing to lead_agent")
-        return {"next": "lead_agent"}
 
     async def lead_agent_node(self, state: PhoneConversationState) -> dict:
         """Handles lead qualification and information gathering using LeadAgent."""
@@ -295,10 +305,10 @@ class AgentsGraph:
             error_scratchpad['error'] = str(e)
             return {"history": [("Human", user_input), ("AI", response_text)], "agent_scratchpad": error_scratchpad}
 
-    async def sf_agent_node(self, state: PhoneConversationState) -> dict:
+    async def old_user_identification_node(self, state: PhoneConversationState) -> dict:
         """Handles Salesforce account lookup using SFAgent."""
         call_sid = state.get('call_sid', 'N/A')
-        phone = state.get('caller_phone', '')
+        phone = state.get('caller_phone', 'N/A')
         self.logger.info(f"[{call_sid}] Entering SF Agent node for phone: {phone}")
         
         if not phone:
