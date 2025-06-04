@@ -15,10 +15,10 @@ from pydub.effects import normalize
 from fastapi import WebSocket
 #
 from app.agents.phone_conversation_state_model import PhoneConversationState
-from app.speech.outgoing_manager import OutgoingManager
 from app.speech.speech_to_text import SpeechToTextProvider
 from app.agents.agents_graph import AgentsGraph
-from app.speech.incoming_manager import IncomingManager
+from app.managers.incoming_manager import IncomingManager
+from app.managers.outgoing_audio_manager import OutgoingManager
 
 class IncomingAudioManager(IncomingManager):
     """Audio processing utilities for improving speech recognition quality and handling Twilio events"""
@@ -29,10 +29,10 @@ class IncomingAudioManager(IncomingManager):
     # Temporary directory for audio files
     TEMP_DIR = "./static/audio"# c:\Dev\squad-ai\LudoAppoinmentTaker\app\speech\outgoing_manager.py    
 
-    def __init__(self, stt_provider: SpeechToTextProvider,outgoing_audio_processing: OutgoingManager, compiled_graph : AgentsGraph, sample_width=2, frame_rate=8000, channels=1, vad_aggressiveness=3):
+    def __init__(self, stt_provider: SpeechToTextProvider,outgoing_manager: OutgoingManager, compiled_graph : AgentsGraph, sample_width=2, frame_rate=8000, channels=1, vad_aggressiveness=3):
         self.logger = logging.getLogger(__name__)
         self.stt_provider : SpeechToTextProvider = stt_provider
-        self.outgoing_audio_processing : OutgoingManager = outgoing_audio_processing
+        self.outgoing_manager : OutgoingManager = outgoing_manager
         self.sample_width = sample_width
         self.frame_rate = frame_rate
         self.channels = channels
@@ -66,7 +66,7 @@ class IncomingAudioManager(IncomingManager):
 
     def set_stream_sid(self, stream_sid: str) -> None:
         self.stream_sid = stream_sid
-        self.outgoing_audio_processing.update_stream_sid(stream_sid)        
+        self.outgoing_manager.update_stream_sid(stream_sid)        
         self.logger.info(f"Updated Incoming / Outgoing AudioManagers to stream SID: {stream_sid}")
 
     def set_phone_number(self, phone_number: str, stream_sid: str) -> None:
@@ -220,7 +220,7 @@ class IncomingAudioManager(IncomingManager):
             
         return stream_sid
 
-    async def handle_incoming_websocket_media_event_async(self, audio_data: dict) -> None:        
+    async def process_incoming_data_async(self, audio_data: dict) -> None:        
         if not self.stream_sid:
             self.logger.error("/!\\ 'media event' received before the 'start event'")
             return
@@ -436,12 +436,12 @@ class IncomingAudioManager(IncomingManager):
         Updates the speaking state based on the text queue status
         This provides a more accurate representation of when audio is actually being sent
         """
-        is_sending_audio = self.outgoing_audio_processing.is_sending_speech()
+        is_sending_audio = self.outgoing_manager.is_sending_speech()
         if is_sending_audio != self.is_speaking:
             if is_sending_audio:
                 self.is_speaking = True
                 # Log more detailed stats about the text queue
-                stats = self.outgoing_audio_processing.get_streaming_stats()
+                stats = self.outgoing_manager.get_streaming_stats()
                 text_stats = stats['text_queue']
                 self.logger.debug(f"Speaking started - Text queue: {text_stats['current_size_chars']} chars, " +
                                 f"{text_stats['total_chars_processed']} chars processed so far")
@@ -457,7 +457,7 @@ class IncomingAudioManager(IncomingManager):
                 self.rag_interrupt_flag["interrupted"] = True
                 self.logger.info("RAG streaming interrupted due to speech interruption")
                 
-            await self.outgoing_audio_processing.clear_text_queue()
+            await self.outgoing_manager.clear_text_queue()
             self.logger.info("Cleared text queue due to speech interruption")
             self.is_speaking = False
             return True  # Speech was stopped

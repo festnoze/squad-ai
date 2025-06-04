@@ -6,7 +6,7 @@ from app.speech.text_queue_manager import TextQueueManager
 from app.speech.text_processing import ProcessText
 from app.speech.twilio_audio_sender import TwilioAudioSender
 from app.speech.text_to_speech import TextToSpeechProvider
-from app.speech.outgoing_manager import OutgoingManager
+from app.managers.outgoing_manager import OutgoingManager
 
 class OutgoingAudioManager(OutgoingManager):
     """

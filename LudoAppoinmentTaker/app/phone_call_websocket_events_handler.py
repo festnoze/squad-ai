@@ -10,8 +10,8 @@ from fastapi import WebSocket, WebSocketDisconnect
 from app.speech.text_to_speech import get_text_to_speech_provider
 from app.speech.speech_to_text import get_speech_to_text_provider
 from app.agents.agents_graph import AgentsGraph
-from app.speech.incoming_audio_manager import IncomingAudioManager
-from app.speech.outgoing_audio_manager import OutgoingAudioManager
+from app.managers.incoming_audio_manager import IncomingAudioManager
+from app.managers.outgoing_audio_manager import OutgoingAudioManager
 #
 from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
 from app.api_client.salesforce_api_client import SalesforceApiClient
@@ -111,7 +111,7 @@ class PhoneCallWebsocketEventsHandler:
                                     frame_rate=self.frame_rate,
                                     vad_aggressiveness=3
                                 )
-
+                                
         if self.openai_client is None:
             self.openai_client = OpenAI(api_key=self.OPENAI_API_KEY)
 
@@ -188,7 +188,7 @@ class PhoneCallWebsocketEventsHandler:
 
     async def _handle_media_event_async(self, media_data: dict) -> None:
         """Handle the 'media' event from Twilio which contains audio data."""
-        await self.incoming_audio_processing.handle_incoming_websocket_media_event_async(media_data)
+        await self.incoming_audio_processing.process_incoming_data_async(media_data)
             
     def _is_websocket_connected(self) -> bool:
         """Check if the websocket is still connected"""

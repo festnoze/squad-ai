@@ -19,18 +19,19 @@ from agents.sf_agent import SFAgent
 # Clients
 from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
 from app.api_client.salesforce_api_client import SalesforceApiClient
-from app.speech.outgoing_manager import OutgoingManager
+from app.managers.outgoing_manager import OutgoingManager
 
 class AgentsGraph:
-    def __init__(self, outgoing_manager: OutgoingManager, studi_rag_inference_api_client: StudiRAGInferenceApiClient, salesforce_api_client: SalesforceApiClient):
+    def __init__(self, outgoing_manager: OutgoingManager, studi_rag_client: StudiRAGInferenceApiClient, salesforce_client: SalesforceApiClient, call_sid: str):
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
-        self.logger.info("Agents graph initialization")
+        self.call_sid = call_sid
+        self.logger.info(f"[{self.call_sid}] Agents graph initialization")
         
-        self.studi_rag_inference_api_client = studi_rag_inference_api_client
-        self.salesforce_api_client = salesforce_api_client
+        self.studi_rag_inference_api_client = studi_rag_client
+        self.salesforce_api_client = salesforce_client
 
-        self.outgoing_manager = outgoing_manager
+        self.outgoing_manager: OutgoingManager = outgoing_manager
         
         lid_config_file_path = os.path.join(os.path.dirname(__file__), 'configs', 'lid_api_config.yaml')
         self.lead_agent_instance = LeadAgent(config_path=lid_config_file_path)
@@ -46,7 +47,7 @@ class AgentsGraph:
         
     def _build_graph(self):
         workflow = StateGraph(PhoneConversationState)
-        self.logger.info("Agents graph ongoing creation.")
+        self.logger.info(f"[{self.call_sid}] Agents graph ongoing creation.")
 
         # Add nodes
         workflow.add_node("router", self.router)
@@ -88,7 +89,7 @@ class AgentsGraph:
         # app_graph = workflow.compile(checkpointer=checkpointer)
 
         app_graph = workflow.compile() # Compile w/o checkpointer
-        self.logger.info("Agents graph compiled successfully.")
+        self.logger.info(f"[{self.call_sid}] Agents graph compiled successfully.")
         return app_graph
 
     async def router(self, state: PhoneConversationState) -> dict:
@@ -96,8 +97,9 @@ class AgentsGraph:
             state['agent_scratchpad'] = {}
         if state.get('user_input', None):
             user_input = state.get('user_input')
+            self.logger.info(f"[{self.call_sid}] Router received user input: {user_input}")
             feedback_text = f"Très bien. Vous avez demandé : \"{user_input}\". Un instant, j'analyse votre demande."
-            await self.outgoing_manager.queue_data(feedback_text)
+            await self.outgoing_manager.enqueue_text(feedback_text)
 
         if not state.get('agent_scratchpad', {}).get('conversation_id') or not state.get('agent_scratchpad', None).get('user_input'):
             state['agent_scratchpad']["next_agent_needed"] = "initialization"
@@ -118,7 +120,7 @@ class AgentsGraph:
             Bonjour, je suis Stud'ia, l'assistante virtuelle de Studi. Je suis là pour t'aider en l'absence de nos conseillers.
             Je peux t'aider à explorer nos formations. Sinon, je peux prendre un rendez-vous avec un conseiller pour toi."""
         #welcome_text = "Salut !"
-        await self.outgoing_audio_processing.enqueue_text(welcome_text)
+        await self.outgoing_manager.enqueue_text(welcome_text)
 
         # Retrieve or create the user and a new conversation into the backend API & add welcome msg to it.
         conversation_id = await self.init_user_and_new_conversation_in_backend_api_async(state.get('caller_phone'), state.get('call_sid'))
@@ -212,6 +214,7 @@ class AgentsGraph:
         if not self.lead_agent_instance:
             self.logger.error(f"[{call_sid}] LeadAgent not initialized. Cannot process.")
             response_text = "Je rencontre un problème technique avec l'agent de contact."
+            await self.outgoing_manager.enqueue_text(response_text)
             return {"history": [("Human", user_input), ("AI", response_text)], "agent_scratchpad": {"error": "LeadAgent not initialized"}}
 
         try:
@@ -463,7 +466,7 @@ class AgentsGraph:
                 
                 # Use the enhanced text processing for better speech quality
                 # Using smaller chunks for RAG responses to be more responsive
-                await self.outgoing_audio_processing.enqueue_text(chunk)
+                await self.outgoing_manager.enqueue_text(chunk)
                 
                 # Vérifier si on a été interrompu pendant qu'on parlait
                 if speaking_before and not self.is_speaking:
@@ -484,6 +487,6 @@ class AgentsGraph:
             error_message = f"Je suis désolé, une erreur s'est produite lors de la communication avec le service."
             self.logger.error(f"Error in RAG API communication: {str(e)}")
             # Use enhanced text-to-speech for error messages too
-            await self.outgoing_audio_processing.enqueue_text(error_message)
+            await self.outgoing_manager.enqueue_text(error_message)
 
         return state
