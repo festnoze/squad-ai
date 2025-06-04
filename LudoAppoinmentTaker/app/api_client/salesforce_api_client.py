@@ -33,7 +33,7 @@ class SalesforceApiClient:
             
     def authenticate(self) -> bool:
         """Authenticate with Salesforce using JWT and return success status"""
-        print("Authenticating via JWT...")
+        self.logger.info("Authenticating via JWT...")
     
         # Read private key
         try:
@@ -76,7 +76,7 @@ class SalesforceApiClient:
                 self._instance_url = auth_data.get('instance_url')
                 
                 if self._access_token and self._instance_url:
-                    print("Authentication successful.")
+                    self.logger.info("Authentication successful.")
                     return True
                 else:
                     error_msg = "Authentication completed but access_token or instance_url is missing."
@@ -84,18 +84,18 @@ class SalesforceApiClient:
                         error_msg += " Access token is missing."
                     if not self._instance_url:
                         error_msg += " Instance URL is missing."
-                    print(error_msg)
+                    self.logger.info(error_msg)
                     self._access_token = None # Ensure clean state
                     self._instance_url = None
                     return False
                 
             except httpx.HTTPStatusError as e:
-                print(f"Authentication HTTP error: {e.response.status_code} - {e.response.text}")
+                self.logger.info(f"Authentication HTTP error: {e.response.status_code} - {e.response.text}")
                 self._access_token = None 
                 self._instance_url = None
                 return False
             except Exception as e:
-                print(f"Authentication error: {str(e)}")
+                self.logger.info(f"Authentication error: {str(e)}")
                 self._access_token = None 
                 self._instance_url = None
                 return False
@@ -125,15 +125,15 @@ class SalesforceApiClient:
         """        
         await self._ensure_authenticated_async()
         if not subject or not start_datetime:
-            print("Error: Required event fields (subject, start_datetime) are missing")
+            self.logger.info("Error: Required event fields (subject, start_datetime) are missing")
             return None
             
         end_datetime = self._calculate_end_datetime(start_datetime, duration_minutes)
         if not end_datetime:
-            print("Error: Invalid start_datetime or duration_minutes")
+            self.logger.info("Error: Invalid start_datetime or duration_minutes")
             return None
         
-        print("Creating the Event...")
+        self.logger.info("Creating the Event...")
         
         # Prepare headers
         headers = {
@@ -170,19 +170,19 @@ class SalesforceApiClient:
                 
                 if resp_event.status_code == 201:
                     event_id = resp_event.json().get('id')
-                    print("Event created successfully!")
-                    print(f"ID: {event_id}")
-                    print(f"{self._instance_url}/lightning/r/Event/{event_id}/view")
+                    self.logger.info("Event created successfully!")
+                    self.logger.info(f"ID: {event_id}")
+                    self.logger.info(f"{self._instance_url}/lightning/r/Event/{event_id}/view")
                     return event_id
                 else:
-                    print(f"Error while creating the Event: {resp_event.status_code}")
+                    self.logger.info(f"Error while creating the Event: {resp_event.status_code}")
                     try:
-                        print(json.dumps(resp_event.json(), indent=2, ensure_ascii=False))
+                        self.logger.info(json.dumps(resp_event.json(), indent=2, ensure_ascii=False))
                     except:
-                        print(resp_event.text)
+                        self.logger.info(resp_event.text)
                     return None
             except Exception as e:
-                print(f"Error creating event: {str(e)}")
+                self.logger.info(f"Error creating event: {str(e)}")
                 return None
 
     async def get_events_async(self, start_datetime: str, end_datetime: str, owner_id: str | None = None) -> list | None:
@@ -197,7 +197,7 @@ class SalesforceApiClient:
             List of events if successful, None otherwise
         """
         await self._ensure_authenticated_async()
-        print("Retrieving events...")
+        self.logger.info("Retrieving events...")
         
         # Prepare headers
         headers = {
@@ -218,7 +218,7 @@ class SalesforceApiClient:
         
         # URL encode the query
         encoded_query = urllib.parse.quote(query)
-        print(f"SOQL Query: {query}")
+        self.logger.info(f"SOQL Query: {query}")
         
         # Create query URL
         url_query = f"{self._instance_url}/services/data/{self._version_api}/query/?q={encoded_query}"
@@ -232,7 +232,7 @@ class SalesforceApiClient:
                     data = resp.json()
                     events = data.get('records', [])
                     total_size = data.get('totalSize', 0)
-                    print(f"Retrieved {total_size} events")
+                    self.logger.info(f"Retrieved {total_size} events")
                     
                     # Handle pagination if needed
                     next_records_url = data.get('nextRecordsUrl')
@@ -244,18 +244,18 @@ class SalesforceApiClient:
                             events.extend(next_data.get('records', []))
                             next_records_url = next_data.get('nextRecordsUrl')
                         else:
-                            print(f"Error retrieving additional events: {resp.status_code}")
+                            self.logger.info(f"Error retrieving additional events: {resp.status_code}")
                             break
                     return events
                 else:
-                    print(f"Error retrieving events: {resp.status_code}")
+                    self.logger.info(f"Error retrieving events: {resp.status_code}")
                     try:
-                        print(json.dumps(resp.json(), indent=2, ensure_ascii=False))
+                        self.logger.info(json.dumps(resp.json(), indent=2, ensure_ascii=False))
                     except:
-                        print(resp.text)
+                        self.logger.info(resp.text)
                     return None
             except Exception as e:
-                print(f"Error retrieving events: {str(e)}")
+                self.logger.info(f"Error retrieving events: {str(e)}")
                 return None
 
     async def get_person_by_phone_async(self, phone_number: str) -> dict | None:
@@ -285,7 +285,7 @@ class SalesforceApiClient:
                 f"WHERE Phone = '{phone_number}' OR MobilePhone = '{phone_number}' "
                 "LIMIT 1"
             )
-            print(f"SOQL Query (Contact): {contact_query}")
+            self.logger.info(f"SOQL Query (Contact): {contact_query}")
             encoded_contact_query = urllib.parse.quote(contact_query)
             url_contact_query = f"{self._instance_url}/services/data/{self._version_api}/query/?q={encoded_contact_query}"
 
@@ -296,18 +296,18 @@ class SalesforceApiClient:
                 records = data.get('records', [])
                 if records:
                     contact_data = records[0]
-                    print(f"Found Contact: {contact_data.get('Id')} - {contact_data.get('FirstName')} {contact_data.get('LastName')}")
+                    self.logger.info(f"Found Contact: {contact_data.get('Id')} - {contact_data.get('FirstName')} {contact_data.get('LastName')}")
                     return {'type': 'Contact', 'data': contact_data}
             except httpx.HTTPStatusError as http_err:
-                print(f"HTTP error querying Contact: {http_err} - Status: {http_err.response.status_code}")
+                self.logger.info(f"HTTP error querying Contact: {http_err} - Status: {http_err.response.status_code}")
                 try:
-                    print(json.dumps(http_err.response.json(), indent=2, ensure_ascii=False))
+                    self.logger.info(json.dumps(http_err.response.json(), indent=2, ensure_ascii=False))
                 except json.JSONDecodeError:
-                    print(http_err.response.text)
+                    self.logger.info(http_err.response.text)
             except httpx.RequestError as req_err:
-                print(f"Request error querying Contact: {str(req_err)}")
+                self.logger.info(f"Request error querying Contact: {str(req_err)}")
             except Exception as e:
-                print(f"Generic exception querying Contact: {str(e)}")
+                self.logger.info(f"Generic exception querying Contact: {str(e)}")
 
             # --- If no Contact found, try to find a Lead ---
             lead_query = (
@@ -316,7 +316,7 @@ class SalesforceApiClient:
                 f"WHERE (Phone = '{phone_number}' OR MobilePhone = '{phone_number}') AND IsConverted = false "
                 "LIMIT 1"
             )
-            print(f"SOQL Query (Lead): {lead_query}")
+            self.logger.info(f"SOQL Query (Lead): {lead_query}")
             encoded_lead_query = urllib.parse.quote(lead_query)
             url_lead_query = f"{self._instance_url}/services/data/{self._version_api}/query/?q={encoded_lead_query}"
 
@@ -327,20 +327,20 @@ class SalesforceApiClient:
                 records = data.get('records', [])
                 if records:
                     lead_data = records[0]
-                    print(f"Found Lead: {lead_data.get('Id')} - {lead_data.get('FirstName')} {lead_data.get('LastName')}")
+                    self.logger.info(f"Found Lead: {lead_data.get('Id')} - {lead_data.get('FirstName')} {lead_data.get('LastName')}")
                     return {'type': 'Lead', 'data': lead_data}
             except httpx.HTTPStatusError as http_err:
-                print(f"HTTP error querying Lead: {http_err} - Status: {http_err.response.status_code}")
+                self.logger.info(f"HTTP error querying Lead: {http_err} - Status: {http_err.response.status_code}")
                 try:
-                    print(json.dumps(http_err.response.json(), indent=2, ensure_ascii=False))
+                    self.logger.info(json.dumps(http_err.response.json(), indent=2, ensure_ascii=False))
                 except json.JSONDecodeError:
-                    print(http_err.response.text)
+                    self.logger.info(http_err.response.text)
             except httpx.RequestError as req_err:
-                print(f"Request error querying Lead: {str(req_err)}")
+                self.logger.info(f"Request error querying Lead: {str(req_err)}")
             except Exception as e:
-                print(f"Generic exception querying Lead: {str(e)}")
+                self.logger.info(f"Generic exception querying Lead: {str(e)}")
             
-            print(f"No Contact or non-converted Lead found for phone number: {phone_number}")
+            self.logger.info(f"No Contact or non-converted Lead found for phone number: {phone_number}")
             return None
 
     async def discover_database_async(self, sobjects_to_describe: list[str] | None = None, include_fields: bool = True) -> dict | None:
@@ -373,17 +373,17 @@ class SalesforceApiClient:
             # 1. Get list of all SObjects metadata for URLs
             all_sobjects_url = f"{self._instance_url}/services/data/{self._version_api}/sobjects/"
             try:
-                print("Fetching list of all SObjects...")
+                self.logger.info("Fetching list of all SObjects...")
                 resp = await client.get(all_sobjects_url, headers=headers)
                 resp.raise_for_status()
                 all_sobjects_data = resp.json()
             except httpx.HTTPStatusError as http_err_main:
-                print(f"HTTP error getting SObject list: {http_err_main} - Status: {http_err_main.response.status_code}")
-                try: print(json.dumps(http_err_main.response.json(), indent=2))
-                except: print(http_err_main.response.text)
+                self.logger.info(f"HTTP error getting SObject list: {http_err_main} - Status: {http_err_main.response.status_code}")
+                try: self.logger.info(json.dumps(http_err_main.response.json(), indent=2))
+                except: self.logger.info(http_err_main.response.text)
                 return None
             except Exception as e_main:
-                print(f"Error fetching SObject list: {str(e_main)}")
+                self.logger.info(f"Error fetching SObject list: {str(e_main)}")
                 return None
 
             # Determine the list of SObjects to describe
@@ -399,19 +399,19 @@ class SalesforceApiClient:
                         target_sobjects_info.append({'name': s_name, 'describe_url_path': s_name_to_url_map[s_name]})
                     else: # Fallback to constructing the URL if not found (e.g. object not in global list, or list was partial)
                         target_sobjects_info.append({'name': s_name, 'describe_url_path': f"/services/data/{self._version_api}/sobjects/{s_name}/describe/"})
-                print(f"Will describe {len(target_sobjects_info)} specified SObjects: {', '.join(s_name for s_name in sobjects_to_describe)}")
+                self.logger.info(f"Will describe {len(target_sobjects_info)} specified SObjects: {', '.join(s_name for s_name in sobjects_to_describe)}")
             else:
                 target_sobjects_info = [{'name': s_info['name'], 'describe_url_path': s_info['urls']['describe']}
                                        for s_info in all_sobjects_metadata_list
                                        if 'name' in s_info and 'urls' in s_info and 'describe' in s_info['urls']]
-                print(f"Found {len(target_sobjects_info)} SObjects. Describing all can be very slow and consume many API calls.")
+                self.logger.info(f"Found {len(target_sobjects_info)} SObjects. Describing all can be very slow and consume many API calls.")
 
             total_objects_to_describe = len(target_sobjects_info)
             for i, sobject_item in enumerate(target_sobjects_info):
                 s_name = sobject_item['name']
                 describe_url = f"{self._instance_url}{sobject_item['describe_url_path']}"
                 
-                print(f"Describing SObject {i+1}/{total_objects_to_describe}: {s_name}...")
+                self.logger.info(f"Describing SObject {i+1}/{total_objects_to_describe}: {s_name}...")
                 try:
                     desc_resp = await client.get(describe_url, headers=headers)
                     desc_resp.raise_for_status()
@@ -446,10 +446,10 @@ class SalesforceApiClient:
                     error_detail = "Unknown error"
                     try: error_detail = json.dumps(http_err_desc.response.json(), indent=2)
                     except: error_detail = http_err_desc.response.text
-                    print(f"HTTP error describing SObject {s_name}: {http_err_desc} - Status: {http_err_desc.response.status_code}. Details: {error_detail[:500]}")
+                    self.logger.info(f"HTTP error describing SObject {s_name}: {http_err_desc} - Status: {http_err_desc.response.status_code}. Details: {error_detail[:500]}")
                     schema[s_name] = {'error': f'Failed to describe: {str(http_err_desc)}'}
                 except Exception as e_desc:
-                    print(f"Error describing SObject {s_name}: {str(e_desc)}")
+                    self.logger.info(f"Error describing SObject {s_name}: {str(e_desc)}")
                     schema[s_name] = {'error': f'Failed to describe: {str(e_desc)}'}
         
         return schema
@@ -466,8 +466,8 @@ class SalesforceApiClient:
             end_datetime = end_dt.isoformat().replace('+00:00', 'Z')
             return end_datetime
         except ValueError as e:
-            print(f"Error parsing start_datetime: {e}")
-            print("Make sure start_datetime is in ISO format (e.g., '2025-05-20T14:00:00Z')")
+            self.logger.info(f"Error parsing start_datetime: {e}")
+            self.logger.info("Make sure start_datetime is in ISO format (e.g., '2025-05-20T14:00:00Z')")
             return None
             
     async def _query_salesforce(self, soql_query: str) -> dict | None:
@@ -483,14 +483,14 @@ class SalesforceApiClient:
         # Authentication should be ensured by the public calling method using _ensure_authenticated
         if not self._access_token or not self._instance_url:
              # This state should ideally not be reached if _ensure_authenticated was called.
-            print("Critical Error: _query_salesforce called without prior successful authentication.")
+            self.logger.info("Critical Error: _query_salesforce called without prior successful authentication.")
             return None
 
         headers = {'Authorization': f'Bearer {self._access_token}'}
         encoded_query = urllib.parse.quote(soql_query)
         url_query = f"{self._instance_url}/services/data/{self._version_api}/query/?q={encoded_query}"
         
-        # print(f"Executing SOQL: {soql_query}") # Verbose, enable for deep debugging
+        # self.logger.info(f"Executing SOQL: {soql_query}") # Verbose, enable for deep debugging
         async with httpx.AsyncClient() as client:
             try:
                 resp = await client.get(url_query, headers=headers)
@@ -498,15 +498,15 @@ class SalesforceApiClient:
                 return resp.json()
             except httpx.HTTPStatusError as http_err:
                 error_message = f"SOQL Query HTTP error: {http_err} - Status: {http_err.response.status_code}. Query: {soql_query}"
-                print(error_message)
+                self.logger.info(error_message)
                 try: 
                     error_details = http_err.response.json()
-                    print(json.dumps(error_details, indent=2, ensure_ascii=False))
+                    self.logger.info(json.dumps(error_details, indent=2, ensure_ascii=False))
                 except json.JSONDecodeError:
-                    print(f"Response text: {http_err.response.text}")
+                    self.logger.info(f"Response text: {http_err.response.text}")
                 return None
             except Exception as e:
-                print(f"SOQL Query general error: {str(e)}. Query: {soql_query}")
+                self.logger.info(f"SOQL Query general error: {str(e)}. Query: {soql_query}")
                 return None
 
     async def get_leads_by_details_async(self, email: str | None = None, first_name: str | None = None, last_name: str | None = None, company_name: str | None = None) -> list[dict] | None:
@@ -529,14 +529,14 @@ class SalesforceApiClient:
         if first_name and last_name:
             conditions.append(f"(FirstName = '{first_name}' AND LastName = '{last_name}')")
         elif first_name or last_name:
-            print("Warning: For name-based Lead search, providing both first_name and last_name is recommended for accuracy.")
+            self.logger.info("Warning: For name-based Lead search, providing both first_name and last_name is recommended for accuracy.")
             if first_name: conditions.append(f"FirstName = '{first_name}'")
             if last_name: conditions.append(f"LastName = '{last_name}'")
         if company_name:
             conditions.append(f"Company = '{company_name}'")
 
         if len(conditions) == 1: # Only IsConverted = false, no other criteria
-            print("Error: At least one search criterion (email, full name, or company) must be provided for get_leads_by_details_async.")
+            self.logger.info("Error: At least one search criterion (email, full name, or company) must be provided for get_leads_by_details_async.")
             return None # Or an empty list if that's preferred for bad input
 
         query_filter = " AND " + " AND ".join(f"({c})" for c in conditions[1:])
@@ -568,7 +568,7 @@ class SalesforceApiClient:
         await self._ensure_authenticated_async()
 
         if not lead_id:
-            print("Error: lead_id must be provided.")
+            self.logger.info("Error: lead_id must be provided.")
             return None
 
         # Step 1: Get Lead conversion details
@@ -579,7 +579,7 @@ class SalesforceApiClient:
             # _query_salesforce would have printed an error if lead_response is None
             # If records is None (but lead_response isn't), or empty, Lead not found or query issue.
             if lead_response and lead_response.get('totalSize', 0) == 0:
-                 print(f"Lead with ID '{lead_id}' not found.")
+                 self.logger.info(f"Lead with ID '{lead_id}' not found.")
                  return []
             return None # Error occurred during query
         
@@ -592,13 +592,13 @@ class SalesforceApiClient:
         common_opp_fields = "SELECT Id, Name, StageName, Amount, CloseDate, AccountId, Account.Name, Owner.Name, CreatedDate FROM Opportunity"
 
         if is_converted and converted_opp_id:
-            print(f"Lead '{lead_id}' was converted to Opportunity ID: '{converted_opp_id}'. Fetching this Opportunity.")
+            self.logger.info(f"Lead '{lead_id}' was converted to Opportunity ID: '{converted_opp_id}'. Fetching this Opportunity.")
             opportunity_soql = f"{common_opp_fields} WHERE Id = '{converted_opp_id}' LIMIT 1"
         elif is_converted and converted_acc_id:
-            print(f"Lead '{lead_id}' was converted to Account ID: '{converted_acc_id}'. Searching Opportunities for this Account.")
+            self.logger.info(f"Lead '{lead_id}' was converted to Account ID: '{converted_acc_id}'. Searching Opportunities for this Account.")
             opportunity_soql = f"{common_opp_fields} WHERE AccountId = '{converted_acc_id}' ORDER BY CreatedDate DESC LIMIT 200"
         else:
-            print(f"Lead '{lead_id}' is not converted, or no ConvertedOpportunityId/ConvertedAccountId found. No direct Opportunities from conversion.")
+            self.logger.info(f"Lead '{lead_id}' is not converted, or no ConvertedOpportunityId/ConvertedAccountId found. No direct Opportunities from conversion.")
             return []
 
         if not opportunity_soql: # Should not happen if logic above is correct, but as a safeguard.

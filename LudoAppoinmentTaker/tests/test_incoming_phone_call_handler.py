@@ -6,7 +6,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from app.speech.text_processing import ProcessText
-from app.speech.outgoing_audio_manager import OutgoingAudioManager
+from app.managers.outgoing_audio_manager import OutgoingAudioManager
 
 
 @pytest.fixture
