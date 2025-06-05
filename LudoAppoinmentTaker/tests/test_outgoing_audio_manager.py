@@ -18,7 +18,7 @@ def fixture(mocker):
     outgoing_audio_manager = OutgoingAudioManager(
         websocket=mock_websocket,
         tts_provider=mock_tts_provider,
-        streamSid="test_stream_sid"
+        call_sid="test_call_sid"
     )
     
     # Patch the send_audio_chunk method of audio_sender

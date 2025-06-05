@@ -14,7 +14,7 @@ from pydub import AudioSegment
 from pydub.effects import normalize
 from fastapi import WebSocket
 #
-from app.agents.phone_conversation_state_model import PhoneConversationState
+from app.agents.phone_conversation_state_model import ConversationState, PhoneConversationState
 from app.speech.speech_to_text import SpeechToTextProvider
 from app.agents.agents_graph import AgentsGraph
 from app.managers.incoming_manager import IncomingManager
@@ -29,7 +29,7 @@ class IncomingAudioManager(IncomingManager):
     # Temporary directory for audio files
     TEMP_DIR = "./static/audio"# c:\Dev\squad-ai\LudoAppoinmentTaker\app\speech\outgoing_manager.py    
 
-    def __init__(self, stt_provider: SpeechToTextProvider,outgoing_manager: OutgoingManager, compiled_graph : AgentsGraph, sample_width=2, frame_rate=8000, channels=1, vad_aggressiveness=3):
+    def __init__(self, stt_provider: SpeechToTextProvider,outgoing_manager: OutgoingManager, agents_graph : AgentsGraph, sample_width=2, frame_rate=8000, channels=1, vad_aggressiveness=3):
         self.logger = logging.getLogger(__name__)
         self.stt_provider : SpeechToTextProvider = stt_provider
         self.outgoing_manager : OutgoingManager = outgoing_manager
@@ -43,9 +43,9 @@ class IncomingAudioManager(IncomingManager):
         # State tracking
         self.start_time = None
         self.conversation_id = None
-        self.stream_states = {}
+        self.stream_states : dict[str, ConversationState] = {}
         self.phones_by_call_sid = {}  # Map call_sid to phone numbers
-        self.compiled_graph : AgentsGraph = compiled_graph
+        self.agents_graph : AgentsGraph = agents_graph
         self.openai_client = None
         self.rag_interrupt_flag = {"interrupted": False}
         self.is_speaking = False
@@ -64,14 +64,13 @@ class IncomingAudioManager(IncomingManager):
     def set_websocket(self, websocket: WebSocket):
         self.websocket = websocket
 
-    def set_stream_sid(self, stream_sid: str) -> None:
-        self.stream_sid = stream_sid
-        self.outgoing_manager.update_stream_sid(stream_sid)        
-        self.logger.info(f"Updated Incoming / Outgoing AudioManagers to stream SID: {stream_sid}")
+    def set_call_sid(self, call_sid: str) -> None:
+        self.call_sid = call_sid
+        self.outgoing_manager.update_call_sid(call_sid)        
+        self.logger.info(f"Updated Incoming / Outgoing AudioManagers to call SID: {call_sid}")
 
-    def set_phone_number(self, phone_number: str, stream_sid: str) -> None:
-        self.phone_number = phone_number
-        self.phones_by_call_sid[stream_sid] = phone_number
+    def set_phone_number(self, phone_number: str, call_sid: str) -> None:
+        self.phones_by_call_sid[call_sid] = phone_number
     
     def is_speech(self, audio_chunk: bytes, frame_duration_ms=30) -> bool:
         """
@@ -178,17 +177,13 @@ class IncomingAudioManager(IncomingManager):
         is_silence = speech_to_noise_ratio < threshold
         return is_silence, speech_to_noise_ratio
         
-    async def handle_incoming_websocket_start_event_async(self, call_sid: str, stream_sid: str) -> str:
+    async def init_conversation_async(self, call_sid: str, stream_sid: str) -> None:
         """Handle the 'start' event from Twilio which begins a new call."""
-        
         phone_number = self.phones_by_call_sid.get(call_sid)
         if phone_number is None:
             self.logger.error(f"Phone number not found for call SID: {call_sid}")
             return None
-        self.start_time = time.time()
         self.logger.info(f"--- Call started --- \nPhone number: {phone_number}, CallSid: {call_sid}, StreamSid: {stream_sid}.")
-        self.set_stream_sid(stream_sid)
-        self.set_phone_number(phone_number, stream_sid)
         
         # Get or Create the state for the graph
         if stream_sid in self.stream_states:
@@ -207,7 +202,7 @@ class IncomingAudioManager(IncomingManager):
         
         try:            
             # Then invoke the graph with initial state to get the AI-generated welcome message
-            updated_state = await self.compiled_graph.ainvoke(current_state)
+            updated_state = await self.agents_graph.ainvoke(current_state)
             self.stream_states[stream_sid] = updated_state
             
             # # If there's an AI message from the graph, send it after the welcome message
@@ -220,8 +215,7 @@ class IncomingAudioManager(IncomingManager):
 
         except Exception as e:
             self.logger.error(f"Error in initial graph invocation: {e}", exc_info=True)
-            
-        return stream_sid
+
 
     async def process_incoming_data_async(self, audio_data: dict) -> None:        
         if not self.stream_sid:
@@ -319,7 +313,7 @@ class IncomingAudioManager(IncomingManager):
             else:
                 current_state : PhoneConversationState = {
                     "call_sid": self.call_sid,
-                    "caller_phone": self.phone_number,
+                    "caller_phone": self.phones_by_call_sid[self.call_sid],
                     "user_input": user_query,
                     "history": [], #TODO: Add history
                     "agent_scratchpad": {}
@@ -327,7 +321,7 @@ class IncomingAudioManager(IncomingManager):
                 self.stream_states[self.stream_sid] = current_state
                         
             # Invoke the graph with current state to get the AI-generated welcome message
-            updated_state = await self.compiled_graph.ainvoke(current_state)
+            updated_state = await self.agents_graph.ainvoke(current_state)
             self.stream_states[self.stream_sid] = updated_state
         except Exception as e:
             self.logger.error(f"Error in user query to agents graph: {e}", exc_info=True)

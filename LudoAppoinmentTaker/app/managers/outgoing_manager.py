@@ -30,7 +30,7 @@ class OutgoingManager(abc.ABC):
     @abc.abstractmethod
     def run_background_streaming_worker(self) -> None:
         """Start the data delivery process."""
-        self.is_running = True
+        pass
     
     @abc.abstractmethod
     def stop_background_streaming_worker_async(self) -> None:
@@ -43,9 +43,9 @@ class OutgoingManager(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def update_stream_sid(self, streamSid: str) -> None:
+    def update_call_sid(self, call_sid: str) -> None:
         """
-        Updates the stream SID when it changes (e.g., when a new call starts or ends)
+        Updates the call SID when it changes (e.g., when a new call starts or ends)
         Allows setting to None when resetting after a call ends
         """
         pass

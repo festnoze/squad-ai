@@ -8,6 +8,10 @@ class IncomingManager(abc.ABC):
     """    
     def __init__(self):
         self.is_processing = False
+
+    @abc.abstractmethod
+    def init_conversation_async(self, call_sid: str, stream_sid: str) -> None:
+        pass
     
     @abc.abstractmethod
     async def process_incoming_data_async(self, data: any) -> None:
@@ -19,9 +23,9 @@ class IncomingManager(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def set_stream_sid(self, stream_sid: str) -> None:
+    def set_call_sid(self, call_sid: str) -> None:
         pass
 
     @abc.abstractmethod
-    def set_phone_number(self, phone_number: str, stream_sid: str) -> None:
+    def set_phone_number(self, phone_number: str, call_sid: str) -> None:
         pass

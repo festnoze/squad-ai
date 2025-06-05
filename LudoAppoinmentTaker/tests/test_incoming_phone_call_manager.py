@@ -1,6 +1,7 @@
 import pytest
 import sys
 import os
+from unittest.mock import Mock, AsyncMock
 
 # Add the parent directory to sys.path to allow importing app modules
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -8,55 +9,54 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from app.speech.text_processing import ProcessText
 from app.managers.outgoing_audio_manager import OutgoingAudioManager
 
-
-@pytest.fixture
-def mock_outgoing_audio_manager(mocker):
-    mock_outgoing_audio_manager = mocker.Mock(spec=OutgoingAudioManager)
-    mock_outgoing_audio_manager.enqueue_text = mocker.AsyncMock(return_value=True)
-    return mock_outgoing_audio_manager
-
-@pytest.fixture
-def mock_logger(mocker):
-    return mocker.Mock()
-
-@pytest.fixture
-def mock_tts_provider(mocker):
-    mock_tts_provider = mocker.Mock()
-    mock_tts_provider.synthesize_speech_to_bytes = mocker.Mock(return_value=b'dummy_audio')
-    return mock_tts_provider
-
-@pytest.fixture
-def mock_text_queue_manager(mocker):
-    mock_text_queue_manager = mocker.Mock()
-    mock_text_queue_manager.get_queue_stats = mocker.Mock(return_value={
-        'current_size_chars': 150,
-        'total_chars_enqueued': 1000,
-        'total_chars_processed': 850,
-        'is_empty': False,
-        'processing_efficiency': 85.0
-    })
-    return mock_text_queue_manager
-
-@pytest.fixture
-def mock_audio_sender(mocker):
-    mock_audio_sender = mocker.Mock()
-    mock_audio_sender.get_sender_stats = mocker.Mock(return_value={
-        'chunks_sent': 42,
-        'bytes_sent': 84000,
-        'bytes_sent_kb': 82.03,
-        'avg_chunk_size': 2000.0,
-        'consecutive_errors': 0,
-        'is_sending': True,
-        'last_chunk_time': 1621234567.89,
-        'time_since_last_chunk': 0.25,
-        'total_duration': 30.5,
-        'send_duration': 28.75,
-        'stream_sid': 'test-stream-123'
-    })
-    return mock_audio_sender
-
 @pytest.mark.asyncio
-class TestIncomingPhoneCallHandler:
+class TestIncomingPhoneCallManager:
+
+    @pytest.fixture
+    def mock_outgoing_audio_manager(self):
+        mock_outgoing_audio_manager = Mock(spec=OutgoingAudioManager)
+        mock_outgoing_audio_manager.enqueue_text = AsyncMock(return_value=True)
+        return mock_outgoing_audio_manager
+
+    @pytest.fixture
+    def mock_logger(self):
+        return Mock()
+
+    @pytest.fixture
+    def mock_tts_provider(self):
+        mock_tts_provider = Mock()
+        mock_tts_provider.synthesize_speech_to_bytes = AsyncMock(return_value=b'dummy_audio')
+        return mock_tts_provider
+
+    @pytest.fixture
+    def mock_text_queue_manager(self):
+        mock_text_queue_manager = Mock()
+        mock_text_queue_manager.get_queue_stats = AsyncMock(return_value={
+            'current_size_chars': 150,
+            'total_chars_enqueued': 1000,
+            'total_chars_processed': 850,
+            'is_empty': False,
+            'processing_efficiency': 85.0
+        })
+        return mock_text_queue_manager
+
+    @pytest.fixture
+    def mock_audio_sender(self):
+        mock_audio_sender = Mock()
+        mock_audio_sender.get_sender_stats = AsyncMock(return_value={
+            'chunks_sent': 42,
+            'bytes_sent': 84000,
+            'bytes_sent_kb': 82.03,
+            'avg_chunk_size': 2000.0,
+            'consecutive_errors': 0,
+            'is_sending': True,
+            'last_chunk_time': 1621234567.89,
+            'time_since_last_chunk': 0.25,
+            'total_duration': 30.5,
+            'send_duration': 28.75,
+            'stream_sid': 'test-stream-123'
+        })
+        return mock_audio_sender
 
     @pytest.mark.asyncio
     async def test_speak_and_send_text_functionality(self, mock_outgoing_audio_manager, mock_logger):

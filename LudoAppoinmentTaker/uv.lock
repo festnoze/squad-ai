@@ -968,6 +968,7 @@ dependencies = [
     { name = "pandas-gbq" },
     { name = "parameterized" },
     { name = "pydub" },
+    { name = "pyshould" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-mock" },
@@ -1002,6 +1003,7 @@ requires-dist = [
     { name = "pandas-gbq", specifier = ">=0.28.0" },
     { name = "parameterized", specifier = ">=0.9.0" },
     { name = "pydub", specifier = ">=0.25.1" },
+    { name = "pyshould", specifier = ">=0.7.1" },
     { name = "pytest", specifier = ">=8.3.5" },
     { name = "pytest-asyncio", specifier = ">=0.26.0" },
     { name = "pytest-mock", specifier = ">=3.14.0" },
@@ -1570,6 +1572,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pyhamcrest"
+version = "2.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/16/3f/f286caba4e64391a8dc9200e6de6ce0d07471e3f718248c3276843b7793b/pyhamcrest-2.1.0.tar.gz", hash = "sha256:c6acbec0923d0cb7e72c22af1926f3e7c97b8e8d69fc7498eabacaf7c975bd9c", size = 60538 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/0c/71/1b25d3797a24add00f6f8c1bb0ac03a38616e2ec6606f598c1d50b0b0ffb/pyhamcrest-2.1.0-py3-none-any.whl", hash = "sha256:f6913d2f392e30e0375b3ecbd7aee79e5d1faa25d345c8f4ff597665dcac2587", size = 54555 },
+]
+
+[[package]]
 name = "pyjwt"
 version = "2.10.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1604,6 +1615,15 @@ sdist = { url = "https://files.pythonhosted.org/packages/bb/22/f1129e69d94ffff62
 wheels = [
     { url = "https://files.pythonhosted.org/packages/05/e7/df2285f3d08fee213f2d041540fa4fc9ca6c2d44cf36d3a035bf2a8d2bcc/pyparsing-3.2.3-py3-none-any.whl", hash = "sha256:a749938e02d6fd0b59b356ca504a24982314bb090c383e3cf201c95ef7e2bfcf", size = 111120 },
 ]
+
+[[package]]
+name = "pyshould"
+version = "0.7.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyhamcrest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/28/3c/130303ee81f31b416ac15c744d7b5c12a87c002a8cf0fb215e809f161767/pyshould-0.7.1.tar.gz", hash = "sha256:fccc7a6cc9d54f475fc345890c25810f6a0d32da7b893c7d858b3a012bdcf6d3", size = 22665 }
 
 [[package]]
 name = "pytest"

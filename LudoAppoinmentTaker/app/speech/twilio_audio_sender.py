@@ -10,10 +10,10 @@ class TwilioAudioSender:
     """
     Handles sending audio to Twilio with rate limiting to prevent connection issues.
     """
-    def __init__(self, websocket: any, streamSid: str = None, min_chunk_interval: float = 0.02):
+    def __init__(self, websocket: any, call_sid: str = None, min_chunk_interval: float = 0.02):
         self.logger = logging.getLogger(__name__)
         self.websocket = websocket
-        self.streamSid = streamSid
+        self.call_sid = call_sid
         self.min_chunk_interval = min_chunk_interval  # Minimum time between chunks (in seconds)
         self.last_send_time = time.time()
         self.is_sending = False
@@ -36,8 +36,8 @@ class TwilioAudioSender:
         if not audio_chunk:
             return False
             
-        if not self.streamSid:
-            self.logger.error("No streamSid provided, cannot send audio to Twilio")
+        if not self.call_sid:
+            self.logger.error("No call_sid provided, cannot send audio to Twilio")
             return False
             
         # More detailed debugging for WebSocket state
@@ -170,7 +170,7 @@ class TwilioAudioSender:
             'time_since_last_chunk': round(now - self.last_chunk_time, 3) if self.last_chunk_time > 0 else 0,
             'total_duration': round(now - self.start_time, 2),
             'send_duration': round(self.total_send_duration, 2),
-            'stream_sid': self.streamSid or 'None'
+            'call_sid': self.call_sid or 'None'
         }
                 
     def get_sending_stats(self) -> dict[str, any]:

@@ -176,7 +176,7 @@ class AgentsGraph:
             
             end_welcome_text = f"""
             Merci de nous contacter à nouveau {first_name} {last_name}. 
-            Votre conseiller, {owner_first_name}, qui vous accompagne d'habitude, n'est pas actuellement disponible.
+            Votre conseiller, {owner_first_name}, qui vous accompagne d'habitude, n'est actuellement pas disponible.
             Je vous propose de prendre un rendez-vous avec {owner_first_name} afin de vous permettre d'échanger directement avec lui.
             Avez-vous un jour ou un moment de la journée qui vous convient le mieux pour ce rendez-vous ?
             """

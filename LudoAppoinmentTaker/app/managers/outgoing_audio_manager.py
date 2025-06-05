@@ -13,9 +13,9 @@ class OutgoingAudioManager(OutgoingManager):
     Manages the complete audio streaming process using a text-based approach.
     Text is queued, then processed into speech in small chunks for better responsiveness.
     """
-    def __init__(self, websocket: any, tts_provider: TextToSpeechProvider, streamSid: str = None, min_chunk_interval: float = 0.05, min_chars_for_interruptible_speech: int = 15, sample_width=1, frame_rate=8000, channels=1):
+    def __init__(self, websocket: any, tts_provider: TextToSpeechProvider, call_sid: str = None, min_chunk_interval: float = 0.05, min_chars_for_interruptible_speech: int = 15, sample_width=1, frame_rate=8000, channels=1):
         self.text_queue_manager = TextQueueManager()
-        self.audio_sender : TwilioAudioSender = TwilioAudioSender(websocket, streamSid=streamSid, min_chunk_interval=min_chunk_interval)
+        self.audio_sender : TwilioAudioSender = TwilioAudioSender(websocket, call_sid=call_sid, min_chunk_interval=min_chunk_interval)
         self.logger = logging.getLogger(__name__)
         self.tts_provider : TextToSpeechProvider = tts_provider  # Text-to-speech provider for converting text to audio
         self.sender_task = None
@@ -32,16 +32,16 @@ class OutgoingAudioManager(OutgoingManager):
         self.websocket = websocket
         self.audio_sender.websocket = websocket
 
-    def update_stream_sid(self, streamSid: str) -> None:
+    def update_call_sid(self, call_sid: str) -> None:
         """
-        Updates the stream SID when it changes (e.g., when a new call starts or ends)
+        Updates the call SID when it changes (e.g., when a new call starts or ends)
         Allows setting to None when resetting after a call ends
         """
-        self.audio_sender.streamSid = streamSid
-        if not streamSid:
-            self.logger.info("Reset stream SID to None")
+        self.audio_sender.call_sid = call_sid
+        if not call_sid:
+            self.logger.info("Reset call SID to None")
         else:
-            self.logger.info(f"Updated stream SID to: {streamSid}")
+            self.logger.info(f"Updated call SID to: {call_sid}")
         return
          
     async def _background_streaming_worker(self) -> None:
@@ -63,12 +63,12 @@ class OutgoingAudioManager(OutgoingManager):
                 continue
 
             try:
-                if not self.audio_sender.streamSid:
+                if not self.audio_sender.call_sid:
                     streamSid_wait_count += 1
                     if streamSid_wait_count <= max_streamSid_wait:
-                        self.logger.warning(f"Waiting for StreamSid initialization ({streamSid_wait_count}/{max_streamSid_wait})...")
+                        self.logger.warning(f"Waiting for CallSid initialization ({streamSid_wait_count}/{max_streamSid_wait})...")
                     else:
-                        self.logger.error(f"No StreamSid set after {streamSid_wait_count} attempts, audio transmission may fail")
+                        self.logger.error(f"No CallSid set after {streamSid_wait_count} attempts, audio transmission may fail")
                     
                     await asyncio.sleep(0.2)
                     continue
