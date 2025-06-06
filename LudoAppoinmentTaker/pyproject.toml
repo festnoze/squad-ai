@@ -30,7 +30,12 @@ dependencies = [
     "uvicorn>=0.34.2",
     "webrtcvad>=2.0.10",
     "websockets>=15.0.1",
+    "enforce>=0.5.4",
+    "strong-types @ file:///C:/Dev/squad-ai/LudoAppoinmentTaker/wheel/strong_types-1.0.1-py3-none-any.whl",
 ]
+
+[tool.setuptools]
+packages = ["app"]
 
 [dependency-groups]
 dev = [

@@ -4,7 +4,7 @@ import time
 from app.managers.outgoing_manager import OutgoingManager
 
 class OutgoingTextManager(OutgoingManager):
-    
+
     def __init__(self, call_sid: str):
         super().__init__(call_sid)
         self.text_queue = asyncio.Queue()
@@ -23,15 +23,37 @@ class OutgoingTextManager(OutgoingManager):
         await self.text_queue.put(text_chunk)
         self.logger.debug(f"Text chunk queued for call {self.call_sid}: {text_chunk[:50]}...")
 
-    def _send_text_from_queue(self):
+    def run_background_streaming_worker(self) -> None:
+        if self.stream_task is not None:
+            self.logger.error("Streaming is already running")
+            return
+            
+        self.ask_to_stop_streaming_worker = False
+        self.stream_task = asyncio.create_task(self._background_streaming_worker_async())
+        self.logger.info("Text background streaming handler started")
+
+    async def stop_background_streaming_worker_async(self) -> None:
+        self.ask_to_stop_streaming_worker = True
+        if self.stream_task:
+            try:
+                await asyncio.wait_for(self.stream_task, timeout=2.0)
+            except asyncio.TimeoutError:
+                self.logger.warning("Streaming worker did not stop in time, cancelling")
+                self.stream_task.cancel()
+            except Exception as e:
+                self.logger.error(f"Error stopping streaming worker: {e}")
+            finally:
+                self.stream_task = None
+
+    async def _background_streaming_worker_async(self) -> None:
         """
-        Continuously sends text from the queue over the WebSocket.
+        Continuously sends text from the queue to stdout.
         """
         self.logger.info(f"Starting text sending loop for call {self.call_sid}")
         try:
             while True:
                 if self.text_queue.empty():
-                    time.sleep(0.1)
+                    await asyncio.sleep(0.1)
                     continue
 
                 while self.is_streaming or not self.text_queue.empty():
@@ -58,49 +80,6 @@ class OutgoingTextManager(OutgoingManager):
         finally:
             self.logger.info(f"Exiting _send_text_from_queue for call {self.call_sid}. Remaining items in queue: {self.text_queue.qsize()}")
 
-
-    def run_background_streaming_worker(self) -> None:
-        if self.audio_sender.is_sending or self.sender_task is not None:
-            self.logger.error("Streaming is already running")
-            return
-            
-        self.ask_to_stop_streaming_worker = False
-        self.sender_task = asyncio.create_task(self._background_streaming_worker())
-        self.logger.info("Audio streaming started")
-
-    async def stop_background_streaming_worker_async(self) -> None:
-        self.ask_to_stop_streaming_worker = True
-        if self.sender_task:
-            try:
-                await asyncio.wait_for(self.sender_task, timeout=2.0)
-            except asyncio.TimeoutError:
-                self.logger.warning("Streaming worker did not stop in time, cancelling")
-                self.sender_task.cancel()
-            except Exception as e:
-                self.logger.error(f"Error stopping streaming worker: {e}")
-            finally:
-                self.sender_task = None
-
-    def _background_streaming_worker(self):
-        while True:
-            try:
-                text_chunk = self.text_queue.get_nowait()
-                if text_chunk is None: # Sentinel value to stop
-                    self.logger.info(f"Received None sentinel in text queue for call {self.call_sid}. Stopping.")
-                    break
-                
-                message_to_send = {"event": "text_response", "streamSid": self.call_sid, "text": text_chunk}
-                self.websocket.send_json(message_to_send)
-                self.logger.info(f"Sent text chunk for call {self.call_sid}: {text_chunk[:50]}...")
-                self.text_queue.task_done()
-            except asyncio.QueueEmpty:
-                if self.ask_to_stop_streaming_worker:
-                    self.logger.info(f"Text streaming stopped for call {self.call_sid}.")
-                    break
-                continue
-            except Exception as e:
-                self.logger.error(f"Error processing text chunk for call {self.call_sid}: {e}", exc_info=True)
-                break
 
     def enqueue_text(self, text: str) -> bool:
         """

@@ -44,7 +44,7 @@ class OutgoingAudioManager(OutgoingManager):
             self.logger.info(f"Updated call SID to: {call_sid}")
         return
          
-    async def _background_streaming_worker(self) -> None:
+    async def _background_streaming_worker_async(self) -> None:
         """Background worker that continuously processes texts from the queue and sends audio to the websocket"""
         self.logger.info("Background TTS and audio streaming worker started")
         text_chunks_processed = 0
@@ -140,7 +140,7 @@ class OutgoingAudioManager(OutgoingManager):
             return
             
         self.ask_to_stop_streaming_worker = False
-        self.sender_task = asyncio.create_task(self._background_streaming_worker())
+        self.sender_task = asyncio.create_task(self._background_streaming_worker_async())
         self.logger.info("Audio streaming started")
         
     async def stop_background_streaming_worker_async(self) -> None:

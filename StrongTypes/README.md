@@ -2,8 +2,6 @@
 
 *Python Library v.1.0.1*
 
-
-
 ##What is it for?
 
 > **Strong Types** is a Python library capable to transforms your whole python project codebase into a **strongly typed** environment, like Java or C#. It combines 2 unique tools:
@@ -34,8 +32,20 @@
 
 ## Installation
 
+Install it from the web:
+
 ```bash
 pip install strong-types
+(when the library is available abroad)
+```
+
+---
+
+Or install it from local library wheel, like so:
+
+```textile
+copy file: "strong_types-1.0.1-py3-none-any.whl to target project" dir.
+add it to your project pip install "requirements.txt" file.
 ```
 
 ---

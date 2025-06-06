@@ -1,8 +1,7 @@
 
 import pytest
-from strong_types.analyzer import run_static_analysis
+from strong_types.static_type_analyzer import run_static_analysis
 from strong_types.decorators import strong_type
-from typing import Union
 
 class Demo:
     @strong_type

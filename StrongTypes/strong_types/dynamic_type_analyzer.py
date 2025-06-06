@@ -1,7 +1,7 @@
 import sys
 import inspect
 from typing import Any, Callable, Type
-from decorators import strong_type
+from strong_types.decorators import strong_type
 
 class DynamicTypeAnalyzer:
     @staticmethod

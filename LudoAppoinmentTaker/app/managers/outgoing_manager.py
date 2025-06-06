@@ -38,7 +38,7 @@ class OutgoingManager(abc.ABC):
         self.is_running = False
 
     @abc.abstractmethod
-    def _background_streaming_worker(self) -> None:
+    async def _background_streaming_worker_async(self) -> None:
         """Worker task to process the queue and send data."""
         pass
 

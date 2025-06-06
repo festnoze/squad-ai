@@ -64,7 +64,8 @@ docker run -d --name studi-website-rag-api --network my_network -p 8281:8281 rag
 - 'rag_studi_public_website_xxx_0.10' est le nom de l'image docker à partir de laquelle créer le container.
   
   ---
-
+  
    **5.3. <u>Tester</u> le bon fonctionnement**
+  
       Chaque API expose un endpoint "/ping" qui permet de test son bon fonctionnement, et renvoie "pong" en cas de réussite.
       De plus, l'API Slack expose un endpoint "/ping-api" qui appelle le endpoint "/ping" de l'API RAG, permettant de tester la chaine, et le bon fonctionnement de la communication entre containers des deux containters docker.
