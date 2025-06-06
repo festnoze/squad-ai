@@ -24,6 +24,7 @@ class OutgoingAudioManager(OutgoingManager):
         self.channels = channels
         self.max_words_by_stream_chunk = 10
         self.max_chars_by_stream_chunk = 100
+        self.streaming_interuption_asked = False
         self.ask_to_stop_streaming_worker = False
         self.websocket = websocket
         self.min_chars_for_interruptible_speech = min_chars_for_interruptible_speech
@@ -173,6 +174,7 @@ class OutgoingAudioManager(OutgoingManager):
         
     async def clear_text_queue(self) -> None:
         await self.text_queue_manager.clear_queue()
+        self.streaming_interuption_asked = True
         self.logger.info("Text queue cleared for interruption")
         
     def is_sending_speech(self) -> bool:

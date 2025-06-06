@@ -117,15 +117,25 @@ class HybridSTTProvider(SpeechToTextProvider):
     def transcribe_audio_static(openai_client, speech, client, temp_dir: str, file_name: str, language_code: str, frame_rate: int) -> str:
         """Transcribe audio file using OpenAI STT API, fallback to Google Cloud Speech-to-Text API."""
         # Try Google transcription first
-        transcript = GoogleSTTProvider.transcribe_audio_static(temp_dir, speech, client, file_name, language_code, frame_rate)
-        if transcript:
-            return transcript
+        # transcript = GoogleSTTProvider.transcribe_audio_static(temp_dir, speech, client, file_name, language_code, frame_rate)
+        # if transcript:
+        #     return transcript
 
-        # Fallback to OpenAI transcription
-        if openai_client:
-            transcript = OpenAISTTProvider.transcribe_audio_static(openai_client, temp_dir, file_name, language_code, frame_rate)
-            return transcript
-        return ""
+        # # Fallback to OpenAI transcription
+        # if openai_client:
+        #     transcript = OpenAISTTProvider.transcribe_audio_static(openai_client, temp_dir, file_name, language_code, frame_rate)
+        #     return transcript
+        # return ""
+        
+        transcript_google = GoogleSTTProvider.transcribe_audio_static(temp_dir, speech, client, file_name, language_code, frame_rate)
+        transcript_openai = OpenAISTTProvider.transcribe_audio_static(openai_client, temp_dir, file_name, language_code, frame_rate)
+        
+        if len(transcript_google) == 0 or len(transcript_openai) == 0:
+            return ""
+
+        if len(transcript_google) > len(transcript_openai):
+            return transcript_google
+        return transcript_openai
 
 def get_speech_to_text_provider(temp_dir: str, provider_name: str = "openai", language_code: str = "fr-FR", frame_rate: int = 8000) -> SpeechToTextProvider:
     """Factory function to get the appropriate speech-to-text provider"""

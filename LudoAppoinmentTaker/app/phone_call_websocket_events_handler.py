@@ -104,6 +104,7 @@ class PhoneCallWebsocketEventsHandler:
                                 ).graph
 
         self.incoming_audio_processing = IncomingAudioManager(
+                                    websocket=self.websocket, 
                                     stt_provider=self.stt_provider,
                                     outgoing_manager=self.outgoing_audio_processing,
                                     agents_graph=self.compiled_graph,

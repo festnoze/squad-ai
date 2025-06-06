@@ -53,13 +53,13 @@ class AgentsGraph:
         workflow.set_entry_point("router")
 
         workflow.add_node("router", self.router)
-        workflow.add_node("conversation_starter", self.send_begin_of_welcome_message_node)
-        workflow.add_edge("conversation_starter", "init_conversation")
+        workflow.add_node("conversation_start", self.send_begin_of_welcome_message_node)
+        workflow.add_edge("conversation_start", "init_conversation")
         workflow.add_node("init_conversation", self.init_conversation_node)
         workflow.add_edge("init_conversation", "user_identification")
         workflow.add_node("user_identification", self.user_identification_node)
-        workflow.add_edge("user_identification", "conversation_starter_end")
-        workflow.add_node("conversation_starter_end", self.send_end_of_welcome_message_node)
+        workflow.add_edge("user_identification", "conversation_start_end")
+        workflow.add_node("conversation_start_end", self.send_end_of_welcome_message_node)
 
         workflow.add_node("wait_for_user_input", self.wait_for_user_input_node)
         workflow.add_edge("wait_for_user_input", END)
@@ -73,11 +73,12 @@ class AgentsGraph:
             "router",
             self.decide_next_step,
             {
-                "conversation_starter": "conversation_starter",
+                "conversation_start": "conversation_start",
                 "lead_agent": "lead_agent",
                 "user_identification": "user_identification",
                 "calendar_agent": "calendar_agent",
                 "rag_course_agent": "rag_course_agent",
+                "wait_for_user_input": "wait_for_user_input",
                 END: END
             }
         )
@@ -100,11 +101,11 @@ class AgentsGraph:
         if state.get('user_input', None):
             user_input = state.get('user_input')
             self.logger.info(f"[{self.call_sid}] Router received user input: {user_input}")
-            feedback_text = f"Très bien. Vous avez demandé : \"{user_input}\". Un instant, j'analyse votre demande."
+            feedback_text = f"Très bien, vous avez demandé : \"{user_input}\". Un instant, j'analyse votre demande."
             await self.outgoing_manager.enqueue_text(feedback_text)
 
         if not state.get('agent_scratchpad', {}).get('conversation_id'):
-            state['agent_scratchpad']["next_agent_needed"] = "conversation_starter"
+            state['agent_scratchpad']["next_agent_needed"] = "conversation_start"
         elif not state.get('agent_scratchpad', None).get('user_input'):
             state['agent_scratchpad']["next_agent_needed"] = "wait_for_user_input"
         elif not state.get('agent_scratchpad', {}).get('sf_account_info'):
@@ -114,14 +115,14 @@ class AgentsGraph:
         elif not state.get('agent_scratchpad', {}).get('calendar_extracted_info'):
             state['agent_scratchpad']["next_agent_needed"] = "calendar_agent"
         else:
-            state['agent_scratchpad']["next_agent_needed"] = "conversation_starter"
+            state['agent_scratchpad']["next_agent_needed"] = "conversation_start"
         return state
 
     async def send_begin_of_welcome_message_node(self, state: PhoneConversationState) -> dict:
         """Send the begin of welcome message to the user"""
         call_sid = state.get('call_sid', 'N/A')
         phone_number = state.get('caller_phone', 'N/A')
-        welcome_text = "Bonjour, je suis Stud'ia, l'assistante virtuelle de Studi. Je suis là pour t'aider en l'absence de nos conseillers."
+        welcome_text = "Bonjour, je suis Stud'IA, l'assistante virtuelle de Studi."
         
         await self.outgoing_manager.enqueue_text(welcome_text)
         self.logger.info(f"[{call_sid}] Sent begin of welcome message to {phone_number}")
@@ -170,18 +171,19 @@ class AgentsGraph:
         leads_info = state.get('agent_scratchpad', {}).get('sf_leads_info', {})
         
         if sf_account:
+            civility = sf_account.get('Salutation', '').replace("Mme", "Madame").replace("Melle", "Mademoiselle").replace("Mr.", "Monsieur")
             first_name = sf_account.get('FirstName', '')
             last_name = sf_account.get('LastName', '')
             owner_first_name = sf_account.get('Owner', {}).get('Name', '')
             
             end_welcome_text = f"""
-            Merci de nous contacter à nouveau {first_name} {last_name}. 
-            Votre conseiller, {owner_first_name}, qui vous accompagne d'habitude, n'est actuellement pas disponible.
+            Merci de nous recontacter {civility} {first_name} {last_name}. 
+            Je suis là pour vous aider en l'absence de votre conseiller, {owner_first_name}, qui vous accompagne habituellement.
             Je vous propose de prendre un rendez-vous avec {owner_first_name} afin de vous permettre d'échanger directement avec lui.
             Avez-vous un jour ou un moment de la journée qui vous convient le mieux pour ce rendez-vous ?
             """
         else:
-            end_welcome_text = "Je peux t'aider à explorer nos formations, ou prendre rendez-vous avec un conseiller pour toi."
+            end_welcome_text = "Je suis là pour vous aider en l'absence de nos conseillers. Avez-vous des questions sur nos formations, ou souhaitez-vous prendre rendez-vous avec un conseiller ?"
                 
         await self.outgoing_manager.enqueue_text(end_welcome_text)
         self.logger.info(f"[{call_sid}] Sent end of welcome message to {phone_number}")

@@ -101,7 +101,8 @@ class TerminalEventsHandler:
             try:
                 input_text = input("User: ")
                 
-                if input_text.lower() == "bye": break
+                if input_text.lower() == "bye": 
+                    break
                 await self.incoming_text_async(media_data={"text": input_text})
 
             except Exception as e:

@@ -257,7 +257,7 @@ class TestTerminalEventsHandler:
         
         try:
             # Patch only the input function to break the loop
-            with patch('app.terminal_events_handler.input', side_effect=['bye']):
+            with patch('app.terminal_events_handler.input', side_effect=['quels BTS en informatique ?','bye']):
                 # Create real handler (with minimal actual dependencies)
                 handler = TerminalEventsHandler()
                 

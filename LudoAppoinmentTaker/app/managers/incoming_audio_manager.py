@@ -29,8 +29,9 @@ class IncomingAudioManager(IncomingManager):
     # Temporary directory for audio files
     TEMP_DIR = "./static/audio"# c:\Dev\squad-ai\LudoAppoinmentTaker\app\speech\outgoing_manager.py    
 
-    def __init__(self, stt_provider: SpeechToTextProvider,outgoing_manager: OutgoingManager, agents_graph : AgentsGraph, sample_width=2, frame_rate=8000, channels=1, vad_aggressiveness=3):
+    def __init__(self, websocket: WebSocket, stt_provider: SpeechToTextProvider,outgoing_manager: OutgoingManager, agents_graph : AgentsGraph, sample_width=2, frame_rate=8000, channels=1, vad_aggressiveness=3):
         self.logger = logging.getLogger(__name__)
+        self.websocket : WebSocket = websocket
         self.stt_provider : SpeechToTextProvider = stt_provider
         self.outgoing_manager : OutgoingManager = outgoing_manager
         self.sample_width = sample_width
@@ -53,10 +54,11 @@ class IncomingAudioManager(IncomingManager):
         # Audio processing parameters
         self.audio_buffer = b""
         self.consecutive_silence_duration_ms = 0.0
-        self.speech_threshold = 250  # RMS threshold for speech detection
-        self.required_silence_ms_to_answer = 700  # ms of silence to trigger transcript
+        self.speech_threshold = 200  # RMS threshold for speech detection
+        self.required_silence_ms_to_answer = 1000  # ms of silence to trigger transcript
         self.min_audio_bytes_for_processing = 1000  # Minimum buffer size to process
         self.max_audio_bytes_for_processing = 200000  # Maximum buffer size to process
+        self.max_silence_duration_before_hangup_ms = 60000  # ms of silence before hanging up the call
         
         # Create temp directory if it doesn't exist
         os.makedirs(self.TEMP_DIR, exist_ok=True)
@@ -75,6 +77,10 @@ class IncomingAudioManager(IncomingManager):
 
     def set_phone_number(self, phone_number: str, call_sid: str) -> None:
         self.phones_by_call_sid[call_sid] = phone_number
+    
+    def hangup_call(self):
+        self.logger.info("Hanging up call...")
+        self.websocket.close(code=1000)
     
     def is_speech(self, audio_chunk: bytes, frame_duration_ms=30) -> bool:
         """
@@ -263,6 +269,12 @@ class IncomingAudioManager(IncomingManager):
             msg = f"\rConsecutive silent chunks - Duration: {self.consecutive_silence_duration_ms:.1f}ms - Speech/noise: {speech_to_noise_ratio:04d} (size: {len(chunk)} bytes)."
             print(msg, end="", flush=True)
 
+        # Hangup the call if the user is silent for too long
+        if self.consecutive_silence_duration_ms >= self.max_silence_duration_before_hangup_ms:
+            self.logger.info(f"User silence duration exceeded threshold: {self.consecutive_silence_duration_ms:.1f}ms")
+            self.hangup_call()
+            return
+        
         # Add chunk to buffer if speech has begun or this is a speech chunk
         if has_speech_began or not is_silence:
             self.audio_buffer += chunk
@@ -311,6 +323,7 @@ class IncomingAudioManager(IncomingManager):
             # Get the current state
             if self.stream_sid in self.stream_states:
                 current_state : PhoneConversationState= self.stream_states[self.stream_sid]
+                current_state["user_input"] = user_query
             else:
                 current_state : PhoneConversationState = {
                     "call_sid": self.call_sid,
@@ -323,6 +336,13 @@ class IncomingAudioManager(IncomingManager):
                         
             # Invoke the graph with current state to get the AI-generated welcome message
             updated_state = await self.agents_graph.ainvoke(current_state)
+            #TODO: handle history in the graph itself
+            # if updated_state["user_input"]:
+            #     updated_state["history"].append({
+            #         "role": "user",
+            #         "content": updated_state["user_input"]
+            #     })
+            #     updated_state["user_input"] = ""
             self.stream_states[self.stream_sid] = updated_state
         except Exception as e:
             self.logger.error(f"Error in user query to agents graph: {e}", exc_info=True)
@@ -339,8 +359,7 @@ class IncomingAudioManager(IncomingManager):
             self.logger.error(f"Error decoding/converting audio chunk: {decode_err}")
             return None
 
-    def _perform_speech_to_text_transcription(self, audio_data: bytes):
-        is_audio_file_to_delete = False
+    def _perform_speech_to_text_transcription(self, audio_data: bytes, is_audio_file_to_delete : bool = True):
         try:
             # Check if the audio buffer has a high enough speech to noise ratio
             speech_to_noise_ratio = audioop.rms(audio_data, self.sample_width)
@@ -358,7 +377,6 @@ class IncomingAudioManager(IncomingManager):
                 
             # Save the processed audio to a file
             wav_audio_filename = self.save_as_wav_file(processed_audio)
-            is_audio_file_to_delete = False #True
             
             # Transcribe using the hybrid STT provider
             self.logger.info("Transcribing audio with hybrid STT provider...")

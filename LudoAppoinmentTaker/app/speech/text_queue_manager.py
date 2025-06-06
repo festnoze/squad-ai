@@ -26,7 +26,7 @@ class TextQueueManager:
             return False
             
         async with self.lock:
-            self.text_queue += text
+            self.text_queue += ' ' + text
             self.total_enqueued_chars += len(text)
             self.logger.debug(f"Enqueued {len(text)} characters. Queue length: {len(self.text_queue)} characters")
             return True

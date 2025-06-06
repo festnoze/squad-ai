@@ -280,7 +280,7 @@ class SalesforceApiClient:
         async with httpx.AsyncClient() as client:
             # --- Try to find a Contact ---
             contact_query = (
-                "SELECT Id, FirstName, LastName, Email, Phone, MobilePhone, Account.Id, Account.Name, Owner.Id, Owner.Name "
+                "SELECT Id, Contact.Salutation, Contact.FirstName, Contact.LastName, Contact.Email, Contact.Phone, Contact.MobilePhone, Account.Id, Account.Name, Owner.Id, Owner.Name "
                 "FROM Contact "
                 f"WHERE Phone = '{phone_number}' OR MobilePhone = '{phone_number}' "
                 "LIMIT 1"
@@ -311,7 +311,7 @@ class SalesforceApiClient:
 
             # --- If no Contact found, try to find a Lead ---
             lead_query = (
-                "SELECT Id, FirstName, LastName, Email, Phone, MobilePhone, Company, Owner.Id, Owner.Name, Status, IsConverted "
+                "SELECT Id, Lead.FirstName, Lead.LastName, Lead.Email, Lead.Phone, Lead.MobilePhone, Lead.Company, Lead.Owner.Id, Lead.Owner.Name, Lead.Status, Lead.IsConverted "
                 "FROM Lead "
                 f"WHERE (Phone = '{phone_number}' OR MobilePhone = '{phone_number}') AND IsConverted = false "
                 "LIMIT 1"
@@ -361,7 +361,7 @@ class SalesforceApiClient:
         async with httpx.AsyncClient() as client:
             # --- Try to find a Contact ---
             contact_query = (
-                "SELECT Id, FirstName, LastName, Email, Phone, MobilePhone, Account.Id, Account.Name, Owner.Id, Owner.Name "
+                "SELECT Id, Contact.Salutation, Contact.FirstName, Contact.LastName, Contact.Email, Contact.Phone, Contact.MobilePhone, Account.Id, Account.Name, Owner.Id, Owner.Name "
                 "FROM Contact "
                 "WHERE Id != null "
                 "ORDER BY Id DESC "
