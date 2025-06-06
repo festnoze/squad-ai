@@ -16,6 +16,9 @@ REM set the BUILD_VERSION env. variable to the version of the lib built
 set "BUILD_VERSION=%NEW_VERSION%"
 echo The version of lib built is: %BUILD_VERSION%
 
+REM Update the version in pyproject.toml
+powershell -Command "(Get-Content pyproject.toml) -replace '(version = ")([0-9.]+)(")','${1}%BUILD_VERSION%${3}' | Set-Content pyproject.toml"
+
 REM Build the lib
 python -m build --no-isolation .
 echo package: strong_types-%BUILD_VERSION% is now available into the dist folder

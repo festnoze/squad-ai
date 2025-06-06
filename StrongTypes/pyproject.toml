@@ -1,6 +1,6 @@
 [project]
-name = "strongtypes"
-version = "0.1.0"
+name = "strong-types"
+version = "1.0.1"
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -10,6 +10,6 @@ dependencies = [
     "setuptools>=80.9.0",
     "build>=1.2.2.post1",
 ]
-license = { text = "MIT" }
+license = "MIT"
 authors = [{ name = "Étienne Millerioux" }]
 urls = { Homepage = "https://github.com/festnoze/strong-types", Repository = "https://github.com/festnoze/strong-types" }
