@@ -26,8 +26,14 @@ class TextQueueManager:
             return False
             
         async with self.lock:
-            self.text_queue += ' ' + text
+            # Add space if last char isn't
+            if self.text_queue and not self.text_queue.endswith(" "):
+                self.text_queue += " " 
+                self.total_enqueued_chars += 1
+            
+            self.text_queue += text
             self.total_enqueued_chars += len(text)
+
             self.logger.debug(f"Enqueued {len(text)} characters. Queue length: {len(self.text_queue)} characters")
             return True
             
@@ -49,8 +55,8 @@ class TextQueueManager:
         async with self.lock:
             splitted_text = ProcessText.chunk_text_by_sentences_size(self.text_queue, max_words_by_sentence, max_chars_by_sentence)
             self.text_queue = "".join(splitted_text[1:])
-            return splitted_text[0]
-            
+            self.total_processed_chars += len(splitted_text[0])
+            return splitted_text[0]            
     
     def is_empty(self) -> bool:
         """
@@ -80,3 +86,5 @@ class TextQueueManager:
         async with self.lock:
             self.logger.debug(f"Clearing text queue (was {len(self.text_queue)} chars)")
             self.text_queue = ""
+            self.total_processed_chars = 0
+            self.total_enqueued_chars = 0

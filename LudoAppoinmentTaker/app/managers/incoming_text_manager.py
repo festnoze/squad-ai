@@ -10,7 +10,6 @@ class IncomingTextManager(IncomingManager):
         super().__init__()
         self.calls_states : dict[str, ConversationState] = {}
         self.agents_graph: AgentsGraph = agents_graph
-        self.is_processing: bool = False
         self.outgoing_manager: OutgoingManager = outgoing_manager
         self.call_sid: str = call_sid
         self.phones_by_call_sid: dict[str, str] = {}
@@ -21,10 +20,6 @@ class IncomingTextManager(IncomingManager):
         """
         Processes incoming text data by sending it to the agent graph.
         """
-        if not self.is_processing:
-            self.logger.warning(f"IncomingTextManager for call {self.call_sid} is not processing. Ignoring data: {text_data}")
-            return
-
         self.logger.info(f"IncomingTextManager received text for call {self.call_sid}: {text_data}")
         try:
             # Get the current state

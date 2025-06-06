@@ -79,8 +79,10 @@ class IncomingAudioManager(IncomingManager):
         self.phones_by_call_sid[call_sid] = phone_number
     
     def hangup_call(self):
-        self.logger.info("Hanging up call...")
-        self.websocket.close(code=1000)
+        if self.websocket:
+            self.logger.info("Hanging up call...")
+            self.websocket.close(code=1000)
+            self.websocket = None
     
     def is_speech(self, audio_chunk: bytes, frame_duration_ms=30) -> bool:
         """

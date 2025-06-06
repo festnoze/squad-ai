@@ -58,6 +58,13 @@ class OutgoingAudioManager(OutgoingManager):
             if self.ask_to_stop_streaming_worker:
                 self.logger.info("Stopping audio streaming worker asked")
                 break
+
+            if self.streaming_interuption_asked:
+                self.logger.info("Streaming interuption asked")
+                self.audio_sender.streaming_interuption_asked = True
+                self.audio_sender.is_sending = False
+                self.streaming_interuption_asked = False
+                continue
             
             if not self.is_sending_speech():
                 await asyncio.sleep(0.1)

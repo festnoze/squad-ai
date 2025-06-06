@@ -14,7 +14,8 @@ class TestTextQueueManager:
     @pytest.mark.parametrize("texts_to_add", [
         ["This is a test message.", "Another part.", "And a third part."],
         ["Hello world!", "This is another test.", "With three parts."],
-        ["A short text.", "With some punctuation,", "commas, and a period."]
+        ["A short text.", "With some punctuation,", "commas, and a period."],
+        ["A longer sentence that exceeds the word limit", "is to be sent in multiple chunks.", "It's the third chunk."]
     ])
     async def test_enqueue_text(self, text_queue_manager : TextQueueManager, texts_to_add : list[str]):
         """Test enqueueing multiple text chunks to the queue"""
@@ -31,7 +32,7 @@ class TestTextQueueManager:
             # Measure the length of this chunk
             chunk_length = len(text)
             total_expected_length += chunk_length
-            expected_combined_text += text
+            expected_combined_text += ' ' + text
             
             # Enqueue the text chunk
             result = await text_queue_manager.enqueue_text(text)
@@ -40,9 +41,9 @@ class TestTextQueueManager:
             assert result, f"Enqueue should return True for valid text: '{text}'"
             
         # Verify the final state after all chunks are added
-        assert text_queue_manager.text_queue == expected_combined_text, \
+        assert text_queue_manager.text_queue == expected_combined_text.strip(), \
             f"Queue content mismatch for dataset with texts: {texts_to_add}"
-        assert text_queue_manager.total_enqueued_chars == total_expected_length, \
+        assert text_queue_manager.total_enqueued_chars == total_expected_length + len(texts_to_add) - 1, \
             f"Character count mismatch for dataset with texts: {texts_to_add}"
         
     @pytest.mark.asyncio
