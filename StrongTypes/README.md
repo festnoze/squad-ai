@@ -8,7 +8,7 @@
 > 
 > - **A static analyser**, based on an <u>AST analyzer</u>. This analysis is performed at "build" time (through your CI or a dedicated unit test). It ensures that all your type annotations are respected, before you even run your code.
 > 
-> - **A dynamic analyser**, based on [`enforce`](https://github.com/RussBaz/enforce)(which is comparable to Pydantic, but simpler and faster). This analysis is performed at runtime, it happens each time the code is actually executed. It ensures that every used objects instances has the awaited type, wherever there're used.
+> - **A dynamic analyser**, based on [`typeguard`]  (which is comparable to Pydantic, but simpler and faster). It previously rely on previously [`enforce`], but this lib is now obsolete and has been replaced. This analysis is performed at runtime, it happens each time the code is actually executed. It ensures that every used objects instances has the awaited type, wherever there're used.
 
 ---
 
@@ -76,7 +76,7 @@ class Calculator:
 ### Static validation
 
 ```python
-from strong_types.analyzer import run_static_analysis
+from strong_types.static_type_analyzer import run_static_analysis
 
 def process(value: int) -> str:
     return str(value)
@@ -90,13 +90,14 @@ run_static_analysis(process)  # passes
 
 ```python
 def test_static_consistency():
+    from strong_types.static_type_analyzer import run_static_analysis
     from mymodule import MyService
     run_static_analysis(MyService)
 ```
 
 ---
 
-## ✅ Advanced Usage: Full Strong Typing for Your Project
+## ✅ Advanced Usage: Full Strong Typing for your Whole Project
 
 ### Auto-apply `@strong_type` everywhere with `initialize_strong_typing`
 
@@ -123,6 +124,16 @@ if __name__ == "__main__":
     DynamicTypeAnalyzer.initialize_strong_typing(project_namespace="myapp")
     app.run()
 ```
+
+---
+
+Rather, you also can create a <u>unit test</u> with the code above.
+
+It allows to:
+
+- perform those checks on demand,
+
+- rather than perform those checks upon each app launching.
 
 ---
 

@@ -94,7 +94,7 @@ class TerminalEventsHandler:
         self.outgoing_text_processing.run_background_streaming_worker()
         self.logger.info("Text stream manager initialized and started with optimized parameters")
 
-        await self._handle_start_event_async(start_data={"callSid": "terminal_sid", "streamSid": "terminal_stream_sid"})
+        await self._handle_start_event_async(start_data={"callSid": call_sid, "streamSid": "terminal_stream_sid"})
 
         # Loop of input/output from and to the terminal
         while True:

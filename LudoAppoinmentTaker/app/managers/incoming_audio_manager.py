@@ -54,7 +54,7 @@ class IncomingAudioManager(IncomingManager):
         self.audio_buffer = b""
         self.consecutive_silence_duration_ms = 0.0
         self.speech_threshold = 250  # RMS threshold for speech detection
-        self.required_silence_ms_to_answer = 1000  # ms of silence to trigger transcript
+        self.required_silence_ms_to_answer = 300  # ms of silence to trigger transcript
         self.min_audio_bytes_for_processing = 1000  # Minimum buffer size to process
         self.max_audio_bytes_for_processing = 200000  # Maximum buffer size to process
         
@@ -65,9 +65,13 @@ class IncomingAudioManager(IncomingManager):
         self.websocket = websocket
 
     def set_call_sid(self, call_sid: str) -> None:
-        self.call_sid = call_sid
-        self.outgoing_manager.update_call_sid(call_sid)        
+        self.call_sid = call_sid      
         self.logger.info(f"Updated Incoming / Outgoing AudioManagers to call SID: {call_sid}")
+
+    def set_stream_sid(self, stream_sid: str) -> None:
+        self.stream_sid = stream_sid
+        self.outgoing_manager.update_stream_sid(stream_sid)  
+        self.logger.info(f"Updated Incoming / Outgoing AudioManagers to stream SID: {stream_sid}")
 
     def set_phone_number(self, phone_number: str, call_sid: str) -> None:
         self.phones_by_call_sid[call_sid] = phone_number
@@ -179,6 +183,8 @@ class IncomingAudioManager(IncomingManager):
         
     async def init_conversation_async(self, call_sid: str, stream_sid: str) -> None:
         """Handle the 'start' event from Twilio which begins a new call."""
+        self.set_call_sid(call_sid)
+        self.set_stream_sid(stream_sid)
         phone_number = self.phones_by_call_sid.get(call_sid)
         if phone_number is None:
             self.logger.error(f"Phone number not found for call SID: {call_sid}")
@@ -200,18 +206,10 @@ class IncomingAudioManager(IncomingManager):
         # Store the initial state for this stream (used by graph and other handlers)
         self.stream_states[stream_sid] = current_state
         
+        # Then invoke the graph with initial state to get the AI-generated welcome message
         try:            
-            # Then invoke the graph with initial state to get the AI-generated welcome message
             updated_state = await self.agents_graph.ainvoke(current_state)
             self.stream_states[stream_sid] = updated_state
-            
-            # # If there's an AI message from the graph, send it after the welcome message
-            # if updated_state.get('history') and updated_state['history'][0][0] == 'AI':
-            #     ai_message = updated_state['history'][0][1]
-            #     first_word = ai_message.split()[0] if ai_message else ""
-            #     if ai_message and ai_message != first_word:
-            #         await self.outgoing_audio_processing.enqueue_text(ai_message)
-            #         await self.studi_rag_inference_api_client.add_external_ai_message_to_conversation(self.conversation_id, ai_message)
 
         except Exception as e:
             self.logger.error(f"Error in initial graph invocation: {e}", exc_info=True)

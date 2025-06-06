@@ -49,7 +49,7 @@ class OutgoingTextManager(OutgoingManager):
         """
         Continuously sends text from the queue to stdout.
         """
-        self.logger.info(f"Starting text sending loop for call {self.call_sid}")
+        self.logger.info(f"Starting text sending loop for stream: {self.stream_sid}")
         try:
             while True:
                 if self.text_queue.empty():
@@ -60,25 +60,25 @@ class OutgoingTextManager(OutgoingManager):
                     try:
                         text_chunk = self.text_queue.get_nowait()
                         if text_chunk is None: # Sentinel value to stop
-                            self.logger.info(f"Received None sentinel in text queue for call {self.call_sid}. Stopping.")
+                            self.logger.info(f"Received None sentinel in text queue for stream {self.stream_sid}. Stopping.")
                             break
                         
                         print(text_chunk)
                         self.text_queue.task_done()
                     except asyncio.TimeoutError:
                         if not self.is_streaming and self.text_queue.empty():
-                            self.logger.info(f"Text sending loop for call {self.call_sid} timed out and queue is empty, streaming stopped.")
+                            self.logger.info(f"Text sending loop for stream {self.stream_sid} timed out and queue is empty, streaming stopped.")
                             break
                         continue
                     except Exception as e:
-                        self.logger.error(f"Error sending text chunk for call {self.call_sid}: {e}", exc_info=True)
+                        self.logger.error(f"Error sending text chunk for stream {self.stream_sid}: {e}", exc_info=True)
                         if not self.is_streaming:
                             break
-                self.logger.info(f"Text sending loop for call {self.call_sid} finished.")
+                self.logger.info(f"Text sending loop for stream {self.stream_sid} finished.")
         except asyncio.CancelledError:
-            self.logger.info(f"Text sending task cancelled for call {self.call_sid}.")
+            self.logger.info(f"Text sending task cancelled for stream {self.stream_sid}.")
         finally:
-            self.logger.info(f"Exiting _send_text_from_queue for call {self.call_sid}. Remaining items in queue: {self.text_queue.qsize()}")
+            self.logger.info(f"Exiting _send_text_from_queue for stream {self.stream_sid}. Remaining items in queue: {self.text_queue.qsize()}")
 
 
     def enqueue_text(self, text: str) -> bool:
@@ -87,17 +87,22 @@ class OutgoingTextManager(OutgoingManager):
         """
         return self.text_queue.put_nowait(text)
 
-    def update_call_sid(self, call_sid: str) -> None:
+    def update_stream_sid(self, stream_sid: str) -> None:
         """
-        Updates the call SID when it changes (e.g., when a new call starts or ends)
+        Updates the stream SID when it changes (e.g., when a new call starts or ends)
         Allows setting to None when resetting after a call ends
         """
-        self.call_sid = call_sid
+        self.stream_sid = stream_sid
+        if not stream_sid:
+            self.logger.info("Reset stream SID to None")
+        else:
+            self.logger.info(f"Updated stream SID to: {stream_sid}")
+        return
 
     async def cleanup(self):
         """
         Perform any cleanup operations.
         """
-        self.logger.info(f"Cleaning up OutgoingTextManager for call {self.call_sid}.")
+        self.logger.info(f"Cleaning up OutgoingTextManager for stream {self.stream_sid}.")
         await self.stop_streaming()
-        self.logger.info(f"OutgoingTextManager cleanup finished for call {self.call_sid}.")
+        self.logger.info(f"OutgoingTextManager cleanup finished for stream {self.stream_sid}.")

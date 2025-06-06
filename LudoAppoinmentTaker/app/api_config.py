@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse, StreamingResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 #
 from app import endpoints
+from app.phone_call_websocket_events_handler import PhoneCallWebsocketEventsHandlerFactory
 
 class ApiConfig:
     @asynccontextmanager
@@ -29,10 +30,8 @@ class ApiConfig:
         )
         app.state.shutdown = lambda: None
         
-        # Include controllers as routers
         app.include_router(endpoints.router)
 
-        # All CORS settings are enabled for development purposes
         app.add_middleware(
             CORSMiddleware,
             allow_origins=["*"],
@@ -41,16 +40,28 @@ class ApiConfig:
             allow_headers=["*"],
         )
 
+        # Configure logging: set level and clear existing handlers then create new ones.
+        num_log_level = logging.getLogger("uvicorn.error").level
+        root_logger = logging.getLogger()
+        if root_logger.hasHandlers():
+            for handler in list(root_logger.handlers):
+                root_logger.removeHandler(handler)
+                handler.close()
+
         logging.basicConfig(
-            level=logging.INFO,
-            format="Log: %(asctime)s - %(levelname)s - %(message)s",
+            level=num_log_level,
+            format="Log: %(asctime)s - %(levelname)s - %(name)s - %(message)s",
             handlers=[
-                logging.FileHandler(f"outputs\\logs\\app.{datetime.now().strftime("%Y-%m-%d.%H%M%S")}.log"),
-                logging.StreamHandler()  # Also print logs to the terminal
+                logging.FileHandler(f"outputs\\logs\\app.{datetime.now().strftime('%Y-%m-%d.%H%M%S')}.log"),
+                logging.StreamHandler()  # Output to console
             ]
         )
 
         logger = logging.getLogger(__name__)
+        assert logger.getEffectiveLevel() == num_log_level
+
+        # Initialize PhoneCallWebsocketEventsHandlerFactory
+        endpoints.phone_call_websocket_events_handler_factory = PhoneCallWebsocketEventsHandlerFactory()
         
         print('\n\n---------------------------------------------')
         print('🌐 Voice Appointment Maker API 🚀 started 🚀')

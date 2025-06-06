@@ -27,5 +27,9 @@ class IncomingManager(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def set_stream_sid(self, stream_sid: str) -> None:
+        pass
+
+    @abc.abstractmethod
     def set_phone_number(self, phone_number: str, call_sid: str) -> None:
         pass

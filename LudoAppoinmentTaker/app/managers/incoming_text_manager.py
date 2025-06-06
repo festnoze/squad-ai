@@ -66,12 +66,24 @@ class IncomingTextManager(IncomingManager):
                 history=[], #TODO: Add history
                 agent_scratchpad={}
             )
-            self.calls_states[call_sid] = current_state
+        
+        self.calls_states[call_sid] = current_state        
+        # Then invoke the graph with initial state to get the AI-generated welcome message
+        try:            
+            updated_state = await self.agents_graph.ainvoke(current_state)
+            self.calls_states[call_sid] = updated_state
+
+        except Exception as e:
+            self.logger.error(f"Error in initial graph invocation: {e}", exc_info=True)
             
     def set_call_sid(self, call_sid: str) -> None:
-        self.call_sid = call_sid
-        self.outgoing_manager.update_call_sid(call_sid)        
+        self.call_sid = call_sid       
         self.logger.info(f"Updated Incoming / Outgoing TextManagers to call SID: {call_sid}")
+
+    def set_stream_sid(self, stream_sid: str) -> None:
+        self.stream_sid = stream_sid
+        self.outgoing_manager.update_stream_sid(stream_sid)        
+        self.logger.info(f"Updated Incoming / Outgoing TextManagers to stream SID: {stream_sid}")
 
     def set_phone_number(self, phone_number: str, call_sid: str) -> None:
         self.phone_number = phone_number

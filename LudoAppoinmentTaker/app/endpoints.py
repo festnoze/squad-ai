@@ -12,7 +12,8 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-phone_call_websocket_events_handler_factory = PhoneCallWebsocketEventsHandlerFactory()
+# Instanciate after app startup
+phone_call_websocket_events_handler_factory: PhoneCallWebsocketEventsHandlerFactory = None
 
 @staticmethod
 async def _extract_request_data_async(request: Request) -> tuple:
@@ -65,9 +66,11 @@ async def voice_webhook(request: Request) -> HTMLResponse:
 async def websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid: str) -> None:
     await ws.accept()
     logger.info(f"WebSocket connection accepted from: {ws.client.host}:{ws.client.port}")
-    try:
+    
+    try:        
         call_handler: PhoneCallWebsocketEventsHandler = phone_call_websocket_events_handler_factory.get_new_phone_call_websocket_events_handler(websocket=ws)
-        await call_handler.handle_all_websocket_receieved_events_async(calling_phone_number, call_sid)
+        await call_handler.handle_websocket_all_receieved_events_async(calling_phone_number, call_sid)
+
     except WebSocketDisconnect:
         logger.info(f"WebSocket disconnected: {ws.client.host}:{ws.client.port}")
     except Exception as e:

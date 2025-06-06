@@ -50,14 +50,14 @@ class TestIncomingTextManager:
         """Test setting stream SID updates both the manager and its outgoing manager."""
         
         # Call the method with a new stream SID
-        test_call_sid = 'new_call_sid'
-        incoming_text_manager.set_call_sid(test_call_sid)
+        test_stream_sid = 'new_stream_sid'
+        incoming_text_manager.set_stream_sid(test_stream_sid)
         
         # Assert stream SID was updated
-        incoming_text_manager.call_sid | should.equal(test_call_sid)
+        incoming_text_manager.stream_sid | should.equal(test_stream_sid)
         
         # Assert outgoing manager was notified
-        incoming_text_manager.outgoing_manager.update_call_sid.have_been_called_once_with(test_call_sid)
+        incoming_text_manager.outgoing_manager.update_stream_sid.have_been_called_once_with(test_stream_sid)
     
     def test_set_phone_number(self, incoming_text_manager  : IncomingTextManager):
         """Test setting phone number correctly updates internal state."""

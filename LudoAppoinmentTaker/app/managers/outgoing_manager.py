@@ -43,9 +43,9 @@ class OutgoingManager(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def update_call_sid(self, call_sid: str) -> None:
+    def update_stream_sid(self, stream_sid: str) -> None:
         """
-        Updates the call SID when it changes (e.g., when a new call starts or ends)
+        Updates the stream SID when it changes (e.g., when a new call starts or ends)
         Allows setting to None when resetting after a call ends
         """
         pass

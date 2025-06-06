@@ -21,7 +21,6 @@ class PhoneCallWebsocketEventsHandler:
     compiled_graph = None # LangGraph workflow compilation
     outgoing_audio_processing : OutgoingAudioManager = None
     incoming_audio_processing : IncomingAudioManager = None
-    phones: dict[str, str] = {}  # Map call_sid to phone numbers
     
     def __init__(self, websocket: WebSocket = None):
         # Instance variables
@@ -90,7 +89,7 @@ class PhoneCallWebsocketEventsHandler:
         self.outgoing_audio_processing = OutgoingAudioManager(
                                     websocket=self.websocket, 
                                     tts_provider=self.tts_provider,
-                                    call_sid=None,
+                                    stream_sid=None,
                                     min_chunk_interval=0.05,
                                     sample_width=self.sample_width,
                                     frame_rate=self.frame_rate,
@@ -123,7 +122,7 @@ class PhoneCallWebsocketEventsHandler:
         self.incoming_audio_processing.set_websocket(websocket)
         self.outgoing_audio_processing.set_websocket(websocket)
 
-    async def handle_all_websocket_receieved_events_async(self, calling_phone_number: str, call_sid: str) -> None:
+    async def handle_websocket_all_receieved_events_async(self, calling_phone_number: str, call_sid: str) -> None:
         """Main method: handle a full audio conversation with I/O Twilio streams on a WebSocket."""
         if not self.websocket:
             self.logger.error("WebSocket not set, cannot handle WebSocket connection.")
@@ -132,8 +131,6 @@ class PhoneCallWebsocketEventsHandler:
         self.logger.info(f"WebSocket handler started for {self.websocket.client.host}:{self.websocket.client.port}")
         
         # Store the caller's phone number and call SID so we can retrieve them later
-        self.call_sid = call_sid
-        self.phones[call_sid] = calling_phone_number
         self.incoming_audio_processing.set_call_sid(call_sid)
         self.incoming_audio_processing.set_phone_number(calling_phone_number, call_sid)
 
@@ -184,7 +181,8 @@ class PhoneCallWebsocketEventsHandler:
         """Handle the 'start' event from Twilio which begins a new call."""
         call_sid = start_data.get("callSid")
         stream_sid = start_data.get("streamSid")
-        await self.incoming_audio_processing.init_conversation_async(call_sid, stream_sid, self.phones.get(call_sid))
+        await self.incoming_audio_processing.init_conversation_async(call_sid, stream_sid)
+        self.outgoing_audio_processing.update_stream_sid(stream_sid)
         return stream_sid
 
     async def _handle_media_event_async(self, media_data: dict) -> None:
