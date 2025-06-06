@@ -54,7 +54,7 @@ class IncomingAudioManager(IncomingManager):
         self.audio_buffer = b""
         self.consecutive_silence_duration_ms = 0.0
         self.speech_threshold = 250  # RMS threshold for speech detection
-        self.required_silence_ms_to_answer = 300  # ms of silence to trigger transcript
+        self.required_silence_ms_to_answer = 700  # ms of silence to trigger transcript
         self.min_audio_bytes_for_processing = 1000  # Minimum buffer size to process
         self.max_audio_bytes_for_processing = 200000  # Maximum buffer size to process
         
@@ -263,10 +263,13 @@ class IncomingAudioManager(IncomingManager):
             msg = f"\rConsecutive silent chunks - Duration: {self.consecutive_silence_duration_ms:.1f}ms - Speech/noise: {speech_to_noise_ratio:04d} (size: {len(chunk)} bytes)."
             print(msg, end="", flush=True)
 
-        # Add speech chunk to buffer
+        # Add chunk to buffer if speech has begun or this is a speech chunk
         if has_speech_began or not is_silence:
             self.audio_buffer += chunk
-            self.consecutive_silence_duration_ms = 0.0
+            
+            # Only reset silence counter if the current chunk contains speech
+            if not is_silence:
+                self.consecutive_silence_duration_ms = 0.0
 
             if(random.randint(0, 100) < 1): # Log every 1%
                 self.logger.debug(
