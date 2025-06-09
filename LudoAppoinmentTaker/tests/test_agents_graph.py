@@ -110,6 +110,52 @@ class TestAgentsGraph:
         # Verify outgoing_manager was called with the response
         mock_dependencies["outgoing_manager"].enqueue_text.assert_called()
 
+    @pytest.mark.asyncio
+    async def test_schedule_calendar_appointment(self, mock_dependencies):
+        # Arrange
+        # Create an instance of AgentsGraph with mocked dependencies
+        agents_graph = AgentsGraph(
+            outgoing_manager=mock_dependencies["outgoing_manager"],
+            studi_rag_client=mock_dependencies["studi_rag_client"],
+            salesforce_client=mock_dependencies["salesforce_client"],
+            call_sid=mock_dependencies["call_sid"]
+        ).graph
+        
+        # Add necessary attributes for streaming
+        agents_graph.is_speaking = True
+        agents_graph.start_time = 0
+        agents_graph.rag_interrupt_flag = {"interrupted": False}
+        
+        # Set up initial state with a user query about scheduling an appointment
+        init_msg = "Bonjour, je suis votre assistant Studi. Comment puis-je vous aider aujourd'hui ?"
+        user_input = "Je voudrais prendre rendez-vous avec un conseiller pour discuter de mon inscription"
+        
+        # Create initial state
+        initial_state: PhoneConversationState = PhoneConversationState(
+            call_sid=mock_dependencies["call_sid"],
+            caller_phone=mock_dependencies["phone_number"],
+            user_input=user_input,
+            history=[("AI", init_msg)],
+            agent_scratchpad={"conversation_id": "39e81136-4525-4ea8-bd00-c22211110001"}
+        )
+
+        # Act
+        updated_state: PhoneConversationState = await agents_graph.ainvoke(initial_state)
+        
+        # Assert
+        assert len(updated_state["history"]) >= 3  # Welcome + user query + response
+        assert updated_state["history"][-2][0] == "Human"
+        assert updated_state["history"][-2][1] == user_input
+        assert updated_state["history"][-1][0] == "AI"
+        #assert updated_state["history"][-1][1] == "D'accord, je vais vous aider à prendre rendez-vous avec un conseiller."
+        
+        # Verify Salesforce client methods were called
+        mock_dependencies["salesforce_client"].get_person_by_phone_async.assert_called_once_with(mock_dependencies["phone_number"])
+        mock_dependencies["salesforce_client"].get_available_slots_async.assert_called_once()
+        
+        # Verify outgoing_manager was called with a response
+        mock_dependencies["outgoing_manager"].enqueue_text.assert_called()
+
 
     @pytest.fixture
     def mock_dependencies(self):
