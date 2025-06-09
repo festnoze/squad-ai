@@ -26,13 +26,13 @@ class IncomingTextManager(IncomingManager):
             if self.call_sid in self.calls_states:
                 current_state : PhoneConversationState= self.calls_states[self.call_sid]
             else:
-                current_state : PhoneConversationState = {
-                    "call_sid": self.call_sid,
-                    "caller_phone": self.phones_by_call_sid[self.call_sid],
-                    "user_input": text_data,
-                    "history": [], #TODO: Add history
-                    "agent_scratchpad": {}
-                }
+                current_state : PhoneConversationState = PhoneConversationState(
+                    call_sid=self.call_sid,
+                    caller_phone=self.phones_by_call_sid[self.call_sid],
+                    user_input=text_data,
+                    history=[], #TODO: Add history
+                    agent_scratchpad={}
+                )
                 self.calls_states[self.call_sid] = current_state
                         
             # Invoke the graph with current state to get the AI-generated welcome message

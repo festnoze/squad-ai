@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
-
+import asyncio
 from app.agents.agents_graph import AgentsGraph
 from app.agents.phone_conversation_state_model import PhoneConversationState
 from app.managers.outgoing_manager import OutgoingManager
@@ -72,25 +72,40 @@ class TestAgentsGraph:
             call_sid=mock_dependencies["call_sid"],
             caller_phone=mock_dependencies["phone_number"],
             user_input=user_input,
-            history=[("ai", init_msg)],
+            history=[("AI", init_msg)],
             agent_scratchpad={"conversation_id": "39e81136-4525-4ea8-bd00-c22211110001"}
         )
+
+        # Mock the add_external_ai_message_to_conversation method
+        mock_dependencies["studi_rag_client"].add_external_ai_message_to_conversation = AsyncMock()
         
         # Set up the RAG client to return a response about BTS in HR
         bts_response = "Le BTS Gestion des Ressources Humaines (GRH) est une formation qui prépare aux métiers des ressources humaines. Cette formation de niveau Bac+2 vous permettra d'acquérir des compétences en gestion administrative du personnel, en recrutement, et en formation professionnelle."
         mock_dependencies["studi_rag_client"].query_rag_api.return_value = bts_response
+        
+         # Create an async generator that yields words from the response with a delay
+        async def mock_stream_response(*args, **kwargs):
+            words = bts_response.split()
+            for i, word in enumerate(words):
+                last_word = i == len(words) - 1
+                await asyncio.sleep(0.01)  # 10ms delay
+                yield word + (" " if not last_word else "")
+        
+        # Mock the rag_query_stream_async method to return the async generator
+        # We need to return the generator function itself, not call it
+        mock_dependencies["studi_rag_client"].rag_query_stream_async = mock_stream_response
         
         # Act
         updated_state: PhoneConversationState = await agents_graph.ainvoke(initial_state)
         
         # Assert
         assert len(updated_state["history"]) >= 3  # Welcome + user query + response
-        assert updated_state["history"][1][0] == "AI"
-        assert updated_state["history"][1][1] == init_msg
-        assert updated_state["history"][2][0] == "Human"
-        assert updated_state["history"][2][1] == user_input
-        assert updated_state["history"][3][0] == "AI"
-        assert updated_state["history"][3][1] == bts_response
+        assert updated_state["history"][-3][0] == "AI"
+        assert updated_state["history"][-3][1] == init_msg
+        assert updated_state["history"][-2][0] == "Human"
+        assert updated_state["history"][-2][1] == user_input
+        assert updated_state["history"][-1][0] == "AI"
+        assert updated_state["history"][-1][1] == bts_response
 
         # Verify outgoing_manager was called with the response
         mock_dependencies["outgoing_manager"].enqueue_text.assert_called()

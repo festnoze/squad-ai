@@ -99,24 +99,28 @@ class AgentsGraph:
     async def router(self, state: PhoneConversationState) -> dict:
         if not state.get('agent_scratchpad', None):
             state['agent_scratchpad'] = {}
-
+        
+        user_input = state.get('user_input')
         if not state.get('agent_scratchpad', {}).get('conversation_id', None):
             state['agent_scratchpad']["next_agent_needed"] = "conversation_start"
+            return state
 
-        elif not state.get('agent_scratchpad', None).get('user_input', None):            
-            user_input = state.get('user_input')
+        if user_input:       
+            state['history'].append(("Human", user_input))
             feedback_text = f"Très bien, vous avez demandé : \"{user_input}\". Un instant, j'analyse votre demande."
             await self.outgoing_manager.enqueue_text(feedback_text)
-            category = await self.analyse_user_input_for_dispatch_async(user_input)
 
+            category = await self.analyse_user_input_for_dispatch_async(user_input)
             if category == "schedule_calendar_appointment":
                 state['agent_scratchpad']["next_agent_needed"] = "calendar_agent"
             elif category == "training_course_query":
                 state['agent_scratchpad']["next_agent_needed"] = "rag_course_agent"
             elif category == "others":
                 state['agent_scratchpad']["next_agent_needed"] = "conversation_start"
-
+            return state
+        state['agent_scratchpad']["next_agent_needed"] = "wait_for_user_input"
         return state
+
 
     async def analyse_user_input_for_dispatch_async(self, user_input: str) -> str:
         """Analyse the user input and dispatch to the right agent"""
@@ -461,10 +465,12 @@ class AgentsGraph:
         call_sid = state.get('call_sid', 'N/A')
         user_query = state.get('user_input', '')
         self.logger.info(f"> Ongoing RAG query on training course information. User request: '{user_query}' for: [{call_sid[-4:]}].")
+        
         conversation_id=state.get('agent_scratchpad', {}).get('conversation_id', None)
         if not conversation_id:
             self.logger.error(f"[~{call_sid[-4:]}] No conversation ID found, ending graph run.")
             return END
+        
         try:
             self.rag_interrupt_flag = {"interrupted": False} # Reset the interrupt flag before starting new streaming
 
@@ -484,30 +490,16 @@ class AgentsGraph:
                     break
                     
                 full_answer += chunk
-                self.logger.debug(f"Received chunk: {chunk}")
-                print(f"<< ... {chunk} ... >>")
+                self.logger.debug(f"Received chunk: << ... {chunk} ... >>")
                 
-                # Sauvegarder l'état de parole avant de parler
-                speaking_before = self.is_speaking
-                
-                # Use the enhanced text processing for better speech quality
-                # Using smaller chunks for RAG responses to be more responsive
                 await self.outgoing_manager.enqueue_text(chunk)
-                
-                # Vérifier si on a été interrompu pendant qu'on parlait
-                if speaking_before and not self.is_speaking:
-                    was_interrupted = True
-                    self.logger.info("Speech interrupted during RAG response chunk")
-                    break
-                
-            # Loguer les résultats du traitement RAG
-            end_time = time.time()
-            if was_interrupted:
-                self.logger.info(f"RAG streaming was interrupted")
-            elif full_answer:
-                self.logger.info(f"Full answer received from RAG API in {end_time - self.start_time:.2f}s: {full_answer[:100]}...")
-            else:
-                self.logger.warning(f"Empty response received from RAG API")
+
+            if full_answer:
+                self.logger.info(f"Full answer received from RAG API: '{full_answer}'")
+                state["history"].append(("AI", full_answer))
+                #await self.studi_rag_inference_api_client.add_external_ai_message_to_conversation(state['agent_scratchpad']['conversation_id'], full_answer)
+
+            return state
                 
         except Exception as e:
             error_message = f"Je suis désolé, une erreur s'est produite lors de la communication avec le service."

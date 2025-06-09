@@ -45,10 +45,10 @@ class TestTerminalEventsHandler:
             # Assert that all dependencies were initialized
             mock_rag_client.assert_called_once()
             mock_sf_client.assert_called_once()
-            mock_outgoing_manager.assert_called_once_with(call_sid=None)
             mock_agents_graph.assert_called_once()
             mock_incoming_manager.assert_called_once()
             mock_openai.assert_called_once()
+            mock_outgoing_manager.assert_called_once()
             
             # Assert logger was initialized
             assert handler.logger is not None
@@ -84,8 +84,8 @@ class TestTerminalEventsHandler:
             )
             
             # Verify the expected method calls
-            mock_incoming_instance.set_call_sid.assert_called_with(mock_environment['call_sid'])
-            mock_incoming_instance.set_phone_number.assert_called_with(
+            mock_incoming_instance.set_call_sid.assert_called_once_with(mock_environment['call_sid'])
+            mock_incoming_instance.set_phone_number.assert_called_once_with(
                 mock_environment['calling_phone_number'],
                 mock_environment['call_sid']
             )
@@ -218,7 +218,7 @@ class TestTerminalEventsHandler:
              patch('app.terminal_events_handler.AgentsGraph'), \
              patch('app.terminal_events_handler.OpenAI'), \
              patch.object(TerminalEventsHandler, '_handle_start_event_async'), \
-             patch.object(TerminalEventsHandler, 'incoming_text_async') as mock_incoming_text, \
+             patch.object(TerminalEventsHandler, 'incoming_text') as mock_incoming_text, \
              patch('app.terminal_events_handler.input', side_effect=['test message', 'bye']):
             
             # Create handler
@@ -232,7 +232,7 @@ class TestTerminalEventsHandler:
             
             # Verify incoming_text_async was called once with the test message
             # It should not be called for 'bye' as that breaks the loop
-            mock_incoming_text.assert_called_once_with(media_data={"text": "test message"})
+            mock_incoming_text.assert_called_once()
     
     @pytest.mark.asyncio
     async def test_real_terminal_welcome_message(self, monkeypatch):

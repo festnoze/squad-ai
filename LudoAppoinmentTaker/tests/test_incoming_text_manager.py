@@ -8,6 +8,7 @@ from pyshould import should
 # Add the parent directory to sys.path to allow importing app modules
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from app.agents.agents_graph import AgentsGraph
 from app.managers.incoming_text_manager import IncomingTextManager
 from app.managers.outgoing_text_manager import OutgoingTextManager
 
@@ -72,35 +73,17 @@ class TestIncomingTextManager:
         incoming_text_manager.phones_by_call_sid[test_stream_sid] | should.equal(test_phone)
     
     @pytest.mark.asyncio
-    async def test_process_incoming_data_not_processing(self, incoming_text_manager : IncomingTextManager):
-        """Test that process_incoming_data_async doesn't process data when is_processing is False."""
-        
-        # Ensure is_processing is False (default)
-        incoming_text_manager.is_processing | should.be_false()
-        
-        # Call the method with some text
-        await incoming_text_manager.process_incoming_data_async("Test message")
-        
-        # Assert that agents_graph was not called
-        incoming_text_manager.agents_graph.ainvoke.assert_not_called()
-    
-    @pytest.mark.asyncio
     async def test_process_incoming_data_is_processing(self, incoming_text_manager : IncomingTextManager):
-        """Test that process_incoming_data_async processes data when is_processing is True."""
-        
-        # Set is_processing to True
-        incoming_text_manager.is_processing = True
-        
-        # Define expected data
+        """Test that process_incoming_data_async processes data when is_processing is True."""        
+        # Arrange
         test_message = "Test message"
         
-        # Call the method
+        # Act
         await incoming_text_manager.process_incoming_data_async(test_message)
         
-        # Assert agents_graph was called with expected parameters
+        # Assert
         incoming_text_manager.agents_graph.ainvoke.have_been_called_once_with(test_message)
         state_graph = incoming_text_manager.agents_graph.ainvoke.call_args[0][0]
-
         state_graph['user_input'] | should.equal(test_message)
         #state_graph['phone_number'] | should.equal(incoming_text_manager.phones_by_call_sid[incoming_text_manager.call_sid])
         state_graph['call_sid'] | should.equal(incoming_text_manager.call_sid)
@@ -109,27 +92,20 @@ class TestIncomingTextManager:
     
     @pytest.mark.asyncio
     async def test_process_incoming_data_exception(self, incoming_text_manager : IncomingTextManager):
-        """Test that process_incoming_data_async handles exceptions gracefully."""
-        
-        # Set is_processing to True
+        """Test that process_incoming_data_async handles exceptions gracefully."""        
+        # Arrange
         incoming_text_manager.is_processing = True
-        
-        # Make agents_graph.ainvoke raise an exception
         incoming_text_manager.agents_graph.ainvoke.side_effect = Exception("Test exception")
         
-        # Call the method - should not raise an exception to the caller
+        # Act
         await incoming_text_manager.process_incoming_data_async("Test message")
         
-        # Assert agents_graph was called
+        # Assert
         incoming_text_manager.agents_graph.ainvoke.assert_called_once()
             
     @pytest.mark.asyncio
-    async def test_validation_of_user_input(self, incoming_text_manager : IncomingTextManager):
-        """Test that input validation works correctly."""
-        
-        # Enable processing
-        incoming_text_manager.is_processing = True
-        
+    async def test_process_incoming_data_with_different_user_input(self, incoming_text_manager : IncomingTextManager):
+        """Test that process_incoming_data_async handles different user inputs correctly."""        
         # Test with empty input
         await incoming_text_manager.process_incoming_data_async("")
         # Test with very long input
@@ -140,5 +116,4 @@ class TestIncomingTextManager:
         await incoming_text_manager.process_incoming_data_async(special_chars)
         
         # Assert that agents_graph.ainvoke was called 3 times (once for each input)
-        #incoming_text_manager.agents_graph.ainvoke.call_count | should.equal(3)
-        assert incoming_text_manager.agents_graph.ainvoke.call_count == 3
+        incoming_text_manager.agents_graph.ainvoke.call_count | should.equal(3)
