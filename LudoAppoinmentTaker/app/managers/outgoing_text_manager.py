@@ -5,13 +5,14 @@ from app.managers.outgoing_manager import OutgoingManager
 
 class OutgoingTextManager(OutgoingManager):
 
-    def __init__(self, call_sid: str):
+    def __init__(self, call_sid: str, outgoing_text_func=None):
         super().__init__(call_sid)
         self.text_queue = asyncio.Queue()
         self.is_streaming = False
         self.stream_task = None
         self.logger = logging.getLogger(__name__)
         self.logger.info(f"OutgoingTextManager initialized for call_sid: {call_sid}")
+        self._outgoing_text_func = outgoing_text_func
 
     async def queue_data(self, text_chunk: str):
         """
@@ -63,7 +64,8 @@ class OutgoingTextManager(OutgoingManager):
                             self.logger.info(f"Received None sentinel in text queue for stream {self.stream_sid}. Stopping.")
                             break
                         
-                        print(text_chunk)
+                        self.outgoing_text(text_chunk)
+                        
                         self.text_queue.task_done()
                     except asyncio.TimeoutError:
                         if not self.is_streaming and self.text_queue.empty():
@@ -80,6 +82,12 @@ class OutgoingTextManager(OutgoingManager):
         finally:
             self.logger.info(f"Exiting _send_text_from_queue for stream {self.stream_sid}. Remaining items in queue: {self.text_queue.qsize()}")
 
+    
+    def outgoing_text(self, text: str) -> None:
+        if self._outgoing_text_func:
+            self._outgoing_text_func(text)
+        else:
+            print(text)
 
     def enqueue_text(self, text: str) -> bool:
         """

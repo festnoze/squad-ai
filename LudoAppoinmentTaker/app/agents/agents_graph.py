@@ -1,7 +1,6 @@
 import logging
 import os
 import uuid
-import asyncio
 from uuid import UUID
 from langgraph.graph import StateGraph, END
 
@@ -20,8 +19,12 @@ from app.agents.sf_agent import SFAgent
 from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
 from app.api_client.salesforce_api_client import SalesforceApiClient
 from app.managers.outgoing_manager import OutgoingManager
+from llms.llm_info import LlmInfo
+from llms.langchain_factory import LangChainFactory
+from llms.langchain_adapter_type import LangChainAdapterType
 
 class AgentsGraph:
+    welcome_text = ""
     def __init__(self, outgoing_manager: OutgoingManager, studi_rag_client: StudiRAGInferenceApiClient, salesforce_client: SalesforceApiClient, call_sid: str):
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
@@ -43,6 +46,7 @@ class AgentsGraph:
         self.sf_agent_instance = SFAgent()
         self.logger.info("Initialize SF Agent succeed")
         
+        self.llm = LangChainFactory.create_llm_from_info(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4.1-mini", timeout=50, temperature=0.1, api_key=os.getenv("OPENAI_API_KEY")))
         self.graph = self._build_graph()
         
     def _build_graph(self):
@@ -60,7 +64,6 @@ class AgentsGraph:
         workflow.add_node("user_identification", self.user_identification_node)
         workflow.add_edge("user_identification", "conversation_start_end")
         workflow.add_node("conversation_start_end", self.send_end_of_welcome_message_node)
-
         workflow.add_node("wait_for_user_input", self.wait_for_user_input_node)
         workflow.add_edge("wait_for_user_input", END)
 
@@ -75,7 +78,6 @@ class AgentsGraph:
             {
                 "conversation_start": "conversation_start",
                 "lead_agent": "lead_agent",
-                "user_identification": "user_identification",
                 "calendar_agent": "calendar_agent",
                 "rag_course_agent": "rag_course_agent",
                 "wait_for_user_input": "wait_for_user_input",
@@ -83,7 +85,6 @@ class AgentsGraph:
             }
         )
 
-        workflow.add_edge("user_identification", END)
         workflow.add_edge("calendar_agent", END)
         workflow.add_edge("rag_course_agent", END)
 
@@ -98,36 +99,47 @@ class AgentsGraph:
     async def router(self, state: PhoneConversationState) -> dict:
         if not state.get('agent_scratchpad', None):
             state['agent_scratchpad'] = {}
-        if state.get('user_input', None):
+
+        if not state.get('agent_scratchpad', {}).get('conversation_id', None):
+            state['agent_scratchpad']["next_agent_needed"] = "conversation_start"
+
+        elif not state.get('agent_scratchpad', None).get('user_input', None):            
             user_input = state.get('user_input')
-            self.logger.info(f"[{self.call_sid}] Router received user input: {user_input}")
             feedback_text = f"Très bien, vous avez demandé : \"{user_input}\". Un instant, j'analyse votre demande."
             await self.outgoing_manager.enqueue_text(feedback_text)
+            category = await self.analyse_user_input_for_dispatch_async(user_input)
 
-        if not state.get('agent_scratchpad', {}).get('conversation_id'):
-            state['agent_scratchpad']["next_agent_needed"] = "conversation_start"
-        elif not state.get('agent_scratchpad', None).get('user_input'):
-            state['agent_scratchpad']["next_agent_needed"] = "wait_for_user_input"
-        elif not state.get('agent_scratchpad', {}).get('sf_account_info'):
-            state['agent_scratchpad']["next_agent_needed"] = "user_identification"
-        elif not state.get('agent_scratchpad', {}).get('lead_extracted_info'):
-            state['agent_scratchpad']["next_agent_needed"] = "lead_agent"
-        elif not state.get('agent_scratchpad', {}).get('calendar_extracted_info'):
-            state['agent_scratchpad']["next_agent_needed"] = "calendar_agent"
-        else:
-            state['agent_scratchpad']["next_agent_needed"] = "conversation_start"
+            if category == "schedule_calendar_appointment":
+                state['agent_scratchpad']["next_agent_needed"] = "calendar_agent"
+            elif category == "training_course_query":
+                state['agent_scratchpad']["next_agent_needed"] = "rag_course_agent"
+            elif category == "others":
+                state['agent_scratchpad']["next_agent_needed"] = "conversation_start"
+
         return state
+
+    async def analyse_user_input_for_dispatch_async(self, user_input: str) -> str:
+        """Analyse the user input and dispatch to the right agent"""
+        prompt = ("### Instructions ###"
+                "Your aim is to analyse the following user query and return a single word corresponding to the category it belongs to."
+                "The allowed values for categories are: ['schedule_calendar_appointment', 'training_course_query', 'others']."
+                "'schedule_calendar_appointment' category matches if the user query is related to scheduling a calendar appointment."
+                "'training_course_query' category matches if the user query is related to a training course or its informations, like access conditions, fundings, ..."
+                "'others' category matches if the user query is not related to none of the previous categories."
+                ""
+                "### User query ###"
+                f"The user query to analyse is: {user_input}")
+        response = await self.llm.ainvoke(prompt)
+        return response.content
 
     async def send_begin_of_welcome_message_node(self, state: PhoneConversationState) -> dict:
         """Send the begin of welcome message to the user"""
         call_sid = state.get('call_sid', 'N/A')
         phone_number = state.get('caller_phone', 'N/A')
-        welcome_text = "Bonjour, je suis Stud'IA, l'assistante virtuelle de Studi."
+        self.welcome_text = "Bonjour, je suis Stud'IA, l'assistante virtuelle de Studi."
         
-        await self.outgoing_manager.enqueue_text(welcome_text)
+        await self.outgoing_manager.enqueue_text(self.welcome_text)
         self.logger.info(f"[{call_sid}] Sent begin of welcome message to {phone_number}")
-
-        state['history'] = [("AI", welcome_text)]
         return state
 
     async def init_conversation_node(self, state: PhoneConversationState) -> dict:
@@ -137,12 +149,8 @@ class AgentsGraph:
         
         self.logger.info(f"User and a new conversation init. in RAG API for caller: {state.get('caller_phone')}") 
         conversation_id = await self.init_user_and_new_conversation_in_backend_api_async(state.get('caller_phone'), state.get('call_sid'))
-
-        for msg in state.get('history', []):
-            await self.studi_rag_inference_api_client.add_external_ai_message_to_conversation(conversation_id, msg[1])
         
-        # messages = await self.studi_rag_inference_api_client.add_external_ai_message_to_conversation(conversation_id, welcome_text)
-        # state['history'] = messages
+        state['history'] = []
         
         if state.get('agent_scratchpad') is None: 
             state['agent_scratchpad'] = {}
@@ -158,7 +166,7 @@ class AgentsGraph:
         sf_account_info = await self.salesforce_api_client.get_person_by_phone_async(phone_number)
         leads_info = await self.salesforce_api_client.get_leads_by_details_async(phone_number)
         state['agent_scratchpad']['sf_account_info'] = sf_account_info.get('data', {}) if sf_account_info else {}
-        state['agent_scratchpad']['sf_leads_info'] = leads_info.get('data', {}) if leads_info else {}
+        state['agent_scratchpad']['sf_leads_info'] = leads_info[0] if any(leads_info) else {}
         self.logger.info(f"[{call_sid}] Stored sf_account_info: {sf_account_info.get('data', {})} in agent_scratchpad")
         return state
 
@@ -186,6 +194,9 @@ class AgentsGraph:
             end_welcome_text = "Je suis là pour vous aider en l'absence de nos conseillers. Avez-vous des questions sur nos formations, ou souhaitez-vous prendre rendez-vous avec un conseiller ?"
                 
         await self.outgoing_manager.enqueue_text(end_welcome_text)
+        full_welcome_text = self.welcome_text + "\n" + end_welcome_text
+        state['history'].append(("AI", full_welcome_text))
+        await self.studi_rag_inference_api_client.add_external_ai_message_to_conversation(state['agent_scratchpad']['conversation_id'], full_welcome_text)
         self.logger.info(f"[{call_sid}] Sent end of welcome message to {phone_number}")
         return state
     
@@ -450,13 +461,16 @@ class AgentsGraph:
         call_sid = state.get('call_sid', 'N/A')
         user_query = state.get('user_input', '')
         self.logger.info(f"> Ongoing RAG query on training course information. User request: '{user_query}' for: [{call_sid[-4:]}].")
-
+        conversation_id=state.get('agent_scratchpad', {}).get('conversation_id', None)
+        if not conversation_id:
+            self.logger.error(f"[~{call_sid[-4:]}] No conversation ID found, ending graph run.")
+            return END
         try:
             self.rag_interrupt_flag = {"interrupted": False} # Reset the interrupt flag before starting new streaming
 
             rag_query_RM = QueryAskingRequestModel(
-                conversation_id=self.conversation_id,
-                user_query_content= user_query_transcript,
+                conversation_id=conversation_id,
+                user_query_content= user_query,
                 display_waiting_message=False
             )
             response = self.studi_rag_inference_api_client.rag_query_stream_async(rag_query_RM, timeout=60, interrupt_flag=self.rag_interrupt_flag)

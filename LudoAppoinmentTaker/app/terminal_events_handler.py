@@ -19,10 +19,10 @@ from app.api_client.salesforce_api_client import SalesforceApiClient
 class TerminalEventsHandler:
     # Class variables shared across instances
     compiled_graph = None # LangGraph workflow compilation
-    outgoing_text_processing : OutgoingTextManager = None
     incoming_text_processing : IncomingTextManager = None
+    outgoing_text_processing : OutgoingTextManager = None
     
-    def __init__(self):
+    def __init__(self, outgoing_text_func=None):
         # Instance variables
         self.logger = logging.getLogger(__name__)
         self.logger.info("TerminalEventsHandler logger started")
@@ -50,7 +50,7 @@ class TerminalEventsHandler:
             "secrets/google-calendar-credentials.json"
         )
         self.google_calendar_credentials_path = os.path.join(self.project_root, self.google_calendar_credentials_filename)
-        print(self.google_calendar_credentials_path)
+        self.logger.info(self.google_calendar_credentials_path)
 
         if os.path.exists(self.google_calendar_credentials_path):
             os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = self.google_calendar_credentials_path
@@ -63,7 +63,8 @@ class TerminalEventsHandler:
         self.salesforce_api_client = SalesforceApiClient()
         
         self.outgoing_text_processing = OutgoingTextManager(
-            call_sid=None
+            call_sid=None,
+            outgoing_text_func=outgoing_text_func
         )
 
         self.compiled_graph = AgentsGraph(
@@ -84,12 +85,15 @@ class TerminalEventsHandler:
 
         self.logger.info("TerminalEventsHandler initialized successfully.")
 
-    async def init_incoming_data_handler(self, calling_phone_number: str, call_sid: str) -> None:
+    def set_call_sid_and_phone_number(self, calling_phone_number: str, call_sid: str) -> None:
         # Store the caller's phone number and call SID so we can retrieve them later
         self.call_sid = call_sid
         self.phones_by_call_sid[call_sid] = calling_phone_number
         self.incoming_text_processing.set_call_sid(call_sid)
         self.incoming_text_processing.set_phone_number(calling_phone_number, call_sid)
+
+    async def init_incoming_data_handler_async(self, calling_phone_number: str, call_sid: str) -> None:
+        self.set_call_sid_and_phone_number(calling_phone_number, call_sid)
 
         self.outgoing_text_processing.run_background_streaming_worker()
         self.logger.info("Text stream manager initialized and started with optimized parameters")
@@ -99,17 +103,21 @@ class TerminalEventsHandler:
         # Loop of input/output from and to the terminal
         while True:
             try:
-                input_text = input("User: ")
+                input_text = self.incoming_text()
                 
                 if input_text.lower() == "bye": 
                     break
-                await self.incoming_text_async(media_data={"text": input_text})
+                await self.process_incoming_text_async(media_data={"text": input_text})
 
             except Exception as e:
                 self.logger.error(f"Error in terminal input loop: {e}")
                 break
 
-    async def incoming_text_async(self, media_data: dict) -> None:
+    def incoming_text() -> str:
+        input_text = input("User: ")
+        return input_text
+
+    async def process_incoming_text_async(self, media_data: dict) -> None:
         """Handle the incoming of new text data from the terminal"""
         await self.incoming_text_processing.process_incoming_data_async(media_data)
     
