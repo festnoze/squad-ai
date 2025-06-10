@@ -40,13 +40,13 @@ class AgentsGraph:
         self.lead_agent_instance = LeadAgent(config_path=lid_config_file_path)
         self.logger.info(f"Initialize Lead Agent succeed with config: {lid_config_file_path}")
         
-        self.calendar_agent_instance = CalendarAgent()
+        self.llm = LangChainFactory.create_llm_from_info(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4.1-mini", timeout=50, temperature=0.1, api_key=os.getenv("OPENAI_API_KEY")))
+        
+        self.calendar_agent_instance = CalendarAgent(llm_or_chain=self.llm, salesforce_client=self.salesforce_api_client)
         self.logger.info("Initialize Calendar Agent succeed")
         
         self.sf_agent_instance = SFAgent()
         self.logger.info("Initialize SF Agent succeed")
-        
-        self.llm = LangChainFactory.create_llm_from_info(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4.1-mini", timeout=50, temperature=0.1, api_key=os.getenv("OPENAI_API_KEY")))
         self.graph = self._build_graph()
         
     def _build_graph(self):
@@ -199,9 +199,14 @@ class AgentsGraph:
             end_welcome_text = "Je suis là pour vous aider en l'absence de nos conseillers. Avez-vous des questions sur nos formations, ou souhaitez-vous prendre rendez-vous avec un conseiller ?"
                 
         await self.outgoing_manager.enqueue_text(end_welcome_text)
+
         full_welcome_text = self.welcome_text + "\n" + end_welcome_text
         state['history'].append(("AI", full_welcome_text))
-        await self.studi_rag_inference_api_client.add_external_ai_message_to_conversation(state['agent_scratchpad']['conversation_id'], full_welcome_text)
+        conv_id = state['agent_scratchpad'].get('conversation_id', None)
+        if conv_id:
+            await self.studi_rag_inference_api_client.add_external_ai_message_to_conversation_async(conv_id, full_welcome_text)
+        else:
+            self.logger.warning("/!\\ ERROR: No conversation ID found in state. Unable to add welcome msg to conversation properly.")
         self.logger.info(f"[{call_sid}] Sent end of welcome message to {phone_number}")
         return state
     
@@ -220,11 +225,12 @@ class AgentsGraph:
             device_info=DeviceInfoRequestModel(user_agent="twilio", platform="phone", app_version="", os="", browser="", is_mobile=True)
         )
         try:
-            user = await self.studi_rag_inference_api_client.create_or_retrieve_user(user_RM)
+            await self.studi_rag_inference_api_client.test_client_connection_async()
+            user = await self.studi_rag_inference_api_client.create_or_retrieve_user_async(user_RM)
             user_id = UUID(user['id'])
             new_conversation = ConversationRequestModel(user_id=user_id, messages=[])
             self.logger.info(f"Creating new conversation for user: {user_id}")
-            new_conversation = await self.studi_rag_inference_api_client.create_new_conversation(new_conversation)
+            new_conversation = await self.studi_rag_inference_api_client.create_new_conversation_async(new_conversation)
             return new_conversation['id']
 
         except Exception as e:
@@ -387,46 +393,41 @@ class AgentsGraph:
         # Get SF account info from scratchpad
         sf_account_info = state.get('agent_scratchpad', {}).get('sf_account_info', {})
         
-        if not sf_account_info:
-            self.logger.warning(f"[{call_sid}] No SF account info available for calendar operations")
-            return {
-                "history": [("Human", user_input), ("AI", "Je n'ai pas trouvé vos informations. Pourriez-vous me donner vos coordonnées à nouveau ?")],
-                "agent_scratchpad": {"next_agent_needed": "lead_agent"}
-            }
-        
-        try:
-            # Initialize Calendar Agent with user info from SF
-            calendar_agent = CalendarAgent(
-                first_name=sf_account_info.get('FirstName', ''),
-                last_name=sf_account_info.get('LastName', ''),
-                email=sf_account_info.get('Email', ''),
-                owner_first_name=sf_account_info.get('OwnerFirstName', ''),
-                owner_last_name=sf_account_info.get('OwnerLastName', ''),
-                owner_email=sf_account_info.get('OwnerEmail', ''),
-                config_path="calendar_agent.yaml"
-            )
-            
-            # Process the user's input
-            response_text = calendar_agent.analyze_text(user_input)
-            
-            # Update scratchpad with calendar agent state if needed
-            updated_scratchpad = state.get('agent_scratchpad', {})
-            
-            # If appointment was created, we can end the conversation
-            if "J'ai réservé un rendez-vous" in response_text:
-                updated_scratchpad['appointment_created'] = True
-            
-            return {
-                "history": [("Human", user_input), ("AI", response_text)],
-                "agent_scratchpad": updated_scratchpad
-            }
-            
-        except Exception as e:
-            self.logger.error(f"[{call_sid[-4:]}] Error in Calendar Agent node: {e}", exc_info=True)
-            return {
-                "history": [("Human", user_input), ("AI", "Je rencontre un problème pour gérer votre rendez-vous. Pourriez-vous réessayer plus tard ?")],
-                "agent_scratchpad": {"error": str(e)}
-            }
+        if sf_account_info:        
+            try:
+                # Initialize Calendar Agent with user info from SF
+                self.calendar_agent_instance.set_user_info(
+                    first_name=sf_account_info.get('FirstName', ''),
+                    last_name=sf_account_info.get('LastName', ''),
+                    email=sf_account_info.get('Email', ''),
+                    owner_first_name=sf_account_info.get('OwnerFirstName', ''),
+                    owner_last_name=sf_account_info.get('OwnerLastName', ''),
+                    owner_email=sf_account_info.get('OwnerEmail', '')
+                )
+                chat_history = state.get('agent_scratchpad', {}).get('chat_history', [])
+                await self.calendar_agent_instance.run_async(user_input, chat_history)
+                
+                # Process the user's input
+                response_text = self.calendar_agent_instance.analyze_text(user_input)
+                
+                # Update scratchpad with calendar agent state if needed
+                updated_scratchpad = state.get('agent_scratchpad', {})
+                
+                # If appointment was created, we can end the conversation
+                if "J'ai réservé un rendez-vous" in response_text:
+                    updated_scratchpad['appointment_created'] = True
+                
+                return {
+                    "history": [("Human", user_input), ("AI", response_text)],
+                    "agent_scratchpad": updated_scratchpad
+                }
+                
+            except Exception as e:
+                self.logger.error(f"[{call_sid[-4:]}] Error in Calendar Agent node: {e}", exc_info=True)
+                return {
+                    "history": [("Human", user_input), ("AI", "Je rencontre un problème pour gérer votre rendez-vous. Pourriez-vous réessayer plus tard ?")],
+                    "agent_scratchpad": {"error": str(e)}
+                }
 
     async def decide_next_step(self, state: PhoneConversationState) -> str:
         """Determines the next node to visit based on the current state."""
@@ -480,7 +481,13 @@ class AgentsGraph:
                 user_query_content= user_query,
                 display_waiting_message=False
             )
-            response = self.studi_rag_inference_api_client.rag_query_stream_async(rag_query_RM, timeout=60, interrupt_flag=self.rag_interrupt_flag)
+
+            # Call but not await the RAG API to get the streaming response
+            response = self.studi_rag_inference_api_client.rag_query_stream_async(
+                                query_asking_request_model = rag_query_RM,
+                                interrupt_flag = self.rag_interrupt_flag,
+                                timeout = 120
+                            )
 
             full_answer = ""
             was_interrupted = False

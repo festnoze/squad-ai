@@ -315,7 +315,7 @@ class IncomingAudioManager(IncomingManager):
             if user_query_transcript:
                 self.logger.info(f"Sending incoming user query to agents graph. Transcription: '{user_query_transcript}'")  
                 await self.send_user_query_to_agents_graph_async(user_query_transcript)
-        await asyncio.sleep(0.05) # Pause incoming process to let others processes breathe
+        await asyncio.sleep(0.1) # Pause incoming process to let others processes breathe
         return
 
     async def send_user_query_to_agents_graph_async(self, user_query : str):

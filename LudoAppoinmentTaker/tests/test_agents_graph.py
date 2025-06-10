@@ -10,7 +10,7 @@ from app.api_client.salesforce_api_client import SalesforceApiClient
 @pytest.mark.asyncio
 class TestAgentsGraph:
     @pytest.mark.asyncio
-    async def test_welcome_message_and_conversation_id(self, mock_dependencies):
+    async def test_graph_init_conversation_and_welcome_message(self, mock_dependencies):
         """Test that without user input, we get a welcome message and conversation_id is set."""
         # Arrange
         # Create the graph with mocked dependencies but use the real graph implementation
@@ -47,8 +47,8 @@ class TestAgentsGraph:
             assert awaited_line.strip() == received_line.strip()
         
         # Verify that the user and conversation creation methods were called
-        mock_dependencies["studi_rag_client"].create_or_retrieve_user.assert_called_once()
-        mock_dependencies["studi_rag_client"].create_new_conversation.assert_called_once()
+        mock_dependencies["studi_rag_client"].create_or_retrieve_user_async.assert_called_once()
+        mock_dependencies["studi_rag_client"].create_new_conversation_async.assert_called_once()
         
         # Verify outgoing_manager was called with welcome message
         mock_dependencies["outgoing_manager"].enqueue_text.assert_called()
@@ -150,7 +150,7 @@ class TestAgentsGraph:
         #assert updated_state["history"][-1][1] == "D'accord, je vais vous aider à prendre rendez-vous avec un conseiller."
         
         # Verify Salesforce client methods were called
-        mock_dependencies["salesforce_client"].get_person_by_phone_async.assert_called_once_with(mock_dependencies["phone_number"])
+        mock_dependencies["salesforce_client"].get_person_by_phone_async.assert_not_called()
         mock_dependencies["salesforce_client"].get_available_slots_async.assert_called_once()
         
         # Verify outgoing_manager was called with a response
@@ -170,16 +170,16 @@ class TestAgentsGraph:
         mock_studi_rag_client.query_rag_api.return_value = "This is a mock RAG response about BTS programs."
         
         # Mock user creation/retrieval
-        mock_studi_rag_client.create_or_retrieve_user = AsyncMock()
-        mock_studi_rag_client.create_or_retrieve_user.return_value = {
+        mock_studi_rag_client.create_or_retrieve_user_async  = AsyncMock()
+        mock_studi_rag_client.create_or_retrieve_user_async .return_value = {
             "id": "39e81136-4525-4ea8-bd00-c22211110000",
             "user_name": "Test User",
             "created_at": "2025-06-01T00:00:00Z"
         }
         
         # Mock conversation creation
-        mock_studi_rag_client.create_new_conversation = AsyncMock()
-        mock_studi_rag_client.create_new_conversation.return_value = {
+        mock_studi_rag_client.create_new_conversation_async = AsyncMock()
+        mock_studi_rag_client.create_new_conversation_async.return_value = {
             "id": "39e81136-4525-4ea8-bd00-c22211110001",
             "user_id": "39e81136-4525-4ea8-bd00-c22211110000",
             "created_at": "2025-06-02T00:00:00Z"

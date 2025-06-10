@@ -105,7 +105,7 @@ class SalesforceApiClient:
             if not self.authenticate():
                 raise Exception("Salesforce authentication failed. Cannot proceed with API call.")
 
-    async def create_event_async(self, subject: str, start_datetime: str, duration_minutes: int = 60, description: str | None = None, 
+    async def schedule_new_appointment_async(self, subject: str, start_datetime: str, duration_minutes: int = 60, description: str | None = None, 
                    location: str | None = None, owner_id: str | None = None, 
                    what_id: str | None = None, who_id: str | None = None) -> str | None:
         """Create an event in Salesforce and return the event ID if successful
@@ -185,7 +185,7 @@ class SalesforceApiClient:
                 self.logger.info(f"Error creating event: {str(e)}")
                 return None
 
-    async def get_events_async(self, start_datetime: str, end_datetime: str, owner_id: str | None = None) -> list | None:
+    async def get_scheduled_appointments_async(self, start_datetime: str, end_datetime: str, owner_id: str | None = None) -> list | None:
         """Get events from Salesforce calendar between specified start and end datetimes
         
         Args:

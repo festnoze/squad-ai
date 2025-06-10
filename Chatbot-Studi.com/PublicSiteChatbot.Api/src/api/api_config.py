@@ -146,11 +146,11 @@ class ApiConfig:
                 
         async def startup_event():
             """Handle application startup."""
-            logger.error("Application startup: Task handler is running.")
+            logger.info("Application startup: Task handler is running.")
 
         async def shutdown_event():
             """Handle application shutdown."""
-            logger.error("Shutting down: Stopping the task handler.")
+            logger.info("Shutting down: Stopping the task handler.")
             task_handler.stop()
         
         app.add_event_handler("startup", startup_event)

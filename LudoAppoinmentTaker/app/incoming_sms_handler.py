@@ -22,12 +22,12 @@ class IncomingSMSHandler:
             device_info=DeviceInfoRequestModel(user_agent="twilio", platform="phone", app_version="", os="", browser="", is_mobile=True)
         )
         try:
-            user = await self.studi_rag_inference_api_client.create_or_retrieve_user(user_RM)
+            user = await self.studi_rag_inference_api_client.create_or_retrieve_user_async(user_RM)
             user_id = user['id']
             if isinstance(user_id, str): 
                 user_id = UUID(user_id)
                 
-            last_conversation = await self.studi_rag_inference_api_client.get_user_last_conversation(user_id)
+            last_conversation = await self.studi_rag_inference_api_client.get_user_last_conversation_async(user_id)
             
             if last_conversation['id'] is not None:
                 self.logger.info(f"Retrieved existing conversation {last_conversation['id']} for user: {user_id}")
@@ -35,7 +35,7 @@ class IncomingSMSHandler:
             else: # Create the conversation if none already exists
                 self.logger.info(f"Creating new conversation for user: {user_id}")
                 conversation_model = ConversationRequestModel(user_id=user_id)
-                new_conversation = await self.studi_rag_inference_api_client.create_new_conversation(conversation_model)
+                new_conversation = await self.studi_rag_inference_api_client.create_new_conversation_async(conversation_model)
                 return new_conversation['id']           
 
         except Exception as e:

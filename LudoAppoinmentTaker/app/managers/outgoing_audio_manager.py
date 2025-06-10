@@ -53,9 +53,7 @@ class OutgoingAudioManager(OutgoingManager):
         streamSid_wait_count = 0
         max_streamSid_wait = 20  # Maximum number of attempts to wait for streamSid
         last_chunk_end_time = 0  # Track timing for natural speech flow (in ms)
-        
         while True:
-            await asyncio.sleep(0.05) # Pause outgoing loop process to let others processes breathe
             if self.ask_to_stop_streaming_worker:
                 self.logger.info("Stopping audio streaming worker asked")
                 break
@@ -68,8 +66,10 @@ class OutgoingAudioManager(OutgoingManager):
                 continue
             
             if not self.is_sending_speech():
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(0.5)
                 continue
+            
+            await asyncio.sleep(0.2) # Pause outgoing loop process to let others processes breathe
 
             try:
                 if not self.audio_sender.stream_sid:
@@ -79,7 +79,7 @@ class OutgoingAudioManager(OutgoingManager):
                     else:
                         self.logger.error(f"No StreamSid set after {streamSid_wait_count} attempts, audio transmission may fail")
                     
-                    await asyncio.sleep(0.2)
+                    await asyncio.sleep(0.1)
                     continue
                     
                 if streamSid_wait_count > 0:
