@@ -222,7 +222,7 @@ class IncomingAudioManager(IncomingManager):
             self.logger.error(f"Error in initial graph invocation: {e}", exc_info=True)
 
 
-    async def process_incoming_data_async(self, audio_data: dict) -> None:        
+    async def process_incoming_data_async(self, audio_data: dict) -> None:
         if not self.stream_sid:
             self.logger.error("/!\\ 'media event' received before the 'start event'")
             return
@@ -268,7 +268,7 @@ class IncomingAudioManager(IncomingManager):
             chunk_duration_ms = (len(chunk) / self.sample_width) / self.frame_rate * 1000
             self.consecutive_silence_duration_ms += chunk_duration_ms
             msg = f"\rConsecutive silent chunks - Duration: {self.consecutive_silence_duration_ms:.1f}ms - Speech/noise: {speech_to_noise_ratio:04d} (size: {len(chunk)} bytes)."
-            self.logger.debug(msg)
+            print(msg, end="", flush=True)
 
         # Hangup the call if the user is silent for too long
         if self.consecutive_silence_duration_ms >= self.max_silence_duration_before_hangup_ms:
@@ -310,13 +310,12 @@ class IncomingAudioManager(IncomingManager):
 
             # 4. Transcribe speech to text
             user_query_transcript = self._perform_speech_to_text_transcription(audio_data)
-            if user_query_transcript is None:
-                return
-            self.logger.info(f"Sending incoming user query to agents graph. Transcription: '{user_query_transcript}'")  
-
+            
             # 5. Send the user query to the agents graph
-            await self.send_user_query_to_agents_graph_async(user_query_transcript)
-
+            if user_query_transcript:
+                self.logger.info(f"Sending incoming user query to agents graph. Transcription: '{user_query_transcript}'")  
+                await self.send_user_query_to_agents_graph_async(user_query_transcript)
+        await asyncio.sleep(0.05) # Pause incoming process to let others processes breathe
         return
 
     async def send_user_query_to_agents_graph_async(self, user_query : str):

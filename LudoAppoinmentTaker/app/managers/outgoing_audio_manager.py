@@ -55,6 +55,7 @@ class OutgoingAudioManager(OutgoingManager):
         last_chunk_end_time = 0  # Track timing for natural speech flow (in ms)
         
         while True:
+            await asyncio.sleep(0.05) # Pause outgoing loop process to let others processes breathe
             if self.ask_to_stop_streaming_worker:
                 self.logger.info("Stopping audio streaming worker asked")
                 break
@@ -149,7 +150,7 @@ class OutgoingAudioManager(OutgoingManager):
             
         self.ask_to_stop_streaming_worker = False
         self.sender_task = asyncio.create_task(self._background_streaming_worker_async())
-        self.logger.info("Audio streaming started")
+        self.logger.info("Audio background streaming worker started")
         
     async def stop_background_streaming_worker_async(self) -> None:
         """
@@ -171,7 +172,7 @@ class OutgoingAudioManager(OutgoingManager):
             finally:
                 self.sender_task = None
 
-        self.logger.info("Audio streaming worker stopped")
+        self.logger.info("Audio background streaming worker stopped")
         
     async def enqueue_text(self, text: str) -> bool:
         """

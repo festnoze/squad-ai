@@ -141,7 +141,7 @@ class ApiConfig:
                 
         @app.get("/ping")
         async def ping() -> str:
-            logger.error("Ping request received.")
+            logger.info("Ping request received.")
             return "pong"
                 
         async def startup_event():

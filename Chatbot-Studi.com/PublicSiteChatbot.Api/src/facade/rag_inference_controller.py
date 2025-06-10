@@ -23,7 +23,7 @@ def reinitialize():
         return Response(status_code=204)
     
     except Exception as e:
-        print(f"Failed to create conversation: {e}")
+        print(f"Failed to reinitialize: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     
 @inference_router.patch("/user/sync")
@@ -38,11 +38,11 @@ async def create_or_retrieve_user(user_request_model: UserRequestModel):
         return JSONResponse(content={"id": str(user_id)}, status_code=200)
     
     except QuotaOverloadException as e:
-        print(f"Failed to create conversation: {e}")
+        print(f"Failed to retrieve or create user: {e}")
         raise HTTPException(status_code=429, detail=str(e))
     
     except Exception as e:
-        print(f"Failed to create conversation: {e}")
+        print(f"Failed to retrieve or create user: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     
 

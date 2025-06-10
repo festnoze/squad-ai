@@ -31,7 +31,9 @@ class StudiRAGInferenceApiClient:
     async def create_or_retrieve_user(self, user_request_model: UserRequestModel, timeout: int = 10) -> Dict[str, Any]:
         """PATCH /rag/inference/user/sync: Create or retrieve a user."""
         try:
-            resp = await self.client.patch("/rag/inference/user/sync", json=user_request_model.to_dict(), timeout=httpx.Timeout(timeout))
+            test = await self.client.get("/ping", timeout=httpx.Timeout(timeout))
+            user_request_model_dict = user_request_model.to_dict()
+            resp = await self.client.patch("/rag/inference/user/sync", json=user_request_model_dict, timeout=httpx.Timeout(timeout))
             resp.raise_for_status()
             return resp.json()
         except httpx.ConnectError as exc:
