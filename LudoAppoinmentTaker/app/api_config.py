@@ -50,7 +50,8 @@ class ApiConfig:
 
         logging.basicConfig(
             level=num_log_level,
-            format="Log: %(asctime)s - %(levelname)s - %(name)s - %(message)s",
+            format="%(levelname)s (%(name)s ln.%(lineno)d) %(message)s",
+            #format="%(levelname)s: %(asctime)s (%(name)s ln.%(lineno)d) %(message)s",
             handlers=[
                 logging.FileHandler(f"outputs\\logs\\app.{datetime.now().strftime('%Y-%m-%d.%H%M%S')}.log"),
                 logging.StreamHandler()  # Output to console

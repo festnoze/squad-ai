@@ -6,10 +6,9 @@ import random
 import logging
 import webrtcvad
 import audioop
-import time
 import uuid
 import logging
-import abc
+import asyncio
 from pydub import AudioSegment
 from pydub.effects import normalize
 from fastapi import WebSocket
@@ -269,12 +268,12 @@ class IncomingAudioManager(IncomingManager):
             chunk_duration_ms = (len(chunk) / self.sample_width) / self.frame_rate * 1000
             self.consecutive_silence_duration_ms += chunk_duration_ms
             msg = f"\rConsecutive silent chunks - Duration: {self.consecutive_silence_duration_ms:.1f}ms - Speech/noise: {speech_to_noise_ratio:04d} (size: {len(chunk)} bytes)."
-            print(msg, end="", flush=True)
+            self.logger.debug(msg)
 
         # Hangup the call if the user is silent for too long
         if self.consecutive_silence_duration_ms >= self.max_silence_duration_before_hangup_ms:
             self.logger.info(f"User silence duration exceeded threshold: {self.consecutive_silence_duration_ms:.1f}ms")
-            self.hangup_call()
+            #self.hangup_call()
             return
         
         # Add chunk to buffer if speech has begun or this is a speech chunk

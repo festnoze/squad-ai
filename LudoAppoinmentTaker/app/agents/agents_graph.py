@@ -151,9 +151,10 @@ class AgentsGraph:
         if state.get('agent_scratchpad', {}).get('conversation_id', None) is not None:
             return state
         
-        self.logger.info(f"User and a new conversation init. in RAG API for caller: {state.get('caller_phone')}") 
-        conversation_id = await self.init_user_and_new_conversation_in_backend_api_async(state.get('caller_phone'), state.get('call_sid'))
-        
+        self.logger.info(f"Start init. RAG API for caller (User and a new conversation): {state.get('caller_phone')}") 
+        conversation_id = await self.init_user_and_new_conversation_in_backend_api_async(state.get('caller_phone'), state.get('call_sid'))     
+        self.logger.info(f"End init. RAG API for caller (User and a new conversation): {state.get('caller_phone')}")
+
         state['history'] = []
         
         if state.get('agent_scratchpad') is None: 
