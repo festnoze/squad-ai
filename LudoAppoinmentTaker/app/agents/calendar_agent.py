@@ -9,10 +9,10 @@ from uuid import UUID
 import logging
 
 class CalendarAgent:
-    def __init__(self, llm_or_chain: any, salesforce_client: SalesforceApiClient):
+    salesforce_client: SalesforceApiClient = SalesforceApiClient()
+    def __init__(self, llm_or_chain: any):
         self.logger = logging.getLogger(__name__)
         self.tools = [self.get_current_date, self.get_appointments, self.schedule_new_appointment]
-        self.salesforce_client = salesforce_client
         self.llm = llm_or_chain
         self.prompt = self._load_prompt()
         self.prompts = ChatPromptTemplate.from_messages([
@@ -28,13 +28,15 @@ class CalendarAgent:
     @tool
     def get_current_date() -> str:
         """Get the current date"""
+        return CalendarAgent.get_current_date_tool()
+
+    def get_current_date_tool() -> str:
         return datetime.now().strftime("%A, %B %d, %Y")
 
     @tool
     def get_appointments(start_date: datetime, end_date: datetime, owner_id: UUID) -> list[dict[str, any]]:
         """Get the existing appointments between the start and end dates for the owner"""
-        salesforce_client = SalesforceApiClient()
-        return salesforce_client.get_scheduled_appointments_async(str(start_date), str(end_date), str(owner_id))
+        return CalendarAgent.salesforce_client.get_scheduled_appointments_async(str(start_date), str(end_date), str(owner_id))
 
     @tool
     def schedule_new_appointment(
@@ -48,8 +50,8 @@ class CalendarAgent:
         """Schedule a new appointment with the owner at the specified date and time"""
         object = object if object else "Demande de conseil en formation prospect"
         description = description if description else "RV pris par l'IA après appel entrant du prospect"
-        salesforce_client = SalesforceApiClient()
-        return salesforce_client.schedule_new_appointment_async(str(user_id), str(owner_id), object, description, str(date_and_time), duration)
+        
+        return CalendarAgent.salesforce_client.schedule_new_appointment_async(str(user_id), str(owner_id), object, description, str(date_and_time), duration)
 
     def _load_prompt(self):
         with open("app/agents/calendar_prompt.txt", "r", encoding="utf-8") as f:
@@ -93,10 +95,16 @@ class CalendarAgent:
                 formatted_history.append(AIMessage(content=message["AI"]))
             elif "human" in message:
                 formatted_history.append(HumanMessage(content=message["human"]))
-        response = await self.agent_executor.ainvoke({
-            "input": user_input,
-            "chat_history": formatted_history
-        })
+        try:
+            response = await self.agent_executor.ainvoke({"input": "quel jour sommes nous ?", "chat_history": []})
+            response = await self.agent_executor.ainvoke({"input": "Je voudrais prendre rendez-vous demain", "chat_history": []})
+            response = await self.agent_executor.ainvoke({
+                "input": user_input,
+                "chat_history": formatted_history
+            }) 
+        except Exception as e:
+            self.logger.error(f"Error executing calendar agent with tools: {e}")
+            raise
         return {
             "output": response["output"],
             "intermediate_steps": response.get("intermediate_steps", [])
