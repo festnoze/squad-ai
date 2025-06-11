@@ -131,12 +131,27 @@ class TestAgentsGraph:
         user_input = "Je voudrais prendre rendez-vous avec un conseiller pour discuter de mon inscription"
         
         # Create initial state
+        sf_account_info = {
+            'attributes': {'type': 'Contact', 'url': '/services/data/v60.0/sobjects/Contact/003Aa00000jW2RBIA0'}, 
+            'Id': '003Aa00000jW2RBIA0', 
+            'Salutation': 'Mr.', 
+            'FirstName': 'jean', 
+            'LastName': 'dujardin', 
+            'Email': 'eti.mille@studi.fr', 
+            'Phone': None, 
+            'MobilePhone': '+33668422388', 
+            'Account': {'attributes': {'type': 'Account', 'url': '/services/data/v60.0/sobjects/Account/001Aa00001J8StVIAV'}, 'Id': '001Aa00001J8StVIAV', 'Name': 'jean dujardin'}, 
+            'Owner': {'attributes': {'type': 'User', 'url': '/services/data/v60.0/sobjects/User/005Aa00000K990ZIAR'}, 'Id': '005Aa00000K990ZIAR', 'Name': 'Etienne Millerioux'}
+        }
         initial_state: PhoneConversationState = PhoneConversationState(
             call_sid=mock_dependencies["call_sid"],
             caller_phone=mock_dependencies["phone_number"],
             user_input=user_input,
             history=[("AI", init_msg)],
-            agent_scratchpad={"conversation_id": "39e81136-4525-4ea8-bd00-c22211110001"}
+            agent_scratchpad={
+                "conversation_id": "39e81136-4525-4ea8-bd00-c22211110001", 
+                "sf_account_info": sf_account_info
+            }
         )
 
         # Act

@@ -400,9 +400,7 @@ class AgentsGraph:
                     first_name=sf_account_info.get('FirstName', ''),
                     last_name=sf_account_info.get('LastName', ''),
                     email=sf_account_info.get('Email', ''),
-                    owner_first_name=sf_account_info.get('OwnerFirstName', ''),
-                    owner_last_name=sf_account_info.get('OwnerLastName', ''),
-                    owner_email=sf_account_info.get('OwnerEmail', '')
+                    owner_name=sf_account_info.get('Owner').get('Name', '')
                 )
                 chat_history = state.get('agent_scratchpad', {}).get('chat_history', [])
                 await self.calendar_agent_instance.run_async(user_input, chat_history)

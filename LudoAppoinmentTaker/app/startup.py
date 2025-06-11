@@ -12,5 +12,8 @@ for folder in ["outputs/logs", "static/audio"]:
         shutil.rmtree(folder)
     os.makedirs(folder, exist_ok=True)
 
+#from app.agents.agents_graph import AgentsGraph
+#tmp = AgentsGraph(None, None, None, None)
+
 # Start the app
 app = ApiConfig.create_app()

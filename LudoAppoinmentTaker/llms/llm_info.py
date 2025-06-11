@@ -1,3 +1,5 @@
+#### DUPLICATE FROM COMMON TOOLS ####
+
 from llms.langchain_adapter_type import LangChainAdapterType
 
 class LlmInfo:

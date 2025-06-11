@@ -1,3 +1,5 @@
+#### DUPLICATE FROM COMMON TOOLS ####
+
 from enum import Enum
 
 class LangChainAdapterType(Enum):

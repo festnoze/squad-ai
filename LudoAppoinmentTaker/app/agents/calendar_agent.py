@@ -1,7 +1,7 @@
 import os
 from datetime import datetime, timedelta
-from langchain.tools import tool
-from langchain.agents import AgentExecutor, create_react_agent
+from langchain.tools import tool, BaseTool
+from langchain.agents import AgentExecutor, create_tool_calling_agent, create_react_agent
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from app.api_client.salesforce_api_client import SalesforceApiClient
@@ -11,7 +11,7 @@ import logging
 class CalendarAgent:
     def __init__(self, llm_or_chain: any, salesforce_client: SalesforceApiClient):
         self.logger = logging.getLogger(__name__)
-        self.tools = [self.get_appointments, self.schedule_new_appointment]
+        self.tools = [self.get_current_date, self.get_appointments, self.schedule_new_appointment]
         self.salesforce_client = salesforce_client
         self.llm = llm_or_chain
         self.prompt = self._load_prompt()
@@ -21,33 +21,41 @@ class CalendarAgent:
             ("human", "{input}"),
             MessagesPlaceholder(variable_name="agent_scratchpad"),
         ])
-        self.agent = create_react_agent(self.llm, self.tools, self.prompts)
+        self.agent = create_tool_calling_agent(self.llm, self.tools, self.prompts)
         self.agent_executor = AgentExecutor(agent=self.agent, tools=self.tools, verbose=True)
+        # response = self.agent_executor.invoke({"input": "quel jour sommes nous ?", "chat_history": []})['output']
 
     @tool
-    def get_appointments(self, start_date: datetime, end_date: datetime, owner_id: UUID) -> list[dict[str, any]]:
-        """Récupère les créneaux pris entre les date de début et de fin spécifiés (format YYYY-MM-DD)"""
-        return self.salesforce_client.get_scheduled_appointments_async(str(start_date), str(end_date), str(owner_id))
+    def get_current_date() -> str:
+        """Get the current date"""
+        return datetime.now().strftime("%A, %B %d, %Y")
 
     @tool
-    def schedule_new_appointment(self,
-        user_id: UUID,
-        owner_id: UUID,
-        date_and_time: datetime,
-        object: str | None = None,
-        description: str | None = None,
-        duration: int = 30
-    ) -> dict[str, any]:
-        """Programme un nouveau rendez-vous."""
+    def get_appointments(start_date: datetime, end_date: datetime, owner_id: UUID) -> list[dict[str, any]]:
+        """Get the existing appointments between the start and end dates for the owner"""
+        salesforce_client = SalesforceApiClient()
+        return salesforce_client.get_scheduled_appointments_async(str(start_date), str(end_date), str(owner_id))
+
+    @tool
+    def schedule_new_appointment(
+            user_id: UUID,
+            owner_id: UUID,
+            date_and_time: datetime,
+            object: str | None = None,
+            description: str | None = None,
+            duration: int = 30
+        ) -> dict[str, any]:
+        """Schedule a new appointment with the owner at the specified date and time"""
         object = object if object else "Demande de conseil en formation prospect"
         description = description if description else "RV pris par l'IA après appel entrant du prospect"
-        return self.salesforce_client.schedule_new_appointment_async(str(user_id), str(owner_id), object, description, str(date_and_time), duration)
+        salesforce_client = SalesforceApiClient()
+        return salesforce_client.schedule_new_appointment_async(str(user_id), str(owner_id), object, description, str(date_and_time), duration)
 
     def _load_prompt(self):
         with open("app/agents/calendar_prompt.txt", "r", encoding="utf-8") as f:
             return f.read()
 
-    def set_user_info(self, first_name, last_name, email, owner_first_name, owner_last_name, owner_email, ):
+    def set_user_info(self, first_name, last_name, email, owner_name):
         """
         Initialize the Calendar Agent with user information and configuration.
         
@@ -55,19 +63,13 @@ class CalendarAgent:
             first_name: Customer's first name
             last_name: Customer's last name
             email: Customer's email
-            owner_first_name: Owner's (advisor) first name
-            owner_last_name: Owner's (advisor) last name
-            owner_email: Owner's (advisor) email
-            config_path: Path to the calendar agent configuration file
+            owner_name: Owner's (advisor) name
         """
-        self.logger.info(f"Initializing CalendarAgent for: {first_name} {last_name}")
+        self.logger.info(f"Setting user info for CalendarAgent to: {first_name} {last_name} {email}, for owner: {owner_name}")
         self.first_name = first_name
         self.last_name = last_name
         self.email = email
-        self.owner_first_name = owner_first_name
-        self.owner_last_name = owner_last_name
-        self.owner_email = owner_email
-        
+        self.owner_name = owner_name        
         # self.calendar_service = self._init_google_calendar()
         # self.calendar_id = self.config["google_calendar"]["calendar_id"]
 
