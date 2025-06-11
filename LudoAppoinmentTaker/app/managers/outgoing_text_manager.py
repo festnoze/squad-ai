@@ -39,7 +39,7 @@ class OutgoingTextManager(OutgoingManager):
             try:
                 await asyncio.wait_for(self.stream_task, timeout=2.0)
             except asyncio.TimeoutError:
-                self.logger.warning("Streaming worker did not stop in time, cancelling")
+                self.logger.warning("Streaming text worker did not stop in time, cancelling")
                 self.stream_task.cancel()
             except Exception as e:
                 self.logger.error(f"Error stopping streaming worker: {e}")

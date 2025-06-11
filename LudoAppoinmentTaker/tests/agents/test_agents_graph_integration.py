@@ -9,22 +9,22 @@ from app.api_client.salesforce_api_client import SalesforceApiClient
 from app.agents.calendar_agent import CalendarAgent
 
 @pytest.mark.asyncio
-class TestAgentsGraph:
+class TestAgentsGraphIntegration:
     @pytest.mark.asyncio
-    async def test_graph_init_conversation_and_welcome_message(self, mock_dependencies):
+    async def test_graph_init_conversation_and_welcome_message(self, agents_graph_mockings):
         """Test that without user input, we get a welcome message and conversation_id is set."""
         # Arrange
         # Create the graph with mocked dependencies but use the real graph implementation
         agents_graph = AgentsGraph(
-            outgoing_manager=mock_dependencies["outgoing_manager"],
-            studi_rag_client=mock_dependencies["studi_rag_client"],
-            salesforce_client=mock_dependencies["salesforce_client"],
-            call_sid=mock_dependencies["call_sid"]
+            outgoing_manager=agents_graph_mockings["outgoing_manager"],
+            studi_rag_client=agents_graph_mockings["studi_rag_client"],
+            salesforce_client=agents_graph_mockings["salesforce_client"],
+            call_sid=agents_graph_mockings["call_sid"]
         ).graph
 
         initial_state: PhoneConversationState = PhoneConversationState(
-            call_sid=mock_dependencies["call_sid"],
-            caller_phone=mock_dependencies["phone_number"],
+            call_sid=agents_graph_mockings["call_sid"],
+            caller_phone=agents_graph_mockings["phone_number"],
             user_input="",
             history=[],
             agent_scratchpad={}
@@ -40,49 +40,49 @@ class TestAgentsGraph:
 
         welcome_text = """Bonjour, je suis Stud'IA, l'assistante virtuelle de Studi.
         Merci de nous recontacter  Test User. 
-        Je suis là pour vous aider en l'absence de votre conseiller, Test Owner, qui vous accompagne habituellement.
-        Je vous propose de prendre un rendez-vous avec Test Owner afin de vous permettre d'échanger directement avec lui.
-        Avez-vous un jour ou un moment de la journée qui vous convient le mieux pour ce rendez-vous ?"""
+        Je vous propose de prendre rendez-vous avec Test Owner, votre conseiller.
+        Sinon, je peux aussi répondre à vos questions sur nos formations."""
+
         first_history_msg = updated_state["history"][0][1].replace("\n\n", "\n")
         for awaited_line, received_line in zip(welcome_text.split("\n"), first_history_msg.split("\n")):
             assert awaited_line.strip() == received_line.strip()
         
         # Verify that the user and conversation creation methods were called
-        mock_dependencies["studi_rag_client"].create_or_retrieve_user_async.assert_called_once()
-        mock_dependencies["studi_rag_client"].create_new_conversation_async.assert_called_once()
+        agents_graph_mockings["studi_rag_client"].create_or_retrieve_user_async.assert_called_once()
+        agents_graph_mockings["studi_rag_client"].create_new_conversation_async.assert_called_once()
         
         # Verify outgoing_manager was called with welcome message
-        mock_dependencies["outgoing_manager"].enqueue_text.assert_called()
+        agents_graph_mockings["outgoing_manager"].enqueue_text.assert_called()
     
     @pytest.mark.asyncio
-    async def test_query_response_about_courses(self, mock_dependencies):
+    async def test_query_response_about_courses(self, agents_graph_mockings):
         """Test that with a user input query about courses, the history contains the query and the answer."""
         # Arrange
         # Create the graph with mocked dependencies but use the real graph implementation
         agents_graph = AgentsGraph(
-            outgoing_manager=mock_dependencies["outgoing_manager"],
-            studi_rag_client=mock_dependencies["studi_rag_client"],
-            salesforce_client=mock_dependencies["salesforce_client"],
-            call_sid=mock_dependencies["call_sid"]
+            outgoing_manager=agents_graph_mockings["outgoing_manager"],
+            studi_rag_client=agents_graph_mockings["studi_rag_client"],
+            salesforce_client=agents_graph_mockings["salesforce_client"],
+            call_sid=agents_graph_mockings["call_sid"]
         ).graph
                         
         init_msg = "Welcome to Studi! How can I help you schedule an appointment today?"
         user_input = "Quels BTS en RH ?"
         # Create a state with conversation_id already set and user input about BTS in HR
         initial_state: PhoneConversationState = PhoneConversationState(
-            call_sid=mock_dependencies["call_sid"],
-            caller_phone=mock_dependencies["phone_number"],
+            call_sid=agents_graph_mockings["call_sid"],
+            caller_phone=agents_graph_mockings["phone_number"],
             user_input=user_input,
             history=[("AI", init_msg)],
             agent_scratchpad={"conversation_id": "39e81136-4525-4ea8-bd00-c22211110001"}
         )
 
         # Mock the add_external_ai_message_to_conversation method
-        mock_dependencies["studi_rag_client"].add_external_ai_message_to_conversation = AsyncMock()
+        agents_graph_mockings["studi_rag_client"].add_external_ai_message_to_conversation = AsyncMock()
         
         # Set up the RAG client to return a response about BTS in HR
         bts_response = "Le BTS Gestion des Ressources Humaines (GRH) est une formation qui prépare aux métiers des ressources humaines. Cette formation de niveau Bac+2 vous permettra d'acquérir des compétences en gestion administrative du personnel, en recrutement, et en formation professionnelle."
-        mock_dependencies["studi_rag_client"].query_rag_api.return_value = bts_response
+        agents_graph_mockings["studi_rag_client"].query_rag_api.return_value = bts_response
         
          # Create an async generator that yields words from the response with a delay
         async def mock_stream_response(*args, **kwargs):
@@ -94,7 +94,7 @@ class TestAgentsGraph:
         
         # Mock the rag_query_stream_async method to return the async generator
         # We need to return the generator function itself, not call it
-        mock_dependencies["studi_rag_client"].rag_query_stream_async = mock_stream_response
+        agents_graph_mockings["studi_rag_client"].rag_query_stream_async = mock_stream_response
         
         # Act
         updated_state: PhoneConversationState = await agents_graph.ainvoke(initial_state)
@@ -109,17 +109,18 @@ class TestAgentsGraph:
         assert updated_state["history"][-1][1] == bts_response
 
         # Verify outgoing_manager was called with the response
-        mock_dependencies["outgoing_manager"].enqueue_text.assert_called()
+        agents_graph_mockings["outgoing_manager"].enqueue_text.assert_called()
 
     @pytest.mark.asyncio
-    async def test_schedule_calendar_appointment(self, mock_dependencies):
+    async def test_schedule_calendar_appointment(self, agents_graph_mockings):
         # Arrange
+
         # Create an instance of AgentsGraph with mocked dependencies
         agents = AgentsGraph(
-            outgoing_manager=mock_dependencies["outgoing_manager"],
-            studi_rag_client=mock_dependencies["studi_rag_client"],
-            salesforce_client=mock_dependencies["salesforce_client"],
-            call_sid=mock_dependencies["call_sid"]
+            outgoing_manager=agents_graph_mockings["outgoing_manager"],
+            studi_rag_client=agents_graph_mockings["studi_rag_client"],
+            salesforce_client=agents_graph_mockings["salesforce_client"],
+            call_sid=agents_graph_mockings["call_sid"]
         )
         
         # Add necessary attributes for streaming
@@ -129,34 +130,33 @@ class TestAgentsGraph:
         
         # Set up mocks for calendar agent methods
         with patch.object(CalendarAgent, 'get_current_date_tool', return_value="Monday, 1 April, 2025") as mock_get_current_date, \
-             patch.object(SalesforceApiClient, 'get_scheduled_appointments_async', return_value=[{"date": "2025-4-1", "time": "15:00", "object": "test slot"}]) as mock_get_appointments, \
+             patch.object(SalesforceApiClient, 'get_scheduled_appointments_async', return_value=[{"date": "2025-4-2", "time": "15:00", "object": "test slot"}]) as mock_get_appointments, \
              patch.object(SalesforceApiClient, 'schedule_new_appointment_async', return_value={}) as mock_schedule_new_appointment:
             
             # Set up initial state with a user query about scheduling an appointment
             init_msg = "Bonjour, je suis votre assistant Studi. Comment puis-je vous aider aujourd'hui ?"
             user_input = "Je voudrais prendre rendez-vous avec un conseiller pour discuter de mon inscription"
             
-            # Create initial state
-            sf_account_info = {
-                'attributes': {'type': 'Contact', 'url': '/services/data/v60.0/sobjects/Contact/003Aa00000jW2RBIA0'}, 
-                'Id': '003Aa00000jW2RBIA0', 
-                'Salutation': 'Mr.', 
-                'FirstName': 'jean', 
-                'LastName': 'dujardin', 
-                'Email': 'eti.mille@studi.fr', 
-                'Phone': None, 
-                'MobilePhone': '+33668422388', 
-                'Account': {'attributes': {'type': 'Account', 'url': '/services/data/v60.0/sobjects/Account/001Aa00001J8StVIAV'}, 'Id': '001Aa00001J8StVIAV', 'Name': 'jean dujardin'}, 
-                'Owner': {'attributes': {'type': 'User', 'url': '/services/data/v60.0/sobjects/User/005Aa00000K990ZIAR'}, 'Id': '005Aa00000K990ZIAR', 'Name': 'Etienne Millerioux'}
-            }
+            # Create initial state                    
             initial_state: PhoneConversationState = PhoneConversationState(
-                call_sid=mock_dependencies["call_sid"],
-                caller_phone=mock_dependencies["phone_number"],
+                call_sid=agents_graph_mockings["call_sid"],
+                caller_phone=agents_graph_mockings["phone_number"],
                 user_input=user_input,
                 history=[("AI", init_msg)],
                 agent_scratchpad={
                     "conversation_id": "39e81136-4525-4ea8-bd00-c22211110001", 
-                    "sf_account_info": sf_account_info
+                    "sf_account_info": {
+                        'attributes': {'type': 'Contact', 'url': '/services/data/v60.0/sobjects/Contact/003Aa00000jW2RBIA0'}, 
+                        'Id': '003Aa00000jW2RBIA0', 
+                        'Salutation': 'Mr.', 
+                        'FirstName': 'jean', 
+                        'LastName': 'dujardin', 
+                        'Email': 'eti.mille@studi.fr', 
+                        'Phone': None, 
+                        'MobilePhone': '+33668422388', 
+                        'Account': {'attributes': {'type': 'Account', 'url': '/services/data/v60.0/sobjects/Account/001Aa00001J8StVIAV'}, 'Id': '001Aa00001J8StVIAV', 'Name': 'jean dujardin'}, 
+                        'Owner': {'attributes': {'type': 'User', 'url': '/services/data/v60.0/sobjects/User/005Aa00000K990ZIAR'}, 'Id': '005Aa00000K990ZIAR', 'Name': 'Etienne Millerioux'}
+                    }
                 }
             )
 
@@ -171,11 +171,11 @@ class TestAgentsGraph:
             #assert updated_state["history"][-1][1] == "D'accord, je vais vous aider à prendre rendez-vous avec un conseiller."
         
             # Verify Salesforce client methods were called
-            mock_dependencies["salesforce_client"].get_person_by_phone_async.assert_not_called()
-            mock_dependencies["salesforce_client"].get_available_slots_async.assert_called_once()
+            agents_graph_mockings["salesforce_client"].get_person_by_phone_async.assert_not_called()
+            agents_graph_mockings["salesforce_client"].get_available_slots_async.assert_called_once()
         
             # Verify outgoing_manager was called with a response
-            mock_dependencies["outgoing_manager"].enqueue_text.assert_called()
+            agents_graph_mockings["outgoing_manager"].enqueue_text.assert_called()
             
             # Verify calendar agent tools were called correctly
             mock_get_current_date.assert_called_once()
@@ -184,7 +184,7 @@ class TestAgentsGraph:
 
 
     @pytest.fixture
-    def mock_dependencies(self):
+    def agents_graph_mockings(self):
         # Create mock dependencies
         mock_outgoing_manager = MagicMock(spec=OutgoingManager)
         mock_outgoing_manager.enqueue_text = AsyncMock()

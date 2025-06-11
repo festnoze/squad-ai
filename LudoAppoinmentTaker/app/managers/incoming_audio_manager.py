@@ -160,7 +160,7 @@ class IncomingAudioManager(IncomingManager):
             # Return original data if processing fails
             return audio_data
     
-    def detect_silence_speech(self, audio_data: bytes, threshold=250) -> tuple[bool, int]:
+    def analyse_speech_for_silence(self, audio_data: bytes, threshold=400) -> tuple[bool, int]:
         """
         Detect silence vs speech using both VAD and RMS
         
@@ -239,9 +239,7 @@ class IncomingAudioManager(IncomingManager):
         # Check for speech while system is speaking (interruption detection)
         if self.is_speaking:
             # Check if this chunk contains speech - use a lower threshold to detect speech earlier
-            is_silence, speech_to_noise_ratio = self.detect_silence_speech(
-                chunk, threshold=self.speech_threshold * 0.8  # More sensitive detection while speaking
-            )
+            is_silence, speech_to_noise_ratio = self.analyse_speech_for_silence(chunk, threshold=self.speech_threshold * 0.8)  # More sensitive detection while speaking
             
             # If user is speaking while system is speaking, stop system speech
             # Use a lower threshold multiplier (1.2x instead of 1.5x) for quicker interruption
@@ -255,9 +253,7 @@ class IncomingAudioManager(IncomingManager):
                 print(f"\r>>> USER INTERRUPTION - Incoming speech while system was speaking ({speech_to_noise_ratio})")
         
         # Use WebRTC VAD for better speech detection
-        is_silence, speech_to_noise_ratio = self.detect_silence_speech(
-            chunk, threshold=self.speech_threshold
-        )
+        is_silence, speech_to_noise_ratio = self.analyse_speech_for_silence(chunk, threshold=self.speech_threshold)
 
         # 2. Silence detection before adding to buffer
         has_speech_began = len(self.audio_buffer) > 0
@@ -267,8 +263,8 @@ class IncomingAudioManager(IncomingManager):
             # Calculate duration
             chunk_duration_ms = (len(chunk) / self.sample_width) / self.frame_rate * 1000
             self.consecutive_silence_duration_ms += chunk_duration_ms
-            msg = f"\rConsecutive silent chunks - Duration: {self.consecutive_silence_duration_ms:.1f}ms - Speech/noise: {speech_to_noise_ratio:04d} (size: {len(chunk)} bytes)."
-            print(msg, end="", flush=True)
+            # msg = f"\rConsecutive silent chunks - Duration: {self.consecutive_silence_duration_ms:.1f}ms - Speech/noise: {speech_to_noise_ratio:04d} (size: {len(chunk)} bytes)."
+            # print(msg, end="", flush=True)
 
         # Hangup the call if the user is silent for too long
         if self.consecutive_silence_duration_ms >= self.max_silence_duration_before_hangup_ms:
@@ -309,18 +305,18 @@ class IncomingAudioManager(IncomingManager):
             #await self.speak_and_send_text("Très bien, je vais traiter votre demande.")
 
             # 4. Transcribe speech to text
-            user_query_transcript = self._perform_speech_to_text_transcription(audio_data)
+            user_query_transcript = self._perform_speech_to_text_transcription(audio_data, is_audio_file_to_delete=False)
             
             # 5. Send the user query to the agents graph
             if user_query_transcript:
-                self.logger.info(f"Sending incoming user query to agents graph. Transcription: '{user_query_transcript}'")  
                 await self.send_user_query_to_agents_graph_async(user_query_transcript)
-        await asyncio.sleep(0.1) # Pause incoming process to let others processes breathe
+        #await asyncio.sleep(0.1) # Pause incoming process to let others processes breathe
         return
 
     async def send_user_query_to_agents_graph_async(self, user_query : str):
         try:
-            # Get the current state
+            self.logger.info(f"Sending incoming user query to agents graph. Transcription: '{user_query}'")  
+
             if self.stream_sid in self.stream_states:
                 current_state : PhoneConversationState= self.stream_states[self.stream_sid]
                 current_state["user_input"] = user_query
@@ -336,13 +332,6 @@ class IncomingAudioManager(IncomingManager):
                         
             # Invoke the graph with current state to get the AI-generated welcome message
             updated_state = await self.agents_graph.ainvoke(current_state)
-            #TODO: handle history in the graph itself
-            # if updated_state["user_input"]:
-            #     updated_state["history"].append({
-            #         "role": "user",
-            #         "content": updated_state["user_input"]
-            #     })
-            #     updated_state["user_input"] = ""
             self.stream_states[self.stream_sid] = updated_state
         except Exception as e:
             self.logger.error(f"Error in user query to agents graph: {e}", exc_info=True)

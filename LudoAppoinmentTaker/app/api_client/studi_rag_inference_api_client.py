@@ -19,12 +19,13 @@ class StudiRAGInferenceApiClient:
         self.is_ssh = is_ssh
         self.connect_timeout = connect_timeout
         self.read_timeout = read_timeout
-        
+        self.timeout = httpx.Timeout(connect=self.connect_timeout, read=self.read_timeout, write=self.read_timeout, pool=self.connect_timeout)
+  
         self.host_base_url = f"http{'s' if is_ssh else ''}://{self.host_base_name}:{self.host_port}"
         self.client = httpx.AsyncClient(
-            base_url=self.host_base_url,
-            timeout=httpx.Timeout(connect=self.connect_timeout, read=self.read_timeout, write=self.read_timeout, pool=self.connect_timeout)
-        )
+                base_url=self.host_base_url,
+                timeout=self.timeout
+            )
 
     async def test_client_connection_async(self):
         #Test client connection
@@ -50,7 +51,7 @@ class StudiRAGInferenceApiClient:
         """PATCH /rag/inference/user/sync: Create or retrieve a user."""
         try:
             user_request_model_dict = user_request_model.to_dict()
-            resp = await self.client.patch("/rag/inference/user/sync", json=user_request_model_dict, timeout=httpx.Timeout(timeout))
+            resp = await self.client.patch("/rag/inference/user/sync", json=user_request_model_dict, timeout=self.timeout)
             resp.raise_for_status()
             return resp.json()
         except httpx.ConnectError as exc:
@@ -59,7 +60,7 @@ class StudiRAGInferenceApiClient:
     async def create_new_conversation_async(self, conversation_request_model: ConversationRequestModel, timeout: int = 10) -> Dict[str, Any]:
         """POST /rag/inference/conversation/create: Create a new conversation."""
         try:
-            resp = await self.client.post("/rag/inference/conversation/create", json=conversation_request_model.to_dict(), timeout=httpx.Timeout(timeout))
+            resp = await self.client.post("/rag/inference/conversation/create", json=conversation_request_model.to_dict(), timeout=self.timeout)
             resp.raise_for_status()
             return resp.json()
         except httpx.ConnectError as exc:
@@ -68,7 +69,7 @@ class StudiRAGInferenceApiClient:
     async def get_user_last_conversation_async(self, user_id: UUID, timeout: int = 10) -> Dict[str, Any]:
         """GET /rag/inference/conversation/last/user/{user_id}: Get the last conversation for a user."""
         try:
-            resp = await self.client.get(f"/rag/inference/conversation/last/user/{str(user_id)}", timeout=httpx.Timeout(timeout))
+            resp = await self.client.get(f"/rag/inference/conversation/last/user/{str(user_id)}", timeout=self.timeout)
             resp.raise_for_status()
             return resp.json()
         except httpx.ConnectError as exc:
@@ -78,7 +79,7 @@ class StudiRAGInferenceApiClient:
         """POST /rag/inference/conversation/add-message: Add a message to a conversation."""
         try:
             request_model = QueryAskingRequestModel(conversation_id=UUID(conversation_id), user_query_content=new_message, display_waiting_message=False)
-            resp = await self.client.post("/rag/inference/conversation/add-external-message", json=request_model.to_dict(), timeout=httpx.Timeout(timeout))
+            resp = await self.client.post("/rag/inference/conversation/add-external-message", json=request_model.to_dict(), timeout=self.timeout)
             resp.raise_for_status()
             return resp.json()
         except httpx.ConnectError as exc:
@@ -95,13 +96,13 @@ class StudiRAGInferenceApiClient:
         """
         try:
             # Set separate timeouts for connect and read operations
-            custom_timeout = httpx.Timeout(connect=min(10.0, timeout), read=timeout)
+            #custom_timeout = httpx.Timeout(connect=self.connect_timeout, read=timeout, write=timeout, pool=self.connect_timeout)
             
             async with self.client.stream(
                 "POST", 
                 "/rag/inference/conversation/ask-question/phone/stream", 
                 json=query_asking_request_model.to_dict(),
-                timeout=custom_timeout
+                #timeout=custom_timeout
             ) as resp:
                 resp.raise_for_status()
                 async for segment in self._stream_by_segment(resp, interrupt_flag):
@@ -124,7 +125,7 @@ class StudiRAGInferenceApiClient:
             resp = await self.client.post(
                 "/rag/inference/no-conversation/ask-question",
                 json=query_no_conversation_request_model.to_dict(),
-                timeout=httpx.Timeout(timeout)
+                timeout=self.timeout
             )
             resp.raise_for_status()
             return resp.json()
@@ -139,15 +140,12 @@ class StudiRAGInferenceApiClient:
             interrupt_flag: Drapeau d'interruption (dictionnaire avec clé "interrupted")
             timeout: Délai d'expiration en secondes pour la requête
         """
-        try:
-            # Set separate timeouts for connect and read operations
-            custom_timeout = httpx.Timeout(connect=min(10.0, timeout), read=timeout)
-            
+        try:            
             async with self.client.stream(
                 "POST", 
                 "/rag/inference/no-conversation/ask-question/stream", 
                 json=query_no_conversation_request_model.to_dict(),
-                timeout=custom_timeout
+                timeout=self.timeout
             ) as resp:
                 resp.raise_for_status()
                 async for segment in self._stream_by_segment(resp, interrupt_flag):

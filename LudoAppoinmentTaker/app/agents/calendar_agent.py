@@ -5,10 +5,12 @@ from langchain.agents import AgentExecutor, create_tool_calling_agent, create_re
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from app.api_client.salesforce_api_client import SalesforceApiClient
-from uuid import UUID
 import logging
 
-class CalendarAgent:
+class CalendarAgent:        
+    salesforce_api_client = SalesforceApiClient()
+    owner_id = None
+    
     def __init__(self, llm_or_chain: any):
         self.logger = logging.getLogger(__name__)
         self.tools = [self.get_current_date, self.get_appointments, self.schedule_new_appointment]
@@ -29,18 +31,18 @@ class CalendarAgent:
         """Get the current date"""
         return CalendarAgent.get_current_date_tool()
 
+    @staticmethod
     def get_current_date_tool() -> str:
         return datetime.now().strftime("%A, %B %d, %Y")
 
     @tool
-    def get_appointments(start_date: str, end_date: str, owner_id: str) -> list[dict[str, any]]:
+    def get_appointments(start_date: str, end_date: str) -> list[dict[str, any]]:
         """Get the existing appointments between the start and end dates for the owner"""
-        return SalesforceApiClient().get_scheduled_appointments_async(start_date, end_date, owner_id)
+        return CalendarAgent.salesforce_api_client.get_scheduled_appointments_async(start_date, end_date, CalendarAgent.owner_id) #TODO: manage "CalendarAgent.owner_id" another way to allow multi-calls handling.
 
     @tool
     def schedule_new_appointment(
             user_id: str,
-            owner_id: str,
             date_and_time: str,
             object: str | None = None,
             description: str | None = None,
@@ -50,13 +52,13 @@ class CalendarAgent:
         object = object if object else "Demande de conseil en formation prospect"
         description = description if description else "RV pris par l'IA après appel entrant du prospect"
         
-        return SalesforceApiClient().schedule_new_appointment_async(user_id, owner_id, date_and_time, object, description, duration)
+        return CalendarAgent.salesforce_api_client.schedule_new_appointment_async(user_id, CalendarAgent.owner_id, date_and_time, object, description, duration) #TODO: manage "CalendarAgent.owner_id" another way to allow multi-calls handling.
 
     def _load_prompt(self):
         with open("app/agents/calendar_prompt.txt", "r", encoding="utf-8") as f:
             return f.read()
 
-    def set_user_info(self, first_name, last_name, email, owner_name):
+    def set_user_info(self, first_name, last_name, email, owner_id, owner_name):
         """
         Initialize the Calendar Agent with user information and configuration.
         
@@ -64,12 +66,14 @@ class CalendarAgent:
             first_name: Customer's first name
             last_name: Customer's last name
             email: Customer's email
+            owner_id: Owner's (advisor) ID
             owner_name: Owner's (advisor) name
         """
         self.logger.info(f"Setting user info for CalendarAgent to: {first_name} {last_name} {email}, for owner: {owner_name}")
         self.first_name = first_name
         self.last_name = last_name
         self.email = email
+        CalendarAgent.owner_id = owner_id
         self.owner_name = owner_name        
         # self.calendar_service = self._init_google_calendar()
         # self.calendar_id = self.config["google_calendar"]["calendar_id"]
@@ -95,8 +99,8 @@ class CalendarAgent:
             elif "human" in message:
                 formatted_history.append(HumanMessage(content=message["human"]))
         try:
-            response = await self.agent_executor.ainvoke({"input": "quel jour sommes nous ?", "chat_history": []})
-            response = await self.agent_executor.ainvoke({"input": "Je voudrais prendre rendez-vous demain", "chat_history": []})
+            # response = await self.agent_executor.ainvoke({"input": "quel jour sommes nous ?", "chat_history": []})
+            # response = await self.agent_executor.ainvoke({"input": "Je voudrais prendre rendez-vous demain", "chat_history": []})
             response = await self.agent_executor.ainvoke({
                 "input": user_input,
                 "chat_history": formatted_history
@@ -104,7 +108,4 @@ class CalendarAgent:
         except Exception as e:
             self.logger.error(f"Error executing calendar agent with tools: {e}")
             raise
-        return {
-            "output": response["output"],
-            "intermediate_steps": response.get("intermediate_steps", [])
-        }
+        return response["output"]

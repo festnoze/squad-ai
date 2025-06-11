@@ -40,7 +40,7 @@ class AgentsGraph:
         self.lead_agent_instance = LeadAgent(config_path=lid_config_file_path)
         self.logger.info(f"Initialize Lead Agent succeed with config: {lid_config_file_path}")
         
-        self.llm = LangChainFactory.create_llm_from_info(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4.1-mini", timeout=50, temperature=0.1, api_key=os.getenv("OPENAI_API_KEY")))
+        self.llm = LangChainFactory.create_llm_from_info(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4.1", timeout=50, temperature=0.1, api_key=os.getenv("OPENAI_API_KEY")))
         
         self.calendar_agent_instance = CalendarAgent(llm_or_chain=self.llm)
         self.logger.info("Initialize Calendar Agent succeed")
@@ -106,11 +106,11 @@ class AgentsGraph:
             return state
 
         if user_input:       
-            state['history'].append(("Human", user_input))
+            #state['history'].append(("Human", user_input))
             feedback_text = f"Très bien, vous avez demandé : \"{user_input}\". Un instant, j'analyse votre demande."
             await self.outgoing_manager.enqueue_text(feedback_text)
 
-            category = await self.analyse_user_input_for_dispatch_async(user_input)
+            category = await self.analyse_user_input_for_dispatch_async(user_input, state['history'])
             if category == "schedule_calendar_appointment":
                 state['agent_scratchpad']["next_agent_needed"] = "calendar_agent"
             elif category == "training_course_query":
@@ -121,19 +121,17 @@ class AgentsGraph:
         state['agent_scratchpad']["next_agent_needed"] = "wait_for_user_input"
         return state
 
-
-    async def analyse_user_input_for_dispatch_async(self, user_input: str) -> str:
-        """Analyse the user input and dispatch to the right agent"""
-        prompt = ("### Instructions ###"
-                "Your aim is to analyse the following user query and return a single word corresponding to the category it belongs to."
-                "The allowed values for categories are: ['schedule_calendar_appointment', 'training_course_query', 'others']."
-                "'schedule_calendar_appointment' category matches if the user query is related to scheduling a calendar appointment."
-                "'training_course_query' category matches if the user query is related to a training course or its informations, like access conditions, fundings, ..."
-                "'others' category matches if the user query is not related to none of the previous categories."
-                ""
-                "### User query ###"
-                f"The user query to analyse is: {user_input}")
+    async def analyse_user_input_for_dispatch_async(self, user_input: str, chat_history: list[dict[str, str]]) -> str:
+        """Analyse the user input and dispatch to the right agent"""  
+        file_path = os.path.join(os.path.dirname(__file__), 'analyse_user_input_with_history_for_dispatch_prompt.txt')
+        with open(file_path, 'r', encoding='utf-8') as file:
+            prompt = file.read()      
+        chat_history_str = "\n".join([f"[{key}]: {value}" for msg in chat_history for key, value in msg.items()])
+        prompt = prompt.format(user_input=user_input, chat_history=chat_history_str)
+        
         response = await self.llm.ainvoke(prompt)
+        
+        self.logger.info(f"Analysis of user input (+ history) decide to dispatch to: --{response.content}--")
         return response.content
 
     async def send_begin_of_welcome_message_node(self, state: PhoneConversationState) -> dict:
@@ -184,19 +182,19 @@ class AgentsGraph:
         leads_info = state.get('agent_scratchpad', {}).get('sf_leads_info', {})
         
         if sf_account:
-            civility = sf_account.get('Salutation', '').replace("Mme", "Madame").replace("Melle", "Mademoiselle").replace("Mr.", "Monsieur")
-            first_name = sf_account.get('FirstName', '')
-            last_name = sf_account.get('LastName', '')
-            owner_first_name = sf_account.get('Owner', {}).get('Name', '')
+            civility = sf_account.get('Salutation', '').replace("Mme", "Madame").replace("Melle", "Mademoiselle").replace("Mr.", "Monsieur").replace("Ms.", "Madame").strip()
+            first_name = sf_account.get('FirstName', '').strip()
+            last_name = sf_account.get('LastName', '').strip()
+            owner_first_name = sf_account.get('Owner', {}).get('Name', '').strip()
             
             end_welcome_text = f"""
-            Merci de nous recontacter {civility} {first_name} {last_name}. 
-            Je suis là pour vous aider en l'absence de votre conseiller, {owner_first_name}, qui vous accompagne habituellement.
-            Je vous propose de prendre un rendez-vous avec {owner_first_name} afin de vous permettre d'échanger directement avec lui.
-            Avez-vous un jour ou un moment de la journée qui vous convient le mieux pour ce rendez-vous ?
+            Merci de nous recontacter {civility} {first_name} {last_name}.
+            Je vous propose de prendre rendez-vous avec {owner_first_name}, votre conseiller.
+            Sinon, je peux aussi répondre à vos questions sur nos formations.
             """
+            #Avez-vous un jour ou un moment de la journée qui vous convient le mieux pour ce rendez-vous ?
         else:
-            end_welcome_text = "Je suis là pour vous aider en l'absence de nos conseillers. Avez-vous des questions sur nos formations, ou souhaitez-vous prendre rendez-vous avec un conseiller ?"
+            end_welcome_text = "Je suis là pour vous aider en l'absence de nos conseillers. Pour votre premier appel, je peux répondre à vos questions sur nos formations, ou planifier un rendez-vous avec un conseiller en formation."
                 
         await self.outgoing_manager.enqueue_text(end_welcome_text)
 
@@ -400,32 +398,20 @@ class AgentsGraph:
                     first_name=sf_account_info.get('FirstName', ''),
                     last_name=sf_account_info.get('LastName', ''),
                     email=sf_account_info.get('Email', ''),
+                    owner_id=sf_account_info.get('Owner').get('Id', ''),
                     owner_name=sf_account_info.get('Owner').get('Name', '')
                 )
-                chat_history = state.get('agent_scratchpad', {}).get('chat_history', [])
-                await self.calendar_agent_instance.run_async(user_input, chat_history)
+                chat_history = state.get('history', [])
+                calendar_agent_answer = await self.calendar_agent_instance.run_async(user_input, chat_history)                
                 
-                # Process the user's input
-                response_text = self.calendar_agent_instance.analyze_text(user_input)
-                
-                # Update scratchpad with calendar agent state if needed
-                updated_scratchpad = state.get('agent_scratchpad', {})
-                
-                # If appointment was created, we can end the conversation
-                if "J'ai réservé un rendez-vous" in response_text:
-                    updated_scratchpad['appointment_created'] = True
-                
-                return {
-                    "history": [("Human", user_input), ("AI", response_text)],
-                    "agent_scratchpad": updated_scratchpad
-                }
+                state['history'].append({"human": user_input})
+                state['history'].append({"AI": calendar_agent_answer})
+
+                return state
                 
             except Exception as e:
                 self.logger.error(f"[{call_sid[-4:]}] Error in Calendar Agent node: {e}", exc_info=True)
-                return {
-                    "history": [("Human", user_input), ("AI", "Je rencontre un problème pour gérer votre rendez-vous. Pourriez-vous réessayer plus tard ?")],
-                    "agent_scratchpad": {"error": str(e)}
-                }
+                return state
 
     async def decide_next_step(self, state: PhoneConversationState) -> str:
         """Determines the next node to visit based on the current state."""
