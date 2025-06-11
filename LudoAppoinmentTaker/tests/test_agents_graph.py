@@ -6,6 +6,7 @@ from app.agents.phone_conversation_state_model import PhoneConversationState
 from app.managers.outgoing_manager import OutgoingManager
 from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
 from app.api_client.salesforce_api_client import SalesforceApiClient
+from app.agents.calendar_agent import CalendarAgent
 
 @pytest.mark.asyncio
 class TestAgentsGraph:
@@ -17,10 +18,9 @@ class TestAgentsGraph:
         agents_graph = AgentsGraph(
             outgoing_manager=mock_dependencies["outgoing_manager"],
             studi_rag_client=mock_dependencies["studi_rag_client"],
+            salesforce_client=mock_dependencies["salesforce_client"],
             call_sid=mock_dependencies["call_sid"]
         ).graph
-
-        AgentsGraph.salesforce_api_client=mock_dependencies["salesforce_client"]
 
         initial_state: PhoneConversationState = PhoneConversationState(
             call_sid=mock_dependencies["call_sid"],
@@ -62,9 +62,9 @@ class TestAgentsGraph:
         agents_graph = AgentsGraph(
             outgoing_manager=mock_dependencies["outgoing_manager"],
             studi_rag_client=mock_dependencies["studi_rag_client"],
+            salesforce_client=mock_dependencies["salesforce_client"],
             call_sid=mock_dependencies["call_sid"]
         ).graph
-        AgentsGraph.salesforce_api_client=mock_dependencies["salesforce_client"]
                         
         init_msg = "Welcome to Studi! How can I help you schedule an appointment today?"
         user_input = "Quels BTS en RH ?"
@@ -118,9 +118,9 @@ class TestAgentsGraph:
         agents = AgentsGraph(
             outgoing_manager=mock_dependencies["outgoing_manager"],
             studi_rag_client=mock_dependencies["studi_rag_client"],
+            salesforce_client=mock_dependencies["salesforce_client"],
             call_sid=mock_dependencies["call_sid"]
         )
-        AgentsGraph.salesforce_api_client=mock_dependencies["salesforce_client"]
         
         # Add necessary attributes for streaming
         agents.graph.is_speaking = True
@@ -128,9 +128,9 @@ class TestAgentsGraph:
         agents.graph.rag_interrupt_flag = {"interrupted": False}
         
         # Set up mocks for calendar agent methods
-        with patch.object(agents.calendar_agent_instance, 'get_current_date_tool', return_value="Monday, 1 April, 2025") as mock_get_current_date, \
-             patch.object(agents.calendar_agent_instance.salesforce_client, 'get_scheduled_appointments_async', return_value=[{"date": "2025-4-1", "time": "15:00", "object": "test slot"}]) as mock_get_appointments, \
-             patch.object(agents.calendar_agent_instance.salesforce_client, 'schedule_new_appointment_async', return_value={}) as mock_schedule_new_appointment:
+        with patch.object(CalendarAgent, 'get_current_date_tool', return_value="Monday, 1 April, 2025") as mock_get_current_date, \
+             patch.object(SalesforceApiClient, 'get_scheduled_appointments_async', return_value=[{"date": "2025-4-1", "time": "15:00", "object": "test slot"}]) as mock_get_appointments, \
+             patch.object(SalesforceApiClient, 'schedule_new_appointment_async', return_value={}) as mock_schedule_new_appointment:
             
             # Set up initial state with a user query about scheduling an appointment
             init_msg = "Bonjour, je suis votre assistant Studi. Comment puis-je vous aider aujourd'hui ?"

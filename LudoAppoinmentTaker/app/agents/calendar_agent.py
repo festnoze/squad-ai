@@ -9,7 +9,6 @@ from uuid import UUID
 import logging
 
 class CalendarAgent:
-    salesforce_client: SalesforceApiClient = SalesforceApiClient()
     def __init__(self, llm_or_chain: any):
         self.logger = logging.getLogger(__name__)
         self.tools = [self.get_current_date, self.get_appointments, self.schedule_new_appointment]
@@ -34,15 +33,15 @@ class CalendarAgent:
         return datetime.now().strftime("%A, %B %d, %Y")
 
     @tool
-    def get_appointments(start_date: datetime, end_date: datetime, owner_id: UUID) -> list[dict[str, any]]:
+    def get_appointments(start_date: str, end_date: str, owner_id: str) -> list[dict[str, any]]:
         """Get the existing appointments between the start and end dates for the owner"""
-        return CalendarAgent.salesforce_client.get_scheduled_appointments_async(str(start_date), str(end_date), str(owner_id))
+        return SalesforceApiClient().get_scheduled_appointments_async(start_date, end_date, owner_id)
 
     @tool
     def schedule_new_appointment(
-            user_id: UUID,
-            owner_id: UUID,
-            date_and_time: datetime,
+            user_id: str,
+            owner_id: str,
+            date_and_time: str,
             object: str | None = None,
             description: str | None = None,
             duration: int = 30
@@ -51,7 +50,7 @@ class CalendarAgent:
         object = object if object else "Demande de conseil en formation prospect"
         description = description if description else "RV pris par l'IA après appel entrant du prospect"
         
-        return CalendarAgent.salesforce_client.schedule_new_appointment_async(str(user_id), str(owner_id), object, description, str(date_and_time), duration)
+        return SalesforceApiClient().schedule_new_appointment_async(user_id, owner_id, date_and_time, object, description, duration)
 
     def _load_prompt(self):
         with open("app/agents/calendar_prompt.txt", "r", encoding="utf-8") as f:

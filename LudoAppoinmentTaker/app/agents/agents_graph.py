@@ -25,14 +25,14 @@ from llms.langchain_adapter_type import LangChainAdapterType
 
 class AgentsGraph:
     welcome_text = ""
-    salesforce_api_client : SalesforceApiClient = SalesforceApiClient()
-    def __init__(self, outgoing_manager: OutgoingManager, studi_rag_client: StudiRAGInferenceApiClient, call_sid: str):
+    def __init__(self, outgoing_manager: OutgoingManager, studi_rag_client: StudiRAGInferenceApiClient, salesforce_client: SalesforceApiClient, call_sid: str):
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
         self.call_sid = call_sid
         self.logger.info(f"[{self.call_sid}] Agents graph initialization")
         
         self.studi_rag_inference_api_client = studi_rag_client
+        self.salesforce_api_client = salesforce_client
 
         self.outgoing_manager: OutgoingManager = outgoing_manager
         
@@ -167,9 +167,9 @@ class AgentsGraph:
         self.logger.info(f"Initializing SF Agent")
         call_sid = state.get('call_sid', 'N/A')
         phone_number = state.get('caller_phone', 'N/A')
-        #accounts = await AgentsGraph.salesforce_api_client.get_persons_async()
-        sf_account_info = await AgentsGraph.salesforce_api_client.get_person_by_phone_async(phone_number)
-        leads_info = await AgentsGraph.salesforce_api_client.get_leads_by_details_async(phone_number)
+        #accounts = await self.salesforce_api_client.get_persons_async()
+        sf_account_info = await self.salesforce_api_client.get_person_by_phone_async(phone_number)
+        leads_info = await self.salesforce_api_client.get_leads_by_details_async(phone_number)
         state['agent_scratchpad']['sf_account_info'] = sf_account_info.get('data', {}) if sf_account_info else {}
         state['agent_scratchpad']['sf_leads_info'] = leads_info[0] if any(leads_info) else {}
         self.logger.info(f"[{call_sid}] Stored sf_account_info: {sf_account_info.get('data', {})} in agent_scratchpad")
