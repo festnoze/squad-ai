@@ -40,8 +40,9 @@ class TestAgentsGraphIntegration:
 
         welcome_text = """Bonjour, je suis Stud'IA, l'assistante virtuelle de Studi.
         Merci de nous recontacter  Test User. 
-        Je vous propose de prendre rendez-vous avec Test Owner, votre conseiller.
-        Sinon, je peux aussi répondre à vos questions sur nos formations."""
+        Je peux prendre un rendez-vous avec votre conseiller : Test Owner.
+        Je peux aussi répondre à vos questions à propos de nos formations.
+        Que souhaitez-vous faire ?"""
 
         first_history_msg = updated_state["history"][0][1].replace("\n\n", "\n")
         for awaited_line, received_line in zip(welcome_text.split("\n"), first_history_msg.split("\n")):

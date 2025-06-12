@@ -30,12 +30,13 @@ class StudiRAGInferenceApiClient:
     async def test_client_connection_async(self):
         #Test client connection
         try:
-            resp = await self.client.get("/ping")
+            short_timeout = httpx.Timeout(connect=3, read=3, write=3, pool=3)
+            resp = await self.client.get("/ping", timeout=short_timeout)
             assert resp.status_code == 200
             assert resp.content == b'"pong"'
             return True
         except httpx.ConnectError:
-            return False
+            raise RuntimeError(f"Cannot connect to RAG inference server at {self.host_base_url}")
 
     async def reinitialize_async(self) -> None:
         """POST /rag/inference/reinitialize: Reinitialize the service."""

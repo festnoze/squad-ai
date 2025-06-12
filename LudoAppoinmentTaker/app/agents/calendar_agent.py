@@ -38,11 +38,25 @@ class CalendarAgent:
     @tool
     async def get_appointments(start_date: str, end_date: str) -> list[dict[str, any]]:
         """Get the existing appointments between the start and end dates for the owner"""
-        taken_slots = await CalendarAgent.salesforce_api_client.get_scheduled_appointments_async(start_date, end_date, CalendarAgent.owner_id) #TODO: manage "CalendarAgent.owner_id" another way to allow multi-calls handling.
+        # Handle different input formats for dates (w/ or w/o: time, 'T' / 'Z' chars)
+        start_date_formated = start_date if "T" in start_date else f"{start_date}T"
+        end_date_formated = end_date if "T" in end_date else f"{end_date}T"
+        #
+        if start_date_formated.endswith("T"): start_date_formated += "00:00:00"
+        if end_date_formated.endswith("T"): end_date_formated += "23:59:59"
+        #
+        if not start_date_formated.endswith("Z"): start_date_formated += "Z"
+        if not end_date_formated.endswith("Z"): end_date_formated += "Z"
+
+        # Get the existing appointments from Salesforce API
+        #TODO: manage "CalendarAgent.owner_id" another way to allow multi-calls handling.
+        taken_slots = await CalendarAgent.salesforce_api_client.get_scheduled_appointments_async(start_date_formated, end_date_formated, CalendarAgent.owner_id)
+        
+        # Log the result
         logger = logging.getLogger(__name__)
         logger.info(f"Called 'get_appointments' tool for owner {CalendarAgent.owner_id} between {start_date} and {end_date}.")
         if taken_slots:
-            logger.info(f"Here is the list of the owner calendar taken slots: \n{'\n'.join(f'- De {slot['start_datetime']} à {slot['end_datetime']}: {slot['subject']}' for slot in taken_slots)}")
+            logger.info(f"Here is the list of the owner calendar taken slots: \n{'\n'.join(f'- De {slot['StartDateTime']} à {slot['EndDateTime']} - Sujet: {slot['Subject']} - Description: {slot['Description']}' for slot in taken_slots)}")
         else:
             logger.info("No appointments found for the owner between the specified dates.")
         return taken_slots
@@ -113,6 +127,5 @@ class CalendarAgent:
                 "chat_history": formatted_history
             }) 
         except Exception as e:
-            self.logger.error(f"Error executing calendar agent with tools: {e}")
-            raise
+            self.logger.error(f"/!\\ Error executing calendar agent with tools: {e}")
         return response["output"]

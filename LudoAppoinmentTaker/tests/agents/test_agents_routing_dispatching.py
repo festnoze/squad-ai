@@ -14,7 +14,9 @@ class TestAgentsRoutingDispatching:
         ("training_course_query", "Quels BTS en ressources humaines ?", []),
         ("schedule_calendar_appointment", "Je souhaite prendre rendez-vous", []),
         ("others", "Quelle est la météo ?", []), # Hors-sujet
-        ("greetings", "Salut", []), # Hors-sujet
+        ("greetings", "Excuse moi", []), # Interupting
+        ("non-sense", "Je t'interomps", []), # Interupting
+        ("greetings", "Salut", []), # Greeting
         ("non-sense", "je souhaiterais connaitre", []), # Incomplete query 
         ("non-sense", "Elle formation vrai", []), # query with transcription error
         ("non-sense", "", []), # Empty query

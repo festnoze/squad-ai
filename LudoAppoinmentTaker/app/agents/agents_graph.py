@@ -24,7 +24,7 @@ from llms.langchain_factory import LangChainFactory
 from llms.langchain_adapter_type import LangChainAdapterType
 
 class AgentsGraph:
-    welcome_text = ""
+    start_welcome_text = ""
     def __init__(self, outgoing_manager: OutgoingManager, studi_rag_client: StudiRAGInferenceApiClient, salesforce_client: SalesforceApiClient, call_sid: str):
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
@@ -139,9 +139,9 @@ class AgentsGraph:
         """Send the begin of welcome message to the user"""
         call_sid = state.get('call_sid', 'N/A')
         phone_number = state.get('caller_phone', 'N/A')
-        self.welcome_text = "Bonjour, je suis Stud'IA, l'assistante virtuelle de Studi."
+        self.start_welcome_text = "Bonjour, je suis Stud'IA, l'assistante virtuelle de Studi."
         
-        await self.outgoing_manager.enqueue_text(self.welcome_text)
+        await self.outgoing_manager.enqueue_text(self.start_welcome_text)
         self.logger.info(f"[{call_sid}] Sent begin of welcome message to {phone_number}")
         return state
 
@@ -199,7 +199,7 @@ class AgentsGraph:
                 
         await self.outgoing_manager.enqueue_text(end_welcome_text)
 
-        full_welcome_text = self.welcome_text + "\n" + end_welcome_text
+        full_welcome_text = self.start_welcome_text + "\n" + end_welcome_text
         state["history"].append(("assistant", full_welcome_text))
         conv_id = state['agent_scratchpad'].get('conversation_id', None)
         if conv_id:
@@ -234,6 +234,8 @@ class AgentsGraph:
 
         except Exception as e:
             self.logger.error(f"Error creating conversation: {str(e)}")
+            err_msg = "Je rencontre un problème technique, le service est temporairement indisponible, merci de nous recontacter plus tard."
+            await self.outgoing_manager.enqueue_text(err_msg)
             return str(uuid.uuid4())
 
     async def lead_agent_node(self, state: PhoneConversationState) -> dict:
