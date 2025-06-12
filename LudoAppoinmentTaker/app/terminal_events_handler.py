@@ -43,21 +43,6 @@ class TerminalEventsHandler:
         self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
         os.environ['OPENAI_API_KEY'] = self.OPENAI_API_KEY
 
-        # Set Google Calendar credentials
-        self.project_root = os.path.dirname(os.path.dirname(__file__))
-        self.google_calendar_credentials_filename = os.getenv(
-            "GOOGLE_CALENDAR_CREDENTIALS_FILENAME", 
-            "secrets/google-calendar-credentials.json"
-        )
-        self.google_calendar_credentials_path = os.path.join(self.project_root, self.google_calendar_credentials_filename)
-        self.logger.info(self.google_calendar_credentials_path)
-
-        if os.path.exists(self.google_calendar_credentials_path):
-            os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = self.google_calendar_credentials_path
-            self.logger.info(f"Set GOOGLE_APPLICATION_CREDENTIALS to: {self.google_calendar_credentials_path}")
-        else:
-            self.logger.error(f"/!\\ Google calendar credentials file not found at {self.google_calendar_credentials_path}")
-
         # Initialize dependencies
         self.studi_rag_inference_api_client = StudiRAGInferenceApiClient()
         self.salesforce_api_client = SalesforceApiClient()

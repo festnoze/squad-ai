@@ -40,9 +40,10 @@ class AgentsGraph:
         self.lead_agent_instance = LeadAgent(config_path=lid_config_file_path)
         self.logger.info(f"Initialize Lead Agent succeed with config: {lid_config_file_path}")
         
-        self.llm = LangChainFactory.create_llm_from_info(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4.1", timeout=50, temperature=0.1, api_key=os.getenv("OPENAI_API_KEY")))
+        self.router_llm = LangChainFactory.create_llm_from_info(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4.1", timeout=20, temperature=0.5, api_key=os.getenv("OPENAI_API_KEY")))
+        self.calendar_llm = LangChainFactory.create_llm_from_info(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4o", timeout=50, temperature=0.5, api_key=os.getenv("OPENAI_API_KEY")))
         
-        self.calendar_agent_instance = CalendarAgent(llm_or_chain=self.llm)
+        self.calendar_agent_instance = CalendarAgent(llm_or_chain=self.calendar_llm)
         self.logger.info("Initialize Calendar Agent succeed")
         
         self.sf_agent_instance = SFAgent()
@@ -106,7 +107,7 @@ class AgentsGraph:
             return state
 
         if user_input:
-            feedback_text = f"Très bien, vous avez demandé : \"{user_input}\". Un instant, j'analyse votre demande."
+            feedback_text = f"Très bien, vous avez demandé : \"{user_input}\"."
             await self.outgoing_manager.enqueue_text(feedback_text)
 
             category = await self.analyse_user_input_for_dispatch_async(user_input, state["history"])
@@ -130,9 +131,9 @@ class AgentsGraph:
         chat_history_str = "\n".join([f"[{msg[0]}]: {msg[1]}" for msg in chat_history])
         prompt = prompt.format(user_input=user_input, chat_history=chat_history_str)
         
-        response = await self.llm.ainvoke(prompt)
+        response = await self.router_llm.ainvoke(prompt)
         
-        self.logger.info(f"Analysis of user input (+ history) decide to dispatch to: --{response.content}--")
+        self.logger.info(f"#> Router Analysis decide to dispatch to: |###> {response.content} <###|")
         return response.content
 
     async def send_begin_of_welcome_message_node(self, state: PhoneConversationState) -> dict:

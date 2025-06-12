@@ -13,7 +13,22 @@ class OutgoingAudioManager(OutgoingManager):
     Manages the complete audio streaming process using a text-based approach.
     Text is queued, then processed into speech in small chunks for better responsiveness.
     """
-    def __init__(self, websocket: any, tts_provider: TextToSpeechProvider, stream_sid: str = None, min_chunk_interval: float = 0.05, min_chars_for_interruptible_speech: int = 15, sample_width=1, frame_rate=8000, channels=1):
+    def __init__(
+            self,
+            websocket: any,
+            tts_provider: TextToSpeechProvider,
+            stream_sid: str = None,
+            min_chunk_interval: float = 0.05,  # 50ms~
+            min_chars_for_interruptible_speech: int = 15,
+            sample_width: int = 1,
+            frame_rate: int = 8000,
+            channels: int = 1,
+            loop_interval: float = 0.05, # 100ms~
+            pause_between_chunks: float = 0.05, # 50ms~
+            max_words_by_stream_chunk: int = 20,
+            max_chars_by_stream_chunk: int = 100
+        ):
+
         self.text_queue_manager = TextQueueManager()
         self.audio_sender : TwilioAudioSender = TwilioAudioSender(websocket, stream_sid=stream_sid, min_chunk_interval=min_chunk_interval)
         self.logger = logging.getLogger(__name__)
@@ -22,12 +37,14 @@ class OutgoingAudioManager(OutgoingManager):
         self.frame_rate = frame_rate   # mu-law in 8/16kHz
         self.sample_width = sample_width    # mu-law in 8/16 bits
         self.channels = channels
-        self.max_words_by_stream_chunk = 10
-        self.max_chars_by_stream_chunk = 100
         self.streaming_interuption_asked = False
         self.ask_to_stop_streaming_worker = False
         self.websocket = websocket
         self.min_chars_for_interruptible_speech = min_chars_for_interruptible_speech
+        self.loop_interval = loop_interval
+        self.pause_between_chunks = pause_between_chunks
+        self.max_words_by_stream_chunk = max_words_by_stream_chunk
+        self.max_chars_by_stream_chunk = max_chars_by_stream_chunk
 
     def set_websocket(self, websocket: WebSocket):
         self.websocket = websocket
@@ -66,10 +83,10 @@ class OutgoingAudioManager(OutgoingManager):
                 continue
             
             if not self.is_sending_speech():
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(self.loop_interval)
                 continue
             
-            await asyncio.sleep(0.1) # Pause outgoing loop process to let others processes breathe
+            await asyncio.sleep(self.loop_interval) # Pause outgoing loop process to let others processes breathe
 
             try:
                 if not self.audio_sender.stream_sid:
@@ -96,7 +113,7 @@ class OutgoingAudioManager(OutgoingManager):
                 start_time, end_time = ProcessText.calculate_speech_timing(
                     speech_chunk, 
                     previous_chunk_end_time=last_chunk_end_time,
-                    min_gap=0.05  # 50ms minimum gap between chunks
+                    min_gap=self.pause_between_chunks
                 )
                 
                 text_chunks_processed += 1
@@ -133,7 +150,7 @@ class OutgoingAudioManager(OutgoingManager):
                     continue
                 
                 # Wait for a natural pause between chunks (helps create more natural rhythm)
-                await asyncio.sleep(0.05)
+                await asyncio.sleep(self.pause_between_chunks)
                     
             except Exception as e:
                 self.logger.error(f"Error in streaming worker: {e}", exc_info=True)

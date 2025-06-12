@@ -52,36 +52,14 @@ class PhoneCallWebsocketEventsHandler:
         self.start_time = None         
 
         # Environment and configuration settings
-        self.VOICE_ID = os.getenv("VOICE_ID", "")
         self.TEMP_DIR = "static/audio"
-        self.TWILIO_SID = os.getenv("TWILIO_SID", "")
-        self.TWILIO_AUTH = os.getenv("TWILIO_AUTH", "")
-
-        # Set OpenAI API key
         self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+
         os.environ['OPENAI_API_KEY'] = self.OPENAI_API_KEY
-
-        # Set Google Calendar credentials
-        self.project_root = os.path.dirname(os.path.dirname(__file__))
-        self.google_calendar_credentials_filename = os.getenv(
-            "GOOGLE_CALENDAR_CREDENTIALS_FILENAME", 
-            "secrets/google-calendar-credentials.json"
-        )
-        self.google_calendar_credentials_path = os.path.join(self.project_root, self.google_calendar_credentials_filename)
-        print(self.google_calendar_credentials_path)
-
-        # Create temp directory if it doesn't exist
-        os.makedirs(self.TEMP_DIR, exist_ok=True)
-
-        if os.path.exists(self.google_calendar_credentials_path):
-            os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = self.google_calendar_credentials_path
-            self.logger.info(f"Set GOOGLE_APPLICATION_CREDENTIALS to: {self.google_calendar_credentials_path}")
-        else:
-            self.logger.error(f"/!\\ Google calendar credentials file not found at {self.google_calendar_credentials_path}")
 
         # Initialize dependencies
         self.tts_provider = get_text_to_speech_provider(self.TEMP_DIR, provider_name="openai", frame_rate=self.frame_rate, channels=self.channels, sample_width=self.sample_width)
-        self.stt_provider = get_speech_to_text_provider(self.TEMP_DIR, provider_name="hybrid", language_code="fr-FR", frame_rate=self.frame_rate)
+        self.stt_provider = get_speech_to_text_provider(self.TEMP_DIR, provider_name="openai", language_code="fr-FR", frame_rate=self.frame_rate)
         
         self.studi_rag_inference_api_client = StudiRAGInferenceApiClient()
         self.salesforce_client = SalesforceApiClient()

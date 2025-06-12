@@ -88,7 +88,7 @@ class IncomingAudioManager(IncomingManager):
                 self.logger.error(f"Error closing websocket: {e}")
             self.websocket = None
 
-            # Then, try to hang-up the Twilio call
+            # Hang-up Twilio phone call
             try:
                 twilio_sid = os.getenv("TWILIO_SID", "")
                 twilio_auth = os.getenv("TWILIO_AUTH", "")
@@ -261,10 +261,10 @@ class IncomingAudioManager(IncomingManager):
         # Check for speech while system is speaking (interruption detection)
         if self.is_speaking:
             # Check if this chunk contains speech - use a lower threshold to detect speech earlier
-            is_silence, speech_to_noise_ratio = self.analyse_speech_for_silence(chunk, threshold=self.speech_threshold * 0.8)  # More sensitive detection while speaking
+            is_silence, speech_to_noise_ratio = self.analyse_speech_for_silence(chunk, threshold=self.speech_threshold * 2.5)  # Less sensitive detection while speaking
             
-            # If user is speaking while system is speaking, stop system speech
-            if not is_silence and speech_to_noise_ratio > self.speech_threshold * 1.2:
+            # If user is speaking while system is speaking, stop system speech, but only if user speak loud
+            if not is_silence:
                 self.logger.info(f"Speech interruption detected (level: {speech_to_noise_ratio}), stopping system speech")
                 await self.stop_speaking_async()
                 # Reset buffer to clear any previous speech before interruption

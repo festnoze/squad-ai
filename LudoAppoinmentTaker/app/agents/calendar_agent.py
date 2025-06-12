@@ -10,10 +10,11 @@ import logging
 class CalendarAgent:        
     salesforce_api_client = SalesforceApiClient()
     owner_id = None
+    owner_name = None
     
     def __init__(self, llm_or_chain: any):
         self.logger = logging.getLogger(__name__)
-        self.tools = [self.get_current_date, self.get_appointments, self.schedule_new_appointment]
+        self.tools = [self.get_owner_name, self.get_current_date, self.get_appointments, self.schedule_new_appointment]
         self.llm = llm_or_chain
         self.prompt = self._load_prompt()
         self.prompts = ChatPromptTemplate.from_messages([
@@ -25,6 +26,16 @@ class CalendarAgent:
         self.agent = create_tool_calling_agent(self.llm, self.tools, self.prompts)
         self.agent_executor = AgentExecutor(agent=self.agent, tools=self.tools, verbose=True)
         # response = self.agent_executor.invoke({"input": "quel jour sommes nous ?", "chat_history": []})['output']
+
+    
+    @tool
+    def get_owner_name() -> str:
+        """Get the owner name"""
+        return CalendarAgent.get_owner_name_tool()
+
+    @staticmethod
+    def get_owner_name_tool() -> str:
+        return CalendarAgent.owner_name
 
     @tool
     def get_current_date() -> str:
@@ -81,7 +92,7 @@ class CalendarAgent:
         return await CalendarAgent.salesforce_api_client.schedule_new_appointment_async(user_id, CalendarAgent.owner_id, date_and_time, object, description, duration) #TODO: manage "CalendarAgent.owner_id" another way to allow multi-calls handling.
 
     def _load_prompt(self):
-        with open("app/agents/calendar_prompt.txt", "r", encoding="utf-8") as f:
+        with open("app/agents/calendar_agent_prompt.txt", "r", encoding="utf-8") as f:
             return f.read()
 
     def set_user_info(self, first_name, last_name, email, owner_id, owner_name):
@@ -100,7 +111,7 @@ class CalendarAgent:
         self.last_name = last_name
         self.email = email
         CalendarAgent.owner_id = owner_id
-        self.owner_name = owner_name        
+        CalendarAgent.owner_name = owner_name        
         # self.calendar_service = self._init_google_calendar()
         # self.calendar_id = self.config["google_calendar"]["calendar_id"]
 
@@ -131,6 +142,7 @@ class CalendarAgent:
                 "input": user_input,
                 "chat_history": formatted_history
             }) 
+            return response["output"] if response else ""
         except Exception as e:
             self.logger.error(f"/!\\ Error executing calendar agent with tools: {e}")
-        return response["output"]
+        return ""
