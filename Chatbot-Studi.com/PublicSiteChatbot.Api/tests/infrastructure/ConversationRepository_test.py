@@ -24,12 +24,7 @@ class TestConversationRepository:
     db_path_or_url: str = "tests/infrastructure/conversations_test.db"
 
     def setup_method(self):
-        if os.path.exists(self.db_path_or_url):
-            try:
-                os.remove(self.db_path_or_url) # Remove the existing test database if it exists
-            except Exception as e:
-                print(f"Error during setup: {e}")
-
+        self.delete_database()
         self.conversation_repository = ConversationRepository(db_path_or_url=self.db_path_or_url)
 
         self.sample_device_info = DeviceInfo(ip="1.2.3.4", user_agent="Mozilla/5.0", platform="Windows", app_version="1.0", os="Windows", browser="Chrome", is_mobile=False)
@@ -44,11 +39,14 @@ class TestConversationRepository:
     def teardown_method(self):
         # Dispose of the database connection and remove the test database
         self.conversation_repository.data_context.engine.dispose()
+        self.delete_database()
+
+    def delete_database(self):
         if os.path.exists(self.db_path_or_url):
             try:
                 os.remove(self.db_path_or_url)
             except Exception as e:
-                print(f"Error during teardown: {e}")
+                print(f"Error during database deletion: {e}")
 
     @pytest.mark.asyncio
     async def test_create_new_empty_conversation(self):

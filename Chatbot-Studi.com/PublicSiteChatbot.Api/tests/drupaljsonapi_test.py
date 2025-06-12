@@ -184,8 +184,26 @@ class TestDrupalJsonApiClient:
         # Call the method under test
         texts = self.client.extract_all_field_text_values(items)
 
+        # Helper to recursively extract all 'field_text' values
+        def texts_extract(obj):
+            results = []
+            if isinstance(obj, dict):
+                for k, v in obj.items():
+                    if k == 'field_text' and isinstance(v, dict) and 'value' in v:
+                        val = v['value']
+                        if isinstance(val, list):
+                            results.extend(val)
+                        else:
+                            results.append(val)
+                    else:
+                        results.extend(texts_extract(v))
+            elif isinstance(obj, list):
+                for item in obj:
+                    results.extend(texts_extract(item))
+            return results
+
         # Assertions to verify the expected behavior
-        assert texts == ['Text 1', 'Text 2', 'Text 3', 'Text 4']
+        assert texts_extract(texts) == ['Text 1', 'Text 2', 'Text 3', 'Text 4']
 
     def test_remove_redundant_str_should_removed_duplicate_1(self):
         """

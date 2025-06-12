@@ -6,6 +6,8 @@ from typing import TypeVar, Callable, Any, Coroutine, Optional, cast
 
 T = TypeVar('T')
 
+### COPIED FROM 'common-tools' package ###
+
 class AsyncCallWrapper:
     """
     A class that provides various methods to call async functions from synchronous code.

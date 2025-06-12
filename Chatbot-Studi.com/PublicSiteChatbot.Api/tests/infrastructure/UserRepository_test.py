@@ -1,14 +1,10 @@
 import os
 import pytest
 import asyncio
-
-from sqlalchemy import delete
 pytest_plugins = ["pytest_asyncio"]
-from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 from src.database_conversations.conversation_converters import ConversationConverters
-from src.database_conversations.entities import UserEntity, DeviceInfoEntity
 from src.infrastructure.user_repository import UserRepository
 #
 from common_tools.helpers.txt_helper import txt
@@ -20,6 +16,7 @@ class TestUserRepository:
 
     def setup_method(self):
         txt.activate_print = True
+        self.delete_database()
         self.sample_device_info = DeviceInfo(ip="1.2.3.4", user_agent="Mozilla/5.0", platform="Windows", app_version="1.0", os="Windows", browser="Chrome", is_mobile=False)
         self.sample_user = User(id= uuid4(), name= "First User", device_info= self.sample_device_info)
         self.user_repository = UserRepository(db_path_or_url=self.db_path_or_url)
@@ -29,11 +26,14 @@ class TestUserRepository:
     def teardown_method(self):
         asyncio.run(self.user_repository.data_context.empty_all_database_tables_async())
         self.user_repository.data_context.engine.dispose()
+        self.delete_database()
+
+    def delete_database(self):
         if os.path.exists(self.db_path_or_url):
             try:
                 os.remove(self.db_path_or_url)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"Error during database deletion: {e}")
 
     @pytest.mark.asyncio
     async def test_get_user_by_id(self):
