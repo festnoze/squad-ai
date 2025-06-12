@@ -109,8 +109,8 @@ class AgentsGraph:
             feedback_text = f"Très bien, vous avez demandé : \"{user_input}\". Un instant, j'analyse votre demande."
             await self.outgoing_manager.enqueue_text(feedback_text)
 
-            category = await self.analyse_user_input_for_dispatch_async(user_input, state['history'])
-            state['history'].append(("user", user_input))
+            category = await self.analyse_user_input_for_dispatch_async(user_input, state["history"])
+            state["history"].append(("user", user_input))
 
             if category == "schedule_calendar_appointment":
                 state['agent_scratchpad']["next_agent_needed"] = "calendar_agent"
@@ -154,7 +154,7 @@ class AgentsGraph:
         conversation_id = await self.init_user_and_new_conversation_in_backend_api_async(state.get('caller_phone'), state.get('call_sid'))     
         self.logger.info(f"End init. RAG API for caller (User and a new conversation): {state.get('caller_phone')}")
 
-        state['history'] = []
+        state["history"] = []
         
         if state.get('agent_scratchpad') is None: 
             state['agent_scratchpad'] = {}
@@ -200,7 +200,7 @@ class AgentsGraph:
         await self.outgoing_manager.enqueue_text(end_welcome_text)
 
         full_welcome_text = self.welcome_text + "\n" + end_welcome_text
-        state['history'].append(("assistant", full_welcome_text))
+        state["history"].append(("assistant", full_welcome_text))
         conv_id = state['agent_scratchpad'].get('conversation_id', None)
         if conv_id:
             await self.studi_rag_inference_api_client.add_external_ai_message_to_conversation_async(conv_id, full_welcome_text)
@@ -348,9 +348,9 @@ class AgentsGraph:
                     owner_name=sf_account_info.get('Owner').get('Name', '')
                 )
                 chat_history = state.get('history', [])
-                calendar_agent_answer = await self.calendar_agent_instance.run_async(user_input, chat_history)                
+                calendar_agent_answer = await self.calendar_agent_instance.run_async(user_input, chat_history)
             
-                state['history'].append(("assistant", calendar_agent_answer))
+                state["history"].append(("assistant", calendar_agent_answer))
                 return state
                 
             except Exception as e:
@@ -426,7 +426,7 @@ class AgentsGraph:
                     break
                     
                 full_answer += chunk
-                self.logger.debug(f"Received chunk: << ... {chunk} ... >>")
+                #self.logger.info(f"Received chunk: << ... {chunk} ... >>")
                 
                 await self.outgoing_manager.enqueue_text(chunk)
 

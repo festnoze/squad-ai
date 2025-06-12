@@ -267,7 +267,7 @@ class IncomingAudioManager(IncomingManager):
 
         # Hangup the call if the user is silent for too long
         if self.consecutive_silence_duration_ms >= self.max_silence_duration_before_hangup_ms:
-            self.logger.info(f"User silence duration exceeded threshold: {self.consecutive_silence_duration_ms:.1f}ms")
+            self.logger.info(f"### HANGING UP ### User silence duration of {self.consecutive_silence_duration_ms:.1f}ms exceeded max. allowed silence of {self.max_silence_duration_before_hangup_ms:.1f}ms")
             #self.hangup_call()
             return
         
@@ -301,7 +301,7 @@ class IncomingAudioManager(IncomingManager):
             self.consecutive_silence_duration_ms = 0.0
 
             # Waiting message
-            #await self.speak_and_send_text("Très bien, je vais traiter votre demande.")
+            #await self.outgoing_manager.enqueue_text("Très bien, je vous demande un instant.")
 
             # 4. Transcribe speech to text
             user_query_transcript = self._perform_speech_to_text_transcription(audio_data, is_audio_file_to_delete=False)

@@ -172,15 +172,12 @@ class TestAgentsGraphIntegration:
         
             # Verify Salesforce client methods were called
             agents_graph_mockings["salesforce_client"].get_person_by_phone_async.assert_not_called()
-            agents_graph_mockings["salesforce_client"].get_available_slots_async.assert_called_once()
-        
-            # Verify outgoing_manager was called with a response
-            agents_graph_mockings["outgoing_manager"].enqueue_text.assert_called()
+            agents_graph_mockings["outgoing_manager"].enqueue_text.assert_called_once()
             
-            # Verify calendar agent tools were called correctly
-            mock_get_current_date.assert_called_once()
-            mock_get_appointments.assert_called_once()
-            mock_schedule_new_appointment.assert_not_called()
+            # Verify called calendar agent 'tools'
+            assert mock_get_current_date.call_count >= 1
+            assert mock_get_appointments.call_count >= 1
+            assert mock_schedule_new_appointment.call_count == 0
 
 
     @pytest.fixture

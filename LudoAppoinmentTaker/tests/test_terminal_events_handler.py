@@ -64,7 +64,7 @@ class TestTerminalEventsHandler:
              patch('app.terminal_events_handler.AgentsGraph'), \
              patch('app.terminal_events_handler.OpenAI'), \
              patch('app.terminal_events_handler.input', side_effect=['bye']), \
-             patch.object(TerminalEventsHandler, '_handle_start_event_async') as mock_start_handler:
+             patch.object(TerminalEventsHandler, '_handle_start_event_async', return_value="") as mock_start_handler:
             
             # Configure mocks
             mock_outgoing_instance = mock_outgoing_manager.return_value
@@ -72,7 +72,6 @@ class TestTerminalEventsHandler:
             mock_outgoing_instance.run_background_streaming_worker = MagicMock()
             mock_incoming_instance.set_call_sid = MagicMock()
             mock_incoming_instance.set_phone_number = MagicMock()
-            mock_start_handler.return_value = AsyncMock()
             
             # Create a TerminalEventsHandler instance
             handler = TerminalEventsHandler()
@@ -217,7 +216,7 @@ class TestTerminalEventsHandler:
              patch('app.terminal_events_handler.IncomingTextManager'), \
              patch('app.terminal_events_handler.AgentsGraph'), \
              patch('app.terminal_events_handler.OpenAI'), \
-             patch.object(TerminalEventsHandler, '_handle_start_event_async'), \
+             patch.object(TerminalEventsHandler, '_handle_start_event_async', return_value="") as mock_start_handler, \
              patch.object(TerminalEventsHandler, 'incoming_text') as mock_incoming_text, \
              patch('app.terminal_events_handler.input', side_effect=['test message', 'bye']):
             
@@ -230,6 +229,7 @@ class TestTerminalEventsHandler:
                 mock_environment['call_sid']
             )
             
+            mock_start_handler.assert_called_once()
             # Verify incoming_text_async was called once with the test message
             # It should not be called for 'bye' as that breaks the loop
             mock_incoming_text.assert_called_once()
