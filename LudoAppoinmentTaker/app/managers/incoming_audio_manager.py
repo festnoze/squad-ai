@@ -80,9 +80,31 @@ class IncomingAudioManager(IncomingManager):
     def hangup_call(self):
         if self.websocket:
             self.logger.info("Hanging up call...")
-            self.websocket.close(code=1000)
+
+            # Close the websocket first
+            try:
+                self.websocket.close(code=1000)
+            except Exception as e:
+                self.logger.error(f"Error closing websocket: {e}")
             self.websocket = None
-    
+
+            # Then, try to hang-up the Twilio call
+            try:
+                twilio_sid = os.getenv("TWILIO_SID", "")
+                twilio_auth = os.getenv("TWILIO_AUTH", "")
+                if twilio_sid and twilio_auth and getattr(self, "call_sid", None):
+                    from twilio.rest import Client
+                    client = Client(twilio_sid, twilio_auth)
+                    client.calls(self.call_sid).update(status="completed")
+                    self.logger.info(f"Call {self.call_sid} hung up via Twilio")
+                else:
+                    if not twilio_sid or not twilio_auth:
+                        self.logger.error("Twilio credentials not configured")
+                    else:
+                        self.logger.warning("call_sid not set; unable to hang up via Twilio")
+            except Exception as e:
+                self.logger.error(f"Error hanging up call via Twilio: {e}", exc_info=True)
+
     def is_speech(self, audio_chunk: bytes, frame_duration_ms=30) -> bool:
         """
         Determine if audio chunk contains speech using WebRTC VAD
@@ -192,7 +214,7 @@ class IncomingAudioManager(IncomingManager):
         """Handle the 'start' event from Twilio which begins a new call."""
         self.set_call_sid(call_sid)
         self.set_stream_sid(stream_sid)
-        phone_number = self.phones_by_call_sid.get(call_sid)
+        phone_number = self.phones_by_call_sid.get(call_sid, None)
         if phone_number is None:
             self.logger.error(f"Phone number not found for call SID: {call_sid}")
             return None
@@ -268,7 +290,7 @@ class IncomingAudioManager(IncomingManager):
         # Hangup the call if the user is silent for too long
         if self.consecutive_silence_duration_ms >= self.max_silence_duration_before_hangup_ms:
             self.logger.info(f"### HANGING UP ### User silence duration of {self.consecutive_silence_duration_ms:.1f}ms exceeded max. allowed silence of {self.max_silence_duration_before_hangup_ms:.1f}ms")
-            #self.hangup_call()
+            self.hangup_call()
             return
         
         # Add chunk to buffer if speech has begun or this is a speech chunk
@@ -336,12 +358,12 @@ class IncomingAudioManager(IncomingManager):
             self.logger.error(f"Error in user query to agents graph: {e}", exc_info=True)
 
     def _decode_audio_chunk(self, data : dict):
-        media_data = data.get("media", {})
-        payload = media_data.get("payload")
-        if not payload:
-            self.logger.warning("Received media event without payload")
-            return None
         try:
+            media_data = data.get("media", {})
+            payload = media_data.get("payload", None)
+            if not payload:
+                self.logger.warning("Received media event without payload")
+                return None
             return audioop.ulaw2lin(base64.b64decode(payload), self.sample_width)
         except Exception as decode_err:
             self.logger.error(f"Error decoding/converting audio chunk: {decode_err}")

@@ -72,7 +72,12 @@ class CalendarAgent:
         """Schedule a new appointment with the owner at the specified date and time"""
         object = object if object else "Demande de conseil en formation prospect"
         description = description if description else "RV pris par l'IA après appel entrant du prospect"
-        
+        if not date_and_time.endswith("Z"):
+            date_and_time += "Z"
+
+        logger = logging.getLogger(__name__)
+        logger.info(f"########### Called 'schedule_new_appointment' tool for {CalendarAgent.owner_id} at: {date_and_time}.")
+
         return await CalendarAgent.salesforce_api_client.schedule_new_appointment_async(user_id, CalendarAgent.owner_id, date_and_time, object, description, duration) #TODO: manage "CalendarAgent.owner_id" another way to allow multi-calls handling.
 
     def _load_prompt(self):
