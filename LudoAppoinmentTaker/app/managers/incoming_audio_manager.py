@@ -80,8 +80,32 @@ class IncomingAudioManager(IncomingManager):
     def hangup_call(self):
         if self.websocket:
             self.logger.info("Hanging up call...")
-            self.websocket.close(code=1000)
+
+            # Close the websocket first
+            try:
+                self.websocket.close(code=1000)
+            except Exception as e:
+                self.logger.error(f"Error closing websocket: {e}")
+
             self.websocket = None
+
+        # Terminate the Twilio call if possible
+        try:
+            twilio_sid = os.getenv("TWILIO_SID", "")
+            twilio_auth = os.getenv("TWILIO_AUTH", "")
+            if twilio_sid and twilio_auth and getattr(self, "call_sid", None):
+                from twilio.rest import Client
+
+                client = Client(twilio_sid, twilio_auth)
+                client.calls(self.call_sid).update(status="completed")
+                self.logger.info(f"Call {self.call_sid} hung up via Twilio")
+            else:
+                if not twilio_sid or not twilio_auth:
+                    self.logger.error("Twilio credentials not configured")
+                else:
+                    self.logger.warning("call_sid not set; unable to hang up via Twilio")
+        except Exception as e:
+            self.logger.error(f"Error hanging up call via Twilio: {e}", exc_info=True)
     
     def is_speech(self, audio_chunk: bytes, frame_duration_ms=30) -> bool:
         """
