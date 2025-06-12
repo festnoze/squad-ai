@@ -105,12 +105,13 @@ class AgentsGraph:
             state['agent_scratchpad']["next_agent_needed"] = "conversation_start"
             return state
 
-        if user_input:       
-            #state['history'].append(("Human", user_input))
+        if user_input:
             feedback_text = f"Très bien, vous avez demandé : \"{user_input}\". Un instant, j'analyse votre demande."
             await self.outgoing_manager.enqueue_text(feedback_text)
 
             category = await self.analyse_user_input_for_dispatch_async(user_input, state['history'])
+            state['history'].append(("user", user_input))
+
             if category == "schedule_calendar_appointment":
                 state['agent_scratchpad']["next_agent_needed"] = "calendar_agent"
             elif category == "training_course_query":
@@ -126,7 +127,7 @@ class AgentsGraph:
         file_path = os.path.join(os.path.dirname(__file__), 'analyse_user_input_with_history_for_dispatch_prompt.txt')
         with open(file_path, 'r', encoding='utf-8') as file:
             prompt = file.read()      
-        chat_history_str = "\n".join([f"[{key}]: {value}" for msg in chat_history for key, value in msg.items()])
+        chat_history_str = "\n".join([f"[{msg[0]}]: {msg[1]}" for msg in chat_history])
         prompt = prompt.format(user_input=user_input, chat_history=chat_history_str)
         
         response = await self.llm.ainvoke(prompt)
@@ -199,7 +200,7 @@ class AgentsGraph:
         await self.outgoing_manager.enqueue_text(end_welcome_text)
 
         full_welcome_text = self.welcome_text + "\n" + end_welcome_text
-        state['history'].append(("AI", full_welcome_text))
+        state['history'].append(("assistant", full_welcome_text))
         conv_id = state['agent_scratchpad'].get('conversation_id', None)
         if conv_id:
             await self.studi_rag_inference_api_client.add_external_ai_message_to_conversation_async(conv_id, full_welcome_text)
@@ -247,7 +248,7 @@ class AgentsGraph:
             self.logger.error(f"[{call_sid}] LeadAgent not initialized. Cannot process.")
             response_text = "Je rencontre un problème technique avec l'agent de contact."
             await self.outgoing_manager.enqueue_text(response_text)
-            return {"history": [("Human", user_input), ("AI", response_text)], "agent_scratchpad": {"error": "LeadAgent not initialized"}}
+            return {"history": [("user", user_input), ("assistant", response_text)], "agent_scratchpad": {"error": "LeadAgent not initialized"}}
 
         try:
             # 1. Extract info using LLM (based on LeadAgent logic)
@@ -315,7 +316,7 @@ class AgentsGraph:
             updated_scratchpad['lead_last_status'] = next_step
 
             return {
-                "history": [("Human", user_input), ("AI", response_text)],
+                "history": [("user", user_input), ("assistant", response_text)],
                 "agent_scratchpad": updated_scratchpad
             }
 
@@ -325,62 +326,7 @@ class AgentsGraph:
             # Include the error in the scratchpad for debugging if needed
             error_scratchpad = state.get('agent_scratchpad', {})
             error_scratchpad['error'] = str(e)
-            return {"history": [("Human", user_input), ("AI", response_text)], "agent_scratchpad": error_scratchpad}
-
-    async def old_user_identification_node(self, state: PhoneConversationState) -> dict:
-        """Handles Salesforce account lookup using SFAgent."""
-        call_sid = state.get('call_sid', 'N/A')
-        phone = state.get('caller_phone', 'N/A')
-        self.logger.info(f"[{call_sid}] Entering SF Agent node for phone: {phone}")
-        
-        if not phone:
-            self.logger.warning(f"[{call_sid}] No phone number available for SF lookup")
-            return {"next_agent_needed": "lead_agent"}
-        
-        try:
-            # Initialize SFAgent and look up account
-            sf_agent = SFAgent()
-            account_info = sf_agent.get_account_info(phone)
-            
-            updated_scratchpad = state.get('agent_scratchpad', {})
-            
-            if account_info:
-                # Store account info for future use
-                updated_scratchpad['sf_account_info'] = account_info
-                
-                # Prepare greeting for returning user
-                first_name = account_info.get('FirstName', '')
-                owner_first_name = account_info.get('OwnerFirstName', '')
-                
-                response_text = f"""
-                Je suis ravi que vous nous contactiez à nouveau {first_name}. {owner_first_name} qui vous accompagne d'habitude n'est pas disponible.
-                Je vais donc m'occuper de prendre un rendez-vous avec vous afin que {owner_first_name} puisse vous contacter à son retour.
-                Pouvez-vous me donner le jour et le moment de la journée qui vous convient le mieux pour ce rendez-vous ?
-                """
-                
-                updated_scratchpad['next_agent_needed'] = "calendar_agent"
-            else:
-                # No account found, continue with lead collection
-                response_text = """
-                Bienvenue chez Studi, l'école 100% en ligne !
-                Je suis l'assistant virtuel Stud'IA, je prends le relais lorsque nos conseillers en formation ne sont pas présents.
-                Pouvez-vous me laisser vos coordonnées : nom, prénom, email et numéro de téléphone afin qu'un conseiller en formation puisse vous contacter dès son retour ?
-                """
-                
-                updated_scratchpad['next_agent_needed'] = "lead_agent"
-            
-            return {
-                "history": [("AI", response_text)],
-                "agent_scratchpad": updated_scratchpad
-            }
-            
-        except Exception as e:
-            self.logger.error(f"[{call_sid[-4:]}] Error in SF Agent node: {e}", exc_info=True)
-            # Default to Lead Agent in case of error
-            return {
-                "history": [("AI", "Bienvenue chez Studi. Pouvez-vous me laisser vos coordonnées afin qu'un conseiller puisse vous contacter ?")],
-                "agent_scratchpad": {"error": str(e), "next_agent_needed": "lead_agent"}
-            }
+            return {"history": [("user", user_input), ("assistant", response_text)], "agent_scratchpad": error_scratchpad}
 
     async def calendar_agent_node(self, state: PhoneConversationState) -> dict:
         """Handles calendar operations using CalendarAgent."""
@@ -403,10 +349,8 @@ class AgentsGraph:
                 )
                 chat_history = state.get('history', [])
                 calendar_agent_answer = await self.calendar_agent_instance.run_async(user_input, chat_history)                
-                
-                state['history'].append({"human": user_input})
-                state['history'].append({"AI": calendar_agent_answer})
-
+            
+                state['history'].append(("assistant", calendar_agent_answer))
                 return state
                 
             except Exception as e:
@@ -488,7 +432,7 @@ class AgentsGraph:
 
             if full_answer:
                 self.logger.info(f"Full answer received from RAG API: '{full_answer}'")
-                state["history"].append(("AI", full_answer))
+                state["history"].append(("assistant", full_answer))
                 #await self.studi_rag_inference_api_client.add_external_ai_message_to_conversation(state['agent_scratchpad']['conversation_id'], full_answer)
 
             return state

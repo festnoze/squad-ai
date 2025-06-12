@@ -73,7 +73,7 @@ class TestAgentsGraphIntegration:
             call_sid=agents_graph_mockings["call_sid"],
             caller_phone=agents_graph_mockings["phone_number"],
             user_input=user_input,
-            history=[("AI", init_msg)],
+            history=[("assistant", init_msg)],
             agent_scratchpad={"conversation_id": "39e81136-4525-4ea8-bd00-c22211110001"}
         )
 
@@ -101,11 +101,11 @@ class TestAgentsGraphIntegration:
         
         # Assert
         assert len(updated_state["history"]) >= 3  # Welcome + user query + response
-        assert updated_state["history"][-3][0] == "AI"
+        assert updated_state["history"][-3][0] == "assistant"
         assert updated_state["history"][-3][1] == init_msg
-        assert updated_state["history"][-2][0] == "Human"
+        assert updated_state["history"][-2][0] == "user"
         assert updated_state["history"][-2][1] == user_input
-        assert updated_state["history"][-1][0] == "AI"
+        assert updated_state["history"][-1][0] == "assistant"
         assert updated_state["history"][-1][1] == bts_response
 
         # Verify outgoing_manager was called with the response
@@ -142,7 +142,7 @@ class TestAgentsGraphIntegration:
                 call_sid=agents_graph_mockings["call_sid"],
                 caller_phone=agents_graph_mockings["phone_number"],
                 user_input=user_input,
-                history=[("AI", init_msg)],
+                history=[("assistant", init_msg)],
                 agent_scratchpad={
                     "conversation_id": "39e81136-4525-4ea8-bd00-c22211110001", 
                     "sf_account_info": {
@@ -165,9 +165,9 @@ class TestAgentsGraphIntegration:
             
             # Assert
             assert len(updated_state["history"]) >= 3  # Welcome + user query + response
-            assert updated_state["history"][-2][0] == "Human"
+            assert updated_state["history"][-2][0] == "user"
             assert updated_state["history"][-2][1] == user_input
-            assert updated_state["history"][-1][0] == "AI"
+            assert updated_state["history"][-1][0] == "assistant"
             #assert updated_state["history"][-1][1] == "D'accord, je vais vous aider à prendre rendez-vous avec un conseiller."
         
             # Verify Salesforce client methods were called

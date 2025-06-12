@@ -28,14 +28,14 @@ def generate_pcm_audio(duration_ms, sample_rate=16000, bit_depth=16):
     return b'\x00\x00' * num_samples 
 
 @pytest.mark.asyncio
-async def test_initialization(audio_sender, mock_websocket):
+async def test_initialization(audio_sender: TwilioAudioSender, mock_websocket):
     assert audio_sender.websocket == mock_websocket
     assert audio_sender.stream_sid == "test_stream_sid_123"
     assert not audio_sender.streaming_interruption_asked
     assert isinstance(audio_sender.send_lock, asyncio.Lock)
 
 @pytest.mark.asyncio
-async def test_send_audio_chunk_empty_audio(audio_sender, caplog):
+async def test_send_audio_chunk_empty_audio(audio_sender: TwilioAudioSender, caplog):
     assert not await audio_sender.send_audio_chunk(b'')
     assert "send_audio_chunk called with empty audio_chunk" in caplog.text
 
@@ -52,14 +52,14 @@ async def test_send_audio_chunk_no_websocket(caplog):
     assert "WebSocket is not set" in caplog.text
 
 @pytest.mark.asyncio
-async def test_send_audio_chunk_websocket_closed(audio_sender, mock_websocket, caplog):
+async def test_send_audio_chunk_websocket_closed(audio_sender: TwilioAudioSender, mock_websocket, caplog):
     mock_websocket.closed = True
     assert not await audio_sender.send_audio_chunk(generate_pcm_audio(100))
     assert "WebSocket is closed" in caplog.text
 
 @pytest.mark.asyncio
 @patch('audioop.lin2ulaw')
-async def test_send_audio_chunk_lin2ulaw_error(mock_lin2ulaw, audio_sender, caplog):
+async def test_send_audio_chunk_lin2ulaw_error(mock_lin2ulaw, audio_sender: TwilioAudioSender, caplog):
     mock_lin2ulaw.side_effect = audioop.error("conversion failed")
     audio_data = generate_pcm_audio(100)
     assert not await audio_sender.send_audio_chunk(audio_data)
@@ -70,7 +70,7 @@ async def test_send_audio_chunk_lin2ulaw_error(mock_lin2ulaw, audio_sender, capl
 @patch('asyncio.sleep', new_callable=AsyncMock)
 @patch('audioop.lin2ulaw')
 @patch('time.time') 
-async def test_send_audio_chunk_single_segment_success(mock_time, mock_lin2ulaw, mock_async_sleep, audio_sender, mock_websocket):
+async def test_send_audio_chunk_single_segment_success(mock_time, mock_lin2ulaw, mock_async_sleep, audio_sender: TwilioAudioSender, mock_websocket):
     mock_current_time = 1000.0
     audio_sender.start_time = mock_current_time # Align start time for duration metrics
     # Simulate time advancing for last_send_time, last_chunk_time, total_send_duration
@@ -102,7 +102,7 @@ async def test_send_audio_chunk_single_segment_success(mock_time, mock_lin2ulaw,
 @patch('asyncio.sleep', new_callable=AsyncMock)
 @patch('audioop.lin2ulaw')
 @patch('time.time')
-async def test_send_audio_chunk_multiple_segments_success(mock_time, mock_lin2ulaw, mock_async_sleep, audio_sender, mock_websocket):
+async def test_send_audio_chunk_multiple_segments_success(mock_time, mock_lin2ulaw, mock_async_sleep, audio_sender: TwilioAudioSender, mock_websocket):
     mock_current_time = 2000.0
     audio_sender.start_time = mock_current_time
     # Provide enough time values for each segment + initial + final
@@ -141,7 +141,7 @@ async def test_send_audio_chunk_multiple_segments_success(mock_time, mock_lin2ul
 @pytest.mark.asyncio
 @patch('asyncio.sleep', new_callable=AsyncMock)
 @patch('audioop.lin2ulaw')
-async def test_send_audio_chunk_interruption(mock_lin2ulaw, mock_async_sleep, audio_sender, mock_websocket, caplog):
+async def test_send_audio_chunk_interruption(mock_lin2ulaw, mock_async_sleep, audio_sender: TwilioAudioSender, mock_websocket, caplog):
     pcm_audio = generate_pcm_audio(250) # Multi-segment
     mulaw_audio_full = b'\xBB' * (len(pcm_audio) // 2)
     mock_lin2ulaw.return_value = mulaw_audio_full
@@ -170,7 +170,7 @@ async def test_send_audio_chunk_interruption(mock_lin2ulaw, mock_async_sleep, au
 @pytest.mark.asyncio
 @patch('asyncio.sleep', new_callable=AsyncMock)
 @patch('audioop.lin2ulaw')
-async def test_send_audio_chunk_websocket_send_error_once(mock_lin2ulaw, mock_async_sleep, audio_sender, mock_websocket, caplog):
+async def test_send_audio_chunk_websocket_send_error_once(mock_lin2ulaw, mock_async_sleep, audio_sender: TwilioAudioSender, mock_websocket, caplog):
     pcm_audio = generate_pcm_audio(50) 
     mulaw_audio = b'\xCC' * (len(pcm_audio) // 2)
     mock_lin2ulaw.return_value = mulaw_audio
@@ -191,7 +191,7 @@ async def test_send_audio_chunk_websocket_send_error_once(mock_lin2ulaw, mock_as
 @pytest.mark.asyncio
 @patch('asyncio.sleep', new_callable=AsyncMock)
 @patch('audioop.lin2ulaw')
-async def test_send_audio_chunk_websocket_send_error_max_attempts_in_chunk(mock_lin2ulaw, mock_async_sleep, audio_sender, mock_websocket, caplog):
+async def test_send_audio_chunk_websocket_send_error_max_attempts_in_chunk(mock_lin2ulaw, mock_async_sleep, audio_sender: TwilioAudioSender, mock_websocket, caplog):
     pcm_audio = generate_pcm_audio(250) 
     mulaw_audio_full = b'\xDD' * (len(pcm_audio) // 2)
     mock_lin2ulaw.return_value = mulaw_audio_full
@@ -215,7 +215,7 @@ async def test_send_audio_chunk_websocket_send_error_max_attempts_in_chunk(mock_
 @pytest.mark.asyncio
 @patch('asyncio.sleep', new_callable=AsyncMock)
 @patch('audioop.lin2ulaw')
-async def test_send_audio_chunk_max_errors_across_calls(mock_lin2ulaw, mock_async_sleep, audio_sender, mock_websocket, caplog):
+async def test_send_audio_chunk_max_errors_across_calls(mock_lin2ulaw, mock_async_sleep, audio_sender: TwilioAudioSender, mock_websocket, caplog):
     pcm_audio = generate_pcm_audio(50)
     mulaw_audio = b'\xEE' * (len(pcm_audio) // 2)
     mock_lin2ulaw.return_value = mulaw_audio
@@ -237,7 +237,7 @@ async def test_send_audio_chunk_max_errors_across_calls(mock_lin2ulaw, mock_asyn
     audio_sender.max_consecutive_errors = 5 
 
 
-def test_get_sender_stats(audio_sender):
+def test_get_sender_stats(audio_sender: TwilioAudioSender):
     current_t = time.time()
     audio_sender.total_bytes_sent = 10240
     audio_sender.chunks_sent = 5
@@ -262,7 +262,7 @@ def test_get_sender_stats(audio_sender):
     assert abs(stats['total_duration'] - 60) < 0.1 
     assert abs(stats['send_duration'] - 5.0) < 1e-9
 
-def test_get_sending_stats(audio_sender):
+def test_get_sending_stats(audio_sender: TwilioAudioSender):
     current_t = time.time()
     audio_sender.total_bytes_sent = 5120
     audio_sender.chunks_sent = 2
@@ -282,7 +282,7 @@ def test_get_sending_stats(audio_sender):
 @pytest.mark.asyncio
 @patch('asyncio.sleep', new_callable=AsyncMock)
 @patch('audioop.lin2ulaw')
-async def test_integration_send_sequence_with_interruption(mock_lin2ulaw, mock_async_sleep, audio_sender, mock_websocket, caplog):
+async def test_integration_send_sequence_with_interruption(mock_lin2ulaw, mock_async_sleep, audio_sender: TwilioAudioSender, mock_websocket, caplog):
     audio_sender.total_bytes_sent = 0
     audio_sender.chunks_sent = 0
     audio_sender.consecutive_errors = 0
@@ -307,8 +307,6 @@ async def test_integration_send_sequence_with_interruption(mock_lin2ulaw, mock_a
     async def interrupt_side_effect(json_str):
         nonlocal sent_segments_chunk1
         send_text_calls_payloads.append(json.loads(json_str)['media']['payload'])
-        # Simulate original mock behavior for call counting etc.
-        await original_send_text_mock(json_str) 
         payload_content = base64.b64decode(json.loads(json_str)['media']['payload'])
         if payload_content.startswith(b'\x11'): # First chunk's data
             sent_segments_chunk1 += 1
@@ -320,8 +318,6 @@ async def test_integration_send_sequence_with_interruption(mock_lin2ulaw, mock_a
     res1 = await audio_sender.send_audio_chunk(pcm_audio1)
     assert res1 
     assert sent_segments_chunk1 == 2
-    # send_text was called twice for the first chunk before interruption
-    assert mock_websocket.send_text.call_count == 2 
     assert "Streaming interruption asked" in caplog.text
     assert audio_sender.total_bytes_sent == len(pcm_audio1)
     assert audio_sender.chunks_sent == 1

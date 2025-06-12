@@ -20,11 +20,11 @@ class TestAgentsRoutingDispatching:
         ("non-sense", "", []), # Empty query
         
         # Ambiguous request from the user query needing history to be dispatched to the right agent
-        ("training_course_query", "oui", [{"human": "Quels BTS en ressources humaines ?"}, {"AI": "Il existe deux BTS en ressources humaines : le BTS SIO et le BTS RNCP. souhaitez-vous plus d'informations à leur sujet ?"}]),
-        ("schedule_calendar_appointment", "oui", [{"human": "Je souhaite prendre rendez-vous"}, {"AI": "Bien sûr, seriez-vous disponible demain matin ?"}]),
-        ("schedule_calendar_appointment", "Je souhaite prendre rendez-vous", [{"human": "Quels BTS en ressources humaines ?"}, {"AI": "Il existe deux BTS en ressources humaines : le BTS SIO et le BTS RNCP. souhaitez-vous plus d'informations à leur sujet ?"}]),
+        ("training_course_query", "oui", [("user", "Quels BTS en ressources humaines ?"), ("assistant", "Il existe deux BTS en ressources humaines : le BTS SIO et le BTS RNCP. souhaitez-vous plus d'informations à leur sujet ?")]),
+        ("schedule_calendar_appointment", "oui", [("user", "Je souhaite prendre rendez-vous"), ("assistant", "Bien sûr, seriez-vous disponible demain matin ?")]),
+        ("schedule_calendar_appointment", "Je souhaite prendre rendez-vous", [("user", "Quels BTS en ressources humaines ?"), ("assistant", "Il existe deux BTS en ressources humaines : le BTS SIO et le BTS RNCP. souhaitez-vous plus d'informations à leur sujet ?")]),
     ])
-    async def test_agents_dispatching(self, agents_graph_mockings, user_input: str, chat_history: list[dict[str, str]], awaited_dispatch: str):
+    async def test_agents_dispatching(self, agents_graph_mockings, user_input: str, chat_history: list[tuple[str, str]], awaited_dispatch: str):
         """Test that the agents graph dispatch to the targeted agent."""
         # Arrange
 

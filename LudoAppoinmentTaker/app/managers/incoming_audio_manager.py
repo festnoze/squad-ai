@@ -53,7 +53,7 @@ class IncomingAudioManager(IncomingManager):
         # Audio processing parameters
         self.audio_buffer = b""
         self.consecutive_silence_duration_ms = 0.0
-        self.speech_threshold = 200  # RMS threshold for speech detection
+        self.speech_threshold = 300  # RMS threshold for speech detection
         self.required_silence_ms_to_answer = 1000  # ms of silence to trigger transcript
         self.min_audio_bytes_for_processing = 1000  # Minimum buffer size to process
         self.max_audio_bytes_for_processing = 200000  # Maximum buffer size to process
@@ -242,7 +242,6 @@ class IncomingAudioManager(IncomingManager):
             is_silence, speech_to_noise_ratio = self.analyse_speech_for_silence(chunk, threshold=self.speech_threshold * 0.8)  # More sensitive detection while speaking
             
             # If user is speaking while system is speaking, stop system speech
-            # Use a lower threshold multiplier (1.2x instead of 1.5x) for quicker interruption
             if not is_silence and speech_to_noise_ratio > self.speech_threshold * 1.2:
                 self.logger.info(f"Speech interruption detected (level: {speech_to_noise_ratio}), stopping system speech")
                 await self.stop_speaking_async()
