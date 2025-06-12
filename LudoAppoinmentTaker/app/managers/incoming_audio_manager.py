@@ -324,7 +324,7 @@ class IncomingAudioManager(IncomingManager):
                     "call_sid": self.call_sid,
                     "caller_phone": self.phones_by_call_sid[self.call_sid],
                     "user_input": user_query,
-                    "history": [], #TODO: Add history
+                    "history": [],
                     "agent_scratchpad": {}
                 }
                 self.stream_states[self.stream_sid] = current_state

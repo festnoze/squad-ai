@@ -30,7 +30,7 @@ class IncomingTextManager(IncomingManager):
                     call_sid=self.call_sid,
                     caller_phone=self.phones_by_call_sid[self.call_sid],
                     user_input=text_data,
-                    history=[], #TODO: Add history
+                    history=[],
                     agent_scratchpad={}
                 )
                 self.calls_states[self.call_sid] = current_state
@@ -58,7 +58,7 @@ class IncomingTextManager(IncomingManager):
                 call_sid=call_sid,
                 caller_phone=phone_number,
                 user_input="",
-                history=[], #TODO: Add history
+                history=[],
                 agent_scratchpad={}
             )
         

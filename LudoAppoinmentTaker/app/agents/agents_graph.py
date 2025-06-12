@@ -190,10 +190,10 @@ class AgentsGraph:
             
             end_welcome_text = f"""
             Merci de nous recontacter {civility} {first_name} {last_name}.
-            Je vous propose de prendre rendez-vous avec {owner_first_name}, votre conseiller.
-            Sinon, je peux aussi répondre à vos questions sur nos formations.
+            Je peux prendre un rendez-vous avec votre conseiller : {owner_first_name}.
+            Je peux aussi répondre à vos questions à propos de nos formations.
+            Que souhaitez-vous faire ?
             """
-            #Avez-vous un jour ou un moment de la journée qui vous convient le mieux pour ce rendez-vous ?
         else:
             end_welcome_text = "Je suis là pour vous aider en l'absence de nos conseillers. Pour votre premier appel, je peux répondre à vos questions sur nos formations, ou planifier un rendez-vous avec un conseiller en formation."
                 
@@ -350,6 +350,8 @@ class AgentsGraph:
                 chat_history = state.get('history', [])
                 calendar_agent_answer = await self.calendar_agent_instance.run_async(user_input, chat_history)
             
+                await self.outgoing_manager.enqueue_text(calendar_agent_answer)
+
                 state["history"].append(("assistant", calendar_agent_answer))
                 return state
                 

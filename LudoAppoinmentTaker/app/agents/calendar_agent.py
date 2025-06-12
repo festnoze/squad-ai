@@ -36,12 +36,19 @@ class CalendarAgent:
         return datetime.now().strftime("%A, %B %d, %Y")
 
     @tool
-    def get_appointments(start_date: str, end_date: str) -> list[dict[str, any]]:
+    async def get_appointments(start_date: str, end_date: str) -> list[dict[str, any]]:
         """Get the existing appointments between the start and end dates for the owner"""
-        return CalendarAgent.salesforce_api_client.get_scheduled_appointments_async(start_date, end_date, CalendarAgent.owner_id) #TODO: manage "CalendarAgent.owner_id" another way to allow multi-calls handling.
+        taken_slots = await CalendarAgent.salesforce_api_client.get_scheduled_appointments_async(start_date, end_date, CalendarAgent.owner_id) #TODO: manage "CalendarAgent.owner_id" another way to allow multi-calls handling.
+        logger = logging.getLogger(__name__)
+        logger.info(f"Called 'get_appointments' tool for owner {CalendarAgent.owner_id} between {start_date} and {end_date}.")
+        if taken_slots:
+            logger.info(f"Here is the list of the owner calendar taken slots: \n{'\n'.join(f'- De {slot['start_datetime']} à {slot['end_datetime']}: {slot['subject']}' for slot in taken_slots)}")
+        else:
+            logger.info("No appointments found for the owner between the specified dates.")
+        return taken_slots
 
     @tool
-    def schedule_new_appointment(
+    async def schedule_new_appointment(
             user_id: str,
             date_and_time: str,
             object: str | None = None,
@@ -52,7 +59,7 @@ class CalendarAgent:
         object = object if object else "Demande de conseil en formation prospect"
         description = description if description else "RV pris par l'IA après appel entrant du prospect"
         
-        return CalendarAgent.salesforce_api_client.schedule_new_appointment_async(user_id, CalendarAgent.owner_id, date_and_time, object, description, duration) #TODO: manage "CalendarAgent.owner_id" another way to allow multi-calls handling.
+        return await CalendarAgent.salesforce_api_client.schedule_new_appointment_async(user_id, CalendarAgent.owner_id, date_and_time, object, description, duration) #TODO: manage "CalendarAgent.owner_id" another way to allow multi-calls handling.
 
     def _load_prompt(self):
         with open("app/agents/calendar_prompt.txt", "r", encoding="utf-8") as f:
