@@ -49,17 +49,31 @@ class PhoneCallWebsocketEventsHandler:
         
         self.audio_buffer = b""
         self.current_stream = None
-        self.start_time = None         
+        self.start_time = None
 
         # Environment and configuration settings
         self.TEMP_DIR = "static/audio"
         self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-
         os.environ['OPENAI_API_KEY'] = self.OPENAI_API_KEY
+
+        # Set Google Calendar credentials (needed for STT)
+        self.project_root = os.path.dirname(os.path.dirname(__file__))
+        self.google_calendar_credentials_filename = os.getenv(
+            "GOOGLE_CALENDAR_CREDENTIALS_FILENAME", 
+            "secrets/google-calendar-credentials.json"
+        )
+        self.google_calendar_credentials_path = os.path.join(self.project_root, self.google_calendar_credentials_filename)
+        print(self.google_calendar_credentials_path)
+
+        if os.path.exists(self.google_calendar_credentials_path):
+            os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = self.google_calendar_credentials_path
+            self.logger.info(f"Set GOOGLE_APPLICATION_CREDENTIALS to: {self.google_calendar_credentials_path}")
+        else:
+            self.logger.error(f"/!\\ Google calendar credentials file not found at {self.google_calendar_credentials_path}")
 
         # Initialize dependencies
         self.tts_provider = get_text_to_speech_provider(self.TEMP_DIR, provider_name="openai", frame_rate=self.frame_rate, channels=self.channels, sample_width=self.sample_width)
-        self.stt_provider = get_speech_to_text_provider(self.TEMP_DIR, provider_name="openai", language_code="fr-FR", frame_rate=self.frame_rate)
+        self.stt_provider = get_speech_to_text_provider(self.TEMP_DIR, provider_name="hybrid", language_code="fr-FR", frame_rate=self.frame_rate)
         
         self.studi_rag_inference_api_client = StudiRAGInferenceApiClient()
         self.salesforce_client = SalesforceApiClient()

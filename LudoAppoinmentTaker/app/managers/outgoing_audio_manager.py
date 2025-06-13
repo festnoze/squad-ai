@@ -155,7 +155,7 @@ class OutgoingAudioManager(OutgoingManager):
                     self.logger.info(f"StreamSid now available after {streamSid_wait_count} attempts: {self.audio_sender.stream_sid}")
                     streamSid_wait_count = 0
                 
-                # Start pre-synthesis if not already running
+                # Start pre-synthesis for the first chunk
                 if not pre_synthesis_task:
                     self.logger.debug("Starting initial speech synthesis")
                     pre_synthesis_task = asyncio.create_task(asyncio.to_thread(
@@ -189,14 +189,14 @@ class OutgoingAudioManager(OutgoingManager):
                     text_chunks_processed += 1
                     self.logger.debug(f"- Processing speech chunk #{text_chunks_processed}: '{speech_chunk}' ({len(speech_chunk)} chars)")
                     
-                    # Immediately start the next synthesis while we send this chunk
-                    pre_synthesis_task = asyncio.create_task(asyncio.to_thread(
-                        self.synthesize_next_audio_chunk
-                    ))
-                    
                     # Send the current audio
                     send_task = asyncio.create_task(self.audio_sender.send_audio_chunk(speech_bytes))
                     
+                    # Start pre-synthesis for the next chunk in parallel
+                    pre_synthesis_task = asyncio.create_task(asyncio.to_thread(
+                        self.synthesize_next_audio_chunk
+                    ))
+
                     # Wait for the send to complete, but check for completion of next synthesis as well
                     while not send_task.done():
                         await asyncio.sleep(0.05)

@@ -30,6 +30,8 @@
 
 # Pix2Text
 
+usage du fork suivant (non-up-to-date): https://github.com/rprasad2/Pix2Text-OCR
+
 ## Update 2024.04.28: **V1.1** Released
 
 Major changes:

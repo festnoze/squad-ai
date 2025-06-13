@@ -121,7 +121,7 @@ class TestAsyncCallWrapper:
         # Assertions
         assert "Task 1 completed" in results
         assert "Task 2 completed" in results
-        assert elapsed_time < 1.5, f"Expected parallel execution to take <1.5s but took {elapsed_time:.2f}s"
+        assert elapsed_time < 1.1, f"Expected parallel execution to take <1.1s but took {elapsed_time:.2f}s"
         
     def test_run_in_thread_exception_propagation(self):
         with pytest.raises(ValueError, match="Test exception"):

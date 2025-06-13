@@ -3,6 +3,7 @@ import logging
 import os
 import io
 from pydub import AudioSegment
+from app.speech.text_to_speech_openai import TTS_OpenAI
 
 class TextToSpeechProvider(ABC):
     client: any = None
@@ -105,6 +106,22 @@ class OpenAITTSProvider(TextToSpeechProvider):
             audio_bytes = resp.read()
             return self.convert_to_PCM_UTF_8_bytes(audio_bytes)
 
+        except Exception as openai_error:
+            self.logger.error(f"OpenAI TTS failed: {openai_error}.", exc_info=True)
+            return b""
+
+    def NEW_synthesize_speech_to_bytes(self, text: str) -> bytes:
+        try:
+            audio_bytes: bytes = TTS_OpenAI.generate_speech(
+                model="tts-1-hd",
+                text=text,
+                voice="fable",
+                instructions="Parle d'une voix calme, positive, avec une diction rapide et claire",
+                speed=1.2,
+                response_format="pcm",
+                pcm_rate=self.frame_rate
+            )
+            return audio_bytes
         except Exception as openai_error:
             self.logger.error(f"OpenAI TTS failed: {openai_error}.", exc_info=True)
             return b""

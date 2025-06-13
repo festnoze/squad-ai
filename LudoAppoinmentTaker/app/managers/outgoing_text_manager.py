@@ -13,6 +13,7 @@ class OutgoingTextManager(OutgoingManager):
         self.logger = logging.getLogger(__name__)
         self.logger.info(f"OutgoingTextManager initialized for call_sid: {call_sid}")
         self._outgoing_text_func = outgoing_text_func
+        self.stream_sid = ""
 
     async def queue_data(self, text_chunk: str):
         """
