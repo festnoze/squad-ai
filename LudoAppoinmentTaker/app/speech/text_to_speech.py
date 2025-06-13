@@ -100,7 +100,7 @@ class OpenAITTSProvider(TextToSpeechProvider):
                 voice="fable",  # Better for french: fable, nova, shimmer
                 # All OpenAI TTS voices: alloy, ash, ballad, coral, echo, fable, nova, onyx, sage, shimmer
                 input=text,
-                speed=1.2
+                speed=1.0
             )
             audio_bytes = resp.read()
             return self.convert_to_PCM_UTF_8_bytes(audio_bytes)

@@ -7,6 +7,8 @@ from app.speech.text_processing import ProcessText
 from app.speech.twilio_audio_sender import TwilioAudioSender
 from app.speech.text_to_speech import TextToSpeechProvider
 from app.managers.outgoing_manager import OutgoingManager
+#
+from app.utils.async_call_wrapper import AsyncCallWrapper
 
 class OutgoingAudioManager(OutgoingManager):
     """
@@ -61,6 +63,29 @@ class OutgoingAudioManager(OutgoingManager):
         else:
             self.logger.info(f"Updated stream SID to: {stream_sid}")
         return
+
+    def synthesize_next_audio_chunk(self):
+        """
+        Gets the next text chunk and synthesizes it to audio bytes.
+        Returns None if no text is available or tuple (speech_chunk, speech_bytes) if successful.
+        """
+        try:
+            # Process this text into optimal chunks for natural speech
+            if self.text_queue_manager.is_empty():
+                return None
+            speech_chunk = self.text_queue_manager.get_next_text_chunk_sync()
+            if not speech_chunk:
+                return None
+            
+            speech_bytes = self.tts_provider.synthesize_speech_to_bytes(speech_chunk)
+            if not speech_bytes:
+                self.logger.warning(f"Failed to synthesize speech for chunk: '{speech_chunk}'")
+                return None
+                
+            return (speech_chunk, speech_bytes)
+        except Exception as e:
+            self.logger.error(f"Error in synthesize_next_audio_chunk: {e}")
+            return None
          
     async def _background_streaming_worker_async(self) -> None:
         """Background worker that continuously processes texts from the queue and sends audio to the websocket"""
@@ -70,16 +95,43 @@ class OutgoingAudioManager(OutgoingManager):
         streamSid_wait_count = 0
         max_streamSid_wait = 20  # Maximum number of attempts to wait for streamSid
         last_chunk_end_time = 0  # Track timing for natural speech flow (in ms)
+        pre_synthesis_task = None
+        next_chunk_data = None  # Will store (speech_chunk, speech_bytes)
+        
+        # Helper function to safely cancel and clean up the pre-synthesis task
+        def cleanup_pre_synthesis():
+            nonlocal pre_synthesis_task, next_chunk_data
+            if pre_synthesis_task:
+                try:
+                    if not pre_synthesis_task.done():
+                        # We can't directly cancel a thread, but we'll reset the reference
+                        pass
+                except Exception as e:
+                    self.logger.error(f"Error cleaning up pre-synthesis task: {e}")
+                pre_synthesis_task = None
+            next_chunk_data = None
+
+        # Create a helper function to create a task for async.to_thread-like behavior
+        async def create_synthesis_task():
+            nonlocal pre_synthesis_task
+            if not pre_synthesis_task or pre_synthesis_task.done():
+                pre_synthesis_task = asyncio.create_task(asyncio.to_thread(
+                    self.synthesize_next_audio_chunk
+                ))
+            return pre_synthesis_task
+
         while True:
             if self.ask_to_stop_streaming_worker:
                 self.logger.info("Stopping audio streaming worker asked")
+                cleanup_pre_synthesis()
                 break
 
             if self.streaming_interuption_asked:
-                self.logger.info("Streaming interuption asked")
+                self.logger.info("Streaming interruption asked")
                 self.audio_sender.streaming_interuption_asked = True
                 self.audio_sender.is_sending = False
                 self.streaming_interuption_asked = False
+                cleanup_pre_synthesis()
                 continue
             
             if not self.is_sending_speech():
@@ -103,21 +155,53 @@ class OutgoingAudioManager(OutgoingManager):
                     self.logger.info(f"StreamSid now available after {streamSid_wait_count} attempts: {self.audio_sender.stream_sid}")
                     streamSid_wait_count = 0
                 
-                # Process this text into optimal chunks for natural speech
-                speech_chunk = await self.text_queue_manager.get_next_text_chunk()
-                                
-                if not speech_chunk:
-                    continue
-
-                text_chunks_processed += 1
-                self.logger.debug(f"- Processing speech chunk #{text_chunks_processed}: '{speech_chunk}' ({len(speech_chunk)} chars)")
+                # Start pre-synthesis if not already running
+                if not pre_synthesis_task:
+                    self.logger.debug("Starting initial speech synthesis")
+                    pre_synthesis_task = asyncio.create_task(asyncio.to_thread(
+                        self.synthesize_next_audio_chunk
+                    ))
                 
+                # Wait for synthesis to complete if it's running
+                if not pre_synthesis_task.done():
+                    try:
+                        # Wait with timeout to allow for interruption checks
+                        await asyncio.wait_for(asyncio.shield(pre_synthesis_task), 0.5)
+                    except asyncio.TimeoutError:
+                        # Keep waiting in the next loop iteration
+                        continue
+                    except Exception as e:
+                        self.logger.error(f"Error waiting for pre-synthesis: {e}")
+                        pre_synthesis_task = None
+                        continue
+                
+                # Get the result of the synthesis
                 try:
-                    # Synthesize speech from this chunk (returns MP3 format)
-                    speech_bytes = self.tts_provider.synthesize_speech_to_bytes(speech_chunk)
+                    next_chunk_data = pre_synthesis_task.result()
+                    pre_synthesis_task = None
                     
-                    # Send the converted PCM audio to Twilio
-                    result = await self.audio_sender.send_audio_chunk(speech_bytes)
+                    if not next_chunk_data:
+                        self.logger.debug("No speech chunk available, waiting...")
+                        await asyncio.sleep(0.1)
+                        continue
+                    
+                    speech_chunk, speech_bytes = next_chunk_data
+                    text_chunks_processed += 1
+                    self.logger.debug(f"- Processing speech chunk #{text_chunks_processed}: '{speech_chunk}' ({len(speech_chunk)} chars)")
+                    
+                    # Immediately start the next synthesis while we send this chunk
+                    pre_synthesis_task = asyncio.create_task(asyncio.to_thread(
+                        self.synthesize_next_audio_chunk
+                    ))
+                    
+                    # Send the current audio
+                    send_task = asyncio.create_task(self.audio_sender.send_audio_chunk(speech_bytes))
+                    
+                    # Wait for the send to complete, but check for completion of next synthesis as well
+                    while not send_task.done():
+                        await asyncio.sleep(0.05)
+                    
+                    result = send_task.result()
                     
                     if result:
                         self.logger.debug(f"Successfully sent text chunk #{text_chunks_processed} as audio")
@@ -127,20 +211,28 @@ class OutgoingAudioManager(OutgoingManager):
                         
                         if errors > 5 and errors % 5 == 0:
                             self.logger.error(f"Multiple audio sending errors: {errors} chunks failed")
-                    
-                except Exception as e:
-                    self.logger.error(f"Error synthesizing or sending speech: {e}")
-                    errors += 1
-                    continue
                 
-                # Wait for a natural pause between chunks (helps create more natural rhythm)
-                #await asyncio.sleep(self.pause_between_chunks)
+                except asyncio.CancelledError:
+                    self.logger.info("Pre-synthesis task was cancelled")
+                    pre_synthesis_task = None
+                    continue
+                except Exception as e:
+                    self.logger.error(f"Error processing or sending speech: {e}")
+                    errors += 1
+                    pre_synthesis_task = None
+                    await asyncio.sleep(0.2)  # Sleep briefly before retrying
+                    continue
                     
+            except asyncio.CancelledError:
+                self.logger.info("Streaming worker task was cancelled")
+                cleanup_pre_synthesis()
+                break
+                
             except Exception as e:
                 self.logger.error(f"Error in streaming worker: {e}", exc_info=True)
                 errors += 1
                 await asyncio.sleep(0.5)  # Sleep a bit longer on error
-                       
+                
     def run_background_streaming_worker(self) -> None:
         """
         Starts the streaming process in a background task

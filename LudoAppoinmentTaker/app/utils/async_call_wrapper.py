@@ -6,7 +6,7 @@ from typing import TypeVar, Callable, Any, Coroutine, Optional, cast
 
 T = TypeVar('T')
 
-### COPIED FROM 'common-tools' package ###
+### COPIED FROM/TO 'common-tools' package ###
 
 class AsyncCallWrapper:
     """

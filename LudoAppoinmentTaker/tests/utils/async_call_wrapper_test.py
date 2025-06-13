@@ -56,13 +56,78 @@ class TestAsyncCallWrapper:
         result = AsyncCallWrapper.run_in_thread(self.example_async_function(0.1, "thread"))
         assert result == "Completed with value: thread"
         
-        # Test exception propagation in thread
+    def test_parallel_thread_execution(self):
+        """Test that two methods running in parallel threads complete faster than sequential execution."""
+        import time
+        import threading
+        
+        # Create two futures to store results
+        results = [None, None]
+        
+        # Define functions to run in threads
+        async def long_task1():
+            await asyncio.sleep(1.0)
+            return "Task 1 complete"
+            
+        async def long_task2():
+            await asyncio.sleep(1.0)
+            return "Task 2 complete"
+        
+        # Start timer
+        start_time = time.time()
+        
+        # Start two threads each running a task
+        t1 = threading.Thread(target=lambda: results.__setitem__(0, AsyncCallWrapper.run_coroutine(long_task1())))
+        t2 = threading.Thread(target=lambda: results.__setitem__(1, AsyncCallWrapper.run_coroutine(long_task2())))
+        
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+        
+        # Calculate elapsed time
+        elapsed_time = time.time() - start_time
+        
+        # Assertions
+        assert results[0] == "Task 1 complete"
+        assert results[1] == "Task 2 complete"
+        assert elapsed_time < 2.0, f"Parallel execution took {elapsed_time} seconds, which is too long"
+        print(f"Parallel execution of two 1-second tasks completed in {elapsed_time:.2f} seconds")
+
+    def test_parallel_run_in_thread(self):
+        """Test that AsyncCallWrapper.run_in_thread actually runs tasks in parallel."""
+        import time
+        import concurrent.futures
+        
+        # Define tasks that will each take 1 second
+        async def task_one_second(task_id):
+            await asyncio.sleep(1.0)
+            return f"Task {task_id} completed"
+        
+        # Start timer
+        start_time = time.time()
+        
+        # Use concurrent.futures to run two tasks in parallel using run_in_thread
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            future1 = executor.submit(lambda: AsyncCallWrapper.run_in_thread(task_one_second(1)))
+            future2 = executor.submit(lambda: AsyncCallWrapper.run_in_thread(task_one_second(2)))
+            
+            # Wait for both to complete
+            results = [future1.result(), future2.result()]
+        
+        # Calculate elapsed time
+        elapsed_time = time.time() - start_time
+        
+        # Assertions
+        assert "Task 1 completed" in results
+        assert "Task 2 completed" in results
+        assert elapsed_time < 1.5, f"Expected parallel execution to take <1.5s but took {elapsed_time:.2f}s"
+        
+    def test_run_in_thread_exception_propagation(self):
         with pytest.raises(ValueError, match="Test exception"):
             AsyncCallWrapper.run_in_thread(self.async_function_with_exception())
     
-    # Test nested event loop handling with nest_asyncio
     def test_nested_event_loops(self):
-        # Create a running event loop
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         

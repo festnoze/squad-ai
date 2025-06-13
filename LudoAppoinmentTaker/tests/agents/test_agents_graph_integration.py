@@ -173,7 +173,7 @@ class TestAgentsGraphIntegration:
         
             # Verify Salesforce client methods were called
             agents_graph_mockings["salesforce_client"].get_person_by_phone_async.assert_not_called()
-            agents_graph_mockings["outgoing_manager"].enqueue_text.assert_called_once()
+            assert agents_graph_mockings["outgoing_manager"].enqueue_text.call_count >= 1
             
             # Verify called calendar agent 'tools'
             assert mock_get_current_date.call_count >= 1

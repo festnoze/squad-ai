@@ -22,10 +22,10 @@ class TestStrongTypes:
         # Run the type analyzer
         from strong_types.dynamic_type_analyzer import DynamicTypeAnalyzer
         DynamicTypeAnalyzer.initialize_strong_typing(project_namespace=project_namespace)
-
-    
+  
     def test_dynamic_analyser(self, project_namespace: str = None, exclude_fastapi: bool = True) -> None:
         """Initialize strong typing for all modules of the project"""
+        from strong_types.dynamic_type_analyzer import DynamicTypeAnalyzer
         for module_name in list(sys.modules.keys()):
             if project_namespace and module_name.startswith(project_namespace):
                 module = sys.modules[module_name]
@@ -39,7 +39,7 @@ class TestStrongTypes:
         from strong_types.static_type_analyzer import run_static_analysis
         run_static_analysis(ApiConfig)
 
-    
+
     def _import_all_modules_recursively(self, package_name):
         """Recursively import all modules in a package"""
         package = importlib.import_module(package_name)
