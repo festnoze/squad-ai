@@ -23,7 +23,7 @@ class OutgoingAudioManager(OutgoingManager):
             sample_width: int = 1,
             frame_rate: int = 8000,
             channels: int = 1,
-            loop_interval: float = 0.05, # 100ms~
+            loop_interval: float = 0.05, # 50ms~
             pause_between_chunks: float = 0.05, # 50ms~
             max_words_by_stream_chunk: int = 20,
             max_chars_by_stream_chunk: int = 100
@@ -109,16 +109,8 @@ class OutgoingAudioManager(OutgoingManager):
                 if not speech_chunk:
                     continue
 
-                # Calculate timing for this chunk
-                start_time, end_time = ProcessText.calculate_speech_timing(
-                    speech_chunk, 
-                    previous_chunk_end_time=last_chunk_end_time,
-                    min_gap=self.pause_between_chunks
-                )
-                
                 text_chunks_processed += 1
-                chunk_len = len(speech_chunk)
-                self.logger.debug(f"Processing speech chunk #{text_chunks_processed}: '{speech_chunk}' ({chunk_len} chars)")
+                self.logger.debug(f"- Processing speech chunk #{text_chunks_processed}: '{speech_chunk}' ({len(speech_chunk)} chars)")
                 
                 try:
                     # Synthesize speech from this chunk (returns MP3 format)
@@ -136,21 +128,13 @@ class OutgoingAudioManager(OutgoingManager):
                         if errors > 5 and errors % 5 == 0:
                             self.logger.error(f"Multiple audio sending errors: {errors} chunks failed")
                     
-                    # Update the last chunk end time
-                    last_chunk_end_time = end_time
-                    
-                    # Log progress periodically
-                    if text_chunks_processed % 10 == 0:
-                        self.logger.debug(
-                            f"Processed {text_chunks_processed} chunks, total duration: {last_chunk_end_time/1000:.2f} seconds"
-                        )
                 except Exception as e:
                     self.logger.error(f"Error synthesizing or sending speech: {e}")
                     errors += 1
                     continue
                 
                 # Wait for a natural pause between chunks (helps create more natural rhythm)
-                await asyncio.sleep(self.pause_between_chunks)
+                #await asyncio.sleep(self.pause_between_chunks)
                     
             except Exception as e:
                 self.logger.error(f"Error in streaming worker: {e}", exc_info=True)

@@ -96,10 +96,11 @@ class OpenAITTSProvider(TextToSpeechProvider):
     def synthesize_speech_to_bytes(self, text: str) -> bytes:
         try:            
             resp: any = self.client.audio.speech.create(
-                model="tts-1",
+                model="tts-1-hd",
                 voice="fable",  # Better for french: fable, nova, shimmer
                 # All OpenAI TTS voices: alloy, ash, ballad, coral, echo, fable, nova, onyx, sage, shimmer
-                input=text
+                input=text,
+                speed=1.2
             )
             audio_bytes = resp.read()
             return self.convert_to_PCM_UTF_8_bytes(audio_bytes)

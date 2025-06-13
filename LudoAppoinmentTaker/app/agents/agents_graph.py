@@ -172,7 +172,7 @@ class AgentsGraph:
         leads_info = await self.salesforce_api_client.get_leads_by_details_async(phone_number)
         state['agent_scratchpad']['sf_account_info'] = sf_account_info.get('data', {}) if sf_account_info else {}
         state['agent_scratchpad']['sf_leads_info'] = leads_info[0] if any(leads_info) else {}
-        self.logger.info(f"[{call_sid}] Stored sf_account_info: {sf_account_info.get('data', {})} in agent_scratchpad")
+        self.logger.info(f"[{call_sid}] Stored sf_account_info: {sf_account_info.get('data', {}) if sf_account_info else "-no SF account found-"} in agent_scratchpad")
         return state
 
     async def send_end_of_welcome_message_node(self, state: PhoneConversationState) -> dict:
