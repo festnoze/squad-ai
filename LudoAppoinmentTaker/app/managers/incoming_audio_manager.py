@@ -8,7 +8,7 @@ import webrtcvad
 import audioop
 import uuid
 import logging
-import asyncio
+import time
 from pydub import AudioSegment
 from pydub.effects import normalize
 from fastapi import WebSocket
@@ -79,8 +79,11 @@ class IncomingAudioManager(IncomingManager):
     
     def hangup_call(self):
         if self.websocket:
-            self.logger.info("Hanging up call...")
-
+            self.logger.info(f"### HANGING UP ### User silence duration of {self.consecutive_silence_duration_ms:.1f}ms exceeded max. allowed silence of {self.max_silence_duration_before_hangup_ms:.1f}ms")
+            
+            # Speak out "Au revoir" to the user first
+            self.outgoing_manager.enqueue_text("Au revoir")
+            time.sleep(1)
             # Close the websocket first
             try:
                 self.websocket.close(code=1000)
@@ -289,7 +292,6 @@ class IncomingAudioManager(IncomingManager):
 
         # Hangup the call if the user is silent for too long
         if self.consecutive_silence_duration_ms >= self.max_silence_duration_before_hangup_ms:
-            self.logger.info(f"### HANGING UP ### User silence duration of {self.consecutive_silence_duration_ms:.1f}ms exceeded max. allowed silence of {self.max_silence_duration_before_hangup_ms:.1f}ms")
             self.hangup_call()
             return
         
@@ -462,7 +464,7 @@ class IncomingAudioManager(IncomingManager):
         Updates the speaking state based on the text queue status
         This provides a more accurate representation of when audio is actually being sent
         """
-        is_sending_audio = self.outgoing_manager.is_sending_speech()
+        is_sending_audio = self.outgoing_manager.is_sending()
         if is_sending_audio != self.is_speaking:
             if is_sending_audio:
                 self.is_speaking = True

@@ -7,6 +7,7 @@ import json
 import datetime
 import asyncio
 import os
+import re
 
 class SalesforceApiClient:
     _client_id = '3MVG9IKwJOi7clC2.8QIzh9BkM6NhU53bup6EUfFQiXJ01nh.l2YJKF5vbNWqPkFEdjgzAXIqK3U1p2WCBUD3'
@@ -127,11 +128,18 @@ class SalesforceApiClient:
         if not subject or not start_datetime:
             self.logger.info("Error: Required event fields (subject, start_datetime) are missing")
             return None
+
+        # Convert to UTC
+        start_datetime_utc = self._to_utc_datetime(self._get_datetime_from_str(start_datetime))
             
-        end_datetime = self._calculate_end_datetime(start_datetime, duration_minutes)
-        if not end_datetime:
+        end_datetime_utc = self._calculate_end_datetime(start_datetime_utc, duration_minutes)
+        if not end_datetime_utc:
             self.logger.info("Error: Invalid start_datetime or duration_minutes")
             return None
+
+        # Convert to UTC
+        start_datetime_utc_str = self._get_str_from_datetime(start_datetime_utc)
+        end_datetime_utc_str = self._get_str_from_datetime(end_datetime_utc)
         
         self.logger.info("Creating the Event...")
         
@@ -144,8 +152,8 @@ class SalesforceApiClient:
         # Prepare event payload
         payload_event = {
             'Subject': subject,
-            'StartDateTime': start_datetime,
-            'EndDateTime': end_datetime
+            'StartDateTime': start_datetime_utc_str,
+            'EndDateTime': end_datetime_utc_str
         }
         
         # Add optional fields if they exist
@@ -507,19 +515,28 @@ class SalesforceApiClient:
 
     ## Internal helpers ##
 
-    def _calculate_end_datetime(self, start_datetime: str, duration_minutes: int) -> str | None:
-        try:
-            # Parse the ISO format datetime string
-            start_dt = datetime.datetime.fromisoformat(start_datetime.replace('Z', '+00:00'))
-            # Add the duration in minutes
-            end_dt = start_dt + datetime.timedelta(minutes=duration_minutes)
-            # Convert back to ISO format string
-            end_datetime = end_dt.isoformat().replace('+00:00', 'Z')
-            return end_datetime
-        except ValueError as e:
-            self.logger.info(f"Error parsing start_datetime: {e}")
-            self.logger.info("Make sure start_datetime is in ISO format (e.g., '2025-05-20T14:00:00Z')")
+    def _get_datetime_from_str(self, datetime_str: str) -> datetime.datetime | None:
+        pattern = r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$'
+        if not re.match(pattern, datetime_str):
+            self.logger.info(f"Invalid 'datetime_str' paramter format: {datetime_str}")
+            self.logger.info("datetime_str must be in the format 'YYYY-MM-DDTHH:MM:SSZ', like: '2025-06-15T23:59:59Z'")
             return None
+        start_dt = datetime.datetime.strptime(datetime_str, "%Y-%m-%dT%H:%M:%SZ")
+        return start_dt
+
+    def _get_str_from_datetime(self, dt: datetime.datetime) -> str:
+        """Convert a datetime to a string in the format 'YYYY-MM-DDTHH:MM:SSZ'"""
+        return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    def _to_utc_datetime(self, dt: datetime.datetime) -> datetime.datetime:
+        """Convert a naive or local-aware datetime to UTC-aware datetime."""
+        if dt.tzinfo is None:
+            # Assume naive datetimes are in local time; convert to UTC
+            return dt.astimezone(datetime.timezone.utc)
+        return dt.astimezone(datetime.timezone.utc)
+
+    def _calculate_end_datetime(self, start_datetime: datetime.datetime, duration_minutes: int) -> datetime.datetime | None:
+        return start_datetime + datetime.timedelta(minutes=duration_minutes)
             
     async def _query_salesforce(self, soql_query: str) -> dict | None:
         """Helper method to execute a SOQL query and return the full JSON response.

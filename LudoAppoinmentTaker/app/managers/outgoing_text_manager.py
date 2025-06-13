@@ -7,6 +7,7 @@ class OutgoingTextManager(OutgoingManager):
 
     def __init__(self, call_sid: str, outgoing_text_func=None):
         super().__init__(call_sid)
+        self.call_sid = call_sid
         self.text_queue = asyncio.Queue()
         self.is_streaming = False
         self.stream_task = None
@@ -107,6 +108,10 @@ class OutgoingTextManager(OutgoingManager):
         else:
             self.logger.info(f"Updated stream SID to: {stream_sid}")
         return
+
+    def is_sending(self) -> bool:
+        """Returns True if an audio stream is currently outgoing."""
+        return self.is_streaming
 
     async def cleanup(self):
         """

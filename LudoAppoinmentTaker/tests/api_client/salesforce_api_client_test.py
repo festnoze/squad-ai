@@ -109,21 +109,23 @@ class TestSalesforceApiClient:
     @pytest.mark.asyncio
     async def test_schedule_new_appointment_async(self, salesforce_api_client: SalesforceApiClient):
         """Test scheduling a new appointment"""
-        # Create a test appointment in the future
-        now = datetime.utcnow()
-        start_time = now + timedelta(days=1)  # Tomorrow
-        start_datetime = start_time.strftime("%Y-%m-%dT%H:%M:%SZ")
+        now = datetime.now()
+        start_datetime = now # Today, now + timedelta(days=1)  # Tomorrow
+        start_datetime_str = start_datetime.strftime("%Y-%m-%dT%H:%M:%SZ")
         
         subject = "Test Appointment from Automated Tests"
         description = "This is a test appointment created by automated tests. Please ignore."
-        
+        owner_id = '005Aa00000K990ZIAR'
+        who_id = '003Aa00000jW2RBIA0'
+
         # Schedule the appointment
         event_id = await salesforce_api_client.schedule_new_appointment_async(
-            subject=subject,
-            start_datetime=start_datetime,
-            duration_minutes=30,
-            description=description
-        )
+                            subject=subject,
+                            start_datetime=start_datetime_str,
+                            duration_minutes=30,
+                            description=description,
+                            owner_id=owner_id,
+                            who_id=who_id)
         
         # Verify we got an event ID back
         assert event_id is not None, "Should receive an event ID when scheduling an appointment"

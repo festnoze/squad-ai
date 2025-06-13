@@ -74,11 +74,10 @@ class CalendarAgent:
 
     @tool
     async def schedule_new_appointment(
-            user_id: str,
             date_and_time: str,
+            duration: int = 30,
             object: str | None = None,
-            description: str | None = None,
-            duration: int = 30
+            description: str | None = None
         ) -> dict[str, any]:
         """Schedule a new appointment with the owner at the specified date and time"""
         object = object if object else "Demande de conseil en formation prospect"
@@ -89,18 +88,19 @@ class CalendarAgent:
         logger = logging.getLogger(__name__)
         logger.info(f"########### Called 'schedule_new_appointment' tool for {CalendarAgent.owner_id} at: {date_and_time}.")
 
-        return await CalendarAgent.salesforce_api_client.schedule_new_appointment_async(user_id, CalendarAgent.owner_id, date_and_time, object, description, duration) #TODO: manage "CalendarAgent.owner_id" another way to allow multi-calls handling.
+        #TODO: manage "CalendarAgent.*" variables another way for multi-calls handling.
+        return await CalendarAgent.salesforce_api_client.schedule_new_appointment_async(object, date_and_time, duration, description, owner_id= CalendarAgent.owner_id, who_id=CalendarAgent.user_id) 
 
     def _load_prompt(self):
         with open("app/agents/calendar_agent_prompt.txt", "r", encoding="utf-8") as f:
             return f.read()
 
-    def set_user_info(self, first_name, last_name, email, owner_id, owner_name):
+    def set_user_info(self, user_id, first_name, last_name, email, owner_id, owner_name):
         """
         Initialize the Calendar Agent with user information and configuration.
         
         Args:
-            first_name: Customer's first name
+            user_id: Customer's ID
             last_name: Customer's last name
             email: Customer's email
             owner_id: Owner's (advisor) ID
@@ -110,6 +110,8 @@ class CalendarAgent:
         self.first_name = first_name
         self.last_name = last_name
         self.email = email
+        
+        CalendarAgent.user_id = user_id
         CalendarAgent.owner_id = owner_id
         CalendarAgent.owner_name = owner_name        
         # self.calendar_service = self._init_google_calendar()

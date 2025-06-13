@@ -49,3 +49,10 @@ class OutgoingManager(abc.ABC):
         Allows setting to None when resetting after a call ends
         """
         pass
+
+    @abc.abstractmethod
+    def is_sending(self) -> bool:
+        """
+        Returns True if the data delivery process is currently running.
+        """
+        pass
