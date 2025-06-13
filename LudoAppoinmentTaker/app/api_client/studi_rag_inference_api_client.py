@@ -172,30 +172,21 @@ class StudiRAGInferenceApiClient:
     async def _stream_by_segment(response_stream: httpx.Response, interrupt_flag: Optional[dict[str, bool]] = None):
         """Process the response stream byte by byte and yield segments"""
         text_buffer = ""
-        # Set a timeout for each individual chunk read
-        chunk_timeout = 10  # 10 seconds per chunk timeout
         
-        try:
-            async for chunk in asyncio.wait_for(response_stream.aiter_bytes().__aiter__(), chunk_timeout):
-                is_interrupted = interrupt_flag and interrupt_flag.get("interrupted", False)
-                # First check if streaming should be interrupted
-                if is_interrupted:
-                    break
-                    
-                if chunk:
-                    text = chunk.decode("utf-8", errors="ignore")
-                    text_buffer += text
-                    # Yield when we have a complete thought or enough words
-                    if len(text_buffer.split()) > 10 or len(text_buffer) > 100:
-                        yield text_buffer
-                        text_buffer = ""
-            
-            # Only yield remaining text if not interrupted and there's something to yield
-            if text_buffer and not (interrupt_flag and interrupt_flag.get("interrupted", False)):
-                yield text_buffer
+        async for chunk in response_stream.aiter_bytes():
+            is_interrupted = interrupt_flag and interrupt_flag.get("interrupted", False)
+            # First check if streaming should be interrupted
+            if is_interrupted:
+                break
                 
-        except asyncio.TimeoutError:
-            # If we have any buffered text, yield it before raising the timeout
-            if text_buffer:
-                yield text_buffer
-            yield "Le serveur prend trop de temps à répondre. La communication a été interrompue."
+            if chunk:
+                text = chunk.decode("utf-8", errors="ignore")
+                text_buffer += text
+                # Yield when we have a complete thought or enough words
+                if len(text_buffer.split()) > 10 or len(text_buffer) > 100:
+                    yield text_buffer
+                    text_buffer = ""
+        
+        # Only yield remaining text if not interrupted and there's something to yield
+        if text_buffer and not (interrupt_flag and interrupt_flag.get("interrupted", False)):
+            yield text_buffer
