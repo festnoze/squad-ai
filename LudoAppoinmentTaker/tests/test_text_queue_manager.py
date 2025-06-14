@@ -17,10 +17,10 @@ class TestTextQueueManager:
         ["A short text.", "With some punctuation,", "commas, and a period."],
         ["A longer sentence that exceeds the word limit", "is to be sent in multiple chunks.", "It's the third chunk."]
     ])
-    async def test_enqueue_text(self, text_queue_manager : TextQueueManager, texts_to_add : list[str]):
+    async def test_enqueue_text_async(self, text_queue_manager : TextQueueManager, texts_to_add : list[str]):
         """Test enqueueing multiple text chunks to the queue"""
         # Reset the queue for each test case
-        await text_queue_manager.clear_queue()
+        await text_queue_manager.clear_queue_aync()
         text_queue_manager.total_enqueued_chars = 0
         
         # Track expected values
@@ -35,7 +35,7 @@ class TestTextQueueManager:
             expected_combined_text += ' ' + text
             
             # Enqueue the text chunk
-            result = await text_queue_manager.enqueue_text(text)
+            result = await text_queue_manager.enqueue_text_async(text)
             
             # Verify the chunk was correctly enqueued
             assert result, f"Enqueue should return True for valid text: '{text}'"
@@ -49,14 +49,14 @@ class TestTextQueueManager:
     @pytest.mark.asyncio
     async def test_enqueue_empty_text(self, text_queue_manager : TextQueueManager):
         """Test that enqueueing empty text returns False"""
-        result = await text_queue_manager.enqueue_text("")
+        result = await text_queue_manager.enqueue_text_async("")
         assert result is False, "Enqueue should return False for empty text"
 
     @pytest.mark.asyncio
     async def test_get_text_chunk_sentence_end(self, text_queue_manager : TextQueueManager):
         """Test getting a text chunk that ends with a sentence"""
         # Enqueue text with a sentence end
-        await text_queue_manager.enqueue_text("This is a short sentence. This is another sentence.")
+        await text_queue_manager.enqueue_text_async("This is a short sentence. This is another sentence.")
         
         # Get a chunk - should return the first sentence
         chunk = await text_queue_manager.get_next_text_chunk(max_words_by_sentence=8, max_chars_by_sentence=100)
@@ -72,7 +72,7 @@ class TestTextQueueManager:
     async def test_get_text_chunk_word_limit(self, text_queue_manager : TextQueueManager):
         """Test getting a text chunk based on word limit"""
         # Enqueue text with more than 10 words but no sentence end
-        await text_queue_manager.enqueue_text("One two three four five six seven eight nine ten eleven twelve thirteen")
+        await text_queue_manager.enqueue_text_async("One two three four five six seven eight nine ten eleven twelve thirteen")
         
         # Get a chunk - should return the first 10 words
         chunk = await text_queue_manager.get_next_text_chunk(max_words_by_sentence=10, max_chars_by_sentence=100)
@@ -92,7 +92,7 @@ class TestTextQueueManager:
         """Test is_empty method"""
         assert text_queue_manager.is_empty() is True, "Queue should be empty initially"
         
-        await text_queue_manager.enqueue_text("Some text")
+        await text_queue_manager.enqueue_text_async("Some text")
         assert text_queue_manager.is_empty() is False, "Queue should not be empty after enqueuing"
         
         await text_queue_manager.get_next_text_chunk()
@@ -101,7 +101,7 @@ class TestTextQueueManager:
     @pytest.mark.asyncio
     async def test_clear_queue(self, text_queue_manager : TextQueueManager):
         """Test clearing the queue"""
-        await text_queue_manager.enqueue_text("Text to be cleared")
-        await text_queue_manager.clear_queue()
+        await text_queue_manager.enqueue_text_async("Text to be cleared")
+        await text_queue_manager.clear_queue_aync()
         assert text_queue_manager.text_queue == ""
         assert text_queue_manager.is_empty() is True

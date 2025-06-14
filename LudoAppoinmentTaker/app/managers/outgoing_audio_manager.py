@@ -77,9 +77,9 @@ class OutgoingAudioManager(OutgoingManager):
                 return None
             
             speech_bytes = self.tts_provider.synthesize_speech_to_bytes(speech_chunk)
-            self.logger.info(f">>>>>> Synthesized speech for chunk: '{speech_chunk}'")
+            self.logger.info(f">>>>>> Synthesized speech for: '{speech_chunk}'")
             if not speech_bytes:
-                self.logger.warning(f"?? Failed to synthesize speech for chunk: '{speech_chunk}'")
+                self.logger.warning(f"?? Failed to synthesize speech for: '{speech_chunk}'")
                 return None
                 
             return speech_bytes
@@ -87,7 +87,6 @@ class OutgoingAudioManager(OutgoingManager):
         except Exception as e:
             self.logger.error(f"Error in synthesize_next_audio_chunk: {e}")
             return None
-
          
     async def _background_streaming_worker_async(self) -> None:
         """Background worker that continuously processes texts from the queue and sends audio to the websocket"""
@@ -101,13 +100,13 @@ class OutgoingAudioManager(OutgoingManager):
 
         while True:
             if self.ask_to_stop_streaming_worker:
-                self.logger.info("Stopping audio streaming worker asked")
+                self.logger.info("!!! Stopped - Background Audio Streaming Worker !!!")
                 pre_synthesis_task = None
                 break
 
             if self.streaming_interuption_asked:
-                self.logger.info("Streaming interruption asked")
-                self.audio_sender.streaming_interuption_asked = True
+                self.logger.info("!!! Interruption asked - Background Audio Streaming Worker !!!")
+                self.audio_sender.streaming_interruption_asked = True
                 self.audio_sender.is_sending = False
                 self.streaming_interuption_asked = False
                 pre_synthesis_task = None
@@ -162,12 +161,12 @@ class OutgoingAudioManager(OutgoingManager):
                     await asyncio.sleep(0.05)
                     
             except asyncio.CancelledError:
-                self.logger.info("Streaming worker task was cancelled")
+                self.logger.info("!!! Stopped - Background Audio Streaming Worker task was cancelled !!!")
                 pre_synthesis_task = None
                 break
                 
             except Exception as e:
-                self.logger.error(f"Error in streaming worker: {e}", exc_info=True)
+                self.logger.error(f"Error in Background Audio Streaming Worker: {e}", exc_info=True)
                 errors += 1
                 await asyncio.sleep(0.5)  # Sleep a bit longer on error
                 
@@ -175,44 +174,54 @@ class OutgoingAudioManager(OutgoingManager):
         """
         Starts the streaming process in a background task
         """
-        if self.is_sending() or self.sender_task is not None:
+        if self.is_sending() or self.sender_task:
             self.logger.error("Streaming is already running")
             return
             
         self.ask_to_stop_streaming_worker = False
         self.sender_task = asyncio.create_task(self._background_streaming_worker_async())
-        self.logger.info("Audio background streaming worker started")
+        self.logger.info("Started - Background Audio Streaming Worker")
         
     async def stop_background_streaming_worker_async(self) -> None:
         """
         Stops the streaming process and clears the text queue
         """
         self.audio_sender.is_sending = False
-        await self.text_queue_manager.clear_queue()
+        await self.text_queue_manager.clear_queue_aync()
 
         # Stop the background streaming worker
         if self.sender_task:
             try:
                 self.ask_to_stop_streaming_worker = True
+                self.logger.info("Asked to halt - Background Audio Streaming Worker")
                 await asyncio.wait_for(self.sender_task, timeout=5.0)
             except asyncio.TimeoutError:
-                self.logger.warning("Streaming audio worker did not stop in time, cancelling")
+                self.logger.warning("Background Audio Streaming Worker didn't stop in time - Cancelling")
                 self.sender_task.cancel()
             except Exception as e:
-                self.logger.error(f"Error stopping streaming worker: {e}")
+                self.logger.error(f"Error stopping Background Audio Streaming Worker: {e}")
             finally:
                 self.sender_task = None
 
-        self.logger.info("Audio background streaming worker stopped")
         
-    async def enqueue_text(self, text: str) -> bool:
+    def enqueue_text(self, text: str) -> bool:
         """
         Adds text to the queue for speech synthesis and streaming.
         """
-        return await self.text_queue_manager.enqueue_text(text)
+        if not self.sender_task:
+            self.run_background_streaming_worker()
+
+        # if self.sender_task and self.sender_task._state == "PENDING":
+        #     self.logger.info("/!\\ FREEZED - Background Audio Streaming Worker is frozen in 'pending' state, stop & restart it /!\\")
+        #     await self.stop_background_streaming_worker_async()
+        #     self.run_background_streaming_worker()
         
-    async def clear_text_queue(self) -> None:
-        await self.text_queue_manager.clear_queue()
+        # Don't await enqueue_text_async, no need to block the main thread
+        return self.text_queue_manager.enqueue_text_async(text)
+        
+    def clear_text_queue(self) -> None:
+        # Don't await clear_queue_aync, no need to block the main thread
+        self.text_queue_manager.clear_queue_aync()
         self.streaming_interuption_asked = True
         self.logger.info("Text queue cleared for interruption")
         

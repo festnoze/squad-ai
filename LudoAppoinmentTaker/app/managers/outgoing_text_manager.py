@@ -91,11 +91,17 @@ class OutgoingTextManager(OutgoingManager):
         else:
             print(text)
 
-    def enqueue_text(self, text: str) -> bool:
+    async def enqueue_text_async(self, text: str) -> bool:
         """
         Adds text to the queue for delivery.
         """
         return self.text_queue.put_nowait(text)
+
+    def clear_text_queue(self) -> None:
+        """
+        Clears the text queue.
+        """
+        self.text_queue = asyncio.Queue()
 
     def update_stream_sid(self, stream_sid: str) -> None:
         """

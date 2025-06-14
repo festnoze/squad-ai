@@ -72,7 +72,7 @@ class TestIncomingPhoneCallManager:
             is_speaking = True
             
             # Use the new text-based approach with the audio stream manager
-            result = await mock_outgoing_audio_manager.enqueue_text(text_buffer)
+            result = mock_outgoing_audio_manager.enqueue_text(text_buffer)
             
             if result:
                 mock_logger.info(f"Text enqueued for streaming: {len(text_buffer)} chars")
@@ -136,7 +136,7 @@ class TestIncomingPhoneCallManager:
             
             # Streaming approach
             for chunk_text, _, end_time in timed_chunks:
-                result = await mock_outgoing_audio_manager.enqueue_text(chunk_text)
+                result = mock_outgoing_audio_manager.enqueue_text(chunk_text)
                 if result:
                     total_duration_ms = end_time
                     mock_logger.debug(f"Enqueued chunk: '{chunk_text}'")
@@ -181,7 +181,7 @@ class TestIncomingPhoneCallManager:
     async def test_stop_speaking_functionality(self, mock_outgoing_audio_manager, mock_logger, mocker):
         """Test functionality of the refactored stop_speaking method"""
         # Setup mock
-        mock_outgoing_audio_manager.clear_text_queue = mocker.AsyncMock()
+        mock_outgoing_audio_manager.clear_text_queue = mocker.Mock()
         
         # Create a mock for interrupt flag
         mock_rag_interrupt_flag = {"interrupted": False}
@@ -199,7 +199,7 @@ class TestIncomingPhoneCallManager:
                 mock_logger.info("RAG streaming interrupted due to speech interruption")
                 
                 # Clear the text queue
-                await mock_outgoing_audio_manager.clear_text_queue()
+                mock_outgoing_audio_manager.clear_text_queue()
                 mock_logger.info("Cleared text queue due to speech interruption")
                 
                 # Update speaking state

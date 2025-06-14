@@ -107,8 +107,8 @@ class AgentsGraph:
             return state
 
         if user_input:
-            feedback_text = f"Très bien. Vous avez dit : \"{user_input}\"."
-            await self.outgoing_manager.enqueue_text(feedback_text)
+            feedback_text = f"Vous avez dit : \"{user_input}\". Je vous demande un instant ..."
+            self.outgoing_manager.enqueue_text(feedback_text)
 
             category = await self.analyse_user_input_for_dispatch_async(user_input, state["history"])
             state["history"].append(("user", user_input))
@@ -129,6 +129,9 @@ class AgentsGraph:
         with open(file_path, 'r', encoding='utf-8') as file:
             prompt = file.read()      
         chat_history_str = "\n".join([f"[{msg[0]}]: {msg[1]}" for msg in chat_history])
+        max_history_chars = 100000
+        if len(chat_history_str) > max_history_chars:
+            chat_history_str = chat_history_str[-max_history_chars:]
         prompt = prompt.format(user_input=user_input, chat_history=chat_history_str)
         
         response = await self.router_llm.ainvoke(prompt)
@@ -142,7 +145,7 @@ class AgentsGraph:
         phone_number = state.get('caller_phone', 'N/A')
         self.start_welcome_text = "Bonjour, je suis Studia, l'assistante virtuelle de Studi."
         
-        await self.outgoing_manager.enqueue_text(self.start_welcome_text)
+        self.outgoing_manager.enqueue_text(self.start_welcome_text)
         self.logger.info(f"[{call_sid}] Sent begin of welcome message to {phone_number}")
         return state
 
@@ -172,7 +175,7 @@ class AgentsGraph:
         leads_info = await self.salesforce_api_client.get_leads_by_details_async(phone_number)
         state['agent_scratchpad']['sf_account_info'] = sf_account_info.get('data', {}) if sf_account_info else {}
         state['agent_scratchpad']['sf_leads_info'] = leads_info[0] if any(leads_info) else {}
-        self.logger.info(f"[{call_sid}] Stored sf_account_info: {sf_account_info.get('data', {}) if sf_account_info else "-no SF account found-"} in agent_scratchpad")
+        self.logger.debug(f"[{call_sid}] Stored sf_account_info: {sf_account_info.get('data', {}) if sf_account_info else "-no SF account found-"} in agent_scratchpad")
         return state
 
     async def send_end_of_welcome_message_node(self, state: PhoneConversationState) -> dict:
@@ -198,7 +201,7 @@ class AgentsGraph:
         else:
             end_welcome_text = "Je suis là pour vous aider en l'absence de nos conseillers. Pour votre premier appel, je peux répondre à vos questions sur nos formations, ou planifier un rendez-vous avec un conseiller en formation."
                 
-        await self.outgoing_manager.enqueue_text(end_welcome_text)
+        self.outgoing_manager.enqueue_text(end_welcome_text)
 
         full_welcome_text = self.start_welcome_text + "\n" + end_welcome_text
         state["history"].append(("assistant", full_welcome_text))
@@ -236,7 +239,7 @@ class AgentsGraph:
         except Exception as e:
             self.logger.error(f"Error creating conversation: {str(e)}")
             err_msg = "Je rencontre un problème technique, le service est temporairement indisponible, merci de nous recontacter plus tard."
-            await self.outgoing_manager.enqueue_text(err_msg)
+            self.outgoing_manager.enqueue_text(err_msg)
             return str(uuid.uuid4())
 
     async def lead_agent_node(self, state: PhoneConversationState) -> dict:
@@ -250,7 +253,7 @@ class AgentsGraph:
         if not self.lead_agent_instance:
             self.logger.error(f"[{call_sid}] LeadAgent not initialized. Cannot process.")
             response_text = "Je rencontre un problème technique avec l'agent de contact."
-            await self.outgoing_manager.enqueue_text(response_text)
+            self.outgoing_manager.enqueue_text(response_text)
             return {"history": [("user", user_input), ("assistant", response_text)], "agent_scratchpad": {"error": "LeadAgent not initialized"}}
 
         try:
@@ -354,7 +357,7 @@ class AgentsGraph:
                 chat_history = state.get('history', [])
                 calendar_agent_answer = await self.calendar_agent_instance.run_async(user_input, chat_history)
             
-                await self.outgoing_manager.enqueue_text(calendar_agent_answer)
+                self.outgoing_manager.enqueue_text(calendar_agent_answer)
 
                 state["history"].append(("assistant", calendar_agent_answer))
                 return state
@@ -434,7 +437,7 @@ class AgentsGraph:
                 full_answer += chunk
                 #self.logger.info(f"Received chunk: << ... {chunk} ... >>")
                 
-                await self.outgoing_manager.enqueue_text(chunk)
+                self.outgoing_manager.enqueue_text(chunk)
 
             if full_answer:
                 self.logger.info(f"Full answer received from RAG API: '{full_answer}'")
@@ -447,6 +450,6 @@ class AgentsGraph:
             error_message = f"Je suis désolé, une erreur s'est produite lors de la communication avec le service."
             self.logger.error(f"Error in RAG API communication: {str(e)}")
             # Use enhanced text-to-speech for error messages too
-            await self.outgoing_manager.enqueue_text(error_message)
+            self.outgoing_manager.enqueue_text(error_message)
 
         return state

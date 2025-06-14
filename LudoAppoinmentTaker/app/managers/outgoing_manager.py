@@ -26,6 +26,12 @@ class OutgoingManager(abc.ABC):
             text: Text to be queued for output
         """
         pass
+
+
+    @abc.abstractmethod
+    def clear_text_queue(self) -> None:
+        """Clear the text queue."""
+        pass
     
     @abc.abstractmethod
     def run_background_streaming_worker(self) -> None:

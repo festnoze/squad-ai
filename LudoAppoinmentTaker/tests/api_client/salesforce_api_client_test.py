@@ -143,8 +143,8 @@ class TestSalesforceApiClient:
         """Test retrieving scheduled appointments"""
         # Get appointments for the next 7 days
         if fixed_date:
-            start_datetime = "2025-06-01T00:00:00Z"
-            end_datetime = "2025-06-15T23:59:59Z"
+            start_datetime = "2025-06-02T00:00:00Z"
+            end_datetime = "2025-06-03T23:59:59Z"
         else:
             now = datetime.now()
             start_datetime = now.strftime("%Y-%m-%dT%H:%M:%SZ")
