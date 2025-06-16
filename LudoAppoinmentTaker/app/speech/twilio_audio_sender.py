@@ -28,7 +28,7 @@ class TwilioAudioSender:
         self.start_time = time.time()
         self.total_send_duration = 0
         
-    async def send_audio_chunk(self, audio_chunk: bytes) -> bool:
+    async def send_audio_chunk_async(self, audio_chunk: bytes) -> bool:
         """
         Sends an audio chunk to Twilio by breaking it into smaller segments,
         with proportional delays and interruption support.

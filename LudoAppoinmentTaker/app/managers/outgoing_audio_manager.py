@@ -150,7 +150,7 @@ class OutgoingAudioManager(OutgoingManager):
                 text_chunks_processed += 1
                 
                 # Send the current audio
-                send_audio_chunk_task = asyncio.create_task(self.audio_sender.send_audio_chunk(speech_bytes))
+                send_audio_chunk_task = asyncio.create_task(self.audio_sender.send_audio_chunk_async(speech_bytes))
                 
                 # Start pre-synthesis for the next chunk in parallel of sending the current chunk
                 pre_synthesis_task = None

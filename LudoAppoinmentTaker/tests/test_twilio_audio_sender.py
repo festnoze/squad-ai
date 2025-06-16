@@ -36,25 +36,25 @@ async def test_initialization(audio_sender: TwilioAudioSender, mock_websocket):
 
 @pytest.mark.asyncio
 async def test_send_audio_chunk_empty_audio(audio_sender: TwilioAudioSender, caplog):
-    assert not await audio_sender.send_audio_chunk(b'')
+    assert not await audio_sender.send_audio_chunk_async(b'')
     assert "send_audio_chunk called with empty audio_chunk" in caplog.text
 
 @pytest.mark.asyncio
 async def test_send_audio_chunk_no_stream_sid(mock_websocket, caplog):
     sender = TwilioAudioSender(websocket=mock_websocket, stream_sid=None)
-    assert not await sender.send_audio_chunk(generate_pcm_audio(100))
+    assert not await sender.send_audio_chunk_async(generate_pcm_audio(100))
     assert "No stream_sid provided" in caplog.text
 
 @pytest.mark.asyncio
 async def test_send_audio_chunk_no_websocket(caplog):
     sender = TwilioAudioSender(websocket=None, stream_sid="test_sid")
-    assert not await sender.send_audio_chunk(generate_pcm_audio(100))
+    assert not await sender.send_audio_chunk_async(generate_pcm_audio(100))
     assert "WebSocket is not set" in caplog.text
 
 @pytest.mark.asyncio
 async def test_send_audio_chunk_websocket_closed(audio_sender: TwilioAudioSender, mock_websocket, caplog):
     mock_websocket.closed = True
-    assert not await audio_sender.send_audio_chunk(generate_pcm_audio(100))
+    assert not await audio_sender.send_audio_chunk_async(generate_pcm_audio(100))
     assert "WebSocket is closed" in caplog.text
 
 @pytest.mark.asyncio
@@ -62,7 +62,7 @@ async def test_send_audio_chunk_websocket_closed(audio_sender: TwilioAudioSender
 async def test_send_audio_chunk_lin2ulaw_error(mock_lin2ulaw, audio_sender: TwilioAudioSender, caplog):
     mock_lin2ulaw.side_effect = audioop.error("conversion failed")
     audio_data = generate_pcm_audio(100)
-    assert not await audio_sender.send_audio_chunk(audio_data)
+    assert not await audio_sender.send_audio_chunk_async(audio_data)
     assert "Error converting PCM to μ-law" in caplog.text
     mock_lin2ulaw.assert_called_once_with(audio_data, 2)
 
@@ -80,7 +80,7 @@ async def test_send_audio_chunk_single_segment_success(mock_time, mock_lin2ulaw,
     mulaw_audio = b'\x7F' * (len(pcm_audio) // 2)
     mock_lin2ulaw.return_value = mulaw_audio
 
-    result = await audio_sender.send_audio_chunk(pcm_audio)
+    result = await audio_sender.send_audio_chunk_async(pcm_audio)
     assert result
 
     mock_lin2ulaw.assert_called_once_with(pcm_audio, 2)
@@ -115,7 +115,7 @@ async def test_send_audio_chunk_multiple_segments_success(mock_time, mock_lin2ul
     mulaw_audio_full = b'\xAA' * (len(pcm_audio) // 2)
     mock_lin2ulaw.return_value = mulaw_audio_full
 
-    result = await audio_sender.send_audio_chunk(pcm_audio)
+    result = await audio_sender.send_audio_chunk_async(pcm_audio)
     assert result
 
     mock_lin2ulaw.assert_called_once_with(pcm_audio, 2)
@@ -163,7 +163,7 @@ async def test_send_audio_chunk_interruption(mock_lin2ulaw, mock_async_sleep, au
         
     mock_websocket.send_text.side_effect = send_text_side_effect
 
-    result = await audio_sender.send_audio_chunk(pcm_audio)
+    result = await audio_sender.send_audio_chunk_async(pcm_audio)
 
     # Assert
     assert result # True as first segment was sent
@@ -186,7 +186,7 @@ async def test_send_audio_chunk_websocket_send_error_once(mock_lin2ulaw, mock_as
 
     mock_websocket.send_text.side_effect = Exception("Send failed!")
 
-    result = await audio_sender.send_audio_chunk(pcm_audio)
+    result = await audio_sender.send_audio_chunk_async(pcm_audio)
     assert not result
 
     assert mock_websocket.send_text.call_count == 1
@@ -209,7 +209,7 @@ async def test_send_audio_chunk_websocket_send_error_max_attempts_in_chunk(mock_
     
     mock_websocket.send_text.side_effect = Exception("Network error on first segment")
 
-    result = await audio_sender.send_audio_chunk(pcm_audio)
+    result = await audio_sender.send_audio_chunk_async(pcm_audio)
     assert not result 
 
     assert mock_websocket.send_text.call_count == 1 
@@ -231,11 +231,11 @@ async def test_send_audio_chunk_max_errors_across_calls(mock_lin2ulaw, mock_asyn
     audio_sender.max_consecutive_errors = 2
     audio_sender.consecutive_errors = 0 
 
-    await audio_sender.send_audio_chunk(pcm_audio) 
+    await audio_sender.send_audio_chunk_async(pcm_audio) 
     assert audio_sender.consecutive_errors == 1
     assert "Max consecutive errors (2) reached" not in caplog.text 
 
-    await audio_sender.send_audio_chunk(pcm_audio) 
+    await audio_sender.send_audio_chunk_async(pcm_audio) 
     assert audio_sender.consecutive_errors == 2
     assert "Max consecutive errors (2) reached while sending segment" in caplog.text
     
@@ -317,7 +317,7 @@ async def test_integration_send_with_interruption(mock_lin2ulaw, mock_async_slee
     mock_websocket.send_text.side_effect = interrupt_side_effect
 
     # Execute
-    result = await audio_sender.send_audio_chunk(pcm_audio)
+    result = await audio_sender.send_audio_chunk_async(pcm_audio)
     
     # Assert
     assert result  # True as segments were sent before interruption
@@ -354,7 +354,7 @@ async def test_integration_send_after_interruption(mock_lin2ulaw, mock_async_sle
     mock_websocket.send_text.side_effect = normal_send_effect
 
     # Execute
-    result = await audio_sender.send_audio_chunk(pcm_audio)
+    result = await audio_sender.send_audio_chunk_async(pcm_audio)
     
     # Assert
     assert result
