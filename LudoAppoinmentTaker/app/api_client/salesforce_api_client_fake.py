@@ -72,7 +72,10 @@ class SalesforceApiClientFake(SalesforceApiClientInterface):
                 "Id": "EVT000000000001",
                 "Subject": "Fake Meeting",
                 "StartDateTime": start_datetime,
-                "EndDateTime": end_datetime,
+                "EndDateTime": (
+                    (datetime.strptime(start_datetime, "%Y-%m-%dT%H:%M:%SZ") + timedelta(minutes=30))
+                    .strftime("%Y-%m-%dT%H:%M:%SZ")
+                ),
             }
         ]
 
