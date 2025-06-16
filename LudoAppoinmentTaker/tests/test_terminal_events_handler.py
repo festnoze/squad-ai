@@ -33,7 +33,7 @@ class TestTerminalEventsHandler:
         
         # Mock all dependencies needed by TerminalEventsHandler
         with patch('app.terminal_events_handler.StudiRAGInferenceApiClient') as mock_rag_client, \
-             patch('app.terminal_events_handler.SalesforceApiClient') as mock_sf_client, \
+             patch('app.terminal_events_handler.SalesforceApiClientInterface') as mock_sf_client, \
              patch('app.terminal_events_handler.OutgoingTextManager') as mock_outgoing_manager, \
              patch('app.terminal_events_handler.IncomingTextManager') as mock_incoming_manager, \
              patch('app.terminal_events_handler.AgentsGraph') as mock_agents_graph, \
@@ -59,7 +59,7 @@ class TestTerminalEventsHandler:
         """Test the initialization of incoming data handler."""
         
         with patch('app.terminal_events_handler.StudiRAGInferenceApiClient'), \
-             patch('app.terminal_events_handler.SalesforceApiClient'), \
+             patch('app.terminal_events_handler.SalesforceApiClientInterface'), \
              patch('app.terminal_events_handler.OutgoingTextManager') as mock_outgoing_manager, \
              patch('app.terminal_events_handler.IncomingTextManager') as mock_incoming_manager, \
              patch('app.terminal_events_handler.AgentsGraph'), \
@@ -100,7 +100,7 @@ class TestTerminalEventsHandler:
         test_media_data = {"text": test_text}
         
         with patch('app.terminal_events_handler.StudiRAGInferenceApiClient'), \
-             patch('app.terminal_events_handler.SalesforceApiClient'), \
+             patch('app.terminal_events_handler.SalesforceApiClientInterface'), \
              patch('app.terminal_events_handler.OutgoingTextManager'), \
              patch('app.terminal_events_handler.IncomingTextManager') as mock_incoming_manager, \
              patch('app.terminal_events_handler.AgentsGraph'), \
@@ -127,7 +127,7 @@ class TestTerminalEventsHandler:
         }
         
         with patch('app.terminal_events_handler.StudiRAGInferenceApiClient'), \
-             patch('app.terminal_events_handler.SalesforceApiClient'), \
+             patch('app.terminal_events_handler.SalesforceApiClientInterface'), \
              patch('app.terminal_events_handler.OutgoingTextManager'), \
              patch('app.terminal_events_handler.IncomingTextManager') as mock_incoming_manager, \
              patch('app.terminal_events_handler.AgentsGraph'), \
@@ -154,7 +154,7 @@ class TestTerminalEventsHandler:
         """Test closing of a session."""
         
         with patch('app.terminal_events_handler.StudiRAGInferenceApiClient'), \
-             patch('app.terminal_events_handler.SalesforceApiClient'), \
+             patch('app.terminal_events_handler.SalesforceApiClientInterface'), \
              patch('app.terminal_events_handler.OutgoingTextManager') as mock_outgoing_manager, \
              patch('app.terminal_events_handler.IncomingTextManager'), \
              patch('app.terminal_events_handler.AgentsGraph'), \
@@ -182,7 +182,7 @@ class TestTerminalEventsHandler:
         """Test handling of the stop event."""
         
         with patch('app.terminal_events_handler.StudiRAGInferenceApiClient'), \
-             patch('app.terminal_events_handler.SalesforceApiClient'), \
+             patch('app.terminal_events_handler.SalesforceApiClientInterface'), \
              patch('app.terminal_events_handler.OutgoingTextManager'), \
              patch('app.terminal_events_handler.IncomingTextManager') as mock_incoming_manager, \
              patch('app.terminal_events_handler.AgentsGraph'), \
@@ -212,7 +212,7 @@ class TestTerminalEventsHandler:
         
         # Test with two inputs: a normal message and then "bye" to exit the loop
         with patch('app.terminal_events_handler.StudiRAGInferenceApiClient'), \
-             patch('app.terminal_events_handler.SalesforceApiClient'), \
+             patch('app.terminal_events_handler.SalesforceApiClientInterface'), \
              patch('app.terminal_events_handler.OutgoingTextManager'), \
              patch('app.terminal_events_handler.IncomingTextManager'), \
              patch('app.terminal_events_handler.AgentsGraph'), \

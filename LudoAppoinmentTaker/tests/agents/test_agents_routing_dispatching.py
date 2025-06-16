@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, AsyncMock
 from app.agents.agents_graph import AgentsGraph
 from app.managers.outgoing_manager import OutgoingManager
 from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
-from app.api_client.salesforce_api_client import SalesforceApiClient
+from app.api_client.salesforce_api_client_interface import SalesforceApiClientInterface
 
 @pytest.mark.asyncio
 class TestAgentsRoutingDispatching:
@@ -49,6 +49,8 @@ class TestAgentsRoutingDispatching:
         # Assert
         assert result == awaited_dispatch
 
+
+    ### Fixture ###
     
     @pytest.fixture
     def agents_graph_mockings(self):
@@ -95,8 +97,8 @@ class TestAgentsRoutingDispatching:
             ]
         }
         
-        # Create mock for SalesforceApiClient with all necessary methods
-        mock_salesforce_client = MagicMock(spec=SalesforceApiClient)
+        # Create mock for SalesforceApiClientInterface with all necessary methods
+        mock_salesforce_client = MagicMock(spec=SalesforceApiClientInterface)
         
         # Mock get_person_by_phone_async method
         mock_salesforce_client.get_person_by_phone_async = AsyncMock()

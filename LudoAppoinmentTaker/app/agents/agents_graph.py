@@ -17,7 +17,7 @@ from app.agents.sf_agent import SFAgent
 
 # Clients
 from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
-from app.api_client.salesforce_api_client import SalesforceApiClient
+from app.api_client.salesforce_api_client_interface import SalesforceApiClientInterface
 from app.managers.outgoing_manager import OutgoingManager
 from llms.llm_info import LlmInfo
 from llms.langchain_factory import LangChainFactory
@@ -25,14 +25,14 @@ from llms.langchain_adapter_type import LangChainAdapterType
 
 class AgentsGraph:
     start_welcome_text = ""
-    def __init__(self, outgoing_manager: OutgoingManager, studi_rag_client: StudiRAGInferenceApiClient, salesforce_client: SalesforceApiClient, call_sid: str):
+    def __init__(self, outgoing_manager: OutgoingManager, studi_rag_client: StudiRAGInferenceApiClient, salesforce_client: SalesforceApiClientInterface, call_sid: str):
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
         self.call_sid = call_sid
         self.logger.info(f"[{self.call_sid}] Agents graph initialization")
         
         self.studi_rag_inference_api_client = studi_rag_client
-        self.salesforce_api_client = salesforce_client
+        self.salesforce_api_client: SalesforceApiClientInterface = salesforce_client
 
         self.outgoing_manager: OutgoingManager = outgoing_manager
         

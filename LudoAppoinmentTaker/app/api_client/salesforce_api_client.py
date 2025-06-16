@@ -8,8 +8,9 @@ import datetime
 import asyncio
 import os
 import re
+from app.api_client.salesforce_api_client_interface import SalesforceApiClientInterface
 
-class SalesforceApiClient:
+class SalesforceApiClient(SalesforceApiClientInterface):
     _client_id = '3MVG9IKwJOi7clC2.8QIzh9BkM6NhU53bup6EUfFQiXJ01nh.l2YJKF5vbNWqPkFEdjgzAXIqK3U1p2WCBUD3'
     _username = 'etienne.millerioux@studi.fr'
     _private_key_file = 'salesforce_server_private.key'

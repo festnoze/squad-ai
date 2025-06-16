@@ -1,14 +1,18 @@
 import os
+import logging
+
 from datetime import datetime, timedelta
 from langchain.tools import tool, BaseTool
 from langchain.agents import AgentExecutor, create_tool_calling_agent, create_react_agent
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+
+from app.api_client.salesforce_api_client_interface import SalesforceApiClientInterface
+from app.api_client.salesforce_api_client_fake import SalesforceApiClientFake
 from app.api_client.salesforce_api_client import SalesforceApiClient
-import logging
 
 class CalendarAgent:        
-    salesforce_api_client = SalesforceApiClient()
+    salesforce_api_client: SalesforceApiClientInterface = SalesforceApiClientFake()
     owner_id = None
     owner_name = None
     

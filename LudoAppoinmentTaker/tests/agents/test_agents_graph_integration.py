@@ -5,7 +5,7 @@ from app.agents.agents_graph import AgentsGraph
 from app.agents.phone_conversation_state_model import PhoneConversationState
 from app.managers.outgoing_manager import OutgoingManager
 from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
-from app.api_client.salesforce_api_client import SalesforceApiClient
+from app.api_client.salesforce_api_client_interface import SalesforceApiClientInterface
 from app.agents.calendar_agent import CalendarAgent
 
 @pytest.mark.asyncio
@@ -131,8 +131,8 @@ class TestAgentsGraphIntegration:
         
         # Set up mocks for calendar agent methods
         with patch.object(CalendarAgent, 'get_current_date_tool', return_value="Monday, 1 April, 2025") as mock_get_current_date, \
-             patch.object(SalesforceApiClient, 'get_scheduled_appointments_async', return_value=[{"date": "2025-4-2", "time": "15:00", "object": "test slot"}]) as mock_get_appointments, \
-             patch.object(SalesforceApiClient, 'schedule_new_appointment_async', return_value={}) as mock_schedule_new_appointment:
+             patch.object(SalesforceApiClientInterface, 'get_scheduled_appointments_async', return_value=[{"date": "2025-4-2", "time": "15:00", "object": "test slot"}]) as mock_get_appointments, \
+             patch.object(SalesforceApiClientInterface, 'schedule_new_appointment_async', return_value={}) as mock_schedule_new_appointment:
             
             # Set up initial state with a user query about scheduling an appointment
             init_msg = "Bonjour, je suis votre assistant Studi. Comment puis-je vous aider aujourd'hui ?"
@@ -226,8 +226,8 @@ class TestAgentsGraphIntegration:
             ]
         }
         
-        # Create mock for SalesforceApiClient with all necessary methods
-        mock_salesforce_client = MagicMock(spec=SalesforceApiClient)
+        # Create mock for SalesforceApiClientInterface with all necessary methods
+        mock_salesforce_client = MagicMock(spec=SalesforceApiClientInterface)
         
         # Mock get_person_by_phone_async method
         mock_salesforce_client.get_person_by_phone_async = AsyncMock()

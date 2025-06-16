@@ -14,6 +14,9 @@ from app.managers.incoming_audio_manager import IncomingAudioManager
 from app.managers.outgoing_audio_manager import OutgoingAudioManager
 #
 from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
+#
+from app.api_client.salesforce_api_client_interface import SalesforceApiClientInterface
+from app.api_client.salesforce_api_client_fake import SalesforceApiClientFake
 from app.api_client.salesforce_api_client import SalesforceApiClient
 
 class PhoneCallWebsocketEventsHandler:
@@ -76,7 +79,7 @@ class PhoneCallWebsocketEventsHandler:
         self.stt_provider = get_speech_to_text_provider(self.TEMP_DIR, provider_name="hybrid", language_code="fr-FR", frame_rate=self.frame_rate)
         
         self.studi_rag_inference_api_client = StudiRAGInferenceApiClient()
-        self.salesforce_client = SalesforceApiClient()
+        self.salesforce_client: SalesforceApiClientInterface = SalesforceApiClientFake()
         
         self.outgoing_audio_processing = OutgoingAudioManager(
                                     websocket=self.websocket, 
