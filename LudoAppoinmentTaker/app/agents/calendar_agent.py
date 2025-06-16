@@ -1,23 +1,22 @@
 import os
 import logging
-
+#
 from datetime import datetime, timedelta
 from langchain.tools import tool, BaseTool
 from langchain.agents import AgentExecutor, create_tool_calling_agent, create_react_agent
 from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-
+#
 from app.api_client.salesforce_api_client_interface import SalesforceApiClientInterface
-from app.api_client.salesforce_api_client_fake import SalesforceApiClientFake
-from app.api_client.salesforce_api_client import SalesforceApiClient
 
 class CalendarAgent:        
-    salesforce_api_client: SalesforceApiClientInterface = SalesforceApiClientFake()
+    salesforce_api_client: SalesforceApiClientInterface
     owner_id = None
     owner_name = None
     
-    def __init__(self, llm_or_chain: any):
+    def __init__(self, llm_or_chain: any, salesforce_api_client: SalesforceApiClientInterface):
         self.logger = logging.getLogger(__name__)
+        CalendarAgent.salesforce_api_client = salesforce_api_client
         self.tools = [self.get_owner_name, self.get_current_date, self.get_appointments, self.schedule_new_appointment]
         self.llm = llm_or_chain
         self.prompt = self._load_prompt()
@@ -71,7 +70,7 @@ class CalendarAgent:
         logger = logging.getLogger(__name__)
         logger.info(f"Called 'get_appointments' tool for owner {CalendarAgent.owner_id} between {start_date} and {end_date}.")
         if taken_slots:
-            logger.info(f"Here is the list of the owner calendar taken slots: \n{'\n'.join(f'- De {slot['StartDateTime']} à {slot['EndDateTime']} - Sujet: {slot['Subject']} - Description: {slot['Description']}' for slot in taken_slots)}")
+            logger.info(f"Here is the list of the owner calendar taken slots: \n{'\n'.join(f'- De {slot.get('StartDateTime')} à {slot.get('EndDateTime')} - Sujet: {slot.get('Subject', '-')} - Description: {slot.get('Description', '-')} - Location: {slot.get('Location', '-')} - OwnerId: {slot.get('OwnerId', '-')} - WhatId: {slot.get('WhatId', '-')} - WhoId: {slot.get('WhoId', '-')}' for slot in taken_slots)}")
         else:
             logger.info("No appointments found for the owner between the specified dates.")
         return taken_slots
@@ -117,19 +116,7 @@ class CalendarAgent:
         
         CalendarAgent.user_id = user_id
         CalendarAgent.owner_id = owner_id
-        CalendarAgent.owner_name = owner_name        
-        # self.calendar_service = self._init_google_calendar()
-        # self.calendar_id = self.config["google_calendar"]["calendar_id"]
-
-        # self.duration = self.config["appointments"].get("duration_minutes", 30)
-        # self.max_slots = self.config["appointments"].get("max_slots", 3)
-        
-        # self.tz_name = "Europe/Paris"
-        # self.tz = ZoneInfo(self.tz_name)
-        # self.tz_offset = timezone(timedelta(hours=2))  # Adaptable si besoin
-        
-        # self.working_hours = self.config["appointments"]["working_hours"]
-        # self.days_ahead = self.config["appointments"].get("days_ahead", 2)
+        CalendarAgent.owner_name = owner_name
 
 
     async def run_async(self, user_input: str, chat_history: list[dict[str, str]] = None) -> dict[str, any]:
@@ -142,8 +129,6 @@ class CalendarAgent:
             elif "human" in message:
                 formatted_history.append(HumanMessage(content=message["human"]))
         try:
-            # response = await self.agent_executor.ainvoke({"input": "quel jour sommes nous ?", "chat_history": []})
-            # response = await self.agent_executor.ainvoke({"input": "Je voudrais prendre rendez-vous demain", "chat_history": []})
             response = await self.agent_executor.ainvoke({
                 "input": user_input,
                 "chat_history": formatted_history

@@ -43,7 +43,7 @@ class AgentsGraph:
         self.router_llm = LangChainFactory.create_llm_from_info(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4.1", timeout=20, temperature=0.5, api_key=os.getenv("OPENAI_API_KEY")))
         self.calendar_llm = LangChainFactory.create_llm_from_info(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4o-mini", timeout=50, temperature=0.5, api_key=os.getenv("OPENAI_API_KEY")))
         
-        self.calendar_agent_instance = CalendarAgent(llm_or_chain=self.calendar_llm)
+        self.calendar_agent_instance = CalendarAgent(llm_or_chain=self.calendar_llm, salesforce_api_client=self.salesforce_api_client)
         self.logger.info("Initialize Calendar Agent succeed")
         
         self.sf_agent_instance = SFAgent()
@@ -127,8 +127,12 @@ class AgentsGraph:
         """Analyse the user input and dispatch to the right agent"""  
         file_path = os.path.join(os.path.dirname(__file__), 'analyse_user_input_with_history_for_dispatch_prompt.txt')
         with open(file_path, 'r', encoding='utf-8') as file:
-            prompt = file.read()      
+            prompt = file.read()
+        
         chat_history_str = "\n".join([f"[{msg[0]}]: {msg[1]}" for msg in chat_history])
+        max_history_chars = 100000 # TODO: Make this adapted to max. LLM context window
+        if len(chat_history) > max_history_chars:
+            chat_history = chat_history[-max_history_chars:]
         prompt = prompt.format(user_input=user_input, chat_history=chat_history_str)
         
         response = await self.router_llm.ainvoke(prompt)

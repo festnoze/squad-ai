@@ -294,7 +294,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
                 f"WHERE Phone = '{phone_number}' OR MobilePhone = '{phone_number}' "
                 "LIMIT 1"
             )
-            self.logger.info(f"SOQL Query (Contact): {contact_query}")
+            self.logger.debug(f"SOQL Query (Contact): {contact_query}")
             encoded_contact_query = urllib.parse.quote(contact_query)
             url_contact_query = f"{self._instance_url}/services/data/{self._version_api}/query/?q={encoded_contact_query}"
 
@@ -305,7 +305,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
                 records = data.get('records', [])
                 if records:
                     contact_data = records[0]
-                    self.logger.info(f"Found Contact: {contact_data.get('Id')} - {contact_data.get('FirstName')} {contact_data.get('LastName')}")
+                    self.logger.info(f"Found Contact: Id= {contact_data.get('Id')}, Name= {contact_data.get('FirstName')} {contact_data.get('LastName')}")
                     return {'type': 'Contact', 'data': contact_data}
             except httpx.HTTPStatusError as http_err:
                 self.logger.info(f"HTTP error querying Contact: {http_err} - Status: {http_err.response.status_code}")
@@ -325,7 +325,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
                 f"WHERE (Phone = '{phone_number}' OR MobilePhone = '{phone_number}') AND IsConverted = false "
                 "LIMIT 1"
             )
-            self.logger.info(f"SOQL Query (Lead): {lead_query}")
+            self.logger.debug(f"SOQL Query (Lead): {lead_query}")
             encoded_lead_query = urllib.parse.quote(lead_query)
             url_lead_query = f"{self._instance_url}/services/data/{self._version_api}/query/?q={encoded_lead_query}"
 
@@ -376,7 +376,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
                 "ORDER BY Id DESC "
                 "LIMIT 10"
             )
-            self.logger.info(f"SOQL Query (Contact): {contact_query}")
+            self.logger.debug(f"SOQL Query (Contact): {contact_query}")
             encoded_contact_query = urllib.parse.quote(contact_query)
             url_contact_query = f"{self._instance_url}/services/data/{self._version_api}/query/?q={encoded_contact_query}"
 
@@ -391,15 +391,15 @@ class SalesforceApiClient(SalesforceApiClientInterface):
                     all_contacts.append(record)
                 return all_contacts
             except httpx.HTTPStatusError as http_err:
-                self.logger.info(f"HTTP error querying Contact: {http_err} - Status: {http_err.response.status_code}")
+                self.logger.error(f"HTTP error querying Contact: {http_err} - Status: {http_err.response.status_code}")
                 try:
-                    self.logger.info(json.dumps(http_err.response.json(), indent=2, ensure_ascii=False))
+                    self.logger.error(json.dumps(http_err.response.json(), indent=2, ensure_ascii=False))
                 except json.JSONDecodeError:
-                    self.logger.info(http_err.response.text)
+                    self.logger.error(http_err.response.text)
             except httpx.RequestError as req_err:
-                self.logger.info(f"Request error querying Contact: {str(req_err)}")
+                self.logger.error(f"Request error querying Contact: {str(req_err)}")
             except Exception as e:
-                self.logger.info(f"Generic exception querying Contact: {str(e)}")
+                self.logger.error(f"Generic exception querying Contact: {str(e)}")
             
             return None
 
@@ -438,12 +438,12 @@ class SalesforceApiClient(SalesforceApiClientInterface):
                 resp.raise_for_status()
                 all_sobjects_data = resp.json()
             except httpx.HTTPStatusError as http_err_main:
-                self.logger.info(f"HTTP error getting SObject list: {http_err_main} - Status: {http_err_main.response.status_code}")
-                try: self.logger.info(json.dumps(http_err_main.response.json(), indent=2))
-                except: self.logger.info(http_err_main.response.text)
+                self.logger.error(f"HTTP error getting SObject list: {http_err_main} - Status: {http_err_main.response.status_code}")
+                try: self.logger.error(json.dumps(http_err_main.response.json(), indent=2))
+                except: self.logger.error(http_err_main.response.text)
                 return None
             except Exception as e_main:
-                self.logger.info(f"Error fetching SObject list: {str(e_main)}")
+                self.logger.error(f"Error fetching SObject list: {str(e_main)}")
                 return None
 
             # Determine the list of SObjects to describe
