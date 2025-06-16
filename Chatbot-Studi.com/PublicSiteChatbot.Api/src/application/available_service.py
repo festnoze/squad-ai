@@ -41,6 +41,8 @@ class AvailableService:
     max_conversations_by_day = EnvHelper.get_max_conversations_by_day()
     max_messages_by_conversation = EnvHelper.get_max_messages_by_conversation()
     waiting_message = "Merci de patienter un instant ... Je cherche les informations correspondant à votre question."
+    user_repository: UserRepository = None
+    conversation_repository: ConversationRepository = None
 
     def init(activate_print = True):
         load_dotenv()
@@ -59,6 +61,12 @@ class AvailableService:
             RAGPreTreatment.domain_specific_metadata_filters_validation_and_correction_async_method = StudiPublicWebsiteRagSpecificConfig.get_domain_specific_metadata_filters_validation_and_correction_async_method
             AvailableService.inference_pipeline = RagInferencePipeline(rag= AvailableService.rag_service, default_filters= StudiPublicWebsiteRagSpecificConfig.get_domain_specific_default_filters(), metadata_descriptions= metadata_descriptions_for_studi_public_site, tools= None)
             EvaluationService.init_existing_services(AvailableService.rag_service, AvailableService.inference_pipeline)
+
+        if not AvailableService.user_repository:
+            AvailableService.user_repository = UserRepository()
+
+        if not AvailableService.conversation_repository:
+            AvailableService.conversation_repository = ConversationRepository()
 
     def re_init():
         AvailableService.rag_service = None
@@ -137,36 +145,33 @@ class AvailableService:
             device_info = user_device_info,
             id = user_id,
         )
-        user_id = await UserRepository().create_or_update_user_async(user)
+        user_id = await AvailableService.user_repository.create_or_update_user_async(user)
         return user_id
     
     @staticmethod
     async def create_new_conversation_async(user_id: UUID, messages: list[Message] = None) -> Conversation:
-        conv_repo = ConversationRepository() # TODO: do IoC for repositories instanciation
-        recent_conversation_count = await conv_repo.get_recent_conversations_count_by_user_id_async(user_id)
+        recent_conversation_count = await AvailableService.conversation_repository.get_recent_conversations_count_by_user_id_async(user_id)
         if AvailableService.max_conversations_by_day and recent_conversation_count > AvailableService.max_conversations_by_day: 
             raise QuotaOverloadException("You have reached the maximum number of conversations allowed per day.")
         
-        new_conversation = await conv_repo.create_new_conversation_empty_async(user_id)
-        new_conv = await conv_repo.get_conversation_by_id_async(new_conversation.id)
+        new_conversation = await AvailableService.conversation_repository.create_new_conversation_empty_async(user_id)
+        new_conv = await AvailableService.conversation_repository.get_conversation_by_id_async(new_conversation.id)
         if messages and any(messages):
             for message in messages:
                 new_conv.add_new_message(message.role, message.content)
-                assert await conv_repo.add_message_to_existing_conversation_async(new_conv.id, new_conv.last_message)
+                assert await AvailableService.conversation_repository.add_message_to_existing_conversation_async(new_conv.id, new_conv.last_message)
         return new_conv
 
     @staticmethod
     async def get_user_last_conversation_async(user_id: UUID) -> Conversation:
-        conv_repo = ConversationRepository() # TODO: do IoC for repositories instanciation
-        conversations = await conv_repo.get_all_user_conversations_async(user_id)
+        conversations = await AvailableService.conversation_repository.get_all_user_conversations_async(user_id)
         if any(conversations):
             return conversations[-1]
         return None
     
     @staticmethod
     async def add_message_to_user_last_conversation_or_create_one_async(user_id:UUID, new_message:str) -> Conversation:
-        conv_repo = ConversationRepository() # TODO: do IoC for repositories instanciation
-        conversations = await conv_repo.get_all_user_conversations_async(user_id)
+        conversations = await AvailableService.conversation_repository.get_all_user_conversations_async(user_id)
         if any(conversations):
             conversation = conversations[-1]
         else:
@@ -174,16 +179,15 @@ class AvailableService:
 
         if new_message:
             conversation.add_new_message("user", new_message)
-            assert await conv_repo.add_message_to_existing_conversation_async(conversation.id, conversation.last_message)
+            assert await AvailableService.conversation_repository.add_message_to_existing_conversation_async(conversation.id, conversation.last_message)
         return conversation
     
     @staticmethod
     async def add_external_message_to_conversation_async(conversation_id:UUID, new_message:str, user_role: str = "assistant") -> Conversation:
-        conv_repo = ConversationRepository()
-        conversation = await conv_repo.get_conversation_by_id_async(conversation_id)
+        conversation = await AvailableService.conversation_repository.get_conversation_by_id_async(conversation_id)
         if new_message and user_role:
             conversation.add_new_message(user_role, new_message)
-            assert await conv_repo.add_message_to_existing_conversation_async(conversation.id, conversation.last_message)
+            assert await AvailableService.conversation_repository.add_message_to_existing_conversation_async(conversation.id, conversation.last_message)
         return conversation
     
     @staticmethod
@@ -192,14 +196,13 @@ class AvailableService:
         while task_handler.is_task_ongoing(conversation_id):
             await asyncio.sleep(0.5)
         
-        conv_repo = ConversationRepository() # TODO: do IoC for repositories instanciation
-        conversation = await conv_repo.get_conversation_by_id_async(conversation_id)
+        conversation = await AvailableService.conversation_repository.get_conversation_by_id_async(conversation_id)
         if not conversation: raise ValueError(f"Conversation with ID {conversation_id} not found in database.")
         if AvailableService.max_messages_by_conversation and len(conversation.messages) > AvailableService.max_messages_by_conversation: 
             raise QuotaOverloadException("You have reached the maximum number of messages allowed per conversation.")
         
         conversation.add_new_message("user", user_query_content)
-        assert await conv_repo.add_message_to_existing_conversation_async(conversation.id, conversation.last_message)
+        assert await AvailableService.conversation_repository.add_message_to_existing_conversation_async(conversation.id, conversation.last_message)
         return conversation
         
     @staticmethod
@@ -239,9 +242,7 @@ class AvailableService:
     async def add_answer_summary_to_conversation_async(conversation, full_answer_str):
         summarized_response = await AvailableService.get_summarized_answer_async(full_answer_str)
         conversation.add_new_message("assistant", summarized_response)
-        
-        conv_repo = ConversationRepository() # TODO: do IoC for repositories instanciation
-        assert await conv_repo.add_message_to_existing_conversation_async(conversation.id, conversation.last_message)
+        assert await AvailableService.conversation_repository.add_message_to_existing_conversation_async(conversation.id, conversation.last_message)
     
     @staticmethod
     async def rag_query_retrieval_and_augmented_generation_streaming_async(conversation_history:Conversation, display_waiting_message = True, is_stream_decoded = False, is_audio_query = False, all_chunks_output: list[str] = []):
