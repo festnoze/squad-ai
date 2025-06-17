@@ -79,7 +79,7 @@ class PhoneCallWebsocketEventsHandler:
         self.stt_provider = get_speech_to_text_provider(self.TEMP_DIR, provider_name="hybrid", language_code="fr-FR", frame_rate=self.frame_rate)
         
         self.studi_rag_inference_api_client = StudiRAGInferenceApiClient()
-        self.salesforce_client: SalesforceApiClientInterface = SalesforceApiClientFake()
+        self.salesforce_client: SalesforceApiClientInterface = SalesforceApiClient()
         
         self.outgoing_audio_processing = OutgoingAudioManager(
                                     websocket=self.websocket, 

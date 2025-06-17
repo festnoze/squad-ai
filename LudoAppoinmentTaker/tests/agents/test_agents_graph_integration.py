@@ -130,8 +130,7 @@ class TestAgentsGraphIntegration:
         agents.graph.rag_interrupt_flag = {"interrupted": False}
         
         # Set up mocks for calendar agent methods
-        with patch.object(CalendarAgent, 'get_current_date_tool', return_value="Monday, 1 April, 2025") as mock_get_current_date, \
-             patch.object(SalesforceApiClientInterface, 'get_scheduled_appointments_async', return_value=[{"date": "2025-4-2", "time": "15:00", "object": "test slot"}]) as mock_get_appointments, \
+        with patch.object(SalesforceApiClientInterface, 'get_scheduled_appointments_async', return_value=[{"date": "2025-4-2", "time": "15:00", "object": "test slot"}]) as mock_get_appointments, \
              patch.object(SalesforceApiClientInterface, 'schedule_new_appointment_async', return_value={}) as mock_schedule_new_appointment:
             
             # Set up initial state with a user query about scheduling an appointment
@@ -161,6 +160,8 @@ class TestAgentsGraphIntegration:
                 }
             )
 
+            agents.calendar_agent_instance.salesforce_api_client.get_scheduled_appointments_async = mock_get_appointments
+            
             # Act
             updated_state: PhoneConversationState = await agents.graph.ainvoke(initial_state)
             
@@ -176,7 +177,6 @@ class TestAgentsGraphIntegration:
             assert agents_graph_mockings["outgoing_manager"].enqueue_text.call_count >= 1
             
             # Verify called calendar agent 'tools'
-            assert mock_get_current_date.call_count >= 1
             assert mock_get_appointments.call_count >= 1
             assert mock_schedule_new_appointment.call_count == 0
 

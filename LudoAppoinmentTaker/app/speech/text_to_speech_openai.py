@@ -17,7 +17,7 @@ class TTS_OpenAI:
     def generate_speech(
             model: TTSModel,
             text: str,
-            voice: VoicePreset = "alloy",
+            voice: VoicePreset = "nova",
             instructions: str = "",
             speed: float = 1.0,
             response_format: ResponseFormat = "pcm",
@@ -43,7 +43,7 @@ class TTS_OpenAI:
     def tts_playback(
             text: str,
             model: TTSModel = "tts-1",
-            voice: VoicePreset = "alloy",
+            voice: VoicePreset = "nova",
             instructions: str = "Speak in a cheerful and positive tone.",
             speed: float = 1.0,
             response_format: ResponseFormat = "pcm",

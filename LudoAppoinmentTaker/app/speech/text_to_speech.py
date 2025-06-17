@@ -113,11 +113,11 @@ class OpenAITTSProvider(TextToSpeechProvider):
     def NEW_synthesize_speech_to_bytes(self, text: str) -> bytes:
         try:
             audio_bytes: bytes = TTS_OpenAI.generate_speech(
-                model="tts-1-hd",
+                model="tts-1",
                 text=text,
-                voice="fable",
+                voice="nova",
                 instructions="Parle d'une voix calme, positive, avec une diction rapide et claire",
-                speed=1.2,
+                speed=1.0,
                 response_format="pcm",
                 pcm_rate=self.frame_rate
             )

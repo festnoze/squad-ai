@@ -232,6 +232,15 @@ class SalesforceApiClient(SalesforceApiClientInterface):
         # Create query URL
         url_query = f"{self._instance_url}/services/data/{self._version_api}/query/?q={encoded_query}"
         
+        start_date_formated = start_datetime if "T" in start_datetime else f"{start_datetime}T"
+        end_date_formated = end_datetime if "T" in end_datetime else f"{end_datetime}T"
+        #
+        if start_date_formated.endswith("T"): start_date_formated += "00:00:00"
+        if end_date_formated.endswith("T"): end_date_formated += "23:59:59"
+        #
+        if not start_date_formated.endswith("Z"): start_date_formated += "Z"
+        if not end_date_formated.endswith("Z"): end_date_formated += "Z"
+
         # Send request
         async with httpx.AsyncClient() as client:
             try:
