@@ -29,10 +29,10 @@ class TestOutgoingAudioManager:
         outgoing_audio_manager.audio_sender = audio_sender
         
         sent_chunks = []
-        async def mock_send_audio_chunk(audio_bytes):
+        async def mock_send_audio_chunk_async(audio_bytes):
             sent_chunks.append(audio_bytes)
             return True
-        outgoing_audio_manager.audio_sender.send_audio_chunk = mock_send_audio_chunk
+        outgoing_audio_manager.audio_sender.send_audio_chunk_async = mock_send_audio_chunk_async
         
         original_synthesize = outgoing_audio_manager.synthesize_next_audio_chunk
         processed_chunks = []
@@ -82,18 +82,18 @@ class TestOutgoingAudioManager:
         outgoing_audio_manager.audio_sender = mock_audio_sender
         
         sent_chunks = []
-        async def mock_send_audio_chunk(audio_bytes):
+        async def send_audio_chunk_async(audio_bytes):
             sent_chunks.append(audio_bytes)
             return True
             
-        outgoing_audio_manager.audio_sender.send_audio_chunk = mock_send_audio_chunk
+        outgoing_audio_manager.audio_sender.send_audio_chunk_async = send_audio_chunk_async
         outgoing_audio_manager.run_background_streaming_worker()
         
         # Act
         await outgoing_audio_manager.enqueue_text("Single test chunk.")
         
         # Wait for processing to complete
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(1)
         
         # Assertions
         assert len(sent_chunks) == 1, "Expected the single chunk to be sent"

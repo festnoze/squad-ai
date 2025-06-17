@@ -4,7 +4,6 @@ import os
 import logging
 from datetime import datetime, timedelta
 from app.api_client.salesforce_api_client import SalesforceApiClient
-from app.api_client.salesforce_api_client_fake import SalesforceApiClientFake
 
 from app.api_client.salesforce_api_client_interface import SalesforceApiClientInterface
 
@@ -13,8 +12,7 @@ class TestSalesforceApiClient:
     
     @pytest.fixture
     def salesforce_api_client(self) -> SalesforceApiClientInterface:
-        salesforce_api_client = SalesforceApiClientFake()
-        #salesforce_api_client = SalesforceApiClient()
+        salesforce_api_client = SalesforceApiClient()
         return salesforce_api_client
     
     def test_authenticate(self, salesforce_api_client: SalesforceApiClientInterface):

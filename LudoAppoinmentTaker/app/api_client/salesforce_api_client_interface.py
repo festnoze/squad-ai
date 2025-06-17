@@ -72,6 +72,22 @@ class SalesforceApiClientInterface(ABC):
         pass
 
     @abstractmethod
+    async def get_leads_by_details_async(self, email: str | None = None, first_name: str | None = None, last_name: str | None = None, company_name: str | None = None) -> list[dict] | None:
+        """
+        Retrieve a list of Leads from Salesforce by details (asynchronous).
+
+        Args:
+            email: Optional email to search for.
+            first_name: Optional first name to search for.
+            last_name: Optional last name to search for.
+            company_name: Optional company name to search for.
+
+        Returns:
+            A list of dictionaries containing the lead's data, or None if no matching record is found.
+        """
+        pass
+
+    @abstractmethod
     async def discover_database_async(self, sobjects_to_describe: list[str] | None = None, include_fields: bool = True) -> dict | None:
         """
         Discovers the schema of Salesforce SObjects.

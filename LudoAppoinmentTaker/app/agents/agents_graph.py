@@ -195,7 +195,7 @@ class AgentsGraph:
             
             end_welcome_text = f"""
             Merci de nous recontacter {civility} {first_name} {last_name}.
-            Je peux prendre un rendez-vous avec votre conseiller : {owner_first_name}.
+            Je peux prendre un rendez-vous avec votre conseiller {owner_first_name}.
             Je peux aussi répondre à vos questions à propos de nos formations.
             Que souhaitez-vous faire ?
             """

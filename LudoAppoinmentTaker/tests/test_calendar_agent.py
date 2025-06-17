@@ -2,6 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
+from datetime import datetime, timedelta
 from langchain_core.runnables import Runnable
 from langchain_core.messages import AIMessage
 from app.agents.calendar_agent import CalendarAgent
@@ -108,3 +109,154 @@ async def test_rendez_vous_confirme_calls_schedule(sf_client_mock, user_input, c
     agent.set_user_info("uid", "John", "Doe", "john@ex.com", "ownerId", "Alice")
     await agent.run_async(user_input, chat_history)
     sf_client_mock.schedule_new_appointment_async.assert_awaited()
+
+
+# ------------------ Tests for get_available_slots_from_scheduled_ones ------------------
+
+
+SLOT_DURATION = 30  # minutes
+
+def _slot_to_string(start_dt: datetime, duration_minutes: int = SLOT_DURATION):
+    """Format a datetime slot to dd-MM-YY HH:mm-HH:mm."""
+    end_dt = start_dt + timedelta(minutes=duration_minutes)
+    return start_dt.strftime("%d-%m-%y %H:%M") + "-" + end_dt.strftime("%H:%M")
+
+
+
+
+def _make_slot(start_dt: datetime, duration_minutes: int = 30):
+    """Helper to build a fake Salesforce appointment dict."""
+    end_dt = start_dt + timedelta(minutes=duration_minutes)
+    return {
+        "Id": "EVT_TEST",
+        "Subject": "Test Meeting",
+        "Description": "Test",
+        "StartDateTime": start_dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "EndDateTime": end_dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+
+
+# ------------------ Static availability tests ------------------
+
+@pytest.mark.parametrize(
+    "availability_timeframe, start_date, end_date, taken_slots, expected_ranges",
+    [
+        # 1. No taken slots – full morning and afternoon ranges available
+        (
+            [("9:00", "12:00"), ("13:00", "18:00")],
+            datetime(2025, 1, 6), datetime(2025, 1, 6),
+            [],
+            [
+                "2025-01-06 09:00-12:00",
+                "2025-01-06 13:00-18:00",
+            ],
+        ),
+        # 2. First slot taken (09:00-09:30) - morning range starts later
+        (
+            [("9:00", "12:00"), ("13:00", "18:00")],
+            datetime(2025, 1, 6), datetime(2025, 1, 6),
+            [_make_slot(datetime(2025, 1, 6, 9, 0))],
+            [
+                "2025-01-06 09:30-12:00",
+                "2025-01-06 13:00-18:00",
+            ],
+        ),
+        # 3. Custom opening hours 10–12 only
+        (
+            [("10:00", "12:00")],
+            datetime(2025, 1, 6), datetime(2025, 1, 6),
+            [],
+            [
+                "2025-01-06 10:00-12:00",
+            ],
+        ),
+        # 4. Two consecutive taken slots 09:00 & 09:30 - morning range starts at 10:00
+        (
+            [("9:00", "12:00"), ("13:00", "18:00")],
+            datetime(2025, 1, 6), datetime(2025, 1, 6),
+            [
+                _make_slot(datetime(2025, 1, 6, 9, 0), 30),
+                _make_slot(datetime(2025, 1, 6, 9, 30), 30),
+            ],
+            [
+                "2025-01-06 10:00-12:00",
+                "2025-01-06 13:00-18:00",
+            ],
+        ),
+        # 5. Overlapping appointments split morning availability
+        (
+            [("9:00", "12:00"), ("13:00", "18:00")],
+            datetime(2025, 1, 6), datetime(2025, 1, 6),
+            [
+                _make_slot(datetime(2025, 1, 6, 10, 0), 45),
+                _make_slot(datetime(2025, 1, 6, 10, 15), 30),
+            ],
+            [
+                "2025-01-06 09:00-10:00",
+                "2025-01-06 11:00-12:00",
+                "2025-01-06 13:00-18:00",
+            ],
+        ),
+        # 6. All slots taken within window – expect none for that timeframe
+        (
+            [("9:00", "10:00"), ("13:00", "18:00")],
+            datetime(2025, 1, 6), datetime(2025, 1, 6),
+            [
+                _make_slot(datetime(2025, 1, 6, 9, 0)),
+                _make_slot(datetime(2025, 1, 6, 9, 30)),
+            ],
+            [
+                "2025-01-06 13:00-18:00",
+            ],
+        ),
+        # 7. Friday to next Monday (weekend skip)
+        (
+            [("9:00", "10:00")],
+            datetime(2025, 1, 10),  # Friday
+            datetime(2025, 1, 13),  # Monday
+            [],
+            [
+                "2025-01-10 09:00-10:00",
+                "2025-01-13 09:00-10:00",
+            ],
+        ),
+        # 8. Multiple appointments creating fragmented availability
+        (
+            [("9:00", "18:00")],
+            datetime(2025, 1, 6), datetime(2025, 1, 6),
+            [
+                _make_slot(datetime(2025, 1, 6, 10, 0), 60),  # 10:00-11:00
+                _make_slot(datetime(2025, 1, 6, 13, 0), 60),  # 13:00-14:00
+                _make_slot(datetime(2025, 1, 6, 16, 0), 60),  # 16:00-17:00
+            ],
+            [
+                "2025-01-06 09:00-10:00",
+                "2025-01-06 11:00-13:00",
+                "2025-01-06 14:00-16:00",
+                "2025-01-06 17:00-18:00",
+            ],
+        ),
+    ],
+)
+def test_get_available_slots_from_scheduled_ones(
+    sf_client_mock,
+    availability_timeframe,
+    start_date,
+    end_date,
+    taken_slots,
+    expected_ranges,
+):
+    """Verify CalendarAgent.get_available_slots_from_scheduled_ones with consolidated time ranges."""
+    agent = CalendarAgent(DummyLLM(), sf_client_mock)
+
+    available_ranges = agent.get_available_timeframes_from_scheduled_slots(
+        start_date,
+        end_date,
+        taken_slots,
+        slot_duration_minutes=SLOT_DURATION,
+        availability_timeframe=availability_timeframe,
+    )
+
+    # Sort both lists to ensure consistent comparison regardless of order
+    assert sorted(available_ranges[:len(expected_ranges)]) == sorted(expected_ranges)
+

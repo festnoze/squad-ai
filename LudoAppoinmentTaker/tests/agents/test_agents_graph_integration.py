@@ -40,7 +40,7 @@ class TestAgentsGraphIntegration:
 
         welcome_text = """Bonjour, je suis Studia, l'assistante virtuelle de Studi.
         Merci de nous recontacter  Test User. 
-        Je peux prendre un rendez-vous avec votre conseiller : Test Owner.
+        Je peux prendre un rendez-vous avec votre conseiller Test Owner.
         Je peux aussi répondre à vos questions à propos de nos formations.
         Que souhaitez-vous faire ?"""
 
@@ -161,7 +161,7 @@ class TestAgentsGraphIntegration:
             )
 
             agents.calendar_agent_instance.salesforce_api_client.get_scheduled_appointments_async = mock_get_appointments
-            
+
             # Act
             updated_state: PhoneConversationState = await agents.graph.ainvoke(initial_state)
             

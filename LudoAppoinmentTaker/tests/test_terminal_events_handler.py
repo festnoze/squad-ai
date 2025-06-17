@@ -33,7 +33,7 @@ class TestTerminalEventsHandler:
         
         # Mock all dependencies needed by TerminalEventsHandler
         with patch('app.terminal_events_handler.StudiRAGInferenceApiClient') as mock_rag_client, \
-             patch('app.terminal_events_handler.SalesforceApiClientInterface') as mock_sf_client, \
+             patch('app.terminal_events_handler.SalesforceApiClient') as mock_sf_client, \
              patch('app.terminal_events_handler.OutgoingTextManager') as mock_outgoing_manager, \
              patch('app.terminal_events_handler.IncomingTextManager') as mock_incoming_manager, \
              patch('app.terminal_events_handler.AgentsGraph') as mock_agents_graph, \

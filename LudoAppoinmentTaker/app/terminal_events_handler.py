@@ -14,9 +14,8 @@ from app.managers.incoming_text_manager import IncomingTextManager
 from app.managers.outgoing_text_manager import OutgoingTextManager
 #
 from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
+from app.api_client.salesforce_api_client import SalesforceApiClient
 from app.api_client.salesforce_api_client_interface import SalesforceApiClientInterface
-from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
-from app.api_client.salesforce_api_client_fake import SalesforceApiClientFake
 
 class TerminalEventsHandler:
     # Class variables shared across instances
@@ -47,7 +46,7 @@ class TerminalEventsHandler:
 
         # Initialize dependencies
         self.studi_rag_inference_api_client = StudiRAGInferenceApiClient()
-        self.salesforce_api_client: SalesforceApiClientInterface = SalesforceApiClientFake()
+        self.salesforce_api_client: SalesforceApiClientInterface = SalesforceApiClient()
         
         self.outgoing_text_processing = OutgoingTextManager(
             call_sid=None,

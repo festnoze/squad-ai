@@ -66,11 +66,15 @@ class SalesforceApiClientFake(SalesforceApiClientInterface):
     ) -> List[Dict[str, Any]] | None:
         """Return at least one dummy appointment so `any(appointments)` is True."""
         await self._ensure_authenticated_async()
-
+        
+        is_btw_time_less_one_hour = datetime.strptime(end_datetime, "%Y-%m-%dT%H:%M:%SZ") - datetime.strptime(start_datetime, "%Y-%m-%dT%H:%M:%SZ") < timedelta(hours=1)
+        if is_btw_time_less_one_hour: return []
+        
         return [
             {
                 "Id": "EVT000000000001",
                 "Subject": "Fake Meeting",
+                "Description": "Fake Meeting Description",
                 "StartDateTime": start_datetime,
                 "EndDateTime": (
                     (datetime.strptime(start_datetime, "%Y-%m-%dT%H:%M:%SZ") + timedelta(minutes=30))

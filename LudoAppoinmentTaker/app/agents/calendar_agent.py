@@ -1,5 +1,6 @@
 import os
 import logging
+import time
 #
 from datetime import datetime, timedelta
 from langchain.tools import tool, BaseTool
@@ -149,12 +150,15 @@ class CalendarAgent:
 
         try:
             # Use whichever async interface the provided LLM exposes.
-            if hasattr(self.llm, "apredict_messages"):
-                resp = await self.llm.apredict_messages(messages)
-                return resp.content.strip()
-            elif hasattr(self.llm, "ainvoke"):
+            if hasattr(self.llm, "ainvoke"):
                 resp = await self.llm.ainvoke({"messages": messages})
                 return resp.content.strip() if hasattr(resp, "content") else str(resp).strip()
+            elif hasattr(self.llm, "invoke"):
+                resp = self.llm.invoke({"messages": messages})
+                return resp.content.strip() if hasattr(resp, "content") else str(resp).strip()
+            else:
+                self.logger.error("LLM categorisation failed, fallback to heuristics: LLM does not have an async interface.")
+                
         except Exception as e:
             self.logger.warning(f"LLM categorisation failed, fallback to heuristics: {e}")
 
@@ -184,12 +188,23 @@ class CalendarAgent:
             start_date = (datetime.now() + timedelta(days=1))
             end_date = (start_date + timedelta(days=2))
 
-            appointments = await CalendarAgent.salesforce_api_client.get_scheduled_appointments_async(self._to_str(start_date), self._to_str(end_date), CalendarAgent.owner_id)
-            #TODO: exclude taken slots
-            return (
-                "Je peux vous proposer un rendez-vous dans les deux prochains jours ouvrés. "
-                "Avez-vous une préférence pour l'heure ?"
+            appointments = await CalendarAgent.salesforce_api_client.get_scheduled_appointments_async(
+                self._to_str(start_date),
+                self._to_str(end_date),
+                CalendarAgent.owner_id,
             )
+
+            available = self.get_available_timeframes_from_scheduled_slots(start_date, end_date, appointments)
+
+            if not available:
+                return (
+                    "Je suis désolé, aucun créneau n'est disponible entre le " + self._to_str(start_date) + " et le " + self._to_str(end_date) + " "
+                    "Souhaitez-vous élargir la recherche ?"
+                )
+
+            # Propose the 3 first available times
+            available_timeframes = self._get_french_from_timeframes(available[:3])
+            return f"Je peux vous proposer les créneaux suivants :\n- {"\n- ".join(available_timeframes)}.\nLequel vous conviendrait ?"
 
         if category == "Demande des disponibilités":
             return "Quels jours et quelles heures de la journée vous conviennent le mieux ?"
@@ -229,6 +244,131 @@ class CalendarAgent:
         except Exception as e:
             self.logger.error(f"/!\\ Error executing calendar agent with tools: {e}")
             return ""
+
+    def _get_french_from_timeframes(self, slots: list[str]) -> str:
+        results = []
+        for slot in slots:
+            results.append(self._get_french_from_timeframe(slot))
+        return results
+
+    def _get_french_from_timeframe(self, slot: str) -> str:
+        # Expects slot in "YYYY-MM-DD HH:MM-HH:MM"
+        date_part, time_part = slot.split(" ")
+        start_time, end_time = time_part.split("-")
+        dt = datetime.strptime(date_part, "%Y-%m-%d")
+        jours = [
+            "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"
+        ]
+        mois = [
+            "", "janvier", "février", "mars", "avril", "mai", "juin",
+            "juillet", "août", "septembre", "octobre", "novembre", "décembre"
+        ]
+        jour = jours[dt.weekday()]
+        mois_nom = mois[dt.month]        
+        jour_num = str(dt.day) # Remove leading zero for day
+        debut_h, debut_m = start_time.split(":")
+        fin_h, fin_m = end_time.split(":")
+        return f"le {jour} {jour_num} {mois_nom} entre {int(debut_h)} heure {'' if debut_m == '00' else int(debut_m)} et {int(fin_h)} heure {'' if fin_m == '00' else int(fin_m)}"
     
-    def _to_str(self, datetime: datetime) -> str:
-        return datetime.strftime("%Y-%m-%dT%H:%M:%SZ")
+    def _to_str(self, dt: datetime) -> str:
+        return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    def get_available_timeframes_from_scheduled_slots(
+        self,
+        start_date_only: datetime,
+        end_date: datetime,
+        taken_slots: list[dict[str, any]],
+        slot_duration_minutes: int = 30,
+        max_weekday: int = 5,
+        availability_timeframe: list[tuple[str, str]] = None,
+    ) -> list[str]:
+        """
+        Return available appointment timeframes between start_date and end_date as consolidated ranges.
+        
+        Args:
+            start_date: Start date for availability search
+            end_date: End date for availability search
+            taken_slots: List of occupied slots from Salesforce
+            slot_duration_minutes: Duration of each slot in minutes
+            max_weekday: Maximum weekday (0=Monday, 6=Sunday), default is 5 (only weekdays)
+            availability_timeframe: List of tuples with opening hours [("09:00", "12:00"), ("13:00", "18:00")]
+                                   Default is morning 9-12 and afternoon 13-18
+        
+        Returns:
+            List of consolidated available time ranges in format "YYYY-MM-DD HH:MM-HH:MM"
+        """
+        # Set default availability timeframe if not provided
+        if availability_timeframe is None:
+            availability_timeframe = [("09:00", "12:00"), ("13:00", "18:00")]
+            
+        # Build list of occupied intervals
+        occupied: list[tuple[datetime, datetime]] = []
+        for slot in taken_slots or []:
+            try:
+                s = datetime.strptime(slot["StartDateTime"], "%Y-%m-%dT%H:%M:%SZ")
+                e = datetime.strptime(slot["EndDateTime"], "%Y-%m-%dT%H:%M:%SZ")
+                occupied.append((s, e))
+            except Exception:
+                continue
+
+        # Initialize results
+        available_ranges: list[str] = []
+        delta = timedelta(minutes=slot_duration_minutes)
+        
+        # Process each day in the range
+        start_date_only = start_date_only.date()
+        end_date_only = end_date.date()
+        
+        while start_date_only <= end_date_only:
+            # Skip weekends based on max_weekday
+            if start_date_only.weekday() < max_weekday:
+                # Process each availability timeframe for this day
+                for timeframe in availability_timeframe:
+                    start_time, end_time = timeframe
+                    
+                    # Parse timeframe hours
+                    start_hour_dt = datetime.strptime(start_time, "%H:%M")
+                    end_hour_dt = datetime.strptime(end_time, "%H:%M")
+                    
+                    # Create datetime objects for this timeframe
+                    timeframe_start = datetime.combine(
+                        start_date_only,
+                        start_hour_dt.time()
+                    )
+                    timeframe_end = datetime.combine(
+                        end_date_only,
+                        end_hour_dt.time()
+                    )
+                    
+                    # Find available slots within this timeframe
+                    available_slots: list[datetime] = []
+                    current_slot = timeframe_start
+                    
+                    while current_slot + delta <= timeframe_end:
+                        slot_end = current_slot + delta
+                        if not any(current_slot < occ_end and slot_end > occ_start for occ_start, occ_end in occupied):
+                            available_slots.append(current_slot)
+                        current_slot += delta
+                    
+                    # Consolidate consecutive slots into ranges
+                    if available_slots:
+                        ranges = []
+                        range_start = available_slots[0]
+                        prev_slot = available_slots[0]
+                        
+                        for slot in available_slots[1:] + [None]:  # Add None as sentinel
+                            if slot is None or (slot - prev_slot) != delta:
+                                # End of a consecutive range
+                                range_end = prev_slot + delta
+                                formatted_range = f"{range_start.strftime('%Y-%m-%d %H:%M')}-{range_end.strftime('%H:%M')}"
+                                ranges.append(formatted_range)
+                                if slot is not None:
+                                    range_start = slot
+                            prev_slot = slot if slot is not None else prev_slot
+                        
+                        available_ranges.extend(ranges)
+            
+            # Move to next day
+            start_date_only += timedelta(days=1)
+
+        return available_ranges
