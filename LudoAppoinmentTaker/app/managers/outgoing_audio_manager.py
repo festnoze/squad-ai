@@ -88,7 +88,7 @@ class OutgoingAudioManager(OutgoingManager):
             self.logger.error(f"Error in synthesize_next_audio_chunk: {e}")
             return None
 
-         
+     
     async def _background_streaming_worker_async(self) -> None:
         """Background worker that continuously processes texts from the queue and sends audio to the websocket"""
         self.logger.info("Background TTS and audio streaming worker started")

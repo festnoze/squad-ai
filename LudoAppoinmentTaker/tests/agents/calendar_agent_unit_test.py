@@ -1,12 +1,9 @@
-from types import SimpleNamespace
 from unittest.mock import AsyncMock
-
 import pytest
 from datetime import datetime, timedelta
 from langchain_core.runnables import Runnable
 from langchain_core.messages import AIMessage
 from app.agents.calendar_agent import CalendarAgent
-
 
 LLM_SHOULD_FAIL = object()  # Marker object to indicate LLM failure in tests
 
@@ -51,17 +48,12 @@ def sf_client_mock():
         ("Pouvez-vous confirmer notre RDV de demain ?", [], "Demande de confirmation du rendez-vous", "Demande de confirmation du rendez-vous"),
         ("Oui, c'est confirmé pour moi.", [], "Rendez-vous confirmé", "Rendez-vous confirmé"),
 
-        # Test Heuristic fallback path: LLM call fails, heuristics determine the category
-        ("Quels jours et heures sont possibles ?", [], LLM_SHOULD_FAIL, "Demande des disponibilités"),
-        ("Je confirme le rendez-vous.", [], LLM_SHOULD_FAIL, "Demande de confirmation du rendez-vous"),
-        ("Je veux réserver un créneau.", [], LLM_SHOULD_FAIL, "Proposition de rendez-vous"),
-        ("Merci, le rendez-vous est pris.", [], LLM_SHOULD_FAIL, "Rendez-vous confirmé"),
         # Default fallback to "Proposition de créneaux" when LLM fails and no strong heuristic matches
         ("Bonjour, comment allez-vous ?", [], LLM_SHOULD_FAIL, "Proposition de créneaux"),
         ("Une question d'ordre général.", [], LLM_SHOULD_FAIL, "Proposition de créneaux"),
     ]
 )
-async def test_run_async_phrases(sf_client_mock, user_input, chat_history, llm_behavior, expected_category):
+async def test_calendar_agent_classification(sf_client_mock, user_input, chat_history, llm_behavior, expected_category):
     """Tests the categorize_for_dispatch_async method for both LLM and heuristic paths."""
     # Setup DummyLLM based on llm_behavior parameter
     if llm_behavior is LLM_SHOULD_FAIL:

@@ -78,6 +78,7 @@ class TerminalEventsHandler:
         self.incoming_text_processing.set_call_sid(call_sid)
         self.incoming_text_processing.set_phone_number(calling_phone_number, call_sid)
 
+
     async def init_incoming_data_handler_async(self, calling_phone_number: str, call_sid: str) -> None:
         self.set_call_sid_and_phone_number(calling_phone_number, call_sid)
 

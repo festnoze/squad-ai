@@ -125,8 +125,7 @@ class AgentsGraph:
 
     async def analyse_user_input_for_dispatch_async(self, user_input: str, chat_history: list[dict[str, str]]) -> str:
         """Analyse the user input and dispatch to the right agent"""  
-        file_path = os.path.join(os.path.dirname(__file__), 'analyse_user_input_with_history_for_dispatch_prompt.txt')
-        with open(file_path, 'r', encoding='utf-8') as file:
+        with open("app/agents/prompts/analyse_user_input_with_history_for_dispatch_prompt.txt", 'r', encoding='utf-8') as file:
             prompt = file.read()
         
         chat_history_str = "\n".join([f"[{msg[0]}]: {msg[1]}" for msg in chat_history])

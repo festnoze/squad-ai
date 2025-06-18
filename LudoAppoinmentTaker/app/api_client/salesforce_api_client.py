@@ -1,18 +1,20 @@
 import jwt
+import os
 import httpx
 import urllib.parse
 import logging
 import time
 import json
-import datetime
+from datetime import datetime, timedelta, timezone
 import asyncio
-import os
 import re
 from app.api_client.salesforce_api_client_interface import SalesforceApiClientInterface
 
 class SalesforceApiClient(SalesforceApiClientInterface):
     _client_id = '3MVG9IKwJOi7clC2.8QIzh9BkM6NhU53bup6EUfFQiXJ01nh.l2YJKF5vbNWqPkFEdjgzAXIqK3U1p2WCBUD3'
-    _username = 'etienne.millerioux@studi.fr'
+    _username = os.getenv('SALESFORCE_USERNAME')
+    _password = os.getenv('SALESFORCE_PASSWORD')
+    _client_secret = os.getenv('SALESFORCE_CLIENT_SECRET')
     _private_key_file = 'salesforce_server_private.key'
     _is_sandbox = True
 
@@ -35,35 +37,41 @@ class SalesforceApiClient(SalesforceApiClientInterface):
             
     def authenticate(self) -> bool:
         """Authenticate with Salesforce using JWT and return success status"""
-        self.logger.info("Authenticating via JWT...")
+        self.logger.info("Salesforce Authentication in progress...")
     
-        # Read private key
-        try:
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            key_path = os.path.join(script_dir, self._private_key_file)
-            with open(key_path, 'r') as f:
-                private_key = f.read()
-        except FileNotFoundError:
-            self.logger.error(f"Error: Private key file '{self._private_key_file}' not found")
-            self._access_token = None
-            self._instance_url = None
-            return False
+        # # Read private key
+        # try:
+        #     script_dir = os.path.dirname(os.path.abspath(__file__))
+        #     key_path = os.path.join(script_dir, self._private_key_file)
+        #     with open(key_path, 'r') as f:
+        #         private_key = f.read()
+        # except FileNotFoundError:
+        #     self.logger.error(f"Error: Private key file '{self._private_key_file}' not found")
+        #     self._access_token = None
+        #     self._instance_url = None
+        #     return False
         
-        # Create JWT payload
-        payload = {
-            'iss': self._client_id,
-            'sub': self._username,
-            'aud': self._auth_url,
-            'exp': int(time.time()) + 300  # 5 minutes expiration
-        }
-        
-        # Encode JWT
-        jwt_token = jwt.encode(payload, private_key, algorithm='RS256')
-        
-        # Prepare authentication request
+        # # Create JWT payload
+        # payload = {
+        #     'iss': self._client_id,
+        #     'sub': self._username,
+        #     'aud': self._auth_url,
+        #     'exp': int(time.time()) + 300  # 5 minutes expiration
+        # }
+        # # Encode JWT
+        # jwt_token = jwt.encode(payload, private_key, algorithm='RS256')
+        # # Prepare authentication request
+        # params = {
+        #     'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        #     'assertion': jwt_token
+        # }
+
         params = {
-            'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-            'assertion': jwt_token
+            'grant_type': 'password',
+            'client_id': self._client_id,
+            'client_secret': self._client_secret,
+            'username': self._username,
+            'password': self._password
         }
         
         # Send authentication request
@@ -525,28 +533,29 @@ class SalesforceApiClient(SalesforceApiClientInterface):
 
     ## Internal helpers ##
 
-    def _get_datetime_from_str(self, datetime_str: str) -> datetime.datetime | None:
+    def _get_datetime_from_str(self, datetime_str: str) -> datetime | None:
         pattern = r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$'
         if not re.match(pattern, datetime_str):
             self.logger.info(f"Invalid 'datetime_str' paramter format: {datetime_str}")
             self.logger.info("datetime_str must be in the format 'YYYY-MM-DDTHH:MM:SSZ', like: '2025-06-15T23:59:59Z'")
             return None
-        start_dt = datetime.datetime.strptime(datetime_str, "%Y-%m-%dT%H:%M:%SZ")
+        start_dt = datetime.strptime(datetime_str, "%Y-%m-%dT%H:%M:%SZ")
+        # To test: start_dt = datetime.fromisoformat(datetime_str)
         return start_dt
 
-    def _get_str_from_datetime(self, dt: datetime.datetime) -> str:
+    def _get_str_from_datetime(self, dt: datetime) -> str:
         """Convert a datetime to a string in the format 'YYYY-MM-DDTHH:MM:SSZ'"""
         return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    def _to_utc_datetime(self, dt: datetime.datetime) -> datetime.datetime:
+    def _to_utc_datetime(self, dt: datetime) -> datetime:
         """Convert a naive or local-aware datetime to UTC-aware datetime."""
         if dt.tzinfo is None:
             # Assume naive datetimes are in local time; convert to UTC
-            return dt.astimezone(datetime.timezone.utc)
-        return dt.astimezone(datetime.timezone.utc)
+            return dt.astimezone(timezone.utc)
+        return dt.astimezone(timezone.utc)
 
-    def _calculate_end_datetime(self, start_datetime: datetime.datetime, duration_minutes: int) -> datetime.datetime | None:
-        return start_datetime + datetime.timedelta(minutes=duration_minutes)
+    def _calculate_end_datetime(self, start_datetime: datetime, duration_minutes: int) -> datetime | None:
+        return start_datetime + timedelta(minutes=duration_minutes)
             
     async def _query_salesforce(self, soql_query: str) -> dict | None:
         """Helper method to execute a SOQL query and return the full JSON response.
