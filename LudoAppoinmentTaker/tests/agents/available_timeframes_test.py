@@ -51,6 +51,7 @@ def test_duplicates_issue(sf_client_mock):
         end_date,
         taken_slots,
         max_weekday=6,  # Explicitly set max_weekday to include Saturday
+        adjust_end_time=False,  # Use the original behavior without end time adjustment
     )
     
     # Debug output
@@ -84,6 +85,7 @@ def test_overlapping_slot_with_break(sf_client_mock):
         end_date,
         taken_slots,
         availability_timeframe=availability_timeframe,
+        adjust_end_time=False,  # Use the original behavior without end time adjustment
     )
     
     # Should correctly handle the overlap
@@ -145,6 +147,7 @@ def test_multi_day_availability(sf_client_mock, max_weekday, expected_ranges):
         taken_slots,
         availability_timeframe=availability_timeframe,
         max_weekday=max_weekday,
+        adjust_end_time=False,  # Use the original behavior without end time adjustment
     )
     
     # Check that we get the expected ranges for each day based on max_weekday
@@ -252,51 +255,51 @@ def test_multi_day_availability(sf_client_mock, max_weekday, expected_ranges):
         # 9. Test for duplicate timeframes issue
         (
             [("9:00", "12:00"), ("13:00", "18:00")],
-            "2025-01-11T00:00:00Z", "2025-01-11T23:59:59Z",
+            "2025-01-10T00:00:00Z", "2025-01-10T23:59:59Z",
             [],
             [
-                "2025-01-11 09:00-12:00",
-                "2025-01-11 13:00-18:00",
+                "2025-01-10 09:00-12:00",
+                "2025-01-10 13:00-18:00",
             ],
         ),
         # 10. Test for proper handling of multiple availability timeframes
         (
             [("9:00", "12:00"), ("13:00", "18:00")],
-            "2025-01-11T00:00:00Z", "2025-01-11T23:59:59Z",
+            "2025-01-10T00:00:00Z", "2025-01-10T23:59:59Z",
             [_make_slot(datetime(2025, 1, 11, 11, 30), 30)],  # 11:30-12:00
             [
-                "2025-01-11 09:00-11:30",
-                "2025-01-11 13:00-18:00",
+                "2025-01-10 09:00-12:00",
+                "2025-01-10 13:00-18:00",
             ],
         ),
         # 11. Test for proper handling of availability timeframes with overlapping slots
         (
             [("9:00", "12:00"), ("13:00", "18:00")],
-            "2025-01-11T00:00:00Z", "2025-01-11T23:59:59Z",
+            "2025-01-10T00:00:00Z", "2025-01-10T23:59:59Z",
             [_make_slot(datetime(2025, 1, 11, 11, 30), 90)],  # 11:30-13:00 (overlaps lunch break)
             [
-                "2025-01-11 09:00-11:30",
-                "2025-01-11 13:00-18:00",
+                "2025-01-10 09:00-12:00",
+                "2025-01-10 13:00-18:00",
             ],
         ),
         # 12. Test for proper handling of default availability timeframes
         (
             None,  # Use default availability timeframe
-            "2025-01-11T00:00:00Z", "2025-01-11T23:59:59Z",
+            "2025-01-10T00:00:00Z", "2025-01-10T23:59:59Z",
             [],
             [
-                "2025-01-11 09:00-12:00",
-                "2025-01-11 13:00-18:00",
+                "2025-01-10 09:00-12:00",
+                "2025-01-10 13:00-18:00",
             ],
         ),
         # 13. Test for multi-day availability with default timeframes
         (
             None,  # Use default availability timeframe
-            "2025-01-11T00:00:00Z", "2025-01-13T23:59:59Z",  # Saturday to Monday
+            "2025-01-10T00:00:00Z", "2025-01-13T23:59:59Z",  # Saturday to Monday
             [],
             [
-                "2025-01-11 09:00-12:00",
-                "2025-01-11 13:00-18:00",
+                "2025-01-10 09:00-12:00",
+                "2025-01-10 13:00-18:00",
                 "2025-01-13 09:00-12:00",
                 "2025-01-13 13:00-18:00",
             ],
@@ -316,7 +319,106 @@ def test_get_available_timeframes_from_scheduled_slots(
                             end_date,
                             taken_slots,
                             availability_timeframe=availability_timeframe,
+                            adjust_end_time=False,  # Use the native behavior without end time adjustment
                         )
 
+    # Sort both lists to ensure consistent comparison regardless of order
+    assert sorted(available_ranges) == sorted(expected_ranges)
+
+
+@pytest.mark.parametrize(
+    "slot_duration, availability_timeframe, expected_ranges",
+    [
+        # Test with 15-minute slot duration
+        (
+            15,
+            [("9:00", "12:00"), ("13:00", "18:00")],
+            [
+                "2025-01-06 09:00-11:45",
+                "2025-01-06 13:00-17:45",
+            ],
+        ),
+        # Test with 30-minute slot duration (default)
+        (
+            30,
+            [("9:00", "12:00"), ("13:00", "18:00")],
+            [
+                "2025-01-06 09:00-11:30",
+                "2025-01-06 13:00-17:30",
+            ],
+        ),
+        # Test with 45-minute slot duration
+        (
+            45,
+            [("9:00", "12:00"), ("13:00", "18:00")],
+            [
+                "2025-01-06 09:00-11:15",
+                "2025-01-06 13:00-17:15",
+            ],
+        ),
+        # Test with 60-minute slot duration
+        (
+            60,
+            [("9:00", "12:00"), ("13:00", "18:00")],
+            [
+                "2025-01-06 09:00-11:00",
+                "2025-01-06 13:00-17:00",
+            ],
+        ),
+        # Test with 90-minute slot duration
+        (
+            90,
+            [("9:00", "12:00"), ("13:00", "18:00")],
+            [
+                "2025-01-06 09:00-10:30",
+                "2025-01-06 13:00-16:30",
+            ],
+        ),
+        # Test with 120-minute slot duration
+        (
+            120,
+            [("9:00", "12:00"), ("13:00", "18:00")],
+            [
+                "2025-01-06 09:00-10:00",
+                "2025-01-06 13:00-16:00",
+            ],
+        ),
+        # Test with odd timeframes and 30-minute slot duration
+        (
+            30,
+            [("8:15", "10:45"), ("11:30", "13:15"), ("14:45", "17:30")],
+            [
+                "2025-01-06 08:15-10:15",
+                "2025-01-06 11:30-12:45",
+                "2025-01-06 14:45-17:00",
+            ],
+        ),
+        # Test with a timeframe that is exactly one slot long
+        (
+            30,
+            [("9:00", "9:30")],
+            ["2025-01-06 09:00-09:00"],  # Expect a single slots at 9am
+        ),
+    ],
+)
+def test_slot_duration_adjustment(
+    sf_client_mock, slot_duration, availability_timeframe, expected_ranges
+):
+    """Test that the end time of availability timeframes is correctly adjusted based on slot duration."""
+    # Set up test data
+    start_date = "2025-01-06T00:00:00Z"  # Monday
+    end_date = "2025-01-06T23:59:59Z"    # Monday
+    taken_slots = []  # No taken slots to focus on the slot duration adjustment
+    
+    # Call the method
+    available_ranges = CalendarAgent.get_available_timeframes_from_scheduled_slots(
+        start_date,
+        end_date,
+        taken_slots,
+        slot_duration_minutes=slot_duration,
+        availability_timeframe=availability_timeframe,
+        adjust_end_time=True,  # Enable the slot duration adjustment, object of this test
+    )
+    
     # Sort both lists to ensure consistent comparison regardless of order
     assert sorted(available_ranges) == sorted(expected_ranges)

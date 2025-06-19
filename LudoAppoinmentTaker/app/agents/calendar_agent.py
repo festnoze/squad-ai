@@ -385,6 +385,7 @@ class CalendarAgent:
         slot_duration_minutes: int = 30,
         max_weekday: int = 5,
         availability_timeframe: list[tuple[str, str]] = None,
+        adjust_end_time: bool = False,
     ) -> list[str]:
         """
         Return available appointment timeframes between start_date and end_date as consolidated ranges.
@@ -397,6 +398,8 @@ class CalendarAgent:
             max_weekday: Maximum weekday (0=Monday, 6=Sunday), default is 5 (only weekdays)
             availability_timeframe: List of tuples with opening hours [("09:00", "12:00"), ("13:00", "18:00")]
                                    Default is morning 9-12 and afternoon 13-18
+            adjust_end_time: If True, adjust the end time of each availability timeframe by subtracting
+                            the slot duration to ensure the last appointment can complete within the timeframe
         
         Returns:
             List of consolidated available time ranges in format "YYYY-MM-DD HH:MM-HH:MM"
@@ -461,39 +464,46 @@ class CalendarAgent:
                         start_date_only,
                         start_hour_dt.time()
                     )
-                    # Adjust the end time to ensure the last appointment can complete within the timeframe
-                    # by subtracting one slot duration from the end time
+                    
+                    # Create datetime object for the end of the timeframe
                     timeframe_end = datetime.combine(
                         start_date_only,
                         end_hour_dt.time()
-                    ) - delta
+                    )
                     
                     # Find available slots within this timeframe
                     available_slots: list[datetime] = []
                     current_slot = timeframe_start
-                    
-                    while current_slot <= timeframe_end:
-                        slot_end = current_slot + delta
-                        if not any(current_slot < occ_end and slot_end > occ_start for occ_start, occ_end in occupied):
+
+                    # Loop as long as a full slot can be completed within the timeframe
+                    while current_slot + delta <= timeframe_end:
+                        # If adjusting, we explicitly exclude the very last slot that touches the end of the timeframe
+                        if adjust_end_time and (current_slot + delta == timeframe_end):
+                            break
+
+                        # Check for overlaps with already taken slots
+                        if not any(current_slot < occ_end and (current_slot + delta) > occ_start for occ_start, occ_end in occupied):
                             available_slots.append(current_slot)
+                        
                         current_slot += delta
                     
                     # Consolidate consecutive slots into ranges
                     if available_slots:
                         ranges = []
                         range_start = available_slots[0]
-                        prev_slot = available_slots[0]
-                        
-                        for slot in available_slots[1:] + [None]:  # Add None as sentinel
-                            if slot is None or (slot - prev_slot) != delta:
-                                # End of a consecutive range
-                                range_end = prev_slot + delta
+                        for i in range(1, len(available_slots)):
+                            # If the current slot is not consecutive, close the previous range
+                            if (available_slots[i] - available_slots[i-1]) != delta:
+                                range_end = available_slots[i-1] + delta
                                 formatted_range = f"{range_start.strftime('%Y-%m-%d %H:%M')}-{range_end.strftime('%H:%M')}"
                                 ranges.append(formatted_range)
-                                if slot is not None:
-                                    range_start = slot
-                            prev_slot = slot if slot is not None else prev_slot
+                                range_start = available_slots[i]
                         
+                        # Add the last consolidated range
+                        range_end = available_slots[-1] + delta
+                        formatted_range = f"{range_start.strftime('%Y-%m-%d %H:%M')}-{range_end.strftime('%H:%M')}"
+                        ranges.append(formatted_range)
+
                         available_ranges.extend(ranges)
             
             # Move to next day
