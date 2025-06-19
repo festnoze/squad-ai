@@ -85,14 +85,17 @@ class CalendarAgent:
         """Get available appointment timeframes between start_date and end_date.
         
         Args:
-            start_date: Start date for availability search
-            end_date: End date for availability search
+            start_date: Start date for availability search in format "YYYY-MM-DD"
+            end_date: End date for availability search in format "YYYY-MM-DD"
             
         Returns:
             List of available time ranges in format "YYYY-MM-DD HH:MM-HH:MM"
         """
+        if len(start_date) == 10: start_date += " 00:00:00"
         if ' ' in start_date: start_date = start_date.replace(' ', 'T')
         if not start_date.endswith("Z"): start_date += "Z"
+        
+        if len(end_date) == 10: end_date += " 00:00:00"
         if ' ' in end_date: end_date = end_date.replace(' ', 'T')
         if not end_date.endswith("Z"): end_date += "Z"
 
