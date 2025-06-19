@@ -64,7 +64,7 @@ async def test_calendar_agent_classification(sf_client_mock, user_input, chat_hi
 
     agent = CalendarAgent(llm_instance, sf_client_mock)
     # User info is needed because categorize_for_dispatch_async formats a prompt with owner_name
-    agent.set_user_info("test_user_id", "Test", "User", "test@example.com", "test_owner_id", "TestOwnerName")
+    agent._set_user_info("test_user_id", "Test", "User", "test@example.com", "test_owner_id", "TestOwnerName")
 
     # Call the method under test
     actual_category = await agent.categorize_for_dispatch_async(user_input, chat_history)
@@ -76,7 +76,7 @@ async def test_calendar_agent_classification(sf_client_mock, user_input, chat_hi
 @pytest.mark.asyncio
 async def test_proposition_de_creneaux_calls_get_appointments(sf_client_mock):
     agent = CalendarAgent(DummyLLM("Proposition de créneaux"), sf_client_mock)
-    agent.set_user_info("uid", "John", "Doe", "john@ex.com", "ownerId", "Alice")
+    agent._set_user_info("uid", "John", "Doe", "john@ex.com", "ownerId", "Alice")
 
     await agent.run_async("Je voudrais un rendez-vous", [])
     
@@ -98,7 +98,7 @@ async def test_proposition_de_creneaux_calls_get_appointments(sf_client_mock):
     ])
 async def test_rendez_vous_confirme_calls_schedule(sf_client_mock, user_input, chat_history):
     agent = CalendarAgent(DummyLLM("Rendez-vous confirmé"), sf_client_mock)
-    agent.set_user_info("uid", "John", "Doe", "john@ex.com", "ownerId", "Alice")
+    agent._set_user_info("uid", "John", "Doe", "john@ex.com", "ownerId", "Alice")
     await agent.run_async(user_input, chat_history)
     sf_client_mock.schedule_new_appointment_async.assert_awaited()
 

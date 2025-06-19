@@ -346,7 +346,7 @@ class AgentsGraph:
         if sf_account_info:        
             try:
                 # Initialize Calendar Agent with user info from SF
-                self.calendar_agent_instance.set_user_info(
+                self.calendar_agent_instance._set_user_info(
                     user_id=sf_account_info.get('Id', ''),
                     first_name=sf_account_info.get('FirstName', ''),
                     last_name=sf_account_info.get('LastName', ''),

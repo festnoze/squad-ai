@@ -25,13 +25,13 @@ from llms.langchain_adapter_type import LangChainAdapterType
 
         # A2: User confirms the appointment
         (
-            "Oui, ce créneau me convient.", 
+            "Oui, réserve le premier créneau.", 
             [
-                {"human": "Je voudrais prendre rendez-vous"}, 
-                {"AI": "Je vous propose le créneaux du jeudi 20 juin à 14 heures. Si ce créneau vous convient, merci de me confirmer afin de finaliser sa réservation."}
+                ("human", "Je voudrais prendre rendez-vous"), 
+                ("AI", "Je vous propose les créneaux suivants : le jeudi 20 juin, de 9 heures à 12 heures ou de 14 heures à 15 heures, ou le vendredi 21 juin, de 16 heures à 17 heures. Avez-vous une préférence ?")
             ],
             "Demande de confirmation du rendez-vous",
-            "Parfait. Votre rendez-vous sera planifié le jeudi 20 juin à 14 heures. Merci de confirmer ce rendez-vous pour le valider.",
+            "Parfait. Votre rendez-vous sera planifié le jeudi 20 juin à 9 heures. Merci de confirmer ce rendez-vous pour le valider.",
             True # Exact match
         ),
         
@@ -39,10 +39,10 @@ from llms.langchain_adapter_type import LangChainAdapterType
         (
             "Je confirme", 
             [
-                {"human": "Je voudrais prendre rendez-vous"}, 
-                {"AI": "Je vous propose le créneaux du jeudi 20 juin à 14 heures. Si ce créneau vous convient, merci de me confirmer afin de finaliser sa réservation."},
-                {"human": "Oui, ce créneau me convient parfaitement"},
-                {"AI": "Veuillez confirmer le rendez-vous du jeudi 20 juin à 14 heures."}
+                ("human", "Je voudrais prendre rendez-vous"), 
+                ("AI", "Je vous propose le créneaux du jeudi 20 juin à 14 heures. Si ce créneau vous convient, merci de me confirmer afin de finaliser sa réservation."),
+                ("human", "Oui, ce créneau me convient parfaitement"),
+                ("AI", "Veuillez confirmer le rendez-vous du jeudi 20 juin à 14 heures.")
             ],
             "Rendez-vous confirmé",
             "Votre rendez-vous est bien planifié pour le jeudi 20 juin à 14 heures. Merci et au revoir.",
@@ -54,8 +54,8 @@ from llms.langchain_adapter_type import LangChainAdapterType
         (
             "Quelles sont vos autres disponibilités ?", 
             [
-                {"human": "Je voudrais prendre rendez-vous"}, 
-                {"AI": "Je vous propose le créneaux du jeudi 20 juin à 14 heures. Si ce créneau vous convient, merci de me confirmer afin de finaliser sa réservation."}
+                ("human", "Je voudrais prendre rendez-vous"), 
+                ("AI", "Je vous propose le créneaux du jeudi 20 juin à 14 heures. Si ce créneau vous convient, merci de me confirmer afin de finaliser sa réservation.")
             ],
             "Demande des disponibilités", 
             "Quels jours ou quelles heures de la journée vous conviendraient le mieux ?",
@@ -66,27 +66,27 @@ from llms.langchain_adapter_type import LangChainAdapterType
         (
             "Je préfère vendredi à 10h", 
             [
-                {"human": "Je voudrais prendre rendez-vous"}, 
-                {"AI": "Je vous propose le créneaux du jeudi 20 juin à 14 heures. Si ce créneau vous convient, merci de me confirmer afin de finaliser sa réservation."},
-                {"human": "Quelles sont vos autres disponibilités ?"},
-                {"AI": "Quels jours ou quelles heures de la journée vous conviendraient le mieux ?"}
+                ("human", "Je voudrais prendre rendez-vous"), 
+                ("AI", "Je vous propose le créneaux du jeudi 20 juin à 14 heures. Si ce créneau vous convient, merci de me confirmer afin de finaliser sa réservation."),
+                ("human", "Quelles sont vos autres disponibilités ?"),
+                ("AI", "Quels jours ou quelles heures de la journée vous conviendraient le mieux ?")
             ],
-            "Proposition de créneaux", 
-            "Je vous propose les créneaux suivants : jeudi 19 juin entre 9 heures et 12 heures, jeudi 19 juin entre 13 heures et 18 heures, vendredi 20 juin entre 9 heures et 12 heures. Avez-vous une préférence ?",
+            "Demande de confirmation du rendez-vous", 
+            "Parfait. Votre rendez-vous sera planifié le vendredi 21 juin à 10 heures. Merci de confirmer ce rendez-vous pour le valider.",
             True # Exact match
         ),
         
-        # B3: User refuses, but specify its availability ("Non, je ne serais dispo qu'à partir de jeudi")
+        # B3: User refuses, but specify its availability ("Non, je ne serais dispo qu'à partir de lundi prochain")
         (
             "Je ne serais dispo qu'à partir de lundi prochain", 
             [
-                {"human": "Je voudrais prendre rendez-vous"}, 
-                {"AI": "Je vous propose le créneaux du jeudi 20 juin à 14 heures. Si ce créneau vous convient, merci de me confirmer afin de finaliser sa réservation."},
-                {"human": "Quelles sont vos autres disponibilités ?"},
-                {"AI": "Quels jours ou quelles heures de la journée vous conviendraient le mieux ?"}
+                ("human", "Je voudrais prendre rendez-vous"), 
+                ("AI", "Je vous propose le créneaux du jeudi 20 juin à 14 heures. Si ce créneau vous convient, merci de me confirmer afin de finaliser sa réservation."),
+                ("human", "Quelles sont vos autres disponibilités ?"),
+                ("AI", "Quels jours ou quelles heures de la journée vous conviendraient le mieux ?")
             ],
             "Proposition de créneaux", 
-            "Je vous propose les créneaux suivants : lundi 24 juin de 9 heures à 12 heures, lundi 24 juin de 13 heures à 18 heures, vendredi 20 juin de 9 heures à 12 heures. Avez-vous une préférence ?",
+            "Je vous propose les créneaux suivants : le lundi 24 juin de 9 heures à 12 heures ou de 13 heures à 18 heures, ou le mardi 25 juin de 9 heures à 12 heures. Avez-vous une préférence ?",
             True # Exact match
         ),
         
@@ -94,12 +94,12 @@ from llms.langchain_adapter_type import LangChainAdapterType
         (
             "Oui, je confirme ce rendez-vous", 
             [
-                {"human": "Je voudrais prendre rendez-vous"}, 
-                {"AI": "Je vous propose le créneaux du jeudi 20 juin à 14 heures. Si ce créneau vous convient, merci de me confirmer afin de finaliser sa réservation."},
-                {"human": "Quelles sont vos autres disponibilités ?"},
-                {"AI": "Quels jours ou quelles heures de la journée vous conviendraient le mieux ?"},
-                {"human": "Je préfère vendredi à 10h"},
-                {"AI": "Veuillez confirmer le rendez-vous du vendredi 21 juin à 10 heures."}
+                ("human", "Je voudrais prendre rendez-vous"), 
+                ("AI", "Je vous propose le créneaux du jeudi 20 juin à 14 heures. Si ce créneau vous convient, merci de me confirmer afin de finaliser sa réservation."),
+                ("human", "Quelles sont vos autres disponibilités ?"),
+                ("AI", "Quels jours ou quelles heures de la journée vous conviendraient le mieux ?"),
+                ("human", "Je préfère vendredi à 10h"),
+                ("AI", "Veuillez confirmer le rendez-vous du vendredi 21 juin à 10 heures.")
             ],
             "Rendez-vous confirmé", 
             "Votre rendez-vous est bien planifié pour le vendredi 21 juin à 10 heures. Merci et au revoir.", 
@@ -120,8 +120,8 @@ from llms.langchain_adapter_type import LangChainAdapterType
         (
             "Oui, pouvez-vous regarder la semaine d'après ?", 
             [
-                {"human": "Je voudrais prendre rendez-vous la semaine prochaine"}, 
-                {"AI": "Je suis désolé, aucun créneau n'est disponible entre le 24 juin et le 28 juin. Souhaitez-vous élargir la recherche ?"}
+                ("human", "Je voudrais prendre rendez-vous la semaine prochaine"), 
+                ("AI", "Je suis désolé, aucun créneau n'est disponible entre le 24 juin et le 28 juin. Souhaitez-vous élargir la recherche ?")
             ],
             "Proposition de créneaux", # Agent will propose new slots
             "Je vous propose le créneaux du lundi 30 juin entre 10 heures et 11 heures. Si ce créneau vous convient, merci de me confirmer afin de finaliser sa réservation.",
@@ -133,8 +133,8 @@ from llms.langchain_adapter_type import LangChainAdapterType
         (
             "Je voudrais prendre rendez-vous jeudi à 15h", 
             [], 
-            "Demande de confirmation du rendez-vous", # Agent found the slot and asks for confirmation
-            "Veuillez confirmer le rendez-vous du jeudi 20 juin à 15 heures.",
+            "Demande de confirmation du rendez-vous",
+            "Parfait. Votre rendez-vous sera planifié le jeudi 13 juin à 15 heures. Merci de confirmer ce rendez-vous pour le valider.",
             True # Exact match
         ),
         
@@ -167,26 +167,26 @@ from llms.langchain_adapter_type import LangChainAdapterType
         ),
         
         # F3: User confirms cancellation with details
-        # (
-        #     "Oui, c'est le rendez-vous de jeudi à 14h", 
-        #     [
-        #         {"human": "Je souhaite annuler mon rendez-vous"}, 
-        #         {"AI": "Pourriez-vous me confirmer la date et l'heure du rendez-vous que vous souhaitez annuler ?"}
-        #     ],
-        #     "Annulation confirmée",
-        #     "Votre rendez-vous du jeudi 20 juin à 14 heures a bien été annulé. Souhaitez-vous en reprogrammer un autre ?",
-        #     True # Exact match
-        # ),
+        (
+            "Oui, c'est le rendez-vous de jeudi à 14h", 
+            [
+                ("human", "Je souhaite annuler mon rendez-vous"), 
+                ("AI", "Pourriez-vous me confirmer la date et l'heure du rendez-vous que vous souhaitez annuler ?")
+            ],
+            "Annulation confirmée",
+            "Votre rendez-vous du jeudi 20 juin à 14 heures a bien été annulé. Souhaitez-vous en reprogrammer un autre ?",
+            True # Exact match
+        ),
         
         # ===== SCENARIO G: RESCHEDULING REQUEST =====
         # G1: User wants to reschedule ("En fait je préfère vendredi matin")
         (
             "En fait je préfère vendredi matin", 
             [
-                {"human": "Je voudrais prendre rendez-vous"}, 
-                {"AI": "Je vous propose le créneaux du jeudi 20 juin à 14 heures. Si ce créneau vous convient, merci de me confirmer afin de finaliser sa réservation."},
-                {"human": "Oui, ce créneau me convient parfaitement"},
-                {"AI": "Veuillez confirmer le rendez-vous du jeudi 20 juin à 14 heures."}
+                ("human", "Je voudrais prendre rendez-vous"), 
+                ("AI", "Je vous propose le créneaux du jeudi 20 juin à 14 heures. Si ce créneau vous convient, merci de me confirmer afin de finaliser sa réservation."),
+                ("human", "Oui, ce créneau me convient parfaitement"),
+                ("AI", "Veuillez confirmer le rendez-vous du jeudi 20 juin à 14 heures.")
             ],
             "Demande de confirmation du rendez-vous", # Agent should ask for new preferences
             "Veuillez confirmer le rendez-vous du vendredi 21 juin à 10 heures.",
@@ -205,7 +205,7 @@ async def test_calendar_agent_integration_classification_plus_outputed_answer(sf
     """
     # Create the agent with mocked dependencies
     agent = CalendarAgent(llm_instance, sf_client_mock)
-    agent.set_user_info("test_user_id", "Test", "User", "test@example.com", "test_owner_id", "TestOwnerName")
+    agent._set_user_info("test_user_id", "Test", "User", "test@example.com", "test_owner_id", "TestOwnerName")
     
     # First, ensure the agent classifies the user input correctly
     actual_category = await agent.categorize_for_dispatch_async(user_input, chat_history)
@@ -232,7 +232,7 @@ async def test_complete_conversation_exchange(sf_client_mock, llm_instance, simi
     """
     # Create the agent with mocked dependencies
     agent = CalendarAgent(llm_instance, sf_client_mock)
-    agent.set_user_info("test_user_id", "Test", "User", "test@example.com", "test_owner_id", "TestOwnerName")
+    agent._set_user_info("test_user_id", "Test", "User", "test@example.com", "test_owner_id", "TestOwnerName")
     
     # Define the conversation flow with expected categories and responses
     conversation_flow = [
@@ -289,8 +289,8 @@ async def test_complete_conversation_exchange(sf_client_mock, llm_instance, simi
                 assert is_similar, f"Step {conversation_flow.index(step) + 1}: Expected a response similar to '{step['expected_response']}', but got '{actual_response}'"
             
             # Update chat history for the next step
-            chat_history.append({"human": step["user_input"]})
-            chat_history.append({"AI": actual_response})
+            chat_history.append(("human", step["user_input"]))
+            chat_history.append(("AI", actual_response))
 
 class SimilarityEvaluator:
     @staticmethod
