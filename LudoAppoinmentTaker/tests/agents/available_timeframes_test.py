@@ -1,0 +1,322 @@
+import pytest
+from datetime import datetime, timedelta
+from app.agents.calendar_agent import CalendarAgent
+from unittest.mock import AsyncMock, patch
+
+class DummyLLM:
+    """Very small mock suitable for our unit tests."""
+    def bind_tools(self, _tools):
+        return self
+
+    def invoke(self, _messages):
+        return {"content": "DefaultCategory"}
+
+
+@pytest.fixture
+def sf_client_mock():
+    class _DummyClient:
+        # Configure with none existing appointments
+        get_scheduled_appointments_async = AsyncMock(return_value=[])
+        schedule_new_appointment_async = AsyncMock(return_value={"Id": "001"})
+    return _DummyClient()
+
+
+def _make_slot(start_dt: datetime, duration_minutes: int = 30):
+    """Helper to build a fake Salesforce appointment dict."""
+    end_dt = start_dt + timedelta(minutes=duration_minutes)
+    return {
+        "Id": "EVT_TEST",
+        "Subject": "Test Meeting",
+        "Description": "Test",
+        "StartDateTime": start_dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "EndDateTime": end_dt.strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+
+
+def format_date_for_comparison(date_str):
+    """Helper to standardize date format for comparison."""
+    return date_str
+
+
+def test_duplicates_issue(sf_client_mock):
+    """Test that the method doesn't return duplicate timeframes."""
+    # Set up test data
+    start_date = "2025-01-11T00:00:00Z"
+    end_date = "2025-01-11T23:59:59Z"
+    taken_slots = []
+    
+    # Call the method
+    available_ranges = CalendarAgent.get_available_timeframes_from_scheduled_slots(
+        start_date,
+        end_date,
+        taken_slots,
+        max_weekday=6,  # Explicitly set max_weekday to include Saturday
+    )
+    
+    # Debug output
+    print(f"\nTest duplicates_issue:")
+    print(f"Available ranges: {available_ranges}")
+    print(f"Expected ranges: ['2025-01-11 09:00-12:00', '2025-01-11 13:00-18:00']\n")
+    
+    # Check for duplicates
+    assert len(available_ranges) == len(set(available_ranges)), "Duplicate timeframes found in results"
+    
+    # Expected result with default availability timeframe [("09:00", "12:00"), ("13:00", "18:00")]
+    expected_ranges = [
+        "2025-01-11 09:00-12:00",
+        "2025-01-11 13:00-18:00",
+    ]
+    
+    assert sorted(available_ranges) == sorted(expected_ranges)
+
+def test_overlapping_slot_with_break(sf_client_mock):
+    """Test that slots overlapping with breaks are handled correctly."""
+    # Set up test data
+    start_date = "2025-01-11T00:00:00Z"
+    end_date = "2025-01-11T23:59:59Z"
+    # Create a slot that overlaps with the lunch break (12:00-13:00)
+    taken_slots = [_make_slot(datetime(2025, 1, 11, 11, 30), 90)]  # 11:30-13:00
+    availability_timeframe = [("09:00", "12:00"), ("13:00", "18:00")]
+    
+    # Call the method
+    available_ranges = CalendarAgent.get_available_timeframes_from_scheduled_slots(
+        start_date,
+        end_date,
+        taken_slots,
+        availability_timeframe=availability_timeframe,
+    )
+    
+    # Should correctly handle the overlap
+    expected_ranges = [
+        "2025-01-11 09:00-11:30",  # Morning until the occupied slot
+        "2025-01-11 13:00-18:00",  # Full afternoon
+    ]
+    
+    assert sorted(available_ranges) == sorted(expected_ranges)
+
+
+@pytest.mark.parametrize(
+    "max_weekday,expected_ranges",
+    [
+        # Case 1: Include Saturday (max_weekday=6)
+        (
+            6,
+            [
+                "2025-01-11 09:00-12:00",  # Saturday morning
+                "2025-01-11 13:00-18:00",  # Saturday afternoon
+                "2025-01-13 09:00-12:00",  # Monday morning
+                "2025-01-13 13:00-18:00",  # Monday afternoon
+            ]
+        ),
+        # Case 2: Only weekdays (max_weekday=5), should exclude Saturday
+        (
+            5,
+            [
+                "2025-01-13 09:00-12:00",  # Monday morning
+                "2025-01-13 13:00-18:00",  # Monday afternoon
+            ]
+        ),
+        # Case 3: Include Sunday (max_weekday=7), should include all days
+        (
+            7,
+            [
+                "2025-01-11 09:00-12:00",  # Saturday morning
+                "2025-01-11 13:00-18:00",  # Saturday afternoon
+                "2025-01-12 09:00-12:00",  # Sunday morning
+                "2025-01-12 13:00-18:00",  # Sunday afternoon
+                "2025-01-13 09:00-12:00",  # Monday morning
+                "2025-01-13 13:00-18:00",  # Monday afternoon
+            ]
+        ),
+    ]
+)
+def test_multi_day_availability(sf_client_mock, max_weekday, expected_ranges):
+    """Test multi-day availability with proper timeframes for different max_weekday values."""
+    # Set up test data
+    start_date = "2025-01-11T00:00:00Z"  # Saturday
+    end_date = "2025-01-13T23:59:59Z"    # Monday
+    taken_slots = []
+    availability_timeframe = [("09:00", "12:00"), ("13:00", "18:00")]
+    
+    # Call the method
+    available_ranges = CalendarAgent.get_available_timeframes_from_scheduled_slots(
+        start_date,
+        end_date,
+        taken_slots,
+        availability_timeframe=availability_timeframe,
+        max_weekday=max_weekday,
+    )
+    
+    # Check that we get the expected ranges for each day based on max_weekday
+    assert sorted(available_ranges) == sorted(expected_ranges)
+
+
+@pytest.mark.parametrize(
+    "availability_timeframe, start_date, end_date, taken_slots, expected_ranges",
+    [
+        # 1. No taken slots – full morning and afternoon ranges available
+        (
+            [("9:00", "12:00"), ("13:00", "18:00")],
+            "2025-01-06T00:00:00Z", "2025-01-06T23:59:59Z",
+            [],
+            [
+                "2025-01-06 09:00-12:00",
+                "2025-01-06 13:00-18:00",
+            ],
+        ),
+        # 2. First slot taken (09:00-09:30) - morning range starts later
+        (
+            [("9:00", "12:00"), ("13:00", "18:00")],
+            "2025-01-06T00:00:00Z", "2025-01-06T23:59:59Z",
+            [_make_slot(datetime(2025, 1, 6, 9, 0))],
+            [
+                "2025-01-06 09:30-12:00",
+                "2025-01-06 13:00-18:00",
+            ],
+        ),
+        # 3. Custom opening hours 10–12 only
+        (
+            [("10:00", "12:00")],
+            "2025-01-06T00:00:00Z", "2025-01-06T23:59:59Z",
+            [],
+            [
+                "2025-01-06 10:00-12:00",
+            ],
+        ),
+        # 4. Two consecutive taken slots 09:00 & 09:30 - morning range starts at 10:00
+        (
+            [("9:00", "12:00"), ("13:00", "18:00")],
+            "2025-01-06T00:00:00Z", "2025-01-06T23:59:59Z",
+            [
+                _make_slot(datetime(2025, 1, 6, 9, 0), 30),
+                _make_slot(datetime(2025, 1, 6, 9, 30), 30),
+            ],
+            [
+                "2025-01-06 10:00-12:00",
+                "2025-01-06 13:00-18:00",
+            ],
+        ),
+        # 5. Overlapping appointments split morning availability
+        (
+            [("9:00", "12:00"), ("13:00", "18:00")],
+            "2025-01-06T00:00:00Z", "2025-01-06T23:59:59Z",
+            [
+                _make_slot(datetime(2025, 1, 6, 10, 0), 45),
+                _make_slot(datetime(2025, 1, 6, 10, 15), 30),
+            ],
+            [
+                "2025-01-06 09:00-10:00",
+                "2025-01-06 11:00-12:00",
+                "2025-01-06 13:00-18:00",
+            ],
+        ),
+        # 6. All slots taken within window – expect none for that timeframe
+        (
+            [("9:00", "10:00"), ("13:00", "18:00")],
+            "2025-01-06T00:00:00Z", "2025-01-06T23:59:59Z",
+            [
+                _make_slot(datetime(2025, 1, 6, 9, 0)),
+                _make_slot(datetime(2025, 1, 6, 9, 30)),
+            ],
+            [
+                "2025-01-06 13:00-18:00",
+            ],
+        ),
+        # 7. Friday to next Monday (weekend skip)
+        (
+            [("9:00", "10:00")],
+            "2025-01-10T00:00:00Z",  # Friday
+            "2025-01-13T23:59:59Z",  # Monday
+            [],
+            [
+                "2025-01-10 09:00-10:00",
+                "2025-01-13 09:00-10:00",
+            ],
+        ),
+        # 8. Multiple appointments creating fragmented availability
+        (
+            [("9:00", "18:00")],
+            "2025-01-06T00:00:00Z", "2025-01-06T23:59:59Z",
+            [
+                _make_slot(datetime(2025, 1, 6, 10, 0), 60),  # 10:00-11:00
+                _make_slot(datetime(2025, 1, 6, 13, 0), 60),  # 13:00-14:00
+                _make_slot(datetime(2025, 1, 6, 16, 0), 60),  # 16:00-17:00
+            ],
+            [
+                "2025-01-06 09:00-10:00",
+                "2025-01-06 11:00-13:00",
+                "2025-01-06 14:00-16:00",
+                "2025-01-06 17:00-18:00",
+            ],
+        ),
+        # 9. Test for duplicate timeframes issue
+        (
+            [("9:00", "12:00"), ("13:00", "18:00")],
+            "2025-01-11T00:00:00Z", "2025-01-11T23:59:59Z",
+            [],
+            [
+                "2025-01-11 09:00-12:00",
+                "2025-01-11 13:00-18:00",
+            ],
+        ),
+        # 10. Test for proper handling of multiple availability timeframes
+        (
+            [("9:00", "12:00"), ("13:00", "18:00")],
+            "2025-01-11T00:00:00Z", "2025-01-11T23:59:59Z",
+            [_make_slot(datetime(2025, 1, 11, 11, 30), 30)],  # 11:30-12:00
+            [
+                "2025-01-11 09:00-11:30",
+                "2025-01-11 13:00-18:00",
+            ],
+        ),
+        # 11. Test for proper handling of availability timeframes with overlapping slots
+        (
+            [("9:00", "12:00"), ("13:00", "18:00")],
+            "2025-01-11T00:00:00Z", "2025-01-11T23:59:59Z",
+            [_make_slot(datetime(2025, 1, 11, 11, 30), 90)],  # 11:30-13:00 (overlaps lunch break)
+            [
+                "2025-01-11 09:00-11:30",
+                "2025-01-11 13:00-18:00",
+            ],
+        ),
+        # 12. Test for proper handling of default availability timeframes
+        (
+            None,  # Use default availability timeframe
+            "2025-01-11T00:00:00Z", "2025-01-11T23:59:59Z",
+            [],
+            [
+                "2025-01-11 09:00-12:00",
+                "2025-01-11 13:00-18:00",
+            ],
+        ),
+        # 13. Test for multi-day availability with default timeframes
+        (
+            None,  # Use default availability timeframe
+            "2025-01-11T00:00:00Z", "2025-01-13T23:59:59Z",  # Saturday to Monday
+            [],
+            [
+                "2025-01-11 09:00-12:00",
+                "2025-01-11 13:00-18:00",
+                "2025-01-13 09:00-12:00",
+                "2025-01-13 13:00-18:00",
+            ],
+        ),
+    ],
+)
+def test_get_available_timeframes_from_scheduled_slots(
+    availability_timeframe,
+    start_date,
+    end_date,
+    taken_slots,
+    expected_ranges,
+):
+    """Verify CalendarAgent.get_available_slots_from_scheduled_ones with consolidated time ranges."""
+    available_ranges = CalendarAgent.get_available_timeframes_from_scheduled_slots(
+                            start_date,
+                            end_date,
+                            taken_slots,
+                            availability_timeframe=availability_timeframe,
+                        )
+
+    # Sort both lists to ensure consistent comparison regardless of order
+    assert sorted(available_ranges) == sorted(expected_ranges)

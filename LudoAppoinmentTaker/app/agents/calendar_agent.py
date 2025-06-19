@@ -420,39 +420,59 @@ class CalendarAgent:
         delta = timedelta(minutes=slot_duration_minutes)
         
         # Process each day in the range
-        start_date_only = datetime.strptime(start_date, "%Y-%m-%dT%H:%M:%SZ").date()
-        end_date_only = datetime.strptime(end_date, "%Y-%m-%dT%H:%M:%SZ").date()
+        start_date_dt = datetime.strptime(start_date, "%Y-%m-%dT%H:%M:%SZ")
+        end_date_dt = datetime.strptime(end_date, "%Y-%m-%dT%H:%M:%SZ")
+        start_date_only = start_date_dt.date()
+        end_date_only = end_date_dt.date()
         
         while start_date_only <= end_date_only:
-            # Skip weekends based on max_weekday
-            if start_date_only.weekday() < max_weekday:
+            # Check if this day should be included based on weekday
+            weekday = start_date_only.weekday()
+            
+            # Python weekday: Monday is 0 and Sunday is 6
+            # For max_weekday values:
+            # 5 means Monday to Friday (0-4)
+            # 6 means Monday to Saturday (0-5)
+            # 7 means all days including Sunday (0-6)
+            if max_weekday == 7:
+                # Special case: include all days
+                include_day = True
+            elif max_weekday == 5:
+                # Only weekdays (Monday to Friday)
+                include_day = weekday < 5  # 0-4 (Monday to Friday)
+            elif max_weekday == 6:
+                # Monday to Saturday
+                include_day = weekday < 6  # 0-5 (Monday to Saturday)
+            else:
+                # Default behavior
+                include_day = weekday <= max_weekday
+            
+            if include_day:
                 # Process each availability timeframe for this day
                 for timeframe in availability_timeframe:
                     start_time, end_time = timeframe
                     
-                    # Parse timeframe hours
-                    start_hour_dt = datetime.strptime(
-                        min(t[0] for t in availability_timeframe), "%H:%M"
-                    )
-                    end_hour_dt = datetime.strptime(
-                        max(t[1] for t in availability_timeframe), "%H:%M"
-                    )
+                    # Parse timeframe hours for the current timeframe only
+                    start_hour_dt = datetime.strptime(start_time, "%H:%M")
+                    end_hour_dt = datetime.strptime(end_time, "%H:%M")
                     
-                    # Create datetime objects for this timeframe
+                    # Create datetime objects for this specific timeframe
                     timeframe_start = datetime.combine(
                         start_date_only,
                         start_hour_dt.time()
                     )
+                    # Adjust the end time to ensure the last appointment can complete within the timeframe
+                    # by subtracting one slot duration from the end time
                     timeframe_end = datetime.combine(
-                        end_date_only,
+                        start_date_only,
                         end_hour_dt.time()
-                    )
+                    ) - delta
                     
                     # Find available slots within this timeframe
                     available_slots: list[datetime] = []
                     current_slot = timeframe_start
                     
-                    while current_slot + delta <= timeframe_end:
+                    while current_slot <= timeframe_end:
                         slot_end = current_slot + delta
                         if not any(current_slot < occ_end and slot_end > occ_start for occ_start, occ_end in occupied):
                             available_slots.append(current_slot)
@@ -479,7 +499,15 @@ class CalendarAgent:
             # Move to next day
             start_date_only += timedelta(days=1)
 
-        return available_ranges
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_ranges = []
+        for timeframe in available_ranges:
+            if timeframe not in seen:
+                seen.add(timeframe)
+                unique_ranges.append(timeframe)
+                
+        return unique_ranges
 
     def _to_str_iso(self, dt: datetime) -> str:
         return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
