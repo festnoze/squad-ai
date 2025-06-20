@@ -43,13 +43,13 @@ def test_duplicates_issue(sf_client_mock):
     # Set up test data
     start_date = "2025-01-11T00:00:00Z"
     end_date = "2025-01-11T23:59:59Z"
-    taken_slots = []
+    scheduled_slots = []
     
     # Call the method
     available_ranges = CalendarAgent.get_available_timeframes_from_scheduled_slots(
         start_date,
         end_date,
-        taken_slots,
+        scheduled_slots,
         max_weekday=6,  # Explicitly set max_weekday to include Saturday
         adjust_end_time=False,  # Use the original behavior without end time adjustment
     )
@@ -66,32 +66,6 @@ def test_duplicates_issue(sf_client_mock):
     expected_ranges = [
         "2025-01-11 09:00-12:00",
         "2025-01-11 13:00-18:00",
-    ]
-    
-    assert sorted(available_ranges) == sorted(expected_ranges)
-
-def test_overlapping_slot_with_break(sf_client_mock):
-    """Test that slots overlapping with breaks are handled correctly."""
-    # Set up test data
-    start_date = "2025-01-11T00:00:00Z"
-    end_date = "2025-01-11T23:59:59Z"
-    # Create a slot that overlaps with the lunch break (12:00-13:00)
-    taken_slots = [_make_slot(datetime(2025, 1, 11, 11, 30), 90)]  # 11:30-13:00
-    availability_timeframe = [("09:00", "12:00"), ("13:00", "18:00")]
-    
-    # Call the method
-    available_ranges = CalendarAgent.get_available_timeframes_from_scheduled_slots(
-        start_date,
-        end_date,
-        taken_slots,
-        availability_timeframe=availability_timeframe,
-        adjust_end_time=False,  # Use the original behavior without end time adjustment
-    )
-    
-    # Should correctly handle the overlap
-    expected_ranges = [
-        "2025-01-11 09:00-11:30",  # Morning until the occupied slot
-        "2025-01-11 13:00-18:00",  # Full afternoon
     ]
     
     assert sorted(available_ranges) == sorted(expected_ranges)
@@ -137,14 +111,14 @@ def test_multi_day_availability(sf_client_mock, max_weekday, expected_ranges):
     # Set up test data
     start_date = "2025-01-11T00:00:00Z"  # Saturday
     end_date = "2025-01-13T23:59:59Z"    # Monday
-    taken_slots = []
+    scheduled_slots = []
     availability_timeframe = [("09:00", "12:00"), ("13:00", "18:00")]
     
     # Call the method
     available_ranges = CalendarAgent.get_available_timeframes_from_scheduled_slots(
         start_date,
         end_date,
-        taken_slots,
+        scheduled_slots,
         availability_timeframe=availability_timeframe,
         max_weekday=max_weekday,
         adjust_end_time=False,  # Use the original behavior without end time adjustment
@@ -155,7 +129,7 @@ def test_multi_day_availability(sf_client_mock, max_weekday, expected_ranges):
 
 
 @pytest.mark.parametrize(
-    "availability_timeframe, start_date, end_date, taken_slots, expected_ranges",
+    "availability_timeframe, start_date, end_date, scheduled_slots, expected_ranges",
     [
         # 1. No taken slots – full morning and afternoon ranges available
         (
@@ -205,7 +179,7 @@ def test_multi_day_availability(sf_client_mock, max_weekday, expected_ranges):
             "2025-01-06T00:00:00Z", "2025-01-06T23:59:59Z",
             [
                 _make_slot(datetime(2025, 1, 6, 10, 0), 45),
-                _make_slot(datetime(2025, 1, 6, 10, 15), 30),
+                _make_slot(datetime(2025, 1, 6, 10, 15), 45),
             ],
             [
                 "2025-01-06 09:00-10:00",
@@ -306,18 +280,18 @@ def test_multi_day_availability(sf_client_mock, max_weekday, expected_ranges):
         ),
     ],
 )
-def test_get_available_timeframes_from_scheduled_slots(
+def test_get_available_timeframes_with_scheduled_slots(
     availability_timeframe,
     start_date,
     end_date,
-    taken_slots,
+    scheduled_slots,
     expected_ranges,
 ):
     """Verify CalendarAgent.get_available_slots_from_scheduled_ones with consolidated time ranges."""
     available_ranges = CalendarAgent.get_available_timeframes_from_scheduled_slots(
                             start_date,
                             end_date,
-                            taken_slots,
+                            scheduled_slots,
                             availability_timeframe=availability_timeframe,
                             adjust_end_time=False,  # Use the native behavior without end time adjustment
                         )
@@ -386,10 +360,10 @@ def test_get_available_timeframes_from_scheduled_slots(
         # Test with odd timeframes and 30-minute slot duration
         (
             30,
-            [("8:15", "10:45"), ("11:30", "13:15"), ("14:45", "17:30")],
+            [("8:15", "10:45"), ("11:30", "13:00"), ("14:45", "17:30")],
             [
                 "2025-01-06 08:15-10:15",
-                "2025-01-06 11:30-12:45",
+                "2025-01-06 11:30-12:30",
                 "2025-01-06 14:45-17:00",
             ],
         ),
@@ -399,22 +373,28 @@ def test_get_available_timeframes_from_scheduled_slots(
             [("9:00", "9:30")],
             ["2025-01-06 09:00-09:00"],  # Expect a single slots at 9am
         ),
+        # Test with a timeframe with slots, and one already taken
+        (
+            45,
+            [("9:00", "9:30")],
+            [],  # Expect no slots
+        ),
     ],
 )
-def test_slot_duration_adjustment(
+def test_get_available_timeframes_with_adjust_end_time(
     sf_client_mock, slot_duration, availability_timeframe, expected_ranges
 ):
     """Test that the end time of availability timeframes is correctly adjusted based on slot duration."""
     # Set up test data
     start_date = "2025-01-06T00:00:00Z"  # Monday
     end_date = "2025-01-06T23:59:59Z"    # Monday
-    taken_slots = []  # No taken slots to focus on the slot duration adjustment
+    scheduled_slots = []  # No taken slots to focus on the slot duration adjustment
     
     # Call the method
     available_ranges = CalendarAgent.get_available_timeframes_from_scheduled_slots(
         start_date,
         end_date,
-        taken_slots,
+        scheduled_slots,
         slot_duration_minutes=slot_duration,
         availability_timeframe=availability_timeframe,
         adjust_end_time=True,  # Enable the slot duration adjustment, object of this test

@@ -1,6 +1,6 @@
 import asyncio
 import threading
-import nest_asyncio
+#import nest_asyncio
 from functools import wraps
 from typing import TypeVar, Callable, Any, Coroutine, Optional, cast
 
@@ -51,7 +51,7 @@ class AsyncCallWrapper:
             try:
                 loop = asyncio.get_running_loop()
                 # If we're in a running event loop, use nest_asyncio to allow nested event loops
-                nest_asyncio.apply()
+                #nest_asyncio.apply()
                 return loop.run_until_complete(coroutine)
             except RuntimeError:
                 # No running event loop, create a new one

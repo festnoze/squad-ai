@@ -3,6 +3,7 @@ import logging
 import time
 #
 from datetime import datetime, timedelta
+from typing import List, Dict, Tuple, Any
 from langchain.tools import tool, BaseTool
 from langchain.agents import AgentExecutor, create_tool_calling_agent, create_react_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -65,20 +66,20 @@ class CalendarAgent:
         """
         # Get the existing appointments from Salesforce API
         #TODO: manage "CalendarAgent.owner_id" another way to allow multi-calls handling.
-        taken_slots = await CalendarAgent.salesforce_api_client.get_scheduled_appointments_async(start_date, end_date, CalendarAgent.owner_id)
+        scheduled_slots = await CalendarAgent.salesforce_api_client.get_scheduled_appointments_async(start_date, end_date, CalendarAgent.owner_id)
         
         # Log the result
         logger = logging.getLogger(__name__)
         logger.info(f"Called 'get_appointments' tool for owner {CalendarAgent.owner_id} between {start_date} and {end_date}.")
-        if taken_slots:
+        if scheduled_slots:
             slot_details = []
-            for slot in taken_slots:
+            for slot in scheduled_slots:
                 slot_detail = f"- De {slot.get('StartDateTime')} à {slot.get('EndDateTime')} - Sujet: {slot.get('Subject', '-')} - Description: {slot.get('Description', '-')} - Location: {slot.get('Location', '-')} - OwnerId: {slot.get('OwnerId', '-')} - WhatId: {slot.get('WhatId', '-')} - WhoId: {slot.get('WhoId', '-')}"
                 slot_details.append(slot_detail)
             logger.info(f"Here is the list of the owner calendar taken slots: \n{chr(10).join(slot_details)}")
         else:
             logger.info("No appointments found for the owner between the specified dates.")
-        return taken_slots
+        return scheduled_slots
 
     @tool
     async def get_available_timeframes(start_date: str, end_date: str) -> list[str]:
@@ -99,8 +100,8 @@ class CalendarAgent:
         if ' ' in end_date: end_date = end_date.replace(' ', 'T')
         if not end_date.endswith("Z"): end_date += "Z"
 
-        taken_slots = await CalendarAgent.salesforce_api_client.get_scheduled_appointments_async(start_date, end_date, CalendarAgent.owner_id)
-        return CalendarAgent.get_available_timeframes_from_scheduled_slots(start_date, end_date, taken_slots)
+        scheduled_slots = await CalendarAgent.salesforce_api_client.get_scheduled_appointments_async(start_date, end_date, CalendarAgent.owner_id)
+        return CalendarAgent.get_available_timeframes_from_scheduled_slots(start_date, end_date, scheduled_slots)
 
     @tool
     async def schedule_new_appointment(
@@ -381,7 +382,7 @@ class CalendarAgent:
     def get_available_timeframes_from_scheduled_slots(
         start_date: str,
         end_date: str,
-        taken_slots: list[dict[str, any]],
+        scheduled_slots: list[dict[str, any]],
         slot_duration_minutes: int = 30,
         max_weekday: int = 5,
         availability_timeframe: list[tuple[str, str]] = None,
@@ -393,118 +394,92 @@ class CalendarAgent:
         Args:
             start_date: Start date for availability search
             end_date: End date for availability search
-            taken_slots: List of occupied slots from Salesforce
+            scheduled_slots: List of occupied slots from Salesforce
             slot_duration_minutes: Duration of each slot in minutes
             max_weekday: Maximum weekday (0=Monday, 6=Sunday), default is 5 (only weekdays)
             availability_timeframe: List of tuples with opening hours [("09:00", "12:00"), ("13:00", "18:00")]
                                    Default is morning 9-12 and afternoon 13-18
             adjust_end_time: If True, adjust the end time of each availability timeframe by subtracting
-                            the slot duration to ensure the last appointment can complete within the timeframe
-        
-        Returns:
-            List of consolidated available time ranges in format "YYYY-MM-DD HH:MM-HH:MM"
+                               the slot duration to ensure the last appointment fits fully.
         """
-        # Set default availability timeframe if not provided
         if availability_timeframe is None:
             availability_timeframe = [("09:00", "12:00"), ("13:00", "18:00")]
-            
-        # Build list of occupied intervals
-        occupied: list[tuple[datetime, datetime]] = []
-        for slot in taken_slots or []:
-            try:
-                s = datetime.strptime(slot["StartDateTime"], "%Y-%m-%dT%H:%M:%SZ")
-                e = datetime.strptime(slot["EndDateTime"], "%Y-%m-%dT%H:%M:%SZ")
-                occupied.append((s, e))
-            except Exception:
+
+        # Parse start and end dates
+        start_date_only = datetime.fromisoformat(start_date.replace('Z', '')).date()
+        end_date_only = datetime.fromisoformat(end_date.replace('Z', '')).date()
+
+        # Prepare occupied slots for quick lookup
+        scheduled_slots_dt = []
+        for slot in scheduled_slots:
+            scheduled_slots_dt.append((
+                datetime.fromisoformat(slot['StartDateTime'].replace('Z', '')),
+                datetime.fromisoformat(slot['EndDateTime'].replace('Z', ''))
+            ))
+
+        delta = timedelta(minutes=slot_duration_minutes)
+        available_ranges = []
+
+        # Iterate through each day in the requested range
+        while start_date_only <= end_date_only:
+            # Skip weekends if max_weekday is set to 5 (Friday)
+            if start_date_only.weekday() >= max_weekday:
+                start_date_only += timedelta(days=1)
                 continue
 
-        # Initialize results
-        available_ranges: list[str] = []
-        delta = timedelta(minutes=slot_duration_minutes)
-        
-        # Process each day in the range
-        start_date_dt = datetime.strptime(start_date, "%Y-%m-%dT%H:%M:%SZ")
-        end_date_dt = datetime.strptime(end_date, "%Y-%m-%dT%H:%M:%SZ")
-        start_date_only = start_date_dt.date()
-        end_date_only = end_date_dt.date()
-        
-        while start_date_only <= end_date_only:
-            # Check if this day should be included based on weekday
-            weekday = start_date_only.weekday()
+            # For each availability timeframe
+            for timeframe in availability_timeframe:
+                start_hour_str, end_hour_str = timeframe
+                start_hour_dt = datetime.strptime(start_hour_str, "%H:%M")
+                end_hour_dt = datetime.strptime(end_hour_str, "%H:%M")
+
+                # Combine date with time to create full datetime objects for the timeframe
+                timeframe_start = datetime.combine(
+                    start_date_only,
+                    start_hour_dt.time()
+                )
+                timeframe_end = datetime.combine(
+                    start_date_only,
+                    end_hour_dt.time()
+                )
+                
+                # If adjust_end_time is True, reduce the timeframe_end by slot_duration_minutes upfront.
+                if adjust_end_time:
+                    timeframe_end -= delta
+                    # Special case: if after adjustment, start == end, return a single slot
+                    if timeframe_start == timeframe_end:
+                        formatted_range = f"{timeframe_start.strftime('%Y-%m-%d %H:%M')}-{timeframe_end.strftime('%H:%M')}"
+                        available_ranges.append(formatted_range)
+                        continue
             
-            # Python weekday: Monday is 0 and Sunday is 6
-            # For max_weekday values:
-            # 5 means Monday to Friday (0-4)
-            # 6 means Monday to Saturday (0-5)
-            # 7 means all days including Sunday (0-6)
-            if max_weekday == 7:
-                # Special case: include all days
-                include_day = True
-            elif max_weekday == 5:
-                # Only weekdays (Monday to Friday)
-                include_day = weekday < 5  # 0-4 (Monday to Friday)
-            elif max_weekday == 6:
-                # Monday to Saturday
-                include_day = weekday < 6  # 0-5 (Monday to Saturday)
-            else:
-                # Default behavior
-                include_day = weekday <= max_weekday
-            
-            if include_day:
-                # Process each availability timeframe for this day
-                for timeframe in availability_timeframe:
-                    start_time, end_time = timeframe
-                    
-                    # Parse timeframe hours for the current timeframe only
-                    start_hour_dt = datetime.strptime(start_time, "%H:%M")
-                    end_hour_dt = datetime.strptime(end_time, "%H:%M")
-                    
-                    # Create datetime objects for this specific timeframe
-                    timeframe_start = datetime.combine(
-                        start_date_only,
-                        start_hour_dt.time()
-                    )
-                    
-                    # Create datetime object for the end of the timeframe
-                    timeframe_end = datetime.combine(
-                        start_date_only,
-                        end_hour_dt.time()
-                    )
-                    
-                    # Find available slots within this timeframe
-                    available_slots: list[datetime] = []
-                    current_slot = timeframe_start
+                # Find available slots within this timeframe
+                available_slots: List[datetime] = [] 
+                current_slot = timeframe_start
 
-                    # Loop as long as a full slot can be completed within the timeframe
-                    while current_slot + delta <= timeframe_end:
-                        # If adjusting, we explicitly exclude the very last slot that touches the end of the timeframe
-                        if adjust_end_time and (current_slot + delta == timeframe_end):
-                            break
+                # Build a list of free intervals within the timeframe, excluding taken slots
+                free_intervals = []
+                interval_start = timeframe_start
+                # Sort taken slots for the day and timeframe
+                day_slots = [s for s in scheduled_slots_dt if s[0].date() == start_date_only]
+                day_slots = sorted(day_slots, key=lambda x: x[0])
+                for occ_start, occ_end in day_slots:
+                    # If the taken slot is outside the current timeframe, skip
+                    if occ_end <= timeframe_start or occ_start >= timeframe_end:
+                        continue
+                    # If there is free time before this taken slot, add it
+                    if interval_start < occ_start:
+                        free_start = max(interval_start, timeframe_start)
+                        free_end = min(occ_start, timeframe_end)
+                        if free_start < free_end:
+                            formatted_range = f"{free_start.strftime('%Y-%m-%d %H:%M')}-{free_end.strftime('%H:%M')}"
+                            free_intervals.append(formatted_range)
+                    interval_start = max(interval_start, occ_end)
+                # Add remaining free time after last taken slot
+                if interval_start < timeframe_end:
+                    formatted_range = f"{interval_start.strftime('%Y-%m-%d %H:%M')}-{timeframe_end.strftime('%H:%M')}"
+                    free_intervals.append(formatted_range)
+                available_ranges.extend(free_intervals)
 
-                        # Check for overlaps with already taken slots
-                        if not any(current_slot < occ_end and (current_slot + delta) > occ_start for occ_start, occ_end in occupied):
-                            available_slots.append(current_slot)
-                        
-                        current_slot += delta
-                    
-                    # Consolidate consecutive slots into ranges
-                    if available_slots:
-                        ranges = []
-                        range_start = available_slots[0]
-                        for i in range(1, len(available_slots)):
-                            # If the current slot is not consecutive, close the previous range
-                            if (available_slots[i] - available_slots[i-1]) != delta:
-                                range_end = available_slots[i-1] + delta
-                                formatted_range = f"{range_start.strftime('%Y-%m-%d %H:%M')}-{range_end.strftime('%H:%M')}"
-                                ranges.append(formatted_range)
-                                range_start = available_slots[i]
-                        
-                        # Add the last consolidated range
-                        range_end = available_slots[-1] + delta
-                        formatted_range = f"{range_start.strftime('%Y-%m-%d %H:%M')}-{range_end.strftime('%H:%M')}"
-                        ranges.append(formatted_range)
-
-                        available_ranges.extend(ranges)
             
             # Move to next day
             start_date_only += timedelta(days=1)
@@ -516,8 +491,9 @@ class CalendarAgent:
             if timeframe not in seen:
                 seen.add(timeframe)
                 unique_ranges.append(timeframe)
-                
+
         return unique_ranges
+
 
     def _to_str_iso(self, dt: datetime) -> str:
         return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
