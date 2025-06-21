@@ -2,6 +2,7 @@ import os
 import logging
 import time
 #
+import datetime
 from datetime import datetime, timedelta
 from typing import List, Dict, Tuple, Any
 from langchain.tools import tool, BaseTool
@@ -15,13 +16,25 @@ class CalendarAgent:
     salesforce_api_client: SalesforceApiClientInterface
     owner_id = None
     owner_name = None
+    now = datetime.now()
     
     def __init__(self, llm_or_chain: any, salesforce_api_client: SalesforceApiClientInterface):
         self.logger = logging.getLogger(__name__)
         self.llm = llm_or_chain
         CalendarAgent.salesforce_api_client = salesforce_api_client
+        CalendarAgent.now = datetime.now()
 
         # The global calendar scheduler agent with tools
+        
+        prompt = self._load_available_timeframes_prompt()
+        prompts = ChatPromptTemplate.from_messages([
+            ("system", prompt),
+            MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ])
+        tools_available_timeframes = [CalendarAgent.get_available_timeframes]
+        agent = create_tool_calling_agent(self.llm, tools_available_timeframes, prompts)
+        self.available_timeframes_agent = AgentExecutor(agent=agent, tools=tools_available_timeframes, verbose=True)
+
         # self.tools = [self.get_appointments, self.schedule_new_appointment]
         # 
         # self.prompt = self._load_prompt()
@@ -51,7 +64,7 @@ class CalendarAgent:
 
     @staticmethod
     def get_current_date_tool() -> str:
-        return CalendarAgent._to_french_date(datetime.now())
+        return CalendarAgent._to_french_date(CalendarAgent.now)
 
     @tool
     async def get_appointments(start_date: str, end_date: str) -> list[dict[str, any]]:
@@ -252,21 +265,12 @@ class CalendarAgent:
             for message in chat_history:
                 formatted_history.append(f"{message[0]}: {message[1]}")
 
-            prompt = self._load_available_timeframes_prompt()\
-                .replace("{current_date_str}", self._to_french_date(datetime.now()) + " à " + self._to_french_time(datetime.now()))\
-                .replace("{owner_name}", CalendarAgent.owner_name)\
-                .replace("{user_input}", user_input)\
-                .replace("{chat_history}", "- " + "\n- ".join(formatted_history))
-
-            prompts = ChatPromptTemplate.from_messages([
-                ("system", prompt),
-                MessagesPlaceholder(variable_name="agent_scratchpad"),
-            ])
-
-            agent = create_tool_calling_agent(self.llm, [CalendarAgent.get_available_timeframes], prompts)
-            available_timeframes_agent = AgentExecutor(agent=agent, tools=[CalendarAgent.get_available_timeframes], verbose=True)
-
-            available_timeframes_answer = await available_timeframes_agent.ainvoke({"input": ""})
+            available_timeframes_answer = await self.available_timeframes_agent.ainvoke({
+                "current_date_str": self._to_french_date(CalendarAgent.now) + " à " + self._to_french_time(CalendarAgent.now),
+                "owner_name": CalendarAgent.owner_name,
+                "user_input": user_input,
+                "chat_history": "- " + "\n- ".join(formatted_history)
+            })
             
             return available_timeframes_answer["output"]
 
