@@ -208,8 +208,13 @@ class CalendarAgent:
 
         formatted_history = []
         for message in chat_history:
-            formatted_history.append(f"{message[0]}: {message[1]}")
-            
+            if isinstance(message, dict):
+                formatted_history.append(f"{message['role']}: {message['content']}")
+            elif isinstance(message, tuple):
+                formatted_history.append(f"{message[0]}: {message[1]}")
+            else:
+                raise ValueError(f"Unsupported message type: {type(message)}")
+                         
         # Current contextual data to inject directly (no dedicated tools anymore)
         current_date_str = self._to_french_date(datetime.now())
         owner_name = CalendarAgent.owner_name or "le conseiller"

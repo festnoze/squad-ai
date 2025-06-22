@@ -47,10 +47,10 @@ if not "%1"=="" (
 )
 
 echo.
-echo Building Docker image %repo_prefix%!new_subversion! .
+echo Building Local Docker image %repo_prefix%!new_subversion! .
 echo.
 
-docker build -t %repo_prefix%!new_subversion! .
+docker build -f Dockerfile.local -t %repo_prefix%!new_subversion! .
 
 endlocal
 
