@@ -36,7 +36,7 @@ COPY . .
 #RUN chmod 777 src/database_conversations/conversation_database.db
 
 # Nettoie le répertoire outputs des données existantes
-RUN rm -rf /outputs/logs/{*,.*}
+#RUN rm -rf /outputs/logs/{*,.*}
 
 # Expose le port défini pour permettre l'accès externe à l'application
 EXPOSE $PORT

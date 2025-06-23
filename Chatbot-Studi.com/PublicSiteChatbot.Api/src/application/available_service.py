@@ -4,9 +4,10 @@ from typing import AsyncGenerator, Optional
 from uuid import UUID
 from dotenv import load_dotenv
 #
-from langchain_core.runnables import RunnablePassthrough
+from langchain_core.runnables import Runnable, RunnablePassthrough
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.docstore.document import Document
+#
 from application.retrieved_docs_formating_service import RetrievedDocsService
 from application.service_exceptions import QuotaOverloadException
 from application.studi_public_website_rag_specific_config import StudiPublicWebsiteRagSpecificConfig
@@ -44,9 +45,8 @@ class AvailableService:
     is_init = False
 
     def init(activate_print = True):
-        load_dotenv()
-        load_dotenv(dotenv_path=".rag_config.env")
         txt.activate_print = activate_print
+        
         AvailableService.current_dir = os.getcwd()
         AvailableService.out_dir = os.path.join(AvailableService.current_dir, 'outputs') 
         

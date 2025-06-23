@@ -4,14 +4,16 @@ src/application/ragas_service.py
 
 src/database_conversations/conversation_database.db
 storage/
-storage.old/
 
-.env
+/outputs/logs/
+/outputs/scraped/
+/outputs/scraped-full/
+
 senv/
-*.log
-.git
 .vscode/
 __pycache__/
+*.log
+.git
 *.log
 *.pyc
 *.pyo

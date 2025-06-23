@@ -19,7 +19,6 @@ from common_tools.helpers.file_helper import file
 
 from facade.rag_ingestion_controller import ingestion_router
 from facade.rag_inference_controller import inference_router
-from facade.rag_evaluation_controller import evaluation_router
 
 class ApiConfig:
     @asynccontextmanager
@@ -30,8 +29,8 @@ class ApiConfig:
             AvailableService.init(activate_print=True)  
             
             startup_duration = time.time() - started_at
-            print(f"\n✓ API Startup duration: {startup_duration:.2f}s.")
-            print("\n  ------------------------------\n  | - RAG API up and running - |\n  ------------------------------\n")
+            txt.print(f"\n✓ API Startup duration: {startup_duration:.2f}s.")
+            txt.print("\n  ------------------------------\n  | - RAG API up and running - |\n  ------------------------------\n")
             yield
 
         finally:
@@ -54,7 +53,9 @@ class ApiConfig:
         
         app.include_router(ingestion_router)
         app.include_router(inference_router)
-        app.include_router(evaluation_router)
+        
+        # from facade.rag_evaluation_controller import evaluation_router
+        # app.include_router(evaluation_router)
 
         # Must be limited to dev env. if reactivated
         # from facade.test_controller import test_router
