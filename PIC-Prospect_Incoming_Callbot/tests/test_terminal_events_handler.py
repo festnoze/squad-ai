@@ -12,7 +12,7 @@ import pytest
 import io
 import sys
 from unittest.mock import patch, MagicMock, AsyncMock, call
-from app.terminal_events_handler import TerminalEventsHandler
+from terminal_events_handler import TerminalEventsHandler
 
 @pytest.fixture
 def mock_environment():

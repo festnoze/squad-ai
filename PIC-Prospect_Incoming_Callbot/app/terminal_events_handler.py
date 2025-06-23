@@ -7,15 +7,15 @@ import logging
 from openai import OpenAI
 from fastapi import WebSocket, WebSocketDisconnect
 #
-from app.speech.text_to_speech import get_text_to_speech_provider
-from app.speech.speech_to_text import get_speech_to_text_provider
-from app.agents.agents_graph import AgentsGraph
-from app.managers.incoming_text_manager import IncomingTextManager
-from app.managers.outgoing_text_manager import OutgoingTextManager
+from speech.text_to_speech import get_text_to_speech_provider
+from speech.speech_to_text import get_speech_to_text_provider
+from agents.agents_graph import AgentsGraph
+from managers.incoming_text_manager import IncomingTextManager
+from managers.outgoing_text_manager import OutgoingTextManager
 #
-from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
-from app.api_client.salesforce_api_client import SalesforceApiClient
-from app.api_client.salesforce_api_client_interface import SalesforceApiClientInterface
+from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
+from api_client.salesforce_api_client import SalesforceApiClient
+from api_client.salesforce_api_client_interface import SalesforceApiClientInterface
 
 class TerminalEventsHandler:
     # Class variables shared across instances

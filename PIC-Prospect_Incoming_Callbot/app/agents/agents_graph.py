@@ -5,20 +5,20 @@ from uuid import UUID
 from langgraph.graph import StateGraph, END
 
 # Models
-from app.agents.phone_conversation_state_model import PhoneConversationState
-from app.api_client.request_models.user_request_model import UserRequestModel, DeviceInfoRequestModel
-from app.api_client.request_models.conversation_request_model import ConversationRequestModel
-from app.api_client.request_models.query_asking_request_model import QueryAskingRequestModel
+from agents.phone_conversation_state_model import PhoneConversationState
+from api_client.request_models.user_request_model import UserRequestModel, DeviceInfoRequestModel
+from api_client.request_models.conversation_request_model import ConversationRequestModel
+from api_client.request_models.query_asking_request_model import QueryAskingRequestModel
 
 # Agents
-from app.agents.lead_agent import LeadAgent
-from app.agents.calendar_agent import CalendarAgent
-from app.agents.sf_agent import SFAgent
+from agents.lead_agent import LeadAgent
+from agents.calendar_agent import CalendarAgent
+from agents.sf_agent import SFAgent
 
 # Clients
-from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
-from app.api_client.salesforce_api_client_interface import SalesforceApiClientInterface
-from app.managers.outgoing_manager import OutgoingManager
+from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
+from api_client.salesforce_api_client_interface import SalesforceApiClientInterface
+from managers.outgoing_manager import OutgoingManager
 from llms.llm_info import LlmInfo
 from llms.langchain_factory import LangChainFactory
 from llms.langchain_adapter_type import LangChainAdapterType
@@ -107,7 +107,7 @@ class AgentsGraph:
             return state
 
         if user_input:
-            feedback_text = f"Très bien. Vous avez dit : \"{user_input}\"."
+            feedback_text = f"Très bien." # Vous avez dit : \"{user_input}\"."
             await self.outgoing_manager.enqueue_text(feedback_text)
 
             category = await self.analyse_user_input_for_dispatch_async(user_input, state["history"])
@@ -355,6 +355,12 @@ class AgentsGraph:
                     owner_name=sf_account_info.get('Owner').get('Name', '')
                 )
                 chat_history = state.get('history', [])
+
+                # Limit the history to the last 10 messages to avoid context overflow
+                if len(chat_history) > 10:
+                    self.logger.info(f"[{call_sid[-4:]}] Chat history has {len(chat_history)} messages. Truncating to the last 10.")
+                    chat_history = chat_history[-10:]
+
                 calendar_agent_answer = await self.calendar_agent_instance.run_async(user_input, chat_history)
             
                 await self.outgoing_manager.enqueue_text(calendar_agent_answer)

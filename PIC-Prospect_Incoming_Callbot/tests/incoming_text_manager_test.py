@@ -8,9 +8,9 @@ from pyshould import should
 # Add the parent directory to sys.path to allow importing app modules
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from app.agents.agents_graph import AgentsGraph
-from app.managers.incoming_text_manager import IncomingTextManager
-from app.managers.outgoing_text_manager import OutgoingTextManager
+from agents.agents_graph import AgentsGraph
+from managers.incoming_text_manager import IncomingTextManager
+from managers.outgoing_text_manager import OutgoingTextManager
     
 call_sid = 'test_call_sid'
 calling_phone_number = '+123456789'

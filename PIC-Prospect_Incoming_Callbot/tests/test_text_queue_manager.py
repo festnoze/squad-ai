@@ -1,5 +1,5 @@
 import pytest
-from app.speech.text_queue_manager import TextQueueManager
+from speech.text_queue_manager import TextQueueManager
 
 # Define the fixture at the module level
 @pytest.fixture

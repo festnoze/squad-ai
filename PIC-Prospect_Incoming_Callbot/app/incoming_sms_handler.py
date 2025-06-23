@@ -3,10 +3,10 @@ import logging
 from uuid import UUID
 from typing import Optional
 #
-from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
-from app.api_client.request_models.user_request_model import UserRequestModel, DeviceInfoRequestModel
-from app.api_client.request_models.conversation_request_model import ConversationRequestModel
-from app.api_client.request_models.query_asking_request_model import QueryAskingRequestModel
+from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
+from api_client.request_models.user_request_model import UserRequestModel, DeviceInfoRequestModel
+from api_client.request_models.conversation_request_model import ConversationRequestModel
+from api_client.request_models.query_asking_request_model import QueryAskingRequestModel
 
 class IncomingSMSHandler:
     def __init__(self):

@@ -3,7 +3,7 @@ from typing import Literal
 from openai import OpenAI
 from pydub import AudioSegment
 import io
-import os
+from utils.envvar import EnvHelper
 
 TTSModel        = Literal["gpt-4o-mini-tts", "gpt-4o-tts", "tts-1", "tts-1-hd"]
 VoicePreset     = Literal["alloy", "echo", "fable", "onyx", "nova", "shimmer"]
@@ -11,7 +11,7 @@ ResponseFormat  = Literal["mp3", "opus", "aac", "flac", "wav", "pcm"]
 OutputType      = Literal["stream", "file", "audio_bytes"]
 
 class TTS_OpenAI:    
-    openai_client: any = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    openai_client: any = OpenAI(api_key=EnvHelper.get_openai_api_key())
     
     @staticmethod
     def generate_speech(

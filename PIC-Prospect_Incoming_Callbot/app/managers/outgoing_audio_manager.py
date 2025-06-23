@@ -2,13 +2,13 @@ import logging
 import asyncio
 from fastapi import WebSocket
 #
-from app.speech.text_queue_manager import TextQueueManager
-from app.speech.text_processing import ProcessText
-from app.speech.twilio_audio_sender import TwilioAudioSender
-from app.speech.text_to_speech import TextToSpeechProvider
-from app.managers.outgoing_manager import OutgoingManager
+from speech.text_queue_manager import TextQueueManager
+from speech.text_processing import ProcessText
+from speech.twilio_audio_sender import TwilioAudioSender
+from speech.text_to_speech import TextToSpeechProvider
+from managers.outgoing_manager import OutgoingManager
 #
-from app.utils.async_call_wrapper import AsyncCallWrapper
+from utils.async_call_wrapper import AsyncCallWrapper
 
 class OutgoingAudioManager(OutgoingManager):
     """

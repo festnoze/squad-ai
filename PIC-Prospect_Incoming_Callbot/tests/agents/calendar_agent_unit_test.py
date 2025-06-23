@@ -3,7 +3,7 @@ import pytest
 from datetime import datetime, timedelta
 from langchain_core.runnables import Runnable
 from langchain_core.messages import AIMessage
-from app.agents.calendar_agent import CalendarAgent
+from agents.calendar_agent import CalendarAgent
 
 LLM_SHOULD_FAIL = object()  # Marker object to indicate LLM failure in tests
 

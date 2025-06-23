@@ -2,7 +2,7 @@ import asyncio
 import pytest
 import time
 from concurrent.futures import ThreadPoolExecutor
-from app.utils.async_call_wrapper import AsyncCallWrapper
+from utils.async_call_wrapper import AsyncCallWrapper
 
 # Test helper functions
 async def example_async_function(delay: float, value: str) -> str:

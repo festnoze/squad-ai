@@ -1,8 +1,8 @@
 import logging
-from app.managers.incoming_manager import IncomingManager
-from app.agents.agents_graph import AgentsGraph
-from app.managers.outgoing_manager import OutgoingManager
-from app.agents.phone_conversation_state_model import ConversationState, PhoneConversationState
+from managers.incoming_manager import IncomingManager
+from agents.agents_graph import AgentsGraph
+from managers.outgoing_manager import OutgoingManager
+from agents.phone_conversation_state_model import ConversationState, PhoneConversationState
 
 class IncomingTextManager(IncomingManager):
 

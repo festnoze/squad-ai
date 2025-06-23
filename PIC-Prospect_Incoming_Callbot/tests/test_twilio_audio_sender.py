@@ -6,7 +6,7 @@ import audioop
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from app.speech.twilio_audio_sender import TwilioAudioSender
+from speech.twilio_audio_sender import TwilioAudioSender
 
 @pytest.fixture
 def mock_websocket():

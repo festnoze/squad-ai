@@ -13,11 +13,11 @@ from pydub import AudioSegment
 from pydub.effects import normalize
 from fastapi import WebSocket
 #
-from app.agents.phone_conversation_state_model import ConversationState, PhoneConversationState
-from app.speech.speech_to_text import SpeechToTextProvider
-from app.agents.agents_graph import AgentsGraph
-from app.managers.incoming_manager import IncomingManager
-from app.managers.outgoing_audio_manager import OutgoingManager
+from agents.phone_conversation_state_model import ConversationState, PhoneConversationState
+from speech.speech_to_text import SpeechToTextProvider
+from agents.agents_graph import AgentsGraph
+from managers.incoming_manager import IncomingManager
+from managers.outgoing_audio_manager import OutgoingManager
 
 class IncomingAudioManager(IncomingManager):
     """Audio processing utilities for improving speech recognition quality and handling Twilio events"""

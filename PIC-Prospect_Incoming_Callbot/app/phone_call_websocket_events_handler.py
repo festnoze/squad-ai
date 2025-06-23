@@ -7,17 +7,18 @@ import logging
 from openai import OpenAI
 from fastapi import WebSocket, WebSocketDisconnect
 #
-from app.speech.text_to_speech import get_text_to_speech_provider
-from app.speech.speech_to_text import get_speech_to_text_provider
-from app.agents.agents_graph import AgentsGraph
-from app.managers.incoming_audio_manager import IncomingAudioManager
-from app.managers.outgoing_audio_manager import OutgoingAudioManager
+from utils.envvar import EnvHelper
+from speech.text_to_speech import get_text_to_speech_provider
+from speech.speech_to_text import get_speech_to_text_provider
+from agents.agents_graph import AgentsGraph
+from managers.incoming_audio_manager import IncomingAudioManager
+from managers.outgoing_audio_manager import OutgoingAudioManager
 #
-from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
+from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
 #
-from app.api_client.salesforce_api_client_interface import SalesforceApiClientInterface
-from app.api_client.salesforce_api_client_fake import SalesforceApiClientFake
-from app.api_client.salesforce_api_client import SalesforceApiClient
+from api_client.salesforce_api_client_interface import SalesforceApiClientInterface
+from api_client.salesforce_api_client_fake import SalesforceApiClientFake
+from api_client.salesforce_api_client import SalesforceApiClient
 
 class PhoneCallWebsocketEventsHandler:
     # Class variables shared across instances
@@ -56,7 +57,7 @@ class PhoneCallWebsocketEventsHandler:
 
         # Environment and configuration settings
         self.TEMP_DIR = "static/audio"
-        self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+        self.OPENAI_API_KEY = EnvHelper.get_openai_api_key()
         os.environ['OPENAI_API_KEY'] = self.OPENAI_API_KEY
 
         # Set Google Calendar credentials (needed for STT)

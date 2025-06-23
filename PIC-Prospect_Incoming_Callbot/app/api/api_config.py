@@ -9,7 +9,8 @@ from fastapi.responses import JSONResponse, StreamingResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 #
 from app import endpoints
-from app.phone_call_websocket_events_handler import PhoneCallWebsocketEventsHandlerFactory
+from utils.envvar import EnvHelper
+from phone_call_websocket_events_handler import PhoneCallWebsocketEventsHandlerFactory
 
 class ApiConfig:
     @asynccontextmanager
@@ -23,12 +24,16 @@ class ApiConfig:
     # Configure the FastAPI app
     def create_app() -> FastAPI:
         app = FastAPI(
-            title="Voice Appointment Maker API",
+            title="Prospect Incoming Callbot API",
             description="Backend API for Voice Appointment Maker through Twilio",
             version= f"{datetime.now().strftime("%Y.%m.%d.%H%M%S")}",
             lifespan=ApiConfig.lifespan
         )
         app.state.shutdown = lambda: None
+        
+        from dotenv import load_dotenv
+        load_dotenv()
+        EnvHelper._init_load_env()
         
         app.include_router(endpoints.router)
 

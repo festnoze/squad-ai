@@ -4,9 +4,9 @@ import logging
 from unittest.mock import MagicMock, AsyncMock, patch
 from fastapi import WebSocket
 
-from app.speech.text_to_speech import TextToSpeechProvider
-from app.speech.twilio_audio_sender import TwilioAudioSender
-from app.managers.outgoing_audio_manager import OutgoingAudioManager
+from speech.text_to_speech import TextToSpeechProvider
+from speech.twilio_audio_sender import TwilioAudioSender
+from managers.outgoing_audio_manager import OutgoingAudioManager
 
 # Configure logging for tests
 logging.basicConfig(level=logging.DEBUG)

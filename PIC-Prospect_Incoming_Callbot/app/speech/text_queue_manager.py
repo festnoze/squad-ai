@@ -1,7 +1,7 @@
 import logging
 import asyncio
 from typing import Optional
-from app.speech.text_processing import ProcessText
+from speech.text_processing import ProcessText
 
 class TextQueueManager:
     """

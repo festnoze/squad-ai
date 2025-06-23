@@ -1,9 +1,9 @@
 import pytest
 from unittest.mock import MagicMock, AsyncMock
-from app.agents.agents_graph import AgentsGraph
-from app.managers.outgoing_manager import OutgoingManager
-from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
-from app.api_client.salesforce_api_client_interface import SalesforceApiClientInterface
+from agents.agents_graph import AgentsGraph
+from managers.outgoing_manager import OutgoingManager
+from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
+from api_client.salesforce_api_client_interface import SalesforceApiClientInterface
 
 
 @pytest.mark.parametrize("awaited_dispatch, user_input, chat_history", [

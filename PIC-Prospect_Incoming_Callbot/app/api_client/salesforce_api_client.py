@@ -8,7 +8,7 @@ import json
 from datetime import datetime, timedelta, timezone
 import asyncio
 import re
-from app.api_client.salesforce_api_client_interface import SalesforceApiClientInterface
+from api_client.salesforce_api_client_interface import SalesforceApiClientInterface
 
 class SalesforceApiClient(SalesforceApiClientInterface):
     _client_id = '3MVG9IKwJOi7clC2.8QIzh9BkM6NhU53bup6EUfFQiXJ01nh.l2YJKF5vbNWqPkFEdjgzAXIqK3U1p2WCBUD3'

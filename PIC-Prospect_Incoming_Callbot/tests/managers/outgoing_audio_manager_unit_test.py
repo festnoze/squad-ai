@@ -1,6 +1,6 @@
 import asyncio
 import pytest
-from app.managers.outgoing_audio_manager import OutgoingAudioManager
+from managers.outgoing_audio_manager import OutgoingAudioManager
 
 
 # Define the fixture at the module level

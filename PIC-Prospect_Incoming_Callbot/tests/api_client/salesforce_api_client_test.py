@@ -3,9 +3,9 @@ import asyncio
 import os
 import logging
 from datetime import datetime, timedelta
-from app.api_client.salesforce_api_client import SalesforceApiClient
+from api_client.salesforce_api_client import SalesforceApiClient
 
-from app.api_client.salesforce_api_client_interface import SalesforceApiClientInterface
+from api_client.salesforce_api_client_interface import SalesforceApiClientInterface
     
 @pytest.fixture
 def salesforce_api_client() -> SalesforceApiClientInterface:

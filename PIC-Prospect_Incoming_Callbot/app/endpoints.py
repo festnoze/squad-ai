@@ -5,8 +5,8 @@ from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from twilio.twiml.voice_response import VoiceResponse, Connect
 from twilio.twiml.messaging_response import MessagingResponse
 #
-from app.phone_call_websocket_events_handler import PhoneCallWebsocketEventsHandler, PhoneCallWebsocketEventsHandlerFactory
-from app.incoming_sms_handler import IncomingSMSHandler
+from phone_call_websocket_events_handler import PhoneCallWebsocketEventsHandler, PhoneCallWebsocketEventsHandlerFactory
+from incoming_sms_handler import IncomingSMSHandler
 
 logger: logging.Logger = logging.getLogger(__name__)
 

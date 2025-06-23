@@ -3,7 +3,7 @@ import pytest
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, patch
 #
-from app.agents.calendar_agent import CalendarAgent
+from agents.calendar_agent import CalendarAgent
 #
 from llms.langchain_factory import LangChainFactory
 from llms.llm_info import LlmInfo

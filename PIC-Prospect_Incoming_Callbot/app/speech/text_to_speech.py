@@ -3,7 +3,7 @@ import logging
 import os
 import io
 from pydub import AudioSegment
-from app.speech.text_to_speech_openai import TTS_OpenAI
+from speech.text_to_speech_openai import TTS_OpenAI
 
 class TextToSpeechProvider(ABC):
     client: any = None

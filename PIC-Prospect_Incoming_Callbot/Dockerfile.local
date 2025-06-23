@@ -11,7 +11,7 @@ ENV PYTHONPATH=/app
 ENV PORT=8281
 
 # Définit l'adresse d'écoute de l'application
-ENV HOST_URI=0.0.0.0
+ENV HOST_URI=127.0.0.1
 
 # Copie les packages wheel précompilés dans le container
 #COPY wheels/ /wheels/

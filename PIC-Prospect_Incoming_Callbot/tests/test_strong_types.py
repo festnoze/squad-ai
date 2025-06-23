@@ -34,7 +34,7 @@
 #             )
 
 # def test_static_analyser():
-#     from app.api_config import ApiConfig
+#     from api_config import ApiConfig
 #     from strong_types.static_type_analyzer import run_static_analysis
 #     run_static_analysis(ApiConfig)
 

@@ -1,12 +1,12 @@
 import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
 import asyncio
-from app.agents.agents_graph import AgentsGraph
-from app.agents.phone_conversation_state_model import PhoneConversationState
-from app.managers.outgoing_manager import OutgoingManager
-from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
-from app.api_client.salesforce_api_client_interface import SalesforceApiClientInterface
-from app.agents.calendar_agent import CalendarAgent
+from agents.agents_graph import AgentsGraph
+from agents.phone_conversation_state_model import PhoneConversationState
+from managers.outgoing_manager import OutgoingManager
+from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
+from api_client.salesforce_api_client_interface import SalesforceApiClientInterface
+from agents.calendar_agent import CalendarAgent
 
 
 async def test_graph_init_conversation_and_welcome_message(agents_graph_mockings):

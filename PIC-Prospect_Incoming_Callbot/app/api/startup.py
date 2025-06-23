@@ -1,5 +1,5 @@
 import os
-from app.api_config import ApiConfig
+from api.api_config import ApiConfig
 import shutil
 
 # # Analyse upon startup the whole project to find all types and generate strong typing
@@ -12,7 +12,7 @@ for folder in ["outputs/logs", "static/audio"]:
         shutil.rmtree(folder)
     os.makedirs(folder, exist_ok=True)
 
-#from app.agents.agents_graph import AgentsGraph
+#from agents.agents_graph import AgentsGraph
 #tmp = AgentsGraph(None, None, None, None)
 
 # Start the app

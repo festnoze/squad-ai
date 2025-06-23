@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import time
-from app.managers.outgoing_manager import OutgoingManager
+from managers.outgoing_manager import OutgoingManager
 
 class OutgoingTextManager(OutgoingManager):
 
