@@ -27,7 +27,6 @@ class DummyLLM(Runnable):
             raise Exception("LLM invoke failed for test")
         return AIMessage(content=self._category_to_return)
 
-
 @pytest.fixture
 def sf_client_mock():
     class _DummyClient:
@@ -37,7 +36,6 @@ def sf_client_mock():
     return _DummyClient()
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "user_input, chat_history, llm_behavior, expected_category",
     [
@@ -75,7 +73,6 @@ async def test_calendar_agent_classification(sf_client_mock, user_input, chat_hi
     assert actual_category == expected_category
 
 
-@pytest.mark.asyncio
 async def test_proposition_de_creneaux_calls_get_appointments(sf_client_mock):
     agent = CalendarAgent(DummyLLM("Proposition de créneaux"), sf_client_mock)
     CalendarAgent.now = datetime(2025, 6, 19)
@@ -85,8 +82,6 @@ async def test_proposition_de_creneaux_calls_get_appointments(sf_client_mock):
     
     sf_client_mock.get_scheduled_appointments_async.assert_awaited()
 
-
-@pytest.mark.asyncio
 
 @pytest.mark.parametrize(
     "user_input, chat_history",

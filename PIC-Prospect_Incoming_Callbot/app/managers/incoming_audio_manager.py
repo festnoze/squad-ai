@@ -26,7 +26,7 @@ class IncomingAudioManager(IncomingManager):
     VOICE_ID = "alloy"
     
     # Temporary directory for audio files
-    TEMP_DIR = "./static/audio"# c:\Dev\squad-ai\LudoAppoinmentTaker\app\speech\outgoing_manager.py    
+    TEMP_DIR = "./static/audio"   
 
     def __init__(self, websocket: WebSocket, stt_provider: SpeechToTextProvider,outgoing_manager: OutgoingManager, agents_graph : AgentsGraph, sample_width=2, frame_rate=8000, channels=1, vad_aggressiveness=3):
         self.logger = logging.getLogger(__name__)
