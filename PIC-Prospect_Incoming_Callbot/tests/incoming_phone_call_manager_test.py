@@ -55,7 +55,7 @@ def mock_audio_sender():
     })
     return mock_audio_sender
 
-@pytest.mark.asyncio
+
 async def test_speak_and_send_text_functionality(mock_outgoing_audio_manager, mock_logger):
     """Test functionality of the refactored speak_and_send_text method"""
     
@@ -104,7 +104,7 @@ async def test_speak_and_send_text_functionality(mock_outgoing_audio_manager, mo
     duration = await speak_and_send_text("Another test message")
     assert duration == 0
 
-@pytest.mark.asyncio
+
 @pytest.mark.parametrize("text_input,max_words,max_chars,expected_chunks", [
     ("This is a test of the enhanced text-to-speech system. It should handle multiple sentences properly.", 15, 150, 1),
     ("Testing with smaller chunks to ensure proper text splitting and timing.", 5, 50, 3),
@@ -174,7 +174,7 @@ async def test_send_text_to_speak_to_twilio(mock_outgoing_audio_manager, mock_lo
     mock_outgoing_audio_manager.enqueue_text.assert_not_called()
     assert duration == 0
 
-@pytest.mark.asyncio
+
 async def test_stop_speaking_functionality(mock_outgoing_audio_manager, mock_logger, mocker):
     """Test functionality of the refactored stop_speaking method"""
     # Setup mock

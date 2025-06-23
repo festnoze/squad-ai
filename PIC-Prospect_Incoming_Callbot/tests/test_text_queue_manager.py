@@ -7,7 +7,7 @@ def text_queue_manager() -> TextQueueManager:
     """Fixture to create a TextQueueManager for each test"""
     return TextQueueManager()
 
-@pytest.mark.asyncio
+
 @pytest.mark.parametrize("texts_to_add", [
     ["This is a test message.", "Another part.", "And a third part."],
     ["Hello world!", "This is another test.", "With three parts."],
@@ -43,13 +43,13 @@ async def test_enqueue_text(text_queue_manager : TextQueueManager, texts_to_add 
     assert text_queue_manager.total_enqueued_chars == total_expected_length + len(texts_to_add) - 1, \
         f"Character count mismatch for dataset with texts: {texts_to_add}"
     
-@pytest.mark.asyncio
+
 async def test_enqueue_empty_text(text_queue_manager : TextQueueManager):
     """Test that enqueueing empty text returns False"""
     result = await text_queue_manager.enqueue_text("")
     assert result is False, "Enqueue should return False for empty text"
 
-@pytest.mark.asyncio
+
 async def test_get_text_chunk_sentence_end(text_queue_manager : TextQueueManager):
     """Test getting a text chunk that ends with a sentence"""
     # Enqueue text with a sentence end
@@ -65,7 +65,7 @@ async def test_get_text_chunk_sentence_end(text_queue_manager : TextQueueManager
     chunk = await text_queue_manager.get_next_text_chunk(max_words_by_sentence=8, max_chars_by_sentence=100)
     assert chunk == "This is another sentence."
 
-@pytest.mark.asyncio
+
 async def test_get_text_chunk_word_limit(text_queue_manager : TextQueueManager):
     """Test getting a text chunk based on word limit"""
     # Enqueue text with more than 10 words but no sentence end
@@ -78,13 +78,13 @@ async def test_get_text_chunk_word_limit(text_queue_manager : TextQueueManager):
     # Queue should now only contain the remaining words
     assert text_queue_manager.text_queue == "eleven twelve thirteen"
 
-@pytest.mark.asyncio
+
 async def test_get_text_chunk_empty_queue(text_queue_manager : TextQueueManager):
     """Test getting a chunk from an empty queue"""
     chunk = await text_queue_manager.get_next_text_chunk()
     assert chunk == None
 
-@pytest.mark.asyncio
+
 async def test_is_empty(text_queue_manager : TextQueueManager):
     """Test is_empty method"""
     assert text_queue_manager.is_empty() is True, "Queue should be empty initially"
@@ -95,7 +95,7 @@ async def test_is_empty(text_queue_manager : TextQueueManager):
     await text_queue_manager.get_next_text_chunk()
     assert text_queue_manager.is_empty() is True, "Queue should be empty after getting all text"
 
-@pytest.mark.asyncio
+
 async def test_clear_queue(text_queue_manager : TextQueueManager):
     """Test clearing the queue"""
     await text_queue_manager.enqueue_text("Text to be cleared")

@@ -5,7 +5,7 @@ from app.managers.outgoing_manager import OutgoingManager
 from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
 from app.api_client.salesforce_api_client_interface import SalesforceApiClientInterface
 
-@pytest.mark.asyncio
+
 @pytest.mark.parametrize("awaited_dispatch, user_input, chat_history", [
     
     # Direct request from the user query

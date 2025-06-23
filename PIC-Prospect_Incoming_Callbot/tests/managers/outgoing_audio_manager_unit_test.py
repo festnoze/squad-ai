@@ -30,11 +30,11 @@ def fixture(mocker):
         'outgoing_audio_manager': outgoing_audio_manager
     }
 
-@pytest.mark.asyncio
+
 class TestOutgoingAudioManager:
     """Test cases for the OutgoingAudioManager class"""
     
-    @pytest.mark.asyncio
+    
     async def test_enqueue_text(self, fixture):
         """Test enqueueing text to the OutgoingAudioManager"""
         outgoing_audio_manager: OutgoingAudioManager = fixture['outgoing_audio_manager']
@@ -48,7 +48,7 @@ class TestOutgoingAudioManager:
         result = await outgoing_audio_manager.enqueue_text("")
         assert result is False
     
-    @pytest.mark.asyncio
+    
     async def test_clear_text_queue(self, fixture):
         """Test clearing the text queue"""
         outgoing_audio_manager: OutgoingAudioManager = fixture['outgoing_audio_manager']
@@ -61,7 +61,7 @@ class TestOutgoingAudioManager:
         await outgoing_audio_manager.clear_text_queue()
         assert outgoing_audio_manager.text_queue_manager.is_empty() is True
     
-    @pytest.mark.asyncio
+    
     async def test_is_sending_speech(self, fixture):
         """Test is_sending_speech method"""
         outgoing_audio_manager: OutgoingAudioManager = fixture['outgoing_audio_manager']
@@ -84,7 +84,7 @@ class TestOutgoingAudioManager:
         assert outgoing_audio_manager.has_text_to_be_sent() is False
         assert outgoing_audio_manager.is_sending() is True
     
-    @pytest.mark.asyncio
+    
     async def test_streaming_text_to_speech(self, fixture):
         """Test the full text-to-speech streaming flow"""
         outgoing_audio_manager: OutgoingAudioManager = fixture['outgoing_audio_manager']
@@ -109,7 +109,7 @@ class TestOutgoingAudioManager:
         # Verify TTS and send_audio_chunk were called
         outgoing_audio_manager.audio_sender.send_audio_chunk.assert_called()
     
-    @pytest.mark.asyncio
+    
     async def test_get_streaming_stats(self, fixture):
         """Test getting streaming statistics"""
         outgoing_audio_manager: OutgoingAudioManager = fixture['outgoing_audio_manager']
@@ -120,7 +120,7 @@ class TestOutgoingAudioManager:
         assert "audio_sender" in stats
         assert "is_sending_speech" in stats
 
-    @pytest.mark.asyncio
+    
     async def test_run_stream_then_stop_audio_streaming_worker(self, fixture):
         """Test the async versions of run and stop background streaming worker"""
         outgoing_audio_manager: OutgoingAudioManager = fixture['outgoing_audio_manager']

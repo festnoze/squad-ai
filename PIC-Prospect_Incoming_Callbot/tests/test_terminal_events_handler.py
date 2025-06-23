@@ -24,7 +24,7 @@ def mock_environment():
         "stream_sid": "test_stream_sid"
     }
 
-@pytest.mark.asyncio
+
 async def test_terminal_events_handler_initialization():
     """Test that TerminalEventsHandler initializes all required dependencies."""
     
@@ -51,7 +51,7 @@ async def test_terminal_events_handler_initialization():
         # Assert logger was initialized
         assert handler.logger is not None
         
-@pytest.mark.asyncio
+
 async def test_init_incoming_data_handler_async(mock_environment):
     """Test the initialization of incoming data handler."""
     
@@ -89,7 +89,7 @@ async def test_init_incoming_data_handler_async(mock_environment):
         mock_outgoing_instance.run_background_streaming_worker.assert_called_once()
         mock_start_handler.assert_called_once()
         
-@pytest.mark.asyncio
+
 async def test_incoming_text_async():
     """Test the processing of incoming text."""
     
@@ -114,7 +114,7 @@ async def test_incoming_text_async():
         # Verify the method was called with the correct data
         mock_incoming_instance.process_incoming_data_async.assert_called_once_with(test_media_data)
 
-@pytest.mark.asyncio
+
 async def test_handle_start_event_async(mock_environment):
     """Test handling of the start event."""
     
@@ -146,7 +146,7 @@ async def test_handle_start_event_async(mock_environment):
         # Verify the return value
         assert result == mock_environment['stream_sid']
 
-@pytest.mark.asyncio
+
 async def test_close_session_async():
     """Test closing of a session."""
     
@@ -174,7 +174,7 @@ async def test_close_session_async():
         # Since current_stream is set and in stream_states, it should be removed
         assert "test_stream" not in handler.stream_states
 
-@pytest.mark.asyncio
+
 async def test_handle_stop_event_async():
     """Test handling of the stop event."""
     
@@ -203,7 +203,7 @@ async def test_handle_stop_event_async():
         # Check that the stream state was removed
         assert "test_stream" not in handler.stream_states
 
-@pytest.mark.asyncio
+
 async def test_terminal_loop_input_processing(mock_environment):
     """Test the terminal input loop processing."""
     
@@ -232,7 +232,7 @@ async def test_terminal_loop_input_processing(mock_environment):
         # It should not be called for 'bye' as that breaks the loop
         mock_incoming_text.assert_called_once()
 
-@pytest.mark.asyncio
+
 async def test_real_terminal_welcome_message(monkeypatch):
     """Test with real dependencies to verify the welcome message output."""
     # Setup environment variables

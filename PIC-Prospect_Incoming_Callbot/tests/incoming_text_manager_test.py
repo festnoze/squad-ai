@@ -69,7 +69,7 @@ def test_set_phone_number(incoming_text_manager  : IncomingTextManager):
     incoming_text_manager.phone_number | should.equal(test_phone)
     incoming_text_manager.phones_by_call_sid[test_stream_sid] | should.equal(test_phone)
 
-@pytest.mark.asyncio
+
 async def test_process_incoming_data_is_processing(incoming_text_manager : IncomingTextManager):
     """Test that process_incoming_data_async processes data when is_processing is True."""        
     # Arrange
@@ -87,7 +87,7 @@ async def test_process_incoming_data_is_processing(incoming_text_manager : Incom
     state_graph['history'] | should.equal([])
     state_graph['agent_scratchpad'] | should.equal({})
 
-@pytest.mark.asyncio
+
 async def test_process_incoming_data_exception(incoming_text_manager : IncomingTextManager):
     """Test that process_incoming_data_async handles exceptions gracefully."""        
     # Arrange
@@ -100,7 +100,7 @@ async def test_process_incoming_data_exception(incoming_text_manager : IncomingT
     # Assert
     incoming_text_manager.agents_graph.ainvoke.assert_called_once()
         
-@pytest.mark.asyncio
+
 async def test_process_incoming_data_with_different_user_input(incoming_text_manager : IncomingTextManager):
     """Test that process_incoming_data_async handles different user inputs correctly."""        
     # Test with empty input

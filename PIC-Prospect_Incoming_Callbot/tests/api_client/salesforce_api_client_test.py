@@ -24,7 +24,7 @@ def test_authenticate(salesforce_api_client: SalesforceApiClientInterface):
     assert salesforce_api_client._access_token is not None, "Access token should be available after re-authentication"
     assert salesforce_api_client._instance_url is not None, "Instance URL should be available after re-authentication"
 
-@pytest.mark.asyncio
+
 async def test_get_person_by_phone_async(salesforce_api_client: SalesforceApiClientInterface):
     """Test retrieving a person by phone number"""
     phone_number = "+33668422388"
@@ -56,7 +56,7 @@ async def test_get_person_by_phone_async(salesforce_api_client: SalesforceApiCli
         # No person found - this is also a valid test result
         logging.info(f"No person found with phone number: {phone_number}")
 
-@pytest.mark.asyncio
+
 async def test_get_leads_by_details_async(salesforce_api_client: SalesforceApiClientInterface):
     """Test retrieving leads by details including phone number"""
     # Use the specified phone number
@@ -105,7 +105,7 @@ async def test_get_leads_by_details_async(salesforce_api_client: SalesforceApiCl
             assert 'Company' in lead, "Lead should have a Company field"
             assert lead['Company'] == "Studi", "Company should match our search criteria"
 
-@pytest.mark.asyncio
+
 async def test_schedule_new_appointment_async(salesforce_api_client: SalesforceApiClientInterface):
     """Test scheduling a new appointment"""
     now = datetime.now()
@@ -133,7 +133,7 @@ async def test_schedule_new_appointment_async(salesforce_api_client: SalesforceA
     # Log the created event ID
     logging.info(f"Created test appointment with ID: {event_id}")
 
-@pytest.mark.asyncio
+
 @pytest.mark.parametrize("fixed_date", [
     True,
     #False
@@ -173,7 +173,7 @@ async def test_get_scheduled_appointments_async(salesforce_api_client: Salesforc
             assert 'StartDateTime' in appointment, "Appointment should have a StartDateTime"
             assert 'EndDateTime' in appointment, "Appointment should have an EndDateTime"
 
-@pytest.mark.asyncio
+
 async def test_get_persons_async(salesforce_api_client: SalesforceApiClientInterface):
     """Test retrieving persons (contacts)"""
     # Get the latest contacts

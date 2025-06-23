@@ -8,7 +8,7 @@ from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiCl
 from app.api_client.salesforce_api_client_interface import SalesforceApiClientInterface
 from app.agents.calendar_agent import CalendarAgent
 
-@pytest.mark.asyncio
+
 async def test_graph_init_conversation_and_welcome_message(agents_graph_mockings):
     """Test that without user input, we get a welcome message and conversation_id is set."""
     # Arrange
@@ -53,7 +53,7 @@ async def test_graph_init_conversation_and_welcome_message(agents_graph_mockings
     # Verify outgoing_manager was called with welcome message
     agents_graph_mockings["outgoing_manager"].enqueue_text.assert_called()
     
-@pytest.mark.asyncio
+
 async def test_query_response_about_courses(agents_graph_mockings):
     """Test that with a user input query about courses, the history contains the query and the answer."""
     # Arrange
@@ -110,7 +110,7 @@ async def test_query_response_about_courses(agents_graph_mockings):
     # Verify outgoing_manager was called with the response
     agents_graph_mockings["outgoing_manager"].enqueue_text.assert_called()
 
-@pytest.mark.asyncio
+
 async def test_schedule_calendar_appointment(agents_graph_mockings):
     # Arrange
 

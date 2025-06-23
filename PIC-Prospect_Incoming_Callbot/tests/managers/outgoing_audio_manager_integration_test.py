@@ -11,7 +11,7 @@ from app.managers.outgoing_audio_manager import OutgoingAudioManager
 # Configure logging for tests
 logging.basicConfig(level=logging.DEBUG)
 
-@pytest.mark.asyncio
+
 async def test_all_chunks_processing():
     """Test that all chunks in the queue gets processed and sent."""
     # Arrange        
@@ -64,7 +64,7 @@ async def test_all_chunks_processing():
     # Clean up
     await outgoing_audio_manager.stop_background_streaming_worker_async()
 
-@pytest.mark.asyncio
+
 async def test_single_chunk_processing():
     """Test that a single chunk in the queue gets processed correctly."""
     # Arrange

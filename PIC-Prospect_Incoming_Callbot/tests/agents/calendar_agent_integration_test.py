@@ -10,7 +10,7 @@ from llms.llm_info import LlmInfo
 from llms.langchain_adapter_type import LangChainAdapterType
 
 
-@pytest.mark.asyncio
+
 @pytest.mark.parametrize(
     "user_input, chat_history, expected_category, expected_answer, await_exact_match",
     [
@@ -228,7 +228,7 @@ async def test_calendar_agent_integration_classification_plus_outputed_answer(sf
             f"Expected a response semantically similar to:\n{expected_answer}\nGot:\n{actual_response}")
 
 
-@pytest.mark.asyncio
+
 async def test_complete_conversation_exchange(sf_client_mock, llm_instance, similarity_evaluator):
     """
     Tests a complete conversation flow from initial contact to appointment confirmation.
