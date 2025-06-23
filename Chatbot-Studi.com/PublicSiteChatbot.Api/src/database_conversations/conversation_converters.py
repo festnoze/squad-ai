@@ -1,11 +1,12 @@
 from datetime import datetime, timezone
-from src.database_conversations.entities import ConversationEntity, MessageEntity, UserEntity, DeviceInfoEntity
 from common_tools.models.conversation import Conversation
 from common_tools.models.message import Message
 from common_tools.models.user import User
 from common_tools.models.device_info import DeviceInfo
 import uuid
 from uuid import UUID
+
+from database_conversations.entities import ConversationEntity, MessageEntity, UserEntity, DeviceInfoEntity
 
 class ConversationConverters:
     @staticmethod

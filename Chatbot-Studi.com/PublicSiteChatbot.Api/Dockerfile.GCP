@@ -32,7 +32,8 @@ RUN pip install --no-cache-dir -r requirements_docker.txt
 COPY . .
 
 # Modifie les permissions du fichier de base de données des conversations
-RUN chmod 777 src/database_conversations/conversation_database.db
+# Obsolete: DB is removed from .dockerignore
+#RUN chmod 777 src/database_conversations/conversation_database.db
 
 # Nettoie le répertoire outputs des données existantes
 RUN rm -rf /outputs/logs/{*,.*}

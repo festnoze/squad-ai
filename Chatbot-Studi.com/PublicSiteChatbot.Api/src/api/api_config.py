@@ -2,7 +2,7 @@ import time
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, StreamingResponse, Response
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import Response as StarletteResponse
 from contextlib import asynccontextmanager
@@ -17,7 +17,6 @@ from datetime import datetime
 from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.file_helper import file
 
-from facade.test_controller import test_router
 from facade.rag_ingestion_controller import ingestion_router
 from facade.rag_inference_controller import inference_router
 from facade.rag_evaluation_controller import evaluation_router
@@ -29,7 +28,7 @@ class ApiConfig:
             started_at = time.time()
 
             AvailableService.init(activate_print=True)  
-
+            
             startup_duration = time.time() - started_at
             print(f"\n✓ API Startup duration: {startup_duration:.2f}s.")
             print("\n  ------------------------------\n  | - RAG API up and running - |\n  ------------------------------\n")
@@ -52,11 +51,15 @@ class ApiConfig:
         app.state.shutdown = noop_shutdown
         
         # Include controllers as routers
-        app.include_router(test_router)
+        
         app.include_router(ingestion_router)
         app.include_router(inference_router)
         app.include_router(evaluation_router)
 
+        # Must be limited to dev env. if reactivated
+        # from facade.test_controller import test_router
+        # app.include_router(test_router)
+        
         # All CORS settings are enabled for development purposes
         app.add_middleware(
             CORSMiddleware,

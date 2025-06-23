@@ -1,4 +1,12 @@
-#.env
+src/facade/rag_evaluation_controller.py
+src/application/evaluation_service.py
+src/application/ragas_service.py
+
+src/database_conversations/conversation_database.db
+storage/
+storage.old/
+
+.env
 senv/
 *.log
 .git

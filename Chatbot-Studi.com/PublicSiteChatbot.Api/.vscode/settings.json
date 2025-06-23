@@ -1,4 +1,5 @@
 {
+    "python.defaultInterpreterPath": "./senv/Scripts/python.exe",
     "python.terminal.activateEnvironment": true,
     "python.testing.pytestArgs": [
         "tests"

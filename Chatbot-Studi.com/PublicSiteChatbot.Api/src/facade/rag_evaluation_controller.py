@@ -1,7 +1,6 @@
 import os
 import time
 from fastapi import APIRouter
-from application.evaluation_service import EvaluationService
 from common_tools.helpers.env_helper import EnvHelper
 from common_tools.helpers.file_helper import file
 from common_tools.langchains.langchain_factory import LangChainFactory
@@ -9,9 +8,16 @@ from common_tools.models.embedding_model import EmbeddingModel
 from common_tools.models.embedding_model_factory import EmbeddingModelFactory
 from common_tools.models.doc_w_summary_chunks_questions import DocWithSummaryChunksAndQuestions
 from common_tools.RAG.rag_ingestion_pipeline.summary_and_questions.summary_and_questions_chunks_service import SummaryAndQuestionsChunksService
+from application.available_service import AvailableService
+from application.evaluation_service import EvaluationService
 
 evaluation_router = APIRouter(prefix="/rag/evaluation", tags=["Evaluation"])
 output_path:str = './outputs'
+
+if not AvailableService.is_init:
+    AvailableService.init()
+
+EvaluationService.init_existing_services(AvailableService.rag_service, AvailableService.inference_pipeline)
 
 @evaluation_router.post("/create-ground-truth-dataset-run-inference-and-evaluate")
 async def create_q_and_a_dataset_then_run_inference_then_evaluate(samples_count_by_metadata: int = 20, batch_size: int = 20) -> dict:

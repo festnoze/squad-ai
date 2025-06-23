@@ -10,7 +10,7 @@ echo [1/3] Building %IMAGE%…
 docker build -f Dockerfile.GCP -t %IMAGE% . || goto :fail
 
 echo [2/3] Calling deployment…
-call docker_gcp_deploy.bat "%IMAGE%" || goto :fail
+call .\docker_gcp_deploy.bat "%IMAGE%" || goto :fail
 
 echo [3/3] Build + deploy complete.
 goto :eof

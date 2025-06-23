@@ -1,8 +1,8 @@
 from typing import Optional
 from uuid import UUID
 #
-from src.database_conversations.entities import Base, UserEntity, DeviceInfoEntity
-from src.database_conversations.conversation_converters import ConversationConverters
+from database_conversations.entities import Base, UserEntity, DeviceInfoEntity
+from database_conversations.conversation_converters import ConversationConverters
 #
 from common_tools.database.generic_datacontext import GenericDataContext
 from common_tools.models.conversation import User

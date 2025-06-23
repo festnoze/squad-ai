@@ -1,14 +1,12 @@
 import asyncio
 import os
-import re
 from typing import AsyncGenerator, Optional
 from uuid import UUID
 from dotenv import load_dotenv
 #
-from langchain_core.runnables import Runnable, RunnablePassthrough
+from langchain_core.runnables import RunnablePassthrough
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.docstore.document import Document
-from application.evaluation_service import EvaluationService
 from application.retrieved_docs_formating_service import RetrievedDocsService
 from application.service_exceptions import QuotaOverloadException
 from application.studi_public_website_rag_specific_config import StudiPublicWebsiteRagSpecificConfig
@@ -43,6 +41,7 @@ class AvailableService:
     waiting_message = "Merci de patienter un instant ... Je cherche les informations correspondant à votre question."
     user_repository: UserRepository = None
     conversation_repository: ConversationRepository = None
+    is_init = False
 
     def init(activate_print = True):
         load_dotenv()
@@ -60,13 +59,15 @@ class AvailableService:
             RAGAugmentedGeneration.augmented_generation_audio_prompt = Ressource.get_rag_augmented_generation_audio_prompt_on_studi()
             RAGPreTreatment.domain_specific_metadata_filters_validation_and_correction_async_method = StudiPublicWebsiteRagSpecificConfig.get_domain_specific_metadata_filters_validation_and_correction_async_method
             AvailableService.inference_pipeline = RagInferencePipeline(rag= AvailableService.rag_service, default_filters= StudiPublicWebsiteRagSpecificConfig.get_domain_specific_default_filters(), metadata_descriptions= metadata_descriptions_for_studi_public_site, tools= None)
-            EvaluationService.init_existing_services(AvailableService.rag_service, AvailableService.inference_pipeline)
 
         if not AvailableService.user_repository:
             AvailableService.user_repository = UserRepository()
 
         if not AvailableService.conversation_repository:
             AvailableService.conversation_repository = ConversationRepository()
+
+        AvailableService.is_init = True
+
 
     def re_init():
         AvailableService.rag_service = None

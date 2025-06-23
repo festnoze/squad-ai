@@ -4,8 +4,8 @@ from uuid import UUID
 from common_tools.database.generic_datacontext import GenericDataContext
 from common_tools.models.conversation import Conversation, Message
 from common_tools.models.device_info import DeviceInfo
-from src.database_conversations.entities import Base, ConversationEntity, MessageEntity, UserEntity, DeviceInfoEntity
-from src.database_conversations.conversation_converters import ConversationConverters
+from database_conversations.entities import Base, ConversationEntity, MessageEntity, UserEntity, DeviceInfoEntity
+from database_conversations.conversation_converters import ConversationConverters
 
 class ConversationRepository:
     def __init__(self, db_path_or_url='database_conversations/conversation_database.db'):
