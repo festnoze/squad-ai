@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 REM Define the image name prefix (can be modify)
-set "repo_prefix=rag_studi_public_website_api_0."
+set "repo_prefix=pic-prospect-incoming-callbot_0."
 
 REM Calculate the length of repo_prefix and store it in prefix_length
 call :StrLen repo_prefix prefix_length

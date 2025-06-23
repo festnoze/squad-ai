@@ -1,0 +1,46 @@
+# Utilise l'image Python 3.12.1-slim comme base
+FROM python:3.12.1-slim
+
+# Définit le répertoire de travail à la racine du container
+WORKDIR /
+
+# Définit le chemin par défaut pour Python dans le container
+ENV PYTHONPATH=/app
+
+# Définit le port d'écoute de l'application
+ENV PORT=8281
+
+# Définit l'adresse d'écoute de l'application
+ENV HOST_URI=0.0.0.0
+
+# Copie les packages wheel précompilés dans le container
+#COPY wheels/ /wheels/
+
+# Copie les fichiers de dépendances
+COPY pyproject.toml .
+COPY uv.lock .
+
+# Installation des outils de compilation nécessaires pour webrtcvad
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Installation de uv et des dépendances
+RUN pip install --no-cache-dir uv
+RUN uv sync
+
+# Copie l'intégralité du projet dans le container
+COPY . .
+
+# Modifie les permissions du fichier de base de données des conversations
+## Obsolete: DB is removed from .dockerignore
+#RUN chmod 777 app/database_conversations/conversation_database.db
+
+# Nettoie le répertoire outputs des données existantes
+#RUN rm -rf /outputs/logs/{*,.*}
+
+# Expose le port défini pour permettre l'accès externe à l'application
+EXPOSE $PORT
+
+# Démarre l'application via Uvicorn avec les paramètres spécifiés
+CMD ["sh", "-c", "/.venv/bin/python -m uvicorn app.api.startup:app --host $HOST_URI --port $PORT --log-level error"]
