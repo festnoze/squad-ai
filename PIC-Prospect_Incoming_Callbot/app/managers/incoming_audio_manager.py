@@ -9,6 +9,7 @@ import audioop
 import uuid
 import logging
 import time
+import asyncio
 from pydub import AudioSegment
 from pydub.effects import normalize
 from fastapi import WebSocket
@@ -79,7 +80,7 @@ class IncomingAudioManager(IncomingManager):
     
     def hangup_call(self):
         if self.websocket:
-            self.logger.info(f"### HANGING UP ### User silence duration of {self.consecutive_silence_duration_ms:.1f}ms exceeded max. allowed silence of {self.max_silence_duration_before_hangup_ms:.1f}ms")
+            self.logger.info(f"### HANGING UP ### Make phone call ends.")
             
             # Speak out "Au revoir" to the user first
             self.outgoing_manager.enqueue_text("Au revoir")
@@ -292,6 +293,7 @@ class IncomingAudioManager(IncomingManager):
 
         # Hangup the call if the user is silent for too long
         if self.consecutive_silence_duration_ms >= self.max_silence_duration_before_hangup_ms:
+            self.logger.info(f">>> User silence duration of {self.consecutive_silence_duration_ms:.1f}ms exceeded max. allowed silence of {self.max_silence_duration_before_hangup_ms:.1f}ms.")
             self.hangup_call()
             return
         
@@ -356,6 +358,14 @@ class IncomingAudioManager(IncomingManager):
             # Invoke the graph with current state to get the AI-generated welcome message
             updated_state = await self.agents_graph.ainvoke(current_state)
             self.stream_states[self.stream_sid] = updated_state
+
+            # If the agents graph response ends with "Merci et au revoir.", do hang-up
+            if updated_state["history"][-1][1].endswith("Merci et au revoir."):
+                self.logger.info(">>> Agents graph response ends with 'Merci et au revoir.', hanging up the call.")
+                while self.outgoing_manager.has_text_to_be_sent() or self.outgoing_manager.is_sending():
+                    await asyncio.sleep(0.3)
+                self.hangup_call()
+
         except Exception as e:
             self.logger.error(f"Error in user query to agents graph: {e}", exc_info=True)
 

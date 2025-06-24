@@ -62,3 +62,10 @@ class OutgoingManager(abc.ABC):
         Returns True if the data delivery process is currently running.
         """
         pass
+
+    @abc.abstractmethod
+    def has_text_to_be_sent(self) -> bool:
+        """
+        Returns True if there is still text to be sent.
+        """
+        pass

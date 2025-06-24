@@ -102,6 +102,12 @@ class OutgoingTextManager(OutgoingManager):
             await self.text_queue.put(None)
             self.logger.info("Text queue cleared for interruption")
 
+    def has_text_to_be_sent(self) -> bool:
+        """
+        Returns True if there is still text to be sent.
+        """
+        return not self.text_queue.empty()
+
     def update_stream_sid(self, stream_sid: str) -> None:
         """
         Updates the stream SID when it changes (e.g., when a new call starts or ends)

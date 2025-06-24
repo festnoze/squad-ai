@@ -77,26 +77,6 @@ class CalendarAgent:
             
             return available_timeframes_answer["output"]
 
-            # available_timeframes = self.available_timeframes_agent.invoke({"input": user_input, "chat_history": chat_history})
-            # # Determine search window: next two business days
-            # start_date = (datetime.now() + timedelta(days=1))
-            # end_date = (start_date + timedelta(days=2))
-
-            # appointments = await CalendarAgent.salesforce_api_client.get_scheduled_appointments_async(
-            #     self._to_str_iso(start_date),
-            #     self._to_str_iso(end_date),
-            #     CalendarAgent.owner_id,
-            # )
-
-            #available_timeframes = CalendarAgent.get_available_timeframes_from_scheduled_slots(start_date, end_date, appointments)
-
-            # if not available_timeframes:
-            #     return "Je suis désolé, aucun créneau n'est disponible entre le " + self._to_str_iso(start_date) + " et le " + self._to_str_iso(end_date) + ". " + "Souhaitez-vous élargir la recherche ?"
-
-            # # Propose the first available slot
-            # available_timeframes_str = ", ou ".join(self._get_french_from_timeframes(available_timeframes[:3]))
-            # return f"Je vous propose les créneaux suivants : {available_timeframes_str}. Avez-vous une préférence ?"
-
         if category == "Demande des disponibilités":
             return "Quels jours ou quelles heures de la journée vous conviendraient le mieux ?"
 
