@@ -95,7 +95,7 @@ class CalendarAgent:
             date_and_time: datetime = await self._extract_appointment_selected_date_and_time_async(user_input, chat_history)
             
             if date_and_time:
-                return "Parfait. Votre rendez-vous sera planifié le " + self._to_french_date(date_and_time, include_weekday=True, include_year=False) + " à " + self._to_french_time(date_and_time) + ". Merci de confirmer ce rendez-vous pour le valider."
+                return "C'est fait. Votre rendez-vous sera planifié le " + self._to_french_date(date_and_time, include_weekday=True, include_year=False) + " à " + self._to_french_time(date_and_time) + ". Merci de confirmer ce rendez-vous pour le valider."
             return "Je n'ai pas trouvé la date et l'heure du rendez-vous. Veuillez me préciser la date et l'heure du rendez-vous souhaité."
 
         if category == "Rendez-vous confirmé":
