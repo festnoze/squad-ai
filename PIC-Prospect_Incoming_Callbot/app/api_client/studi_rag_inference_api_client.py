@@ -14,8 +14,8 @@ class StudiRAGInferenceApiClient:
     def __init__(self, host_base_name: str | None = None, host_port: int | None = None, is_ssh: bool = False,
                  connect_timeout: float = 5.0, read_timeout: float = 60.0):
         # Read host and port from environment if not provided
-        self.host_base_name = host_base_name or os.getenv("RAG_HOST", "localhost")
-        self.host_port = host_port or int(os.getenv("RAG_PORT", "8281"))
+        self.host_base_name = host_base_name or os.getenv("RAG_API_HOST", "localhost")
+        self.host_port = host_port or int(os.getenv("RAG_API_PORT", "8281"))
         self.is_ssh = is_ssh
         self.connect_timeout = connect_timeout
         self.read_timeout = read_timeout

@@ -41,7 +41,7 @@ class AgentsGraph:
         self.logger.info(f"Initialize Lead Agent succeed with config: {lid_config_file_path}")
         
         self.router_llm = LangChainFactory.create_llm_from_info(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4.1", timeout=20, temperature=0.5, api_key=os.getenv("OPENAI_API_KEY")))
-        self.calendar_llm = LangChainFactory.create_llm_from_info(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4o-mini", timeout=50, temperature=0.5, api_key=os.getenv("OPENAI_API_KEY")))
+        self.calendar_llm = LangChainFactory.create_llm_from_info(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4.1", timeout=50, temperature=0.5, api_key=os.getenv("OPENAI_API_KEY")))
         
         self.calendar_agent_instance = CalendarAgent(llm_or_chain=self.calendar_llm, salesforce_api_client=self.salesforce_api_client)
         self.logger.info("Initialize Calendar Agent succeed")
@@ -433,6 +433,8 @@ class AgentsGraph:
                 user_query_content= user_query,
                 display_waiting_message=False
             )
+
+            await self.outgoing_manager.enqueue_text("Je réfléchie à votre demande.")
 
             # Call but not await the RAG API to get the streaming response
             response = self.studi_rag_inference_api_client.rag_query_stream_async(

@@ -9,15 +9,15 @@ Les catégories possibles sont : ["Proposition de créneaux", "Demande des dispo
 <Règles>
 Règles à respecter pour le choix de la catégorie:
 1. La catégorie est : "Proposition de créneaux", dans trois cas : 
-    - soit, au début de la conversation, et si l'utilisateur n'a pas spécifié un créneau spécifique (ce cas relevant de la règle 4.), 
-    - soit, après que l'utilisateur ait spécifié ses disponibilités,
-    - soit, après que l'utilisateur ait refusé un ou des créneaux proposés, et qu'il a déjà spécifié ses disponibilités.
+    1.1. soit, au début de la conversation, et si l'utilisateur n'a pas spécifié un créneau spécifique (ce cas relevant de la règle 4.), 
+    1.2. soit, après que l'utilisateur ait spécifié ses disponibilités,
+    1.3. soit, après que l'utilisateur ait refusé un ou des créneaux proposés, et qu'il a déjà spécifié ses disponibilités.
 2. La catégorie est : "Demande des disponibilités", uniquement si l'utilisateur n'a pas déjà spécifié ses disponibilités, et lorsque les créneaux proposés lors du premier échange ne conviennent pas, et uniquement si l'utilisateur ne spécifie pas de façon proactive dans l'échange, ses disponibilités ou un créneau spécifique (ces cas relevant, respectivement, des règles 4. et 5.).
 3. La catégorie est : "Proposition de rendez-vous" (qui propose un créneau unique), si l'utilisateur ne spécifie pas lui-même un créneau spécifique, comme, par exemple, si il n'a pas de préférence.
 4. La catégorie est : "Demande de confirmation du rendez-vous", si l'utilisateur a désigné ou accepté un proposition pour un créneau spécifique.
 5. La catégorie est : "Rendez-vous confirmé", après que l'utilisateur ait confirmé explicitement le rendez-vous.
-6. La catégorie est : "Demande de modification", si l'utilisateur souhaite modifier un rendez-vous existant.
-7. La catégorie est : "Demande d'annulation", si l'utilisateur souhaite annuler un rendez-vous existant.
+6. La catégorie est : "Demande de modification", uniquement si l'utilisateur souhaite modifier un rendez-vous existant. Si l'utilisateur demande un autre créneau que ceux proposés, il s'agit du cas 1.3 de "Proposition de créneaux", et non d'une demande de modification - qui ne concerne que les rendez-vous déjà planifiés. 
+7. La catégorie est : "Demande d'annulation", uniquement si l'utilisateur souhaite annuler un rendez-vous existant.
 </Règles>
 
 <Sortie attendu>

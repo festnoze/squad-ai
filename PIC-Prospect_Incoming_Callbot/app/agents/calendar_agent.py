@@ -299,7 +299,7 @@ class CalendarAgent:
                 raise ValueError(f"Unsupported message type: {type(message)}")
                          
         # Current contextual data to inject directly (no dedicated tools anymore)
-        current_date_str = self._to_french_date(datetime.now(), include_weekday=True, include_year=True)
+        current_date_str = self._to_french_date(CalendarAgent.now, include_weekday=True, include_year=True)
         owner_name = CalendarAgent.owner_name or "le conseiller"
 
         classifier_prompt = self._load_classifier_prompt()\
@@ -521,7 +521,7 @@ class CalendarAgent:
         response = await chain.ainvoke({
             "input": user_input,
             "chat_history": chat_history_str,
-            "now": self._to_french_date(datetime.now(), include_weekday=True, include_year=True)
+            "now": self._to_french_date(CalendarAgent.now, include_weekday=True, include_year=True)
         })
         
         try:

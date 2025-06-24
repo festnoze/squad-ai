@@ -6,6 +6,7 @@ import logging
 import time
 import json
 from datetime import datetime, timedelta, timezone
+import pytz
 import asyncio
 import re
 from api_client.salesforce_api_client_interface import SalesforceApiClientInterface
@@ -261,7 +262,21 @@ class SalesforceApiClient(SalesforceApiClientInterface):
                 
                 if resp.status_code == 200:
                     data = resp.json()
-                    events = data.get('records', [])
+                    local_tz = pytz.timezone('Europe/Paris')
+
+                    def convert_times(records):
+                        processed_events = []
+                        for event in records:
+                            if event.get('StartDateTime'):
+                                utc_dt = datetime.fromisoformat(event['StartDateTime'].replace('Z', '+00:00'))
+                                event['StartDateTime'] = utc_dt.astimezone(local_tz).isoformat()
+                            if event.get('EndDateTime'):
+                                utc_dt = datetime.fromisoformat(event['EndDateTime'].replace('Z', '+00:00'))
+                                event['EndDateTime'] = utc_dt.astimezone(local_tz).isoformat()
+                            processed_events.append(event)
+                        return processed_events
+
+                    events = convert_times(data.get('records', []))
                     total_size = data.get('totalSize', 0)
                     self.logger.info(f"Retrieved {total_size} events")
                     
@@ -272,7 +287,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
                         resp = await client.get(next_url, headers=headers)
                         if resp.status_code == 200:
                             next_data = resp.json()
-                            events.extend(next_data.get('records', []))
+                            events.extend(convert_times(next_data.get('records', [])))
                             next_records_url = next_data.get('nextRecordsUrl')
                         else:
                             self.logger.info(f"Error retrieving additional events: {resp.status_code}")

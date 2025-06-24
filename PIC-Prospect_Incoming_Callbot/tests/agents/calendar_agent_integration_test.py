@@ -29,7 +29,7 @@ from llms.langchain_adapter_type import LangChainAdapterType
             "Oui, réserve le premier créneau.", 
             [
                 ("human", "Je voudrais prendre rendez-vous"), 
-                ("AI", "Je vous propose les créneaux suivants : le jeudi 20 juin, de 9 heures à 12 heures ou de 14 heures à 15 heures, ou le vendredi 21 juin, de 16 heures à 17 heures. Avez-vous une préférence ?")
+                ("AI", "Je vous propose les créneaux suivants : jeudi 20 juin, de 9 heures à 12 heures ou de 14 heures à 15 heures, ou vendredi 21 juin, de 16 heures à 17 heures. Avez-vous une préférence ?")
             ],
             "Demande de confirmation du rendez-vous",
             "Parfait. Votre rendez-vous sera planifié le jeudi 20 juin à 9 heures. Merci de confirmer ce rendez-vous pour le valider.",
@@ -87,7 +87,7 @@ from llms.langchain_adapter_type import LangChainAdapterType
                 ("AI", "Quels jours ou quelles heures de la journée vous conviendraient le mieux ?")
             ],
             "Proposition de créneaux", 
-            "Je vous propose les créneaux suivants : le lundi 23 juin, de 9 heures à 12 heures ou de 13 heures à 18 heures, ou le mardi 25 juin, de 9 heures à 12 heures. Avez-vous une préférence ?",
+            "Je vous propose les créneaux suivants : lundi 24 juin, de 9 heures à 12 heures ou de 13 heures à 18 heures, ou mardi 25 juin, de 9 heures à 12 heures. Avez-vous une préférence ?",
             True # Exact match
         ),
         
@@ -135,7 +135,7 @@ from llms.langchain_adapter_type import LangChainAdapterType
             "Je voudrais prendre rendez-vous jeudi à 15h", 
             [], 
             "Demande de confirmation du rendez-vous",
-            "Parfait. Votre rendez-vous sera planifié le jeudi 13 juin à 15 heures. Merci de confirmer ce rendez-vous pour le valider.",
+            "Parfait. Votre rendez-vous sera planifié le jeudi 20 juin à 15 heures. Merci de confirmer ce rendez-vous pour le valider.",
             True # Exact match
         ),
         
@@ -192,7 +192,7 @@ from llms.langchain_adapter_type import LangChainAdapterType
                 ("AI", "Veuillez confirmer le rendez-vous du jeudi 20 juin à 14 heures.")
             ],
             "Proposition de créneaux", # Agent should ask for new preferences
-            "Je vous propose le créneau suivant : le vendredi 21 juin, de 9 heures à 12 heures. Avez-vous une préférence ?",
+            "Je vous propose le créneau suivant : vendredi, le 21 juin, de 9 heures à 12 heures. Avez-vous une préférence ?",
             True # Exact match
         )
     ]
@@ -208,7 +208,7 @@ async def test_calendar_agent_integration_classification_plus_outputed_answer(sf
     """
     # Create the agent with mocked dependencies
     agent = CalendarAgent(llm_instance, sf_client_mock)
-    CalendarAgent.now = datetime(2025, 6, 19)
+    CalendarAgent.now = datetime(2024, 6, 19)
     agent._set_user_info("test_user_id", "Test", "User", "test@example.com", "test_owner_id", "TestOwnerName")
     
     # First, ensure the agent classifies the user input correctly
@@ -236,7 +236,7 @@ async def test_complete_conversation_exchange(sf_client_mock, llm_instance, simi
     """
     # Create the agent with mocked dependencies
     agent = CalendarAgent(llm_instance, sf_client_mock)
-    CalendarAgent.now = datetime(2025, 6, 19)
+    CalendarAgent.now = datetime(2024, 6, 19)
     agent._set_user_info("test_user_id", "Test", "User", "test@example.com", "test_owner_id", "TestOwnerName")
     
     # Define the conversation flow with expected categories and responses
