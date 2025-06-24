@@ -370,7 +370,8 @@ class AgentsGraph:
                     chat_history = chat_history[-max_history_length:]
 
                 calendar_agent_answer = await self.calendar_agent_instance.run_async(user_input, chat_history)
-            
+                
+                self.outgoing_manager.can_speech_be_interupted = False
                 await self.outgoing_manager.enqueue_text(calendar_agent_answer)
 
                 state["history"].append(("assistant", calendar_agent_answer))

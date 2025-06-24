@@ -6,7 +6,7 @@ from managers.outgoing_manager import OutgoingManager
 class OutgoingTextManager(OutgoingManager):
 
     def __init__(self, call_sid: str, outgoing_text_func=None):
-        super().__init__(call_sid)
+        super().__init__("text")
         self.call_sid = call_sid
         self.text_queue = asyncio.Queue()
         self.is_streaming = False
@@ -96,6 +96,11 @@ class OutgoingTextManager(OutgoingManager):
         Adds text to the queue for delivery.
         """
         return self.text_queue.put_nowait(text)
+
+    async def clear_text_queue(self) -> None:
+        if self.can_speech_be_interupted:
+            await self.text_queue.put(None)
+            self.logger.info("Text queue cleared for interruption")
 
     def update_stream_sid(self, stream_sid: str) -> None:
         """

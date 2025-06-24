@@ -16,6 +16,7 @@ class OutgoingManager(abc.ABC):
         """
         self.output_channel = output_channel
         self.is_running = False
+        self.can_speech_be_interupted = True
     
     @abc.abstractmethod
     def enqueue_text(self, text: str) -> None:
@@ -25,6 +26,11 @@ class OutgoingManager(abc.ABC):
         Args:
             text: Text to be queued for output
         """
+        pass
+
+    @abc.abstractmethod
+    async def clear_text_queue(self) -> None:
+        """Clear the text queue."""
         pass
     
     @abc.abstractmethod

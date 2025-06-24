@@ -7,7 +7,7 @@ set "REGISTRY=europe-west9-docker.pkg.dev/incoming-callbot/pic-prospect-incoming
 set "IMAGE=%REGISTRY%:%TAG%"
 
 echo [1/3] Building %IMAGE%…
-docker build -f Dockerfile.GCP -t %IMAGE% . || goto :fail
+docker build -f Dockerfile -t %IMAGE% . || goto :fail
 
 echo [2/3] Calling deployment…
 call .\docker_gcp_deploy.bat "%IMAGE%" || goto :fail

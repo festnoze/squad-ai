@@ -8,6 +8,9 @@ if "%~1"=="" (
 )
 set "IMAGE=%~1"
 
+REM Set the GCP project
+gcloud config set project studi-com-rag-api
+
 echo [1/2] Pushing %IMAGE%…
 docker push %IMAGE% || goto :fail
 

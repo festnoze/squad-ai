@@ -267,7 +267,7 @@ class IncomingAudioManager(IncomingManager):
             is_silence, speech_to_noise_ratio = self.analyse_speech_for_silence(chunk, threshold=self.speech_threshold * 2.5)  # Less sensitive detection while speaking
             
             # If user is speaking while system is speaking, stop system speech, but only if user speak loud
-            if not is_silence:
+            if not is_silence and self.outgoing_manager.can_speech_be_interupted:
                 self.logger.info(f"Speech interruption detected (level: {speech_to_noise_ratio}), stopping system speech")
                 await self.stop_speaking_async()
                 # Reset buffer to clear any previous speech before interruption

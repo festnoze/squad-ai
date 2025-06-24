@@ -30,10 +30,11 @@ class OutgoingAudioManager(OutgoingManager):
             max_words_by_stream_chunk: int = 20,
             max_chars_by_stream_chunk: int = 100
         ):
-
+        self.logger = logging.getLogger(__name__)
+        super().__init__("audio")
         self.text_queue_manager = TextQueueManager()
         self.audio_sender : TwilioAudioSender = TwilioAudioSender(websocket, stream_sid=stream_sid, min_chunk_interval=min_chunk_interval)
-        self.logger = logging.getLogger(__name__)
+        
         self.tts_provider : TextToSpeechProvider = tts_provider  # Text-to-speech provider for converting text to audio
         self.sender_task = None
         self.frame_rate = frame_rate   # mu-law in 8/16kHz
@@ -212,9 +213,10 @@ class OutgoingAudioManager(OutgoingManager):
         return await self.text_queue_manager.enqueue_text(text)
         
     async def clear_text_queue(self) -> None:
-        await self.text_queue_manager.clear_queue()
-        self.streaming_interuption_asked = True
-        self.logger.info("Text queue cleared for interruption")
+        if self.can_speech_be_interupted:
+            await self.text_queue_manager.clear_queue()
+            self.streaming_interuption_asked = True
+            self.logger.info("Text queue cleared for interruption")
         
     def has_text_to_be_sent(self) -> bool:
         """Check if the audio stream manager has text to send."""
