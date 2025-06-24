@@ -526,6 +526,8 @@ class CalendarAgent:
         prompt = ChatPromptTemplate.from_template("""
         Extract the exact date and time specified by the user for the appointment from the following conversation.
         Only return the date and time in the following format: YYYY-MM-DDTHH:MM:SSZ.
+        The now date and time is: {now}
+        Note that the appointment date can only be in the future, and in the near future (less than 2 months from now).
         
         Current conversation:
         {chat_history}
@@ -540,7 +542,8 @@ class CalendarAgent:
         chat_history_str = "- " + "\n- ".join((msg[0] + ": " + msg[1]) for msg in chat_history)
         response = await chain.ainvoke({
             "input": user_input,
-            "chat_history": chat_history_str
+            "chat_history": chat_history_str,
+            "now": datetime.now().isoformat()
         })
         
         try:

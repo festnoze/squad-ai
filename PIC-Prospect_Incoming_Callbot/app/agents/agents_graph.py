@@ -107,7 +107,14 @@ class AgentsGraph:
             return state
 
         if user_input:
-            feedback_text = f"Très bien." # Vous avez dit : \"{user_input}\"."
+            repeat_user_input = False
+            acknowledge_text = f"Très bien."            
+            await self.outgoing_manager.enqueue_text(acknowledge_text)
+
+            if repeat_user_input : 
+                feedback_text = f" Vous avez dit : \"{user_input}\"."
+            else:
+                feedback_text = f" Un instant s'il vous plait."
             await self.outgoing_manager.enqueue_text(feedback_text)
 
             category = await self.analyse_user_input_for_dispatch_async(user_input, state["history"])
@@ -357,9 +364,10 @@ class AgentsGraph:
                 chat_history = state.get('history', [])
 
                 # Limit the history to the last 10 messages to avoid context overflow
-                if len(chat_history) > 10:
-                    self.logger.info(f"[{call_sid[-4:]}] Chat history has {len(chat_history)} messages. Truncating to the last 10.")
-                    chat_history = chat_history[-10:]
+                max_history_length = 4
+                if len(chat_history) > max_history_length:
+                    self.logger.info(f"[{call_sid[-4:]}] Chat history has {len(chat_history)} messages. Truncating to the last {max_history_length}.")
+                    chat_history = chat_history[-max_history_length:]
 
                 calendar_agent_answer = await self.calendar_agent_instance.run_async(user_input, chat_history)
             

@@ -1,0 +1,39 @@
+image: google/cloud-sdk:slim
+
+variables:
+  GCP_PROJECT_ID: studi-ai
+  REGION: europe-west1
+  SERVICE_ACCOUNT: studi-ai@studi-ai-454216.iam.gserviceaccount.com
+  REPOSITORY: docker-${GCP_PROJECT_ID}-repo
+  IMAGE: europe-west1-docker.pkg.dev/$GCP_PROJECT_ID/$REPOSITORY/$SERVICE_NAME
+
+  ####     VARIABLES à MODIFIER          >>>
+  SERVICE_NAME: pic-prospect-incoming-callbot
+
+stages:
+  - build
+  - deploy
+  - cleanup
+
+before_script:
+  - gcloud auth activate-service-account --key-file=${CI_PROJECT_DIR}/google_credentials.json
+  - gcloud config set project $GCP_PROJECT_ID
+  - gcloud --quiet auth configure-docker europe-west1-docker.pkg.dev
+
+build:
+  stage: build
+  tags:
+    - gcloud,docker
+  script:
+    - docker build -t $IMAGE .
+    - docker push $IMAGE
+
+cleanup:
+  stage: cleanup
+  tags:
+    - gcloud,docker
+  needs:
+    - deploy
+  script:
+    - docker rmi -f $IMAGE
+  when: always

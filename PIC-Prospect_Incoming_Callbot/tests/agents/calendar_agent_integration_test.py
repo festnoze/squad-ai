@@ -87,7 +87,7 @@ from llms.langchain_adapter_type import LangChainAdapterType
                 ("AI", "Quels jours ou quelles heures de la journée vous conviendraient le mieux ?")
             ],
             "Proposition de créneaux", 
-            "Je vous propose les créneaux suivants : le lundi 24 juin, de 9 heures à 12 heures ou de 13 heures à 18 heures, ou le mardi 25 juin, de 9 heures à 12 heures. Avez-vous une préférence ?",
+            "Je vous propose les créneaux suivants : le lundi 23 juin, de 9 heures à 12 heures ou de 13 heures à 18 heures, ou le mardi 25 juin, de 9 heures à 12 heures. Avez-vous une préférence ?",
             True # Exact match
         ),
         

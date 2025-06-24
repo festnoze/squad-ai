@@ -141,6 +141,11 @@ class SalesforceApiClient(SalesforceApiClientInterface):
         # Convert to UTC
         start_datetime_utc = self._to_utc_datetime(self._get_datetime_from_str(start_datetime))
             
+        if start_datetime_utc <= datetime.now(timezone.utc):
+            err_msg = "Error: Start datetime to schedule a new appointment must be in the future, bur is: {start_datetime}"
+            self.logger.info(err_msg)
+            raise ValueError(err_msg)
+
         end_datetime_utc = self._calculate_end_datetime(start_datetime_utc, duration_minutes)
         if not end_datetime_utc:
             self.logger.info("Error: Invalid start_datetime or duration_minutes")
