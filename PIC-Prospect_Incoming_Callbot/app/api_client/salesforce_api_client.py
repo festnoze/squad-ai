@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 import pytz
 import asyncio
 import re
+from time import tzname
 from utils.envvar import EnvHelper
 from api_client.salesforce_api_client_interface import SalesforceApiClientInterface
 
@@ -141,7 +142,18 @@ class SalesforceApiClient(SalesforceApiClientInterface):
             return None
 
         # Convert to UTC
-        start_datetime_utc = self._to_utc_datetime(self._get_datetime_from_str(start_datetime))
+        start_dt = self._get_french_datetime_from_str(start_datetime)
+        if start_dt is None:
+            self.logger.info("Error: Invalid start_datetime format")
+            return None
+        # TODO NOW: tmp to fix timezone issue in docker container
+        french_now = datetime.now(pytz.timezone('Europe/Paris'))
+        utc_offset_hours = (french_now.utcoffset().total_seconds() or 0) / 3600        
+        if utc_offset_hours != 0:
+            start_dt = start_dt - timedelta(hours=utc_offset_hours)
+            self.logger.error(f"<<@>> UTC offset hours removed: {utc_offset_hours}")
+
+        start_datetime_utc = self._to_utc_datetime(start_dt)
             
         if start_datetime_utc <= datetime.now(timezone.utc):
             err_msg = "Error: Start datetime to schedule a new appointment must be in the future, bur is: {start_datetime}"
@@ -554,15 +566,16 @@ class SalesforceApiClient(SalesforceApiClientInterface):
 
     ## Internal helpers ##
 
-    def _get_datetime_from_str(self, datetime_str: str) -> datetime | None:
+    def _get_french_datetime_from_str(self, datetime_str: str) -> datetime | None:
         pattern = r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$'
         if not re.match(pattern, datetime_str):
             self.logger.info(f"Invalid 'datetime_str' paramter format: {datetime_str}")
             self.logger.info("datetime_str must be in the format 'YYYY-MM-DDTHH:MM:SSZ', like: '2025-06-15T23:59:59Z'")
             return None
         start_dt = datetime.strptime(datetime_str, "%Y-%m-%dT%H:%M:%SZ")
-        # To test: start_dt = datetime.fromisoformat(datetime_str)
-        return start_dt
+        start_dt_utc = start_dt.replace(tzinfo=pytz.utc)
+        french_tz = pytz.timezone('Europe/Paris')
+        return start_dt_utc.astimezone(french_tz)
 
     def _get_str_from_datetime(self, dt: datetime) -> str:
         """Convert a datetime to a string in the format 'YYYY-MM-DDTHH:MM:SSZ'"""

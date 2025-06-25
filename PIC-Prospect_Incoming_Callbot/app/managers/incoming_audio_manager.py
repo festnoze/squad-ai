@@ -329,7 +329,7 @@ class IncomingAudioManager(IncomingManager):
             self.consecutive_silence_duration_ms = 0.0
 
             # Waiting message
-            #await self.outgoing_manager.enqueue_text("Très bien, je vous demande un instant.")
+            #await self.outgoing_manager.enqueue_text(random.choice(["Très bien, je vous demande un instant.", "Merci de patienter.", "Laissez-moi y réfléchir.", "Une petite seconde."]))
 
             # 4. Transcribe speech to text
             user_query_transcript = self._perform_speech_to_text_transcription(audio_data, is_audio_file_to_delete=False)

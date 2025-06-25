@@ -2,6 +2,7 @@ import logging
 import os
 import uuid
 from uuid import UUID
+import random
 from langgraph.graph import StateGraph, END
 
 # Models
@@ -111,13 +112,13 @@ class AgentsGraph:
 
         if user_input:
             repeat_user_input = False
-            acknowledge_text = f"Très bien."            
+            acknowledge_text = random.choice(["Très bien.", "OK.", "D'accord.", "Entendu.", "Parfait."])
             await self.outgoing_manager.enqueue_text(acknowledge_text)
 
             if repeat_user_input : 
                 feedback_text = f" Vous avez dit : \"{user_input}\"."
             else:
-                feedback_text = f" Un instant s'il vous plait."
+                feedback_text = random.choice([" Un instant s'il vous plait.", " Merci de patienter.", " Laissez-moi y réfléchir.", " Une petite seconde."])
             await self.outgoing_manager.enqueue_text(feedback_text)
 
             category = await self.analyse_user_input_for_dispatch_async(user_input, state["history"])
@@ -442,7 +443,7 @@ class AgentsGraph:
                 display_waiting_message=False
             )
 
-            await self.outgoing_manager.enqueue_text("Je réfléchie à votre demande.")
+            await self.outgoing_manager.enqueue_text("Merci de patienter. Je recherche les informations correspondant à votre demande afin de vous répondre.")
 
             # Call but not await the RAG API to get the streaming response
             response = self.studi_rag_inference_api_client.rag_query_stream_async(

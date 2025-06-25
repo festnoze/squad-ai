@@ -179,6 +179,58 @@ async def test_schedule_calendar_appointment(agents_graph_mockings):
         assert mock_schedule_new_appointment.call_count == 0
 
 
+async def test_long_conversation_history_is_truncated(agents_graph_mockings):
+    """Test that a long conversation history is truncated before being sent to the router LLM."""
+    # Arrange
+    agents = AgentsGraph(
+        outgoing_manager=agents_graph_mockings["outgoing_manager"],
+        studi_rag_client=agents_graph_mockings["studi_rag_client"],
+        salesforce_client=agents_graph_mockings["salesforce_client"],
+        call_sid=agents_graph_mockings["call_sid"]
+    )
+
+    # Mock the router LLM's ainvoke method to check the prompt
+    agents.router_llm.ainvoke = AsyncMock(return_value=MagicMock(content="studi_rag_agent"))
+
+    # Create a long chat history that should be truncated
+    # The new logic takes the last 8 messages and limits total chars to ~16k
+    long_message = "a" * 2500  # A long message
+    chat_history = [("user" if i % 2 == 0 else "assistant", long_message) for i in range(10)] # 10 messages > 8
+    
+    original_history_len = sum(len(text) for _, text in chat_history)
+    assert original_history_len > 20000 # Ensure it's long enough to be truncated
+
+    user_input = "This is a new user input."
+    
+    initial_state: PhoneConversationState = PhoneConversationState(
+        call_sid=agents_graph_mockings["call_sid"],
+        caller_phone=agents_graph_mockings["phone_number"],
+        user_input=user_input,
+        history=chat_history,
+        agent_scratchpad={"conversation_id": "39e81136-4525-4ea8-bd00-c22211110001"}
+    )
+
+    # Act
+    await agents.graph.ainvoke(initial_state)
+
+    # Assert
+    agents.router_llm.ainvoke.assert_called_once()
+    
+    # Check the prompt that was actually sent
+    sent_prompt = agents.router_llm.ainvoke.call_args[0][0]
+    
+    # The prompt should be significantly shorter than the original history
+    # The limit is around 16000 characters for the history part.
+    # The prompt template adds some characters as well.
+    assert len(sent_prompt) < 18000
+    assert len(sent_prompt) < original_history_len
+
+    # Also check that only the last 8 messages are included.
+    # The prompt contains "[user]:" and "[assistant]:" prefixes.
+    assert sent_prompt.count("[user]:") <= 4
+    assert sent_prompt.count("[assistant]:") <= 4
+
+
 @pytest.fixture
 def agents_graph_mockings():
     # Create mock dependencies

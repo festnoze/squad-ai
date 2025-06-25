@@ -1,6 +1,7 @@
 import logging
 import datetime
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
+import pytz
 from langchain.tools import tool, BaseTool
 from langchain.agents import AgentExecutor, create_tool_calling_agent, create_react_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -12,13 +13,13 @@ class CalendarAgent:
     salesforce_api_client: SalesforceApiClientInterface
     owner_id = None
     owner_name = None
-    now = datetime.now()
+    now = None
     
     def __init__(self, llm_or_chain: any, salesforce_api_client: SalesforceApiClientInterface):
         self.logger = logging.getLogger(__name__)
         self.llm = llm_or_chain
         CalendarAgent.salesforce_api_client = salesforce_api_client
-        CalendarAgent.now = datetime.now()
+        CalendarAgent.now = datetime.now(tz=pytz.timezone('Europe/Paris'))
 
         # The global calendar scheduler agent with tools
         
@@ -81,7 +82,7 @@ class CalendarAgent:
             return "Quels jours ou quelles heures de la journée vous conviendraient le mieux ?"
 
         if category == "Proposition de rendez-vous":
-            start_date = datetime.now().date()
+            start_date = CalendarAgent.now.date()
             end_date = start_date + timedelta(days=2)
             appointments = await CalendarAgent.get_appointments(str(start_date), str(end_date))
             available_timeframes = CalendarAgent.get_available_timeframes_from_scheduled_slots(str(start_date), str(end_date), appointments)
@@ -477,9 +478,6 @@ class CalendarAgent:
         return unique_ranges
 
 
-    def _to_str_iso(self, dt: datetime) -> str:
-        return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
-
     async def _extract_appointment_selected_date_and_time_async(self, user_input: str, chat_history: list[dict[str, str]]) -> datetime:
         from langchain_core.prompts import ChatPromptTemplate
         from langchain_core.output_parsers import StrOutputParser
@@ -515,3 +513,6 @@ class CalendarAgent:
                 return datetime.strptime(response, "%Y-%m-%dT%H:%M:%SZ")
         except ValueError:
             return None
+
+    def _to_str_iso(self, dt: datetime) -> str:
+        return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
