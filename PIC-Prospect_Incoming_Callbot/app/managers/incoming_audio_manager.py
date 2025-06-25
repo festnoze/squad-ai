@@ -59,6 +59,7 @@ class IncomingAudioManager(IncomingManager):
         self.min_audio_bytes_for_processing = 1000  # Minimum buffer size to process
         self.max_audio_bytes_for_processing = 200000  # Maximum buffer size to process
         self.max_silence_duration_before_hangup_ms = 60000  # ms of silence before hanging up the call
+        self.do_audio_preprocessing = os.getenv("DO_AUDIO_PREPROCESSING", True)
         
         # Create temp directory if it doesn't exist
         os.makedirs(self.TEMP_DIR, exist_ok=True)
@@ -143,7 +144,7 @@ class IncomingAudioManager(IncomingManager):
             rms = audioop.rms(audio_chunk, self.sample_width)
             return rms > 250  # Default threshold
     
-    def preprocess_audio(self, audio_data: bytes) -> bytes:
+    def perform_audio_preprocessing(self, audio_data: bytes) -> bytes:
         """
         Preprocess audio data to improve speech recognition quality
         
@@ -394,7 +395,7 @@ class IncomingAudioManager(IncomingManager):
             
             # Apply audio preprocessing to improve quality
             self.logger.info("Applying audio preprocessing...")
-            processed_audio = self.preprocess_audio(audio_data)
+            processed_audio = self.perform_audio_preprocessing(audio_data) if self.do_audio_preprocessing else audio_data
             self.logger.info(f"Audio preprocessing complete. Original size: {len(audio_data)} bytes, Processed size: {len(processed_audio)} bytes")
                 
             # Save the processed audio to a file

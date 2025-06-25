@@ -80,7 +80,7 @@ class OutgoingAudioManager(OutgoingManager):
             speech_bytes = self.tts_provider.synthesize_speech_to_bytes(speech_chunk)
             self.logger.info(f">>>>>> Synthesized speech for chunk: '{speech_chunk}'")
             if not speech_bytes:
-                self.logger.warning(f"?? Failed to synthesize speech for chunk: '{speech_chunk}'")
+                self.logger.error(f"/!\\ Failed to synthesize speech for chunk: '{speech_chunk}'")
                 return None
                 
             return speech_bytes

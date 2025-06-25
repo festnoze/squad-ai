@@ -140,7 +140,7 @@ class HybridSTTProvider(SpeechToTextProvider):
 
 def get_speech_to_text_provider(temp_dir: str, provider_name: str = "openai", language_code: str = "fr-FR", frame_rate: int = 8000) -> SpeechToTextProvider:
     """Factory function to get the appropriate speech-to-text provider"""
-    if provider_name == "hybrid": return HybridSTTProvider(temp_dir, language_code=language_code, frame_rate=frame_rate)
-    if provider_name == "google": return GoogleSTTProvider(temp_dir, language_code=language_code, frame_rate=frame_rate)
-    if provider_name == "openai": return OpenAISTTProvider(temp_dir, language_code=language_code, frame_rate=frame_rate)
+    if provider_name.lower() == "hybrid": return HybridSTTProvider(temp_dir, language_code=language_code, frame_rate=frame_rate)
+    if provider_name.lower() == "google": return GoogleSTTProvider(temp_dir, language_code=language_code, frame_rate=frame_rate)
+    if provider_name.lower() == "openai": return OpenAISTTProvider(temp_dir, language_code=language_code, frame_rate=frame_rate)
     raise ValueError(f"Invalid STT provider: {provider_name}")

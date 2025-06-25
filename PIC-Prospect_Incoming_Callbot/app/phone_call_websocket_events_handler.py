@@ -76,8 +76,10 @@ class PhoneCallWebsocketEventsHandler:
             self.logger.error(f"/!\\ Google calendar credentials file not found at {self.google_calendar_credentials_path}")
 
         # Initialize dependencies
-        self.tts_provider = get_text_to_speech_provider(self.TEMP_DIR, provider_name="openai", frame_rate=self.frame_rate, channels=self.channels, sample_width=self.sample_width)
-        self.stt_provider = get_speech_to_text_provider(self.TEMP_DIR, provider_name="hybrid", language_code="fr-FR", frame_rate=self.frame_rate)
+        tts_provider_name = os.getenv("TEXT_TO_SPEECH_PROVIDER", "openai")
+        stt_provider_name = os.getenv("SPEECH_TO_TEXT_PROVIDER", "google")
+        self.tts_provider = get_text_to_speech_provider(self.TEMP_DIR, provider_name=tts_provider_name, frame_rate=self.frame_rate, channels=self.channels, sample_width=self.sample_width)
+        self.stt_provider = get_speech_to_text_provider(self.TEMP_DIR, provider_name=stt_provider_name, language_code="fr-FR", frame_rate=self.frame_rate)
         
         self.studi_rag_inference_api_client = StudiRAGInferenceApiClient()
         self.salesforce_client: SalesforceApiClientInterface = SalesforceApiClient()
