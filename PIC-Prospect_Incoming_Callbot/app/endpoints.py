@@ -33,18 +33,17 @@ async def create_incoming_call_websocket_async(request: Request) -> HTMLResponse
         phone_number, call_sid, _ = await _extract_request_data_async(request)
         logger.info(f"Call from: {phone_number}, CallSid: {call_sid}")
 
-        # Open a websocket to handle the phone call audio I/O
-        ws_scheme = "wss" if request.url.scheme == "https" else "ws"
+        x_forwarded_proto = request.headers.get("x-forwarded-proto")
+        is_secure = x_forwarded_proto == "https" or request.url.scheme == "https"
+        ws_scheme = "wss" if is_secure else "ws"
         ws_url = f"{ws_scheme}://{request.url.netloc}/ws/phone/{phone_number}/sid/{call_sid}"
         logger.info(f"[<--->] Connecting Twilio stream to WebSocket: {ws_url}")
 
         response = VoiceResponse()
         connect = Connect()
-        
-        # Request higher quality audio from Twilio
         connect.stream(url=ws_url, track="inbound_track", parameters={
             "mediaEncoding": "audio/x-mulaw", 
-            "sampleRate": 8000  # Request 8kHz if possible
+            "sampleRate": 8000  # Request 8kHz audio (max on )
         })
         response.append(connect)
         return HTMLResponse(content=str(response), media_type="application/xml")
@@ -64,12 +63,18 @@ async def voice_webhook(request: Request) -> HTMLResponse:
 # ========= Incoming phone call WebSocket endpoint ========= #
 @router.websocket("/ws/phone/{calling_phone_number}/sid/{call_sid}")
 async def websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid: str) -> None:
-    await ws.accept()
-    logger.info(f"WebSocket connection accepted from: {ws.client.host}:{ws.client.port}")
-    
-    try:        
+    logger.info(f"WebSocket connection attempted for call SID {call_sid} from {ws.client.host}.")
+    try:
+        await ws.accept()
+        logger.info(f"[SUCCESS] WebSocket connection accepted for call SID {call_sid}.")
+    except Exception as e:
+        logger.error(f"[FAIL] Failed to accept WebSocket connection for call SID {call_sid}: {e}", exc_info=True)
+        return
+
+    try:
         call_handler: PhoneCallWebsocketEventsHandler = phone_call_websocket_events_handler_factory.get_new_phone_call_websocket_events_handler(websocket=ws)
         await call_handler.handle_websocket_all_receieved_events_async(calling_phone_number, call_sid)
+        logger.info(f"WebSocket handler finished for call SID {call_sid}.")
 
     except WebSocketDisconnect:
         logger.info(f"WebSocket disconnected: {ws.client.host}:{ws.client.port}")

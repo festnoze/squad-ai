@@ -32,7 +32,7 @@ from llms.langchain_adapter_type import LangChainAdapterType
                 ("AI", "Je vous propose les créneaux suivants : jeudi 20 juin, de 9 heures à 12 heures ou de 14 heures à 15 heures, ou vendredi 21 juin, de 16 heures à 17 heures. Avez-vous une préférence ?")
             ],
             "Demande de confirmation du rendez-vous",
-            "Parfait. Votre rendez-vous sera planifié le jeudi 20 juin à 9 heures. Merci de confirmer ce rendez-vous pour le valider.",
+            "Récapitulons : votre rendez-vous sera planifié le jeudi 20 juin à 9 heures. Merci de confirmer ce rendez-vous pour le valider.",
             True # Exact match
         ),
         
@@ -46,7 +46,7 @@ from llms.langchain_adapter_type import LangChainAdapterType
                 ("AI", "Veuillez confirmer le rendez-vous du jeudi 20 juin à 14 heures.")
             ],
             "Rendez-vous confirmé",
-            "Votre rendez-vous est bien planifié pour le jeudi 20 juin à 14 heures. Merci et au revoir.",
+            "C'est confirmé ! Votre rendez-vous est maintenant planifié pour le jeudi 20 juin à 14 heures. Merci et au revoir.",
             True # Exact match
         ),
         
@@ -73,7 +73,7 @@ from llms.langchain_adapter_type import LangChainAdapterType
                 ("AI", "Quels jours ou quelles heures de la journée vous conviendraient le mieux ?")
             ],
             "Demande de confirmation du rendez-vous", 
-            "Parfait. Votre rendez-vous sera planifié le vendredi 21 juin à 10 heures. Merci de confirmer ce rendez-vous pour le valider.",
+            "Récapitulons : votre rendez-vous sera planifié le vendredi 21 juin à 10 heures. Merci de confirmer ce rendez-vous pour le valider.",
             True # Exact match
         ),
         
@@ -103,7 +103,7 @@ from llms.langchain_adapter_type import LangChainAdapterType
                 ("AI", "Veuillez confirmer le rendez-vous du vendredi 21 juin à 10 heures.")
             ],
             "Rendez-vous confirmé", 
-            "Votre rendez-vous est bien planifié pour le vendredi 21 juin à 10 heures. Merci et au revoir.", 
+            "C'est confirmé ! Votre rendez-vous est maintenant planifié pour le vendredi 21 juin à 10 heures. Merci et au revoir.", 
             True # Exact match
         ),
         
@@ -135,7 +135,7 @@ from llms.langchain_adapter_type import LangChainAdapterType
             "Je voudrais prendre rendez-vous jeudi à 15h", 
             [], 
             "Demande de confirmation du rendez-vous",
-            "Parfait. Votre rendez-vous sera planifié le jeudi 20 juin à 15 heures. Merci de confirmer ce rendez-vous pour le valider.",
+            "Récapitulons : votre rendez-vous sera planifié le jeudi 20 juin à 15 heures. Merci de confirmer ce rendez-vous pour le valider.",
             True # Exact match
         ),
         
@@ -228,7 +228,6 @@ async def test_calendar_agent_integration_classification_plus_outputed_answer(sf
             f"Expected a response semantically similar to:\n{expected_answer}\nGot:\n{actual_response}")
 
 
-
 async def test_complete_conversation_exchange(sf_client_mock, llm_instance, similarity_evaluator):
     """
     Tests a complete conversation flow from initial contact to appointment confirmation.
@@ -266,7 +265,7 @@ async def test_complete_conversation_exchange(sf_client_mock, llm_instance, simi
         {
             "user_input": "Parfait, ça me convient",
             "category": "Demande de confirmation du rendez-vous",
-            "expected_response": "Parfait. Votre rendez-vous sera planifié le vendredi 21 juin à 13 heures. Merci de confirmer ce rendez-vous pour le valider.",
+            "expected_response": "Récapitulons : votre rendez-vous sera planifié le vendredi 21 juin à 13 heures. Merci de confirmer ce rendez-vous pour le valider.",
             "await_exact_match": True
         },
         # Step 5: User confirms the appointment

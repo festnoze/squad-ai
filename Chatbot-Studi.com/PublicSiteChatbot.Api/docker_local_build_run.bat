@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 REM Define the image name prefix (can be modify)
-set "repo_prefix=pic-prospect-incoming-callbot_0."
+set "repo_prefix=rag_studi_public_website_api_0."
 
 REM Calculate the length of repo_prefix and store it in prefix_length
 call :StrLen repo_prefix prefix_length
@@ -47,10 +47,17 @@ if not "%1"=="" (
 )
 
 echo.
-echo Building Local Docker image %repo_prefix%!new_subversion! .
+echo Building Local Docker image %repo_prefix%!new_subversion! ...
 echo.
 
 docker build -f Dockerfile.local -t %repo_prefix%!new_subversion! .
+
+
+echo.
+echo Running Local Docker image %repo_prefix%!new_subversion! on my_network ...
+echo.
+docker run -d --name %repo_prefix%!new_subversion! --network my_network -p 8281:8281 %repo_prefix%!new_subversion!
+
 
 endlocal
 

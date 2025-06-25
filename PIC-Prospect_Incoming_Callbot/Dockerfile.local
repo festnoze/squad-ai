@@ -7,11 +7,15 @@ WORKDIR /
 # Définit le chemin par défaut pour Python dans le container
 ENV PYTHONPATH=/app
 
-# Définit le port d'écoute de l'application
-ENV PORT=8281
-
 # Définit l'adresse d'écoute de l'application
-ENV HOST_URI=127.0.0.1
+ENV HOST_URI=0.0.0.0
+
+# Définit le port d'écoute de l'application
+ENV PORT=8344
+
+# Définit le port et l'adresse de l'API RAG
+ENV RAG_API_HOST="rag_studi_public_website_api_0.10"
+ENV RAG_API_PORT=8281
 
 # Copie les packages wheel précompilés dans le container
 #COPY wheels/ /wheels/

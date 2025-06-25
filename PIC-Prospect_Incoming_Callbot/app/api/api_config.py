@@ -53,18 +53,30 @@ class ApiConfig:
                 root_logger.removeHandler(handler)
                 handler.close()
 
-        logging.basicConfig(
-            level=num_log_level,
-            format="%(levelname)s (%(name)s ln.%(lineno)d) %(message)s",
-            #format="%(levelname)s: %(asctime)s (%(name)s ln.%(lineno)d) %(message)s",
-            handlers=[
-                logging.FileHandler(f"outputs\\logs\\app.{datetime.now().strftime('%Y-%m-%d.%H%M%S')}.log"),
-                logging.StreamHandler()  # Output to console
-            ]
+        # Set root logger to a permissive level; handlers will filter.
+        root_logger.setLevel(logging.DEBUG)
+
+        # Create a formatter
+        formatter = logging.Formatter(
+            "%(levelname)s (%(name)s ln.%(lineno)d) %(message)s"
         )
 
+        # Configure file handler to log at INFO level
+        file_handler = logging.FileHandler(
+            f"outputs/logs/app.{datetime.now().strftime('%Y-%m-%d.%H%M%S')}.log"
+        )
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(formatter)
+        root_logger.addHandler(file_handler)
+
+        # Configure stream handler to use the level from environment settings
+        stream_handler = logging.StreamHandler()
+        stream_handler.setLevel(num_log_level)
+        stream_handler.setFormatter(formatter)
+        root_logger.addHandler(stream_handler)
+
         logger = logging.getLogger(__name__)
-        assert logger.getEffectiveLevel() == num_log_level
+
 
         # Initialize PhoneCallWebsocketEventsHandlerFactory
         endpoints.phone_call_websocket_events_handler_factory = PhoneCallWebsocketEventsHandlerFactory()

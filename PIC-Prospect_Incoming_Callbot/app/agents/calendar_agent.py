@@ -95,7 +95,7 @@ class CalendarAgent:
             date_and_time: datetime = await self._extract_appointment_selected_date_and_time_async(user_input, chat_history)
             
             if date_and_time:
-                return "C'est fait. Votre rendez-vous sera planifié le " + self._to_french_date(date_and_time, include_weekday=True, include_year=False) + " à " + self._to_french_time(date_and_time) + ". Merci de confirmer ce rendez-vous pour le valider."
+                return "Récapitulons : votre rendez-vous sera planifié le " + self._to_french_date(date_and_time, include_weekday=True, include_year=False) + " à " + self._to_french_time(date_and_time) + ". Merci de confirmer ce rendez-vous pour le valider."
             return "Je n'ai pas trouvé la date et l'heure du rendez-vous. Veuillez me préciser la date et l'heure du rendez-vous souhaité."
 
         if category == "Rendez-vous confirmé":
@@ -103,7 +103,7 @@ class CalendarAgent:
             appointment_slot_datetime_str = self._to_str_iso(appointment_slot_datetime)
             success = await CalendarAgent.schedule_new_appointment_tool_async(appointment_slot_datetime_str)
             if success is not None:
-                return "Votre rendez-vous est bien planifié pour le " + self._to_french_date(appointment_slot_datetime, include_weekday=True, include_year=False) + " à " + self._to_french_time(appointment_slot_datetime) + ". Merci et au revoir."
+                return "C'est confirmé ! Votre rendez-vous est maintenant planifié pour le " + self._to_french_date(appointment_slot_datetime, include_weekday=True, include_year=False) + " à " + self._to_french_time(appointment_slot_datetime) + ". Merci et au revoir."
             return "Je n'ai pas pu planifier le rendez-vous. Souhaitez-vous essayer un autre créneau ?"
 
         if category == "Demande de modification":
