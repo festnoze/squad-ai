@@ -2,10 +2,11 @@ from abc import ABC, abstractmethod
 import logging
 import os
 
+from utils.envvar import EnvHelper
+
 class SpeechToTextProvider(ABC):
     google_client: any = None
     logger: logging.Logger = None
-    openai_api_key: str = os.getenv("OPENAI_API_KEY")
     temp_dir: str = ""
     language_code: str = "fr-FR"
     frame_rate: int = 8000
@@ -63,11 +64,7 @@ class OpenAISTTProvider(SpeechToTextProvider):
         self.temp_dir = temp_dir
         self.language_code = language_code
         self.frame_rate = frame_rate
-        if self.openai_api_key:
-            self.openai_client = OpenAI(api_key=self.openai_api_key)
-        else:
-            self.openai_client = None
-            self.logger.warning("OPENAI_API_KEY not set, OpenAI transcription will not be available.")
+        self.openai_client = OpenAI(api_key=EnvHelper.get_openai_api_key())
 
     def transcribe_audio(self, file_name: str) -> str:
         """Transcribe audio file using OpenAI STT API."""
@@ -98,13 +95,9 @@ class HybridSTTProvider(SpeechToTextProvider):
         self.logger = logging.getLogger(__name__)
         self.temp_dir = temp_dir
         self.google_client = self.google_speech.SpeechClient()
-        self.openai_client = None
+        self.openai_client = OpenAI(api_key=EnvHelper.get_openai_api_key())
         self.language_code = language_code
         self.frame_rate = frame_rate
-        if not self.openai_api_key:
-            self.logger.warning("OPENAI_API_KEY not set, OpenAI transcription will not be available.")
-        else:
-            self.openai_client = OpenAI(api_key=self.openai_api_key)
 
     def transcribe_audio(self, file_name: str) -> str:
         try:

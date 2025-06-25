@@ -14,6 +14,7 @@ from pydub import AudioSegment
 from pydub.effects import normalize
 from fastapi import WebSocket
 #
+from utils.envvar import EnvHelper
 from agents.phone_conversation_state_model import ConversationState, PhoneConversationState
 from speech.speech_to_text import SpeechToTextProvider
 from agents.agents_graph import AgentsGraph
@@ -59,7 +60,7 @@ class IncomingAudioManager(IncomingManager):
         self.min_audio_bytes_for_processing = 1000  # Minimum buffer size to process
         self.max_audio_bytes_for_processing = 200000  # Maximum buffer size to process
         self.max_silence_duration_before_hangup_ms = 60000  # ms of silence before hanging up the call
-        self.do_audio_preprocessing = os.getenv("DO_AUDIO_PREPROCESSING", True)
+        self.do_audio_preprocessing = EnvHelper.get_do_audio_preprocessing()
         
         # Create temp directory if it doesn't exist
         os.makedirs(self.TEMP_DIR, exist_ok=True)
@@ -95,8 +96,8 @@ class IncomingAudioManager(IncomingManager):
 
             # Hang-up Twilio phone call
             try:
-                twilio_sid = os.getenv("TWILIO_SID", "")
-                twilio_auth = os.getenv("TWILIO_AUTH", "")
+                twilio_sid = EnvHelper.get_twilio_sid()
+                twilio_auth = EnvHelper.get_twilio_auth()
                 if twilio_sid and twilio_auth and getattr(self, "call_sid", None):
                     from twilio.rest import Client
                     client = Client(twilio_sid, twilio_auth)

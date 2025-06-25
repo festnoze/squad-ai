@@ -8,11 +8,53 @@ class EnvHelper:
     @staticmethod
     def get_openai_api_key():
         return EnvHelper.get_env_variable_value_by_name('OPENAI_API_KEY')
+    
+    @staticmethod
+    def get_salesforce_username():
+        return EnvHelper.get_env_variable_value_by_name('SALESFORCE_USERNAME')
 
     @staticmethod
-    def get_google_calendar_credentials():
-        return EnvHelper.get_env_variable_value_by_name('GOOGLE_CALENDAR_CREDENTIALS')
+    def get_salesforce_password():
+        return EnvHelper.get_env_variable_value_by_name('SALESFORCE_PASSWORD')
+
+    @staticmethod
+    def get_salesforce_client_secret():
+        return EnvHelper.get_env_variable_value_by_name('SALESFORCE_CLIENT_SECRET')
+
+    @staticmethod
+    def get_rag_api_host():
+        return EnvHelper.get_env_variable_value_by_name('RAG_API_HOST')
+
+    @staticmethod
+    def get_rag_api_port():
+        port_str = EnvHelper.get_env_variable_value_by_name('RAG_API_PORT')
+        return int(port_str)
+
+    @staticmethod
+    def get_do_audio_preprocessing():
+        value = EnvHelper.get_env_variable_value_by_name('DO_AUDIO_PREPROCESSING')
+        return value.lower() == 'true'
+
+    @staticmethod
+    def get_text_to_speech_provider():
+        return EnvHelper.get_env_variable_value_by_name('TEXT_TO_SPEECH_PROVIDER')
+
+    @staticmethod
+    def get_speech_to_text_provider():
+        return EnvHelper.get_env_variable_value_by_name('SPEECH_TO_TEXT_PROVIDER')
+
+    @staticmethod
+    def get_twilio_sid():
+        return EnvHelper.get_env_variable_value_by_name('TWILIO_SID')
+
+    @staticmethod
+    def get_twilio_auth():
+        return EnvHelper.get_env_variable_value_by_name('TWILIO_AUTH')
+
     
+    ### Internal methods###
+    #######################
+
     @staticmethod
     def _get_custom_env_files():
         return EnvHelper.get_env_variable_value_by_name('CUSTOM_ENV_FILES', load_env=False, fails_if_missing=False)
@@ -47,7 +89,7 @@ class EnvHelper:
         if variable_name not in os.environ:
             if load_env:
                 EnvHelper._init_load_env()
-            variable_value: str = os.getenv(variable_name)
+            variable_value: str = os.getenv(variable_name, None)
             if not variable_value:
                 if fails_if_missing:
                     raise ValueError(f'Variable named: "{variable_name}" is not set in the environment')

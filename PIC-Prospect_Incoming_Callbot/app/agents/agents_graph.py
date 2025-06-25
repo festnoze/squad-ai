@@ -19,9 +19,11 @@ from agents.sf_agent import SFAgent
 from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
 from api_client.salesforce_api_client_interface import SalesforceApiClientInterface
 from managers.outgoing_manager import OutgoingManager
+#
 from llms.llm_info import LlmInfo
 from llms.langchain_factory import LangChainFactory
 from llms.langchain_adapter_type import LangChainAdapterType
+from utils.envvar import EnvHelper
 
 class AgentsGraph:
     start_welcome_text = ""
@@ -40,8 +42,9 @@ class AgentsGraph:
         self.lead_agent_instance = LeadAgent(config_path=lid_config_file_path)
         self.logger.info(f"Initialize Lead Agent succeed with config: {lid_config_file_path}")
         
-        self.router_llm = LangChainFactory.create_llm_from_info(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4.1", timeout=20, temperature=0.5, api_key=os.getenv("OPENAI_API_KEY")))
-        self.calendar_llm = LangChainFactory.create_llm_from_info(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4.1", timeout=50, temperature=0.5, api_key=os.getenv("OPENAI_API_KEY")))
+        openai_api_key = EnvHelper.get_openai_api_key()
+        self.router_llm = LangChainFactory.create_llm_from_info(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4.1", timeout=20, temperature=0.5, api_key=openai_api_key))
+        self.calendar_llm = LangChainFactory.create_llm_from_info(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4.1", timeout=50, temperature=0.5, api_key=openai_api_key))
         
         self.calendar_agent_instance = CalendarAgent(llm_or_chain=self.calendar_llm, salesforce_api_client=self.salesforce_api_client)
         self.logger.info("Initialize Calendar Agent succeed")

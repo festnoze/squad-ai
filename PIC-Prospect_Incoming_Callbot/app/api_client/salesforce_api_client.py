@@ -9,13 +9,14 @@ from datetime import datetime, timedelta, timezone
 import pytz
 import asyncio
 import re
+from utils.envvar import EnvHelper
 from api_client.salesforce_api_client_interface import SalesforceApiClientInterface
 
 class SalesforceApiClient(SalesforceApiClientInterface):
     _client_id = '3MVG9IKwJOi7clC2.8QIzh9BkM6NhU53bup6EUfFQiXJ01nh.l2YJKF5vbNWqPkFEdjgzAXIqK3U1p2WCBUD3'
-    _username = os.getenv('SALESFORCE_USERNAME')
-    _password = os.getenv('SALESFORCE_PASSWORD')
-    _client_secret = os.getenv('SALESFORCE_CLIENT_SECRET')
+    _username = EnvHelper.get_salesforce_username()
+    _password = EnvHelper.get_salesforce_password()
+    _client_secret = EnvHelper.get_salesforce_client_secret()
     _private_key_file = 'salesforce_server_private.key'
     _is_sandbox = True
 

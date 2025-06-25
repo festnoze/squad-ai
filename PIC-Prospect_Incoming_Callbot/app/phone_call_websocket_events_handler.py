@@ -62,12 +62,8 @@ class PhoneCallWebsocketEventsHandler:
 
         # Set Google Calendar credentials (needed for STT)
         self.project_root = os.path.dirname(os.path.dirname(__file__))
-        self.google_calendar_credentials_filename = os.getenv(
-            "GOOGLE_CALENDAR_CREDENTIALS_FILENAME", 
-            "secrets/google-calendar-credentials.json"
-        )
+        self.google_calendar_credentials_filename = "secrets/google-calendar-credentials.json"
         self.google_calendar_credentials_path = os.path.join(self.project_root, self.google_calendar_credentials_filename)
-        print(self.google_calendar_credentials_path)
 
         if os.path.exists(self.google_calendar_credentials_path):
             os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = self.google_calendar_credentials_path
@@ -76,8 +72,8 @@ class PhoneCallWebsocketEventsHandler:
             self.logger.error(f"/!\\ Google calendar credentials file not found at {self.google_calendar_credentials_path}")
 
         # Initialize dependencies
-        tts_provider_name = os.getenv("TEXT_TO_SPEECH_PROVIDER", "openai")
-        stt_provider_name = os.getenv("SPEECH_TO_TEXT_PROVIDER", "google")
+        tts_provider_name = EnvHelper.get_text_to_speech_provider()
+        stt_provider_name = EnvHelper.get_speech_to_text_provider()
         self.tts_provider = get_text_to_speech_provider(self.TEMP_DIR, provider_name=tts_provider_name, frame_rate=self.frame_rate, channels=self.channels, sample_width=self.sample_width)
         self.stt_provider = get_speech_to_text_provider(self.TEMP_DIR, provider_name=stt_provider_name, language_code="fr-FR", frame_rate=self.frame_rate)
         
