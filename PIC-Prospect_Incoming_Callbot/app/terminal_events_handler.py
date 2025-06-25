@@ -7,6 +7,7 @@ import logging
 from openai import OpenAI
 from fastapi import WebSocket, WebSocketDisconnect
 #
+from utils.envvar import EnvHelper
 from speech.text_to_speech import get_text_to_speech_provider
 from speech.speech_to_text import get_speech_to_text_provider
 from agents.agents_graph import AgentsGraph
@@ -41,7 +42,7 @@ class TerminalEventsHandler:
         self.start_time = None         
 
         # Set OpenAI API key
-        self.OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+        self.OPENAI_API_KEY = EnvHelper.get_openai_api_key()
         os.environ['OPENAI_API_KEY'] = self.OPENAI_API_KEY
 
         # Initialize dependencies

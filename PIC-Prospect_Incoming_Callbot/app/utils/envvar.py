@@ -6,12 +6,16 @@ class EnvHelper:
     is_env_loaded = False
 
     @staticmethod
-    def _get_custom_env_files():
-        return EnvHelper.get_env_variable_value_by_name('CUSTOM_ENV_FILES', load_env=False, fails_if_missing=False)
-    
-    @staticmethod
     def get_openai_api_key():
         return EnvHelper.get_env_variable_value_by_name('OPENAI_API_KEY')
+
+    @staticmethod
+    def get_google_calendar_credentials():
+        return EnvHelper.get_env_variable_value_by_name('GOOGLE_CALENDAR_CREDENTIALS')
+    
+    @staticmethod
+    def _get_custom_env_files():
+        return EnvHelper.get_env_variable_value_by_name('CUSTOM_ENV_FILES', load_env=False, fails_if_missing=False)
     
     @staticmethod
     def _get_llms_json() -> str:

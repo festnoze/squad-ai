@@ -104,11 +104,11 @@ class IncomingAudioManager(IncomingManager):
                     self.logger.info(f"Call {self.call_sid} hung up via Twilio")
                 else:
                     if not twilio_sid or not twilio_auth:
-                        self.logger.error("Twilio credentials not configured")
+                        self.logger.error("/!\\ Twilio credentials not configured")
                     else:
-                        self.logger.warning("call_sid not set; unable to hang up via Twilio")
+                        self.logger.error("/!\\ call_sid not set; unable to hang up Twilio phone call")
             except Exception as e:
-                self.logger.error(f"Error hanging up call via Twilio: {e}", exc_info=True)
+                self.logger.error(f"/!\\ Error hanging up call via Twilio: {e}", exc_info=True)
 
     def is_speech(self, audio_chunk: bytes, frame_duration_ms=30) -> bool:
         """
@@ -139,7 +139,7 @@ class IncomingAudioManager(IncomingManager):
         try:
             return self.vad.is_speech(audio_chunk, self.frame_rate)
         except Exception as e:
-            self.logger.error(f"VAD error: {e}")
+            self.logger.error(f"/!\ VAD error: {e}")
             # Fallback to RMS-based detection
             rms = audioop.rms(audio_chunk, self.sample_width)
             return rms > 250  # Default threshold
@@ -183,7 +183,7 @@ class IncomingAudioManager(IncomingManager):
                 
             return processed_audio
         except Exception as e:
-            self.logger.error(f"Audio preprocessing error: {e}")
+            self.logger.error(f"/!\ Audio preprocessing error: {e}")
             # Return original data if processing fails
             return audio_data
     

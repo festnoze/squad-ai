@@ -6,6 +6,7 @@ import os
 import requests
 import logging
 from openai import OpenAI
+from utils.envvar import EnvHelper
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,7 @@ class LeadAgent:
                 raise ValueError("YAML configuration must contain a 'lead_injection' endpoint")
             
             # Initialize OpenAI client
-            openai_key = os.getenv("OPENAI_API_KEY", "")
+            openai_key = EnvHelper.get_openai_api_key()
             self.client = OpenAI(api_key=openai_key)
             
             self.extracted_info = {}

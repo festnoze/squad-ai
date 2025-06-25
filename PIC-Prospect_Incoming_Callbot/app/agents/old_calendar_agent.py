@@ -11,6 +11,7 @@ from googleapiclient.errors import HttpError
 from datetime import timezone, timedelta, datetime
 from zoneinfo import ZoneInfo
 import logging
+from utils.envvar import EnvHelper
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +72,7 @@ class OldCalendarAgent:
 
         # OpenAI configuration
         openai_config = self.config.get('openai', {})
-        api_key = openai_config.get('api_key', os.getenv("OPENAI_API_KEY", ""))
+        api_key = openai_config.get('api_key', EnvHelper.get_openai_api_key())
         
         # Initialize OpenAI client
         self.client = OpenAI(api_key=api_key)
