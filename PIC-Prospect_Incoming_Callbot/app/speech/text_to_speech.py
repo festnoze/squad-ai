@@ -127,6 +127,6 @@ class OpenAITTSProvider(TextToSpeechProvider):
             return b""
 
 def get_text_to_speech_provider(temp_dir: str, provider_name: str = "openai", frame_rate: int = 8000, channels: int = 1, sample_width: int = 2) -> TextToSpeechProvider:
-    if provider_name == "google": return GoogleTTSProvider(temp_dir, frame_rate=frame_rate, channels=channels, sample_width=sample_width)
-    if provider_name == "openai": return OpenAITTSProvider(temp_dir, frame_rate=frame_rate, channels=channels, sample_width=sample_width)
+    if provider_name.lower() == "google": return GoogleTTSProvider(temp_dir, frame_rate=frame_rate, channels=channels, sample_width=sample_width)
+    if provider_name.lower() == "openai": return OpenAITTSProvider(temp_dir, frame_rate=frame_rate, channels=channels, sample_width=sample_width)
     raise ValueError(f"Invalid TTS provider: {provider_name}")
