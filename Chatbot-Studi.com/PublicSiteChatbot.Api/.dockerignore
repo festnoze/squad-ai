@@ -3,7 +3,6 @@ src/application/evaluation_service.py
 src/application/ragas_service.py
 
 src/database_conversations/conversation_database.db
-storage/
 
 /outputs/logs/
 /outputs/scraped/

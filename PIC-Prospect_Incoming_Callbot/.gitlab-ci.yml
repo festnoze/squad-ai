@@ -16,7 +16,8 @@ stages:
   - cleanup
 
 before_script:
-  - gcloud auth activate-service-account --key-file=${CI_PROJECT_DIR}/google_credentials.json
+  - echo "$GOOGLE_CREDENTIALS" > ${CI_PROJECT_DIR}/google-credentials.json
+  - gcloud auth activate-service-account --key-file=${CI_PROJECT_DIR}/google-credentials.json
   - gcloud config set project $GCP_PROJECT_ID
   - gcloud --quiet auth configure-docker europe-west1-docker.pkg.dev
 
@@ -27,6 +28,14 @@ build:
   script:
     - docker build -t $IMAGE .
     - docker push $IMAGE
+
+deploy:
+  stage: deploy
+  tags:
+    - gcloud,docker
+  script:
+    - echo "Deploying Cloud Run job..."
+    - gcloud run jobs deploy $SERVICE_NAME --image $IMAGE --region $REGION --service-account=$SERVICE_ACCOUNT --set-env-vars GOOGLE_CLOUD_PROJECT=$GCP_PROJECT_ID,dest_project_id=$DEST_PROJECT_ID --memory 32Gi --cpu 8
 
 cleanup:
   stage: cleanup

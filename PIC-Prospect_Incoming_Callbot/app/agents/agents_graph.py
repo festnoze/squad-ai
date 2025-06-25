@@ -171,7 +171,19 @@ class AgentsGraph:
             return state
         
         self.logger.info(f"Start init. RAG API for caller (User and a new conversation): {state.get('caller_phone')}") 
-        conversation_id = await self.init_user_and_new_conversation_in_backend_api_async(state.get('caller_phone'), state.get('call_sid'))     
+        
+        try:
+            await self.studi_rag_inference_api_client.test_client_connection_async()
+        except Exception as e:
+            self.logger.error(f"/!\\ Error testing connection to RAG API : {str(e)}")
+            err_msg = "Je rencontre un problème technique, le service est temporairement indisponible, merci de nous recontacter plus tard."
+            await self.outgoing_manager.enqueue_text(err_msg)    
+            return state
+        
+        conversation_id = await self.init_user_and_new_conversation_in_backend_api_async(state.get('caller_phone'), state.get('call_sid'))
+        if not conversation_id:
+            err_msg = "Je rencontre un problème technique, le service est temporairement indisponible, merci de nous recontacter plus tard."
+            await self.outgoing_manager.enqueue_text(err_msg)    
         self.logger.info(f"End init. RAG API for caller (User and a new conversation): {state.get('caller_phone')}")
 
         state["history"] = []
@@ -190,7 +202,7 @@ class AgentsGraph:
         sf_account_info = await self.salesforce_api_client.get_person_by_phone_async(phone_number)
         leads_info = await self.salesforce_api_client.get_leads_by_details_async(phone_number)
         state['agent_scratchpad']['sf_account_info'] = sf_account_info.get('data', {}) if sf_account_info else {}
-        state['agent_scratchpad']['sf_leads_info'] = leads_info[0] if any(leads_info) else {}
+        state['agent_scratchpad']['sf_leads_info'] = leads_info[0] if leads_info else {}
         self.logger.info(f"[{call_sid}] Stored sf_account_info: {sf_account_info.get('data', {}) if sf_account_info else "-no SF account found-"} in agent_scratchpad")
         return state
 
@@ -233,7 +245,7 @@ class AgentsGraph:
         """Wait for user input"""
         return state
     
-    async def init_user_and_new_conversation_in_backend_api_async(self, calling_phone_number: str, call_sid: str):
+    async def init_user_and_new_conversation_in_backend_api_async(self, calling_phone_number: str, call_sid: str) -> str | None:
         """ Initialize the user session in the backend API: create user and conversation"""
         user_name_val = "Twilio incoming call " + (calling_phone_number or "Unknown User")
         ip_val = calling_phone_number or "Unknown IP"
@@ -244,7 +256,6 @@ class AgentsGraph:
             device_info=DeviceInfoRequestModel(user_agent="twilio", platform="phone", app_version="", os="", browser="", is_mobile=True)
         )
         try:
-            await self.studi_rag_inference_api_client.test_client_connection_async()
             user = await self.studi_rag_inference_api_client.create_or_retrieve_user_async(user_RM)
             user_id = UUID(user['id'])
             new_conversation = ConversationRequestModel(user_id=user_id, messages=[])
@@ -254,9 +265,7 @@ class AgentsGraph:
 
         except Exception as e:
             self.logger.error(f"Error creating conversation: {str(e)}")
-            err_msg = "Je rencontre un problème technique, le service est temporairement indisponible, merci de nous recontacter plus tard."
-            await self.outgoing_manager.enqueue_text(err_msg)
-            return str(uuid.uuid4())
+            return None
 
     async def lead_agent_node(self, state: PhoneConversationState) -> dict:
         """Handles lead qualification and information gathering using LeadAgent."""

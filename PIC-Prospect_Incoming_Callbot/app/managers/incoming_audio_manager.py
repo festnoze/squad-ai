@@ -80,7 +80,7 @@ class IncomingAudioManager(IncomingManager):
     def set_phone_number(self, phone_number: str, call_sid: str) -> None:
         self.phones_by_call_sid[call_sid] = phone_number
     
-    def hangup_call(self):
+    async def hangup_call_async(self):
         if self.websocket:
             self.logger.info(f"### HANGING UP ### Make phone call ends.")
             
@@ -89,7 +89,7 @@ class IncomingAudioManager(IncomingManager):
             time.sleep(1)
             # Close the websocket first
             try:
-                self.websocket.close(code=1000)
+                await self.websocket.close(code=1000)
             except Exception as e:
                 self.logger.error(f"Error closing websocket: {e}")
             self.websocket = None
@@ -296,7 +296,7 @@ class IncomingAudioManager(IncomingManager):
         # Hangup the call if the user is silent for too long
         if self.consecutive_silence_duration_ms >= self.max_silence_duration_before_hangup_ms:
             self.logger.info(f">>> User silence duration of {self.consecutive_silence_duration_ms:.1f}ms exceeded max. allowed silence of {self.max_silence_duration_before_hangup_ms:.1f}ms.")
-            self.hangup_call()
+            await self.hangup_call_async()
             return
         
         # Add chunk to buffer if speech has begun or this is a speech chunk
@@ -366,7 +366,7 @@ class IncomingAudioManager(IncomingManager):
                 self.logger.info(">>> Agents graph response ends with 'Merci et au revoir.', hanging up the call.")
                 while self.outgoing_manager.has_text_to_be_sent() or self.outgoing_manager.is_sending():
                     await asyncio.sleep(0.3)
-                self.hangup_call()
+                await self.hangup_call_async()
 
         except Exception as e:
             self.logger.error(f"Error in user query to agents graph: {e}", exc_info=True)
