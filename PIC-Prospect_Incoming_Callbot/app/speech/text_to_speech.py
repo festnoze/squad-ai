@@ -18,11 +18,12 @@ class TextToSpeechProvider(ABC):
         """Speech-to-text using specified the provider, and return it as bytes"""
         pass
 
+        
     def convert_to_PCM_UTF_8_bytes(self, mp3_bytes: bytes) -> bytes:
         if not mp3_bytes:
             self.logger.warning("No MP3 bytes provided to convert")
             return b""
-            
+        
         try:
             # Load MP3 from bytes
             audio = AudioSegment.from_file(io.BytesIO(mp3_bytes), format="mp3")
@@ -55,6 +56,30 @@ class TextToSpeechProvider(ABC):
             # Return empty bytes on error
             return b""
 
+    def convert_to_PCM_UTF_8_bytes_new(self, audio_bytes: bytes) -> bytes:
+        if not audio_bytes:
+            self.logger.warning("No audio bytes provided to convert")
+            return b""
+            
+        try:
+            # Load MP3 from bytes
+            audio = AudioSegment.from_file(io.BytesIO(audio_bytes), format="mp3")
+            # audio = AudioSegment.from_raw(io.BytesIO(audio_bytes), sample_width=2, frame_rate=24000, channels=1)
+            # audio = audio.set_frame_rate(self.frame_rate).set_channels(self.channels).set_sample_width(self.sample_width)
+            
+            buffer = io.BytesIO()
+            audio.export(buffer, format="raw")
+            
+            # Get the raw PCM bytes
+            buffer.seek(0)
+            pcm_bytes = buffer.read()
+            return pcm_bytes
+            
+        except Exception as e:
+            self.logger.error(f"Error converting MP3 to PCM: {e}")
+            # Return empty bytes on error
+            return b""
+
 class GoogleTTSProvider(TextToSpeechProvider):
     def __init__(self, temp_dir: str, frame_rate: int = 8000, channels: int = 1, sample_width: int = 2):
         from google.cloud import texttospeech as google_tts
@@ -65,24 +90,6 @@ class GoogleTTSProvider(TextToSpeechProvider):
         self.frame_rate = frame_rate
         self.channels = channels
         self.sample_width = sample_width
-
-    def synthesize_speech_to_file(self, text: str) -> str:
-        """Synthesize speech using Google Cloud Text-to-Speech API."""
-        audio_bytes = self.synthesize_speech_to_bytes(text)
-        return self.save_raw_audio_stream(audio_bytes)
-    
-    def synthesize_speech_to_bytes(self, text: str) -> bytes:
-        try:
-            synthesis_input = self.google_tts.SynthesisInput(text=text)
-            voice = self.google_tts.VoiceSelectionParams(language_code="fr-FR", ssml_gender=self.google_tts.SsmlVoiceGender.FEMALE)
-            audio_config = self.google_tts.AudioConfig(audio_encoding=self.google_tts.AudioEncoding.MP3)
-
-            response = self.client.synthesize_speech(input=synthesis_input, voice=voice, audio_config=audio_config)
-            return self.convert_to_PCM_UTF_8_bytes(response.audio_content)
-
-        except Exception as google_error:
-            self.logger.error(f"Google TTS failed: {google_error}.", exc_info=True)
-            return b""
 
 class OpenAITTSProvider(TextToSpeechProvider):
     def __init__(self, temp_dir: str, frame_rate: int = 8000, channels: int = 1, sample_width: int = 2):
@@ -101,27 +108,12 @@ class OpenAITTSProvider(TextToSpeechProvider):
                 voice="nova",  # Better for french: fable, nova, shimmer
                 # All OpenAI TTS voices: alloy, ash, ballad, coral, echo, fable, nova, onyx, sage, shimmer
                 input=text,
+                #instructions="Parle d'une voix calme, positive, avec une diction rapide et claire",
                 speed=1.0
             )
             audio_bytes = resp.read()
             return self.convert_to_PCM_UTF_8_bytes(audio_bytes)
 
-        except Exception as openai_error:
-            self.logger.error(f"OpenAI TTS failed: {openai_error}.", exc_info=True)
-            return b""
-
-    def NEW_synthesize_speech_to_bytes(self, text: str) -> bytes:
-        try:
-            audio_bytes: bytes = TTS_OpenAI.generate_speech(
-                model="tts-1",
-                text=text,
-                voice="nova",
-                instructions="Parle d'une voix calme, positive, avec une diction rapide et claire",
-                speed=1.0,
-                response_format="pcm",
-                pcm_rate=self.frame_rate
-            )
-            return audio_bytes
         except Exception as openai_error:
             self.logger.error(f"OpenAI TTS failed: {openai_error}.", exc_info=True)
             return b""
