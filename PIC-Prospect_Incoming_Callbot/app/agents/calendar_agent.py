@@ -69,7 +69,7 @@ class CalendarAgent:
                 formatted_history.append(f"{message[0]}: {message[1]}")
 
             available_timeframes_answer = await self.available_timeframes_agent.ainvoke({
-                "current_date_str": self._to_french_date(CalendarAgent.now, include_weekday=True, include_year=True) + " à " + self._to_french_time(CalendarAgent.now),
+                "current_date_str": self._to_french_date(CalendarAgent.now, include_weekday=True, include_year=True, include_hour=True),
                 "owner_name": CalendarAgent.owner_name,
                 "user_input": user_input,
                 "chat_history": "- " + "\n- ".join(formatted_history)
@@ -95,7 +95,7 @@ class CalendarAgent:
             date_and_time: datetime = await self._extract_appointment_selected_date_and_time_async(user_input, chat_history)
             
             if date_and_time:
-                return "Récapitulons : votre rendez-vous sera planifié le " + self._to_french_date(date_and_time, include_weekday=True, include_year=False) + " à " + self._to_french_time(date_and_time) + ". Merci de confirmer ce rendez-vous pour le valider."
+                return "Récapitulons : votre rendez-vous sera planifié le " + self._to_french_date(date_and_time, include_weekday=True, include_year=False, include_hour=True) + ". Merci de confirmer ce rendez-vous pour le valider."
             return "Je n'ai pas trouvé la date et l'heure du rendez-vous. Veuillez me préciser la date et l'heure du rendez-vous souhaité."
 
         if category == "Rendez-vous confirmé":
@@ -103,7 +103,7 @@ class CalendarAgent:
             appointment_slot_datetime_str = self._to_str_iso(appointment_slot_datetime)
             success = await CalendarAgent.schedule_new_appointment_tool_async(appointment_slot_datetime_str)
             if success is not None:
-                return "C'est confirmé ! Votre rendez-vous est maintenant planifié pour le " + self._to_french_date(appointment_slot_datetime, include_weekday=True, include_year=False) + " à " + self._to_french_time(appointment_slot_datetime) + ". Merci et au revoir."
+                return "C'est confirmé ! Votre rendez-vous est maintenant planifié pour le " + self._to_french_date(appointment_slot_datetime, include_weekday=True, include_year=False, include_hour=True) + ". Merci et au revoir."
             return "Je n'ai pas pu planifier le rendez-vous. Souhaitez-vous essayer un autre créneau ?"
 
         if category == "Demande de modification":
@@ -147,7 +147,7 @@ class CalendarAgent:
 
     @staticmethod
     def get_current_date_tool() -> str:
-        return CalendarAgent._to_french_date(CalendarAgent.now, include_weekday=True, include_year=True)
+        return CalendarAgent._to_french_date(CalendarAgent.now, include_weekday=True, include_year=True, include_hour=True)
 
     @tool
     async def get_appointments(start_date: str, end_date: str) -> list[dict[str, any]]:
@@ -284,11 +284,6 @@ class CalendarAgent:
         if chat_history is None:
             chat_history = []
 
-        # First apply rule-based categorization
-        rule_based_category = self._apply_categorization_rules(user_input, chat_history)
-        if rule_based_category:
-            return rule_based_category
-
         formatted_history = []
         for message in chat_history:
             if isinstance(message, dict):
@@ -299,7 +294,7 @@ class CalendarAgent:
                 raise ValueError(f"Unsupported message type: {type(message)}")
                          
         # Current contextual data to inject directly (no dedicated tools anymore)
-        current_date_str = self._to_french_date(CalendarAgent.now, include_weekday=True, include_year=True)
+        current_date_str = self._to_french_date(CalendarAgent.now, include_weekday=True, include_year=True, include_hour=True)
         owner_name = CalendarAgent.owner_name or "le conseiller"
 
         classifier_prompt = self._load_classifier_prompt()\
@@ -315,27 +310,14 @@ class CalendarAgent:
         except Exception as e:
             self.logger.warning(f"CalendarAgent categorisation failed: {e}")
             return "Proposition de créneaux"
-
-    def _apply_categorization_rules(self, user_input: str, chat_history: list) -> str:
-        """Apply rule-based heuristics to categorize user input.
         
-        Args:
-            user_input: The user's message to classify
-            chat_history: List of previous messages in the conversation
-            
-        Returns:
-            A category string if a rule matches, None otherwise
-        """
-        # TO DO: implement rule-based categorization
-        return None
-        
-    def _get_french_from_timeframes(self, slots: list[str]) -> str:
+    def _get_french_slots(self, slots: list[str]) -> str:
         results = []
         for slot in slots:
-            results.append(self._get_french_from_timeframe(slot))
+            results.append(self._get_french_slot(slot))
         return results
 
-    def _get_french_from_timeframe(self, slot: str) -> str:
+    def _get_french_slot(self, slot: str) -> str:
         # Expects slot in "YYYY-MM-DD HH:MM-HH:MM"
         date_part, time_part = slot.split(" ")
         start_time, end_time = time_part.split("-")
@@ -356,7 +338,7 @@ class CalendarAgent:
         fin_m_str = '' if fin_m == '00' else f' {fin_m}'
         return f"{jour} {jour_num} {mois_nom} entre {int(debut_h)} heure{'s' if int(debut_h) != 1 else ''}{debut_m_str} et {int(fin_h)} heure{'s' if int(fin_h) != 1 else ''}{fin_m_str}"
 
-    def _to_french_date(self, dt: datetime, include_weekday: bool = True, include_year: bool = False) -> str:
+    def _to_french_date(self, dt: datetime, include_weekday: bool = True, include_year: bool = False, include_hour: bool = False) -> str:
         french_days = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
         french_months = ["", "janvier", "février", "mars", "avril", "mai", "juin", 
                          "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
@@ -364,6 +346,7 @@ class CalendarAgent:
         if include_weekday: french_date += f"{french_days[dt.weekday()]} "
         french_date += f"{dt.day} {french_months[dt.month]}"
         if include_year: french_date += f" {dt.year}"
+        if include_hour: french_date += f" à {self._to_french_time(dt)}"
         return french_date
 
     def _to_french_time(self, dt: datetime) -> str:
@@ -505,7 +488,7 @@ class CalendarAgent:
         Extract the exact date and time specified by the user for the appointment from the following conversation.
         Only return the date and time in the following format: YYYY-MM-DDTHH:MM:SSZ.
         The now date and time is: {now}
-        Note that the appointment date can only be in the future, and in the near future (less than 2 months from now).
+        Note that the appointment date and time can only be in the future, and in the near future (less than 2 months from now).
         
         Current conversation:
         {chat_history}
@@ -521,7 +504,7 @@ class CalendarAgent:
         response = await chain.ainvoke({
             "input": user_input,
             "chat_history": chat_history_str,
-            "now": self._to_french_date(CalendarAgent.now, include_weekday=True, include_year=True)
+            "now": self._to_french_date(CalendarAgent.now, include_weekday=True, include_year=True, include_hour=True)
         })
         
         try:

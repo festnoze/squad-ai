@@ -208,7 +208,7 @@ async def test_calendar_agent_integration_classification_plus_outputed_answer(sf
     """
     # Create the agent with mocked dependencies
     agent = CalendarAgent(llm_instance, sf_client_mock)
-    CalendarAgent.now = datetime(2024, 6, 19)
+    CalendarAgent.now = datetime(2024, 6, 19, 19, 0)
     agent._set_user_info("test_user_id", "Test", "User", "test@example.com", "test_owner_id", "TestOwnerName")
     
     # First, ensure the agent classifies the user input correctly
@@ -235,7 +235,7 @@ async def test_complete_conversation_exchange(sf_client_mock, llm_instance, simi
     """
     # Create the agent with mocked dependencies
     agent = CalendarAgent(llm_instance, sf_client_mock)
-    CalendarAgent.now = datetime(2024, 6, 19)
+    CalendarAgent.now = datetime(2024, 6, 19, 20, 0)
     agent._set_user_info("test_user_id", "Test", "User", "test@example.com", "test_owner_id", "TestOwnerName")
     
     # Define the conversation flow with expected categories and responses

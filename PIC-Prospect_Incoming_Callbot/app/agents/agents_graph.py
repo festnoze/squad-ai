@@ -138,10 +138,15 @@ class AgentsGraph:
         with open("app/agents/prompts/analyse_user_general_classifier_prompt.txt", 'r', encoding='utf-8') as file:
             prompt = file.read()
         
-        chat_history_str = "\n".join([f"[{msg[0]}]: {msg[1]}" for msg in chat_history])
-        max_history_chars = 100000 # TODO: Make this adapted to max. LLM context window
-        if len(chat_history) > max_history_chars:
-            chat_history = chat_history[-max_history_chars:]
+        # TODO: to improve using langchain history summarization, or our own existing in the RAG API.
+        chat_history_str = "\n".join([f"[{msg[0]}]: {msg[1][:1000]}..." for msg in chat_history])
+        
+        # Reduce to max_history_chars and to max_msg_count total messages to avoid exceeding the context window length of the LLM.
+        max_msg_chars = 16000 
+        max_msg_count = 8
+        if len(chat_history_str) > max_msg_chars:
+            chat_history_str = "\n".join([f"[{msg[0]}]: {msg[1][:1000]}..." for msg in chat_history[-max_msg_count:]])
+            chat_history_str = "... " + chat_history_str[-max_msg_chars:]
         prompt = prompt.format(user_input=user_input, chat_history=chat_history_str)
         
         response = await self.router_llm.ainvoke(prompt)
