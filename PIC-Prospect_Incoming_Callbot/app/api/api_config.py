@@ -81,9 +81,9 @@ class ApiConfig:
         # Initialize PhoneCallWebsocketEventsHandlerFactory
         endpoints.phone_call_websocket_events_handler_factory = PhoneCallWebsocketEventsHandlerFactory()
         
-        print('\n\n---------------------------------------------')
-        print('🌐 Voice Appointment Maker API 🚀 started 🚀')
-        print('---------------------------------------------')
+        logger.error('-----------------------------------------------------')
+        logger.error('🌐 PIC (Prospect Incoming Callbot) API 🚀 started 🚀')
+        logger.error('-----------------------------------------------------')
 
         def handle_error(request: Request, error_msg: str):
             logger.error(f"Logged Error: {error_msg}")

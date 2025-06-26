@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 REM Define the image name prefix (can be modify)
-set "repo_name=pic-prospect-incoming-callbot"
+set "repo_name=prospect-incoming-callbot"
 
 REM Check if the script is running with administrative privileges
 net session >nul 2>&1

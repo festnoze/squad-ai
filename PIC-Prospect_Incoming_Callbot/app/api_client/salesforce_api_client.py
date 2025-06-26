@@ -218,7 +218,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
                         self.logger.info(resp_event.text)
                     return None
             except Exception as e:
-                self.logger.info(f"Error creating event: {str(e)}")
+                self.logger.error(f"Error creating event: {str(e)}")
                 return None
 
     async def get_scheduled_appointments_async(self, start_datetime: str, end_datetime: str, owner_id: str | None = None) -> list | None:

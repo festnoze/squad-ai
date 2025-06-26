@@ -55,7 +55,7 @@ class IncomingAudioManager(IncomingManager):
         # Audio processing parameters
         self.audio_buffer = b""
         self.consecutive_silence_duration_ms = 0.0
-        self.speech_threshold = 300  # RMS threshold for speech detection
+        self.speech_threshold = 500  # RMS threshold for speech detection
         self.required_silence_ms_to_answer = 1000  # ms of silence to trigger transcript
         self.min_audio_bytes_for_processing = 1000  # Minimum buffer size to process
         self.max_audio_bytes_for_processing = 200000  # Maximum buffer size to process
@@ -275,9 +275,11 @@ class IncomingAudioManager(IncomingManager):
                 await self.stop_speaking_async()
                 # Reset buffer to clear any previous speech before interruption
                 self.audio_buffer = b""
+                
+                # Log the interruption (but only the first time)
+                if self.consecutive_silence_duration_ms > 0:
+                    self.logger.info(f"\r>>> USER INTERRUPTION - Incoming speech while system was speaking ({speech_to_noise_ratio})")
                 self.consecutive_silence_duration_ms = 0.0
-                # Add a message to the logs so we can track interruptions
-                print(f"\r>>> USER INTERRUPTION - Incoming speech while system was speaking ({speech_to_noise_ratio})")
         
         # Use WebRTC VAD for better speech detection
         is_silence, speech_to_noise_ratio = self.analyse_speech_for_silence(chunk, threshold=self.speech_threshold)

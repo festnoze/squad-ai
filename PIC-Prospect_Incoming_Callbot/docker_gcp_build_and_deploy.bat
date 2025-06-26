@@ -3,7 +3,7 @@ setlocal
 pushd "%~dp0"
 
 if "%~1" neq "" (set "TAG=%~1") else (set "TAG=1.0")
-set "REGISTRY=europe-west9-docker.pkg.dev/incoming-callbot/pic-prospect-incoming-callbot-docker"
+set "REGISTRY=europe-west9-docker.pkg.dev/studi-com-rag-api/prospect-incoming-callbot"
 set "IMAGE=%REGISTRY%:%TAG%"
 
 echo [1/3] Building %IMAGE%…

@@ -6,9 +6,22 @@ variables:
   SERVICE_ACCOUNT: studi-ai@studi-ai-454216.iam.gserviceaccount.com
   REPOSITORY: docker-${GCP_PROJECT_ID}-repo
   IMAGE: europe-west1-docker.pkg.dev/$GCP_PROJECT_ID/$REPOSITORY/$SERVICE_NAME
-
-  ####     VARIABLES à MODIFIER          >>>
-  SERVICE_NAME: pic-prospect-incoming-callbot
+  ####     VARIABLES SPECIFIQUES :
+  SERVICE_NAME: prospect-incoming-callbot
+  GOOGLE_CREDENTIALS: |
+    {
+      "type": "service_account",
+      "project_id": "studi-ai-454216",
+      "private_key_id": "8bd84fb0c3cc4238b0218c3d31cf58a7bfe2a7cd",
+      "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCf5o3RJXytI87f\n4XJnKEGQs0ac3+V4lMk7lxARfL3bn7pN5Wekz7cnG6DPlG971wjDSw0x2TuvHF7E\nsgWy/dnF4dCSn+q/gJOni3pHhX3+r7eRIceoTKkO+fljOCSxXX2L0Tj4g4CLuO80\n2hDlrClD6zs4f3r6PFNToqw2m7ZSGs1b3j5epaSFs0ajV00AWg0IVhXYLGrOpXw/\nDxuk3v9baZSyop+ReTMbPIYFaqObJLWQfFQkMbNSFidS/c5N1g9gx4eIEfMPRTv7\nIbx1LkDfmAe/tguuVP3+zVI0v5x4BvcQDgNzJkVQY0JBrhvG9sn5EY/wcON0XLf2\nXgCq1HvJAgMBAAECggEAKN4WNPQtz1qtjw7h3Hevejo3u/SFg7ITVIWhd7a4F5/V\nT/9n4/mqx/YJvcQkUjR9atyNvMXWuUS4+/C8ACldNXQniLISn2tPUa0WTZ1SvHtQ\noWlOzDb7pnZBRRieWC6a3ddVhj6l5hAYIxvw4aKE0XUXp7L9TWOJsICNH0/g407K\nsLYoz7zA/VxZZGuiB0m4vzBCBgl5DxWQdCh7Xfr+Gu+abAUI4msM9Yk60TJhyjaw\nD4UFPu573D8mSbLxhM9IlgxSdH91ko5+UfUUeLWhsNjLQivxzZIwE0rg5jmw01dN\nWM5u9/+gm5Q8FKadgsSVrcpyzORej9eXK9F2R2rumQKBgQDYjpKMOHodtJHtkqFM\n8l6PDwFIJJWqY27dH2B0mXGfM/udf1dh9c/1M0w0k+5CvbrbpDANskRCPpT/i4cp\nxZAhoLeLWdnvcoaPzSeDIMWCDL3rHwL4IoqUMHrQpxetNYdtWsj4vSs3Vvtfbs7F\nS0SEB4848Gq3G522cWVM+4NvZwKBgQC9BkKIdQJnFiFlxPr7wtokjRPcPzo1RMAW\n1DppsHQw1k8KncSEcMa/p5eLsqMADLGOwVWlyOUtLOPwtvgLo55Wk0SFuGI57g1u\nRjIf7n8lH+eHecy4+6LVkConi/c9hsiFlHGkjH3vFT1XfCxdVvQEMAwwT+inWH/O\n4PA7udAtTwKBgH06ZRBlEGjhJInngxNGDNxZZvpa/Zlcip2gKV0D5qqTmutG2jcx\nuKIomebFrMA3izi8R3WEIujT28Gy4+SJ9IEduUYCHX7UEXBSyIiRiOVdjO3MLyFi\niBSNvFewaIanL7tTBmigq78Cs7ZKE5QPpH1dCbt5e5yLgbYg+N19jFH9AoGAJOC9\nxkWdzGLi7Sn7FXc0fAESKNwlDRN2rn2FT+1fHdAR565UEsq129pklJqrdm0Djyhk\n/00seR3S8rmftxWa5KUirzwD3e11rVgAm346TBHnZ+T5bfWaFTRlJQYHnHdZU8Zc\nTZAjWau5JgJR3XwDa3W8SwisCUoY1VHJTL25wb0CgYB8yAI0JxyUafyJEMEAbztN\nvGw00YkMet3xdmKMMXI9/fgd+Nr0t0H/bOF8MgxDEHyh3y5zrqI5TEz+revGD0x0\ngRbwYTMItM8qOhnwW3dPEaetHw12rpFrIzCoG2E+Wn6kKIuaaFL76PpMy4XEyq4x\nIjRD6UBnO/vXAxJmhmYEGg==\n-----END PRIVATE KEY-----\n",
+      "client_email": "studi-ai@studi-ai-454216.iam.gserviceaccount.com",
+      "client_id": "114612902424833171232",
+      "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+      "token_uri": "https://oauth2.googleapis.com/token",
+      "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+      "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/studi-ai%40studi-ai-454216.iam.gserviceaccount.com",
+      "universe_domain": "googleapis.com"
+    }
 
 stages:
   - build
@@ -16,9 +29,15 @@ stages:
   - cleanup
 
 before_script:
-  - echo "$GOOGLE_CREDENTIALS" > ${CI_PROJECT_DIR}/google-credentials.json
-  - gcloud auth activate-service-account --key-file=${CI_PROJECT_DIR}/google-credentials.json
+   # 1) Créez le fichier de clé à partir de la variable CI
+  - printf '%s' "$GOOGLE_CREDENTIALS" > /tmp/google-credentials.json
+  # 2) (Facultatif) Affichez les 3 premières lignes pour debug
+  - head -n 3 /tmp/google-credentials.json
+  # 3) Authentifiez-vous avec gcloud
+  - gcloud auth activate-service-account --key-file=/tmp/google-credentials.json
+  # 4) Configurez le projet
   - gcloud config set project $GCP_PROJECT_ID
+  # 5) Configurez le docker
   - gcloud --quiet auth configure-docker europe-west1-docker.pkg.dev
 
 build:

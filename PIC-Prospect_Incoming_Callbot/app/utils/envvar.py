@@ -51,6 +51,11 @@ class EnvHelper:
     def get_twilio_auth():
         return EnvHelper.get_env_variable_value_by_name('TWILIO_AUTH')
 
+    @staticmethod
+    def get_repeat_user_input():
+        value = EnvHelper.get_env_variable_value_by_name('REPEAT_USER_INPUT')
+        return value.lower() == 'true'
+
     
     ### Internal methods###
     #######################
