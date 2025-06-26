@@ -184,7 +184,7 @@ class IncomingAudioManager(IncomingManager):
                 
             return processed_audio
         except Exception as e:
-            self.logger.error(f"/!\ Audio preprocessing error: {e}")
+            self.logger.error(f"/!\\ Audio preprocessing error: {e}")
             # Return original data if processing fails
             return audio_data
     

@@ -215,7 +215,11 @@ class AgentsGraph:
         leads_info = state.get('agent_scratchpad', {}).get('sf_leads_info', {})
         
         if sf_account:
-            civility = sf_account.get('Salutation', '').replace("Mme", "Madame").replace("Melle", "Mademoiselle").replace("Mr.", "Monsieur").replace("Ms.", "Madame").strip()
+            civility = sf_account.get('Salutation', '')
+            if civility:
+                civility = civility.replace("Mme", "Madame").replace("Melle", "Mademoiselle").replace("Mr.", "Monsieur").replace("Ms.", "Madame").strip()
+            else:
+                civility = ''
             first_name = sf_account.get('FirstName', '').strip()
             last_name = sf_account.get('LastName', '').strip()
             owner_first_name = sf_account.get('Owner', {}).get('Name', '').strip()
