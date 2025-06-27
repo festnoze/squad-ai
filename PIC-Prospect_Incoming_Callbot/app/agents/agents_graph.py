@@ -112,7 +112,7 @@ class AgentsGraph:
 
         if user_input:
             repeat_user_input = EnvHelper.get_repeat_user_input()
-            acknowledge_text = random.choice(["Très bien.", "Compris.", "D'accord.", "Entendu.", "Parfait."])
+            acknowledge_text = random.choice(["Très bien.", "C'est compris.", "D'accord.", "Entendu.", "Parfait."])
             await self.outgoing_manager.enqueue_text(acknowledge_text)
 
             if repeat_user_input : 
@@ -201,7 +201,7 @@ class AgentsGraph:
         #accounts = await self.salesforce_api_client.get_persons_async()
         sf_account_info = await self.salesforce_api_client.get_person_by_phone_async(phone_number)
         if not sf_account_info:
-            sf_account_info = await self.salesforce_api_client.get_person_by_email_async("+33668422388")
+            sf_account_info = await self.salesforce_api_client.get_person_by_email_async("+33600000000")
         leads_info = await self.salesforce_api_client.get_leads_by_details_async(phone_number)
         state['agent_scratchpad']['sf_account_info'] = sf_account_info.get('data', {}) if sf_account_info else {}
         state['agent_scratchpad']['sf_leads_info'] = leads_info[0] if leads_info else {}
@@ -458,7 +458,15 @@ class AgentsGraph:
                 display_waiting_message=False
             )
 
-            await self.outgoing_manager.enqueue_text("Merci de patienter un moment, je suis en train de chercher les informations pour répondre à votre demande.")
+            waiting_messages = ["Je suis en train de chercher les informations pour répondre à votre demande.",
+                                "Je recherche les éléments d'informations pour vous répondre.",
+                                "Je recherche dans ma base de connaissances.",
+                                "Un instant, je consulte mes sources d'informations.",
+                                "Laissez-moi vérifier quelques détails.",
+                                "Laissez-moi un instant pour trouver la meilleure réponse.",
+                                "Je rassemble les informations nécessaires."]
+            
+            await self.outgoing_manager.enqueue_text(random.choice(waiting_messages))
 
             # Call but not await the RAG API to get the streaming response
             response = self.studi_rag_inference_api_client.rag_query_stream_async(

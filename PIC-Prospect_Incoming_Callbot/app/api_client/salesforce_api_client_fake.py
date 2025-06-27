@@ -129,7 +129,7 @@ class SalesforceApiClientFake(SalesforceApiClientInterface):
                 {
                     "Id": "00Q000000000001",
                     "Company": "Studi",
-                    "Phone": phone or "+33668422388",
+                    "Phone": phone or "+33600000000",
                     "IsConverted": False,
                 }
             ]
