@@ -1,5 +1,4 @@
 import logging
-from typing import Dict, Any, List
 from langchain.tools import tool
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -53,7 +52,7 @@ Use the provided tools to create Gherkin scenarios and identify edge cases.
 """
     
     @tool
-    def create_gherkin_scenarios(self, user_story: Dict[str, Any]) -> List[str]:
+    def create_gherkin_scenarios(self, user_story: dict[str, any]) -> list[str]:
         """Create Gherkin scenarios from the user story"""
         # Implementation would use the LLM to create Gherkin scenarios
         # For now, we'll return placeholders
@@ -75,7 +74,7 @@ Use the provided tools to create Gherkin scenarios and identify edge cases.
         ]
     
     @tool
-    def identify_edge_cases(self, user_story: Dict[str, Any]) -> List[str]:
+    def identify_edge_cases(self, user_story: dict[str, any]) -> list[str]:
         """Identify edge cases for the user story"""
         # Implementation would use the LLM to identify edge cases
         # For now, we'll return placeholders

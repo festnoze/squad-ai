@@ -60,16 +60,13 @@ def main():
         # Run the workflow asynchronously
         result = asyncio.run(tdd_workflow.run_async(user_story_spec, acceptance_tests_gherkin))
         
-        # Print the final state
-        print("\nWorkflow completed successfully!")
-        print(f"User Story: {result.user_story}")
-        print(f"Scenarios implemented: {len(result.scenarios) - len(result.remaining_scenarios)}/{len(result.scenarios)}")
-        
-        # Print the last test and code for demonstration
-        if result.tests:
-            print("\nLast Test:")
-            print(result.tests)
-        
+        if result.get("error"):
+            print(f"\nError running TDD implementation workflow: {result.get('error_message')}")
+        else:
+            print("\nWorkflow completed successfully!")
+            # The result of a graph invocation is a dictionary
+            print(f"User Story: {result.get('user_story')}")
+            print(f"Final Code:\n{result.get('code')}")
         if result.code:
             print("\nLast Implementation:")
             print(result.code)

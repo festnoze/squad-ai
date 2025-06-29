@@ -1,12 +1,11 @@
 import subprocess
 import logging
-from typing import Dict, Any, List, Optional, Union
 from langchain.tools import tool
 
 logger = logging.getLogger(__name__)
 
 @tool
-def run_linter(file_path: str) -> Dict[str, Any]:
+def run_linter(file_path: str) -> dict[str, any]:
     """
     Run a Python linter (flake8) on the specified file or directory.
     
@@ -14,7 +13,7 @@ def run_linter(file_path: str) -> Dict[str, Any]:
         file_path: Path to the Python file or directory to lint
         
     Returns:
-        Dict containing success status and linting results
+        dict containing success status and linting results
     """
     try:
         # Run flake8 on the specified file or directory
@@ -53,7 +52,7 @@ def run_linter(file_path: str) -> Dict[str, Any]:
         }
 
 @tool
-def run_tests(test_path: Optional[str] = None, test_name: Optional[str] = None) -> Dict[str, Any]:
+def run_tests(test_path: str | None = None, test_name: str | None = None) -> dict[str, any]:
     """
     Run pytest tests on the specified path or test name.
     
@@ -62,7 +61,7 @@ def run_tests(test_path: Optional[str] = None, test_name: Optional[str] = None) 
         test_name: Optional specific test name to run (e.g., 'test_file.py::test_function')
         
     Returns:
-        Dict containing success status and test results
+        dict containing success status and test results
     """
     try:
         # Build the command

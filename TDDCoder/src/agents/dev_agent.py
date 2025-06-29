@@ -1,6 +1,5 @@
 import logging
 import os
-from typing import Dict, Any, List
 from langchain.tools import tool
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -70,7 +69,7 @@ class DevAgent:
         """
     
     @tool
-    def verify_test_passing(self, test: str, code: str) -> Dict[str, Any]:
+    def verify_test_passing(self, test: str, code: str) -> dict[str, any]:
         """Verify that the implemented code passes the test"""
         # Implementation would actually run the test against the code
         # For now, we'll return a placeholder

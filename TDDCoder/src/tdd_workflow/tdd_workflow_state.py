@@ -1,22 +1,22 @@
 from dataclasses import dataclass, field
-from typing import Dict, List, Any, Optional
 from langchain_core.messages import BaseMessage
+from typing import Any
 from pydantic import BaseModel, Field
 
 class TDDWorkflowState(BaseModel):
     """State for the TDD Implementation Workflow."""
     # Input from conception workflow
-    user_story: Dict[str, Any] = Field(
+    user_story: dict[str, Any] = Field(
         default_factory=dict,
         description="User story from the conception workflow"
     )
-    scenarios: List[Dict[str, Any]] = Field(
+    scenarios: list[dict[str, Any]] = Field(
         default_factory=list,
         description="Gherkin/BDD scenarios from the conception workflow"
     )
     
     # Analyst artifacts
-    implementation_steps: List[Dict[str, Any]] = Field(
+    implementation_steps: list[dict[str, Any]] = Field(
         default_factory=list,
         description="Steps identified by the analyst for implementation"
     )
@@ -30,11 +30,11 @@ class TDDWorkflowState(BaseModel):
     )
     
     # Implementation artifacts
-    remaining_scenarios: List[Dict[str, Any]] = Field(
+    remaining_scenarios: list[dict[str, Any]] = Field(
         default_factory=list,
         description="Scenarios that still need to be implemented"
     )
-    current_scenario: Dict[str, Any] = Field(
+    current_scenario: dict[str, Any] = Field(
         default_factory=dict,
         description="The current scenario being implemented"
     )
@@ -48,7 +48,7 @@ class TDDWorkflowState(BaseModel):
     error_message: str = Field(default="", description="Error message if an error occurred")
     
     # Conversation history
-    conversation_history: List[BaseMessage] = Field(
+    conversation_history: list[BaseMessage] = Field(
         default_factory=list,
         description="History of the conversation"
     )

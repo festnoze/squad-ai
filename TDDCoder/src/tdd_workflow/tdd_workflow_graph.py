@@ -1,7 +1,4 @@
 import logging
-from typing import Dict, Any, List, Tuple, Union, Callable, TypedDict, cast
-import json
-import os
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph, END
@@ -131,7 +128,7 @@ class TDDWorkflowGraph:
         
         Args:
             user_story_spec: String containing the user story specification
-            acceptance_tests_gherkin: List of acceptance tests in Gherkin format
+            acceptance_tests_gherkin: list of acceptance tests in Gherkin format
             config: Optional runnable configuration
             
         Returns:

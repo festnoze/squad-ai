@@ -1,0 +1,399 @@
+Linting Results - 2025-06-29 13:14:12
+==================================================
+
+Linting src\main.py...
+Found 2 issues:
+  E501 line too long (83 > 79 characters)
+  E402 module level import not at top of file
+
+Linting src\agents\analyst_agent.py...
+Found 34 issues:
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (93 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (111 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (83 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (113 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (85 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (85 > 79 characters)
+  E501 line too long (83 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (123 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (95 > 79 characters)
+  E501 line too long (105 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (299 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (93 > 79 characters)
+  E501 line too long (102 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+
+Linting src\agents\dev_agent.py...
+Found 20 issues:
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (88 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (107 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (83 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+
+Linting src\agents\po_agent.py...
+Found 19 issues:
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (88 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (129 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (129 > 79 characters)
+  E501 line too long (96 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (80 > 79 characters)
+  E501 line too long (131 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (97 > 79 characters)
+  W293 blank line contains whitespace
+
+Linting src\agents\qa_agent.py...
+Found 22 issues:
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (88 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (102 > 79 characters)
+  E501 line too long (136 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (80 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (81 > 79 characters)
+  W293 blank line contains whitespace
+
+Linting src\agents\refactor_agent.py...
+Found 26 issues:
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (88 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (112 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (82 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (80 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (83 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E302 expected 2 blank lines, found 1
+  E302 expected 2 blank lines, found 1
+  E302 expected 2 blank lines, found 1
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (86 > 79 characters)
+
+Linting src\agents\shared_tools.py...
+Found 15 issues:
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E302 expected 2 blank lines, found 1
+  E501 line too long (92 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (91 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+
+Linting src\agents\unit_test_agent.py...
+Found 22 issues:
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (84 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (88 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (108 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (104 > 79 characters)
+  E501 line too long (104 > 79 characters)
+  E501 line too long (104 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+
+Linting src\agents\__init__.py...
+No issues found.
+
+Linting src\conception_workflow\conception_workflow_graph.py...
+Found 17 issues:
+  E501 line too long (81 > 79 characters)
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (81 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (95 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+
+Linting src\conception_workflow\conception_workflow_state.py...
+Found 7 issues:
+  E302 expected 2 blank lines, found 1
+  E501 line too long (82 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (90 > 79 characters)
+  E501 line too long (92 > 79 characters)
+  W293 blank line contains whitespace
+
+Linting src\conception_workflow\run_conception_workflow.py...
+Found 18 issues:
+  E501 line too long (82 > 79 characters)
+  E402 module level import not at top of file
+  E402 module level import not at top of file
+  E501 line too long (81 > 79 characters)
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (102 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (102 > 79 characters)
+  E305 expected 2 blank lines after class or function definition, found 1
+
+Linting src\conception_workflow\__init__.py...
+No issues found.
+
+Linting src\llms\envvar.py...
+Found 26 issues:
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E303 too many blank lines (5)
+  E266 too many leading '#' for block comment
+  E301 expected 1 blank line, found 0
+  E501 line too long (115 > 79 characters)
+  W293 blank line contains whitespace
+  W291 trailing whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (111 > 79 characters)
+  W291 trailing whitespace
+  W291 trailing whitespace
+  W293 blank line contains whitespace
+  E501 line too long (93 > 79 characters)
+  E501 line too long (125 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (104 > 79 characters)
+  E501 line too long (104 > 79 characters)
+  W291 trailing whitespace
+  W293 blank line contains whitespace
+  '
+  F821 undefined name 'file'
+  W293 blank line contains whitespace
+  W292 no newline at end of file
+
+Linting src\llms\langchain_adapter_type.py...
+Found 3 issues:
+  E266 too many leading '#' for block comment
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+
+Linting src\llms\langchain_factory.py...
+Found 86 issues:
+  E266 too many leading '#' for block comment
+  E302 expected 2 blank lines, found 1
+  E301 expected 1 blank line, found 0
+  F541 f-string is missing placeholders
+  W293 blank line contains whitespace
+  E501 line too long (118 > 79 characters)
+  W293 blank line contains whitespace
+  F541 f-string is missing placeholders
+  E251 unexpected spaces around keyword / parameter equals
+  E251 unexpected spaces around keyword / parameter equals
+  E251 unexpected spaces around keyword / parameter equals
+  E251 unexpected spaces around keyword / parameter equals
+  E251 unexpected spaces around keyword / parameter equals
+  E251 unexpected spaces around keyword / parameter equals
+  W293 blank line contains whitespace
+  E501 line too long (219 > 79 characters)
+  W291 trailing whitespace
+  E501 line too long (238 > 79 characters)
+  E501 line too long (126 > 79 characters)
+  E501 line too long (273 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (81 > 79 characters)
+  E501 line too long (147 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (199 > 79 characters)
+  E501 line too long (98 > 79 characters)
+  W291 trailing whitespace
+  E701 multiple statements on one line (colon)
+  E501 line too long (104 > 79 characters)
+  E501 line too long (124 > 79 characters)
+  E501 line too long (126 > 79 characters)
+  W291 trailing whitespace
+  E701 multiple statements on one line (colon)
+  E501 line too long (109 > 79 characters)
+  E501 line too long (129 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (130 > 79 characters)
+  '
+  W291 trailing whitespace
+  E251 unexpected spaces around keyword / parameter equals
+  E251 unexpected spaces around keyword / parameter equals
+  E251 unexpected spaces around keyword / parameter equals
+  E251 unexpected spaces around keyword / parameter equals
+  E251 unexpected spaces around keyword / parameter equals
+  W293 blank line contains whitespace
+  E501 line too long (247 > 79 characters)
+  '
+  '
+  E251 unexpected spaces around keyword / parameter equals
+  E265 block comment should start with '# '
+  W291 trailing whitespace
+  W293 blank line contains whitespace
+  E501 line too long (116 > 79 characters)
+  '
+  W291 trailing whitespace
+  E251 unexpected spaces around keyword / parameter equals
+  E251 unexpected spaces around keyword / parameter equals
+  E251 unexpected spaces around keyword / parameter equals
+  E251 unexpected spaces around keyword / parameter equals
+  W293 blank line contains whitespace
+  E501 line too long (133 > 79 characters)
+  '
+  W291 trailing whitespace
+  E251 unexpected spaces around keyword / parameter equals
+  E251 unexpected spaces around keyword / parameter equals
+  E251 unexpected spaces around keyword / parameter equals
+  E251 unexpected spaces around keyword / parameter equals
+  E251 unexpected spaces around keyword / parameter equals
+  W293 blank line contains whitespace
+  W291 trailing whitespace
+  E501 line too long (128 > 79 characters)
+  '
+  W291 trailing whitespace
+  E251 unexpected spaces around keyword / parameter equals
+  E251 unexpected spaces around keyword / parameter equals
+  E251 unexpected spaces around keyword / parameter equals
+  E251 unexpected spaces around keyword / parameter equals
+  E251 unexpected spaces around keyword / parameter equals
+  W293 blank line contains whitespace
+  W291 trailing whitespace
+  E501 line too long (132 > 79 characters)
+  '
+  '
+  E261 at least two spaces before inline comment
+  W291 trailing whitespace
+  W292 no newline at end of file
+
+Linting src\llms\llm_info.py...
+Found 27 issues:
+  E266 too many leading '#' for block comment
+  E302 expected 2 blank lines, found 1
+  '
+  '
+  '
+  E501 line too long (208 > 79 characters)
+  '
+  '
+  '
+  '
+  E501 line too long (135 > 79 characters)
+  '
+  '
+  '
+  E501 line too long (103 > 79 characters)
+  E202 whitespace before ')'
+  E501 line too long (109 > 79 characters)
+  E501 line too long (90 > 79 characters)
+  E501 line too long (106 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (86 > 79 characters)
+  W291 trailing whitespace
+  W291 trailing whitespace
+  W291 trailing whitespace
+  W293 blank line contains whitespace
+  E501 line too long (249 > 79 characters)
+  W292 no newline at end of file
+
+Linting src\llms\__init__.py...

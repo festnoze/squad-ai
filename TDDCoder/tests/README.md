@@ -37,7 +37,7 @@ This will:
 
 The linter tests will output:
 - Which files were checked
-- Any issues found per file
+- any issues found per file
 - A summary of total issues
 
 By default, the test will not fail even if linting issues are found. This behavior can be modified by uncommenting the assertion line in `test_linter_on_project()`.

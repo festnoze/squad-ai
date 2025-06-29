@@ -1,5 +1,4 @@
 import logging
-from typing import Dict, Any
 from langchain.tools import tool
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -38,15 +37,15 @@ As a [type of user], I want [an action] so that [a benefit/value].
 
 Additionally, you should include:
 - Acceptance Criteria: Clear conditions that must be met for the story to be considered complete
-- Technical Notes: Any technical considerations or constraints
-- Dependencies: Any dependencies on other features or systems
+- Technical Notes: any technical considerations or constraints
+- Dependencies: any dependencies on other features or systems
 - Priority: The importance of this story (High, Medium, Low)
 
 Use the provided tools to extract requirements and create the User Story.
 """
     
     @tool
-    def extract_requirements(self, user_input: str) -> Dict[str, Any]:
+    def extract_requirements(self, user_input: str) -> dict[str, any]:
         """Extract key requirements from the user's input"""
         # Implementation would use the LLM to extract requirements
         # For now, we'll return a placeholder
@@ -58,7 +57,7 @@ Use the provided tools to extract requirements and create the User Story.
         }
     
     @tool
-    def create_user_story(self, requirements: Dict[str, Any]) -> Dict[str, Any]:
+    def create_user_story(self, requirements: dict[str, any]) -> dict[str, any]:
         """Create a formal User Story from the extracted requirements"""
         # Implementation would use the LLM to create a user story
         # For now, we'll return a placeholder

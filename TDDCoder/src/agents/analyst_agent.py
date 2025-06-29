@@ -1,6 +1,5 @@
 import logging
 import os
-from typing import Dict, Any, List
 from langchain.tools import tool
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -44,7 +43,7 @@ class AnalystAgent:
             raise
     
     @tool
-    def analyze_requirements(self, requirements: Dict[str, Any]) -> Dict[str, Any]:
+    def analyze_requirements(self, requirements: dict[str, any]) -> dict[str, any]:
         """Analyze requirements and break them down into implementable steps.
         
         Args:
@@ -57,7 +56,7 @@ class AnalystAgent:
         return {"steps": [], "message": "Requirements analysis placeholder"}
     
     @tool
-    def prioritize_next_steps(self, current_state: Dict[str, Any]) -> Dict[str, Any]:
+    def prioritize_next_steps(self, current_state: dict[str, any]) -> dict[str, any]:
         """Determine the next test or code to implement based on the current state.
         
         Args:

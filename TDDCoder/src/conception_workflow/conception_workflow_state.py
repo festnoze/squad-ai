@@ -1,4 +1,3 @@
-from typing import Dict, List, Any, Optional
 from langchain_core.messages import BaseMessage
 from pydantic import BaseModel, Field
 
@@ -8,15 +7,15 @@ class ConceptionWorkflowState(BaseModel):
     user_request: str = Field(default="", description="The original user request")
     
     # Artifacts
-    requirements: Dict[str, Any] = Field(
+    requirements: dict[str, any] = Field(
         default_factory=dict,
         description="Requirements extracted from the user request"
     )
-    user_story: Dict[str, Any] = Field(
+    user_story: dict[str, any] = Field(
         default_factory=dict,
         description="User story created from the requirements"
     )
-    scenarios: List[Dict[str, Any]] = Field(
+    scenarios: list[dict[str, any]] = Field(
         default_factory=list,
         description="Gherkin/BDD scenarios created from the user story"
     )
@@ -26,7 +25,7 @@ class ConceptionWorkflowState(BaseModel):
     error_message: str = Field(default="", description="Error message if an error occurred")
     
     # Conversation history
-    conversation_history: List[BaseMessage] = Field(
+    conversation_history: list[BaseMessage] = Field(
         default_factory=list,
         description="History of the conversation"
     )

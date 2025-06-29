@@ -1,6 +1,5 @@
 import logging
 import os
-from typing import Dict, Any
 from langchain.tools import tool
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -49,7 +48,7 @@ class RefactorAgent:
         return ""
         
     @tool
-    def verify_refactored_code(self, code: str, test: str) -> Dict[str, Any]:
+    def verify_refactored_code(self, code: str, test: str) -> dict[str, any]:
         """Verify that the refactored code still passes the test"""
         # Implementation would actually run the test against the refactored code
         # For now, we'll return a placeholder

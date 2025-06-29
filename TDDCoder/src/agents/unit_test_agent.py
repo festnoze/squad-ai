@@ -1,6 +1,5 @@
 import logging
 import os
-from typing import Dict, Any, List
 from langchain.tools import tool
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
@@ -60,7 +59,7 @@ class UnitTestAgent:
         """
     
     @tool
-    def check_test_coverage(self, scenarios: List[str], implemented_tests: List[str]) -> Dict[str, Any]:
+    def check_test_coverage(self, scenarios: list[str], implemented_tests: list[str]) -> dict[str, any]:
         """Check if all scenarios are covered by tests"""
         # Implementation would use the LLM to check coverage
         # For now, we'll return a placeholder

@@ -3,6 +3,7 @@ from unittest.mock import MagicMock, patch
 from agents.analyst_agent import AnalystAgent
 from tdd_workflow.tdd_workflow_state import TDDWorkflowState
 from langchain_core.messages import HumanMessage, AIMessage
+from llms.langchain_factory import LangChainFactory, LangChainAdapterType
 
 class TestAnalystAgent:
     
@@ -24,7 +25,8 @@ class TestAnalystAgent:
             user_story={
                 "role": "web user",
                 "goal": "log in to the application",
-                "benefit": "access my personal dashboard"
+                "benefit": "access my personal dashboard",
+                "llm_model_name": "gpt-4"
             },
             scenarios=[
                 {
