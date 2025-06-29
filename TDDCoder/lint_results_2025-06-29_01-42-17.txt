@@ -1,0 +1,606 @@
+Linting Results - 2025-06-29 01:42:17
+==================================================
+
+Linting src\agents\analyst_agent.py...
+Found 35 issues:
+  F401 'typing.List' imported but unused
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (93 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (111 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (83 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (113 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (85 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (85 > 79 characters)
+  E501 line too long (83 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (123 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (95 > 79 characters)
+  E501 line too long (105 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (299 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (93 > 79 characters)
+  E501 line too long (102 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+
+Linting src\agents\dev_agent.py...
+Found 21 issues:
+  F401 'typing.List' imported but unused
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (88 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (107 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (83 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+
+Linting src\agents\po_agent.py...
+Found 19 issues:
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (88 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (129 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (129 > 79 characters)
+  E501 line too long (96 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (80 > 79 characters)
+  E501 line too long (131 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (97 > 79 characters)
+  W293 blank line contains whitespace
+
+Linting src\agents\qa_agent.py...
+Found 22 issues:
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (88 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (102 > 79 characters)
+  E501 line too long (136 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (80 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (81 > 79 characters)
+  W293 blank line contains whitespace
+
+Linting src\agents\refactor_agent.py...
+Found 26 issues:
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (88 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (112 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (82 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (80 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (83 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E302 expected 2 blank lines, found 1
+  E302 expected 2 blank lines, found 1
+  E302 expected 2 blank lines, found 1
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (86 > 79 characters)
+
+Linting src\agents\shared_tools.py...
+Found 17 issues:
+  F401 'typing.List' imported but unused
+  F401 'typing.Union' imported but unused
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E302 expected 2 blank lines, found 1
+  E501 line too long (98 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (91 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+
+Linting src\agents\unit_test_agent.py...
+Found 22 issues:
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (84 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (88 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (108 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (104 > 79 characters)
+  E501 line too long (104 > 79 characters)
+  E501 line too long (104 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+
+Linting src\agents\__init__.py...
+No issues found.
+
+Linting src\conception_workflow\conception_workflow_graph.py...
+Found 25 issues:
+  F401 'typing.Dict' imported but unused
+  F401 'typing.Any' imported but unused
+  F401 'typing.List' imported but unused
+  F401 'typing.Tuple' imported but unused
+  F401 'typing.Union' imported but unused
+  F401 'typing.Callable' imported but unused
+  F401 'typing.TypedDict' imported but unused
+  F401 'typing.cast' imported but unused
+  E501 line too long (81 > 79 characters)
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (81 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (95 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+
+Linting src\conception_workflow\conception_workflow_state.py...
+Found 8 issues:
+  F401 'typing.Optional' imported but unused
+  E302 expected 2 blank lines, found 1
+  E501 line too long (82 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (90 > 79 characters)
+  E501 line too long (92 > 79 characters)
+  W293 blank line contains whitespace
+
+Linting src\conception_workflow\run_conception_workflow.py...
+Found 18 issues:
+  E501 line too long (82 > 79 characters)
+  E402 module level import not at top of file
+  E402 module level import not at top of file
+  E501 line too long (81 > 79 characters)
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (102 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (102 > 79 characters)
+  E305 expected 2 blank lines after class or function definition, found 1
+
+Linting src\conception_workflow\__init__.py...
+No issues found.
+
+Linting src\tdd_workflow\run_tdd_workflow.py...
+Found 19 issues:
+  E501 line too long (82 > 79 characters)
+  E402 module level import not at top of file
+  E402 module level import not at top of file
+  E302 expected 2 blank lines, found 1
+  E501 line too long (87 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (81 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (122 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E305 expected 2 blank lines after class or function definition, found 1
+
+Linting src\tdd_workflow\tdd_workflow_graph.py...
+Found 50 issues:
+  F401 'typing.Dict' imported but unused
+  F401 'typing.Any' imported but unused
+  F401 'typing.List' imported but unused
+  F401 'typing.Tuple' imported but unused
+  F401 'typing.Union' imported but unused
+  F401 'typing.Callable' imported but unused
+  F401 'typing.TypedDict' imported but unused
+  F401 'typing.cast' imported but unused
+  F401 'os' imported but unused
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (81 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (98 > 79 characters)
+  E501 line too long (82 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (82 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (86 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (85 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (106 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (84 > 79 characters)
+  E501 line too long (92 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (80 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (87 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (98 > 79 characters)
+  E501 line too long (95 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (88 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+
+Linting src\tdd_workflow\tdd_workflow_state.py...
+Found 14 issues:
+  F401 'dataclasses.dataclass' imported but unused
+  F401 'dataclasses.field' imported but unused
+  F401 'typing.Optional' imported but unused
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (85 > 79 characters)
+  E501 line too long (93 > 79 characters)
+  E501 line too long (100 > 79 characters)
+  E501 line too long (94 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (90 > 79 characters)
+  E501 line too long (92 > 79 characters)
+  W293 blank line contains whitespace
+
+Linting src\tdd_workflow\__init__.py...
+No issues found.
+
+Linting tests\test_analyst_agent.py...
+Found 24 issues:
+  F401 'langchain_core.messages.HumanMessage' imported but unused
+  F401 'langchain_core.messages.AIMessage' imported but unused
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (90 > 79 characters)
+  E501 line too long (83 > 79 characters)
+  E501 line too long (96 > 79 characters)
+  E501 line too long (81 > 79 characters)
+  E501 line too long (98 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (84 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (84 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (83 > 79 characters)
+  W293 blank line contains whitespace
+
+Linting tests\test_implementation_integration.py...
+Found 62 issues:
+  F401 'os' imported but unused
+  F401 'src.tdd_workflow.tdd_workflow_state.TDDWorkflowState' imported but unused
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+  E501 line too long (80 > 79 characters)
+  E501 line too long (91 > 79 characters)
+  E501 line too long (104 > 79 characters)
+  E501 line too long (89 > 79 characters)
+  E501 line too long (106 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (83 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (83 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (82 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W291 trailing whitespace
+  W291 trailing whitespace
+  E501 line too long (108 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (87 > 79 characters)
+  E501 line too long (80 > 79 characters)
+  E501 line too long (88 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (80 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (94 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W291 trailing whitespace
+  W291 trailing whitespace
+  W291 trailing whitespace
+  W291 trailing whitespace
+  W291 trailing whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (82 > 79 characters)
+
+Linting tests\test_integration.py...
+Found 60 issues:
+  F401 'tdd_workflow.tdd_workflow_state.TDDWorkflowState' imported but unused
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+  E501 line too long (129 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  F841 local variable 'current_scenario' is assigned to but never used
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (83 > 79 characters)
+  E501 line too long (84 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (91 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (87 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W291 trailing whitespace
+  W291 trailing whitespace
+  E501 line too long (104 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (83 > 79 characters)
+  E501 line too long (84 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W291 trailing whitespace
+  W291 trailing whitespace
+  W291 trailing whitespace
+  W291 trailing whitespace
+  W291 trailing whitespace
+  W291 trailing whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+
+Linting tests\test_linter.py...
+Found 26 issues:
+  E501 line too long (89 > 79 characters)
+  E402 module level import not at top of file
+  E501 line too long (81 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (82 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (96 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  F841 local variable 'all_passed' is assigned to but never used
+  W293 blank line contains whitespace
+  E501 line too long (88 > 79 characters)
+  E501 line too long (123 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (86 > 79 characters)
+  E501 line too long (85 > 79 characters)
+  E501 line too long (81 > 79 characters)
+  E501 line too long (86 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (83 > 79 characters)
+  E501 line too long (97 > 79 characters)
+
+Linting tests\test_po_agent.py...
+Found 19 issues:
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (125 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (80 > 79 characters)
+  E501 line too long (92 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+
+Linting tests\test_prompt_loading.py...
+Found 18 issues:
+  E501 line too long (82 > 79 characters)
+  E402 module level import not at top of file
+  E402 module level import not at top of file
+  E402 module level import not at top of file
+  E402 module level import not at top of file
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+  E501 line too long (96 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (88 > 79 characters)
+  W293 blank line contains whitespace
+  E501 line too long (105 > 79 characters)
+  E501 line too long (97 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E305 expected 2 blank lines after class or function definition, found 1
+
+Linting tests\test_tdd_workflow_graph.py...
+Found 21 issues:
+  E302 expected 2 blank lines, found 1
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (81 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (81 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  E501 line too long (94 > 79 characters)
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+  W293 blank line contains whitespace
+
+Linting tests\__init__.py...
+No issues found.
+
+
+===== Linting Summary =====
+Total files checked: 24
+Files with issues: 20
+Total issues found: 526

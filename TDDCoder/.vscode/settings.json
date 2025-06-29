@@ -1,6 +1,7 @@
 {
+    "debug.terminal.clearBeforeReusing": true,
     "python.testing.pytestArgs": [
-        "src"
+        "tests"
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true

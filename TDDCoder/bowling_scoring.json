@@ -1,0 +1,12 @@
+{
+  "user_story": {
+    "description": "As a bowling player, I want a system that can calculate my bowling score accurately according to the official rules, so that I can track my performance during games."
+  },
+  "scenarios": [
+    "Feature: Bowling Score Calculation\n  Scenario: All Zeros\n    Given a new bowling game\n    When I roll all zeros\n    Then my total score should be 0",
+    "Feature: Bowling Score Calculation\n  Scenario: All Ones\n    Given a new bowling game\n    When I roll all ones\n    Then my total score should be 20",
+    "Feature: Bowling Score Calculation\n  Scenario: One Spare\n    Given a new bowling game\n    When I roll a spare followed by a 3\n    Then the score for the spare frame should be 13",
+    "Feature: Bowling Score Calculation\n  Scenario: One Strike\n    Given a new bowling game\n    When I roll a strike followed by 3 and 4\n    Then the score for the strike frame should be 17",
+    "Feature: Bowling Score Calculation\n  Scenario: Perfect Game\n    Given a new bowling game\n    When I roll 12 strikes\n    Then my total score should be 300"
+  ]
+}
