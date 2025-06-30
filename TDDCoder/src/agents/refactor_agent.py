@@ -48,7 +48,7 @@ class RefactorAgent:
         return ""
         
     @tool
-    def verify_refactored_code(self, code: str, test: str) -> dict[str, any]:
+    def verify_refactored_code(self, code: str, test: str) -> dict[str, str]:
         """Verify that the refactored code still passes the test"""
         # Implementation would actually run the test against the refactored code
         # For now, we'll return a placeholder

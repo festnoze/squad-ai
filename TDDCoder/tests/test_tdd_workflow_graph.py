@@ -2,7 +2,7 @@ import pytest
 from unittest.mock import MagicMock, patch
 from tdd_workflow.tdd_workflow_graph import TDDWorkflowGraph
 from tdd_workflow.tdd_workflow_state import TDDWorkflowState
-
+from langgraph.graph import END
 class TestTDDWorkflowGraph:
     
     @pytest.fixture
@@ -12,44 +12,42 @@ class TestTDDWorkflowGraph:
         return mock_llm
     
     @pytest.fixture
-    def workflow_graph(self, mock_llm):
+    def workflow_graph(self, mock_llm) -> TDDWorkflowGraph:
         """Create a TDD workflow graph with mock agents"""
-        with patch('tdd_workflow.tdd_workflow_graph.POAgent'), \
-             patch('tdd_workflow.tdd_workflow_graph.QAAgent'), \
-             patch('tdd_workflow.tdd_workflow_graph.TestAgent'), \
-             patch('tdd_workflow.tdd_workflow_graph.DevAgent'), \
-             patch('tdd_workflow.tdd_workflow_graph.RefactorAgent'):
+        with patch('agents.analyst_agent.AnalystAgent'), \
+             patch('agents.unit_test_agent.UnitTestAgent'), \
+             patch('agents.dev_agent.DevAgent'), \
+             patch('agents.refactor_agent.RefactorAgent'):
             graph = TDDWorkflowGraph(mock_llm)
             return graph
     
-    def test_workflow_initialization(self, workflow_graph):
+    def test_workflow_initialization(self, workflow_graph: TDDWorkflowGraph):
         """Test that the workflow graph initializes correctly"""
         assert workflow_graph is not None
         assert hasattr(workflow_graph, 'workflow')
-        assert hasattr(workflow_graph, 'po_agent')
-        assert hasattr(workflow_graph, 'qa_agent')
+        assert hasattr(workflow_graph, 'analyst_agent')
         assert hasattr(workflow_graph, 'test_agent')
         assert hasattr(workflow_graph, 'dev_agent')
         assert hasattr(workflow_graph, 'refactor_agent')
     
-    def test_test_agent_router_with_remaining_scenarios(self, workflow_graph):
+    def test_test_agent_router_with_remaining_scenarios(self, workflow_graph: TDDWorkflowGraph):
         """Test the test agent router with remaining scenarios"""
         state = TDDWorkflowState()
         state.remaining_scenarios = ["Scenario 1"]
         
         result = workflow_graph._test_agent_router(state)
-        assert result == "dev_agent"
+        assert result == "analyst_agent"
     
-    def test_test_agent_router_without_remaining_scenarios(self, workflow_graph):
+    def test_agent_router_without_remaining_scenarios(self, workflow_graph: TDDWorkflowGraph):
         """Test the test agent router without remaining scenarios"""
         state = TDDWorkflowState()
         state.remaining_scenarios = []
         
         result = workflow_graph._test_agent_router(state)
-        assert result == "end"
+        assert result == END
     
     @patch('tdd_workflow.tdd_workflow_graph.StateGraph')
-    def test_create_graph(self, mock_state_graph, workflow_graph):
+    def test_create_graph(self, mock_state_graph, workflow_graph: TDDWorkflowGraph):
         """Test the create_graph method"""
         # Reset the mock to clear any previous calls
         mock_state_graph.reset_mock()
@@ -64,22 +62,23 @@ class TestTDDWorkflowGraph:
         mock_instance = mock_state_graph.return_value
         
         # Verify that nodes were added for each agent
-        assert mock_instance.add_node.call_count >= 5  # One for each agent
+        assert mock_instance.add_node.call_count == 4  # One for each agent
         
         # Verify that edges were added
-        assert mock_instance.add_edge.call_count >= 4  # At least one edge for each transition
+        assert mock_instance.add_edge.call_count == 0  # At least one edge for each transition
         
         # Verify that conditional edges were added for the test agent
-        mock_instance.add_conditional_edges.assert_called_once()
+        assert mock_instance.add_conditional_edges.call_count == 4
         
         # Verify that the entry point was set
-        mock_instance.set_entry_point.assert_called_once_with("po_agent")
+        mock_instance.set_entry_point.assert_called_once_with("analyst_agent")
     
-    @patch.object(TDDWorkflowGraph, 'run')
-    def test_run_with_user_request(self, mock_run, workflow_graph):
+    @pytest.mark.asyncio
+    @patch.object(TDDWorkflowGraph, 'run_async')
+    async def test_run_with_user_request(self, mock_run, workflow_graph: TDDWorkflowGraph):
         """Test the run method with a user request"""
         user_request = "I need a login system"
-        workflow_graph.run(user_request)
+        await workflow_graph.run_async(user_request)
         
         # Verify that the run method was called with the correct arguments
         mock_run.assert_called_once()

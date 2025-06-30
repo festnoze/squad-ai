@@ -1,6 +1,6 @@
 {
   "user_story": {
-    "description": "As a bowling player, I want a system that can calculate my bowling score accurately according to the official rules, so that I can track my performance during games."
+    "description": "As a bowling player, I want a system that can calculate a bowling score accurately according to the official rules, so that I can track my performance during games.\\nThe game rules are as follow:\\nThe game consists of 10 frames. In each frame the player has two rolls to knock down 10 pins. The score for the frame is the total number of pins knocked down, plus bonuses for strikes and spares.\\n\\nA spare is when the player knocks down all 10 pins in two rolls. The bonus for that frame is the number of pins knocked down by the next roll.\\n\\nA strike is when the player knocks down all 10 pins on his first roll. The frame is then completed with a single roll. The bonus for that frame is the value of the next two rolls.\\n\\nIn the tenth frame a player who rolls a spare or strike is allowed to roll the extra balls to complete the frame. However no more than three balls can be rolled in tenth frame."
   },
   "scenarios": [
     "Feature: Bowling Score Calculation\n  Scenario: All Zeros\n    Given a new bowling game\n    When I roll all zeros\n    Then my total score should be 0",

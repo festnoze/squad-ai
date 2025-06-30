@@ -3,7 +3,7 @@
 from llms.langchain_adapter_type import LangChainAdapterType
 
 class LlmInfo:
-    def __init__(self, type:LangChainAdapterType, model:str, timeout:int, temperature:float, is_chat_model:bool = True, is_reasoning_model:bool = False, api_key:str = None, extra_params: dict[str, any] = {}):
+    def __init__(self, type:LangChainAdapterType, model:str, timeout:int, temperature:float, is_chat_model:bool = True, is_reasoning_model:bool = False, api_key:str = None, extra_params: dict[str, str] = {}):
         self.type = type
         self.model = model
         self.timeout = timeout

@@ -5,7 +5,7 @@ from langchain.tools import tool
 logger = logging.getLogger(__name__)
 
 @tool
-def run_linter(file_path: str) -> dict[str, any]:
+def run_linter(file_path: str) -> dict[str, str]:
     """
     Run a Python linter (flake8) on the specified file or directory.
     
@@ -52,7 +52,7 @@ def run_linter(file_path: str) -> dict[str, any]:
         }
 
 @tool
-def run_tests(test_path: str | None = None, test_name: str | None = None) -> dict[str, any]:
+def run_tests(test_path: str | None = None, test_name: str | None = None) -> dict[str, str]:
     """
     Run pytest tests on the specified path or test name.
     

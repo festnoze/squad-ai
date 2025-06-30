@@ -52,7 +52,7 @@ Use the provided tools to create Gherkin scenarios and identify edge cases.
 """
     
     @tool
-    def create_gherkin_scenarios(self, user_story: dict[str, any]) -> list[str]:
+    def create_gherkin_scenarios(self, user_story: dict[str, str]) -> list[str]:
         """Create Gherkin scenarios from the user story"""
         # Implementation would use the LLM to create Gherkin scenarios
         # For now, we'll return placeholders
@@ -74,7 +74,7 @@ Use the provided tools to create Gherkin scenarios and identify edge cases.
         ]
     
     @tool
-    def identify_edge_cases(self, user_story: dict[str, any]) -> list[str]:
+    def identify_edge_cases(self, user_story: dict[str, str]) -> list[str]:
         """Identify edge cases for the user story"""
         # Implementation would use the LLM to identify edge cases
         # For now, we'll return placeholders

@@ -43,7 +43,7 @@ class LangChainFactory():
         return llm
     
     @staticmethod
-    def create_llm(adapter_type: LangChainAdapterType, llm_model_name: str, timeout_seconds: int = 50, temperature: float = 0.1, inference_provider_api_key: str = None, extra_body_dict: dict[str, any] = {}) -> Runnable:
+    def create_llm(adapter_type: LangChainAdapterType, llm_model_name: str, timeout_seconds: int = 50, temperature: float = 0.1, inference_provider_api_key: str = None, extra_body_dict: dict[str, str] = {}) -> Runnable:
         llm: Runnable = None
         if adapter_type == LangChainAdapterType.OpenAI:
             if not inference_provider_api_key: 
@@ -93,9 +93,9 @@ class LangChainFactory():
         )
     
     @staticmethod
-    def create_inference_provider_generic_openai_llm(llm_model_name: str, inference_provider_base_url:str, inference_provider_api_key: str, timeout_seconds: int = 50, temperature:float = 0.1, extra_body_dict: dict[str, any] = {}) -> BaseChatModel:
+    def create_inference_provider_generic_openai_llm(llm_model_name: str, inference_provider_base_url:str, inference_provider_api_key: str, timeout_seconds: int = 50, temperature:float = 0.1, extra_body_dict: dict[str, str] = {}) -> BaseChatModel:
         from langchain_openai import ChatOpenAI
-        # base_model_kwargs: dict[str, any] = {
+        # base_model_kwargs: dict[str, str] = {
         #     "headers": {
         #         "HTTP-Referer": "OUR_SITE_URL",
         #         "X-Title": "OUR_SITE_NAME"

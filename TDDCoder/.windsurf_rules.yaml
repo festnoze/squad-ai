@@ -1,0 +1,21 @@
+# Windsurf rules configuration
+# These rules guide the coding and testing practices for this project.
+
+# Typing rules
+typing:
+  # Prefer using built-in generics introduced by PEP 585 (list, dict, tuple, etc.)
+  # and the builtin ``any`` instead of ``typing.Any`` unless Pydantic requires the
+  # legacy ``typing`` versions for proper schema generation.
+  prefer_builtin_generics: true
+  allow_typing_any_only_for_pydantic: true
+
+# Testing rules
+testing:
+  # All tests must be executed with the project's virtual environment Python
+  # interpreter to ensure dependency isolation.
+  always_use_venv: true
+  venv_python: ".venv/Scripts/python"
+
+  # Do not use exotic test marks like @pytest.mark.integration; stick to standard pytest conventions only.
+  forbid_exotic_pytest_marks: true
+

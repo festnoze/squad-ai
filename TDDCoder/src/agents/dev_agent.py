@@ -69,7 +69,7 @@ class DevAgent:
         """
     
     @tool
-    def verify_test_passing(self, test: str, code: str) -> dict[str, any]:
+    def verify_test_passing(self, test: str, code: str) -> dict[str, str]:
         """Verify that the implemented code passes the test"""
         # Implementation would actually run the test against the code
         # For now, we'll return a placeholder

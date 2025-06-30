@@ -1,5 +1,6 @@
 from langchain_core.messages import BaseMessage
 from pydantic import BaseModel, Field
+from typing import Any
 
 class ConceptionWorkflowState(BaseModel):
     """State for the Conception Workflow."""
@@ -7,15 +8,15 @@ class ConceptionWorkflowState(BaseModel):
     user_request: str = Field(default="", description="The original user request")
     
     # Artifacts
-    requirements: dict[str, any] = Field(
+    requirements: dict[str, Any] = Field(
         default_factory=dict,
         description="Requirements extracted from the user request"
     )
-    user_story: dict[str, any] = Field(
+    user_story: dict[str, Any] = Field(
         default_factory=dict,
         description="User story created from the requirements"
     )
-    scenarios: list[dict[str, any]] = Field(
+    scenarios: list[dict[str, Any]] = Field(
         default_factory=list,
         description="Gherkin/BDD scenarios created from the user story"
     )

@@ -93,11 +93,21 @@ class TDDWorkflowGraph:
             self.logger.error(f"Error in Test Agent: {state.error_message}")
             return END
         
-        # If we've completed the current implementation step, go back to the analyst
-        # to determine the next step
-        if state.current_step_index >= len(state.implementation_steps) - 1:
-            self.logger.info("Current implementation step complete. Going back to Analyst.")
+        # If the analyst has determined there are no more steps, go back to the analyst.
+        # The analyst will then set the 'is_implementation_complete' flag.
+        if any(state.implementation_steps) and state.current_step_index >= len(state.implementation_steps):
+            self.logger.info("All implementation steps are complete. Returning to Analyst.")
             return "analyst_agent"
+
+        # If the test agent didn't produce tests, it's an error.
+        if not state.tests:
+            state.error = True
+            state.error_message = "Test Agent failed to produce tests for the current step."
+            self.logger.error(state.error_message)
+            return END
+
+        # Otherwise, proceed to the dev agent.
+        return "dev_agent"
         
         return "dev_agent"
     
@@ -123,7 +133,7 @@ class TDDWorkflowGraph:
         self.logger.info("Refactoring complete. Going back to Analyst for next steps.")
         return "analyst_agent"
     
-    async def run_async(self, user_story_spec: str, acceptance_tests_gherkin: list[str], config: RunnableConfig = None) -> TDDWorkflowState:
+    async def run_async(self, user_story_spec: str, acceptance_tests_gherkin: list[str], project_name:str = None, config: RunnableConfig = None) -> TDDWorkflowState:
         """Run the TDD implementation workflow with the user story and acceptance tests.
         
         Args:
@@ -134,6 +144,14 @@ class TDDWorkflowGraph:
         Returns:
             The final state of the workflow
         """
+        # Initialize project
+        if not project_name:
+            project_name = "Project_" + str(uuid.uuid4())
+        import os
+
+        projects_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "projects")
+        os.makedirs(os.path.join(projects_dir, project_name), exist_ok=True)
+        
         # Initialize the state with the user story and acceptance tests
         scenarios_as_dicts = [{"description": s} for s in acceptance_tests_gherkin]
         state = TDDWorkflowState(

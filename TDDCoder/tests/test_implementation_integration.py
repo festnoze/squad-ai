@@ -5,7 +5,6 @@ from unittest.mock import MagicMock, patch
 from tdd_workflow.tdd_workflow_graph import TDDWorkflowGraph
 from tdd_workflow.tdd_workflow_state import TDDWorkflowState
 
-@pytest.mark.integration
 class TestImplementationWorkflowIntegration:
     
     @pytest.fixture

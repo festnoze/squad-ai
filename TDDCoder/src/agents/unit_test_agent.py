@@ -59,7 +59,7 @@ class UnitTestAgent:
         """
     
     @tool
-    def check_test_coverage(self, scenarios: list[str], implemented_tests: list[str]) -> dict[str, any]:
+    def check_test_coverage(self, scenarios: list[str], implemented_tests: list[str]) -> dict[str, str]:
         """Check if all scenarios are covered by tests"""
         # Implementation would use the LLM to check coverage
         # For now, we'll return a placeholder
