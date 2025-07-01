@@ -1,5 +1,5 @@
 import sys
-from chatbot import ChatbotFront
+from chatbot_front import ChatbotFront
 
 sys.tracebacklimit = 3
 
