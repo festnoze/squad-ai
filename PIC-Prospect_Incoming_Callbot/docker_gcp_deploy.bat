@@ -12,23 +12,29 @@ if defined STEP goto step%STEP%
 goto step1
 
 :step1
-echo [1] Enable Cloud Resource Manager API...
-call gcloud services enable cloudresourcemanager.googleapis.com --project=%PROJECT_ID% --quiet
+echo [1] Activate service account...
+call gcloud auth activate-service-account --key-file=service-account-1.json
 if errorlevel 1 pause
 
 :step2
-echo [2] Set project...
-call gcloud config set project %PROJECT_ID% --quiet
+echo [2] Enable Cloud Resource Manager API...
+call gcloud services enable cloudresourcemanager.googleapis.com --project=%PROJECT_ID% --quiet
 if errorlevel 1 pause
 
 :step3
-echo [3] Activate service account...
-call gcloud auth activate-service-account service-account-1@%PROJECT_ID%.iam.gserviceaccount.com --key-file=service-account-1.json
+echo [3] Set project...
+call gcloud config set project %PROJECT_ID% --quiet
 if errorlevel 1 pause
+
 
 :step4
 echo [4] Configure Docker credential helper...
 call gcloud auth configure-docker %REGION%-docker.pkg.dev --quiet
+if errorlevel 1 pause
+
+:step4b
+echo [4b] Remove old image tag from Artifact Registry…
+call gcloud artifacts docker images delete %IMAGE%:latest --delete-tags --quiet
 if errorlevel 1 pause
 
 :step5

@@ -11,6 +11,7 @@ scraped*/
 structures_descriptions*/
 .langgraph_api/
 .DS_Store
+service-account-1.json
 
 .env*
 *.db
