@@ -7,13 +7,17 @@ class AnalystAgent:
     def __init__(self, llm):
         self.logger = logging.getLogger(__name__)
         self.llm = llm
-        self.tools = [self.create_implementation_steps]
+        self.tools = [self.create_implementation_steps_tool]
 
     def load_analyst_prompt(self):
         with open("src/prompts/analyst_prompt.txt", "r") as f:
             return f.read()
 
     @tool
+    def create_implementation_steps_tool(self, user_story: str, scenarios: list[dict[str, str]]) -> list[dict[str, str]]:
+        """Analyzes the user story and BDD scenarios to create a list of implementation steps."""
+        return self.create_implementation_steps(user_story, scenarios)
+
     def create_implementation_steps(self, user_story: str, scenarios: list[dict[str, str]]) -> list[dict[str, str]]:
         """Analyzes the user story and BDD scenarios to create a list of implementation steps."""
         self.logger.info("Creating mocked implementation steps based on scenarios.")
@@ -38,7 +42,7 @@ class AnalystAgent:
                 # We are accessing the 'description' key based on the provided bowling_scoring.json.
                 state.implementation_steps = self.create_implementation_steps(
                     user_story=state.user_story.get('description', ''),
-                    scenarios=state.scenarios
+                    scenarios=state.gherkin_scenarios
                 )
 
             # Determine if the implementation is complete.

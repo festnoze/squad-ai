@@ -9,7 +9,7 @@ class TDDWorkflowState(BaseModel):
         default_factory=dict,
         description="User story from the conception workflow"
     )
-    scenarios: list[dict[str, str]] = Field(
+    gherkin_scenarios: list[dict[str, str]] = Field(
         default_factory=list,
         description="Gherkin/BDD scenarios from the conception workflow"
     )
@@ -41,8 +41,15 @@ class TDDWorkflowState(BaseModel):
         default_factory=dict,
         description="The current scenario being implemented"
     )
-    tests: str = Field(default="", description="Unit tests for the current scenario")
-    code: str = Field(default="", description="Implementation code for the current scenario")
+
+    current_agent: str = Field(default="", description="The current agent being used")
+    
+    # New granular fields expected by agents and tests
+    current_test: str = Field(default="", description="Unit test currently being implemented")
+    current_code: str = Field(default="", description="Implementation code currently being crafted")
+    implemented_tests: list[str] = Field(default_factory=list, description="All implemented tests")
+    implemented_code: dict[str, str] = Field(default_factory=dict, description="Dictionary mapping module names to implemented code snippets")
+
     refactored_code: str = Field(default="", description="Refactored code for the current scenario")
     tests_passed: bool = Field(default=False, description="Flag indicating if the tests pass")
     
@@ -55,3 +62,4 @@ class TDDWorkflowState(BaseModel):
         default_factory=list,
         description="History of the conversation"
     )
+    is_complete: bool = Field(default=False, description="Flag indicating if the workflow is complete")

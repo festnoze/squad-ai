@@ -1,30 +1,71 @@
 @echo off
 setlocal
-pushd "%~dp0"
 
-if "%~1"=="" (
-  echo Usage: %~nx0 IMAGE
-  exit /b 1
-)
-set "IMAGE=%~1"
+set PROJECT_ID=studi-com-rag-api
+set REGION=europe-west1
+set REPO=depot-docker
+set IMAGE_NAME=prospect-incoming-callbot
+set IMAGE=%REGION%-docker.pkg.dev/%PROJECT_ID%/%REPO%/%IMAGE_NAME%
+set STEP=%1
 
-echo [1/2] Pushing %IMAGE%…
-docker push %IMAGE% || goto :fail
+if defined STEP goto step%STEP%
+goto step1
 
-echo [2/2] Deploying %IMAGE% to Cloud Run…
-gcloud run deploy prospect-incoming-callbot `
-  --image %IMAGE% `
-  --region europe-west9 `
-  --platform managed `
-  --allow-unauthenticated `
-  --quiet || goto :fail
+:step1
+echo [1] Enable Cloud Resource Manager API...
+call gcloud services enable cloudresourcemanager.googleapis.com --project=%PROJECT_ID% --quiet
+if errorlevel 1 pause
 
-echo Deployment succeeded.
-goto :eof
+:step2
+echo [2] Set project...
+call gcloud config set project %PROJECT_ID% --quiet
+if errorlevel 1 pause
 
-:fail
-echo.
-echo ERROR occurred.
+:step3
+echo [3] Activate service account...
+call gcloud auth activate-service-account service-account-1@%PROJECT_ID%.iam.gserviceaccount.com --key-file=service-account-1.json
+if errorlevel 1 pause
+
+:step4
+echo [4] Configure Docker credential helper...
+call gcloud auth configure-docker %REGION%-docker.pkg.dev --quiet
+if errorlevel 1 pause
+
+:step5
+echo [5] Build image %IMAGE%...
+docker build -f Dockerfile -t %IMAGE% .
+if errorlevel 1 pause
+
+:step6
+echo [6] Push to Artifact Registry...
+docker push %IMAGE%
+if errorlevel 1 pause
+
+:step7
+echo [7] Deploy to Cloud Run...
+gcloud run deploy %IMAGE_NAME% --image %IMAGE% --platform managed --region %REGION% --allow-unauthenticated --port 8080
+if errorlevel 1 pause
+
+:step8
+echo [8] Describe service...
+gcloud run services describe %IMAGE_NAME% --platform managed --region %REGION%
+if errorlevel 1 pause
+
+:step9
+echo [9] Get service URL...
+gcloud run services describe %IMAGE_NAME% --platform managed --region %REGION% --format value(status.url)
+if errorlevel 1 pause
+
+:step10
+echo [10] Read logs...
+gcloud run logs read %IMAGE_NAME% --region %REGION%
+if errorlevel 1 pause
+
+:step11
+echo [11] Cleanup local image...
+docker rmi %IMAGE%
+if errorlevel 1 pause
+
+echo Done.
 pause
-popd
 endlocal

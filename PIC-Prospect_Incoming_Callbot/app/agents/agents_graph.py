@@ -201,7 +201,7 @@ class AgentsGraph:
         #accounts = await self.salesforce_api_client.get_persons_async()
         sf_account_info = await self.salesforce_api_client.get_person_by_phone_async(phone_number)
         if not sf_account_info:
-            sf_account_info = await self.salesforce_api_client.get_person_by_email_async("+33600000000")
+            sf_account_info = await self.salesforce_api_client.get_person_by_phone_async("+33600000000")
         leads_info = await self.salesforce_api_client.get_leads_by_details_async(phone_number)
         state['agent_scratchpad']['sf_account_info'] = sf_account_info.get('data', {}) if sf_account_info else {}
         state['agent_scratchpad']['sf_leads_info'] = leads_info[0] if leads_info else {}

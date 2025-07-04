@@ -95,6 +95,7 @@ Use the provided tools to extract requirements and create the User Story.
                         break
             
             state.user_story = user_story
+            state.current_agent = "qa_agent"
             state.chat_history.append({"role": "assistant", "content": result.get("output", "")})
             
             return state

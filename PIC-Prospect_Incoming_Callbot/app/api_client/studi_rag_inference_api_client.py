@@ -11,17 +11,17 @@ class StudiRAGInferenceApiClient:
     """
     Async client for interacting with the /rag/inference endpoints.
     """
-    def __init__(self, host_base_name: str | None = None, host_port: int | None = None, is_ssh: bool = False,
+    def __init__(self, host_base_name: str | None = None, host_port: int | None = None, is_ssh: bool | None = None,
                  connect_timeout: float = 5.0, read_timeout: float = 60.0):
         # Read host and port from environment if not provided
         self.host_base_name = host_base_name or EnvHelper.get_rag_api_host()
         self.host_port = host_port or int(EnvHelper.get_rag_api_port())
-        self.is_ssh = is_ssh
+        self.is_ssh = is_ssh or EnvHelper.get_rag_api_is_ssh()
         self.connect_timeout = connect_timeout
         self.read_timeout = read_timeout
         self.timeout = httpx.Timeout(connect=self.connect_timeout, read=self.read_timeout, write=self.read_timeout, pool=self.connect_timeout)
   
-        self.host_base_url = f"http{'s' if is_ssh else ''}://{self.host_base_name}:{self.host_port}"
+        self.host_base_url = f"http{'s' if self.is_ssh else ''}://{self.host_base_name}:{self.host_port}"
         self.client = httpx.AsyncClient(
                 base_url=self.host_base_url,
                 timeout=self.timeout
@@ -35,8 +35,8 @@ class StudiRAGInferenceApiClient:
             assert resp.status_code == 200
             assert resp.content == b'"pong"'
             return True
-        except httpx.ConnectError:
-            raise RuntimeError(f"Cannot connect to RAG inference server at {self.host_base_url}")
+        except httpx.ConnectError as ex:
+            raise RuntimeError(f"Cannot connect to RAG inference server at {self.host_base_url}: {str(ex)}") from ex
 
     async def reinitialize_async(self) -> None:
         """POST /rag/inference/reinitialize: Reinitialize the service."""

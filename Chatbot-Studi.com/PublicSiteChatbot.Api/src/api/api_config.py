@@ -143,8 +143,13 @@ class ApiConfig:
                     content={"status": "error", "detail": str(exc)}
                 )    
                 
+        @app.get("/")
+        def test_connect() -> str:
+            logger.info("Test connect request received.")
+            return "Test API connection : success."
+
         @app.get("/ping")
-        async def ping() -> str:
+        def ping() -> str:
             logger.info("Ping request received.")
             return "pong"
                 

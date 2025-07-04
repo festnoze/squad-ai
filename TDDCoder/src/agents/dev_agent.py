@@ -3,6 +3,8 @@ import os
 from langchain.tools import tool
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+#
+from tdd_workflow.tdd_workflow_state import TDDWorkflowState
 from agents.shared_tools import run_linter, run_tests
 
 class DevAgent:
@@ -78,7 +80,7 @@ class DevAgent:
             "error": None
         }
     
-    def run(self, state):
+    def run(self, state: TDDWorkflowState):
         """Run the Dev Agent to implement code"""
         try:
             # Extract the current test from the state

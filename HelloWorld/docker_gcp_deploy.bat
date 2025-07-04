@@ -4,68 +4,79 @@ setlocal
 set PROJECT_ID=studi-com-rag-api
 set REGION=europe-west1
 set REPO=depot-docker
-set IMAGE_NAME=public-website-rag-api
+set IMAGE_NAME=hello-world
 set IMAGE=%REGION%-docker.pkg.dev/%PROJECT_ID%/%REPO%/%IMAGE_NAME%
 set STEP=%1
 
 if defined STEP goto step%STEP%
+
 goto step1
 
 :step1
-echo [1] Enable Cloud Resource Manager API...
+echo [1]
 call gcloud services enable cloudresourcemanager.googleapis.com --project=%PROJECT_ID% --quiet
 if errorlevel 1 pause
+goto end
 
 :step2
-echo [2] Set project...
+echo [2]
 call gcloud config set project %PROJECT_ID% --quiet
 if errorlevel 1 pause
+goto end
 
 :step3
-echo [3] Activate service account...
+echo [3]
 call gcloud auth activate-service-account service-account-1@%PROJECT_ID%.iam.gserviceaccount.com --key-file=service-account-1.json
 if errorlevel 1 pause
+goto end
 
 :step4
-echo [4] Configure Docker credential helper...
+echo [4]
 call gcloud auth configure-docker %REGION%-docker.pkg.dev --quiet
 if errorlevel 1 pause
+goto end
 
 :step5
-echo [5] Build image %IMAGE%...
-docker build -f Dockerfile.GCP -t %IMAGE% .
+echo [5]
+docker build -t %IMAGE% .
 if errorlevel 1 pause
+goto end
 
 :step6
-echo [6] Push to Artifact Registry...
+echo [6]
 docker push %IMAGE%
 if errorlevel 1 pause
+goto end
 
 :step7
-echo [7] Deploy to Cloud Run...
-gcloud run deploy %IMAGE_NAME% --image %IMAGE% --platform managed --region %REGION% --allow-unauthenticated --port 8080
+echo [7]
+gcloud run deploy hello-world --image %IMAGE% --platform managed --region %REGION% --allow-unauthenticated --port 8080
 if errorlevel 1 pause
+goto end
 
 :step8
-echo [8] Describe service...
-gcloud run services describe %IMAGE_NAME% --platform managed --region %REGION%
+echo [8]
+gcloud run services describe hello-world --platform managed --region %REGION%
 if errorlevel 1 pause
+goto end
 
 :step9
-echo [9] Get service URL...
-gcloud run services describe %IMAGE_NAME% --platform managed --region %REGION% --format value(status.url)
+echo [9]
+gcloud run services describe hello-world --platform managed --region %REGION% --format value(status.url)
 if errorlevel 1 pause
+goto end
 
 :step10
-echo [10] Read logs...
-gcloud run logs read %IMAGE_NAME% --region %REGION%
+echo [10]
+gcloud run logs read hello-world --region %REGION%
 if errorlevel 1 pause
+goto end
 
 :step11
-echo [11] Cleanup local image...
+echo [11]
 docker rmi %IMAGE%
 if errorlevel 1 pause
+goto end
 
-echo Done.
-pause
+:end
 endlocal

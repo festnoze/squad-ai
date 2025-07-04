@@ -29,6 +29,11 @@ class EnvHelper:
     def get_rag_api_port():
         port_str = EnvHelper.get_env_variable_value_by_name('RAG_API_PORT')
         return int(port_str)
+    
+    @staticmethod
+    def get_rag_api_is_ssh():
+        value = EnvHelper.get_env_variable_value_by_name('RAG_API_IS_SSH')
+        return value.lower() == 'true'
 
     @staticmethod
     def get_do_audio_preprocessing():

@@ -3,6 +3,8 @@ import os
 from langchain.tools import tool
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+#
+from tdd_workflow.tdd_workflow_state import TDDWorkflowState
 from agents.shared_tools import run_linter, run_tests
 
 class RefactorAgent:
@@ -62,7 +64,7 @@ class RefactorAgent:
             ]
         }
         
-    def run(self, state):
+    def run(self, state: TDDWorkflowState):
         """Run the Refactor Agent to improve code quality"""
         try:
             # Extract the current code and test from the state
@@ -91,7 +93,7 @@ class RefactorAgent:
             state.tests_passed = verification.get("passing", False)
             
             # Move back to the test agent to continue the TDD cycle
-            state.current_agent = "test_agent"
+            state.current_agent = "unit_test_agent"
             
             return state
         except Exception as e:

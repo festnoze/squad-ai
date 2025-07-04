@@ -14,8 +14,9 @@ ENV HOST_URI=0.0.0.0
 ENV PORT=8080
 
 # Définit le port et l'adresse de l'API RAG
-ENV RAG_API_HOST=rag_studi_public_website_api
-ENV RAG_API_PORT=8281
+ENV RAG_API_IS_SSH=true
+ENV RAG_API_HOST=public-website-rag-api-985511623262.europe-west1.run.app
+ENV RAG_API_PORT=443
 
 # Copie les packages wheel précompilés dans le container
 #COPY wheels/ /wheels/

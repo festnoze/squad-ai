@@ -20,7 +20,7 @@ def initial_state() -> TDDWorkflowState:
         user_story={
             'description': 'A user wants to calculate their bowling score.'
         },
-        scenarios=[
+        gherkin_scenarios=[
             {'title': 'All Zeros', 'given': 'A new game', 'when': 'All rolls are 0', 'then': 'The score should be 0'},
             {'title': 'All Ones', 'given': 'A new game', 'when': 'All rolls are 1', 'then': 'The score should be 20'}
         ]

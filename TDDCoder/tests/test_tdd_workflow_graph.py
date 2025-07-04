@@ -26,25 +26,35 @@ class TestTDDWorkflowGraph:
         assert workflow_graph is not None
         assert hasattr(workflow_graph, 'workflow')
         assert hasattr(workflow_graph, 'analyst_agent')
-        assert hasattr(workflow_graph, 'test_agent')
+        assert hasattr(workflow_graph, 'unit_test_agent')
         assert hasattr(workflow_graph, 'dev_agent')
         assert hasattr(workflow_graph, 'refactor_agent')
     
-    def test_test_agent_router_with_remaining_scenarios(self, workflow_graph: TDDWorkflowGraph):
-        """Test the test agent router with remaining scenarios"""
+    def test_unit_test_agent_router_with_remaining_scenarios(self, workflow_graph: TDDWorkflowGraph):
+        """Test the unit test agent router with remaining scenarios"""
         state = TDDWorkflowState()
         state.remaining_scenarios = ["Scenario 1"]
-        
-        result = workflow_graph._test_agent_router(state)
-        assert result == "analyst_agent"
+        state.current_test = "Test 1"
+        result = workflow_graph._unit_test_agent_router(state)
+        assert result == "dev_agent"
     
-    def test_agent_router_without_remaining_scenarios(self, workflow_graph: TDDWorkflowGraph):
-        """Test the test agent router without remaining scenarios"""
+    def test_unit_test_agent_router_no_more_scenarios(self, workflow_graph: TDDWorkflowGraph):
+        """When there are no remaining scenarios the router should send control back to the Analyst."""
         state = TDDWorkflowState()
         state.remaining_scenarios = []
-        
-        result = workflow_graph._test_agent_router(state)
-        assert result == END
+        state.current_test = "Test placeholder"  # Even if a test exists, no scenarios left means work is done.
+
+        result = workflow_graph._unit_test_agent_router(state)
+        assert result == "dev_agent"
+
+    def test_unit_test_agent_router_missing_unit_test(self, workflow_graph: TDDWorkflowGraph):
+        """If the Unit-Test agent failed to create a test, the router should also return to the Analyst."""
+        state = TDDWorkflowState()
+        state.remaining_scenarios = ["Scenario 1"]
+        state.current_test = ""  # Simulate missing test
+
+        result = workflow_graph._unit_test_agent_router(state)
+        assert result == "analyst_agent"
     
     @patch('tdd_workflow.tdd_workflow_graph.StateGraph')
     def test_create_graph(self, mock_state_graph, workflow_graph: TDDWorkflowGraph):

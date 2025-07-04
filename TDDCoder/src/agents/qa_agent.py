@@ -2,6 +2,8 @@ import logging
 from langchain.tools import tool
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+#
+from tdd_workflow.tdd_workflow_state import TDDWorkflowState
 
 class QAAgent:
     def __init__(self, llm):
@@ -95,7 +97,7 @@ Use the provided tools to create Gherkin scenarios and identify edge cases.
             """
         ]
     
-    def run(self, state):
+    def run(self, state: TDDWorkflowState):
         """Run the QA Agent to create Gherkin scenarios"""
         try:
             # Extract the user story from the state
@@ -115,7 +117,7 @@ Use the provided tools to create Gherkin scenarios and identify edge cases.
             
             state.gherkin_scenarios = all_scenarios
             state.remaining_scenarios = all_scenarios.copy()  # Copy for tracking
-            state.current_agent = "test_agent"  # Move to the next agent
+            state.current_agent = "unit_test_agent"  # Move to the next agent
             
             return state
         except Exception as e:

@@ -43,7 +43,7 @@ class TestImplementationWorkflowIntegration:
                 current_step = state.implementation_steps[state.current_step_index]
                 
                 if current_step["id"] == "step1":
-                    state.tests = """
+                    state.current_test = """
                     import pytest
 
                     def test_successful_login():
@@ -58,7 +58,7 @@ class TestImplementationWorkflowIntegration:
                         assert result.user_id == user.id
                     """
                 elif current_step["id"] == "step2":
-                    state.tests = """
+                    state.current_test = """
                     import pytest
 
                     def test_failed_login():
@@ -87,7 +87,7 @@ class TestImplementationWorkflowIntegration:
                 current_step = state.implementation_steps[state.current_step_index]
                 
                 if current_step["id"] == "step1" or current_step["id"] == "step2":
-                    state.code = """
+                    state.current_code = """
                     class User:
                         def __init__(self, user_id, username, password):
                             self.id = user_id
@@ -120,7 +120,7 @@ class TestImplementationWorkflowIntegration:
                     """
                 
                 # Set tests_passed to True to simulate successful implementation
-                state.tests_passed = True
+                state.current_test_passed = True
                 
                 return state
             
@@ -133,7 +133,7 @@ class TestImplementationWorkflowIntegration:
         with patch('agents.refactor_agent.RefactorAgent.run') as mock_run:
             def side_effect(state):
                 # Refactor the code
-                state.refactored_code = state.code  # In this mock, we don't actually refactor
+                state.refactored_code = state.current_code  # In this mock, we don't actually refactor
                 
                 # Increment step index to move to next step
                 state.current_step_index += 1
@@ -187,9 +187,6 @@ class TestImplementationWorkflowIntegration:
     
     async def test_implementation_workflow_integration(self, mock_llm, mock_conception_output):
         """Test the full implementation workflow integration."""
-        # Initialize the workflow graph
-        workflow = TDDWorkflowGraph(mock_llm)
-        
         # Extract user story and acceptance tests from mock conception output
         with open(mock_conception_output, 'r') as f:
             conception_data = json.load(f)
@@ -198,6 +195,7 @@ class TestImplementationWorkflowIntegration:
         acceptance_tests_gherkin = conception_data.get("scenarios", [])
         
         # Run the workflow with the user story and acceptance tests
+        workflow = TDDWorkflowGraph(mock_llm)
         result = await workflow.run_async(user_story_spec, acceptance_tests_gherkin)
         
         # Verify that the workflow completed successfully
@@ -210,16 +208,16 @@ class TestImplementationWorkflowIntegration:
         assert "benefit" in result.user_story
         
         # Verify that scenarios were loaded
-        assert len(result.scenarios) > 0
+        assert len(result.gherkin_scenarios) > 0
         
         # Verify that implementation steps were created
         assert len(result.implementation_steps) > 0
         
         # Verify that tests were implemented
-        assert result.tests is not None and result.tests != ""
+        assert result.current_test is not None and result.current_test != ""
         
         # Verify that code was implemented
-        assert result.code is not None and result.code != ""
+        assert result.current_code is not None and result.current_code != ""
         
         # Verify that code was refactored
         assert result.refactored_code is not None and result.refactored_code != ""

@@ -1,5 +1,5 @@
 import logging
-
+import uuid
 from langchain_core.runnables import RunnableConfig
 from langgraph.graph import StateGraph, END
 
@@ -17,7 +17,7 @@ class TDDWorkflowGraph:
         
         # Initialize implementation agents
         self.analyst_agent = AnalystAgent(llm)
-        self.test_agent = UnitTestAgent(llm)
+        self.unit_test_agent = UnitTestAgent(llm)
         self.dev_agent = DevAgent(llm)
         self.refactor_agent = RefactorAgent(llm)
         
@@ -30,7 +30,7 @@ class TDDWorkflowGraph:
         
         # Add nodes for each implementation agent
         graph.add_node("analyst_agent", self.analyst_agent.run)
-        graph.add_node("test_agent", self.test_agent.run)
+        graph.add_node("unit_test_agent", self.unit_test_agent.run)
         graph.add_node("dev_agent", self.dev_agent.run)
         graph.add_node("refactor_agent", self.refactor_agent.run)
         
@@ -41,15 +41,15 @@ class TDDWorkflowGraph:
         graph.add_conditional_edges(
             "analyst_agent",
             self._analyst_agent_router,
-            {"test_agent": "test_agent", END: END}
+            {"unit_test_agent": "unit_test_agent", END: END}
         )
         
         # Test Agent -> Dev Agent (when test is written)
         # Test Agent -> Analyst Agent (to re-analyze after completing a step)
         # Test Agent -> END (if there's an error)
         graph.add_conditional_edges(
-            "test_agent",
-            self._test_agent_router,
+            "unit_test_agent",
+            self._unit_test_agent_router,
             {"dev_agent": "dev_agent", "analyst_agent": "analyst_agent", END: END}
         )
         
@@ -59,7 +59,7 @@ class TDDWorkflowGraph:
         graph.add_conditional_edges(
             "dev_agent",
             self._dev_agent_router,
-            {"refactor_agent": "refactor_agent", "test_agent": "test_agent", END: END}
+            {"refactor_agent": "refactor_agent", "unit_test_agent": "unit_test_agent", END: END}
         )
         
         # Refactor Agent -> Analyst Agent (after refactoring to determine next steps)
@@ -85,12 +85,12 @@ class TDDWorkflowGraph:
             self.logger.info("Analyst has determined that implementation is complete. Workflow complete.")
             return END
         
-        return "test_agent"
+        return "unit_test_agent"
     
-    def _test_agent_router(self, state: TDDWorkflowState) -> str:
-        """Router for the Test Agent node."""
+    def _unit_test_agent_router(self, state: TDDWorkflowState) -> str:
+        """Router for the Unit Test Agent node."""
         if state.error:
-            self.logger.error(f"Error in Test Agent: {state.error_message}")
+            self.logger.error(f"Error in Unit Test Agent: {state.error_message}")
             return END
         
         # If the analyst has determined there are no more steps, go back to the analyst.
@@ -99,16 +99,14 @@ class TDDWorkflowGraph:
             self.logger.info("All implementation steps are complete. Returning to Analyst.")
             return "analyst_agent"
 
-        # If the test agent didn't produce tests, it's an error.
-        if not state.tests:
+        # If the test agent didn't produce a current test, go back to the analyst to re-analyze.
+        if not state.current_test:
             state.error = True
             state.error_message = "Test Agent failed to produce tests for the current step."
             self.logger.error(state.error_message)
-            return END
+            return "analyst_agent"
 
         # Otherwise, proceed to the dev agent.
-        return "dev_agent"
-        
         return "dev_agent"
     
     def _dev_agent_router(self, state: TDDWorkflowState) -> str:
@@ -119,7 +117,7 @@ class TDDWorkflowGraph:
         
         if not state.tests_passed:
             self.logger.info("Tests failed. Going back to Test Agent.")
-            return "test_agent"
+            return "unit_test_agent"
         
         return "refactor_agent"
     
@@ -133,7 +131,7 @@ class TDDWorkflowGraph:
         self.logger.info("Refactoring complete. Going back to Analyst for next steps.")
         return "analyst_agent"
     
-    async def run_async(self, user_story_spec: str, acceptance_tests_gherkin: list[str], project_name:str = None, config: RunnableConfig = None) -> TDDWorkflowState:
+    async def run_async(self, user_story_spec: str, acceptance_tests_gherkin: list[str] = [], project_name:str = None, config: RunnableConfig = None) -> TDDWorkflowState:
         """Run the TDD implementation workflow with the user story and acceptance tests.
         
         Args:
@@ -144,6 +142,18 @@ class TDDWorkflowGraph:
         Returns:
             The final state of the workflow
         """
+        # Initialize project and state
+        state = self._init_state(user_story_spec, acceptance_tests_gherkin, project_name)
+        
+        # Run the workflow
+        self.logger.info("Starting TDD implementation workflow...")
+        result = await self.workflow.ainvoke(state, config)
+        self.logger.info("TDD implementation workflow completed.")
+        
+        return result
+
+    def _init_state(self, user_story_spec: str, acceptance_tests_gherkin: list[str], project_name: str | None) -> TDDWorkflowState:
+        """Initialize the TDDWorkflowState with user story and acceptance tests."""
         # Initialize project
         if not project_name:
             project_name = "Project_" + str(uuid.uuid4())
@@ -154,19 +164,25 @@ class TDDWorkflowGraph:
         
         # Initialize the state with the user story and acceptance tests
         scenarios_as_dicts = [{"description": s} for s in acceptance_tests_gherkin]
-        state = TDDWorkflowState(
+        state: TDDWorkflowState = TDDWorkflowState(
             user_story={"description": user_story_spec},
-            scenarios=scenarios_as_dicts,
+            gherkin_scenarios=scenarios_as_dicts,
             remaining_scenarios=scenarios_as_dicts.copy(),
-            # Initialize implementation steps as empty - the analyst will populate these
             implementation_steps=[],
             current_step_index=0,
-            is_implementation_complete=False
+            is_implementation_complete=False,
+            is_complete=False
         )
         
-        # Run the workflow
-        self.logger.info("Starting TDD implementation workflow...")
-        result = await self.workflow.ainvoke(state, config)
-        self.logger.info("TDD implementation workflow completed.")
+        return state
         
-        return result
+    async def run_wo_graph_async(self, user_story_spec: str, acceptance_tests_gherkin: list[str] = [], project_name: str | None = None, config: RunnableConfig = None) -> TDDWorkflowState:      
+        state: TDDWorkflowState = self._init_state(user_story_spec, acceptance_tests_gherkin, project_name)
+        while not state.is_complete:
+            state = self.analyst_agent.run(state)
+            state = self.unit_test_agent.run(state)
+            state = self.dev_agent.run(state)
+            state = self.refactor_agent.run(state)
+        return state
+        
+        

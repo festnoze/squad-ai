@@ -14,6 +14,7 @@ ENV HOST_URI=0.0.0.0
 ENV PORT=8344
 
 # Définit le port et l'adresse de l'API RAG
+ENV RAG_API_IS_SSH=false
 ENV RAG_API_HOST=rag_studi_public_website_api
 ENV RAG_API_PORT=8281
 
