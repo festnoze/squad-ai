@@ -95,7 +95,7 @@ async def rag_query_stream_async(user_query_request_model: QueryAskingRequestMod
     
 
 @inference_router.post("/conversation/ask-question/phone/stream")
-async def rag_query_stream_async(user_query_request_model: QueryAskingRequestModel):
+async def rag_query_by_phone_stream_async(user_query_request_model: QueryAskingRequestModel):
     try:
         conversation = await AvailableService.prepare_conversation_for_user_query_answer_async(
                                                     user_query_request_model.conversation_id,

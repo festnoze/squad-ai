@@ -32,10 +32,10 @@ echo [4] Configure Docker credential helper...
 call gcloud auth configure-docker %REGION%-docker.pkg.dev --quiet
 if errorlevel 1 pause
 
-:step4b
-echo [4b] Remove old image tag from Artifact Registry…
-call gcloud artifacts docker images delete %IMAGE%:latest --delete-tags --quiet
-if errorlevel 1 pause
+@REM :step4b
+@REM echo [4b] Remove old image tag from Artifact Registry…
+@REM call gcloud artifacts docker images delete %IMAGE%:latest --delete-tags --quiet
+@REM if errorlevel 1 pause
 
 :step5
 echo [5] Build image %IMAGE%...

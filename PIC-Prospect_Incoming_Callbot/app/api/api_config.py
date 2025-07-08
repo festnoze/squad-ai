@@ -1,4 +1,7 @@
+
+import os
 import logging
+from dotenv import load_dotenv
 from starlette.responses import Response as StarletteResponse
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -22,6 +25,7 @@ class ApiConfig:
                 app.state.shutdown()
 
     # Configure the FastAPI app
+    @staticmethod
     def create_app() -> FastAPI:
         app = FastAPI(
             title="Prospect Incoming Callbot API",
@@ -31,7 +35,6 @@ class ApiConfig:
         )
         app.state.shutdown = lambda: None
         
-        from dotenv import load_dotenv
         load_dotenv()
         EnvHelper._init_load_env()
         
@@ -45,38 +48,8 @@ class ApiConfig:
             allow_headers=["*"],
         )
 
-        # Configure logging: set level and clear existing handlers then create new ones.
-        num_log_level = logging.getLogger("uvicorn.error").level
-        root_logger = logging.getLogger()
-        if root_logger.hasHandlers():
-            for handler in list(root_logger.handlers):
-                root_logger.removeHandler(handler)
-                handler.close()
-
-        # Set root logger to a permissive level; handlers will filter.
-        root_logger.setLevel(logging.DEBUG)
-
-        # Create a formatter
-        formatter = logging.Formatter(
-            "%(levelname)s (%(name)s ln.%(lineno)d) %(message)s"
-        )
-
-        # Configure file handler to log at INFO level
-        file_handler = logging.FileHandler(
-            f"outputs/logs/app.{datetime.now().strftime('%Y-%m-%d.%H%M%S')}.log"
-        )
-        file_handler.setLevel(logging.INFO)
-        file_handler.setFormatter(formatter)
-        root_logger.addHandler(file_handler)
-
-        # Configure stream handler to use the level from environment settings
-        stream_handler = logging.StreamHandler()
-        stream_handler.setLevel(num_log_level)
-        stream_handler.setFormatter(formatter)
-        root_logger.addHandler(stream_handler)
-
-        logger = logging.getLogger(__name__)
-
+        # Configure loggings: one in *.log file, one in console
+        logger = ApiConfig.configure_logging()
 
         # Initialize PhoneCallWebsocketEventsHandlerFactory
         endpoints.phone_call_websocket_events_handler_factory = PhoneCallWebsocketEventsHandlerFactory()
@@ -127,11 +100,6 @@ class ApiConfig:
                     content={"status": "error", "detail": str(exc)}
                 )    
                 
-        @app.get("/ping")
-        async def ping() -> str:
-            logger.error("Ping request received.")
-            return "pong"
-                
         async def startup_event():
             """Handle application startup."""
             logger.error("Application startup.")
@@ -144,3 +112,38 @@ class ApiConfig:
         app.add_event_handler("shutdown", shutdown_event)
 
         return app
+
+    @staticmethod
+    def configure_logging():
+        root_logger = logging.getLogger()
+        if root_logger.hasHandlers():
+            for handler in list(root_logger.handlers):
+                root_logger.removeHandler(handler)
+                handler.close()
+
+        # Set root logger to a permissive level; handlers will filter.
+        root_logger.setLevel(logging.DEBUG)
+
+        # Create a formatter
+        formatter = logging.Formatter(
+            "%(levelname)s - %(message)s [%(name)s ln.%(lineno)d] %(asctime)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+
+        # Configure file handler to log at INFO level
+        file_handler = logging.FileHandler(
+            f"outputs/logs/app.{datetime.now().strftime('%Y-%m-%d.%H%M%S')}.log"
+        )
+        file_handler.setLevel(logging.INFO)
+        file_handler.setFormatter(formatter)
+        root_logger.addHandler(file_handler)
+
+        # Configure stream handler to use the level from environment settings
+        stream_handler = logging.StreamHandler()        
+        selected_log_level = logging.getLogger("uvicorn.error").level
+        stream_handler.setLevel(selected_log_level)
+        stream_handler.setFormatter(formatter)
+        root_logger.addHandler(stream_handler)
+
+        logger = logging.getLogger(__name__)
+        return logger

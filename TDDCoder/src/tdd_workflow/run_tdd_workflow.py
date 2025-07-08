@@ -59,6 +59,7 @@ def main():
         
         # Run the workflow asynchronously
         result = asyncio.run(tdd_workflow.run_wo_graph_async(user_story_spec, acceptance_tests_gherkin))
+        #result = asyncio.run(tdd_workflow.run_async(user_story_spec, acceptance_tests_gherkin))
         
         if result.get("error"):
             print(f"\nError running TDD implementation workflow: {result.get('error_message')}")

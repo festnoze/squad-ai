@@ -134,4 +134,21 @@ async def handle_incoming_sms_async(request: Request) -> HTMLResponse:
 @router.api_route("/incoming-sms", methods=["GET", "POST"])
 async def twilio_incoming_sms(request: Request):
     return await handle_incoming_sms_async(request)
+
+
+# ========= Debug endpoints ========= #
+@router.get("/ping")
+def ping() -> str:
+    logger.error("Ping request received.")
+    return "pong"
+
+@router.get("/logs/last")
+def get_last_log_file() -> str:
+    log_files = os.listdir("outputs/logs")
+    log_files.sort()
+    if not log_files or not any(log_files):
+        return "<<<No log files found.>>>"
+    latest_log_file = log_files[-1]
+    with open(f"outputs/logs/{latest_log_file}", "r") as file:
+        return file.read()
     
