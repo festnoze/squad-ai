@@ -166,7 +166,7 @@ class DrupalJsonApiClient:
 
         if fetch_all_pages and 'next' in items_full['links']:
             next_url = items_full['links']['next']['href']
-            txt.print(f"Loading next page to URL: {next_url}")
+            self.logger.info(f"Loading next page to URL: {next_url}")
             items += self.get_drupal_data_recursively(next_url, fetch_all_pages)
         return items
     
@@ -179,7 +179,7 @@ class DrupalJsonApiClient:
                     item['related_infos'][rel] = DrupalJsonApiClient.extract_all_field_text_values(related_infos)
             return item
 
-        txt.print(f"Fetching related infos on {len(items)} items, for a global requests count of  {len(items)* len(items[0]['related_url'].keys())}...")
+        self.logger.info(f"Fetching related infos on {len(items)} items, for a global requests count of  {len(items)* len(items[0]['related_url'].keys())}...")
         
         # Use ThreadPoolExecutor to parallelize the fetch_items_details method
         with ThreadPoolExecutor(max_workers=50) as executor:

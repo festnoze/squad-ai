@@ -1,6 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
-import re
+import logging
 import time
 import requests
 from bs4 import BeautifulSoup
@@ -13,7 +13,7 @@ from common_tools.helpers.ressource_helper import Ressource
 
 class WebsiteScrapingRetrieval:
     def __init__(self):
-        pass
+        self.logger = logging.getLogger(__name__)
 
     def scrape_all_trainings(self, max_pagination=17, batch_size=5):
         txt.activate_print = True
@@ -31,7 +31,7 @@ class WebsiteScrapingRetrieval:
         self.save_sections_from_scraped_pages(pages_out_dir, sections_out_dir)
 
         elapsed = txt.get_elapsed_str(txt.get_elapsed_seconds(total_start_time, time.time()))
-        txt.print(f"Scraping all trainings contents completed and saved in {elapsed}") 
+        self.logger.info(f"Scraping all trainings contents completed and saved in {elapsed}") 
 
     def scrape_or_load_all_trainings_links(self, max_pagination, all_trainings_links_filename):
         all_trainings_urls = []
@@ -132,7 +132,7 @@ class WebsiteScrapingRetrieval:
 
     def scrape_and_save_webpage_content(self, training_url):
         training_name = training_url.split("/")[-1]
-        txt.print(f"Scraping training content of: '{training_name}'")
+        self.logger.info(f"Scraping training content of: '{training_name}'")
         start_time = time.time()
         page_content = self.retrieve_page_content(training_url)
         file.write_file({ 'name': training_name, 'url': training_url, 'content': page_content }, f"outputs/scraped-full/{training_name}.json")
@@ -144,7 +144,7 @@ class WebsiteScrapingRetrieval:
 
         result = None
         if "Ce contenu n'existe pas ou plus." in driver.page_source:
-            txt.print(f">>>>> Page not found: '{url}'")
+            self.logger.warning(f">>>>> Page not found: '{url}'")
         else:
             result = driver.page_source
         driver.quit()
@@ -172,7 +172,7 @@ class WebsiteScrapingRetrieval:
                 count += value.count(f"<{tag}>")
                 count += value.count(f"</{tag}>")
             if count > 0:
-                txt.print(f"Found {count} '{tag}' tags in sections.")
+                self.logger.info(f"Found {count} '{tag}' tags in sections.")
 
     def extract_sections_from_content(self, webpage_name: str, webpage_url: str, webpage_content: str, section_classes=['lame-header-training', 'lame-bref', 'lame-programme', 'lame-cards-diploma', 'lame-methode', 'lame-modalites', 'lame-financement', 'lame-simulation'], section_ids=['jobs']):
         sections = {}
@@ -187,7 +187,7 @@ class WebsiteScrapingRetrieval:
                 sections['title'] = Ressource.remove_curly_brackets(title)
             else:
                 sections['title'] = Ressource.remove_curly_brackets(webpage_name)
-                txt.print(f"/!\\ Title not found in 'title-content' div. Use the one from url instead: '{webpage_name}'.")
+                self.logger.warning(f"Title not found in 'title-content' div. Use the one from url instead: '{webpage_name}'.")
 
             # Extract the academic level from 'tag-w' ul
             tag_w_ul = title_content_div.find('ul', class_='tag-w')
@@ -197,7 +197,7 @@ class WebsiteScrapingRetrieval:
                 if li_tags and any(li_tags):
                     academic_levels = [li_tag.get_text(strip=True) for li_tag in li_tags]
                     if len(academic_levels) != 1:
-                        txt.print(f"Found {len(academic_levels)} academic levels for '{webpage_name}'.")
+                        self.logger.info(f"Found {len(academic_levels)} academic levels for '{webpage_name}'.")
                     sections['academic_level'] = academic_levels[0]
 
         # Extract content from the specified sections by their classes

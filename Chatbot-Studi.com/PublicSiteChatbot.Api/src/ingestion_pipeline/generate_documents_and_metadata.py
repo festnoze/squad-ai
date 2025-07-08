@@ -1,19 +1,17 @@
-
-import json
 import os
 import re
-from typing import List, Dict
-import uuid
+import json
+import logging
 from langchain.schema import Document
 #
 from common_tools.helpers.txt_helper import txt
 from common_tools.helpers.file_helper import file
 from common_tools.helpers.json_helper import JsonHelper
 from common_tools.helpers.ressource_helper import Ressource
-#
 from common_tools.RAG.rag_ingestion_pipeline.summary_and_questions.summary_and_questions_chunks_service import SummaryAndQuestionsChunksService
 
 class GenerateDocumentsAndMetadata:
+    logger = logging.getLogger(__name__)
     
     async def build_trainings_docs_summary_chunked_by_questions_async(path, llm_and_fallback: list) -> list[Document]:
         trainings_objects = await GenerateDocumentsAndMetadata.build_trainings_objects_with_summaries_and_chunks_by_questions_async(path, llm_and_fallback)
@@ -31,7 +29,7 @@ class GenerateDocumentsAndMetadata:
                                                                             )
         return trainings_objects
     
-    def build_all_docs_and_trainings(path: str, write_all_names_lists = True) -> List[Document]:
+    def build_all_docs_and_trainings(path: str, write_all_names_lists = True) -> list[Document]:
         all_docs_but_trainings = []
         txt.print_with_spinner(f"Build all Langchain documents ...")
 
@@ -103,7 +101,7 @@ class GenerateDocumentsAndMetadata:
             contents[content['title']] = content
         return contents
 
-    def process_certifiers(data: List[Dict]) -> tuple[list[Document], list[str]]:
+    def process_certifiers(data: list[dict]) -> tuple[list[Document], list[str]]:
         if not data:
             return []
         all_certifiers_names = set()
@@ -121,7 +119,7 @@ class GenerateDocumentsAndMetadata:
             docs.append(doc)
         return docs, list(all_certifiers_names)
     
-    def process_certifications(data: List[Dict]) -> tuple[list[Document], list[str]]:
+    def process_certifications(data: list[dict]) -> tuple[list[Document], list[str]]:
         if not data:
             return []
         all_certifications_names = set()
@@ -139,7 +137,7 @@ class GenerateDocumentsAndMetadata:
             docs.append(doc)
         return docs, list(all_certifications_names)
 
-    def process_diplomas(data: List[Dict]) -> tuple[list[Document], list[str]]:
+    def process_diplomas(data: list[dict]) -> tuple[list[Document], list[str]]:
         if not data:
             return []
         docs = []
@@ -167,7 +165,7 @@ class GenerateDocumentsAndMetadata:
         all_diplomas_names.add("aucun")
         return docs, list(all_diplomas_names)
 
-    def process_domains(data: List[Dict]) -> tuple[list[Document], list[str]]:
+    def process_domains(data: list[dict]) -> tuple[list[Document], list[str]]:
         if not data:
             return []
         docs = []
@@ -185,7 +183,7 @@ class GenerateDocumentsAndMetadata:
             docs.append(doc)
         return docs, list(all_domains_names)
     
-    def process_sub_domains(data: List[Dict]) -> tuple[list[Document], list[str]]:
+    def process_sub_domains(data: list[dict]) -> tuple[list[Document], list[str]]:
         if not data:
             return []
         docs = []
@@ -205,7 +203,7 @@ class GenerateDocumentsAndMetadata:
             docs.append(doc)
         return docs, list(all_subdomains_names)
 
-    def process_fundings(data: List[Dict]) -> tuple[list[Document], list[str]]:
+    def process_fundings(data: list[dict]) -> tuple[list[Document], list[str]]:
         if not data:
             return []
         docs = []
@@ -224,7 +222,7 @@ class GenerateDocumentsAndMetadata:
             docs.append(doc)
         return docs, list(all_fundings_names)
 
-    def process_jobs(data: List[Dict], domains) -> tuple[list[Document], list[str]]:
+    def process_jobs(data: list[dict], domains) -> tuple[list[Document], list[str]]:
         if not data:
             return []
         docs = []
@@ -279,7 +277,7 @@ class GenerateDocumentsAndMetadata:
             training_data_drupal = next((training for training in trainings_data_from_drupal if training.get("title") == training_title), None)
             if not training_data_drupal:
                 unfound_in_drupal_trainings_count += 1
-                txt.print(f"!!! N°{unfound_in_drupal_trainings_count} unfound training from scraped data: '{training_title}', doesn't exists onto the Drupal data.")
+                GenerateDocumentsAndMetadata.logger.warning(f"!!! N°{unfound_in_drupal_trainings_count} unfound training from scraped data: '{training_title}', doesn't exists onto the Drupal data.")
 
         for training_data_drupal in trainings_data_from_drupal:
             training_title = training_data_drupal.get("title")
@@ -287,7 +285,7 @@ class GenerateDocumentsAndMetadata:
             # Only keep the training from Drupal if it's also present onto the website
             if not training_detail:
                 unfound_in_scraped_trainings_count += 1                    
-                #txt.print(f"!!! N°{unfound_in_scraped_trainings_count} unfound training from Drupal: '{training_title}', doesn't exists onto the website (or at least into the scraped data).")
+                GenerateDocumentsAndMetadata.logger.warning(f"!!! N°{unfound_in_scraped_trainings_count} unfound training from Drupal: '{training_title}', doesn't exists onto the website (or at least into the scraped data).")
                 continue
 
             related_ids = training_data_drupal.get("related_ids", {})
@@ -321,19 +319,19 @@ class GenerateDocumentsAndMetadata:
                 metadata_common["domain_name"] = next((dom.get("name") for dom in domains_data if dom.get("id") == domain_id), "")
             else:
                 unfound_domain_or_certif_count += 1
-                txt.print(f"## N°{unfound_domain_or_certif_count} unfound 'domain'. For: {training_title}")
+                GenerateDocumentsAndMetadata.logger.warning(f"## N°{unfound_domain_or_certif_count} unfound 'domain'. For: {training_title}")
             
             if sub_domain_id:
                 metadata_common["sub_domain_name"] = next((sub_dom.get("name") for sub_dom in sub_domains_data if sub_dom.get("id") == sub_domain_id), "")
             else:
                 unfound_domain_or_certif_count += 1
-                txt.print(f"## N°{unfound_domain_or_certif_count} unfound 'sub-domain'. For: {training_title}")
+                GenerateDocumentsAndMetadata.logger.warning(f"## N°{unfound_domain_or_certif_count} unfound 'sub-domain'. For: {training_title}")
             
             if certification_id:
                 metadata_common["certification_name"] = next((cert.get("name") for cert in certifications_data if cert.get("id") == certification_id), "")
             else:
                 unfound_domain_or_certif_count += 1
-                txt.print(f"## N°{unfound_domain_or_certif_count} unfound 'certification'. For: {training_title}")
+                GenerateDocumentsAndMetadata.logger.warning(f"## N°{unfound_domain_or_certif_count} unfound 'certification'. For: {training_title}")
 
             # Add training URL from details source to metadata
             training_url = ''
@@ -367,7 +365,7 @@ class GenerateDocumentsAndMetadata:
                         removed_sections_names.add(section_name)
 
         if unfound_in_scraped_trainings_count > 0:
-            txt.print(f"!!! Total : {unfound_in_scraped_trainings_count} trainings from json-api Drupal were not found on the scraped website data.")
+            GenerateDocumentsAndMetadata.logger.warning(f"!!! Total : {unfound_in_scraped_trainings_count} trainings from json-api Drupal were not found on the scraped website data.")
         
         #docs.append(Document(page_content= 'Liste complète de toutes les formations proposées par Studi :\n' + ', '.join(all_trainings_titles), metadata={"type": "liste_formations",}))
         return docs

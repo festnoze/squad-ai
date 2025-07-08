@@ -1,6 +1,5 @@
 @echo off
 setlocal
-
 set PROJECT_ID=studi-com-rag-api
 set REGION=europe-west1
 set REPO=depot-docker
@@ -8,8 +7,22 @@ set IMAGE_NAME=public-website-rag-api
 set IMAGE=%REGION%-docker.pkg.dev/%PROJECT_ID%/%REPO%/%IMAGE_NAME%
 set STEP=%1
 
+REM Check if the script is running with administrative privileges
+net session >nul 2>&1
+if %errorLevel% neq 0 (
+    echo WARNING: This script may require administrative privileges tu run. Please log in as administrator.
+    pause
+    exit /b
+)
+
 if defined STEP goto step%STEP%
-goto step1
+goto step0
+
+:step0
+echo [0] Copy the latest 'common_tools' wheel
+if exist "%~dp0wheels\common_tools-latest-py3-none-any.whl" del "%~dp0wheels\common_tools-latest-py3-none-any.whl"
+for /f "delims=" %%F in ('dir /b /o-d "C:\Dev\IA\CommonTools\dist\common_tools-*-py3-none-any.whl"') do copy /y "C:\Dev\IA\CommonTools\dist\%%F" "%~dp0wheels\common_tools-latest-py3-none-any.whl" & goto :afterCopy
+:afterCopy
 
 :step1
 echo [1] Activate service account...

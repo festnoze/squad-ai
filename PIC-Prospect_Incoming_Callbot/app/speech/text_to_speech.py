@@ -75,7 +75,7 @@ class OpenAITTSProvider(TextToSpeechProvider):
     def synthesize_speech_to_bytes(self, text: str) -> bytes:
         try:            
             resp: any = self.client.audio.speech.create(
-                model="tts-1",
+                model="tts-1-hd",
                 response_format="pcm",
                 voice="nova",  # Better for french: fable, nova, shimmer
                 # All OpenAI TTS voices: alloy, ash, ballad, coral, echo, fable, nova, onyx, sage, shimmer

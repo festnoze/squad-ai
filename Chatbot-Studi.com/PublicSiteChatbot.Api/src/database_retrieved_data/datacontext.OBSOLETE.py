@@ -6,12 +6,12 @@
 # from sqlalchemy.orm import sessionmaker
 # from database_retrieved_data.models import Base, Job, Funding, Training, Domain, Diploma, Certification
 # from common_tools.helpers.json_helper import JsonHelper
-# from common_tools.helpers.txt_helper import txt
 # from common_tools.helpers.file_helper import file
 
 # class DataContextRetrievedData:
 #     def __init__(self):
 #         #TODO: untested, (half-copied from conversations datacontext)
+#         self.logger = logging.getLogger(__name__)
 #         db_path_or_url = 'database_retrieved_data//database.db'
 #         if ':' not in db_path_or_url:
 #             source_path = os.environ.get("PYTHONPATH").split(';')[-1]
@@ -22,7 +22,7 @@
 
 #         # Create the database if it does not exist
 #         if 'http' not in db_path_or_url and not file.exists(db_path_or_url):
-#             txt.print(f"/!\\ Conversations Database file not found at path: {db_path_or_url}")
+#             self.logger.warning(f"/!\\ Conversations Database file not found at path: {db_path_or_url}")
 #             self.create_database(db_path_or_url)
         
 #         # Create a session factory
@@ -31,7 +31,7 @@
 #     def create_database(self):
 #         # Create all tables in the SQLite database
 #         Base.metadata.create_all(bind=self.engine)
-#         print("Database and tables created successfully!")
+#         self.logger.info("Database and tables created successfully!")
 
 #     def get_session(self):
 #         # Return a new session instance from the session factory
@@ -55,11 +55,11 @@
 #             # Query the data
 #             jobs = session.query(Job).all()
 #             for job in jobs:
-#                 print(f"Job Title: {job.title}, Domain: {job.domain.title}")
+#                 self.logger.info(f"Job Title: {job.title}, Domain: {job.domain.title}")
 
 #         except Exception as e:
 #             session.rollback()  # Rollback the transaction in case of an error
-#             print(f"An error occurred: {e}")
+#             self.logger.error(f"An error occurred: {e}")
 
 #         finally:
 #             # Close the session regardless of whether an error occurred
@@ -73,36 +73,36 @@
 #             # Fetch all jobs from the database
 #             jobs = session.query(Job).all()
 #             if not jobs:
-#                 print("No jobs found in the database.")
+#                 self.logger.warning("No jobs found in the database.")
 #                 return
             
 #             # Display job details
 #             for job in jobs:
-#                 print(f"Job ID: {job.id}, Title: {job.title}, Domain: {job.domain.title if job.domain else 'N/A'}")
+#                 self.logger.info(f"Job ID: {job.id}, Title: {job.title}, Domain: {job.domain.title if job.domain else 'N/A'}")
                 
 #             # Fetch all domains from the database
 #             domains = session.query(Domain).all()
 #             if domains:
-#                 print("\nDomains:")
+#                 self.logger.info("\nDomains:")
 #                 for domain in domains:
-#                     print(f"Domain ID: {domain.id}, Title: {domain.title}, Changed: {domain.changed}")
+#                     self.logger.info(f"Domain ID: {domain.id}, Title: {domain.title}, Changed: {domain.changed}")
 
 #             # Fetch all funding entries
 #             fundings = session.query(Funding).all()
 #             if fundings:
-#                 print("\nFunding Entries:")
+#                 self.logger.info("\nFunding Entries:")
 #                 for funding in fundings:
-#                     print(f"Funding ID: {funding.id}, Title: {funding.title}")
+#                     self.logger.info(f"Funding ID: {funding.id}, Title: {funding.title}")
 
 #             # Fetch all trainings
 #             trainings = session.query(Training).all()
 #             if trainings:
-#                 print("\nTrainings:")
+#                 self.logger.info("\nTrainings:")
 #                 for training in trainings:
-#                     print(f"Training ID: {training.id}, Title: {training.title}")
+#                     self.logger.info(f"Training ID: {training.id}, Title: {training.title}")
 
 #         except Exception as e:
-#             print(f"An error occurred while loading data: {e}")
+#             self.logger.error(f"An error occurred while loading data: {e}")
 
 #         finally:
 #             # Close the session
@@ -131,7 +131,7 @@
 #             for file_name, model_class in file_mappings.items():
 #                 file_path = os.path.join(json_folder_path, file_name)
 #                 if not os.path.exists(file_path):
-#                     print(f"File not found: {file_path}")
+#                     self.logger.warning(f"File not found: {file_path}")
 #                     continue
                 
 #                 # Open the JSON file using utf-8-sig to handle BOM

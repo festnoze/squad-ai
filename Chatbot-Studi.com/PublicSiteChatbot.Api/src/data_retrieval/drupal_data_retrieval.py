@@ -5,10 +5,13 @@ from common_tools.helpers.json_helper import json
 from common_tools.models.file_already_exists_policy import FileAlreadyExistsPolicy
 from common_tools.helpers.unicode_helper import UnicodeHelper
 from textwrap import dedent
+import logging
+from logging import Logger
 
 class DrupalDataRetrieval:
     def __init__(self, outdir):
         txt.activate_print = True
+        self.logger: Logger = logging.getLogger(__name__)
         self.out_dir = outdir if (outdir.endswith("/") or outdir.endswith("\\")) else  outdir + "/"
         self.studiClient = DrupalJsonApiClient("https://www.studi.com/jsonapi/", "etienne.millerioux@studi.fr", "khHD%!izshbv65A")
 
@@ -21,7 +24,7 @@ class DrupalDataRetrieval:
         self.retrieve_diplomas()
         self.retrieve_certifications()
         self.retrieve_certifiers()
-        txt.print(">>>>> Finished all drupal data retireval.")
+        self.logger.info(">>>>> Finished all drupal data retireval.")
 
     def retrieve_jobs(self):
         """ Retrieve all jobs from studi.com """
@@ -34,7 +37,7 @@ class DrupalDataRetrieval:
         jobs = self.studiClient.extract_common_data_from_nodes(full_data, ['field_paragraph'], ['field_domain'])
         jobs = self.studiClient.parallel_get_items_related_infos(jobs)
         self.save_json_file("jobs", jobs)
-        txt.print(">>> Finished jobs drupal data retireval ...")
+        self.logger.info(">>> Finished jobs drupal data retireval ...")
 
     def retrieve_fundings(self):
         """ Retrieve all fundings from studi.com """
@@ -47,7 +50,7 @@ class DrupalDataRetrieval:
         fundings = self.studiClient.extract_common_data_from_nodes(full_data, ['field_paragraph'], [])      
         fundings = self.studiClient.parallel_get_items_related_infos(fundings)
         self.save_json_file("fundings", fundings)
-        txt.print(">>> Finished fundings drupal data retireval ...")
+        self.logger.info(">>> Finished fundings drupal data retireval ...")
 
     def retrieve_trainings(self):
         """ Retrieve all trainings from studi.com """
@@ -62,7 +65,7 @@ class DrupalDataRetrieval:
             ['field_paragraph'], 
             ['field_content_bloc','field_certification', 'field_diploma', 'field_domain', 'field_job', 'field_funding', 'field_goal', 'field_job'])
         self.save_json_file("trainings", trainings)
-        txt.print(">>> Finished trainings drupal data retireval ...")
+        self.logger.info(">>> Finished trainings drupal data retireval ...")
 
     def retrieve_diplomas(self):
         """ Retrieve all diplomas from studi.com """
@@ -75,7 +78,7 @@ class DrupalDataRetrieval:
         diplomas = self.studiClient.extract_common_data_from_nodes(full_data, ['field_paragraph'], ['field_content_bloc','field_certification', 'field_diploma', 'field_domain', 'field_job', 'field_funding', 'field_goal', 'field_job'])
         diplomas = self.studiClient.parallel_get_items_related_infos(diplomas)
         self.save_json_file("diplomas", diplomas)
-        txt.print(">>> Finished diplomas drupal data retireval ...")
+        self.logger.info(">>> Finished diplomas drupal data retireval ...")
 
     def retrieve_certifications(self):
         """ Retrieve all certifications from studi.com """
@@ -87,7 +90,7 @@ class DrupalDataRetrieval:
 
         certifications = self.studiClient.extract_common_data_from_nodes(full_data, ['field_paragraph'])
         self.save_json_file("certifications", certifications)
-        txt.print(">>> Finished certifications drupal data retireval ...")
+        self.logger.info(">>> Finished certifications drupal data retireval ...")
 
     def retrieve_domains_and_subdomains(self):
         """ Retrieve all domains from studi.com """
@@ -110,7 +113,7 @@ class DrupalDataRetrieval:
 
         self.save_json_file("subdomains", subdomains)
         self.save_json_file("domains", domains)
-        txt.print(">>> Finished domains/sub-domains drupal data retireval ...")
+        self.logger.info(">>> Finished domains/sub-domains drupal data retireval ...")
 
     def retrieve_certifiers(self):
         """ Retrieve all certifications from studi.com """
@@ -122,12 +125,12 @@ class DrupalDataRetrieval:
 
         certifiers = self.studiClient.extract_common_data_from_nodes(full_data)
         self.save_json_file("certifiers", certifiers)
-        txt.print(">>> Finished certifiers drupal data retireval ...")
+        self.logger.info(">>> Finished certifiers drupal data retireval ...")
 
     def display_first_item(self, item_type: str):
         data = file.get_as_str(f"{self.out_dir}{item_type.strip()}.json", encoding='utf-8-sig')
         data = json.loads(data)
-        txt.print_json(data[0])
+        self.logger.info(data[0])
 
     def diplay_select_menu(self):
         while True:
@@ -167,7 +170,7 @@ class DrupalDataRetrieval:
             elif choice.startswith("d"):
                 self.display_first_item(choice[1:])
             elif choice == "e":
-                txt.print("Exiting to main menu ...")
+                self.logger.info("Exiting to main menu ...")
                 break
     
     def save_json_file(self, filename, data):

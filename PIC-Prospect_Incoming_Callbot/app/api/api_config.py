@@ -8,7 +8,7 @@ from datetime import datetime
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, StreamingResponse, Response
+from fastapi.responses import JSONResponse, StreamingResponse, Response, PlainTextResponse
 from fastapi.middleware.cors import CORSMiddleware
 #
 from app import endpoints
@@ -30,7 +30,7 @@ class ApiConfig:
         app = FastAPI(
             title="Prospect Incoming Callbot API",
             description="Backend API for Voice Appointment Maker through Twilio",
-            version= f"{datetime.now().strftime("%Y.%m.%d.%H%M%S")}",
+            version= f"{datetime.now().strftime("%Y.%m.%d_%H.%M.%S")}",
             lifespan=ApiConfig.lifespan
         )
         app.state.shutdown = lambda: None
@@ -57,6 +57,7 @@ class ApiConfig:
         logger.error('-----------------------------------------------------')
         logger.error('🌐 PIC (Prospect Incoming Callbot) API 🚀 started 🚀')
         logger.error('-----------------------------------------------------')
+
 
         def handle_error(request: Request, error_msg: str):
             logger.error(f"Logged Error: {error_msg}")
@@ -99,6 +100,21 @@ class ApiConfig:
                     status_code=500,
                     content={"status": "error", "detail": str(exc)}
                 )    
+
+        @app.get("/ping")
+        def ping() -> str:
+            logger.error("Ping request received.")
+            return "pong"
+
+        @app.get("/logs/last", response_class=PlainTextResponse)
+        def get_last_log_file() -> str:
+            log_files = os.listdir("outputs/logs")
+            log_files.sort()
+            if not log_files or not any(log_files):
+                return "<<<No log files found.>>>"
+            latest_log_file = log_files[-1]
+            with open(f"outputs/logs/{latest_log_file}", "r", encoding="utf-8") as file:
+                return file.read()
                 
         async def startup_event():
             """Handle application startup."""
@@ -114,7 +130,10 @@ class ApiConfig:
         return app
 
     @staticmethod
-    def configure_logging():
+    def configure_logging(app_name: str = "Prospect-Incoming-Callbot-API", logs_dir: str = "outputs/logs/"):
+        if not os.path.isdir(logs_dir):
+            os.makedirs(logs_dir)
+        
         root_logger = logging.getLogger()
         if root_logger.hasHandlers():
             for handler in list(root_logger.handlers):
@@ -124,21 +143,21 @@ class ApiConfig:
         # Set root logger to a permissive level; handlers will filter.
         root_logger.setLevel(logging.DEBUG)
 
-        # Create a formatter
         formatter = logging.Formatter(
-            "%(levelname)s - %(message)s [%(name)s ln.%(lineno)d] %(asctime)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
+            "%(message)s | %(levelname)s [%(name)s ln.%(lineno)d] %(asctime)s",
+            datefmt="%Y/%m/%d %H:%M:%S",
         )
 
-        # Configure file handler to log at INFO level
+        # Configure file handler to log to level: INFO
         file_handler = logging.FileHandler(
-            f"outputs/logs/app.{datetime.now().strftime('%Y-%m-%d.%H%M%S')}.log"
+            f"{logs_dir}{app_name} {datetime.now().strftime('%Y-%m-%d %Hh%Mm%Ss')}.log",
+            encoding="utf-8"
         )
         file_handler.setLevel(logging.INFO)
         file_handler.setFormatter(formatter)
         root_logger.addHandler(file_handler)
 
-        # Configure stream handler to use the level from environment settings
+        # Configure stream handler to use the level defined in environment settings
         stream_handler = logging.StreamHandler()        
         selected_log_level = logging.getLogger("uvicorn.error").level
         stream_handler.setLevel(selected_log_level)
