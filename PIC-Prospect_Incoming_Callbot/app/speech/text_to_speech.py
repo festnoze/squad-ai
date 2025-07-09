@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 import logging
 import audioop
 from utils.envvar import EnvHelper
+from speech.text_to_speech_openai import TTS_OpenAI
 
 class TextToSpeechProvider(ABC):
     client: any = None
@@ -16,18 +17,18 @@ class TextToSpeechProvider(ABC):
         """Speech-to-text using specified the provider, and return it as bytes"""
         pass
 
-    def convert_to_PCM_UTF_with_frame_rate(self, audio_bytes: bytes, frame_rate: int) -> bytes:
+    def convert_PCM_frame_rate_w_audioop(self, audio_bytes: bytes, from_frame_rate: int, to_frame_rate: int) -> bytes:
         if not audio_bytes:
             self.logger.warning("No audio bytes provided to convert")
             return b""
 
-        if frame_rate == self.frame_rate:
+        if from_frame_rate == to_frame_rate:
             return audio_bytes
         
         try:
             # Use audioop to resample.
-            converted_audio, _ = audioop.ratecv(audio_bytes, self.sample_width, self.channels, frame_rate, self.frame_rate, None)
-            self.logger.debug(f"Successfully resampled audio from {frame_rate}Hz to {self.frame_rate}Hz")
+            converted_audio, _ = audioop.ratecv(audio_bytes, self.sample_width, self.channels, from_frame_rate, to_frame_rate, None)
+            self.logger.debug(f"Successfully resampled audio from {from_frame_rate}Hz to {to_frame_rate}Hz")
             return converted_audio
         except audioop.error as e:
             self.logger.error(f"Error resampling audio with audioop: {e}", exc_info=True)
@@ -55,7 +56,8 @@ class GoogleTTSProvider(TextToSpeechProvider):
             )
 
             response = self.client.synthesize_speech(input=synthesis_input, voice=voice, audio_config=audio_config)
-            return response.audio_content
+            audio_bytes = response.audio_content
+            return self.convert_PCM_frame_rate_w_audioop(audio_bytes, from_frame_rate=16000, to_frame_rate=self.frame_rate)
 
         except Exception as google_error:
             self.logger.error(f"Google TTS failed: {google_error}.", exc_info=True)
@@ -71,20 +73,21 @@ class OpenAITTSProvider(TextToSpeechProvider):
         self.frame_rate = frame_rate
         self.channels = channels
         self.sample_width = sample_width
+        self.voice = EnvHelper.get_text_to_speech_voice() or "nova"
+        self.instructions = EnvHelper.get_text_to_speech_instructions() or "Parle d'une voix calme mais positive, avec une diction rapide mais claire"
+        self.model = EnvHelper.get_text_to_speech_model() or "tts-1"
 
     def synthesize_speech_to_bytes(self, text: str) -> bytes:
         try:
-            resp: any = self.client.audio.speech.create(
-                model="tts-1-hd",
+            audio_bytes = TTS_OpenAI.generate_speech(
+                model=self.model,
                 response_format="pcm",
-                voice="nova",  # Better for french: fable, nova, shimmer
-                # All OpenAI TTS voices: alloy, ash, ballad, coral, echo, fable, nova, onyx, sage, shimmer
-                input=text,
-                #instructions="Parle d'une voix calme, positive, avec une diction rapide et claire",
-                speed=1.0
+                voice=self.voice,
+                text=text,
+                instructions=self.instructions,
+                speed=0.9
             )
-            audio_bytes = resp.read()
-            return self.convert_to_PCM_UTF_with_frame_rate(audio_bytes, frame_rate=24000)
+            return self.convert_PCM_frame_rate_w_audioop(audio_bytes, from_frame_rate=24000, to_frame_rate=self.frame_rate)
 
         except Exception as openai_error:
             self.logger.error(f"OpenAI TTS failed: {openai_error}.", exc_info=True)

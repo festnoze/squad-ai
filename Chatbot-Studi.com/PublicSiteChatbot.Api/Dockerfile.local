@@ -13,17 +13,13 @@ ENV PORT=8281
 # Définit l'adresse d'écoute de l'application
 ENV HOST_URI=0.0.0.0
 
+ENV LANGCHAIN_TRACING_V2=false
+
 # Copie les packages wheel précompilés dans le container
 COPY wheels/ /wheels/
 
 # Copie le fichier des dépendances communes (non utilisé pour l'installation ici)
 COPY requirements_common.txt .
-
-# Options d'installation alternatives (non activées)
-# RUN pip install /wheels/*.whl
-# RUN pip install --no-cache-dir -r requirements_common.txt
-
-# Copie et installe les fichiers de dépendances spécifiques pour Docker
 COPY requirements.txt .
 COPY requirements_docker.txt .
 RUN pip install --no-cache-dir -r requirements_docker.txt

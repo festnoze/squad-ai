@@ -13,7 +13,7 @@ structures_descriptions*/
 .DS_Store
 service-account-1.json
 
-.env*
+*.env
 *.db
 *.pyc
 *.exe

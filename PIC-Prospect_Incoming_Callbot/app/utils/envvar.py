@@ -45,6 +45,18 @@ class EnvHelper:
         return EnvHelper.get_env_variable_value_by_name('TEXT_TO_SPEECH_PROVIDER')
 
     @staticmethod
+    def get_text_to_speech_voice():
+        return EnvHelper.get_env_variable_value_by_name('TEXT_TO_SPEECH_VOICE')
+
+    @staticmethod
+    def get_text_to_speech_instructions():
+        return EnvHelper.get_env_variable_value_by_name('TEXT_TO_SPEECH_INSTRUCTIONS')
+
+    @staticmethod
+    def get_text_to_speech_model():
+        return EnvHelper.get_env_variable_value_by_name('TEXT_TO_SPEECH_MODEL')
+
+    @staticmethod
     def get_speech_to_text_provider():
         return EnvHelper.get_env_variable_value_by_name('SPEECH_TO_TEXT_PROVIDER')
 
