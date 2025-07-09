@@ -154,6 +154,11 @@ class ApiConfig:
             latest_log_file = log_files[-1]
             with open(f"outputs/logs/{latest_log_file}", "r", encoding="utf-8") as file:
                 return file.read()
+
+        @app.get("/env-vars/all", response_class=PlainTextResponse)
+        def get_env_variables() -> str:
+            env_vars = os.environ.copy()
+            return "\n".join([f"{key}={value}" for key, value in env_vars.items()])
                 
         async def startup_event():
             """Handle application startup."""

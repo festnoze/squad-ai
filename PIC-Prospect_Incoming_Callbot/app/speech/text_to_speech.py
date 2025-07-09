@@ -73,7 +73,7 @@ class OpenAITTSProvider(TextToSpeechProvider):
         self.sample_width = sample_width
 
     def synthesize_speech_to_bytes(self, text: str) -> bytes:
-        try:            
+        try:
             resp: any = self.client.audio.speech.create(
                 model="tts-1-hd",
                 response_format="pcm",

@@ -19,9 +19,16 @@ if defined STEP goto step%STEP%
 goto step0
 
 :step0
+@REM echo [A] Create 'common_tools' wheel
+@REM call C:\Dev\IA\CommonTools\libs_build.bat
+
 echo [0] Copy the latest 'common_tools' wheel
 if exist "%~dp0wheels\common_tools-latest-py3-none-any.whl" del "%~dp0wheels\common_tools-latest-py3-none-any.whl"
-for /f "delims=" %%F in ('dir /b /o-d "C:\Dev\IA\CommonTools\dist\common_tools-*-py3-none-any.whl"') do copy /y "C:\Dev\IA\CommonTools\dist\%%F" "%~dp0wheels\common_tools-latest-py3-none-any.whl" & goto :afterCopy
+for /f "delims=" %%F in ('dir /b /o-d "C:\Dev\IA\CommonTools\dist\common_tools-*-py3-none-any.whl"') do (
+    echo Copying package named: %%F
+    copy /y "C:\Dev\IA\CommonTools\dist\%%F" "%~dp0wheels\common_tools-latest-py3-none-any.whl"
+    goto :afterCopy
+)
 :afterCopy
 
 :step1
