@@ -32,6 +32,7 @@ class AgentsGraph:
     def __init__(self, outgoing_manager: OutgoingManager, studi_rag_client: StudiRAGInferenceApiClient, salesforce_client: SalesforceApiClientInterface, call_sid: str):
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
+        self.calendar_speech_cannot_be_interupted : bool = False
         self.call_sid = call_sid
         self.logger.info(f"[{self.call_sid}] Agents graph initialization")
         
@@ -396,7 +397,8 @@ class AgentsGraph:
 
                 calendar_agent_answer = await self.calendar_agent_instance.run_async(user_input, chat_history)
                 
-                self.outgoing_manager.can_speech_be_interupted = False
+                if self.calendar_speech_cannot_be_interupted:
+                    self.outgoing_manager.can_speech_be_interupted = False
                 await self.outgoing_manager.enqueue_text(calendar_agent_answer)
 
                 state["history"].append(("assistant", calendar_agent_answer))
