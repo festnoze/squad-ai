@@ -3,7 +3,7 @@ import pytest
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, patch
 #
-from agents.calendar_agent import CalendarAgent
+from app.agents.calendar_agent import CalendarAgent
 #
 from llms.langchain_factory import LangChainFactory
 from llms.llm_info import LlmInfo
@@ -87,7 +87,7 @@ from llms.langchain_adapter_type import LangChainAdapterType
                 ("AI", "Quels jours ou quelles heures de la journée vous conviendraient le mieux ?")
             ],
             "Proposition de créneaux", 
-            "Je vous propose les créneaux suivants : lundi 24 juin, de 9 heures à 12 heures ou de 13 heures à 18 heures, ou mardi 25 juin, de 9 heures à 12 heures. Avez-vous une préférence ?",
+            "Je vous propose les créneaux suivants : lundi, le 24 juin, de 9 heures à 12 heures ou de 13 heures à 18 heures, ou mardi, le 25 juin, de 9 heures à 12 heures. Avez-vous une préférence ?",
             True # Exact match
         ),
         
@@ -207,7 +207,7 @@ async def test_calendar_agent_integration_classification_plus_outputed_answer(sf
                           If False, uses semantic similarity evaluation.
     """
     # Create the agent with mocked dependencies
-    agent = CalendarAgent(llm_instance, sf_client_mock)
+    agent = CalendarAgent(sf_client_mock, llm_instance)
     CalendarAgent.now = datetime(2024, 6, 19, 19, 0)
     agent._set_user_info("test_user_id", "Test", "User", "test@example.com", "test_owner_id", "TestOwnerName")
     
@@ -234,7 +234,7 @@ async def test_complete_conversation_exchange(sf_client_mock, llm_instance, simi
     This test simulates a realistic conversation between a user and the calendar agent.
     """
     # Create the agent with mocked dependencies
-    agent = CalendarAgent(llm_instance, sf_client_mock)
+    agent = CalendarAgent(sf_client_mock, llm_instance)
     CalendarAgent.now = datetime(2024, 6, 19, 20, 0)
     agent._set_user_info("test_user_id", "Test", "User", "test@example.com", "test_owner_id", "TestOwnerName")
     

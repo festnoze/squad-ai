@@ -1,7 +1,7 @@
 import pytest
 from datetime import datetime, timedelta
-from agents.calendar_agent import CalendarAgent
 from unittest.mock import AsyncMock, patch
+from app.agents.calendar_agent import CalendarAgent
 
 class DummyLLM:
     """Very small mock suitable for our unit tests."""

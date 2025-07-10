@@ -3,29 +3,31 @@ import pytest
 from datetime import datetime, timedelta
 from langchain_core.runnables import Runnable
 from langchain_core.messages import AIMessage
-from agents.calendar_agent import CalendarAgent
+from app.agents.calendar_agent import CalendarAgent
+from app.agents.agents_graph import LangChainFactory
+from app.agents.agents_graph import LlmInfo
+from app.agents.agents_graph import LangChainAdapterType
+from app.agents.agents_graph import EnvHelper
 
 LLM_SHOULD_FAIL = object()  # Marker object to indicate LLM failure in tests
 
-class DummyLLM(Runnable):
-    """Very small async mock suitable for our unit tests, can simulate success or failure."""
-
-    def __init__(self, category_to_return: str = "DefaultCategory", raise_exception: bool = False):
-        self._category_to_return = category_to_return
+class FakeLLM(Runnable):
+    def __init__(self, fake_value_to_return: str = "fake llm response", raise_exception: bool = False):
+        self._fake_value_to_return = fake_value_to_return
         self._raise_exception = raise_exception
 
     def bind_tools(self, _tools):
         return self
 
-    async def ainvoke(self, _messages):
+    async def ainvoke(self, _messages, create_task=True):
         if self._raise_exception:
             raise Exception("LLM ainvoke failed for test")
-        return AIMessage(content=self._category_to_return)
+        return AIMessage(content=self._fake_value_to_return)
 
-    def invoke(self, _messages):
+    def invoke(self, _messages, create_task=True):
         if self._raise_exception:
             raise Exception("LLM invoke failed for test")
-        return AIMessage(content=self._category_to_return)
+        return AIMessage(content=self._fake_value_to_return)
 
 @pytest.fixture
 def sf_client_mock():
@@ -53,14 +55,14 @@ def sf_client_mock():
 )
 async def test_calendar_agent_classification(sf_client_mock, user_input, chat_history, llm_behavior, expected_category):
     """Tests the categorize_for_dispatch_async method for both LLM and heuristic paths."""
-    # Setup DummyLLM based on llm_behavior parameter
+    # Setup fake LLM based on llm_behavior parameter
     if llm_behavior is LLM_SHOULD_FAIL:
-        llm_instance = DummyLLM(raise_exception=True)
+        llm_instance = FakeLLM(raise_exception=True)
     else:
         # llm_behavior is the category string the LLM should return
-        llm_instance = DummyLLM(category_to_return=llm_behavior)
+        llm_instance = FakeLLM(fake_value_to_return=llm_behavior)
 
-    agent = CalendarAgent(llm_instance, sf_client_mock)
+    agent = CalendarAgent(sf_client_mock, llm_instance)
     # Set deterministic time for output
     CalendarAgent.now = datetime(2025, 6, 19)
     # User info is needed because categorize_for_dispatch_async formats a prompt with owner_name
@@ -74,7 +76,9 @@ async def test_calendar_agent_classification(sf_client_mock, user_input, chat_hi
 
 
 async def test_proposition_de_creneaux_calls_get_appointments(sf_client_mock):
-    agent = CalendarAgent(DummyLLM("Proposition de créneaux"), sf_client_mock)
+    openai_api_key = EnvHelper.get_openai_api_key()
+    calendar_timeframes_llm = LangChainFactory.create_llm_from_info(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4.1-mini", timeout=50, temperature=0.1, api_key=openai_api_key))
+    agent = CalendarAgent(sf_client_mock, FakeLLM("Proposition de créneaux"), calendar_timeframes_llm)
     CalendarAgent.now = datetime(2025, 6, 19)
     agent._set_user_info("uid", "John", "Doe", "john@ex.com", "ownerId", "Alice")
 
@@ -88,15 +92,15 @@ async def test_proposition_de_creneaux_calls_get_appointments(sf_client_mock):
     [
         ("Parfait, c'est confirmé",
         [
-            {'role': 'human', 'content': 'Je voudrais prendre rendez-vous demain'},
-            {'role': 'AI', 'content': 'Bien sur, je peux vous proposer demain entre 9h et 11h ou entre 14h et 16h. Avez-vous une préférence ?'},
-            {'role': 'human', 'content': 'oui, demain à 10h'},
-            {'role': 'AI', 'content': 'Parfait, je vais planifier votre rendez-vous pour demain, mardi 10 juin de 10h à 10h30 concernant une demande de conseil en formation. Confirmez-vous ce rendez-vous ?'}
+            ("human", "Je voudrais prendre rendez-vous demain"),
+            ("AI", "Bien sur, je peux vous proposer demain entre 9h et 11h ou entre 14h et 16h. Avez-vous une préférence ?"),
+            ("human", "oui, demain à 10h"),
+            ("AI", "Parfait, je vais planifier votre rendez-vous pour demain, mardi 10 juin de 10h à 10h30 concernant une demande de conseil en formation. Confirmez-vous ce rendez-vous ?")
         ])
     ])
-async def test_rendez_vous_confirme_calls_schedule(sf_client_mock, user_input, chat_history):
-    agent = CalendarAgent(DummyLLM("Rendez-vous confirmé"), sf_client_mock)
-    CalendarAgent.now = datetime(2025, 6, 19)
+async def test_user_confirmation_calls_schedule_new_appointment(sf_client_mock, user_input, chat_history):
+    agent = CalendarAgent(sf_client_mock, FakeLLM("Rendez-vous confirmé"), FakeLLM(""), FakeLLM("2025-06-10T10:00:00Z"))
+    CalendarAgent.now = datetime(2025, 6, 9)
     agent._set_user_info("uid", "John", "Doe", "john@ex.com", "ownerId", "Alice")
     await agent.run_async(user_input, chat_history)
     sf_client_mock.schedule_new_appointment_async.assert_awaited()

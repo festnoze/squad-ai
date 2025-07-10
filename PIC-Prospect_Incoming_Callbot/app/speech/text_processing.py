@@ -1,15 +1,11 @@
+import re
+
 """
 Text processing utilities for speech synthesis.
 
 This module provides helper functions for processing text before speech synthesis,
 including text chunking, duration estimation, and timing calculations.
 """
-
-import re
-import logging
-
-logger = logging.getLogger(__name__)
-
 class ProcessText:
     @staticmethod
     def chunk_text_by_sentences_size(text: str, max_words_by_sentence: int = 10, max_chars_by_sentence: int = 100) -> list[str]:

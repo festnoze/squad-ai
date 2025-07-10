@@ -1,5 +1,5 @@
 import pytest
-from speech.text_processing import ProcessText
+from app.speech.text_processing import ProcessText
 
 @pytest.mark.parametrize("test_input,max_words,max_chars,expected", [
     # Test case 1: Simple case of sentence splitting

@@ -156,7 +156,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
         start_datetime_utc = self._to_utc_datetime(start_dt)
             
         if start_datetime_utc <= datetime.now(timezone.utc):
-            err_msg = "Error: Start datetime to schedule a new appointment must be in the future, bur is: {start_datetime}"
+            err_msg = "Error: Start datetime to schedule a new appointment must be in the future, but is: {start_datetime}"
             self.logger.info(err_msg)
             raise ValueError(err_msg)
 
@@ -171,7 +171,6 @@ class SalesforceApiClient(SalesforceApiClientInterface):
         
         self.logger.info("Creating the Event...")
         
-        # Prepare headers
         headers = {
             'Authorization': f'Bearer {self._access_token}',
             'Content-Type': 'application/json'
@@ -182,9 +181,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
             'Subject': subject,
             'StartDateTime': start_datetime_utc_str,
             'EndDateTime': end_datetime_utc_str
-        }
-        
-        # Add optional fields if they exist
+        }        
         if description:
             payload_event['Description'] = description
         if location:
@@ -196,10 +193,8 @@ class SalesforceApiClient(SalesforceApiClientInterface):
         if who_id:
             payload_event['WhoId'] = who_id
         
-        # Create event URL
         url_creation_event = f"{self._instance_url}/services/data/{self._version_api}/sobjects/Event/"
         
-        # Send request
         async with httpx.AsyncClient() as client:
             try:
                 resp_event = await client.post(url_creation_event, headers=headers, data=json.dumps(payload_event))
@@ -316,6 +311,33 @@ class SalesforceApiClient(SalesforceApiClientInterface):
             except Exception as e:
                 self.logger.info(f"Error retrieving events: {str(e)}")
                 return None
+
+    async def delete_event_by_id_async(self, event_id: str) -> bool:
+        await self._ensure_authenticated_async()
+        headers = {
+            'Authorization': f'Bearer {self._access_token}',
+            'Content-Type': 'application/json'
+        }
+        
+        url_deletion_event = f"{self._instance_url}/services/data/{self._version_api}/sobjects/Event/{event_id}"
+        
+        async with httpx.AsyncClient() as client:
+            try:
+                resp_event = await client.delete(url_deletion_event, headers=headers)
+                
+                if resp_event.status_code == 204:
+                    self.logger.info("Event deleted successfully!")
+                    return True
+                else:
+                    self.logger.info(f"Error while deleting the Event: {resp_event.status_code}")
+                    try:
+                        self.logger.info(json.dumps(resp_event.json(), indent=2, ensure_ascii=False))
+                    except:
+                        self.logger.info(resp_event.text)
+                    return False
+            except Exception as e:
+                self.logger.error(f"Error deleting event: {str(e)}")
+                return False
 
     async def get_person_by_phone_async(self, phone_number: str) -> dict | None:
         """

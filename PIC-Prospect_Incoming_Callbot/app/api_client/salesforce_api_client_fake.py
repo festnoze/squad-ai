@@ -83,6 +83,9 @@ class SalesforceApiClientFake(SalesforceApiClientInterface):
             }
         ]
 
+    async def delete_event_by_id_async(self, event_id: str) -> bool:
+        return True
+
     # --- People -----------------------------------------------------------------
     async def get_person_by_phone_async(self, phone_number: str) -> Dict[str, Any] | None:  # type: ignore[override]
         """Return a fake Contact whose phone matches the query."""

@@ -1,12 +1,14 @@
-import pytest
-from unittest.mock import patch, MagicMock, AsyncMock
 import asyncio
+import pytest
+import pytz
+from datetime import datetime, timedelta
+from unittest.mock import patch, MagicMock, AsyncMock
 from app.agents.agents_graph import AgentsGraph
 from app.agents.phone_conversation_state_model import PhoneConversationState
 from app.managers.outgoing_manager import OutgoingManager
 from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
 from app.api_client.salesforce_api_client_interface import SalesforceApiClientInterface
-
+from app.agents.calendar_agent import CalendarAgent
 
 async def test_graph_init_conversation_and_welcome_message(agents_graph_mockings):
     """Test that without user input, we get a welcome message and conversation_id is set."""
@@ -110,7 +112,7 @@ async def test_query_response_about_courses(agents_graph_mockings):
     agents_graph_mockings["outgoing_manager"].enqueue_text.assert_called()
 
 
-async def test_schedule_calendar_appointment(agents_graph_mockings):
+async def test_first_answer_to_calendar_appointment(agents_graph_mockings):
     # Arrange
 
     # Create an instance of AgentsGraph with mocked dependencies
@@ -120,6 +122,7 @@ async def test_schedule_calendar_appointment(agents_graph_mockings):
             salesforce_client=agents_graph_mockings["salesforce_client"],
             call_sid=agents_graph_mockings["call_sid"]
         )
+    CalendarAgent.now = datetime(2025, 4, 2, 10, 0, 0, tzinfo=pytz.timezone('Europe/Paris'))
         
     # Add necessary attributes for streaming
     agents.graph.is_speaking = True
@@ -127,8 +130,8 @@ async def test_schedule_calendar_appointment(agents_graph_mockings):
     agents.graph.rag_interrupt_flag = {"interrupted": False}
         
     # Set up mocks for calendar agent methods
-    with patch.object(SalesforceApiClientInterface, 'get_scheduled_appointments_async', return_value=[{"date": "2025-4-2", "time": "15:00", "object": "test slot"}]) as mock_get_appointments, \
-            patch.object(SalesforceApiClientInterface, 'schedule_new_appointment_async', return_value={}) as mock_schedule_new_appointment:
+    with patch.object(SalesforceApiClientInterface, 'get_scheduled_appointments_async', return_value=[{"StartDateTime": (CalendarAgent.now + timedelta(hours=1)).isoformat(), "EndDateTime": (CalendarAgent.now + timedelta(hours=2)).isoformat(), "object": "test slot"}]) as mock_get_appointments, \
+         patch.object(SalesforceApiClientInterface, 'schedule_new_appointment_async', return_value={}) as mock_schedule_new_appointment:
         
         # Set up initial state with a user query about scheduling an appointment
         init_msg = "Bonjour, je suis votre assistant Studi. Comment puis-je vous aider aujourd'hui ?"
@@ -167,13 +170,13 @@ async def test_schedule_calendar_appointment(agents_graph_mockings):
         assert updated_state["history"][-2][0] == "user"
         assert updated_state["history"][-2][1] == user_input
         assert updated_state["history"][-1][0] == "assistant"
-        #assert updated_state["history"][-1][1] == "D'accord, je vais vous aider à prendre rendez-vous avec un conseiller."
+        assert updated_state["history"][-1][1].startswith("Je vous propose les créneaux suivants :")
     
         # Verify Salesforce client methods were called
         agents_graph_mockings["salesforce_client"].get_person_by_phone_async.assert_not_called()
         assert agents_graph_mockings["outgoing_manager"].enqueue_text.call_count >= 1
         
-        # Verify called calendar agent 'tools'
+        # Verify calendar agent 'tools' calls
         assert mock_get_appointments.call_count >= 1
         assert mock_schedule_new_appointment.call_count == 0
 
@@ -182,52 +185,51 @@ async def test_long_conversation_history_is_truncated(agents_graph_mockings):
     """Test that a long conversation history is truncated before being sent to the router LLM."""
     # Arrange
     agents = AgentsGraph(
-        outgoing_manager=agents_graph_mockings["outgoing_manager"],
-        studi_rag_client=agents_graph_mockings["studi_rag_client"],
-        salesforce_client=agents_graph_mockings["salesforce_client"],
-        call_sid=agents_graph_mockings["call_sid"]
-    )
+            outgoing_manager=agents_graph_mockings["outgoing_manager"],
+            studi_rag_client=agents_graph_mockings["studi_rag_client"],
+            salesforce_client=agents_graph_mockings["salesforce_client"],
+            call_sid=agents_graph_mockings["call_sid"])
 
     # Mock the router LLM's ainvoke method to check the prompt
-    agents.router_llm.ainvoke = AsyncMock(return_value=MagicMock(content="studi_rag_agent"))
+    with patch.object(type(agents.router_llm), "ainvoke", new=AsyncMock(return_value=MagicMock(content="router llm response"))):
+        
+        # Create a long chat history that should be truncated
+        # The new logic takes the last 8 messages and limits total chars to ~16k
+        long_message = "a" * 2500  # A long message
+        chat_history = [("user" if i % 2 == 0 else "assistant", long_message) for i in range(10)] # 10 messages > 8
+        
+        original_history_len = sum(len(text) for _, text in chat_history)
+        assert original_history_len > 20000 # Ensure it's long enough to be truncated
 
-    # Create a long chat history that should be truncated
-    # The new logic takes the last 8 messages and limits total chars to ~16k
-    long_message = "a" * 2500  # A long message
-    chat_history = [("user" if i % 2 == 0 else "assistant", long_message) for i in range(10)] # 10 messages > 8
-    
-    original_history_len = sum(len(text) for _, text in chat_history)
-    assert original_history_len > 20000 # Ensure it's long enough to be truncated
+        user_input = "This is a new user input."
+        
+        initial_state: PhoneConversationState = PhoneConversationState(
+            call_sid=agents_graph_mockings["call_sid"],
+            caller_phone=agents_graph_mockings["phone_number"],
+            user_input=user_input,
+            history=chat_history,
+            agent_scratchpad={"conversation_id": "39e81136-4525-4ea8-bd00-c22211110001"}
+        )
 
-    user_input = "This is a new user input."
-    
-    initial_state: PhoneConversationState = PhoneConversationState(
-        call_sid=agents_graph_mockings["call_sid"],
-        caller_phone=agents_graph_mockings["phone_number"],
-        user_input=user_input,
-        history=chat_history,
-        agent_scratchpad={"conversation_id": "39e81136-4525-4ea8-bd00-c22211110001"}
-    )
+        # Act
+        await agents.graph.ainvoke(initial_state)
 
-    # Act
-    await agents.graph.ainvoke(initial_state)
+        # Assert
+        agents.router_llm.ainvoke.assert_called_once()
+        
+        # Check the prompt that was actually sent
+        sent_prompt = agents.router_llm.ainvoke.call_args[0][0]
+        
+        # The prompt should be significantly shorter than the original history
+        # The limit is around 16000 characters for the history part.
+        # The prompt template adds some characters as well.
+        assert len(sent_prompt) < 18000
+        assert len(sent_prompt) < original_history_len
 
-    # Assert
-    agents.router_llm.ainvoke.assert_called_once()
-    
-    # Check the prompt that was actually sent
-    sent_prompt = agents.router_llm.ainvoke.call_args[0][0]
-    
-    # The prompt should be significantly shorter than the original history
-    # The limit is around 16000 characters for the history part.
-    # The prompt template adds some characters as well.
-    assert len(sent_prompt) < 18000
-    assert len(sent_prompt) < original_history_len
-
-    # Also check that only the last 8 messages are included.
-    # The prompt contains "[user]:" and "[assistant]:" prefixes.
-    assert sent_prompt.count("[user]:") <= 4
-    assert sent_prompt.count("[assistant]:") <= 4
+        # Also check that only the last 10 messages are included.
+        # The prompt contains "[user]:" and "[assistant]:" prefixes.
+        assert sent_prompt.count("[user]:") == 5
+        assert sent_prompt.count("[assistant]:") == 5
 
 
 @pytest.fixture

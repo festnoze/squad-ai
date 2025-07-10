@@ -1,6 +1,6 @@
 import asyncio
 import pytest
-from managers.outgoing_audio_manager import OutgoingAudioManager
+from app.managers.outgoing_audio_manager import OutgoingAudioManager
 
 
 # Define the fixture at the module level
@@ -22,7 +22,7 @@ def fixture(mocker):
     )
     
     # Patch the send_audio_chunk method of audio_sender
-    outgoing_audio_manager.audio_sender.send_audio_chunk = mocker.AsyncMock(return_value=True)
+    outgoing_audio_manager.audio_sender.send_audio_chunk_async = mocker.AsyncMock(return_value=True)
     
     return {
         'websocket': mock_websocket,
@@ -33,7 +33,6 @@ def fixture(mocker):
 
 class TestOutgoingAudioManager:
     """Test cases for the OutgoingAudioManager class"""
-    
     
     async def test_enqueue_text(self, fixture):
         """Test enqueueing text to the OutgoingAudioManager"""
@@ -107,7 +106,7 @@ class TestOutgoingAudioManager:
         assert outgoing_audio_manager.has_text_to_be_sent() is False
         
         # Verify TTS and send_audio_chunk were called
-        outgoing_audio_manager.audio_sender.send_audio_chunk.assert_called()
+        outgoing_audio_manager.audio_sender.send_audio_chunk_async.assert_called()
     
     
     async def test_get_streaming_stats(self, fixture):

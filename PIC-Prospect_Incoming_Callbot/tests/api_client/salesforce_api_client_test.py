@@ -3,9 +3,9 @@ import asyncio
 import os
 import logging
 from datetime import datetime, timedelta
-from api_client.salesforce_api_client import SalesforceApiClient
-
-from api_client.salesforce_api_client_interface import SalesforceApiClientInterface
+#
+from app.api_client.salesforce_api_client import SalesforceApiClient
+from app.api_client.salesforce_api_client_interface import SalesforceApiClientInterface
     
 @pytest.fixture
 def salesforce_api_client() -> SalesforceApiClientInterface:
@@ -109,7 +109,7 @@ async def test_get_leads_by_details_async(salesforce_api_client: SalesforceApiCl
 async def test_schedule_new_appointment_async(salesforce_api_client: SalesforceApiClientInterface):
     """Test scheduling a new appointment"""
     now = datetime.now()
-    start_datetime = now # Today, now + timedelta(days=1)  # Tomorrow
+    start_datetime = now + timedelta(days=1)  # Tomorrow
     start_datetime_str = start_datetime.strftime("%Y-%m-%dT%H:%M:%SZ")
     
     subject = "Test Appointment from Automated Tests"
@@ -130,8 +130,8 @@ async def test_schedule_new_appointment_async(salesforce_api_client: SalesforceA
     assert event_id is not None, "Should receive an event ID when scheduling an appointment"
     assert isinstance(event_id, str), "Event ID should be a string"
     
-    # Log the created event ID
-    logging.info(f"Created test appointment with ID: {event_id}")
+    # Delete the created event ID
+    assert await salesforce_api_client.delete_event_by_id_async(event_id)
 
 
 @pytest.mark.parametrize("fixed_date", [

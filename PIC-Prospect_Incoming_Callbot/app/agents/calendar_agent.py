@@ -6,18 +6,21 @@ from langchain.tools import tool, BaseTool
 from langchain.agents import AgentExecutor, create_tool_calling_agent, create_react_agent
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import StrOutputParser
+from langchain_core.messages import AIMessage, HumanMessage
 #
 from api_client.salesforce_api_client_interface import SalesforceApiClientInterface
 
 class CalendarAgent:        
     salesforce_api_client: SalesforceApiClientInterface
-    owner_id = None
-    owner_name = None
-    now = None
+    owner_id: str | None = None
+    owner_name: str | None = None
+    now: datetime | None = None
     
-    def __init__(self, llm_or_chain: any, salesforce_api_client: SalesforceApiClientInterface):
+    def __init__(self, salesforce_api_client: SalesforceApiClientInterface, classifier_llm: any, available_timeframes_llm: any = None, date_extractor_llm: any = None):
         self.logger = logging.getLogger(__name__)
-        self.llm = llm_or_chain
+        self.classifier_llm = classifier_llm
+        self.available_timeframes_llm = available_timeframes_llm if available_timeframes_llm else classifier_llm
+        self.date_extractor_llm = date_extractor_llm if date_extractor_llm else self.available_timeframes_llm
         CalendarAgent.salesforce_api_client = salesforce_api_client
         CalendarAgent.now = datetime.now(tz=pytz.timezone('Europe/Paris'))
 
@@ -29,7 +32,7 @@ class CalendarAgent:
             MessagesPlaceholder(variable_name="agent_scratchpad"),
         ])
         tools_available_timeframes = [CalendarAgent.get_available_timeframes]
-        agent = create_tool_calling_agent(self.llm, tools_available_timeframes, prompts)
+        agent = create_tool_calling_agent(self.available_timeframes_llm, tools_available_timeframes, prompts)
         self.available_timeframes_agent = AgentExecutor(agent=agent, tools=tools_available_timeframes, verbose=True)
 
         # self.tools = [self.get_appointments, self.schedule_new_appointment]
@@ -41,7 +44,7 @@ class CalendarAgent:
         #     ("human", "{input}"),
         #     MessagesPlaceholder(variable_name="agent_scratchpad"),
         # ])
-        # self.agent = create_tool_calling_agent(self.llm, self.tools, self.prompts)
+        # self.agent = create_tool_calling_agent(self.date_extractor_llm, self.tools, self.prompts)
         # self.agent_executor = AgentExecutor(agent=self.agent, tools=self.tools, verbose=True)
         # response = self.agent_executor.invoke({"input": "quel jour sommes nous ?", "chat_history": []})['output']
 
@@ -305,7 +308,7 @@ class CalendarAgent:
                                 .replace("{chat_history}", "- " + "\n- ".join(formatted_history))
 
         try:
-            resp = await self.llm.ainvoke(classifier_prompt)
+            resp = await self.classifier_llm.ainvoke(classifier_prompt)
             llm_category = resp.content.strip() if hasattr(resp, "content") else str(resp).strip()
             return llm_category
         except Exception as e:
@@ -479,9 +482,6 @@ class CalendarAgent:
 
 
     async def _extract_appointment_selected_date_and_time_async(self, user_input: str, chat_history: list[dict[str, str]]) -> datetime:
-        from langchain_core.prompts import ChatPromptTemplate
-        from langchain_core.output_parsers import StrOutputParser
-        
         prompt = ChatPromptTemplate.from_template("""
         Extract the exact date and time specified by the user for the appointment from the following conversation.
         Only return the date and time in the following format: YYYY-MM-DDTHH:MM:SSZ.
@@ -497,7 +497,7 @@ class CalendarAgent:
         If no clear date/time is mentioned, return 'not-found'.
         """)
         
-        chain = prompt | self.llm | StrOutputParser()
+        chain = prompt | self.date_extractor_llm | StrOutputParser()
         chat_history_str = "- " + "\n- ".join((msg[0] + ": " + msg[1]) for msg in chat_history)
         response = await chain.ainvoke({
             "input": user_input,

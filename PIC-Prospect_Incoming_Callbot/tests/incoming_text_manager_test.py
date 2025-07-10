@@ -1,7 +1,6 @@
 import pytest
 import sys
 import os
-import asyncio
 from unittest.mock import Mock, AsyncMock, patch
 from pyshould import should
 

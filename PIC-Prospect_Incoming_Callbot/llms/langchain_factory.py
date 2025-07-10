@@ -2,8 +2,6 @@
 
 import uuid
 import logging
-#
-from langchain_core.runnables import Runnable
 from langchain_core.language_models.chat_models import BaseChatModel
 #
 from llms.llm_info import LlmInfo
@@ -12,14 +10,14 @@ from llms.langchain_adapter_type import LangChainAdapterType
 class LangChainFactory():
     logger = logging.getLogger(__name__)
     @staticmethod
-    def create_llms_from_infos(llms_infos: list[LlmInfo]) -> list[Runnable]:
+    def create_llms_from_infos(llms_infos: list[LlmInfo]) -> list[BaseChatModel]:
         LangChainFactory.logger.info(f'Loading LLM models ...')
         if isinstance(llms_infos, LlmInfo):
             llms_infos = [llms_infos]
         if len(llms_infos) == 0:
             raise ValueError('No LLMs infos provided.')
 
-        llms: list[Runnable] = []
+        llms: list[BaseChatModel] = []
         for llm_info in llms_infos:
             llm = LangChainFactory.create_llm_from_info(llm_info)
             llms.append(llm)
@@ -28,7 +26,7 @@ class LangChainFactory():
         return llms
     
     @staticmethod
-    def create_llm_from_info(llm_info: LlmInfo) -> Runnable:
+    def create_llm_from_info(llm_info: LlmInfo) -> BaseChatModel:
         LangChainFactory.logger.info(f'Loading LLM model ...')
         llm = LangChainFactory.create_llm(
             adapter_type= llm_info.type,
@@ -42,8 +40,8 @@ class LangChainFactory():
         return llm
     
     @staticmethod
-    def create_llm(adapter_type: LangChainAdapterType, llm_model_name: str, timeout_seconds: int = 50, temperature: float = 0.1, inference_provider_api_key: str = None, extra_body_dict: dict[str, any] = {}) -> Runnable:
-        llm: Runnable = None
+    def create_llm(adapter_type: LangChainAdapterType, llm_model_name: str, timeout_seconds: int = 50, temperature: float = 0.1, inference_provider_api_key: str = None, extra_body_dict: dict[str, any] = {}) -> BaseChatModel:
+        llm: BaseChatModel = None
         if adapter_type == LangChainAdapterType.OpenAI:
             if not inference_provider_api_key: 
                 raise ValueError(f'"{LangChainFactory.__name__}" requires that "type" of {LlmInfo.__name__} (of type: "{LangChainAdapterType.__name__}") to have its "api_key" property specified for adapter: {LangChainAdapterType.OpenAI}')
@@ -144,7 +142,7 @@ class LangChainFactory():
         )
         
     @staticmethod     
-    def create_llm_google(llm_model_name: str, api_key: str, timeout_seconds: int = 50, temperature:float = 0.1):# -> BaseChatModel:
+    def create_llm_google(llm_model_name: str, api_key: str, timeout_seconds: int = 50, temperature:float = 0.1) -> BaseChatModel:
         pass
         # return GoogleGenerativeAI(    
         #     name= f'chat_google_{str(uuid.uuid4())}',

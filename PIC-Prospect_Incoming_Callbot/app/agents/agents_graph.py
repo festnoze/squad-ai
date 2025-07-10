@@ -4,6 +4,7 @@ import uuid
 from uuid import UUID
 import random
 from langgraph.graph import StateGraph, END
+from langchain_core.language_models.chat_models import BaseChatModel
 
 # Models
 from agents.phone_conversation_state_model import PhoneConversationState
@@ -44,10 +45,10 @@ class AgentsGraph:
         self.logger.info(f"Initialize Lead Agent succeed with config: {lid_config_file_path}")
         
         openai_api_key = EnvHelper.get_openai_api_key()
-        self.router_llm = LangChainFactory.create_llm_from_info(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4.1", timeout=20, temperature=0.5, api_key=openai_api_key))
-        self.calendar_llm = LangChainFactory.create_llm_from_info(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4.1", timeout=50, temperature=0.5, api_key=openai_api_key))
+        self.router_llm: BaseChatModel = LangChainFactory.create_llm_from_info(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4.1", timeout=30, temperature=0.1, api_key=openai_api_key))
+        self.calendar_timeframes_llm: BaseChatModel = LangChainFactory.create_llm_from_info(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4.1-mini", timeout=50, temperature=0.1, api_key=openai_api_key))
         
-        self.calendar_agent_instance = CalendarAgent(llm_or_chain=self.calendar_llm, salesforce_api_client=self.salesforce_api_client)
+        self.calendar_agent_instance = CalendarAgent(salesforce_api_client=self.salesforce_api_client, classifier_llm=self.router_llm, available_timeframes_llm=self.calendar_timeframes_llm, date_extractor_llm=self.calendar_timeframes_llm)
         self.logger.info("Initialize Calendar Agent succeed")
         
         self.sf_agent_instance = SFAgent()
@@ -121,7 +122,7 @@ class AgentsGraph:
                 feedback_text = random.choice([" Un instant s'il vous plait.", " Merci de patienter.", " Laissez-moi y réfléchir.", " Une petite seconde."])
             await self.outgoing_manager.enqueue_text(feedback_text)
 
-            category = await self.analyse_user_input_for_dispatch_async(user_input, state["history"])
+            category = await self.analyse_user_input_for_dispatch_async(self.router_llm, user_input, state["history"])
             state["history"].append(("user", user_input))
 
             if category == "schedule_calendar_appointment":
@@ -134,7 +135,7 @@ class AgentsGraph:
         state['agent_scratchpad']["next_agent_needed"] = "wait_for_user_input"
         return state
 
-    async def analyse_user_input_for_dispatch_async(self, user_input: str, chat_history: list[dict[str, str]]) -> str:
+    async def analyse_user_input_for_dispatch_async(self, llm: any, user_input: str, chat_history: list[dict[str, str]]) -> str:
         """Analyse the user input and dispatch to the right agent"""  
         with open("app/agents/prompts/analyse_user_general_classifier_prompt.txt", 'r', encoding='utf-8') as file:
             prompt = file.read()
@@ -150,7 +151,7 @@ class AgentsGraph:
             chat_history_str = "... " + chat_history_str[-max_msg_chars:]
         prompt = prompt.format(user_input=user_input, chat_history=chat_history_str)
         
-        response = await self.router_llm.ainvoke(prompt)
+        response = await llm.ainvoke(prompt)
         
         self.logger.info(f"#> Router Analysis decide to dispatch to: |###> {response.content} <###|")
         return response.content

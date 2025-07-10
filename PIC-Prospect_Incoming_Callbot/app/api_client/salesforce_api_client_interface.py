@@ -31,6 +31,10 @@ class SalesforceApiClientInterface(ABC):
             The ID of the created event if successful, None otherwise
         """        
         pass
+    
+    @abstractmethod
+    async def delete_event_by_id_async(self, event_id: str) -> bool:
+        pass
 
     @abstractmethod
     async def get_scheduled_appointments_async(self, start_datetime: str, end_datetime: str, owner_id: str | None = None) -> list | None:

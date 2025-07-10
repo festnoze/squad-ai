@@ -4,7 +4,7 @@ from openai._types import NOT_GIVEN
 import io
 from utils.envvar import EnvHelper
 
-TTSModel        = Literal["gpt-4o-mini-tts", "gpt-4o-tts", "tts-1", "tts-1-hd"]
+TTSModel        = Literal["gpt-4o-mini-tts", "tts-1", "tts-1-hd"]
 VoicePreset     = Literal["fable", "onyx", "nova", "shimmer", "alloy", "echo", "ash", "ballad", "coral", "sage" ]
                 # Better for french: fable, nova, shimmer
                 # All OpenAI TTS voices: alloy, ash, ballad, coral, echo, fable, nova, onyx, sage, shimmer
