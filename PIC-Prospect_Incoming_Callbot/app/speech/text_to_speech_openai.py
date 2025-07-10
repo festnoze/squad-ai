@@ -1,5 +1,5 @@
 from typing import Literal
-from openai import OpenAI
+from openai import AsyncOpenAI
 from openai._types import NOT_GIVEN
 import io
 from utils.envvar import EnvHelper
@@ -12,10 +12,10 @@ ResponseFormat  = Literal["mp3", "opus", "aac", "flac", "wav", "pcm"]
 OutputType      = Literal["stream", "file", "audio_bytes"]
 
 class TTS_OpenAI:    
-    openai_client: any = OpenAI(api_key=EnvHelper.get_openai_api_key())
+    openai_client: any = AsyncOpenAI(api_key=EnvHelper.get_openai_api_key())
     
     @staticmethod
-    def generate_speech(
+    async def generate_speech_async(
             model: TTSModel,
             text: str,
             voice: VoicePreset = "nova",
@@ -26,7 +26,7 @@ class TTS_OpenAI:
         # 'tts-1*' models don't support instructions, only 'gpt-4o-*-tts' ones does.
         if model.startswith('tts-1'):
             instructions = NOT_GIVEN
-        response: any = TTS_OpenAI.openai_client.audio.speech.create(
+        response: any = await TTS_OpenAI.openai_client.audio.speech.create(
                 model=model,
                 input=text,
                 voice=voice,

@@ -10,9 +10,9 @@ def fixture(mocker):
     # Create mock objects
     mock_websocket = mocker.Mock()
     mock_tts_provider = mocker.Mock()
-    mock_tts_provider.synthesize_speech_to_bytes = mocker.Mock(return_value=b'dummy_audio_bytes' * 100)
+    mock_tts_provider.synthesize_speech_to_bytes_async = mocker.AsyncMock(return_value=b'dummy_audio_bytes' * 100)
     mock_tts_provider.text_queue_manager = mocker.Mock()
-    mock_tts_provider.text_queue_manager.get_next_text_chunk = mocker.Mock(return_value="dummy_text")
+    mock_tts_provider.text_queue_manager.get_next_text_chunk_async = mocker.AsyncMock(return_value="dummy_text")
     
     # Create the OutgoingAudioManager instance with mocks websocket & TTS provider
     outgoing_audio_manager = OutgoingAudioManager(
@@ -99,7 +99,7 @@ class TestOutgoingAudioManager:
         assert outgoing_audio_manager.has_text_to_be_sent() is True
         
         # Give time for the streaming worker to process the text
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(1)
         
         # Stop streaming
         await outgoing_audio_manager.stop_background_streaming_worker_async()

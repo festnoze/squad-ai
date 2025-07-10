@@ -37,7 +37,7 @@ class TextQueueManager:
             self.logger.debug(f"Enqueued {len(text)} characters. Queue length: {len(self.text_queue)} characters")
             return True
             
-    async def get_next_text_chunk(self, max_words_by_sentence: int = 15, max_chars_by_sentence: int = 120) -> Optional[str]:
+    async def get_next_text_chunk_async(self, max_words_by_sentence: int = 20, max_chars_by_sentence: int = 150) -> Optional[str]:
         """
         Gets a chunk of text from the queue.
         Returns a tuple of (text_chunk, estimated_duration_ms)
@@ -58,26 +58,6 @@ class TextQueueManager:
             self.total_processed_chars += len(splitted_text[0])
             return splitted_text[0]
             
-    def get_next_text_chunk_sync(self, max_words_by_sentence: int = 15, max_chars_by_sentence: int = 120) -> Optional[str]:
-        """
-        Synchronous version of get_next_text_chunk.
-        Gets a chunk of text from the queue without using async/await.
-        Used by the AsyncCallWrapper for thread-based processing.
-        
-        Returns a text chunk or None if queue is empty.
-        """
-        if not self.text_queue:
-            return None
-            
-        # No lock usage here since we're using this in a thread-based context
-        # The main thread should ensure no concurrent modifications to the queue
-        splitted_text = ProcessText.chunk_text_by_sentences_size(self.text_queue, max_words_by_sentence, max_chars_by_sentence)
-        if splitted_text:
-            self.text_queue = "".join(splitted_text[1:])
-            self.total_processed_chars += len(splitted_text[0])
-            return splitted_text[0]
-        return None            
-    
     def is_empty(self) -> bool:
         """
         Returns True if the text queue is empty.

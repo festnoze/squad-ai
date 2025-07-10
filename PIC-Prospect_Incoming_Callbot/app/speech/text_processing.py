@@ -8,7 +8,7 @@ including text chunking, duration estimation, and timing calculations.
 """
 class ProcessText:
     @staticmethod
-    def chunk_text_by_sentences_size(text: str, max_words_by_sentence: int = 10, max_chars_by_sentence: int = 100) -> list[str]:
+    def chunk_text_by_sentences_size(text: str, max_words_by_sentence: int = 15, max_chars_by_sentence: int = 120) -> list[str]:
         """
         Split text into chunks at natural sentence boundaries.
         
@@ -28,7 +28,7 @@ class ProcessText:
         
         # Find all sentences ending with punctuation
         # This pattern keeps the sentence-ending punctuation with the sentence
-        pattern = r'[^.!?]+[.!?]'
+        pattern = r'[^.!?;:,]+[.!?;:,]'
         matches = re.findall(pattern, text)
         
         # Process matches to get clean sentences

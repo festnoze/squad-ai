@@ -13,7 +13,7 @@ class TextToSpeechProvider(ABC):
     sample_width: int = None # default: 2 (x bytes = x*8 bits per sample) = 16-bit signed PCM (little-endian)
     
     @abstractmethod
-    def synthesize_speech_to_bytes(self, text: str) -> bytes:
+    async def synthesize_speech_to_bytes_async(self, text: str) -> bytes:
         """Speech-to-text using specified the provider, and return it as bytes"""
         pass
 
@@ -34,7 +34,6 @@ class TextToSpeechProvider(ABC):
             self.logger.error(f"Error resampling audio with audioop: {e}", exc_info=True)
             return b""
 
-
 class GoogleTTSProvider(TextToSpeechProvider):
     def __init__(self, temp_dir: str, frame_rate: int = 8000, channels: int = 1, sample_width: int = 2):
         from google.cloud import texttospeech as google_tts
@@ -46,7 +45,7 @@ class GoogleTTSProvider(TextToSpeechProvider):
         self.channels = channels
         self.sample_width = sample_width
 
-    def synthesize_speech_to_bytes(self, text: str) -> bytes:
+    async def synthesize_speech_to_bytes_async(self, text: str) -> bytes:
         try:
             synthesis_input = self.google_tts.SynthesisInput(text=text)
             voice = self.google_tts.VoiceSelectionParams(language_code="fr-FR", ssml_gender=self.google_tts.SsmlVoiceGender.FEMALE)
@@ -77,9 +76,9 @@ class OpenAITTSProvider(TextToSpeechProvider):
         self.instructions = EnvHelper.get_text_to_speech_instructions() or "Parle d'une voix calme mais positive, avec une diction rapide mais claire"
         self.model = EnvHelper.get_text_to_speech_model() or "tts-1"
 
-    def synthesize_speech_to_bytes(self, text: str) -> bytes:
+    async def synthesize_speech_to_bytes_async(self, text: str) -> bytes:
         try:
-            audio_bytes = TTS_OpenAI.generate_speech(
+            audio_bytes = await TTS_OpenAI.generate_speech_async(
                 model=self.model,
                 response_format="pcm",
                 voice=self.voice,

@@ -15,14 +15,14 @@ async def test_all_chunks_processing():
     """Test that all chunks in the queue gets processed and sent."""
     # Arrange        
     audio_sender = MagicMock(spec=TwilioAudioSender)
-    audio_sender.send_audio_chunk = AsyncMock(return_value=True)
+    audio_sender.send_audio_chunk_async = AsyncMock(return_value=True)
     audio_sender.stream_sid = "mock_stream_sid"
     audio_sender.is_sending = False
 
     websocket = MagicMock(spec=WebSocket)
     tts_provider = MagicMock(spec=TextToSpeechProvider)
     mocked_synthesize_audio_bytes = b"mock_audio_bytes"
-    tts_provider.synthesize_speech_to_bytes = MagicMock(return_value=mocked_synthesize_audio_bytes)
+    tts_provider.synthesize_speech_to_bytes_async = AsyncMock(return_value=mocked_synthesize_audio_bytes)
     outgoing_audio_manager = OutgoingAudioManager(websocket=websocket, tts_provider=tts_provider)
     outgoing_audio_manager.audio_sender = audio_sender
     
@@ -32,14 +32,14 @@ async def test_all_chunks_processing():
         return True
     outgoing_audio_manager.audio_sender.send_audio_chunk_async = mock_send_audio_chunk_async
     
-    original_synthesize = outgoing_audio_manager.synthesize_next_audio_chunk
+    original_synthesize = outgoing_audio_manager.synthesize_next_audio_chunk_async
     processed_chunks = []
-    def mock_synthesize_next_audio_chunk():
-        chunk = original_synthesize()
+    async def mock_synthesize_next_audio_chunk():
+        chunk = await original_synthesize()
         if chunk:
             processed_chunks.append(chunk)  # Record the text chunk
         return chunk
-    outgoing_audio_manager.synthesize_next_audio_chunk = mock_synthesize_next_audio_chunk
+    outgoing_audio_manager.synthesize_next_audio_chunk_async = mock_synthesize_next_audio_chunk
     
     # Act
     outgoing_audio_manager.run_background_streaming_worker()
@@ -70,11 +70,11 @@ async def test_single_chunk_processing():
     websocket = MagicMock(spec=WebSocket)
     tts_provider = MagicMock(spec=TextToSpeechProvider)
     mocked_synthesize_audio_bytes = b"mock_audio_bytes"
-    tts_provider.synthesize_speech_to_bytes = MagicMock(return_value=mocked_synthesize_audio_bytes)
+    tts_provider.synthesize_speech_to_bytes_async = AsyncMock(return_value=mocked_synthesize_audio_bytes)
     outgoing_audio_manager = OutgoingAudioManager(websocket=websocket, tts_provider=tts_provider)
     #
     mock_audio_sender = MagicMock(spec=TwilioAudioSender)
-    mock_audio_sender.send_audio_chunk = AsyncMock(return_value=True)
+    mock_audio_sender.send_audio_chunk_async = AsyncMock(return_value=True)
     mock_audio_sender.stream_sid = "mock_stream_sid"
     mock_audio_sender.is_sending = False
     outgoing_audio_manager.audio_sender = mock_audio_sender

@@ -38,6 +38,12 @@ from app.speech.text_processing import ProcessText
         100, 100,
         ["This one is a very long sentence of more than one hundred characters that should be split into", "multiple chunks based on the specified character limit."]
     ),
+    # Test case 7: Sentence with mid-sentence separators: ; , :
+    (
+        "This one is a very long sentence ; of more than one hundred characters, that should be split into multiple chunks: based on the specified character limit.",
+        100, 100,
+        ["This one is a very long sentence ;", "of more than one hundred characters,", "that should be split into multiple chunks:", "based on the specified character limit."]
+    ),
 ])
 def test_chunk_text_by_sized_sentences(test_input, max_words, max_chars, expected):
     """Test the chunk_text_by_sized_sentences method with various inputs."""

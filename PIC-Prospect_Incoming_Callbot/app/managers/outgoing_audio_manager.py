@@ -66,18 +66,18 @@ class OutgoingAudioManager(OutgoingManager):
         return
 
 
-    def synthesize_next_audio_chunk(self) -> bytes | None:
+    async def synthesize_next_audio_chunk_async(self) -> bytes | None:
         """
         Gets the next text chunk and synthesizes it to audio bytes.
         Returns None if no text is available or tuple (speech_chunk, speech_bytes) if successful.
         """
         try:
             # Process this text into optimal chunks for natural speech
-            speech_chunk = self.text_queue_manager.get_next_text_chunk_sync()
+            speech_chunk = await self.text_queue_manager.get_next_text_chunk_async()
             if not speech_chunk:
                 return None
             
-            speech_bytes = self.tts_provider.synthesize_speech_to_bytes(speech_chunk)
+            speech_bytes = await self.tts_provider.synthesize_speech_to_bytes_async(speech_chunk)
             self.logger.info(f">>>>>> Synthesized speech for chunk: '{speech_chunk}'")
             if not speech_bytes:
                 self.logger.error(f"/!\\ Failed to synthesize speech for chunk: '{speech_chunk}'")
@@ -86,7 +86,7 @@ class OutgoingAudioManager(OutgoingManager):
             return speech_bytes
 
         except Exception as e:
-            self.logger.error(f"Error in synthesize_next_audio_chunk: {e}")
+            self.logger.error(f"Error in synthesize_next_audio_chunk_async: {e}")
             return None
 
      
@@ -132,7 +132,7 @@ class OutgoingAudioManager(OutgoingManager):
             # Handle the next text chunk to be sent
             try:
                 if not pre_synthesis_task and self.has_text_to_be_sent():
-                    pre_synthesis_task = asyncio.create_task(asyncio.to_thread(self.synthesize_next_audio_chunk))
+                    pre_synthesis_task = asyncio.create_task(self.synthesize_next_audio_chunk_async())
                 
                 if not pre_synthesis_task:
                     continue
@@ -156,7 +156,7 @@ class OutgoingAudioManager(OutgoingManager):
                 # Start pre-synthesis for the next chunk in parallel of sending the current chunk
                 pre_synthesis_task = None
                 if self.has_text_to_be_sent():
-                    pre_synthesis_task = asyncio.create_task(asyncio.to_thread(self.synthesize_next_audio_chunk))
+                    pre_synthesis_task = asyncio.create_task(self.synthesize_next_audio_chunk_async())
 
                 # Wait for the send to complete, but check for completion of next synthesis as well
                 while not send_audio_chunk_task.done():
