@@ -84,7 +84,7 @@ class OpenAITTSProvider(TextToSpeechProvider):
                 voice=self.voice,
                 text=text,
                 instructions=self.instructions,
-                speed=0.9
+                speed=1.0
             )
             return self.convert_PCM_frame_rate_w_audioop(audio_bytes, from_frame_rate=24000, to_frame_rate=self.frame_rate)
 

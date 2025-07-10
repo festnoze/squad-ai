@@ -51,6 +51,18 @@ from llms.langchain_adapter_type import LangChainAdapterType
         ),
         
         # ===== SCENARIO B: ALTERNATIVE FLOW - REQUEST DIFFERENT SLOT =====
+        # B0: User asks for different availability
+        (
+            "Quelles sont les dispo la semaine prochaine ?", 
+            [
+                ("human", "Je voudrais prendre rendez-vous"), 
+                ("AI", "Je vous propose le créneaux du jeudi 20 juin à 14 heures. Si ce créneau vous convient, merci de me confirmer afin de finaliser sa réservation.")
+            ],
+            "Proposition de créneaux", 
+            "Je vous propose les créneaux suivants : lundi, le 24 juin, de 9 heures à 12 heures ou de 13 heures à 18 heures, ou mardi, le 25 juin, de 9 heures à 12 heures. Avez-vous une préférence ?",
+            False # Semantic matching
+        ),
+
         # B1: User asks for different availability
         (
             "Quelles sont vos autres disponibilités ?", 
@@ -244,8 +256,8 @@ async def test_complete_conversation_exchange(sf_client_mock, llm_instance, simi
         {
             "user_input": "Bonjour, je voudrais prendre rendez-vous avec mon conseiller",
             "category": "Proposition de créneaux",
-            "expected_response": "Je vous propose le créneau du jeudi 20 juin entre 14 heures et 15 heures. Si ce créneau vous convient, merci de me confirmer afin de finaliser sa réservation.",
-            "await_exact_match": False
+            "expected_response": "Je vous propose les créneaux suivants : demain, le jeudi 20 juin, de 9 heures à 12 heures ou de 13 heures à 18 heures, ou après-demain, le vendredi 21 juin, de 9 heures à 12 heures. Avez-vous une préférence ?",
+            "await_exact_match": True
         },
         # Step 2: User asks for different availabilities
         {
@@ -258,22 +270,22 @@ async def test_complete_conversation_exchange(sf_client_mock, llm_instance, simi
         {
             "user_input": "Je préférerais vendredi après-midi",
             "category": "Proposition de créneaux",
-            "expected_response": "Je vous propose le créneau du vendredi 21 juin entre 14 heures et 15 heures. Si ce créneau vous convient, merci de me confirmer afin de finaliser sa réservation.",
+            "expected_response": "Je vous propose le créneau suivant : vendredi, le 21 juin, de 13 heures à 18 heures. Avez-vous une préférence ?",
             "await_exact_match": False
         },
-        # Step 4: User accepts the proposed time
+        # Step 4: User specifies a slot
         {
-            "user_input": "Parfait, ça me convient",
+            "user_input": "à 15 heures, c'est parfait.",
             "category": "Demande de confirmation du rendez-vous",
-            "expected_response": "Récapitulons : votre rendez-vous sera planifié le vendredi 21 juin à 13 heures. Merci de confirmer ce rendez-vous pour le valider.",
-            "await_exact_match": True
+            "expected_response": "Récapitulons : votre rendez-vous sera planifié le vendredi 21 juin à 15 heures. Merci de confirmer ce rendez-vous pour le valider.",
+            "await_exact_match": False
         },
         # Step 5: User confirms the appointment
         {
             "user_input": "Je confirme le rendez-vous",
             "category": "Rendez-vous confirmé",
-            "expected_response": "Votre rendez-vous du vendredi 21 juin à 14 heures a bien été confirmé. Merci et à bientôt !",
-            "await_exact_match": False
+            "expected_response": "C'est confirmé ! Votre rendez-vous est maintenant planifié pour après-demain, le vendredi 21 juin à 15 heures. Merci et au revoir.",
+            "await_exact_match": True
         }
     ]
     
@@ -302,7 +314,8 @@ class SimilarityEvaluator:
         llm = LangChainFactory.create_llm_from_info(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4o-mini", timeout=50, temperature=0.5, api_key=os.getenv("OPENAI_API_KEY")))
         prompt = "Compare the following two responses for semantic similarity: \nResponse 1: {expected} \nResponse 2: {actual} \nReturn 'True' if they are semantically similar, 'False' otherwise."
 
-        return llm.invoke(prompt.format(expected=expected, actual=actual))
+        response = await llm.ainvoke(prompt.format(expected=expected, actual=actual))
+        return response.content == "True"
 
 @pytest.fixture
 def sf_client_mock():
