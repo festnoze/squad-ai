@@ -7,10 +7,10 @@ from speech.text_to_speech_openai import TTS_OpenAI
 class TextToSpeechProvider(ABC):
     client: any = None
     logger: logging.Logger = None
-    temp_dir: str = None
     frame_rate: int = None # default: 8kHz sample rate (required by Twilio Voice)
     channels: int = None # default: 1 = Mono channel
     sample_width: int = None # default: 2 (x bytes = x*8 bits per sample) = 16-bit signed PCM (little-endian)
+    temp_dir: str = None
     
     @abstractmethod
     async def synthesize_speech_to_bytes_async(self, text: str) -> bytes:
@@ -35,15 +35,15 @@ class TextToSpeechProvider(ABC):
             return b""
 
 class GoogleTTSProvider(TextToSpeechProvider):
-    def __init__(self, temp_dir: str, frame_rate: int = 8000, channels: int = 1, sample_width: int = 2):
+    def __init__(self, frame_rate: int = 8000, channels: int = 1, sample_width: int = 2, temp_dir: str = "static/audio"):
         from google.cloud import texttospeech as google_tts
         self.google_tts = google_tts
         self.logger = logging.getLogger(__name__)
         self.client = self.google_tts.TextToSpeechClient()
-        self.temp_dir = temp_dir
         self.frame_rate = frame_rate
         self.channels = channels
         self.sample_width = sample_width
+        self.temp_dir = temp_dir
 
     async def synthesize_speech_to_bytes_async(self, text: str) -> bytes:
         try:
@@ -63,15 +63,15 @@ class GoogleTTSProvider(TextToSpeechProvider):
             return b""
 
 class OpenAITTSProvider(TextToSpeechProvider):
-    def __init__(self, temp_dir: str, frame_rate: int = 8000, channels: int = 1, sample_width: int = 2, openai_api_key: str = None):
+    def __init__(self, frame_rate: int = 8000, channels: int = 1, sample_width: int = 2, temp_dir: str = "static/audio", openai_api_key: str = None):
         from openai import OpenAI
         self.logger = logging.getLogger(__name__)
         api_key = openai_api_key if openai_api_key else EnvHelper.get_openai_api_key()
         self.client = OpenAI(api_key=api_key)
-        self.temp_dir = temp_dir
         self.frame_rate = frame_rate
         self.channels = channels
         self.sample_width = sample_width
+        self.temp_dir = temp_dir
         self.voice = EnvHelper.get_text_to_speech_voice() or "nova"
         self.instructions = EnvHelper.get_text_to_speech_instructions() or "Parle d'une voix calme mais positive, avec une diction rapide mais claire"
         self.model = EnvHelper.get_text_to_speech_model() or "tts-1"
@@ -92,7 +92,7 @@ class OpenAITTSProvider(TextToSpeechProvider):
             self.logger.error(f"OpenAI TTS failed: {openai_error}.", exc_info=True)
             return b""
 
-def get_text_to_speech_provider(temp_dir: str, provider_name: str = "openai", frame_rate: int = 8000, channels: int = 1, sample_width: int = 2) -> TextToSpeechProvider:
-    if provider_name.lower() == "google": return GoogleTTSProvider(temp_dir, frame_rate=frame_rate, channels=channels, sample_width=sample_width)
-    if provider_name.lower() == "openai": return OpenAITTSProvider(temp_dir, frame_rate=frame_rate, channels=channels, sample_width=sample_width)
+def get_text_to_speech_provider(provider_name: str = "openai", frame_rate: int = 8000, channels: int = 1, sample_width: int = 2, temp_dir: str = "static/audio") -> TextToSpeechProvider:
+    if provider_name.lower() == "google": return GoogleTTSProvider(frame_rate=frame_rate, channels=channels, sample_width=sample_width, temp_dir=temp_dir)
+    if provider_name.lower() == "openai": return OpenAITTSProvider(frame_rate=frame_rate, channels=channels, sample_width=sample_width, temp_dir=temp_dir)
     raise ValueError(f"Invalid TTS provider: {provider_name}")

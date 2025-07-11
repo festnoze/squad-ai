@@ -17,14 +17,14 @@ class SpeechToTextProvider(ABC):
         pass
 
 class GoogleSTTProvider(SpeechToTextProvider):
-    def __init__(self, temp_dir: str, language_code: str = "fr-FR", frame_rate: int = 8000):
+    def __init__(self, language_code: str = "fr-FR", frame_rate: int = 8000, temp_dir: str = "static/audio"):
         from google.cloud import speech
         self.speech = speech
         self.logger = logging.getLogger(__name__)
         self.google_client = self.speech.SpeechClient()
-        self.temp_dir = temp_dir
         self.language_code = language_code
         self.frame_rate = frame_rate
+        self.temp_dir = temp_dir
     def transcribe_audio(self, file_name: str) -> str:
         """Transcribe audio file using Google STT API."""
         try:
@@ -58,13 +58,13 @@ class GoogleSTTProvider(SpeechToTextProvider):
         return transcript
 
 class OpenAISTTProvider(SpeechToTextProvider):
-    def __init__(self, temp_dir: str, language_code: str = "fr-FR", frame_rate: int = 8000):
-        from openai import OpenAI
+    def __init__(self, language_code: str = "fr-FR", frame_rate: int = 8000, temp_dir: str = "static/audio"):
+        from openai import AsyncOpenAI
         self.logger = logging.getLogger(__name__)
-        self.temp_dir = temp_dir
         self.language_code = language_code
         self.frame_rate = frame_rate
-        self.openai_client = OpenAI(api_key=EnvHelper.get_openai_api_key())
+        self.temp_dir = temp_dir
+        self.openai_client = AsyncOpenAI(api_key=EnvHelper.get_openai_api_key())
 
     def transcribe_audio(self, file_name: str) -> str:
         """Transcribe audio file using OpenAI STT API."""
@@ -88,16 +88,16 @@ class OpenAISTTProvider(SpeechToTextProvider):
         return response.text
 
 class HybridSTTProvider(SpeechToTextProvider):
-    def __init__(self, temp_dir: str, language_code: str = "fr-FR", frame_rate: int = 8000):
+    def __init__(self, language_code: str = "fr-FR", frame_rate: int = 8000, temp_dir: str = "static/audio"):
         from google.cloud import speech
         from openai import OpenAI
         self.google_speech = speech
         self.logger = logging.getLogger(__name__)
-        self.temp_dir = temp_dir
         self.google_client = self.google_speech.SpeechClient()
         self.openai_client = OpenAI(api_key=EnvHelper.get_openai_api_key())
         self.language_code = language_code
         self.frame_rate = frame_rate
+        self.temp_dir = temp_dir
 
     def transcribe_audio(self, file_name: str) -> str:
         try:
@@ -131,9 +131,9 @@ class HybridSTTProvider(SpeechToTextProvider):
         #     return transcript_google
         # return transcript_openai
 
-def get_speech_to_text_provider(temp_dir: str, provider_name: str = "openai", language_code: str = "fr-FR", frame_rate: int = 8000) -> SpeechToTextProvider:
+def get_speech_to_text_provider(provider_name: str = "openai", language_code: str = "fr-FR", frame_rate: int = 8000, temp_dir: str = "static/audio") -> SpeechToTextProvider:
     """Factory function to get the appropriate speech-to-text provider"""
-    if provider_name.lower() == "hybrid": return HybridSTTProvider(temp_dir, language_code=language_code, frame_rate=frame_rate)
-    if provider_name.lower() == "google": return GoogleSTTProvider(temp_dir, language_code=language_code, frame_rate=frame_rate)
-    if provider_name.lower() == "openai": return OpenAISTTProvider(temp_dir, language_code=language_code, frame_rate=frame_rate)
+    if provider_name.lower() == "hybrid": return HybridSTTProvider(language_code=language_code, frame_rate=frame_rate, temp_dir=temp_dir)
+    if provider_name.lower() == "google": return GoogleSTTProvider(language_code=language_code, frame_rate=frame_rate, temp_dir=temp_dir)
+    if provider_name.lower() == "openai": return OpenAISTTProvider(language_code=language_code, frame_rate=frame_rate, temp_dir=temp_dir)
     raise ValueError(f"Invalid STT provider: {provider_name}")

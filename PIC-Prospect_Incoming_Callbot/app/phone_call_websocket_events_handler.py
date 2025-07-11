@@ -1,8 +1,6 @@
-import base64
-import io
 import os
-import json
 import logging
+import json
 #
 from openai import OpenAI
 from fastapi import WebSocket, WebSocketDisconnect
@@ -13,6 +11,7 @@ from speech.speech_to_text import get_speech_to_text_provider
 from agents.agents_graph import AgentsGraph
 from managers.incoming_audio_manager import IncomingAudioManager
 from managers.outgoing_audio_manager import OutgoingAudioManager
+#from managers.transcription_manager import TranscriptionManager
 #
 from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
 #
@@ -31,6 +30,7 @@ class PhoneCallWebsocketEventsHandler:
         self.websocket = websocket
         self.logger = logging.getLogger(__name__)
         self.logger.info("IncomingPhoneCallHandler logger started")
+        #self.transcription_manager = TranscriptionManager()
         
         # State tracking for this instance
         self.openai_client = None
@@ -56,7 +56,6 @@ class PhoneCallWebsocketEventsHandler:
         self.start_time = None
 
         # Environment and configuration settings
-        self.TEMP_DIR = "static/audio"
         self.OPENAI_API_KEY = EnvHelper.get_openai_api_key()
         os.environ['OPENAI_API_KEY'] = self.OPENAI_API_KEY
 
@@ -74,8 +73,8 @@ class PhoneCallWebsocketEventsHandler:
         # Initialize dependencies
         tts_provider_name = EnvHelper.get_text_to_speech_provider()
         stt_provider_name = EnvHelper.get_speech_to_text_provider()
-        self.tts_provider = get_text_to_speech_provider(self.TEMP_DIR, provider_name=tts_provider_name, frame_rate=self.frame_rate, channels=self.channels, sample_width=self.sample_width)
-        self.stt_provider = get_speech_to_text_provider(self.TEMP_DIR, provider_name=stt_provider_name, language_code="fr-FR", frame_rate=self.frame_rate)
+        self.tts_provider = get_text_to_speech_provider(provider_name=tts_provider_name, frame_rate=self.frame_rate, channels=self.channels, sample_width=self.sample_width)
+        self.stt_provider = get_speech_to_text_provider(provider_name=stt_provider_name, language_code="fr-FR", frame_rate=self.frame_rate)
         
         self.studi_rag_inference_api_client = StudiRAGInferenceApiClient()
         self.salesforce_client: SalesforceApiClientInterface = SalesforceApiClient()
@@ -182,6 +181,10 @@ class PhoneCallWebsocketEventsHandler:
 
     async def _handle_media_event_async(self, media_data: dict) -> None:
         """Handle the 'media' event from Twilio which contains audio data."""
+        # Process transcription in parallel with existing audio handling
+        #await self.transcription_manager.process_media_event_async(media_data)
+        
+        # Continue with existing audio processing
         await self.incoming_audio_processing.process_incoming_data_async(media_data)
             
     def _is_websocket_connected(self) -> bool:

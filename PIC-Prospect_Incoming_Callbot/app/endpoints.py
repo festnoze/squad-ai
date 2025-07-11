@@ -1,11 +1,16 @@
+import os
 import logging
 from fastapi import APIRouter, WebSocket, Request, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
+from twilio.rest import Client
 from twilio.twiml.voice_response import VoiceResponse, Connect
 from twilio.twiml.messaging_response import MessagingResponse
+from twilio.request_validator import RequestValidator
 #
 from phone_call_websocket_events_handler import PhoneCallWebsocketEventsHandler, PhoneCallWebsocketEventsHandlerFactory
 from incoming_sms_handler import IncomingSMSHandler
+from utils.envvar import EnvHelper
+from fastapi import HTTPException
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -13,21 +18,42 @@ router = APIRouter()
 
 # Instanciate after app startup
 phone_call_websocket_events_handler_factory: PhoneCallWebsocketEventsHandlerFactory = None
+allowed_signatures :list[str] = []
+twilio_authenticate = RequestValidator(EnvHelper.get_twilio_auth())
 
-async def _extract_request_data_async(request: Request) -> tuple:
-    """Extract common data from the request form"""
-    form = await request.form()
-    phone_number: str = form.get("From", "Unknown From")
-    call_sid: str = form.get("CallSid", "Unknown CallSid")
-    body = form.get("Body", "")     
-    return phone_number, call_sid, body
+async def authenticate_twilio_request(request: Request | WebSocket) -> None:
+    signature = request.headers.get("X-Twilio-Signature", "")
+    allowed_signatures.append(signature)
+    if isinstance(request, Request):
+        url = str(request.url)
+        form = await request.form()
+        if not twilio_authenticate.validate(url, dict(form), signature):
+            raise HTTPException(status_code=403)
+    elif isinstance(request, WebSocket):
+        if signature not in allowed_signatures:
+            raise HTTPException(status_code=403)
 
-# ========= Incoming phone call logic ========= #
-async def create_incoming_call_websocket_async(request: Request) -> HTMLResponse:
+twilio_client = Client(EnvHelper.get_twilio_sid(), EnvHelper.get_twilio_auth())
+
+async def verify_twilio_call_sid(call_sid: str, from_number: str) -> None:
+    call = twilio_client.calls(call_sid).fetch()
+    if call.status not in ("in-progress", "in-queue", "ringing"):
+        raise HTTPException(status_code=403)
+    if call.from_formatted != from_number:
+        raise HTTPException(status_code=403)
+
+# ========= Incoming phone call endpoint ========= #
+@router.post("/")
+async def voice_webhook(request: Request) -> HTMLResponse:
+    await authenticate_twilio_request(request)
+    return await create_websocket_for_incoming_call_async(request)
+
+async def create_websocket_for_incoming_call_async(request: Request) -> HTMLResponse:
     """Handle incoming phone calls from Twilio"""
     logger.info("Received POST request for voice webhook")
     try:
         phone_number, call_sid, _ = await _extract_request_data_async(request)
+        await verify_twilio_call_sid(call_sid, phone_number)
         logger.info(f"Call from: {phone_number}, CallSid: {call_sid}")
 
         x_forwarded_proto = request.headers.get("x-forwarded-proto")
@@ -37,10 +63,12 @@ async def create_incoming_call_websocket_async(request: Request) -> HTMLResponse
         logger.info(f"[<--->] Connecting Twilio stream to WebSocket: {ws_url}")
 
         response = VoiceResponse()
+
         connect = Connect()
+        #connect.stream(url=ws_url, track="both_tracks", parameters={
         connect.stream(url=ws_url, track="inbound_track", parameters={
             "mediaEncoding": "audio/x-mulaw", 
-            "sampleRate": 8000  # Request 8kHz audio (max on )
+            "sampleRate": 8000  # Request 8kHz audio (max. on phone lines)
         })
         response.append(connect)
         return HTMLResponse(content=str(response), media_type="application/xml")
@@ -51,15 +79,19 @@ async def create_incoming_call_websocket_async(request: Request) -> HTMLResponse
         response.say("An error occurred processing your call. Please try again later.")
         return HTMLResponse(content=str(response), media_type="application/xml", status_code=500)
 
+async def _extract_request_data_async(request: Request) -> tuple:
+    """Extract common data from the request form"""
+    form = await request.form()
+    phone_number: str = form.get("From", "Unknown From")
+    call_sid: str = form.get("CallSid", "Unknown CallSid")
+    body = form.get("Body", "")     
+    return phone_number, call_sid, body
 
-# ========= Incoming phone call endpoint ========= #
-@router.post("/")
-async def voice_webhook(request: Request) -> HTMLResponse:
-    return await create_incoming_call_websocket_async(request)
-    
 # ========= Incoming phone call WebSocket endpoint ========= #
 @router.websocket("/ws/phone/{calling_phone_number}/sid/{call_sid}")
 async def websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid: str) -> None:
+    await authenticate_twilio_request(ws)
+    await verify_twilio_call_sid(call_sid, calling_phone_number)
     logger.info(f"WebSocket connection attempted for call SID {call_sid} from {ws.client.host}.")
     try:
         await ws.accept()
@@ -88,8 +120,11 @@ async def websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid:
         phone_call_websocket_events_handler_factory.build_new_phone_call_websocket_events_handler()
 
 
-# ========= Incoming SMS logic ========= #
-@staticmethod
+# ========= Incoming SMS endpoint ========= #
+@router.api_route("/incoming-sms", methods=["GET", "POST"])
+async def twilio_incoming_sms(request: Request):
+    return await handle_incoming_sms_async(request)
+
 async def handle_incoming_sms_async(request: Request) -> HTMLResponse:
     """Handle incoming SMS messages from Twilio"""
     logger.info("Received POST request for SMS webhook")
@@ -125,11 +160,4 @@ async def handle_incoming_sms_async(request: Request) -> HTMLResponse:
         logger.error(f"Error processing SMS webhook: {e}", exc_info=True)
         response = MessagingResponse()
         response.message("Une erreur s'est produite. Veuillez réessayer plus tard.")
-        return HTMLResponse(content=str(response), media_type="application/xml", status_code=500)
-
-# ========= Incoming SMS endpoint ========= #
-@router.api_route("/incoming-sms", methods=["GET", "POST"])
-async def twilio_incoming_sms(request: Request):
-    return await handle_incoming_sms_async(request)
-
-    
+        return HTMLResponse(content=str(response), media_type="application/xml", status_code=500)    
