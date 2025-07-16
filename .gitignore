@@ -3,7 +3,7 @@ outputs/
 storage/
 exchanges/
 *.egg-info/
-*.save/
+*.save*/
 *.old/
 secrets/
 chroma_db/

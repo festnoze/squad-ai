@@ -78,7 +78,7 @@ class AvailableService:
         drupal = DrupalDataRetrieval(AvailableService.out_dir)
         drupal.retrieve_all_data()
 
-    async def add_to_vectorstore_chunked_and_embeded_documents_async(out_dir, load_embeddings_from_file_if_exists = True):   
+    async def add_to_vectorstore_chunked_and_embeded_documents_async(out_dir, load_embeddings_from_file_if_exists):   
         all_docs, trainings_docs = GenerateDocumentsAndMetadata.build_all_docs_and_trainings(out_dir, write_all_names_lists=True)
         do_create_summary_from_data = EnvHelper.get_is_summarized_data()
         if do_create_summary_from_data:
@@ -91,7 +91,7 @@ class AvailableService:
             
         AvailableService.chunk_docs_and_add_to_vector_db(all_docs, load_embeddings_from_file_if_exists)
 
-    def chunk_docs_and_add_to_vector_db(all_docs, load_embeddings_from_file_if_exists = True):
+    def chunk_docs_and_add_to_vector_db(all_docs, load_embeddings_from_file_if_exists):
         txt.print_with_spinner("Chunking documents...")
         from common_tools.RAG.rag_ingestion_pipeline.rag_ingestion_pipeline import RagIngestionPipeline
         injection_pipeline = RagIngestionPipeline(AvailableService.rag_service)
@@ -101,7 +101,7 @@ class AvailableService:
         txt.print_with_spinner("Inserting documents into vector database...")
         AvailableService.rag_service.vectorstore = injection_pipeline.embed_chunks_then_add_to_vectorstore(
                             docs_chunks= documents_chunks,
-                            vector_db_type=AvailableService.rag_service.vector_db_type,
+                            vector_db_type= AvailableService.rag_service.vector_db_type,
                             collection_name= AvailableService.rag_service.vector_db_name,
                             delete_existing= True,
                             load_embeddings_from_file_if_exists= load_embeddings_from_file_if_exists,

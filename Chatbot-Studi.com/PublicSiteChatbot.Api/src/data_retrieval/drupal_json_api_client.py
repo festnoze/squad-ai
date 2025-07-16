@@ -1,6 +1,8 @@
-from concurrent.futures import ThreadPoolExecutor, as_completed
+
 import time
 import requests
+import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from langchain_community.retrievers import BM25Retriever
 from rank_bm25 import BM25Okapi
 from langchain.docstore.document import Document
@@ -16,6 +18,7 @@ class DrupalJsonApiClient:
             raise ValueError("Base URL is required to initialize the DrupalJsonApiClient")
         self.user_name = user_name
         self.user_password = user_password
+        self.logger: logging.Logger = logging.getLogger(__name__)
 
     def _perform_request(self, endpoint, remaining_retries=5, allowed_retries=5):
         """
@@ -38,7 +41,7 @@ class DrupalJsonApiClient:
             response.raise_for_status()  # Raise an error for bad responses (4xx or 5xx)
             return response.json()  # Return the JSON response if the request is successful
         except requests.RequestException as e:
-            print(f"Error fetching data from {url}: {e}")
+            self.logger.error(f"Error fetching data from {url}: {e}")
             if remaining_retries > 0: # Retry 'allowed_retries' times upon request failure
                 remaining_retries = remaining_retries - 1
                 time.sleep((allowed_retries-remaining_retries) * 3)
@@ -158,16 +161,16 @@ class DrupalJsonApiClient:
                 extracted_values.extend(self.extract_long_string_values(element, min_length))
         return extracted_values
 
-    def get_drupal_data_recursively(self, url: str, fetch_all_pages=True):
+    def get_drupal_data_recursively(self, url: str, page:int=1, fetch_all_pages=True):
         items_full = self._perform_request(url)
         items_data = items_full['data']
         items = []
         items.extend(items_data)
+        self.logger.info(f"- Loaded page n°{page} with {len(items_data)} items.")
 
         if fetch_all_pages and 'next' in items_full['links']:
             next_url = items_full['links']['next']['href']
-            self.logger.info(f"Loading next page to URL: {next_url}")
-            items += self.get_drupal_data_recursively(next_url, fetch_all_pages)
+            items += self.get_drupal_data_recursively(next_url, page+1, fetch_all_pages)
         return items
     
     def parallel_get_items_related_infos(self, items):
@@ -177,9 +180,10 @@ class DrupalJsonApiClient:
                 for rel in item['related_url']:
                     related_infos = self._perform_request(item['related_url'][rel])
                     item['related_infos'][rel] = DrupalJsonApiClient.extract_all_field_text_values(related_infos)
+                    self.logger.info(f"- Fetched related infos for item {rel}.")
             return item
 
-        self.logger.info(f"Fetching related infos on {len(items)} items, for a global requests count of  {len(items)* len(items[0]['related_url'].keys())}...")
+        self.logger.info(f"- Fetching related infos on {len(items)} items, for a global requests count of  {len(items)* len(items[0]['related_url'].keys())}...")
         
         # Use ThreadPoolExecutor to parallelize the fetch_items_details method
         with ThreadPoolExecutor(max_workers=50) as executor:
@@ -194,7 +198,7 @@ class DrupalJsonApiClient:
                     result = future.result()
                     items[items.index(item)] = result
                 except Exception as ex:
-                    print(f">>> Item {item} generated an exception: {ex}")
+                    self.logger.error(f">>> Item {item} generated an exception: {ex}")
 
         return items
 

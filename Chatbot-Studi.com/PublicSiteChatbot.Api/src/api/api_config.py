@@ -31,7 +31,7 @@ class ApiConfig:
             
             startup_duration = time.time() - started_at
             ApiConfig.logger.error(f"\n✓ API Startup duration: {startup_duration:.2f}s.")
-            ApiConfig.logger.info("")
+            ApiConfig.logger.error("")
             ApiConfig.logger.error("  -------------------------------")
             ApiConfig.logger.error("  | 🌐  RAG API  🚀 started 🚀 |")
             ApiConfig.logger.error("  -------------------------------")
@@ -77,7 +77,6 @@ class ApiConfig:
             allow_methods=["*"],
             allow_headers=["*"],
         )
-
         
         def handle_error(request: Request, error_msg: str):
             err_msg_txt = f"/!\\ ERROR: Call to endpoint: '{request.url.components.path}' fails with error: {error_msg}"
@@ -189,7 +188,7 @@ class ApiConfig:
         root_logger.setLevel(logging.DEBUG)
 
         formatter = logging.Formatter(
-            "%(message)s | %(levelname)s [ln.%(lineno)d] %(asctime)s",
+            "%(message)s | %(levelname)s [%(name)s ln.%(lineno)d] %(asctime)s",
             datefmt="%Y/%m/%d %H:%M:%S",
         )
 

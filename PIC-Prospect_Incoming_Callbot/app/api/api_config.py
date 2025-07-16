@@ -54,9 +54,9 @@ class ApiConfig:
         # Initialize PhoneCallWebsocketEventsHandlerFactory
         endpoints.phone_call_websocket_events_handler_factory = PhoneCallWebsocketEventsHandlerFactory()
         
-        logger.error('-----------------------------------------------------')
-        logger.error('🌐 PIC (Prospect Incoming Callbot) API 🚀 started 🚀')
-        logger.error('-----------------------------------------------------')
+        logger.info('-----------------------------------------------------')
+        logger.info('🌐 PIC (Prospect Incoming Callbot) API 🚀 started 🚀')
+        logger.info('-----------------------------------------------------')
 
 
         def handle_error(request: Request, error_msg: str):

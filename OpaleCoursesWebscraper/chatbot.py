@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from typing import Generator
 import streamlit as st
 import streamlit.components.v1 as components
-import markdown
+#import markdown
 from course_content_querying_service import CourseContentQueryingService
 from models.course_content_models import CourseContent
 from course_content_scraping_service import CourseContentScrapingService
