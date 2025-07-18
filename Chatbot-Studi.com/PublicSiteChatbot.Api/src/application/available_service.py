@@ -68,7 +68,6 @@ class AvailableService:
 
         AvailableService.is_init = True
 
-
     def re_init():
         AvailableService.rag_service = None
         AvailableService.inference_pipeline = None

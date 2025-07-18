@@ -1,117 +1,99 @@
 from typing import Literal
 from openai import AsyncOpenAI
 from openai._types import NOT_GIVEN
-import io
+import base64, io
+
 from utils.envvar import EnvHelper
 
-TTSModel        = Literal["gpt-4o-mini-tts", "tts-1", "tts-1-hd"]
-VoicePreset     = Literal["fable", "onyx", "nova", "shimmer", "alloy", "echo", "ash", "ballad", "coral", "sage" ]
-                # Better for french: fable, nova, shimmer
-                # All OpenAI TTS voices: alloy, ash, ballad, coral, echo, fable, nova, onyx, sage, shimmer
-ResponseFormat  = Literal["mp3", "opus", "aac", "flac", "wav", "pcm"]
-OutputType      = Literal["stream", "file", "audio_bytes"]
+TTSModel        = Literal[
+    "gpt-4o-realtime-preview",
+    "gpt-4o-mini-realtime-preview",
+    "gpt-4o-mini-tts",
+    "tts-1",
+    "tts-1-hd",
+]
+VoicePreset     = Literal[
+    "alloy", "ash", "ballad", "coral", "echo",
+    "fable", "onyx", "nova", "sage", "shimmer",
+]
+ResponseFormat  = Literal["pcm","mp3","wav","flac","opus","aac"]
 
-class TTS_OpenAI:    
-    openai_client: any = AsyncOpenAI(api_key=EnvHelper.get_openai_api_key())
-    
+class TTS_OpenAI:
+    _client: AsyncOpenAI = AsyncOpenAI(api_key=EnvHelper.get_openai_api_key())
+
     @staticmethod
     async def generate_speech_async(
-            model: TTSModel,
-            text: str,
-            voice: VoicePreset = "nova",
-            instructions: str = NOT_GIVEN,
-            speed: float = 1.0,
-            response_format: ResponseFormat = "pcm",
-            convert_to_pcm_rate: int | None = None) -> bytes:
-        # 'tts-1*' models don't support instructions, only 'gpt-4o-*-tts' ones does.
-        if model.startswith('tts-1'):
+        model: TTSModel,
+        text: str,
+        voice: VoicePreset = "nova",
+        instructions: str = NOT_GIVEN,
+        speed: float = 1.0,
+        response_format: ResponseFormat = "pcm",
+        convert_to_pcm_rate: int | None = None,
+    ) -> bytes:
+        if model in {"gpt-4o-realtime-preview", "gpt-4o-mini-realtime-preview"}:
+            return await TTS_OpenAI._generate_realtime_bytes(
+                model=model, text=text, voice=voice
+            )
+        if model.startswith("tts-1"):
             instructions = NOT_GIVEN
-        response: any = await TTS_OpenAI.openai_client.audio.speech.create(
-                model=model,
-                input=text,
-                voice=voice,
-                instructions=instructions,
-                speed=speed,
-                response_format=response_format,
+        resp = await TTS_OpenAI._client.audio.speech.create(
+            model=model,
+            input=text,
+            voice=voice,
+            instructions=instructions,
+            speed=speed,
+            response_format=response_format,
         )
-        raw_response: bytes = response.read()
+        raw = resp.read()
         if response_format == "pcm" and convert_to_pcm_rate:
-            raw_response = TTS_OpenAI.convert_PCM_frame_rate_w_pydub(audio_bytes=raw_response, from_frame_rate=24000, to_frame_rate=convert_to_pcm_rate)
-        return raw_response    
-    
-    def convert_PCM_frame_rate_w_pydub(self, audio_bytes: bytes, from_frame_rate: int, to_frame_rate: int, sample_width: int = 2, channels: int = 1) -> bytes:
-        if not audio_bytes: return b""
-        if from_frame_rate == to_frame_rate: return audio_bytes
-        
-        try:
-            from pydub import AudioSegment
-            audio = AudioSegment.from_raw(io.BytesIO(audio_bytes), sample_width=sample_width, frame_rate=from_frame_rate, channels=channels)
-            audio = audio.set_frame_rate(to_frame_rate)
-            buf = io.BytesIO()
-            audio.export(buf, format="raw")
-            return buf.getvalue()
-        
-        except Exception:
-            return b""
-        
-    def convert_PCM_frame_rate_w_audioop(self, audio_bytes: bytes, from_frame_rate: int, to_frame_rate: int) -> bytes:
-        if not audio_bytes: return b""
-        if from_frame_rate == to_frame_rate: return audio_bytes
-        
-        try:
-            import audioop
-            converted_audio, _ = audioop.ratecv(audio_bytes, self.sample_width, self.channels, from_frame_rate, to_frame_rate, None)
-            return converted_audio
-        
-        except audioop.error as e:
-            return b""
-    
-    ## UN-USE: kept for streaming cases
-    # @staticmethod
-    # def tts_playback(
-    #         text: str,
-    #         model: TTSModel = "tts-1",
-    #         voice: VoicePreset = "nova",
-    #         instructions: str = "Speak in a cheerful and positive tone.",
-    #         speed: float = 1.0,
-    #         response_format: ResponseFormat = "pcm",
-    #         output_type: OutputType = "stream",
-    #         output_path: Path = Path("speech.pcm")) -> any:
-    #     import pyaudio
-    #     if output_type == "stream":
-    #             pa: any = pyaudio.PyAudio()
-    #             stream_out: any = pa.open(format=pyaudio.paInt16, channels=1, rate=24_000, output=True)
-    #             with TTS_OpenAI.openai_client.audio.speech.with_streaming_response.create(
-    #                     model=model,
-    #                     input=text,
-    #                     voice=voice,
-    #                     instructions=instructions,
-    #                     speed=speed,
-    #                     response_format="pcm",
-    #             ) as resp:
-    #                     for chunk in resp.iter_bytes():
-    #                             stream_out.write(chunk)
-    #             stream_out.stop_stream()
-    #             stream_out.close()
-    #             pa.terminate()
-    #     elif output_type == "audio_bytes":
-    #             with TTS_OpenAI.openai_client.audio.speech.with_streaming_response.create(
-    #                     model=model,
-    #                     input=text,
-    #                     voice=voice,
-    #                     instructions=instructions,
-    #                     speed=speed,
-    #                     response_format=response_format,
-    #             ) as resp:
-    #                     return b"".join(resp.iter_bytes())
-    #     else:  # file
-    #             with TTS_OpenAI.openai_client.audio.speech.with_streaming_response.create(
-    #                     model=model,
-    #                     input=text,
-    #                     voice=voice,
-    #                     instructions=instructions,
-    #                     speed=speed,
-    #                     response_format=response_format,
-    #             ) as resp:
-    #                     resp.stream_to_file(output_path)
-    #                     return output_path
+            raw = TTS_OpenAI._convert_rate(raw, 24000, convert_to_pcm_rate)
+        return raw
+
+    @staticmethod
+    async def _generate_realtime_bytes(
+        model: str,
+        text: str,
+        voice: VoicePreset,
+    ) -> bytes:
+        client = TTS_OpenAI._client
+        pcm_chunks: list[bytes] = []
+        async with client.beta.realtime.connect(model=model) as conn:
+            await conn.session.update(session={
+                "modalities": ["audio"],
+                "output_audio_format": "pcm16",
+            })
+            await conn.conversation.item.create(item={
+                "type": "message", "role": "user",
+                "content": [{"type": "input_text", "text": text}],
+            })
+            await conn.response.create(response={
+                "modalities": ["audio"],
+                "voice": voice,
+            })
+            async for event in conn:
+                if event.type == "response.audio.delta":
+                    pcm_chunks.append(base64.b64decode(event.delta))
+                elif event.type == "response.done":
+                    break
+        return b"".join(pcm_chunks)
+
+    @staticmethod
+    def _convert_rate(
+        audio_bytes: bytes,
+        from_rate: int,
+        to_rate: int,
+        sample_width: int = 2,
+        channels: int = 1,
+    ) -> bytes:
+        from pydub import AudioSegment
+        audio = AudioSegment.from_raw(
+            io.BytesIO(audio_bytes),
+            frame_rate=from_rate,
+            sample_width=sample_width,
+            channels=channels,
+        )
+        audio = audio.set_frame_rate(to_rate)
+        buf = io.BytesIO()
+        audio.export(buf, format="raw")
+        return buf.getvalue()

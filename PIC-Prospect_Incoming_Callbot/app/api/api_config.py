@@ -75,7 +75,11 @@ class ApiConfig:
 
                 if endpoint_output.body == b"" or endpoint_output.status_code == 204:
                     return JSONResponse(content={"status": "success"}, status_code=204)
-                    
+
+                #TODO: log if request fails (don't works as this)
+                # if endpoint_output.status_code > 299:
+                #     logger.error(f"Call to endpoint {request.url} fails with status code {endpoint_output.status_code}")  
+                
                 response_body = b"".join([chunk async for chunk in endpoint_output.body_iterator])
 
                 async def iterate_in_chunks(content: bytes):

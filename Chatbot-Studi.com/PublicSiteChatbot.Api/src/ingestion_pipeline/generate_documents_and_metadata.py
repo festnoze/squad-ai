@@ -25,7 +25,7 @@ class GenerateDocumentsAndMetadata:
                                                                             llm_and_fallback=llm_and_fallback,
                                                                             load_existing_summaries_and_questions_from_file=True,
                                                                             file_path=path, 
-                                                                            existing_summaries_and_questions_filename= 'trainings_summaries_chunks_and_questions_objects.json'
+                                                                            existing_summaries_and_questions_filename= 'trainings_summaries_chunks_and_questions_objects'
                                                                             )
         return trainings_objects
     

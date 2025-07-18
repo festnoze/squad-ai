@@ -7,6 +7,8 @@ src/database_conversations/conversation_database.db
 /outputs/logs/
 /outputs/scraped/
 /outputs/scraped-full/
+/outputs.save*/
+/storage.save*/
 
 senv/
 .vscode/

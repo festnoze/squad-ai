@@ -44,8 +44,9 @@ async def verify_twilio_call_sid(call_sid: str, from_number: str) -> None:
 
 # ========= Incoming phone call endpoint ========= #
 @router.post("/")
-async def voice_webhook(request: Request) -> HTMLResponse:
-    await authenticate_twilio_request(request)
+async def voice_incoming_call_endpoint(request: Request) -> HTMLResponse:
+    logger.info("Received POST request for voice endpoint")
+    #await authenticate_twilio_request(request)
     return await create_websocket_for_incoming_call_async(request)
 
 async def create_websocket_for_incoming_call_async(request: Request) -> HTMLResponse:
@@ -90,7 +91,7 @@ async def _extract_request_data_async(request: Request) -> tuple:
 # ========= Incoming phone call WebSocket endpoint ========= #
 @router.websocket("/ws/phone/{calling_phone_number}/sid/{call_sid}")
 async def websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid: str) -> None:
-    await authenticate_twilio_request(ws)
+    #await authenticate_twilio_request(ws)
     await verify_twilio_call_sid(call_sid, calling_phone_number)
     logger.info(f"WebSocket connection attempted for call SID {call_sid} from {ws.client.host}.")
     try:

@@ -28,7 +28,7 @@ class ProcessText:
         
         # Find all sentences ending with punctuation
         # This pattern keeps the sentence-ending punctuation with the sentence
-        pattern = r'[^.!?;:,]+[.!?;:,]'
+        pattern = r'[^.!?;:]+[.!?;:]'
         matches = re.findall(pattern, text)
         
         # Process matches to get clean sentences

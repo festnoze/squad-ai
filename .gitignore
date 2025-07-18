@@ -4,6 +4,7 @@ storage/
 exchanges/
 *.egg-info/
 *.save*/
+saves/
 *.old/
 secrets/
 chroma_db/

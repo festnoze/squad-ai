@@ -54,9 +54,9 @@ class CourseContentQueryingService:
         #llm_chain = rag_custom_prompt | llm | RunnablePassthrough()
 
         all_chunks = []
-        #sync_generator = Execute.async_generator_wrapper_to_sync(Llm.invoke_as_async_stream, 'Answer user course query', llm_chain, input_variables, False, all_chunks, False)
+        #sync_generator = Execute.async_generator_wrapper_to_sync(Llm.invoke_as_async_stream, 'Answer user course query', llm_chain, input_variables, all_chunks, False)
         
-        sync_generator = Execute.async_generator_wrapper_to_sync(Llm.invoke_as_async_stream, 'Answer user course query', llm, messages, False, all_chunks, False)
+        sync_generator = Execute.async_generator_wrapper_to_sync(Llm.invoke_as_async_stream, 'Answer user course query', llm, messages, all_chunks, False)
         return sync_generator
 
     @staticmethod

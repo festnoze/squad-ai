@@ -12,7 +12,7 @@ class SpeechToTextProvider(ABC):
     frame_rate: int = 8000
     
     @abstractmethod
-    def transcribe_audio(self, file_name: str) -> str:
+    async def transcribe_audio_async(self, file_name: str) -> str:
         """Transcribe audio file to text using the specified provider"""
         pass
 
@@ -25,7 +25,8 @@ class GoogleSTTProvider(SpeechToTextProvider):
         self.language_code = language_code
         self.frame_rate = frame_rate
         self.temp_dir = temp_dir
-    def transcribe_audio(self, file_name: str) -> str:
+    
+    async def transcribe_audio_async(self, file_name: str) -> str:
         """Transcribe audio file using Google STT API."""
         try:
             return GoogleSTTProvider.transcribe_audio_static(self.temp_dir, self.speech, self.google_client, file_name, self.language_code, self.frame_rate)
@@ -66,21 +67,21 @@ class OpenAISTTProvider(SpeechToTextProvider):
         self.temp_dir = temp_dir
         self.openai_client = AsyncOpenAI(api_key=EnvHelper.get_openai_api_key())
 
-    def transcribe_audio(self, file_name: str) -> str:
+    async def transcribe_audio_async(self, file_name: str) -> str:
         """Transcribe audio file using OpenAI STT API."""
         try:
-            return OpenAISTTProvider.transcribe_audio_static(self.openai_client, self.temp_dir, file_name, self.language_code, self.frame_rate)
+            return await OpenAISTTProvider.transcribe_audio_static_async(self.openai_client, self.temp_dir, file_name, self.language_code, self.frame_rate)
         except Exception as e:
             self.logger.error(f"Error transcribing audio with OpenAI: {e}", exc_info=True)
             return ""
     
     @staticmethod
-    def transcribe_audio_static(openai_client, temp_dir: str, file_name: str, language_code: str, frame_rate: int) -> str:
+    async def transcribe_audio_static_async(openai_client, temp_dir: str, file_name: str, language_code: str, frame_rate: int) -> str:
         """Transcribe audio file using OpenAI STT API."""
         if not openai_client:
             raise ValueError("OpenAI client not initialized - missing API key")
         with open(os.path.join(temp_dir, file_name), "rb") as audio_file:
-            response = openai_client.audio.transcriptions.create(
+            response = await openai_client.audio.transcriptions.create(
                 model="gpt-4o-transcribe",
                 file=audio_file,
                 language=language_code.split('-')[0] if language_code else "fr"
@@ -99,30 +100,30 @@ class HybridSTTProvider(SpeechToTextProvider):
         self.frame_rate = frame_rate
         self.temp_dir = temp_dir
 
-    def transcribe_audio(self, file_name: str) -> str:
+    async def transcribe_audio_async(self, file_name: str) -> str:
         try:
-            return HybridSTTProvider.transcribe_audio_static(self.openai_client, self.google_speech, self.google_client, self.temp_dir, file_name, self.language_code, self.frame_rate)
+            return await HybridSTTProvider.transcribe_audio_static_async(self.openai_client, self.google_speech, self.google_client, self.temp_dir, file_name, self.language_code, self.frame_rate)
         except Exception as e:
             self.logger.error(f"Error transcribing audio with HybridSTTProvider: {e}", exc_info=True)
             return ""
     
     @staticmethod
-    def transcribe_audio_static(openai_client, speech, client, temp_dir: str, file_name: str, language_code: str, frame_rate: int) -> str:
+    async def transcribe_audio_static_async(openai_client, speech, client, temp_dir: str, file_name: str, language_code: str, frame_rate: int) -> str:
         """Transcribe audio file using OpenAI STT API, fallback to Google Cloud Speech-to-Text API."""
         # Try Google transcription first
-        transcript = GoogleSTTProvider.transcribe_audio_static(temp_dir, speech, client, file_name, language_code, frame_rate)
+        transcript = await GoogleSTTProvider.transcribe_audio_static_async(temp_dir, speech, client, file_name, language_code, frame_rate)
         if transcript:
             return transcript
 
         # Fallback to OpenAI transcription
         if openai_client:
-            transcript = OpenAISTTProvider.transcribe_audio_static(openai_client, temp_dir, file_name, language_code, frame_rate)
+            transcript = await OpenAISTTProvider.transcribe_audio_static_async(openai_client, temp_dir, file_name, language_code, frame_rate)
             return transcript
         return ""
         
         # # Run both transcriptions in parallel
         # transcript_google = GoogleSTTProvider.transcribe_audio_static(temp_dir, speech, client, file_name, language_code, frame_rate)
-        # transcript_openai = OpenAISTTProvider.transcribe_audio_static(openai_client, temp_dir, file_name, language_code, frame_rate)
+        # transcript_openai = await OpenAISTTProvider.transcribe_audio_static_async(openai_client, temp_dir, file_name, language_code, frame_rate)
         
         # if len(transcript_google) == 0 or len(transcript_openai) == 0:
         #     return ""

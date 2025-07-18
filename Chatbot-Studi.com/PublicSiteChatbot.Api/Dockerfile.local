@@ -27,10 +27,8 @@ RUN pip install --no-cache-dir -r requirements_docker.txt
 # Copie l'intégralité du projet dans le container (hors .dockerignore)
 COPY . .
 
-# Nettoie le répertoire storage des données existantes (hors fichiers du sparse vectorizer : .pkl et .npy)
+# Nettoie le répertoire storage des données existantes (hors fichiers du sparse vectorizer : .pkl)
 RUN find /storage -type f -not \( -name "*.pkl" \) -delete
-# RUN find /storage -name "*.npy" -type f -delete
-# RUN find /storage -name "*.json" -type f -delete
 
 # Modifie les permissions du fichier de base de données des conversations
 ## Obsolete: DB is removed from .dockerignore

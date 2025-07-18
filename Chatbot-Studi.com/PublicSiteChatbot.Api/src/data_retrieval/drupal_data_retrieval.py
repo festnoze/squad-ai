@@ -31,93 +31,93 @@ class DrupalDataRetrieval:
         """ Retrieve all jobs from studi.com """
         if file.exists(f"{self.out_dir}{"full/jobs"}.json"):
             full_data = file.get_as_json(f"{self.out_dir}{"full/jobs"}.json")
-            self.logger.info(">>> Loading drupal data for jobs.")
+            self.logger.info("### Loading drupal data for jobs. ###")
         else:
-            self.logger.info(">>> Retrieving drupal data for jobs.")
+            self.logger.info("### Retrieving drupal data for jobs. ###")
             full_data = self.studiClient.get_drupal_data_recursively('node/jobs')
             self.save_json_file("full/jobs", full_data)
-            self.logger.info(">>> Saved drupal data for jobs.")
+            self.logger.info("### Saved drupal data for jobs. ###")
 
         jobs = self.studiClient.extract_common_data_from_nodes(full_data, ['field_paragraph'], ['field_domain'])
         jobs = self.studiClient.parallel_get_items_related_infos(jobs)
         self.save_json_file("jobs", jobs)
-        self.logger.info(">>> Finished jobs drupal data retireval ...")
+        self.logger.info("### Finished drupal data retireval on jobs ###")
 
     def retrieve_fundings(self):
         """ Retrieve all fundings from studi.com """
         if file.exists(f"{self.out_dir}{"full/fundings"}.json"):
             full_data = file.get_as_json(f"{self.out_dir}{"full/fundings"}.json")
-            self.logger.info(">>> Loading drupal data for fundings.")
+            self.logger.info("### Loading drupal data for fundings. ###")
         else:
-            self.logger.info(">>> Retrieving drupal data for fundings.")
+            self.logger.info("### Retrieving drupal data for fundings. ###")
             full_data = self.studiClient.get_drupal_data_recursively('node/funding')
             self.save_json_file("full/fundings", full_data)
-            self.logger.info(">>> Saved drupal data for fundings.")
+            self.logger.info("### Saved drupal data for fundings. ###")
         
         fundings = self.studiClient.extract_common_data_from_nodes(full_data, ['field_paragraph'], [])      
         fundings = self.studiClient.parallel_get_items_related_infos(fundings)
         self.save_json_file("fundings", fundings)
-        self.logger.info(">>> Finished fundings drupal data retireval ...")
+        self.logger.info("### Finished drupal data retireval on fundings ###")
 
     def retrieve_trainings(self):
         """ Retrieve all trainings from studi.com """
         if file.exists(f"{self.out_dir}{"full/trainings"}.json"):
             full_data = file.get_as_json(f"{self.out_dir}{"full/trainings"}.json")
-            self.logger.info(">>> Loading drupal data for trainings.")
+            self.logger.info("### Loading drupal data for trainings. ###")
         else:
-            self.logger.info(">>> Retrieving drupal data for trainings.")
+            self.logger.info("### Retrieving drupal data for trainings. ###")
             full_data = self.studiClient.get_drupal_data_recursively('node/training')
             self.save_json_file("full/trainings", full_data)
-            self.logger.info(">>> Saved drupal data for trainings.")
+            self.logger.info("### Saved drupal data for trainings. ###")
         
         trainings = self.studiClient.extract_common_data_from_nodes(
             full_data,
             ['field_paragraph'], 
             ['field_content_bloc','field_certification', 'field_diploma', 'field_domain', 'field_job', 'field_funding', 'field_goal', 'field_job'])
         self.save_json_file("trainings", trainings)
-        self.logger.info(">>> Finished trainings drupal data retireval ...")
+        self.logger.info("### Finished drupal data retireval on trainings ###")
 
     def retrieve_diplomas(self):
         """ Retrieve all diplomas from studi.com """
         if file.exists(f"{self.out_dir}{"full/diplomas"}.json"):
             full_data = file.get_as_json(f"{self.out_dir}{"full/diplomas"}.json")
-            self.logger.info(">>> Loading drupal data for diplomas.")
+            self.logger.info("### Loading drupal data for diplomas. ###")
         else:
-            self.logger.info(">>> Retrieving drupal data for diplomas.")
+            self.logger.info("### Retrieving drupal data for diplomas. ###")
             full_data = self.studiClient.get_drupal_data_recursively('node/diploma')
             self.save_json_file("full/diplomas", full_data)
-            self.logger.info(">>> Saved drupal data for diplomas.")
+            self.logger.info("### Saved drupal data for diplomas. ###")
 
         diplomas = self.studiClient.extract_common_data_from_nodes(full_data, ['field_paragraph'], ['field_content_bloc','field_certification', 'field_diploma', 'field_domain', 'field_job', 'field_funding', 'field_goal', 'field_job'])
         diplomas = self.studiClient.parallel_get_items_related_infos(diplomas)
         self.save_json_file("diplomas", diplomas)
-        self.logger.info(">>> Finished diplomas drupal data retireval ...")
+        self.logger.info("### Finished drupal data retireval on diplomas ###")
 
     def retrieve_certifications(self):
         """ Retrieve all certifications from studi.com """
         if file.exists(f"{self.out_dir}{"full/certifications"}.json"):
             full_data = file.get_as_json(f"{self.out_dir}{"full/certifications"}.json")
-            self.logger.info(">>> Loading drupal data for certifications.")
+            self.logger.info("### Loading drupal data for certifications. ###")
         else:
-            self.logger.info(">>> Retrieving drupal data for certifications.")
+            self.logger.info("### Retrieving drupal data for certifications. ###")
             full_data = self.studiClient.get_drupal_data_recursively('taxonomy_term/certification')
             self.save_json_file("full/certifications", full_data)
-            self.logger.info(">>> Saved drupal data for certifications.")
+            self.logger.info("### Saved drupal data for certifications. ###")
 
         certifications = self.studiClient.extract_common_data_from_nodes(full_data, ['field_paragraph'])
         self.save_json_file("certifications", certifications)
-        self.logger.info(">>> Finished certifications drupal data retireval ...")
+        self.logger.info("### Finished drupal data retireval on certifications ###")
 
     def retrieve_domains_and_subdomains(self):
         """ Retrieve all domains from studi.com """
         if file.exists(f"{self.out_dir}{"full/domains"}.json"):
             full_data = file.get_as_json(f"{self.out_dir}{"full/domains"}.json")
-            self.logger.info(">>> Loading drupal data for domains.")
+            self.logger.info("### Loading drupal data for domains. ###")
         else:
-            self.logger.info(">>> Retrieving drupal data for domains.")
+            self.logger.info("### Retrieving drupal data for domains. ###")
             full_data = self.studiClient.get_drupal_data_recursively('taxonomy_term/domain')
             self.save_json_file("full/domains", full_data)
-            self.logger.info(">>> Saved drupal data for domains.")
+            self.logger.info("### Saved drupal data for domains. ###")
 
         domains_and_subdomains = self.studiClient.extract_common_data_from_nodes(full_data, ['field_paragraph', 'field_school'], ['field_jobs', 'parent'])  
         
@@ -132,22 +132,22 @@ class DrupalDataRetrieval:
 
         self.save_json_file("subdomains", subdomains)
         self.save_json_file("domains", domains)
-        self.logger.info(">>> Finished domains/sub-domains drupal data retireval ...")
+        self.logger.info("### Finished drupal data retireval on domains/sub-domains ###")
 
     def retrieve_certifiers(self):
         """ Retrieve all certifications from studi.com """
         if file.exists(f"{self.out_dir}{"full/certifiers"}.json"):
             full_data = file.get_as_json(f"{self.out_dir}{"full/certifiers"}.json")
-            self.logger.info(">>> Loading drupal data for certifiers.")
+            self.logger.info("### Loading drupal data for certifiers. ###")
         else:
-            self.logger.info(">>> Retrieving drupal data for certifiers.")
+            self.logger.info("### Retrieving drupal data for certifiers. ###")
             full_data = self.studiClient.get_drupal_data_recursively('taxonomy_term/certifier')
             self.save_json_file("full/certifiers", full_data)
-            self.logger.info(">>> Saved drupal data for certifiers.")
+            self.logger.info("### Saved drupal data for certifiers. ###")
 
         certifiers = self.studiClient.extract_common_data_from_nodes(full_data)
         self.save_json_file("certifiers", certifiers)
-        self.logger.info(">>> Finished certifiers drupal data retireval ...")
+        self.logger.info("### Finished drupal data retireval on certifiers ###")
 
     def display_first_item(self, item_type: str):
         data = file.get_as_str(f"{self.out_dir}{item_type.strip()}.json", encoding='utf-8-sig')

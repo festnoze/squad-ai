@@ -334,7 +334,7 @@ class IncomingAudioManager(IncomingManager):
             #await self.outgoing_manager.enqueue_text(random.choice(["Très bien, je vous demande un instant.", "Merci de patienter.", "Laissez-moi y réfléchir.", "Une petite seconde."]))
 
             # 4. Transcribe speech to text
-            user_query_transcript = self._perform_speech_to_text_transcription(audio_data, is_audio_file_to_delete=False)
+            user_query_transcript = await self._perform_speech_to_text_transcription_async(audio_data, is_audio_file_to_delete=False)
             
             # 5. Send the user query to the agents graph
             if user_query_transcript:
@@ -385,7 +385,7 @@ class IncomingAudioManager(IncomingManager):
             self.logger.error(f"Error decoding/converting audio chunk: {decode_err}")
             return None
 
-    def _perform_speech_to_text_transcription(self, audio_data: bytes, is_audio_file_to_delete : bool = True):
+    async def _perform_speech_to_text_transcription_async(self, audio_data: bytes, is_audio_file_to_delete : bool = True):
         try:
             # Check if the audio buffer has a high enough speech to noise ratio
             speech_to_noise_ratio = audioop.rms(audio_data, self.sample_width)
@@ -406,7 +406,7 @@ class IncomingAudioManager(IncomingManager):
             
             # Transcribe using the hybrid STT provider
             self.logger.info("Transcribing audio with hybrid STT provider...")
-            transcript: str = self.stt_provider.transcribe_audio(wav_audio_filename)
+            transcript: str = await self.stt_provider.transcribe_audio_async(wav_audio_filename)
             self.logger.info(f">> Speech to text transcription: '{transcript}'")
             
             # Filter out known watermark text that appears during silences

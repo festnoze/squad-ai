@@ -180,7 +180,9 @@ class DrupalJsonApiClient:
                 for rel in item['related_url']:
                     related_infos = self._perform_request(item['related_url'][rel])
                     item['related_infos'][rel] = DrupalJsonApiClient.extract_all_field_text_values(related_infos)
-                    self.logger.info(f"- Fetched related infos for item {rel}.")
+                    
+                    data_type = item['type'].split('--')[-1].strip() if '--' in item['type'] else item['type']
+                    self.logger.info(f"- For {data_type}, fetched '{rel}' related infos for item: '{item['title']}'.")
             return item
 
         self.logger.info(f"- Fetching related infos on {len(items)} items, for a global requests count of  {len(items)* len(items[0]['related_url'].keys())}...")
@@ -328,4 +330,3 @@ class DrupalJsonApiClient:
         
         # Return the filtered list containing the most informative phrases
         return [phrase for i, phrase in enumerate(phrases) if to_keep[i]]
-
