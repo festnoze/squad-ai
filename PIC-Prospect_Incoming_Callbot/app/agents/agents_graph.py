@@ -151,7 +151,7 @@ class AgentsGraph:
         """Send the begin of welcome message to the user"""
         call_sid = state.get('call_sid', 'N/A')
         phone_number = state.get('caller_phone', 'N/A')
-        self.start_welcome_text = "Bonjour, je suis Studia, l'assistante virtuelle de Studi."
+        self.start_welcome_text = "Bonjour, je suis Studia, l'assistante virtuelle de Studi. Je prend le relais quand nos conseillers en formations ne sont pas disponibles."
         
         await self.outgoing_manager.enqueue_text_async(self.start_welcome_text)
         self.logger.info(f"[{call_sid}] Sent begin of welcome message to {phone_number}")

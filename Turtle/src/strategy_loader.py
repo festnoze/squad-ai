@@ -17,7 +17,7 @@ class StrategyConfig:
 class StrategyLoader:
     """Loads and parses trading strategy files from the strategies directory"""
     
-    def __init__(self, strategies_dir: str = "strategies"):
+    def __init__(self, strategies_dir: str = "./../strategies"):
         self.strategies_dir = Path(strategies_dir)
     
     def load_all_strategies(self) -> List[StrategyConfig]:

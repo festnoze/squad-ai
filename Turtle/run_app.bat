@@ -6,5 +6,5 @@ if not defined VIRTUAL_ENV (
     call venv\Scripts\activate.bat
 )
 
-cd src
-streamlit run app.py
+cd src\frontend
+streamlit run frontend_main.py

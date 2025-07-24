@@ -51,12 +51,13 @@ class IncomingAudioManager(IncomingManager):
         self.openai_client = None
         self.rag_interrupt_flag = {"interrupted": False}
         self.is_speaking = False
+        self.speak_anew_on_long_silence = False
         
         # Audio processing parameters
         self.audio_buffer = b""
         self.consecutive_silence_duration_ms = 0.0
-        self.speech_threshold = 900  # RMS threshold for speech detection
-        self.required_silence_ms_to_answer = 600  # ms of silence to trigger transcript
+        self.speech_threshold = 1500  # RMS threshold for speech detection
+        self.required_silence_ms_to_answer = 700  # ms of silence to trigger transcript
         self.min_audio_bytes_for_processing = 1000  # Minimum buffer size to process
         self.max_audio_bytes_for_processing = 200000  # Maximum buffer size to process
         self.max_silence_duration_before_reasking = 15 * 1000  # ms of silence before reasking
@@ -280,7 +281,8 @@ class IncomingAudioManager(IncomingManager):
                     f"Buffer size: {len(self.audio_buffer)} bytes")
 
         # 2b. Speak anew if the user remains silent for long enough
-        if (self.consecutive_silence_duration_ms >= self.max_silence_duration_before_reasking 
+        if (self.speak_anew_on_long_silence 
+        and self.consecutive_silence_duration_ms >= self.max_silence_duration_before_reasking 
         and self.consecutive_silence_duration_ms % self.max_silence_duration_before_reasking <= 10):
             self.logger.info(f">>> User silence duration of {self.consecutive_silence_duration_ms:.1f}ms exceeded max. silence before speaking anew: {self.max_silence_duration_before_reasking:.1f}ms.")
             await self.outgoing_manager.enqueue_text_async("Comment puis-je vous aider ? Je peux répondre à vos questions concernant nos formations, ou prendre rendez-vous avec un conseiller.")

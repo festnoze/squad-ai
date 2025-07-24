@@ -4,7 +4,10 @@
       "Bash(*:*)",
       "Bash(mkdir:*)",
       "Bash(rm:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(rg:*)",
+      "Bash(run_app.bat)"
     ],
     "deny": []
   }

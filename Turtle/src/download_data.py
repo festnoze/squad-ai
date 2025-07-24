@@ -46,11 +46,15 @@ def download_btc_data(symbol="BTCUSDT", interval="1m", limit=1000, asset_name="B
             "candles": candles
         }
         
-        # Generate filename with date range
+        # Generate filename with date and time using separators
         if candles:
-            start_date = datetime.fromtimestamp(data[0][0] / 1000).strftime("%Y%m%d")
-            end_date = datetime.fromtimestamp(data[-1][0] / 1000).strftime("%Y%m%d")
-            filename = f"data/{symbol.lower()}_{interval}_{start_date}_{end_date}.json"
+            start_dt = datetime.fromtimestamp(data[0][0] / 1000)
+            end_dt = datetime.fromtimestamp(data[-1][0] / 1000)
+            start_date = start_dt.strftime("%Y-%m-%d")
+            start_time = start_dt.strftime("%H!%M!%S")
+            end_date = end_dt.strftime("%Y-%m-%d")
+            end_time = end_dt.strftime("%H!%M!%S")
+            filename = f"data/{symbol.lower()}_{interval}_{start_date}_{start_time}_{end_date}_{end_time}.json"
         else:
             filename = f"data/{symbol.lower()}_{interval}_nodata.json"
             
@@ -116,11 +120,15 @@ def download_eur_usd_data(base_currency="EUR", quote_currency="USD", limit=100, 
             "candles": candles
         }
         
-        # Generate filename with date range
+        # Generate filename with date and time using separators
         if candles:
-            start_date = candles[0]['timestamp'][:10].replace('-', '')  # YYYYMMDD format
-            end_date = candles[-1]['timestamp'][:10].replace('-', '')   # YYYYMMDD format
-            filename = f"data/{base_currency.lower()}{quote_currency.lower()}_{interval}_{start_date}_{end_date}.json"
+            start_dt = datetime.fromisoformat(candles[0]['timestamp'].replace('Z', '+00:00'))
+            end_dt = datetime.fromisoformat(candles[-1]['timestamp'].replace('Z', '+00:00'))
+            start_date = start_dt.strftime("%Y-%m-%d")
+            start_time = start_dt.strftime("%H!%M!%S")
+            end_date = end_dt.strftime("%Y-%m-%d")
+            end_time = end_dt.strftime("%H!%M!%S")
+            filename = f"data/{base_currency.lower()}{quote_currency.lower()}_{interval}_{start_date}_{start_time}_{end_date}_{end_time}.json"
         else:
             filename = f"data/{base_currency.lower()}{quote_currency.lower()}_{interval}_nodata.json"
             

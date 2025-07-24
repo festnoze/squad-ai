@@ -20,6 +20,6 @@ echo.
 echo Requirements installed successfully!
 echo.
 echo To run the application:
-echo cd src
-echo streamlit run app.py
+echo cd src\frontend
+echo streamlit run frontend_main.py
 pause

@@ -8,7 +8,8 @@ from frontend_helper import (
     load_chart_files, resample_candles, create_candlestick_chart,
     render_download_section, render_chart_selection, render_strategy_section,
     render_portfolio_summary, render_asset_metadata, render_trading_signals,
-    render_position_summary, render_data_information, add_strategy_overlays_to_chart
+    render_position_summary, render_data_information, add_strategy_overlays_to_chart,
+    render_portfolio_info_section
 )
 
 
@@ -27,6 +28,8 @@ def main():
     if 'strategy_engine' not in st.session_state:
         st.session_state.strategy_engine = StrategyEngine()
         st.session_state.strategy_loader = StrategyLoader()
+    if 'run_strategy_triggered' not in st.session_state:
+        st.session_state.run_strategy_triggered = False
     
     # Load available chart files
     chart_files = load_chart_files()
@@ -40,6 +43,11 @@ def main():
         
         # Render chart selection
         selected_file, selected_period = render_chart_selection(chart_files)
+        
+        st.divider()
+        
+        # Render portfolio info section
+        render_portfolio_info_section()
         
         st.divider()
         
@@ -66,10 +74,34 @@ def main():
                 candles=resampled_candles
             )
             
-            # Process with strategy engine if enabled
+            # Handle strategy execution on full chart
             symbol = chart_data.metadata.asset_name.upper()
             signals = []
-            if st.session_state.strategy_engine.strategy_config:
+            
+            # Check if run strategy was triggered
+            if st.session_state.run_strategy_triggered and hasattr(st.session_state, 'run_strategy'):
+                # Reset portfolio with user-defined balance and currency
+                st.session_state.strategy_engine.reset_portfolio()
+                
+                # Update portfolio with user settings
+                portfolio_summary = st.session_state.strategy_engine.get_portfolio_summary()
+                portfolio_summary['current_balance'] = st.session_state.portfolio_balance
+                portfolio_summary['initial_balance'] = st.session_state.portfolio_balance
+                
+                # Load and run the selected strategy on full chart data
+                st.session_state.strategy_engine.load_strategy(st.session_state.run_strategy)
+                st.session_state.strategy_engine.enable_trading(True)
+                
+                # Process all data with the strategy
+                signals = st.session_state.strategy_engine.process_market_data(symbol, resampled_chart_data)
+                
+                # Clear the trigger
+                st.session_state.run_strategy_triggered = False
+                
+                st.success(f"Strategy execution completed! Processed {len(resampled_chart_data.candles)} candles with portfolio balance of {st.session_state.portfolio_currency} {st.session_state.portfolio_balance:,.2f}")
+            
+            # Process with strategy engine if enabled (normal operation)
+            elif st.session_state.strategy_engine.strategy_config:
                 signals = st.session_state.strategy_engine.process_market_data(symbol, resampled_chart_data)
             
             # Render portfolio summary
