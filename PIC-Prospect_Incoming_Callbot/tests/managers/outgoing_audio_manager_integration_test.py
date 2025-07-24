@@ -45,10 +45,10 @@ async def test_all_chunks_processing():
     outgoing_audio_manager.run_background_streaming_worker()
     
     # Enqueue test text chunks
-    await outgoing_audio_manager.enqueue_text("First test chunk.")
+    await outgoing_audio_manager.enqueue_text_async("First test chunk.")
     await asyncio.sleep(0.3)  # Give time for processing
     
-    await outgoing_audio_manager.enqueue_text("Last test chunk.")
+    await outgoing_audio_manager.enqueue_text_async("Last test chunk.")
     await asyncio.sleep(0.5)
     
     # Assert
@@ -88,7 +88,7 @@ async def test_single_chunk_processing():
     outgoing_audio_manager.run_background_streaming_worker()
     
     # Act
-    await outgoing_audio_manager.enqueue_text("Single test chunk.")
+    await outgoing_audio_manager.enqueue_text_async("Single test chunk.")
     
     # Wait for processing to complete
     await asyncio.sleep(1)

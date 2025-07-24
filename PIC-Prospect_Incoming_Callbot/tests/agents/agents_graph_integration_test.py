@@ -52,7 +52,7 @@ async def test_graph_init_conversation_and_welcome_message(agents_graph_mockings
     agents_graph_mockings["studi_rag_client"].create_new_conversation_async.assert_called_once()
     
     # Verify outgoing_manager was called with welcome message
-    agents_graph_mockings["outgoing_manager"].enqueue_text.assert_called()
+    agents_graph_mockings["outgoing_manager"].enqueue_text_async.assert_called()
     
 
 async def test_query_response_about_courses(agents_graph_mockings):
@@ -82,7 +82,7 @@ async def test_query_response_about_courses(agents_graph_mockings):
     
     # Set up the RAG client to return a response about BTS in HR
     bts_response = "Le BTS Gestion des Ressources Humaines (GRH) est une formation qui prépare aux métiers des ressources humaines. Cette formation de niveau Bac+2 vous permettra d'acquérir des compétences en gestion administrative du personnel, en recrutement, et en formation professionnelle."
-    agents_graph_mockings["studi_rag_client"].query_rag_api.return_value = bts_response
+    agents_graph_mockings["studi_rag_client"].rag_query_stream_async.return_value = bts_response
     
         # Create an async generator that yields words from the response with a delay
     async def mock_stream_response(*args, **kwargs):
@@ -109,7 +109,7 @@ async def test_query_response_about_courses(agents_graph_mockings):
     assert updated_state["history"][-1][1] == bts_response
 
     # Verify outgoing_manager was called with the response
-    agents_graph_mockings["outgoing_manager"].enqueue_text.assert_called()
+    agents_graph_mockings["outgoing_manager"].enqueue_text_async.assert_called()
 
 
 async def test_first_answer_to_calendar_appointment(agents_graph_mockings):
@@ -174,7 +174,7 @@ async def test_first_answer_to_calendar_appointment(agents_graph_mockings):
     
         # Verify Salesforce client methods were called
         agents_graph_mockings["salesforce_client"].get_person_by_phone_async.assert_not_called()
-        assert agents_graph_mockings["outgoing_manager"].enqueue_text.call_count >= 1
+        assert agents_graph_mockings["outgoing_manager"].enqueue_text_async.call_count >= 1
         
         # Verify calendar agent 'tools' calls
         assert mock_get_appointments.call_count >= 1
@@ -236,13 +236,13 @@ async def test_long_conversation_history_is_truncated(agents_graph_mockings):
 def agents_graph_mockings():
     # Create mock dependencies
     mock_outgoing_manager = MagicMock(spec=OutgoingManager)
-    mock_outgoing_manager.enqueue_text = AsyncMock()
+    mock_outgoing_manager.enqueue_text_async = AsyncMock()
     mock_outgoing_manager.queue_data = AsyncMock()
     
     # Create mock for StudiRAGInferenceApiClient with all necessary methods
     mock_studi_rag_client = MagicMock(spec=StudiRAGInferenceApiClient)
-    mock_studi_rag_client.query_rag_api = AsyncMock()
-    mock_studi_rag_client.query_rag_api.return_value = "This is a mock RAG response about BTS programs."
+    mock_studi_rag_client.rag_query_stream_async = AsyncMock()
+    mock_studi_rag_client.rag_query_stream_async.return_value = "This is a mock RAG response about BTS programs."
         
     # Mock user creation/retrieval
     mock_studi_rag_client.create_or_retrieve_user_async  = AsyncMock()

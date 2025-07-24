@@ -39,12 +39,12 @@ class TestOutgoingAudioManager:
         outgoing_audio_manager: OutgoingAudioManager = fixture['outgoing_audio_manager']
         
         # Test with valid text
-        result = await outgoing_audio_manager.enqueue_text("Hello, this is a test")
+        result = await outgoing_audio_manager.enqueue_text_async("Hello, this is a test")
         assert result is True
         assert outgoing_audio_manager.text_queue_manager.is_empty() is False
         
         # Test with empty text
-        result = await outgoing_audio_manager.enqueue_text("")
+        result = await outgoing_audio_manager.enqueue_text_async("")
         assert result is False
     
     
@@ -53,11 +53,13 @@ class TestOutgoingAudioManager:
         outgoing_audio_manager: OutgoingAudioManager = fixture['outgoing_audio_manager']
         
         # Add text to the queue
-        await outgoing_audio_manager.enqueue_text("Text to be cleared")
+        enqueued_text = "Text to be cleared"
+        await outgoing_audio_manager.enqueue_text_async(enqueued_text)
         assert outgoing_audio_manager.text_queue_manager.is_empty() is False
         
         # Clear the queue
-        await outgoing_audio_manager.clear_text_queue()
+        removed_text = await outgoing_audio_manager.clear_text_queue_async()
+        assert removed_text == enqueued_text
         assert outgoing_audio_manager.text_queue_manager.is_empty() is True
     
     
@@ -72,13 +74,13 @@ class TestOutgoingAudioManager:
         assert outgoing_audio_manager.is_sending() is False
         
         # When queue has text but not running
-        await outgoing_audio_manager.enqueue_text("Text longer than min_chars_for_interruptible_speech value")
+        await outgoing_audio_manager.enqueue_text_async("Text longer than min_chars_for_interruptible_speech value")
         assert outgoing_audio_manager.text_queue_manager.is_empty() is False
         assert outgoing_audio_manager.has_text_to_be_sent() is True
         assert outgoing_audio_manager.is_sending() is False
         
         # When queue is empty but running
-        await outgoing_audio_manager.clear_text_queue()
+        await outgoing_audio_manager.clear_text_queue_async()
         outgoing_audio_manager.audio_sender.is_sending = True
         assert outgoing_audio_manager.has_text_to_be_sent() is False
         assert outgoing_audio_manager.is_sending() is True
@@ -95,7 +97,7 @@ class TestOutgoingAudioManager:
         
         # Enqueue some text
         test_text = "This is a test message for streaming."
-        await outgoing_audio_manager.enqueue_text(test_text)
+        await outgoing_audio_manager.enqueue_text_async(test_text)
         assert outgoing_audio_manager.has_text_to_be_sent() is True
         
         # Give time for the streaming worker to process the text
@@ -131,7 +133,7 @@ class TestOutgoingAudioManager:
         
         # Enqueue some text to test activity
         test_text = "Testing async streaming worker."
-        await outgoing_audio_manager.enqueue_text(test_text)
+        await outgoing_audio_manager.enqueue_text_async(test_text)
         assert outgoing_audio_manager.has_text_to_be_sent() is True
         
         # Allow some time for processing

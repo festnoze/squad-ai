@@ -55,11 +55,12 @@ class IncomingAudioManager(IncomingManager):
         # Audio processing parameters
         self.audio_buffer = b""
         self.consecutive_silence_duration_ms = 0.0
-        self.speech_threshold = 500  # RMS threshold for speech detection
-        self.required_silence_ms_to_answer = 1000  # ms of silence to trigger transcript
+        self.speech_threshold = 900  # RMS threshold for speech detection
+        self.required_silence_ms_to_answer = 600  # ms of silence to trigger transcript
         self.min_audio_bytes_for_processing = 1000  # Minimum buffer size to process
         self.max_audio_bytes_for_processing = 200000  # Maximum buffer size to process
-        self.max_silence_duration_before_hangup_ms = 60000  # ms of silence before hanging up the call
+        self.max_silence_duration_before_reasking = 15 * 1000  # ms of silence before reasking
+        self.max_silence_duration_before_hangup = 70 * 1000  # ms of silence before hanging up the call
         self.do_audio_preprocessing = EnvHelper.get_do_audio_preprocessing()
         
         # Create temp directory if it doesn't exist
@@ -79,37 +80,6 @@ class IncomingAudioManager(IncomingManager):
 
     def set_phone_number(self, phone_number: str, call_sid: str) -> None:
         self.phones_by_call_sid[call_sid] = phone_number
-    
-    async def hangup_call_async(self):
-        if self.websocket:
-            self.logger.info(f"### HANGING UP ### Make phone call ends.")
-            
-            # Speak out "Au revoir" to the user first
-            self.outgoing_manager.enqueue_text("Au revoir")
-            time.sleep(1)
-            # Close the websocket first
-            try:
-                await self.websocket.close(code=1000)
-            except Exception as e:
-                self.logger.error(f"Error closing websocket: {e}")
-            self.websocket = None
-
-            # Hang-up Twilio phone call
-            try:
-                twilio_sid = EnvHelper.get_twilio_sid()
-                twilio_auth = EnvHelper.get_twilio_auth()
-                if twilio_sid and twilio_auth and getattr(self, "call_sid", None):
-                    from twilio.rest import Client
-                    client = Client(twilio_sid, twilio_auth)
-                    client.calls(self.call_sid).update(status="completed")
-                    self.logger.info(f"Call {self.call_sid} hung up via Twilio")
-                else:
-                    if not twilio_sid or not twilio_auth:
-                        self.logger.error("/!\\ Twilio credentials not configured")
-                    else:
-                        self.logger.error("/!\\ call_sid not set; unable to hang up Twilio phone call")
-            except Exception as e:
-                self.logger.error(f"/!\\ Error hanging up call via Twilio: {e}", exc_info=True)
 
     def is_speech(self, audio_chunk: bytes, frame_duration_ms=30) -> bool:
         """
@@ -140,7 +110,7 @@ class IncomingAudioManager(IncomingManager):
         try:
             return self.vad.is_speech(audio_chunk, self.frame_rate)
         except Exception as e:
-            self.logger.error(f"/!\ VAD error: {e}")
+            self.logger.error(f"/!\\ VAD error: {e}")
             # Fallback to RMS-based detection
             rms = audioop.rms(audio_chunk, self.sample_width)
             return rms > 250  # Default threshold
@@ -265,14 +235,18 @@ class IncomingAudioManager(IncomingManager):
         await self.update_is_speaking_state_async()
         
         # Check for speech while system is speaking (interruption detection)
-        if self.is_speaking:
+        if self.is_speaking and not self.outgoing_manager.can_speech_be_interupted:
+            return
+
+        removed_text_to_speak = ""
+        if self.is_speaking and self.outgoing_manager.can_speech_be_interupted:
             # Check if this chunk contains speech - use a lower threshold to detect speech earlier
             is_silence, speech_to_noise_ratio = self.analyse_speech_for_silence(chunk, threshold=self.speech_threshold * 2.5)  # Less sensitive detection while speaking
-            
+                
             # If user is speaking while system is speaking, stop system speech, but only if user speak loud
-            if not is_silence and self.outgoing_manager.can_speech_be_interupted:
+            if not is_silence:
                 self.logger.info(f"Speech interruption detected (level: {speech_to_noise_ratio}), stopping system speech")
-                await self.stop_speaking_async()
+                removed_text_to_speak = await self.stop_speaking_async()
                 # Reset buffer to clear any previous speech before interruption
                 self.audio_buffer = b""
                 
@@ -280,27 +254,18 @@ class IncomingAudioManager(IncomingManager):
                 if self.consecutive_silence_duration_ms > 0:
                     self.logger.info(f"\r>>> USER INTERRUPTION - Incoming speech while system was speaking ({speech_to_noise_ratio})")
                 self.consecutive_silence_duration_ms = 0.0
-        
-        # Use WebRTC VAD for better speech detection
-        is_silence, speech_to_noise_ratio = self.analyse_speech_for_silence(chunk, threshold=self.speech_threshold)
+        else:
+            # Use WebRTC VAD for better speech detection
+            is_silence, speech_to_noise_ratio = self.analyse_speech_for_silence(chunk, threshold=self.speech_threshold)
 
-        # 2. Silence detection before adding to buffer
+        # 2a. Silence detection before adding to buffer
         has_speech_began = len(self.audio_buffer) > 0
 
-        # Count consecutive silence chunks duration
-        if is_silence:
-            # Calculate duration
+        # Count consecutive silence (while system is not speaking only)
+        if is_silence and not self.is_speaking:
             chunk_duration_ms = (len(chunk) / self.sample_width) / self.frame_rate * 1000
             self.consecutive_silence_duration_ms += chunk_duration_ms
-            # msg = f"\rConsecutive silent chunks - Duration: {self.consecutive_silence_duration_ms:.1f}ms - Speech/noise: {speech_to_noise_ratio:04d} (size: {len(chunk)} bytes)."
-            # print(msg, end="", flush=True)
 
-        # Hangup the call if the user is silent for too long
-        if self.consecutive_silence_duration_ms >= self.max_silence_duration_before_hangup_ms:
-            self.logger.info(f">>> User silence duration of {self.consecutive_silence_duration_ms:.1f}ms exceeded max. allowed silence of {self.max_silence_duration_before_hangup_ms:.1f}ms.")
-            await self.hangup_call_async()
-            return
-        
         # Add chunk to buffer if speech has begun or this is a speech chunk
         if has_speech_began or not is_silence:
             self.audio_buffer += chunk
@@ -314,6 +279,20 @@ class IncomingAudioManager(IncomingManager):
                     f"\nSpeech detected - RMS: {speech_to_noise_ratio}/{self.speech_threshold}, "
                     f"Buffer size: {len(self.audio_buffer)} bytes")
 
+        # 2b. Speak anew if the user remains silent for long enough
+        if (self.consecutive_silence_duration_ms >= self.max_silence_duration_before_reasking 
+        and self.consecutive_silence_duration_ms % self.max_silence_duration_before_reasking <= 10):
+            self.logger.info(f">>> User silence duration of {self.consecutive_silence_duration_ms:.1f}ms exceeded max. silence before speaking anew: {self.max_silence_duration_before_reasking:.1f}ms.")
+            await self.outgoing_manager.enqueue_text_async("Comment puis-je vous aider ? Je peux répondre à vos questions concernant nos formations, ou prendre rendez-vous avec un conseiller.")
+            await asyncio.sleep(0.05)
+            return
+
+        # 2c. Hangup the call if the user remains silent for too long
+        if self.consecutive_silence_duration_ms >= self.max_silence_duration_before_hangup:
+            self.logger.info(f">>> User silence duration of {self.consecutive_silence_duration_ms:.1f}ms exceeded max. allowed silence of {self.max_silence_duration_before_hangup:.1f}ms.")
+            await self._hangup_call_async()
+            return
+        
         is_long_silence_after_speech = has_speech_began and self.consecutive_silence_duration_ms >= self.required_silence_ms_to_answer 
         has_reach_min_speech_length = len(self.audio_buffer) >= self.min_audio_bytes_for_processing
         is_speech_too_long = len(self.audio_buffer) > self.max_audio_bytes_for_processing
@@ -332,13 +311,31 @@ class IncomingAudioManager(IncomingManager):
 
             # Waiting message
             #await self.outgoing_manager.enqueue_text(random.choice(["Très bien, je vous demande un instant.", "Merci de patienter.", "Laissez-moi y réfléchir.", "Une petite seconde."]))
-
+            acknowledge_text = random.choice(["Très bien.", "C'est compris.", "D'accord.", "Entendu.", "Parfait."])
+            await self.outgoing_manager.enqueue_text_async(acknowledge_text)
+            
+            repeat_user_input = EnvHelper.get_repeat_user_input()
+            if not repeat_user_input:
+                feedback_text = random.choice([" Un instant s'il vous plait.", " Merci de patienter.", " Laissez-moi y réfléchir.", " Une petite seconde."])
+                await self.outgoing_manager.enqueue_text_async(feedback_text)
+            
             # 4. Transcribe speech to text
             user_query_transcript = await self._perform_speech_to_text_transcription_async(audio_data, is_audio_file_to_delete=False)
+            self.logger.info(f">>> Transcription finished. Heard text: \"{user_query_transcript}\"")
             
-            # 5. Send the user query to the agents graph
+            if repeat_user_input : 
+                feedback_text = f" Vous avez dit : \"{user_query_transcript}\"."
+                await self.outgoing_manager.enqueue_text_async(feedback_text)
+            
+            # 5. Send user query to the agents graph (for processing and response)
             if user_query_transcript:
                 await self.send_user_query_to_agents_graph_async(user_query_transcript)
+            
+            # If no user query transcript, enqueue back the text to speak previously removed
+            if not user_query_transcript and removed_text_to_speak:
+                await self.outgoing_manager.enqueue_text_async(removed_text_to_speak)
+                self.logger.info(f">>> Empty transcript. Enqueued back originaly removed text to speak: \"{removed_text_to_speak}\"")
+
         #await asyncio.sleep(0.1) # Pause incoming process to let others processes breathe
         return
 
@@ -363,12 +360,12 @@ class IncomingAudioManager(IncomingManager):
             updated_state = await self.agents_graph.ainvoke(current_state)
             self.stream_states[self.stream_sid] = updated_state
 
-            # If the agents graph response ends with "Merci et au revoir.", do hang-up
-            if updated_state["history"][-1][1].endswith("Merci et au revoir."):
-                self.logger.info(">>> Agents graph response ends with 'Merci et au revoir.', hanging up the call.")
+            # If the agents graph response ends with "au revoir.", do hang-up
+            if updated_state["history"][-1][1].endswith("au revoir."):
+                self.logger.info(">>> Agents graph response ends with 'au revoir.', hanging up the call.")
                 while self.outgoing_manager.has_text_to_be_sent() or self.outgoing_manager.is_sending():
                     await asyncio.sleep(0.3)
-                await self.hangup_call_async()
+                await self._hangup_call_async()
 
         except Exception as e:
             self.logger.error(f"Error in user query to agents graph: {e}", exc_info=True)
@@ -462,7 +459,38 @@ class IncomingAudioManager(IncomingManager):
             self.logger.info(f"<< Response text: '{spoken_text}'")
             return spoken_text
         return ""
-    
+        
+    async def _hangup_call_async(self):
+        if self.websocket:
+            self.logger.info(f"### HANGING UP ### Make phone call ends.")
+            
+            # Speak out "Au revoir" to the user first
+            self.outgoing_manager.enqueue_text_async("Au revoir")
+            time.sleep(1)
+            # Close the websocket first
+            try:
+                await self.websocket.close(code=1000)
+            except Exception as e:
+                self.logger.error(f"Error closing websocket: {e}")
+            self.websocket = None
+
+            # Hang-up Twilio phone call
+            try:
+                twilio_sid = EnvHelper.get_twilio_sid()
+                twilio_auth = EnvHelper.get_twilio_auth()
+                if twilio_sid and twilio_auth and getattr(self, "call_sid", None):
+                    from twilio.rest import Client
+                    client = Client(twilio_sid, twilio_auth)
+                    client.calls(self.call_sid).update(status="completed")
+                    self.logger.info(f"Call {self.call_sid} hung up via Twilio")
+                else:
+                    if not twilio_sid or not twilio_auth:
+                        self.logger.error("/!\\ Twilio credentials not configured")
+                    else:
+                        self.logger.error("/!\\ call_sid not set; unable to hang up Twilio phone call")
+            except Exception as e:
+                self.logger.error(f"/!\\ Error hanging up call via Twilio: {e}", exc_info=True)
+
     def save_as_wav_file(self, audio_data: bytes):
         """Save PCM data (16-bit, 8kHz, mono) to a WAV file at the specified path."""
         file_name = f"{uuid.uuid4()}.wav"
@@ -491,7 +519,7 @@ class IncomingAudioManager(IncomingManager):
                 self.is_speaking = False
                 self.logger.debug("Speaking stopped - Text queue empty")
     
-    async def stop_speaking_async(self):
+    async def stop_speaking_async(self) -> str:
         """Stop any ongoing speech and clear text queue and interrupt RAG streaming"""
         if self.is_speaking:
             # Interrupt RAG streaming with its tag if it's active
@@ -499,8 +527,8 @@ class IncomingAudioManager(IncomingManager):
                 self.rag_interrupt_flag["interrupted"] = True
                 self.logger.info("RAG streaming interrupted due to speech interruption")
                 
-            await self.outgoing_manager.clear_text_queue()
+            removed_text = await self.outgoing_manager.clear_text_queue_async()
             self.logger.info("Cleared text queue due to speech interruption")
             self.is_speaking = False
-            return True  # Speech was stopped
-        return False  # No speech was ongoing
+            return removed_text
+        return ""

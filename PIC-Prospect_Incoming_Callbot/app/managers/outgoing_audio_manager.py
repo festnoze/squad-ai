@@ -21,6 +21,7 @@ class OutgoingAudioManager(OutgoingManager):
             tts_provider: TextToSpeechProvider,
             stream_sid: str = None,
             min_chunk_interval: float = 0.05,  # 50ms~
+            can_speech_be_interupted: bool = True,
             min_chars_for_interruptible_speech: int = 5,
             sample_width: int = 1,
             frame_rate: int = 8000,
@@ -31,7 +32,7 @@ class OutgoingAudioManager(OutgoingManager):
             max_chars_by_stream_chunk: int = 100
         ):
         self.logger = logging.getLogger(__name__)
-        super().__init__("audio")
+        super().__init__(output_channel = "audio", can_speech_be_interupted=can_speech_be_interupted)
         self.text_queue_manager = TextQueueManager()
         self.audio_sender : TwilioAudioSender = TwilioAudioSender(websocket, stream_sid=stream_sid, min_chunk_interval=min_chunk_interval)
         
@@ -189,7 +190,7 @@ class OutgoingAudioManager(OutgoingManager):
         Stops the streaming process and clears the text queue
         """
         self.audio_sender.is_sending = False
-        await self.text_queue_manager.clear_queue()
+        await self.text_queue_manager.clear_queue_async()
 
         # Stop the background streaming worker
         if self.sender_task:
@@ -206,17 +207,18 @@ class OutgoingAudioManager(OutgoingManager):
 
         self.logger.info("Audio background streaming worker stopped")
         
-    async def enqueue_text(self, text: str) -> bool:
+    async def enqueue_text_async(self, text: str) -> bool:
         """
         Adds text to the queue for speech synthesis and streaming.
         """
-        return await self.text_queue_manager.enqueue_text(text)
+        return await self.text_queue_manager.enqueue_text_async(text)
         
-    async def clear_text_queue(self) -> None:
+    async def clear_text_queue_async(self) -> str:
         if self.can_speech_be_interupted:
-            await self.text_queue_manager.clear_queue()
+            text = await self.text_queue_manager.clear_queue_async()
             self.streaming_interuption_asked = True
             self.logger.info("Text queue cleared for interruption")
+            return text
         
     def has_text_to_be_sent(self) -> bool:
         """Check if the audio stream manager has text to send."""

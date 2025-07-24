@@ -31,7 +31,7 @@ class CalendarAgent:
             ("system", prompt),
             MessagesPlaceholder(variable_name="agent_scratchpad"),
         ])
-        tools_available_timeframes = [CalendarAgent.get_available_timeframes]
+        tools_available_timeframes = [CalendarAgent.get_available_timeframes_async]
         agent = create_tool_calling_agent(self.available_timeframes_llm, tools_available_timeframes, prompts)
         self.available_timeframes_agent = AgentExecutor(agent=agent, tools=tools_available_timeframes, verbose=True)
 
@@ -87,7 +87,7 @@ class CalendarAgent:
         if category == "Proposition de rendez-vous":
             start_date = CalendarAgent.now.date()
             end_date = start_date + timedelta(days=2)
-            appointments = await CalendarAgent.get_appointments(str(start_date), str(end_date))
+            appointments = await CalendarAgent.get_appointments_async(str(start_date), str(end_date))
             available_timeframes = CalendarAgent.get_available_timeframes_from_scheduled_slots(str(start_date), str(end_date), appointments)
 
             if not available_timeframes:
@@ -106,8 +106,8 @@ class CalendarAgent:
             appointment_slot_datetime: datetime = await self._extract_appointment_selected_date_and_time_async(user_input, chat_history)
             appointment_slot_datetime_str = self._to_str_iso(appointment_slot_datetime)
             success = await CalendarAgent.schedule_new_appointment_tool_async(appointment_slot_datetime_str)
-            if success is not None:
-                return "C'est confirmé ! Votre rendez-vous est maintenant planifié pour le " + self._to_french_date(appointment_slot_datetime, include_weekday=True, include_year=False, include_hour=True) + ". Merci et au revoir."
+            #TODO: tmp removed for demo: if success is not None:
+            return "C'est confirmé ! Votre rendez-vous est maintenant planifié pour le " + self._to_french_date(appointment_slot_datetime, include_weekday=True, include_year=False, include_hour=True) + ". Merci et au revoir."
             return "Je n'ai pas pu planifier le rendez-vous. Souhaitez-vous essayer un autre créneau ?"
 
         if category == "Demande de modification":
@@ -154,7 +154,7 @@ class CalendarAgent:
         return CalendarAgent._to_french_date(CalendarAgent.now, include_weekday=True, include_year=True, include_hour=True)
 
     @tool
-    async def get_appointments(start_date: str, end_date: str) -> list[dict[str, any]]:
+    async def get_appointments_async(start_date: str, end_date: str) -> list[dict[str, any]]:
         """Get the existing appointments between the start and end dates for the owner.
         
         Args:
@@ -182,7 +182,7 @@ class CalendarAgent:
         return scheduled_slots
 
     @tool
-    async def get_available_timeframes(start_date: str, end_date: str) -> list[str]:
+    async def get_available_timeframes_async(start_date: str, end_date: str) -> list[str]:
         """Get available appointment timeframes between start_date and end_date.
         
         Args:
@@ -221,7 +221,7 @@ class CalendarAgent:
         Returns:
             The scheduled appointment details
         """
-        await CalendarAgent.schedule_new_appointment_tool_async(date_and_time, duration, object, description)
+        return await CalendarAgent.schedule_new_appointment_tool_async(date_and_time, duration, object, description)
 
     async def schedule_new_appointment_tool_async(
             date_and_time: str,

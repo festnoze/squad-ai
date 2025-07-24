@@ -14,7 +14,6 @@ from managers.outgoing_audio_manager import OutgoingAudioManager
 #from managers.transcription_manager import TranscriptionManager
 #
 from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
-#
 from api_client.salesforce_api_client_interface import SalesforceApiClientInterface
 from api_client.salesforce_api_client_fake import SalesforceApiClientFake
 from api_client.salesforce_api_client import SalesforceApiClient
@@ -73,6 +72,7 @@ class PhoneCallWebsocketEventsHandler:
         # Initialize dependencies
         tts_provider_name = EnvHelper.get_text_to_speech_provider()
         stt_provider_name = EnvHelper.get_speech_to_text_provider()
+        can_speech_be_interupted = EnvHelper.get_can_speech_be_interupted()
         self.tts_provider = get_text_to_speech_provider(provider_name=tts_provider_name, frame_rate=self.frame_rate, channels=self.channels, sample_width=self.sample_width)
         self.stt_provider = get_speech_to_text_provider(provider_name=stt_provider_name, language_code="fr-FR", frame_rate=self.frame_rate)
         
@@ -84,6 +84,7 @@ class PhoneCallWebsocketEventsHandler:
                                     tts_provider=self.tts_provider,
                                     stream_sid=None,
                                     min_chunk_interval=0.05,
+                                    can_speech_be_interupted=can_speech_be_interupted,
                                     sample_width=self.sample_width,
                                     frame_rate=self.frame_rate,
                                     channels=self.channels

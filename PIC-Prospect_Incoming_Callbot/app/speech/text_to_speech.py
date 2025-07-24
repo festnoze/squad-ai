@@ -44,17 +44,20 @@ class GoogleTTSProvider(TextToSpeechProvider):
         self.channels = channels
         self.sample_width = sample_width
         self.temp_dir = temp_dir
+        self.voice = EnvHelper.get_text_to_speech_voice() or "fr-FR-Neural2-A"
+        self.voice_params = self.google_tts.VoiceSelectionParams(
+                language_code="fr-FR", 
+                ssml_gender=self.google_tts.SsmlVoiceGender.FEMALE,
+                name=self.voice)
+        self.audio_config = self.google_tts.AudioConfig(
+                audio_encoding=self.google_tts.AudioEncoding.LINEAR16,
+                sample_rate_hertz=16000
+            )
 
     async def synthesize_speech_to_bytes_async(self, text: str) -> bytes:
         try:
             synthesis_input = self.google_tts.SynthesisInput(text=text)
-            voice = self.google_tts.VoiceSelectionParams(language_code="fr-FR", ssml_gender=self.google_tts.SsmlVoiceGender.FEMALE)
-            audio_config = self.google_tts.AudioConfig(
-                audio_encoding=self.google_tts.AudioEncoding.LINEAR16,
-                sample_rate_hertz=self.frame_rate
-            )
-
-            response = self.client.synthesize_speech(input=synthesis_input, voice=voice, audio_config=audio_config)
+            response = self.client.synthesize_speech(input=synthesis_input, voice=self.voice_params, audio_config=self.audio_config)
             audio_bytes = response.audio_content
             return self.convert_PCM_frame_rate_w_audioop(audio_bytes, from_frame_rate=16000, to_frame_rate=self.frame_rate)
 

@@ -38,9 +38,13 @@ twilio_client = Client(EnvHelper.get_twilio_sid(), EnvHelper.get_twilio_auth())
 async def verify_twilio_call_sid(call_sid: str, from_number: str) -> None:
     call = twilio_client.calls(call_sid).fetch()
     if call.status not in ("in-progress", "in-queue", "ringing"):
-        raise HTTPException(status_code=403)
+        err_msg = f"Call status is neither in-progress, in-queue nor ringing. Call status is: {call.status}"
+        logger.error(err_msg)
+        raise HTTPException(status_code=403, detail=err_msg)
     if call.from_formatted != from_number:
-        raise HTTPException(status_code=403)
+        err_msg = f"Wrong phone number: {from_number} different from {call.from_formatted}"
+        logger.error(err_msg)
+        raise HTTPException(status_code=403, detail=err_msg)
 
 # ========= Incoming phone call endpoint ========= #
 @router.post("/")

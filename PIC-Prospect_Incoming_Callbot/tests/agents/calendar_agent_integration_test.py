@@ -20,7 +20,7 @@ from llms.langchain_adapter_type import LangChainAdapterType
             "Je voudrais prendre rendez-vous", 
             [], 
             "Proposition de créneaux",
-            "Je vous propose le créneau du jeudi 20 juin entre 14 heures et 15 heures. Si ce créneau vous convient, merci de me confirmer afin de finaliser sa réservation.",
+            "Je vous propose les créneaux suivants : demain, le jeudi 20 juin, de 9 heures à 12 heures ou de 13 heures à 18 heures, ou après-demain, le vendredi 21 juin, de 9 heures à 12 heures. Avez-vous une préférence ?",
             False # Semantic matching
         ),
 
@@ -59,7 +59,7 @@ from llms.langchain_adapter_type import LangChainAdapterType
                 ("AI", "Je vous propose le créneaux du jeudi 20 juin à 14 heures. Si ce créneau vous convient, merci de me confirmer afin de finaliser sa réservation.")
             ],
             "Proposition de créneaux", 
-            "Je vous propose les créneaux suivants : lundi, le 24 juin, de 9 heures à 12 heures ou de 13 heures à 18 heures, ou mardi, le 25 juin, de 9 heures à 12 heures. Avez-vous une préférence ?",
+            "Je suis désolé, aucun créneau n'est disponible entre le 24 juin 2025 et le 28 juin 2025. Souhaitez-vous regarder une autre date ?",
             False # Semantic matching
         ),
 
@@ -99,7 +99,7 @@ from llms.langchain_adapter_type import LangChainAdapterType
                 ("AI", "Quels jours ou quelles heures de la journée vous conviendraient le mieux ?")
             ],
             "Proposition de créneaux", 
-            "Je vous propose les créneaux suivants : lundi, le 24 juin, de 9 heures à 12 heures ou de 13 heures à 18 heures, ou mardi, le 25 juin, de 9 heures à 12 heures. Avez-vous une préférence ?",
+            "Je vous propose les créneaux suivants : lundi 24 juin, de 9 heures à 12 heures ou de 13 heures à 18 heures, ou mardi 25 juin, de 9 heures à 12 heures. Avez-vous une préférence ?",
             True # Exact match
         ),
         
@@ -125,7 +125,7 @@ from llms.langchain_adapter_type import LangChainAdapterType
             "Je voudrais prendre rendez-vous la semaine prochaine", 
             [], 
             "Proposition de créneaux", # Agent indicates no slots
-            "Je suis désolé, aucun créneau n'est disponible entre le 24 juin 2025 et le 27 juin 2025. Souhaitez-vous élargir la recherche ?",
+            "Je suis désolé, aucun créneau n'est disponible entre le 24 juin 2025 et le 28 juin 2025. Souhaitez-vous regarder une autre date ?",
             False # Semantic match
         ),
         
@@ -137,7 +137,7 @@ from llms.langchain_adapter_type import LangChainAdapterType
                 ("AI", "Je suis désolé, aucun créneau n'est disponible entre le 24 juin et le 28 juin. Souhaitez-vous élargir la recherche ?")
             ],
             "Proposition de créneaux", # Agent will propose new slots
-            "Je vous propose le créneaux du lundi 30 juin entre 10 heures et 11 heures. Si ce créneau vous convient, merci de me confirmer afin de finaliser sa réservation.",
+            "Je vous propose le créneaux du lundi 30 juin entre 9 heures et 12 heures. Si ce créneau vous convient, merci de me confirmer afin de finaliser sa réservation.",
             False # Semantic match
         ),
         
@@ -320,21 +320,24 @@ class SimilarityEvaluator:
 @pytest.fixture
 def sf_client_mock():
     class _DummyClient:
-        async def get_scheduled_appointments_async(start_datetime=None, end_datetime=None, *args, **kwargs):
+        async def get_scheduled_appointments_async(self, start_datetime=None, end_datetime=None, *args, **kwargs):
             # Check if the specific date range is requested
-            if (
-                str(start_datetime)[:10] == "2025-06-24" and str(end_datetime)[:10] == "2025-06-27"
-            ):
+            if str(start_datetime)[:10] == "2024-06-24" and str(end_datetime)[:10] == "2024-06-28":
                 # Return 3 appointments, each 9 hours long, one per day
                 appointments = []
-                for day in range(3):
-                    start = datetime(2025, 6, 24) + timedelta(days=day)
+                for day in range(5):
+                    start = datetime(2024, 6, 24, 9, 0, 0) + timedelta(days=day)
                     end = start + timedelta(hours=9)
                     appointments.append({
-                        "id": f"appt_{day+1}",
-                        "start_datetime": start,
-                        "end_datetime": end,
-                        "subject": f"Mock Appointment {day+1}",
+                        "Id": f"appt_{day+1}",
+                        "StartDateTime": start.isoformat() + "Z",
+                        "EndDateTime": end.isoformat() + "Z",
+                        "Subject": f"Mock Appointment {day+1}",
+                        "Description": f"Mock Appointment {day+1}",
+                        "Location": f"Mock Appointment {day+1}",
+                        "OwnerId": "test_owner_id",
+                        "WhatId": "test_what_id",
+                        "WhoId": "test_who_id"
                     })
                 return appointments
             return []

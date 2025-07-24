@@ -113,16 +113,6 @@ class AgentsGraph:
             return state
 
         if user_input:
-            repeat_user_input = EnvHelper.get_repeat_user_input()
-            acknowledge_text = random.choice(["Très bien.", "C'est compris.", "D'accord.", "Entendu.", "Parfait."])
-            await self.outgoing_manager.enqueue_text(acknowledge_text)
-
-            if repeat_user_input : 
-                feedback_text = f" Vous avez dit : \"{user_input}\"."
-            else:
-                feedback_text = random.choice([" Un instant s'il vous plait.", " Merci de patienter.", " Laissez-moi y réfléchir.", " Une petite seconde."])
-            await self.outgoing_manager.enqueue_text(feedback_text)
-
             category = await self.analyse_user_input_for_dispatch_async(self.router_llm, user_input, state["history"])
             state["history"].append(("user", user_input))
 
@@ -163,7 +153,7 @@ class AgentsGraph:
         phone_number = state.get('caller_phone', 'N/A')
         self.start_welcome_text = "Bonjour, je suis Studia, l'assistante virtuelle de Studi."
         
-        await self.outgoing_manager.enqueue_text(self.start_welcome_text)
+        await self.outgoing_manager.enqueue_text_async(self.start_welcome_text)
         self.logger.info(f"[{call_sid}] Sent begin of welcome message to {phone_number}")
         return state
 
@@ -179,13 +169,13 @@ class AgentsGraph:
         except Exception as e:
             self.logger.error(f"/!\\ Error testing connection to RAG API : {str(e)}")
             err_msg = "Je rencontre un problème technique, le service est temporairement indisponible, merci de nous recontacter plus tard."
-            await self.outgoing_manager.enqueue_text(err_msg)    
+            await self.outgoing_manager.enqueue_text_async(err_msg)    
             return state
         
         conversation_id = await self.init_user_and_new_conversation_in_backend_api_async(state.get('caller_phone'), state.get('call_sid'))
         if not conversation_id:
             err_msg = "Je rencontre un problème technique, le service est temporairement indisponible, merci de nous recontacter plus tard."
-            await self.outgoing_manager.enqueue_text(err_msg)    
+            await self.outgoing_manager.enqueue_text_async(err_msg)    
         self.logger.info(f"End init. RAG API for caller (User and a new conversation): {state.get('caller_phone')}")
 
         state["history"] = []
@@ -237,7 +227,7 @@ class AgentsGraph:
         else:
             end_welcome_text = "Je suis là pour vous aider en l'absence de nos conseillers. Pour votre premier appel, je peux répondre à vos questions sur nos formations, ou planifier un rendez-vous avec un conseiller en formation."
                 
-        await self.outgoing_manager.enqueue_text(end_welcome_text)
+        await self.outgoing_manager.enqueue_text_async(end_welcome_text)
 
         full_welcome_text = self.start_welcome_text + "\n" + end_welcome_text
         state["history"].append(("assistant", full_welcome_text))
@@ -286,7 +276,7 @@ class AgentsGraph:
         if not self.lead_agent_instance:
             self.logger.error(f"[{call_sid}] LeadAgent not initialized. Cannot process.")
             response_text = "Je rencontre un problème technique avec l'agent de contact."
-            await self.outgoing_manager.enqueue_text(response_text)
+            await self.outgoing_manager.enqueue_text_async(response_text)
             return {"history": [("user", user_input), ("assistant", response_text)], "agent_scratchpad": {"error": "LeadAgent not initialized"}}
 
         try:
@@ -399,7 +389,7 @@ class AgentsGraph:
                 
                 if self.calendar_speech_cannot_be_interupted:
                     self.outgoing_manager.can_speech_be_interupted = False
-                await self.outgoing_manager.enqueue_text(calendar_agent_answer)
+                await self.outgoing_manager.enqueue_text_async(calendar_agent_answer)
 
                 state["history"].append(("assistant", calendar_agent_answer))
                 return state
@@ -469,7 +459,7 @@ class AgentsGraph:
                                 "Laissez-moi un instant pour trouver la meilleure réponse.",
                                 "Je rassemble les informations nécessaires."]
             
-            await self.outgoing_manager.enqueue_text(random.choice(waiting_messages))
+            await self.outgoing_manager.enqueue_text_async(random.choice(waiting_messages))
 
             # Call but not await the RAG API to get the streaming response
             response = self.studi_rag_inference_api_client.rag_query_stream_async(
@@ -487,9 +477,9 @@ class AgentsGraph:
                     break
                     
                 full_answer += chunk
-                #self.logger.info(f"Received chunk: << ... {chunk} ... >>")
+                self.logger.info(f"Received chunk: << ... {chunk} ... >>")
                 
-                await self.outgoing_manager.enqueue_text(chunk)
+                await self.outgoing_manager.enqueue_text_async(chunk)
 
             if full_answer:
                 self.logger.info(f"Full answer received from RAG API: '{full_answer}'")
@@ -502,6 +492,6 @@ class AgentsGraph:
             error_message = f"Je suis désolé, une erreur s'est produite lors de la communication avec le service."
             self.logger.error(f"Error in RAG API communication: {str(e)}")
             # Use enhanced text-to-speech for error messages too
-            await self.outgoing_manager.enqueue_text(error_message)
+            await self.outgoing_manager.enqueue_text_async(error_message)
 
         return state

@@ -59,8 +59,8 @@ def agents_graph_mockings():
     
     # Create mock for StudiRAGInferenceApiClient with all necessary methods
     mock_studi_rag_client = MagicMock(spec=StudiRAGInferenceApiClient)
-    mock_studi_rag_client.query_rag_api = AsyncMock()
-    mock_studi_rag_client.query_rag_api.return_value = "This is a mock RAG response about BTS programs."
+    mock_studi_rag_client.rag_query_stream_async = AsyncMock()
+    mock_studi_rag_client.rag_query_stream_async.return_value = "This is a mock RAG response about BTS programs."
     
     # Mock user creation/retrieval
     mock_studi_rag_client.create_or_retrieve_user_async  = AsyncMock()

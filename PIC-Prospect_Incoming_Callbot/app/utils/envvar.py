@@ -61,6 +61,11 @@ class EnvHelper:
         return EnvHelper.get_env_variable_value_by_name('SPEECH_TO_TEXT_PROVIDER')
 
     @staticmethod
+    def get_can_speech_be_interupted():
+        value = EnvHelper.get_env_variable_value_by_name('CAN_SPEECH_BE_INTERUPTED')
+        return value.lower() == 'true'
+    
+    @staticmethod
     def get_twilio_sid():
         return EnvHelper.get_env_variable_value_by_name('TWILIO_SID')
 

@@ -5,8 +5,8 @@ from managers.outgoing_manager import OutgoingManager
 
 class OutgoingTextManager(OutgoingManager):
 
-    def __init__(self, call_sid: str, outgoing_text_func=None):
-        super().__init__("text")
+    def __init__(self, call_sid: str, outgoing_text_func=None, can_speech_be_interupted: bool = True):
+        super().__init__(output_channel = "text", can_speech_be_interupted=can_speech_be_interupted)
         self.call_sid = call_sid
         self.text_queue = asyncio.Queue()
         self.is_streaming = False
@@ -16,15 +16,15 @@ class OutgoingTextManager(OutgoingManager):
         self._outgoing_text_func = outgoing_text_func
         self.stream_sid = ""
 
-    async def queue_data(self, text_chunk: str):
+    async def enqueue_text_async(self, text: str):
         """
-        Queues a text chunk to be sent.
+        Queues a text to be sent.
         """
         if not self.is_streaming:
-            self.logger.warning(f"OutgoingTextManager for call {self.call_sid} is not streaming. Ignoring text chunk: {text_chunk}")
+            self.logger.warning(f"OutgoingTextManager for call {self.call_sid} is not streaming. Ignoring text: {text}")
             return
-        await self.text_queue.put(text_chunk)
-        self.logger.debug(f"Text chunk queued for call {self.call_sid}: {text_chunk[:50]}...")
+        await self.text_queue.put(text)
+        self.logger.debug(f"Text chunk queued for call {self.call_sid}: {text[:50]}...")
 
     def run_background_streaming_worker(self) -> None:
         if self.stream_task is not None:
@@ -91,16 +91,18 @@ class OutgoingTextManager(OutgoingManager):
         else:
             print(text)
 
-    def enqueue_text(self, text: str) -> bool:
+    async def enqueue_text_async(self, text: str) -> bool:
         """
         Adds text to the queue for delivery.
         """
         return self.text_queue.put_nowait(text)
 
-    async def clear_text_queue(self) -> None:
+    async def clear_text_queue(self) -> str:
         if self.can_speech_be_interupted:
+            text = self.text_queue.get_nowait()
             await self.text_queue.put(None)
             self.logger.info("Text queue cleared for interruption")
+            return text
 
     def has_text_to_be_sent(self) -> bool:
         """

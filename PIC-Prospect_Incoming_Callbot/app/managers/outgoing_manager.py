@@ -7,7 +7,7 @@ class OutgoingManager(abc.ABC):
     output channel.
     """
     
-    def __init__(self, output_channel: any):
+    def __init__(self, output_channel: any, can_speech_be_interupted: bool = True):
         """
         Initialize the outgoing data manager.
         
@@ -15,11 +15,11 @@ class OutgoingManager(abc.ABC):
             output_channel: The channel to send data through (e.g., WebSocket, file, etc.)
         """
         self.output_channel = output_channel
+        self.can_speech_be_interupted = can_speech_be_interupted
         self.is_running = False
-        self.can_speech_be_interupted = True
     
     @abc.abstractmethod
-    def enqueue_text(self, text: str) -> None:
+    async def enqueue_text_async(self, text: str) -> bool:
         """
         Queue text for delivery.
         
@@ -29,7 +29,7 @@ class OutgoingManager(abc.ABC):
         pass
 
     @abc.abstractmethod
-    async def clear_text_queue(self) -> None:
+    async def clear_text_queue_async(self) -> str:
         """Clear the text queue."""
         pass
     

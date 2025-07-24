@@ -17,7 +17,7 @@ class TextQueueManager:
         # Use a lock to ensure thread-safety when modifying the queue content
         self.lock = asyncio.Lock()  
         
-    async def enqueue_text(self, text: str) -> bool:
+    async def enqueue_text_async(self, text: str) -> bool:
         """
         Appends text to the queue.
         Returns True if the text was successfully enqueued.
@@ -79,12 +79,14 @@ class TextQueueManager:
             'processing_efficiency': round(self.total_processed_chars / max(1, self.total_enqueued_chars) * 100, 2)
         }
         
-    async def clear_queue(self) -> None:
+    async def clear_queue_async(self) -> str:
         """
         Clears the text queue
         """
         async with self.lock:
             self.logger.debug(f"Clearing text queue (was {len(self.text_queue)} chars)")
+            removed_text = self.text_queue
             self.text_queue = ""
             self.total_processed_chars = 0
             self.total_enqueued_chars = 0
+            return removed_text
