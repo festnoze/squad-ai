@@ -6,9 +6,12 @@
         "type": "debugpy",
         "request": "launch",
         "module": "streamlit",
-        "args": ["run", "src/app.py"],
+        "args": ["run", "frontend/frontend_main.py"],
+        "env": {
+                "PYTHONPATH": "${workspaceFolder}/src"
+        },
         "console": "integratedTerminal",
-        "cwd": "${workspaceFolder}"
+        "cwd": "${workspaceFolder}/src"
       }
     ]
 }

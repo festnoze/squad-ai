@@ -2,26 +2,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import List
 import json
-
-
-@dataclass
-class Candle:
-    timestamp: datetime
-    open: float
-    close: float
-    high: float
-    low: float
-
-
-@dataclass
-class ChartMetadata:
-    asset_name: str
-    currency: str
-    period_duration: str = "1min"
+from .candle import Candle
+from .chart_metadata import ChartMetadata
 
 
 @dataclass
 class ChartData:
+    """Container for chart metadata and candle data"""
     metadata: ChartMetadata
     candles: List[Candle]
     
