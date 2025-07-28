@@ -2,6 +2,9 @@ inputs/
 outputs/
 storage/
 exchanges/
+node_modules/
+supabase/
+
 *.egg-info/
 *.save*/
 saves/

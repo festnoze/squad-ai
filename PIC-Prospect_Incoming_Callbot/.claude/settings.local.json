@@ -3,7 +3,8 @@
     "allow": [
       "Bash(type:*)",
       "Bash(cat:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "WebFetch(domain:cloud.google.com)"
     ],
     "deny": []
   }

@@ -4,13 +4,11 @@ sys.path.append('..')
 from models import ChartData
 from src.strategy_engine import StrategyEngine
 from src.strategy_loader import StrategyLoader
-from frontend_helper import (
-    load_chart_files, resample_candles, create_candlestick_chart,
-    render_download_section, render_chart_selection, render_strategy_section,
-    render_portfolio_summary, render_asset_metadata, render_trading_signals,
-    render_position_summary, render_data_information, add_strategy_overlays_to_chart,
-    render_portfolio_info_section
-)
+# Import from new modular files
+from chart_utils import load_chart_files, resample_candles, create_candlestick_chart, add_strategy_overlays_to_chart
+from download_ui import render_download_section
+from sidebar_components import render_chart_selection, render_strategy_section, render_portfolio_info_section
+from display_components import render_portfolio_summary, render_asset_metadata, render_trading_signals, render_position_summary, render_data_information
 
 
 def main():

@@ -102,7 +102,7 @@ turtle/
 │   ├── strategy_engine.py       # Strategy execution engine
 │   ├── strategy_loader.py       # Dynamic strategy loading
 │   └── trading_service.py       # Trading operations
-├── data/                        # Chart data files (JSON)
+├── inputs/                        # Chart history files (JSON)
 ├── strategies/                  # Strategy definitions (Markdown)
 ├── venv/                       # Virtual environment
 ├── requirements.txt            # Python dependencies

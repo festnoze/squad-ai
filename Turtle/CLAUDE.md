@@ -52,7 +52,7 @@ src/
 ├── strategy_engine.py       # Core strategy execution engine
 ├── strategy_loader.py       # Dynamic strategy loading
 └── trading_service.py       # Trading operations service
-data/                        # JSON chart data files
+inputs/                        # Chart history files (JSON)
 strategies/                  # Strategy definitions (Markdown files)
 ```
 
@@ -62,11 +62,11 @@ strategies/                  # Strategy definitions (Markdown files)
 - **`models/`**: Type-safe data models using dataclasses
 - **`strategy_engine.py`**: Turtle trading strategy implementation
 - **`position_manager.py`**: Portfolio and position management
-- **`download_data.py`**: Real-time data fetching capabilities
+- **`download_data.py`**: Enhanced data fetching with historical date range support
 
 ### Data Flow
 ```
-API Data/JSON Files → ChartData → Strategy Engine → Portfolio Manager → UI Visualization
+API inputs/JSON Files → ChartData → Strategy Engine → Portfolio Manager → UI Visualization
                                       ↓
                                Trading Signals → Position Updates → P&L Calculation
 ```
@@ -105,10 +105,17 @@ Chart files are JSON with this structure:
 ## Features
 
 ### Data Management
-- **Real-time Data Download**: Fetch live data from Binance (cryptocurrency) and synthetic Forex data
+- **Enhanced Historical Data Download**: 
+  - **Cryptocurrency**: Binance API with date range support using `startTime`/`endTime` parameters
+  - **Forex**: Alpha Vantage API for real historical data (30+ years) with intelligent fallback to synthetic data
+  - **Date Range Selection**: UI date pickers for custom historical periods
+  - **Smart Validation**: Date range validation with error handling and reasonable limits (max 5 years)
 - **Multiple Timeframes**: Support for 1min, 5min, 15min, 1h, 4h, 12h, 1d, 1w intervals
 - **Data Resampling**: Convert between different timeframes on-the-fly
-- **File Management**: Automatic JSON file handling and storage
+- **Enhanced File Management**: 
+  - **Improved Filename Format**: Uses separators for easy replacement (- for dates, ! for times)
+  - **Example**: `btcusdt_1m_2025-01-01_10-00-00_2025-01-31_23-59-59.json`
+  - **Dropbox Compatible**: Replace all `-` with `/` in dates and `:` in times for standard datetime format
 
 ### Portfolio Management
 - **Configurable Portfolio**: Set custom portfolio balance and currency
@@ -124,7 +131,11 @@ Chart files are JSON with this structure:
 
 ### User Interface
 - **Interactive Charts**: Plotly-based candlestick charts with zoom and pan
-- **Modular Sidebar**: Organized sections for data download, chart selection, portfolio settings, and strategy controls
+- **Enhanced Sidebar**: Organized sections with improved UX:
+  - **Smart Trading Pair Selection**: Dropdown lists with popular pairs for each data source
+  - **Auto-populated Fields**: Asset names and currencies filled automatically based on pair selection
+  - **Period Validation**: Prevents invalid downsampling below native data resolution
+  - **Date Range Pickers**: Optional historical date selection with validation
 - **Real-time Updates**: Live portfolio metrics and trading signals
 - **Responsive Design**: Clean, professional interface optimized for trading analysis
 
@@ -165,3 +176,38 @@ The application gracefully handles:
 - Dynamic strategy loading without code restart
 - Configurable parameters for different market conditions
 - Built-in risk management and position sizing algorithms
+
+## Data Download API
+
+### Cryptocurrency Data (`download_btc_data`, `download_eth_data`)
+```python
+download_btc_data(
+    symbol="BTCUSDT",           # Trading pair (e.g., BTCUSDT, ETHUSDT)
+    interval="1m",              # Timeframe (1m, 5m, 15m, 1h, 4h, 12h, 1d, 1w)
+    limit=1000,                 # Number of candles (if no date range)
+    asset_name="Bitcoin",       # Display name
+    currency="USDT",            # Quote currency
+    start_date="2025-01-01",    # Optional: Start date (YYYY-MM-DD)
+    end_date="2025-01-31"       # Optional: End date (YYYY-MM-DD)
+)
+```
+
+### Forex Data (`download_eur_usd_data`)
+```python
+download_eur_usd_data(
+    base_currency="EUR",        # Base currency (EUR, GBP, JPY, etc.)
+    quote_currency="USD",       # Quote currency
+    limit=100,                  # Number of candles (if no date range)
+    asset_name="Euro",          # Display name
+    interval="1d",              # Daily data only (free tier)
+    start_date="2025-01-01",    # Optional: Start date (YYYY-MM-DD)
+    end_date="2025-01-31"       # Optional: End date (YYYY-MM-DD)
+)
+```
+
+### Data Source Features
+- **Binance API**: Real-time and historical cryptocurrency data with precise timestamps
+- **Alpha Vantage API**: 30+ years of historical forex data (25 requests/day free tier)
+- **Intelligent Fallback**: Automatic fallback to synthetic data when API limits exceeded
+- **Date Validation**: Built-in validation with reasonable limits and error handling
+- **Backward Compatibility**: Works with existing code (date parameters are optional)

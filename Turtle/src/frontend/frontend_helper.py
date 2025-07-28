@@ -6,14 +6,12 @@ import os
 import sys
 sys.path.append('..')
 from models import ChartData, Candle
-from src.download_data import download_btc_data, download_eur_usd_data, download_eth_data
-from src.strategy_loader import StrategyLoader
-from src.strategy_engine import StrategyEngine
+from trading_pairs import get_crypto_trading_pairs, get_forex_pairs
 
 
 def load_chart_files():
     """Load all chart files from the data directory"""
-    data_dir = Path("./../data")
+    data_dir = Path("../inputs")
     if not data_dir.exists():
         return []
     
@@ -153,9 +151,27 @@ def render_download_section():
         
         if data_source == "Cryptocurrency (Binance)":
             # Crypto parameters
-            symbol = st.text_input("Trading Pair:", value="BTCUSDT", help="e.g., BTCUSDT, ETHUSDT, ADAUSDT")
-            asset_name = st.text_input("Asset Name:", value="Bitcoin", help="Display name for the asset")
-            currency = st.text_input("Currency:", value="USDT", help="Quote currency")
+            crypto_pairs = get_crypto_trading_pairs()
+            crypto_symbols = list(crypto_pairs.keys())
+            
+            selected_crypto_symbol = st.selectbox(
+                "Trading Pair:",
+                crypto_symbols,
+                index=0,  # Default to BTCUSDT
+                help="Select a cryptocurrency trading pair from popular Binance pairs"
+            )
+            
+            # Auto-populate based on selection
+            symbol = selected_crypto_symbol
+            asset_name = crypto_pairs[selected_crypto_symbol]["asset_name"]
+            currency = crypto_pairs[selected_crypto_symbol]["currency"]
+            
+            # Show the auto-populated values for reference
+            col1, col2 = st.columns(2)
+            with col1:
+                st.info(f"**Asset:** {asset_name}")
+            with col2:
+                st.info(f"**Currency:** {currency}")
             
             interval = st.selectbox(
                 "Interval:",
@@ -163,12 +179,28 @@ def render_download_section():
                 index=0
             )
             
-            limit = st.number_input("Number of Candles:", min_value=1, value=1000)
+            # Date range option
+            use_date_range = st.checkbox("Use Date Range", help="Select specific start and end dates")
+            
+            if use_date_range:
+                col1, col2 = st.columns(2)
+                with col1:
+                    start_date = st.date_input("Start Date", help="Start date for historical data")
+                with col2:
+                    end_date = st.date_input("End Date", help="End date for historical data")
+                
+                start_date_str = start_date.strftime("%Y-%m-%d") if start_date else None
+                end_date_str = end_date.strftime("%Y-%m-%d") if end_date else None
+                limit_param = 1000  # Default limit for date range
+            else:
+                limit_param = st.number_input("Number of Candles:", min_value=1, value=1000)
+                start_date_str = None
+                end_date_str = None
             
             # Download button for crypto
             if st.button("📥 Download Online Data", type="primary"):
                 with st.spinner(f"Downloading {symbol}..."):
-                    if download_btc_data(symbol, interval, limit, asset_name, currency):
+                    if download_btc_data(symbol, interval, limit_param, asset_name, currency, start_date_str, end_date_str):
                         st.success(f"✓ {symbol} downloaded successfully!")
                         st.rerun()
                     else:
@@ -176,27 +208,152 @@ def render_download_section():
         
         else:  # Forex
             # Forex parameters
-            base_currency = st.text_input("Base Currency:", value="EUR", help="e.g., EUR, GBP, JPY")
-            quote_currency = st.text_input("Quote Currency:", value="USD", help="e.g., USD, EUR")
-            asset_name = st.text_input("Asset Name:", value="Euro", help="Display name for the asset")
+            forex_pairs = get_forex_pairs()
+            forex_symbols = list(forex_pairs.keys())
+            
+            selected_forex_pair = st.selectbox(
+                "Currency Pair:",
+                forex_symbols,
+                index=0,  # Default to EURUSD
+                key="forex_pair_selector",
+                help="Select a forex pair from popular currency pairs"
+            )
+            
+            # Auto-populate based on selection
+            base_currency = forex_pairs[selected_forex_pair]["base"]
+            quote_currency = forex_pairs[selected_forex_pair]["quote"]
+            asset_name = forex_pairs[selected_forex_pair]["asset_name"]
+            
+            # Show the auto-populated values for reference
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.info(f"**Base:** {base_currency}")
+            with col2:
+                st.info(f"**Quote:** {quote_currency}")
+            with col3:
+                st.info(f"**Asset:** {asset_name}")
             
             interval = st.selectbox(
                 "Interval:",
-                ["1m", "5m", "15m", "1h", "4h", "12h", "1d", "1w"],
+                ["1d"],  # Alpha Vantage free tier only supports daily data
                 index=0,
-                key="forex_interval"
+                key="forex_interval",
+                help="Free tier supports daily data only"
             )
             
-            limit = st.number_input("Number of Candles:", min_value=1, value=100, key="forex_limit")
+            # Date range option for forex
+            use_date_range_forex = st.checkbox("Use Date Range", key="forex_date_range", help="Select specific start and end dates")
+            
+            if use_date_range_forex:
+                col1, col2 = st.columns(2)
+                with col1:
+                    start_date_forex = st.date_input("Start Date", key="forex_start_date", help="Start date for historical data")
+                with col2:
+                    end_date_forex = st.date_input("End Date", key="forex_end_date", help="End date for historical data")
+                
+                start_date_forex_str = start_date_forex.strftime("%Y-%m-%d") if start_date_forex else None
+                end_date_forex_str = end_date_forex.strftime("%Y-%m-%d") if end_date_forex else None
+                limit_forex_param = 100  # Default limit for date range
+            else:
+                limit_forex_param = st.number_input("Number of Candles:", min_value=1, value=100, key="forex_limit")
+                start_date_forex_str = None
+                end_date_forex_str = None
             
             # Download button for forex
             if st.button("📥 Download Forex Data", type="primary"):
                 with st.spinner(f"Downloading {base_currency}/{quote_currency}..."):
-                    if download_eur_usd_data(base_currency, quote_currency, limit, asset_name, interval):
+                    if download_eur_usd_data(base_currency, quote_currency, limit_forex_param, asset_name, interval, start_date_forex_str, end_date_forex_str):
                         st.success(f"✓ {base_currency}/{quote_currency} downloaded successfully!")
                         st.rerun()
                     else:
                         st.error(f"✗ Failed to download {base_currency}/{quote_currency}")
+
+
+def get_crypto_trading_pairs():
+    """Get list of popular cryptocurrency trading pairs for Binance"""
+    return {
+        # Major Bitcoin pairs
+        "BTCUSDT": {"asset_name": "Bitcoin", "currency": "USDT"},
+        "BTCBUSD": {"asset_name": "Bitcoin", "currency": "BUSD"},
+        "BTCETH": {"asset_name": "Bitcoin", "currency": "ETH"},
+        
+        # Major Ethereum pairs
+        "ETHUSDT": {"asset_name": "Ethereum", "currency": "USDT"},
+        "ETHBUSD": {"asset_name": "Ethereum", "currency": "BUSD"},
+        "ETHBTC": {"asset_name": "Ethereum", "currency": "BTC"},
+        
+        # Other major cryptocurrencies
+        "ADAUSDT": {"asset_name": "Cardano", "currency": "USDT"},
+        "BNBUSDT": {"asset_name": "Binance Coin", "currency": "USDT"},
+        "XRPUSDT": {"asset_name": "Ripple", "currency": "USDT"},
+        "SOLUSDT": {"asset_name": "Solana", "currency": "USDT"},
+        "DOTUSDT": {"asset_name": "Polkadot", "currency": "USDT"},
+        "AVAXUSDT": {"asset_name": "Avalanche", "currency": "USDT"},
+        "MATICUSDT": {"asset_name": "Polygon", "currency": "USDT"},
+        "LINKUSDT": {"asset_name": "Chainlink", "currency": "USDT"},
+        "UNIUSDT": {"asset_name": "Uniswap", "currency": "USDT"},
+        
+        # Meme coins
+        "DOGEUSDT": {"asset_name": "Dogecoin", "currency": "USDT"},
+        "SHIBUSDT": {"asset_name": "Shiba Inu", "currency": "USDT"},
+        
+        # DeFi tokens
+        "AAVEUSDT": {"asset_name": "Aave", "currency": "USDT"},
+        "COMPUSDT": {"asset_name": "Compound", "currency": "USDT"},
+    }
+
+
+def get_forex_pairs():
+    """Get list of popular forex pairs"""
+    return {
+        # Major pairs
+        "EURUSD": {"base": "EUR", "quote": "USD", "asset_name": "Euro"},
+        "GBPUSD": {"base": "GBP", "quote": "USD", "asset_name": "British Pound"},
+        "USDJPY": {"base": "USD", "quote": "JPY", "asset_name": "US Dollar"},
+        "USDCHF": {"base": "USD", "quote": "CHF", "asset_name": "US Dollar"},
+        "AUDUSD": {"base": "AUD", "quote": "USD", "asset_name": "Australian Dollar"},
+        "USDCAD": {"base": "USD", "quote": "CAD", "asset_name": "US Dollar"},
+        "NZDUSD": {"base": "NZD", "quote": "USD", "asset_name": "New Zealand Dollar"},
+        
+        # Cross pairs
+        "EURGBP": {"base": "EUR", "quote": "GBP", "asset_name": "Euro"},
+        "EURJPY": {"base": "EUR", "quote": "JPY", "asset_name": "Euro"},
+        "GBPJPY": {"base": "GBP", "quote": "JPY", "asset_name": "British Pound"},
+        "CHFJPY": {"base": "CHF", "quote": "JPY", "asset_name": "Swiss Franc"},
+        "EURCHF": {"base": "EUR", "quote": "CHF", "asset_name": "Euro"},
+        "AUDCAD": {"base": "AUD", "quote": "CAD", "asset_name": "Australian Dollar"},
+        "CADCHF": {"base": "CAD", "quote": "CHF", "asset_name": "Canadian Dollar"},
+        "NZDCAD": {"base": "NZD", "quote": "CAD", "asset_name": "New Zealand Dollar"},
+        
+        # Exotic pairs
+        "USDZAR": {"base": "USD", "quote": "ZAR", "asset_name": "US Dollar"},
+        "USDTRY": {"base": "USD", "quote": "TRY", "asset_name": "US Dollar"},
+        "USDBRL": {"base": "USD", "quote": "BRL", "asset_name": "US Dollar"},
+    }
+
+
+def get_period_hierarchy():
+    """Get the hierarchical order of periods for upsampling validation"""
+    return ["1min", "5min", "15min", "1h", "4h", "12h", "1d", "1w"]
+
+
+def get_valid_periods(native_period):
+    """Get list of valid periods that can be upsampled from the native period"""
+    hierarchy = get_period_hierarchy()
+    
+    if native_period not in hierarchy:
+        return hierarchy  # Default to all if unknown period
+    
+    native_index = hierarchy.index(native_period)
+    return hierarchy[native_index:]  # Only periods >= native period
+
+
+def get_period_index(period, period_list):
+    """Get the index of a period in the list, return 0 if not found"""
+    try:
+        return period_list.index(period)
+    except ValueError:
+        return 0
 
 
 def render_chart_selection(chart_files):
@@ -210,13 +367,31 @@ def render_chart_selection(chart_files):
             format_func=format_filename
         )
         
-        # Period selection
+        # Load chart data to get native period
+        native_period = "1min"  # Default
+        if selected_file:
+            try:
+                from models import ChartData
+                chart_data = ChartData.from_json_file(selected_file)
+                native_period = chart_data.metadata.period_duration
+            except Exception as e:
+                st.warning(f"Could not read chart metadata: {e}")
+        
+        # Period selection with validation
         st.header("⏱️ Time Period")
-        period_options = ["1min", "5min", "15min", "1h", "4h", "12h", "1d", "1w"]
+        valid_periods = get_valid_periods(native_period)
+        
+        # Show native period info
+        st.info(f"📈 Period: **{native_period}** (can be upsampled higher)")
+        
+        # Set default to native period
+        default_index = get_period_index(native_period, valid_periods)
+        
         selected_period = st.selectbox(
             "Select time period:",
-            period_options,
-            index=0
+            valid_periods,
+            index=default_index,
+            help=f"Native period is {native_period}. You can only select equal or higher timeframes."
         )
         
         return selected_file, selected_period

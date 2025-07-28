@@ -44,7 +44,7 @@ class GoogleTTSProvider(TextToSpeechProvider):
         self.channels = channels
         self.sample_width = sample_width
         self.temp_dir = temp_dir
-        self.voice = EnvHelper.get_text_to_speech_voice() or "fr-FR-Neural2-A"
+        self.voice = EnvHelper.get_text_to_speech_voice() or "fr-FR-Chirp3-HD-Charon"
         self.voice_params = self.google_tts.VoiceSelectionParams(
                 language_code="fr-FR", 
                 ssml_gender=self.google_tts.SsmlVoiceGender.FEMALE,
