@@ -3,9 +3,7 @@ import urllib.request
 import urllib.parse
 from datetime import datetime, timedelta
 import time
-import random
 import os
-import re
 
 def validate_date_range(start_date, end_date):
     """Validate date range parameters
@@ -273,22 +271,8 @@ def download_crypto_data(symbol="BTCUSDT", interval="1m", limit=1000, asset_name
                 "candles": candles
             }
             
-            # Generate filename
-            if candles:
-                start_dt = datetime.fromtimestamp(data[0][0] / 1000)
-                end_dt = datetime.fromtimestamp(data[-1][0] / 1000)
-                start_date_str = start_dt.strftime("%Y-%m-%d")
-                start_time = start_dt.strftime("%H-%M-%S")
-                end_date_str = end_dt.strftime("%Y-%m-%d")
-                end_time = end_dt.strftime("%H-%M-%S")
-                filename = f"../inputs/{symbol.lower()}_{interval}_{start_date_str}_{start_time}_{end_date_str}_{end_time}.json"
-            else:
-                filename = f"../inputs/{symbol.lower()}_{interval}_nodata.json"
-                
-            os.makedirs(os.path.dirname(filename), exist_ok=True)
-            
-            with open(filename, 'w') as f:
-                json.dump(chart_data, f, indent=2)
+            # Save using centralized function
+            _save_chart_data(chart_data, symbol, interval, "binance")
             
             print(f"Downloaded {len(candles)} {symbol} {interval} candles")
             return True
@@ -313,7 +297,7 @@ def download_crypto_data(symbol="BTCUSDT", interval="1m", limit=1000, asset_name
     # Try single download
     chart_data = download_crypto_data_chunk(symbol, interval, start_date, end_date, asset_name, currency)
     if chart_data:
-        _save_chart_data(chart_data, symbol, interval)
+        _save_chart_data(chart_data, symbol, interval, "binance")
         print(f"Downloaded {len(chart_data['candles'])} {symbol} {interval} candles")
         return True
     
@@ -337,18 +321,21 @@ def _download_crypto_data_chunked(symbol, interval, start_date, end_date, asset_
             time.sleep(0.1)  # Rate limiting
         else:
             print(f"Failed to download chunk {i}")
+
+        if i % 100 == 99:
+            time.sleep(60)            
     
     if chart_data_list:
         combined_data = combine_chart_data(chart_data_list)
-        _save_chart_data(combined_data, symbol, interval)
+        _save_chart_data(combined_data, symbol, interval, "binance")
         print(f"Successfully downloaded {len(combined_data['candles'])} {symbol} {interval} candles from {len(chunks)} chunks")
         return True
     
     return False
 
 
-def _save_chart_data(chart_data, symbol, interval):
-    """Save chart data to file"""
+def _save_chart_data(chart_data, symbol, interval, source="binance"):
+    """Save chart data to file with source identifier"""
     if chart_data['candles']:
         start_dt = datetime.fromisoformat(chart_data['candles'][0]['timestamp'])
         end_dt = datetime.fromisoformat(chart_data['candles'][-1]['timestamp'])
@@ -356,216 +343,14 @@ def _save_chart_data(chart_data, symbol, interval):
         start_time = start_dt.strftime("%H-%M-%S")
         end_date_str = end_dt.strftime("%Y-%m-%d")
         end_time = end_dt.strftime("%H-%M-%S")
-        filename = f"../inputs/{symbol.lower()}_{interval}_{start_date_str}_{start_time}_{end_date_str}_{end_time}.json"
+        filename = f"../inputs/{symbol.lower()}_{interval}_{source}_{start_date_str}_{start_time}_{end_date_str}_{end_time}.json"
     else:
-        filename = f"../inputs/{symbol.lower()}_{interval}_nodata.json"
+        filename = f"../inputs/{symbol.lower()}_{interval}_{source}_nodata.json"
         
     os.makedirs(os.path.dirname(filename), exist_ok=True)
     
     with open(filename, 'w') as f:
         json.dump(chart_data, f, indent=2)
-
-def download_eur_usd_data(base_currency="EUR", quote_currency="USD", limit=100, asset_name="Euro", interval="1d", start_date=None, end_date=None):
-    """Download real historical forex data from Alpha Vantage API with intelligent chunking
-    
-    Args:
-        base_currency: Base currency (e.g., EUR, GBP, JPY)
-        quote_currency: Quote currency (e.g., USD, EUR)
-        limit: Number of recent candles to download (if no date range specified)
-        asset_name: Display name for the asset
-        interval: Time interval (daily only for free tier)
-        start_date: Start date for historical data (YYYY-MM-DD format)
-        end_date: End date for historical data (YYYY-MM-DD format)
-    """
-    # Validate date range if provided
-    if start_date and end_date:
-        is_valid, error_msg = validate_date_range(start_date, end_date)
-        if not is_valid:
-            print(f"Date validation error: {error_msg}")
-            return _fallback_forex_data(base_currency, quote_currency, limit, asset_name, interval, start_date, end_date)
-    
-    # Alpha Vantage free API key (demo key, replace with your own)
-    api_key = "demo"  # Replace with actual API key for production use
-    
-    # Use Alpha Vantage FX_DAILY function for historical forex data
-    symbol_pair = f"{base_currency}{quote_currency}"
-    url = f"https://www.alphavantage.co/query?function=FX_DAILY&from_symbol={base_currency}&to_symbol={quote_currency}&apikey={api_key}"
-    
-    try:
-        with urllib.request.urlopen(url) as response:
-            data = json.loads(response.read().decode())
-        
-        # Check for API errors
-        if "Error Message" in data:
-            print(f"Alpha Vantage API Error: {data['Error Message']}")
-            return _fallback_forex_data(base_currency, quote_currency, limit, asset_name, interval, start_date, end_date)
-        
-        if "Note" in data:
-            print(f"Alpha Vantage API Limit: {data['Note']}")
-            return _fallback_forex_data(base_currency, quote_currency, limit, asset_name, interval, start_date, end_date)
-        
-        if "Time Series FX (Daily)" not in data:
-            print("No forex data available from Alpha Vantage")
-            return _fallback_forex_data(base_currency, quote_currency, limit, asset_name, interval, start_date, end_date)
-        
-        time_series = data["Time Series FX (Daily)"]
-        candles = []
-        
-        # Filter data by date range if specified
-        for date_str, daily_data in time_series.items():
-            date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
-            
-            # Apply date filter if specified
-            if start_date and end_date:
-                start_date_obj = datetime.strptime(start_date, "%Y-%m-%d").date()
-                end_date_obj = datetime.strptime(end_date, "%Y-%m-%d").date()
-                if not (start_date_obj <= date_obj <= end_date_obj):
-                    continue
-            
-            candles.append({
-                "timestamp": f"{date_str}T00:00:00",
-                "open": float(daily_data["1. open"]),
-                "high": float(daily_data["2. high"]),
-                "low": float(daily_data["3. low"]),
-                "close": float(daily_data["4. close"])
-            })
-            
-            # Limit results if no date range specified
-            if not (start_date and end_date) and len(candles) >= limit:
-                break
-        
-        # Sort candles by timestamp (oldest first)
-        candles.sort(key=lambda x: x["timestamp"])
-        
-        chart_data = {
-            "metadata": {
-                "asset_name": asset_name,
-                "currency": quote_currency,
-                "period_duration": interval
-            },
-            "candles": candles
-        }
-        
-        _save_forex_chart_data(chart_data, base_currency, quote_currency, interval)
-        print(f"Downloaded {len(candles)} {base_currency}/{quote_currency} historical daily candles from Alpha Vantage")
-        return True
-        
-    except Exception as e:
-        print(f"Error downloading {base_currency}/{quote_currency} data from Alpha Vantage: {e}")
-        return _fallback_forex_data(base_currency, quote_currency, limit, asset_name, interval, start_date, end_date)
-
-
-
-
-def _save_forex_chart_data(chart_data, base_currency, quote_currency, interval):
-    """Save forex chart data to file"""
-    if chart_data['candles']:
-        start_dt = datetime.fromisoformat(chart_data['candles'][0]['timestamp'])
-        end_dt = datetime.fromisoformat(chart_data['candles'][-1]['timestamp'])
-        start_date_str = start_dt.strftime("%Y-%m-%d")
-        start_time_str = start_dt.strftime("%H-%M-%S")
-        end_date_str = end_dt.strftime("%Y-%m-%d")
-        end_time_str = end_dt.strftime("%H-%M-%S")
-        filename = f"../inputs/{base_currency.lower()}{quote_currency.lower()}_{interval}_{start_date_str}_{start_time_str}_{end_date_str}_{end_time_str}.json"
-    else:
-        filename = f"../inputs/{base_currency.lower()}{quote_currency.lower()}_{interval}_nodata.json"
-        
-    os.makedirs(os.path.dirname(filename), exist_ok=True)
-    
-    with open(filename, 'w') as f:
-        json.dump(chart_data, f, indent=2)
-
-
-def _fallback_forex_data(base_currency, quote_currency, limit, asset_name, interval, start_date=None, end_date=None):
-    """Fallback to synthetic forex data when Alpha Vantage is not available"""
-    print(f"Falling back to synthetic data for {base_currency}/{quote_currency}")
-    
-    # Using exchangerate-api.com as fallback
-    url = f"https://api.exchangerate-api.com/v4/latest/{base_currency}"
-    
-    try:
-        with urllib.request.urlopen(url) as response:
-            data = json.loads(response.read().decode())
-        
-        if quote_currency not in data['rates']:
-            print(f"Currency pair {base_currency}/{quote_currency} not available")
-            return False
-        
-        base_rate = data['rates'][quote_currency]
-        candles = []
-        
-        # Generate date range or recent data
-        if start_date and end_date:
-            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
-            end_dt = datetime.strptime(end_date, "%Y-%m-%d")
-            current_dt = start_dt
-            
-            while current_dt <= end_dt:
-                variation = random.uniform(-0.01, 0.01)
-                open_price = base_rate + variation
-                close_price = base_rate + random.uniform(-0.01, 0.01)
-                high_price = max(open_price, close_price) + abs(random.uniform(0, 0.005))
-                low_price = min(open_price, close_price) - abs(random.uniform(0, 0.005))
-                
-                candles.append({
-                    "timestamp": current_dt.strftime("%Y-%m-%dT00:00:00"),
-                    "open": round(open_price, 5),
-                    "high": round(high_price, 5),
-                    "low": round(low_price, 5),
-                    "close": round(close_price, 5)
-                })
-                current_dt += timedelta(days=1)
-        else:
-            # Generate recent synthetic data
-            for i in range(limit):
-                timestamp = datetime.now() - timedelta(days=limit-i)
-                variation = random.uniform(-0.01, 0.01)
-                open_price = base_rate + variation
-                close_price = base_rate + random.uniform(-0.01, 0.01)
-                high_price = max(open_price, close_price) + abs(random.uniform(0, 0.005))
-                low_price = min(open_price, close_price) - abs(random.uniform(0, 0.005))
-                
-                candles.append({
-                    "timestamp": timestamp.strftime("%Y-%m-%dT00:00:00"),
-                    "open": round(open_price, 5),
-                    "high": round(high_price, 5),
-                    "low": round(low_price, 5),
-                    "close": round(close_price, 5)
-                })
-        
-        chart_data = {
-            "metadata": {
-                "asset_name": asset_name,
-                "currency": quote_currency,
-                "period_duration": interval
-            },
-            "candles": candles
-        }
-        
-        # Generate filename
-        if candles:
-            start_dt = datetime.fromisoformat(candles[0]['timestamp'])
-            end_dt = datetime.fromisoformat(candles[-1]['timestamp'])
-            start_date_str = start_dt.strftime("%Y-%m-%d")
-            start_time_str = start_dt.strftime("%H-%M-%S")
-            end_date_str = end_dt.strftime("%Y-%m-%d")
-            end_time_str = end_dt.strftime("%H-%M-%S")
-            filename = f"../inputs/{base_currency.lower()}{quote_currency.lower()}_{interval}_{start_date_str}_{start_time_str}_{end_date_str}_{end_time_str}.json"
-        else:
-            filename = f"../inputs/{base_currency.lower()}{quote_currency.lower()}_{interval}_nodata.json"
-            
-        # Ensure data directory exists
-        os.makedirs(os.path.dirname(filename), exist_ok=True)
-        
-        with open(filename, 'w') as f:
-            json.dump(chart_data, f, indent=2)
-        
-        print(f"Generated {len(candles)} {base_currency}/{quote_currency} synthetic daily candles")
-        return True
-        
-    except Exception as e:
-        print(f"Error generating fallback {base_currency}/{quote_currency} data: {e}")
-        return False
 
 def download_btc_data(symbol="BTCUSDT", interval="1m", limit=1000, asset_name="Bitcoin", currency="USDT", start_date=None, end_date=None):
     """Download cryptocurrency data from Binance API (alias for download_crypto_data)"""
@@ -575,3 +360,147 @@ def download_eth_data(symbol="ETHUSDT", interval="1m", limit=1000, asset_name="E
     """Download cryptocurrency data from Binance API (alias for download_crypto_data)"""
     return download_crypto_data(symbol, interval, limit, asset_name, currency, start_date, end_date)
 
+
+def _synthetic_crypto_data(symbol, interval, limit, asset_name, currency, start_date=None, end_date=None):
+    """Generate synthetic cryptocurrency data as fallback
+    
+    Args:
+        symbol: Trading pair symbol
+        interval: Time interval
+        limit: Number of candles
+        asset_name: Display name for the asset
+        currency: Quote currency
+        start_date: Start date (YYYY-MM-DD format)
+        end_date: End date (YYYY-MM-DD format)
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    import random
+    
+    print(f"Generating synthetic data for {symbol}")
+    
+    try:
+        candles = []
+        base_price = 50000.0 if "BTC" in symbol else 3000.0  # Different base prices for different assets
+        
+        # Generate date range or recent data
+        if start_date and end_date:
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+            
+            # Calculate time delta based on interval
+            interval_minutes = {
+                "1m": 1, "5m": 5, "15m": 15, "1h": 60,
+                "4h": 240, "12h": 720, "1d": 1440, "1w": 10080
+            }
+            
+            minutes = interval_minutes.get(interval, 1)
+            current_dt = start_dt
+            
+            while current_dt <= end_dt:
+                variation = random.uniform(-0.05, 0.05)  # 5% variation
+                open_price = base_price * (1 + variation)
+                close_price = base_price * (1 + random.uniform(-0.05, 0.05))
+                high_price = max(open_price, close_price) * (1 + abs(random.uniform(0, 0.02)))
+                low_price = min(open_price, close_price) * (1 - abs(random.uniform(0, 0.02)))
+                
+                candles.append({
+                    "timestamp": current_dt.isoformat(),
+                    "open": round(open_price, 2),
+                    "high": round(high_price, 2),
+                    "low": round(low_price, 2),
+                    "close": round(close_price, 2)
+                })
+                
+                # Increment time based on interval
+                if interval == "1w":
+                    current_dt += timedelta(weeks=1)
+                elif interval == "1d":
+                    current_dt += timedelta(days=1)
+                else:
+                    current_dt += timedelta(minutes=minutes)
+                    
+                base_price = close_price  # Use close as next base price for continuity
+        else:
+            # Generate recent synthetic data
+            for i in range(limit):
+                if interval == "1w":
+                    timestamp = datetime.now() - timedelta(weeks=limit-i)
+                elif interval == "1d":
+                    timestamp = datetime.now() - timedelta(days=limit-i)
+                elif interval in ["1h", "4h", "12h"]:
+                    hours = int(interval.replace("h", ""))
+                    timestamp = datetime.now() - timedelta(hours=hours*(limit-i))
+                else:
+                    minutes = int(interval.replace("m", ""))
+                    timestamp = datetime.now() - timedelta(minutes=minutes*(limit-i))
+                
+                variation = random.uniform(-0.05, 0.05)
+                open_price = base_price * (1 + variation)
+                close_price = base_price * (1 + random.uniform(-0.05, 0.05))
+                high_price = max(open_price, close_price) * (1 + abs(random.uniform(0, 0.02)))
+                low_price = min(open_price, close_price) * (1 - abs(random.uniform(0, 0.02)))
+                
+                candles.append({
+                    "timestamp": timestamp.isoformat(),
+                    "open": round(open_price, 2),
+                    "high": round(high_price, 2),
+                    "low": round(low_price, 2),
+                    "close": round(close_price, 2)
+                })
+                
+                base_price = close_price
+        
+        # Sort candles by timestamp
+        candles.sort(key=lambda x: x["timestamp"])
+        
+        chart_data = {
+            "metadata": {
+                "asset_name": asset_name,
+                "currency": currency,
+                "period_duration": interval
+            },
+            "candles": candles
+        }
+        
+        _save_chart_data(chart_data, symbol, interval, "synthetic")
+        print(f"Generated {len(candles)} {symbol} synthetic candles")
+        return True
+        
+    except Exception as e:
+        print(f"Error generating synthetic {symbol} data: {e}")
+        return False
+
+
+def download_crypto_data_with_source(symbol="BTCUSDT", interval="1m", limit=1000, asset_name="Bitcoin", 
+                                   currency="USDT", start_date=None, end_date=None, source="binance"):
+    """Download cryptocurrency data from various sources with source selection
+    
+    Args:
+        symbol: Trading pair symbol (e.g., BTCUSDT, ETHUSDT)
+        interval: Time interval (1m, 5m, 15m, 1h, 4h, 12h, 1d, 1w)
+        limit: Number of candles to download (used if no date range specified)
+        asset_name: Display name for the asset
+        currency: Quote currency
+        start_date: Start date for historical data (YYYY-MM-DD format)
+        end_date: End date for historical data (YYYY-MM-DD format)
+        source: Data source ("binance", "synthetic")
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    print(f"Downloading {symbol} data from {source}")
+    
+    if source == "binance":
+        # Use Binance API (existing download_crypto_data function)
+        return download_crypto_data(symbol, interval, limit, asset_name, currency, start_date, end_date)
+    
+    elif source == "synthetic":
+        # Use synthetic/fallback data
+        return _synthetic_crypto_data(symbol, interval, limit, asset_name, currency, start_date, end_date)
+    
+    else:
+        print(f"Unknown crypto data source: {source}")
+        print("Available sources: binance, synthetic")
+        return False

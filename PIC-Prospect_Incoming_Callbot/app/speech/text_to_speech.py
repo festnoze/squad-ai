@@ -22,6 +22,8 @@ class TextToSpeechProvider(ABC):
             self.logger.warning("No audio bytes provided to convert")
             return b""
 
+        audio_bytes = self.strip_wav_header(audio_bytes)
+
         if from_frame_rate == to_frame_rate:
             return audio_bytes
         
@@ -34,8 +36,14 @@ class TextToSpeechProvider(ABC):
             self.logger.error(f"Error resampling audio with audioop: {e}", exc_info=True)
             return b""
 
+    def strip_wav_header(self, audio_bytes: bytes) -> bytes:
+        if audio_bytes[:4] == b"RIFF":
+            return audio_bytes[44:]
+        else:
+            return audio_bytes
+
 class GoogleTTSProvider(TextToSpeechProvider):
-    def __init__(self, frame_rate: int = 8000, channels: int = 1, sample_width: int = 2, temp_dir: str = "static/audio"):
+    def __init__(self, frame_rate: int = 8000, channels: int = 1, sample_width: int = 2, temp_dir: str = "static/outgoing_audio"):
         from google.cloud import texttospeech as google_tts
         self.google_tts = google_tts
         self.logger = logging.getLogger(__name__)
@@ -66,7 +74,7 @@ class GoogleTTSProvider(TextToSpeechProvider):
             return b""
 
 class OpenAITTSProvider(TextToSpeechProvider):
-    def __init__(self, frame_rate: int = 8000, channels: int = 1, sample_width: int = 2, temp_dir: str = "static/audio", openai_api_key: str = None):
+    def __init__(self, frame_rate: int = 8000, channels: int = 1, sample_width: int = 2, temp_dir: str = "static/outgoing_audio", openai_api_key: str = None):
         from openai import OpenAI
         self.logger = logging.getLogger(__name__)
         api_key = openai_api_key if openai_api_key else EnvHelper.get_openai_api_key()
@@ -95,7 +103,7 @@ class OpenAITTSProvider(TextToSpeechProvider):
             self.logger.error(f"OpenAI TTS failed: {openai_error}.", exc_info=True)
             return b""
 
-def get_text_to_speech_provider(provider_name: str = "openai", frame_rate: int = 8000, channels: int = 1, sample_width: int = 2, temp_dir: str = "static/audio") -> TextToSpeechProvider:
+def get_text_to_speech_provider(provider_name: str = "openai", frame_rate: int = 8000, channels: int = 1, sample_width: int = 2, temp_dir: str = "static/outgoing_audio") -> TextToSpeechProvider:
     if provider_name.lower() == "google": return GoogleTTSProvider(frame_rate=frame_rate, channels=channels, sample_width=sample_width, temp_dir=temp_dir)
     if provider_name.lower() == "openai": return OpenAITTSProvider(frame_rate=frame_rate, channels=channels, sample_width=sample_width, temp_dir=temp_dir)
     raise ValueError(f"Invalid TTS provider: {provider_name}")

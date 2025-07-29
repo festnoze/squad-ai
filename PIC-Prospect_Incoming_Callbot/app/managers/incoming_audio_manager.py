@@ -24,11 +24,8 @@ from managers.outgoing_audio_manager import OutgoingManager
 class IncomingAudioManager(IncomingManager):
     """Audio processing utilities for improving speech recognition quality and handling Twilio events"""
     
-    # Voice settings
-    VOICE_ID = "alloy"
-    
-    # Temporary directory for audio files
-    TEMP_DIR = "./static/audio"   
+    # Tmp directory for incoming audio files
+    incoming_speech_dir = "./static/incoming_audio"   
 
     def __init__(self, websocket: WebSocket, stt_provider: SpeechToTextProvider,outgoing_manager: OutgoingManager, agents_graph : AgentsGraph, sample_width=2, frame_rate=8000, channels=1, vad_aggressiveness=3):
         self.logger = logging.getLogger(__name__)
@@ -56,7 +53,7 @@ class IncomingAudioManager(IncomingManager):
         # Audio processing parameters
         self.audio_buffer = b""
         self.consecutive_silence_duration_ms = 0.0
-        self.speech_threshold = 1500  # RMS threshold for speech detection
+        self.speech_threshold = 950  # RMS threshold for speech detection
         self.required_silence_ms_to_answer = 700  # ms of silence to trigger transcript
         self.min_audio_bytes_for_processing = 1000  # Minimum buffer size to process
         self.max_audio_bytes_for_processing = 200000  # Maximum buffer size to process
@@ -65,7 +62,7 @@ class IncomingAudioManager(IncomingManager):
         self.do_audio_preprocessing = EnvHelper.get_do_audio_preprocessing()
         
         # Create temp directory if it doesn't exist
-        os.makedirs(self.TEMP_DIR, exist_ok=True)
+        os.makedirs(self.incoming_speech_dir, exist_ok=True)
 
     def set_websocket(self, websocket: WebSocket):
         self.websocket = websocket
@@ -313,21 +310,18 @@ class IncomingAudioManager(IncomingManager):
 
             # Waiting message
             #await self.outgoing_manager.enqueue_text(random.choice(["Très bien, je vous demande un instant.", "Merci de patienter.", "Laissez-moi y réfléchir.", "Une petite seconde."]))
-            acknowledge_text = random.choice(["Très bien.", "C'est compris.", "D'accord.", "Entendu.", "Parfait."])
+            acknowledge_text = random.choice(["Très bien,", "C'est compris,", "D'accord,", "Entendu,", "Parfait,"])
+            acknowledge_text += random.choice([" Un instant s'il vous plait.", " Merci de patienter.", " Laissez-moi y réfléchir.", " Une petite seconde."])
             await self.outgoing_manager.enqueue_text_async(acknowledge_text)
             
-            repeat_user_input = EnvHelper.get_repeat_user_input()
-            if not repeat_user_input:
-                feedback_text = random.choice([" Un instant s'il vous plait.", " Merci de patienter.", " Laissez-moi y réfléchir.", " Une petite seconde."])
-                await self.outgoing_manager.enqueue_text_async(feedback_text)
-            
             # 4. Transcribe speech to text
-            user_query_transcript = await self._perform_speech_to_text_transcription_async(audio_data, is_audio_file_to_delete=False)
+            user_query_transcript = await self._perform_speech_to_text_transcription_async(audio_data, is_audio_file_to_delete=True)
             self.logger.info(f">>> Transcription finished. Heard text: \"{user_query_transcript}\"")
             
-            if repeat_user_input : 
-                feedback_text = f" Vous avez dit : \"{user_query_transcript}\"."
-                await self.outgoing_manager.enqueue_text_async(feedback_text)
+            # repeat_user_input = EnvHelper.get_repeat_user_input()
+            # if repeat_user_input : 
+            #     feedback_text = f" Vous avez dit : \"{user_query_transcript}\"."
+            #     await self.outgoing_manager.enqueue_text_async(feedback_text)
             
             # 5. Send user query to the agents graph (for processing and response)
             if user_query_transcript:
@@ -386,6 +380,7 @@ class IncomingAudioManager(IncomingManager):
 
     async def _perform_speech_to_text_transcription_async(self, audio_data: bytes, is_audio_file_to_delete : bool = True):
         try:
+            wav_audio_filename = None
             # Check if the audio buffer has a high enough speech to noise ratio
             speech_to_noise_ratio = audioop.rms(audio_data, self.sample_width)
             if speech_to_noise_ratio < self.speech_threshold:
@@ -438,12 +433,12 @@ class IncomingAudioManager(IncomingManager):
             self.logger.error(f"Error during transcription: {speech_err}", exc_info=True)
             return None
         finally:
-            if is_audio_file_to_delete:
+            if is_audio_file_to_delete and wav_audio_filename:
                 self._delete_temp_file(wav_audio_filename)
     
     def _delete_temp_file(self, file_name: str):
         try:
-            os.remove(os.path.join(self.TEMP_DIR, file_name))
+            os.remove(os.path.join(self.incoming_speech_dir, file_name))
         except Exception as e:
             self.logger.error(f"Error deleting temp file {file_name}: {e}")
 
@@ -496,10 +491,10 @@ class IncomingAudioManager(IncomingManager):
     def save_as_wav_file(self, audio_data: bytes):
         """Save PCM data (16-bit, 8kHz, mono) to a WAV file at the specified path."""
         file_name = f"{uuid.uuid4()}.wav"
-        with wave.open(os.path.join(self.TEMP_DIR, file_name), "wb") as wav_file:
+        with wave.open(os.path.join(self.incoming_speech_dir, file_name), "wb") as wav_file:
             wav_file.setnchannels(1)  # mono
-            wav_file.setsampwidth(self.sample_width)  # 8 or 16-bit
-            wav_file.setframerate(self.frame_rate) # 8kHz?
+            wav_file.setsampwidth(self.sample_width)  # 16-bit
+            wav_file.setframerate(self.frame_rate) # 8kHz
             wav_file.writeframes(audio_data) # PCM data
         return file_name
             

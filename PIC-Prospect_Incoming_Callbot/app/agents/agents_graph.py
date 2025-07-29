@@ -3,6 +3,7 @@ import os
 import uuid
 from uuid import UUID
 import random
+import asyncio
 from langgraph.graph import StateGraph, END
 from langchain_core.language_models.chat_models import BaseChatModel
 
@@ -21,6 +22,7 @@ from agents.sf_agent import SFAgent
 from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
 from api_client.salesforce_api_client_interface import SalesforceApiClientInterface
 from managers.outgoing_manager import OutgoingManager
+from managers.outgoing_audio_manager import OutgoingAudioManager
 #
 from llms.llm_info import LlmInfo
 from llms.langchain_factory import LangChainFactory
@@ -385,11 +387,14 @@ class AgentsGraph:
                     self.logger.info(f"[{call_sid[-4:]}] Chat history has {len(chat_history)} messages. Truncating to the last {max_history_length}.")
                     chat_history = chat_history[-max_history_length:]
 
+                waiting_music_task = await self._start_waiting_music_async()
+
                 calendar_agent_answer = await self.calendar_agent_instance.run_async(user_input, chat_history)
                 
                 if self.calendar_speech_cannot_be_interupted:
                     self.outgoing_manager.can_speech_be_interupted = False
                 await self.outgoing_manager.enqueue_text_async(calendar_agent_answer)
+                await self._stop_waiting_music_async(waiting_music_task)
 
                 state["history"].append(("assistant", calendar_agent_answer))
                 return state
@@ -451,28 +456,34 @@ class AgentsGraph:
                 display_waiting_message=False
             )
 
-            waiting_messages = ["Je suis en train de chercher les informations pour répondre à votre demande.",
-                                "Je recherche les éléments d'informations pour vous répondre.",
-                                "Je recherche dans ma base de connaissances.",
-                                "Un instant, je consulte mes sources d'informations.",
-                                "Laissez-moi vérifier quelques détails.",
-                                "Laissez-moi un instant pour trouver la meilleure réponse.",
-                                "Je rassemble les informations nécessaires."]
+            # waiting_messages = ["Je suis en train de chercher les informations pour répondre à votre demande.",
+            #                     "Je recherche les éléments d'informations pour vous répondre.",
+            #                     "Je recherche dans ma base de connaissances.",
+            #                     "Un instant, je consulte mes sources d'informations.",
+            #                     "Laissez-moi vérifier quelques détails.",
+            #                     "Laissez-moi un instant pour trouver la meilleure réponse.",
+            #                     "Je rassemble les informations nécessaires."]
             
-            await self.outgoing_manager.enqueue_text_async(random.choice(waiting_messages))
+            # await self.outgoing_manager.enqueue_text_async(random.choice(waiting_messages))
+
+            waiting_music_task = await self._start_waiting_music_async()
 
             # Call but not await the RAG API to get the streaming response
             response = self.studi_rag_inference_api_client.rag_query_stream_async(
                                 query_asking_request_model = rag_query_RM,
                                 interrupt_flag = self.rag_interrupt_flag,
-                                timeout = 120
-                            )
+                                timeout = 120)
 
             full_answer = ""
             was_interrupted = False
+
             async for chunk in response:
+                await self._stop_waiting_music_async(waiting_music_task)
+                
                 # Vérifier si on a été interrompu entre les chunks
-                if was_interrupted:
+                if was_interrupted:                    
+                    if isinstance(self.outgoing_manager, OutgoingAudioManager):
+                        self.outgoing_manager.audio_sender.streaming_interruption_asked = True
                     self.logger.info("Speech interrupted while processing RAG response")
                     break
                     
@@ -495,3 +506,25 @@ class AgentsGraph:
             await self.outgoing_manager.enqueue_text_async(error_message)
 
         return state
+
+    def _load_file_bytes(self, file_path: str) -> bytes:
+        with open(file_path, "rb") as f:
+            return f.read()
+
+    async def _start_waiting_music_async(self):
+        # Replace waiting message by a background music
+        waiting_music_bytes = self._load_file_bytes("static/internal/waiting_message.wav")
+        waiting_music_task = None
+        if isinstance(self.outgoing_manager, OutgoingAudioManager):
+            while self.outgoing_manager.audio_sender.is_sending:
+                await asyncio.sleep(0.1) 
+            waiting_music_task = asyncio.create_task(self.outgoing_manager.audio_sender.send_audio_chunk_async(waiting_music_bytes))
+        return waiting_music_task
+
+    async def _stop_waiting_music_async(self, waiting_music_task: asyncio.Task):
+        if waiting_music_task:
+            self.outgoing_manager.audio_sender.streaming_interruption_asked = True
+            while self.outgoing_manager.audio_sender.streaming_interruption_asked:
+                await asyncio.sleep(0.1)
+            waiting_music_task.cancel()
+            waiting_music_task = None

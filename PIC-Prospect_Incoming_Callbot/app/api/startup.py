@@ -7,7 +7,7 @@ import shutil
 # DynamicTypeAnalyzer.initialize_strong_typing(project_namespace="app.")
 
 # Clear logs and temporary audio files
-for folder in ["outputs/logs", "static/audio"]:
+for folder in ["outputs/logs", "static/outgoing_audio", "static/incoming_audio"]:
     if os.path.exists(folder):
         shutil.rmtree(folder)
     os.makedirs(folder, exist_ok=True)

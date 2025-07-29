@@ -17,7 +17,7 @@ class SpeechToTextProvider(ABC):
         pass
 
 class GoogleSTTProvider(SpeechToTextProvider):
-    def __init__(self, language_code: str = "fr-FR", frame_rate: int = 8000, temp_dir: str = "static/audio"):
+    def __init__(self, language_code: str = "fr-FR", frame_rate: int = 8000, temp_dir: str = "static/incoming_audio"):
         from google.cloud import speech
         self.speech = speech
         self.logger = logging.getLogger(__name__)
@@ -59,7 +59,7 @@ class GoogleSTTProvider(SpeechToTextProvider):
         return transcript
 
 class OpenAISTTProvider(SpeechToTextProvider):
-    def __init__(self, language_code: str = "fr-FR", frame_rate: int = 8000, temp_dir: str = "static/audio"):
+    def __init__(self, language_code: str = "fr-FR", frame_rate: int = 8000, temp_dir: str = "static/incoming_audio"):
         from openai import AsyncOpenAI
         self.logger = logging.getLogger(__name__)
         self.language_code = language_code
@@ -89,7 +89,7 @@ class OpenAISTTProvider(SpeechToTextProvider):
         return response.text
 
 class HybridSTTProvider(SpeechToTextProvider):
-    def __init__(self, language_code: str = "fr-FR", frame_rate: int = 8000, temp_dir: str = "static/audio"):
+    def __init__(self, language_code: str = "fr-FR", frame_rate: int = 8000, temp_dir: str = "static/incoming_audio"):
         from google.cloud import speech
         from openai import OpenAI
         self.google_speech = speech
@@ -132,7 +132,7 @@ class HybridSTTProvider(SpeechToTextProvider):
         #     return transcript_google
         # return transcript_openai
 
-def get_speech_to_text_provider(provider_name: str = "openai", language_code: str = "fr-FR", frame_rate: int = 8000, temp_dir: str = "static/audio") -> SpeechToTextProvider:
+def get_speech_to_text_provider(provider_name: str = "openai", language_code: str = "fr-FR", frame_rate: int = 8000, temp_dir: str = "static/incoming_audio") -> SpeechToTextProvider:
     """Factory function to get the appropriate speech-to-text provider"""
     if provider_name.lower() == "hybrid": return HybridSTTProvider(language_code=language_code, frame_rate=frame_rate, temp_dir=temp_dir)
     if provider_name.lower() == "google": return GoogleSTTProvider(language_code=language_code, frame_rate=frame_rate, temp_dir=temp_dir)

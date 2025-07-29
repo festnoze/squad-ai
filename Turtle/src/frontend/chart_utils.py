@@ -65,16 +65,16 @@ def resample_candles(candles: list[Candle], target_period: str) -> list[Candle]:
     
     # Resample to target period
     freq_map = {
-        "5min": "5T",
-        "15min": "15T", 
-        "1h": "1H",
-        "4h": "4H",
-        "12h": "12H",
-        "1d": "1D",
-        "1w": "1W"
+        "5min": "5min",
+        "15min": "15min", 
+        "1h": "1h",
+        "4h": "4h",
+        "12h": "12h",
+        "1d": "1d",
+        "1w": "1w"
     }
     
-    freq = freq_map.get(target_period, "1T")
+    freq = freq_map.get(target_period, "1min")
     
     resampled = df.resample(freq).agg({
         'open': 'first',

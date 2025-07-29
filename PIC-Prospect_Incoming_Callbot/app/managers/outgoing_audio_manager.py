@@ -1,6 +1,9 @@
+import os
 import logging
 import asyncio
+import uuid
 from fastapi import WebSocket
+import wave
 #
 from speech.text_queue_manager import TextQueueManager
 from speech.text_processing import ProcessText
@@ -15,6 +18,10 @@ class OutgoingAudioManager(OutgoingManager):
     Manages the complete audio streaming process using a text-based approach.
     Text is queued, then processed into speech in small chunks for better responsiveness.
     """
+
+    # Tmp directory for outgoing audio files
+    outgoing_speech_dir = "./static/outgoing_audio"   
+
     def __init__(
             self,
             websocket: any,
@@ -34,10 +41,11 @@ class OutgoingAudioManager(OutgoingManager):
         self.logger = logging.getLogger(__name__)
         super().__init__(output_channel = "audio", can_speech_be_interupted=can_speech_be_interupted)
         self.text_queue_manager = TextQueueManager()
-        self.audio_sender : TwilioAudioSender = TwilioAudioSender(websocket, stream_sid=stream_sid, min_chunk_interval=min_chunk_interval)
+        self.audio_sender : TwilioAudioSender = TwilioAudioSender(websocket, stream_sid=stream_sid, sample_rate=frame_rate, min_chunk_interval=min_chunk_interval)
         
         self.tts_provider : TextToSpeechProvider = tts_provider  # Text-to-speech provider for converting text to audio
         self.sender_task = None
+        self.save_outgoing_audio_as_file = True
         self.frame_rate = frame_rate   # mu-law in 8/16kHz
         self.sample_width = sample_width    # mu-law in 8/16 bits
         self.channels = channels
@@ -49,6 +57,9 @@ class OutgoingAudioManager(OutgoingManager):
         self.pause_between_chunks = pause_between_chunks
         self.max_words_by_stream_chunk = max_words_by_stream_chunk
         self.max_chars_by_stream_chunk = max_chars_by_stream_chunk
+        
+        # Create temp directory if it doesn't exist
+        os.makedirs(self.outgoing_speech_dir, exist_ok=True)
 
     def set_websocket(self, websocket: WebSocket):
         self.websocket = websocket
@@ -150,6 +161,9 @@ class OutgoingAudioManager(OutgoingManager):
                     continue
                 
                 text_chunks_processed += 1
+
+                if self.save_outgoing_audio_as_file:
+                    self.save_as_wav_file(speech_bytes)
                 
                 # Send the current audio
                 send_audio_chunk_task = asyncio.create_task(self.audio_sender.send_audio_chunk_async(speech_bytes))
@@ -173,6 +187,16 @@ class OutgoingAudioManager(OutgoingManager):
                 errors += 1
                 await asyncio.sleep(0.5)  # Sleep a bit longer on error
                 
+    def save_as_wav_file(self, audio_data: bytes):
+        """Save PCM data (16-bit, 8kHz, mono) to a WAV file at the specified path."""
+        file_name = f"{uuid.uuid4()}.wav"
+        with wave.open(os.path.join(self.outgoing_speech_dir, file_name), "wb") as wav_file:
+            wav_file.setnchannels(1)  # mono
+            wav_file.setsampwidth(self.sample_width)  # 16-bit
+            wav_file.setframerate(self.frame_rate) # 8kHz
+            wav_file.writeframes(audio_data) # PCM data
+        return file_name
+    
     def run_background_streaming_worker(self) -> None:
         """
         Starts the streaming process in a background task

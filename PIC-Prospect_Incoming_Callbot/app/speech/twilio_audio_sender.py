@@ -9,10 +9,11 @@ class TwilioAudioSender:
     """
     Handles sending audio to Twilio with rate limiting to prevent connection issues.
     """
-    def __init__(self, websocket: any, stream_sid: str = None, min_chunk_interval: float = 0.02):
+    def __init__(self, websocket: any, stream_sid: str = None, sample_rate: int = 8000, min_chunk_interval: float = 0.02):
         self.logger = logging.getLogger(__name__)
         self.websocket = websocket
         self.stream_sid = stream_sid
+        self.sample_rate = sample_rate
         self.min_chunk_interval = min_chunk_interval  # Minimum time between chunks (in seconds)
         self.last_send_time = time.time()
         self.is_sending = False
@@ -72,7 +73,8 @@ class TwilioAudioSender:
             try:
                 for i in range(0, len(full_mulaw_audio), segment_size_mulaw):
                     if self.streaming_interruption_asked:
-                        self.logger.info("Streaming interruption asked by flag, stopping sending for this audio_chunk.")
+                        self.logger.info("~~ Streaming interruption asked by flag, stopping sending for this audio_chunk.~~")
+                        self.streaming_interruption_asked = False
                         break 
 
                     segment_mulaw = full_mulaw_audio[i:i + segment_size_mulaw]
@@ -92,7 +94,7 @@ class TwilioAudioSender:
                         sent_any_segment = True
                         
                         # Proportional delay: µ-law is 8000 samples/sec, 1 byte/sample (8000 bytes/sec)
-                        delay_duration = len(segment_mulaw) / 8000.0 
+                        delay_duration = len(segment_mulaw) / self.sample_rate
                         await asyncio.sleep(delay_duration)
 
                         if self.consecutive_errors > 0:

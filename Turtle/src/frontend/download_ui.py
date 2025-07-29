@@ -1,6 +1,7 @@
 import streamlit as st
 from datetime import datetime, timedelta
-import download_data as dl
+from download.crypto import download_crypto_data_with_source
+from download.forex import download_forex_data
 from frontend.trading_pairs import get_crypto_trading_pairs, get_forex_pairs
 
 def render_download_section():
@@ -13,6 +14,14 @@ def render_download_section():
         )
         
         if data_source == "Cryptocurrency (Binance)":
+            # Crypto source selection
+            crypto_source = st.selectbox(
+                "Data Source:",
+                ["binance", "synthetic"],
+                index=0,
+                help="Choose data source: Binance API for real data, or synthetic for demo/testing"
+            )
+            
             # Crypto parameters
             crypto_pairs = get_crypto_trading_pairs()
             crypto_symbols = list(crypto_pairs.keys())
@@ -69,15 +78,33 @@ def render_download_section():
                 end_date_str = None
             
             # Download button for crypto
-            if st.button("📥 Download Online Data", type="primary"):
-                with st.spinner(f"Downloading {symbol}..."):
-                    if dl.download_crypto_data(symbol, interval, limit_param, asset_name, currency, start_date_str, end_date_str):
-                        st.success(f"✓ {symbol} downloaded successfully!")
+            if st.button("📥 Download Crypto Data", type="primary"):
+                with st.spinner(f"Downloading {symbol} from {crypto_source}..."):
+                    if download_crypto_data_with_source(symbol, interval, limit_param, asset_name, currency, start_date_str, end_date_str, crypto_source):
+                        st.success(f"✓ {symbol} downloaded successfully from {crypto_source}!")
                         st.rerun()
                     else:
-                        st.error(f"✗ Failed to download {symbol}")
+                        st.error(f"✗ Failed to download {symbol} from {crypto_source}")
         
         else:  # Forex
+            # Forex source selection
+            forex_source = st.selectbox(
+                "Data Source:",
+                ["alpha_vantage", "yfinance", "binance", "synthetic"],
+                index=0,
+                key="forex_source_selector",
+                help="Choose data source: Alpha Vantage (free tier), yfinance, Binance API, or synthetic data"
+            )
+            
+            # Show source info
+            source_info = {
+                "alpha_vantage": "📊 Alpha Vantage API - Historical forex data (daily only on free tier)",
+                "yfinance": "📈 Yahoo Finance - Wide range of forex pairs",
+                "binance": "⚡ Binance API - Real-time data with multiple intervals (requires date range)",
+                "synthetic": "🎲 Synthetic Data - Generated data for testing/demo purposes"
+            }
+            st.info(source_info[forex_source])
+            
             # Forex parameters
             forex_pairs = get_forex_pairs()
             forex_symbols = list(forex_pairs.keys())
@@ -104,16 +131,31 @@ def render_download_section():
             with col3:
                 st.info(f"**Asset:** {asset_name}")
             
+            # Interval selection based on source
+            if forex_source == "alpha_vantage":
+                interval_options = ["1d"]
+                interval_help = "Alpha Vantage free tier supports daily data only"
+            elif forex_source == "binance":
+                interval_options = ["1m", "5m", "15m", "1h", "4h", "12h", "1d", "1w"]
+                interval_help = "Binance supports multiple intervals"
+            else:  # yfinance, synthetic
+                interval_options = ["1d", "1wk", "1mo"]
+                interval_help = "Available intervals for this source"
+            
             interval = st.selectbox(
                 "Interval:",
-                ["1d"],  # Alpha Vantage free tier only supports daily data
+                interval_options,
                 index=0,
                 key="forex_interval",
-                help="Free tier supports daily data only"
+                help=interval_help
             )
             
-            # Date range option for forex (enabled by default)
-            use_date_range_forex = st.checkbox("Use Date Range", value=True, key="forex_date_range", help="Select specific start and end dates")
+            # Date range option for forex (required for Binance)
+            if forex_source == "binance":
+                use_date_range_forex = True
+                st.info("📅 Date range is required for Binance forex data")
+            else:
+                use_date_range_forex = st.checkbox("Use Date Range", value=True, key="forex_date_range", help="Select specific start and end dates")
             
             if use_date_range_forex:
                 # Default to 1 year ending today
@@ -142,9 +184,9 @@ def render_download_section():
             
             # Download button for forex
             if st.button("📥 Download Forex Data", type="primary"):
-                with st.spinner(f"Downloading {base_currency}/{quote_currency}..."):
-                    if dl.download_eur_usd_data(base_currency, quote_currency, limit_forex_param, asset_name, interval, start_date_forex_str, end_date_forex_str):
-                        st.success(f"✓ {base_currency}/{quote_currency} downloaded successfully!")
+                with st.spinner(f"Downloading {base_currency}/{quote_currency} from {forex_source}..."):
+                    if download_forex_data(base_currency, quote_currency, limit_forex_param, asset_name, interval, start_date_forex_str, end_date_forex_str, forex_source):
+                        st.success(f"✓ {base_currency}/{quote_currency} downloaded successfully from {forex_source}!")
                         st.rerun()
                     else:
-                        st.error(f"✗ Failed to download {base_currency}/{quote_currency}")
+                        st.error(f"✗ Failed to download {base_currency}/{quote_currency} from {forex_source}")

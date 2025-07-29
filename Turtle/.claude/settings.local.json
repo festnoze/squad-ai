@@ -9,7 +9,8 @@
       "Bash(rg:*)",
       "Bash(run_app.bat)",
       "Bash(python:*)",
-      "Bash(sed:*)"
+      "Bash(sed:*)",
+      "Bash(del test_yfinance_forex.py)"
     ],
     "deny": []
   }

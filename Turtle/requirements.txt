@@ -2,4 +2,4 @@ streamlit
 plotly
 pandas
 pyyaml
-bitstamp-python-client
+yfinance
