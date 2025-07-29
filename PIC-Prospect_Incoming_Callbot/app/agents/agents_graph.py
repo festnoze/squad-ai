@@ -512,19 +512,50 @@ class AgentsGraph:
             return f.read()
 
     async def _start_waiting_music_async(self):
-        # Replace waiting message by a background music
+        # Replace waiting message by a background music that loops
         waiting_music_bytes = self._load_file_bytes("static/internal/waiting_message.wav")
         waiting_music_task = None
         if isinstance(self.outgoing_manager, OutgoingAudioManager):
             while self.outgoing_manager.audio_sender.is_sending:
                 await asyncio.sleep(0.1) 
-            waiting_music_task = asyncio.create_task(self.outgoing_manager.audio_sender.send_audio_chunk_async(waiting_music_bytes))
+            waiting_music_task = asyncio.create_task(self._loop_waiting_music_async(waiting_music_bytes))
         return waiting_music_task
 
+    async def _loop_waiting_music_async(self, music_bytes: bytes):
+        """Continuously play waiting music until interrupted"""
+        try:
+            while not self.outgoing_manager.audio_sender.streaming_interruption_asked:
+                try:
+                    # Play the music chunk
+                    success = await self.outgoing_manager.audio_sender.send_audio_chunk_async(music_bytes)
+                    
+                    # If sending failed or was interrupted, break the loop
+                    if not success or self.outgoing_manager.audio_sender.streaming_interruption_asked:
+                        break
+                        
+                    # Small delay before restarting to avoid tight loop
+                    await asyncio.sleep(0.1)
+                    
+                except asyncio.CancelledError:
+                    # Task was cancelled, exit cleanly
+                    break
+                    
+        except Exception as e:
+            self.logger.error(f"Error in waiting music loop: {e}")
+            # Don't re-raise non-cancellation exceptions to avoid disrupting the call
+
     async def _stop_waiting_music_async(self, waiting_music_task: asyncio.Task):
-        if waiting_music_task:
+        if waiting_music_task and not waiting_music_task.done():
+            # Signal interruption
             self.outgoing_manager.audio_sender.streaming_interruption_asked = True
-            while self.outgoing_manager.audio_sender.streaming_interruption_asked:
-                await asyncio.sleep(0.1)
+            
+            # Wait for the audio sender to actually stop sending
+            while self.outgoing_manager.audio_sender.is_sending:
+                await asyncio.sleep(0.05)
+            
+            # Cancel the task and wait for it to complete
             waiting_music_task.cancel()
-            waiting_music_task = None
+            try:
+                await waiting_music_task
+            except asyncio.CancelledError:
+                pass  # Expected when cancelling a task

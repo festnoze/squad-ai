@@ -74,7 +74,6 @@ class TwilioAudioSender:
                 for i in range(0, len(full_mulaw_audio), segment_size_mulaw):
                     if self.streaming_interruption_asked:
                         self.logger.info("~~ Streaming interruption asked by flag, stopping sending for this audio_chunk.~~")
-                        self.streaming_interruption_asked = False
                         break 
 
                     segment_mulaw = full_mulaw_audio[i:i + segment_size_mulaw]
@@ -134,6 +133,9 @@ class TwilioAudioSender:
                         )
             finally:
                 self.is_sending = False
+                # Reset interruption flag after sending is complete
+                if self.streaming_interruption_asked:
+                    self.streaming_interruption_asked = False
         
         return sent_any_segment
                 
