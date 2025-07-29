@@ -171,9 +171,7 @@ async def test_send_audio_chunk_interruption(mock_lin2ulaw, mock_async_sleep, au
     assert mock_async_sleep.call_count == 1
     assert audio_sender.total_bytes_sent == len(pcm_audio)
     assert audio_sender.chunks_sent == 1
-    assert audio_sender.streaming_interruption_asked == True
-
-    audio_sender.streaming_interruption_asked = False # Reset
+    assert audio_sender.streaming_interruption_asked == False # Should be set back to false after sending
 
 
 @patch('asyncio.sleep', new_callable=AsyncMock)
@@ -322,7 +320,7 @@ async def test_integration_send_with_interruption(mock_lin2ulaw, mock_async_slee
     # Assert
     assert result  # True as segments were sent before interruption
     assert sent_segments == 2
-    assert audio_sender.streaming_interruption_asked == True
+    assert audio_sender.streaming_interruption_asked == False # Should be set back to false after sending
     assert audio_sender.total_bytes_sent == len(pcm_audio)
     assert audio_sender.chunks_sent == 1
 

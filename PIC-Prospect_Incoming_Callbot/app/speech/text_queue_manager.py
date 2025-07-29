@@ -54,6 +54,8 @@ class TextQueueManager:
             
         async with self.lock:
             splitted_text = ProcessText.chunk_text_by_sentences_size(self.text_queue, max_words_by_sentence, max_chars_by_sentence)
+            if not any(splitted_text) or (not any(sep in splitted_text[0] for sep in ProcessText.split_separators) and len(splitted_text[0]) < max_words_by_sentence):
+                return None
             self.text_queue = "".join(splitted_text[1:])
             self.total_processed_chars += len(splitted_text[0])
             return splitted_text[0]

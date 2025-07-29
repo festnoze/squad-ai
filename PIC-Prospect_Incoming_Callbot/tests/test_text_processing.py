@@ -2,23 +2,23 @@ import pytest
 from app.speech.text_processing import ProcessText
 
 @pytest.mark.parametrize("test_input,max_words,max_chars,expected", [
-    # Test case 1: Simple case of sentence splitting
+    # Test case 1: Simple case of sentence splitting within limits
     (
         "This is a test. This is another test! This is a new test ? end",
-        15, 100,
+        15, 120,
         ["This is a test.", "This is another test!", "This is a new test ?", "end"]
     ),
-    # Test case 2: Long sentence splitting
+    # Test case 2: Sentence that exceeds word limit gets further split
     (
-        "This sentence has more than ten words and should be split into multiple chunks based on the word limit.",
-        4, 100,
-        ["This sentence has more", "than ten words and", "should be split into", "multiple chunks based on", "the word limit."]
+        "This is a very long sentence with many words that exceeds the word limit.",
+        5, 120,
+        ["This is a very long", "sentence with many words that", "exceeds the word limit."]
     ),
-    # Test case 3: Character limit splitting
+    # Test case 3: Sentence that exceeds character limit gets further split
     (
-        "Short text. But this one is a bit longer and should be split based on character count if needed.",
-        20, 20,
-        ["Short text.", "But this one is a", "bit longer and", "should be split", "based on character", "count if needed."]
+        "This sentence is short. But this one is much longer and exceeds character set limits.",
+        20, 30,
+        ["This sentence is short.", "But this one is much longer", "and exceeds character set", "limits."]
     ),
     # Test case 4: Empty input
     (
@@ -26,89 +26,33 @@ from app.speech.text_processing import ProcessText
         10, 100,
         []
     ),
-    # Test case 5: Single word exceeding character limit
+    # Test case 5: Mixed separators within limits
     (
-        "Supercalifragilisticexpialidocious",
-        100, 10,
-        ["Supercalif", "ragilistic", "expialidoc", "ious"]
+        "Hello world. How are you? I am fine! Thanks: you; welcome",
+        15, 120,
+        ["Hello world.", "How are you?", "I am fine!", "Thanks:", "you;", "welcome"]
     ),
-    # Test case 6: Sentence exceeding character limit
+    # Test case 6: Single sentence with no separators within limits
     (
-        "This one is a very long sentence of more than one hundred characters that should be split into multiple chunks based on the specified character limit.",
-        100, 100,
-        ["This one is a very long sentence of more than one hundred characters that should be split into", "multiple chunks based on the specified character limit."]
+        "This is a single sentence with no separators",
+        15, 120,
+        ["This is a single sentence with no separators"]
     ),
-    # Test case 7: Sentence with mid-sentence separators: ; , :
+    # Test case 7: Single sentence with no separators exceeding word limit
     (
-        "This one is a very long sentence ; of more than one hundred characters, that should be split into multiple chunks: based on the specified character limit.",
-        100, 100,
-        ["This one is a very long sentence ;", "of more than one hundred characters, that should be split into multiple chunks:", "based on the specified character limit."]
+        "This is a single sentence with no separators that has many words exceeding the limit",
+        8, 120,
+        ["This is a single sentence with no separators", "that has many words exceeding the limit"]
     ),
 ])
 def test_chunk_text_by_sized_sentences(test_input, max_words, max_chars, expected):
-    """Test the chunk_text_by_sized_sentences method with various inputs."""
+    """Test the chunk_text_by_sentences_size method with simplified splitting behavior."""
     result = ProcessText.chunk_text_by_sentences_size(
         test_input, 
         max_words_by_sentence=max_words, 
         max_chars_by_sentence=max_chars
     )
     assert result == expected, f"Expected {expected}, got {result}"
-
-def test_estimate_speech_duration():
-    """Test the estimate_speech_duration method."""
-    # Test with empty text
-    assert ProcessText.estimate_speech_duration("") == 0.0
-    
-    # Test with simple text
-    text = "Hello world"
-    duration = ProcessText.estimate_speech_duration(text)
-    assert duration > 0, "Duration should be greater than zero"
-    
-    # Test with punctuation
-    text_with_punctuation = "Hello, world! How are you today?"
-    duration_with_punctuation = ProcessText.estimate_speech_duration(text_with_punctuation)
-    assert duration_with_punctuation > duration, "Text with punctuation should have longer duration"
-
-def test_calculate_speech_timing():
-    """Test the calculate_speech_timing method."""
-    text = "Hello world"
-    start_time, end_time = ProcessText.calculate_speech_timing(text)
-    
-    # Start time should be positive
-    assert start_time >= 0
-    
-    # End time should be greater than start time
-    assert end_time > start_time
-    
-    # Test with previous chunk end time
-    prev_end_time = 1000.0  # 1 second
-    new_start_time, new_end_time = ProcessText.calculate_speech_timing(text, prev_end_time)
-    
-    # New start time should be greater than previous end time
-    assert new_start_time > prev_end_time
-    
-    # New end time should be greater than new start time
-    assert new_end_time > new_start_time
-
-def test_optimize_speech_timing():
-    """Test the optimize_speech_timing method."""
-    chunks = ["Hello.", "How are you?", "I'm fine, thank you."]
-    result = ProcessText.optimize_speech_timing(chunks)
-    
-    # Should return the correct number of chunks
-    assert len(result) == len(chunks)
-    
-    # Each result should be a tuple of (text, start_time, end_time)
-    for chunk_result in result:
-        assert len(chunk_result) == 3
-        assert isinstance(chunk_result[0], str)
-        assert isinstance(chunk_result[1], float)
-        assert isinstance(chunk_result[2], float)
-        assert chunk_result[2] > chunk_result[1]  # End time > start time
-    
-    # Chunks should be in sequence (end time of one is before start time of next)
-    for i in range(len(result) - 1):
-        assert result[i+1][1] >= result[i][2]
 
 def test_is_sentence_ending():
     """Test the is_sentence_ending method."""

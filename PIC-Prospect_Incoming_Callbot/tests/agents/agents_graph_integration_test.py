@@ -37,7 +37,7 @@ async def test_graph_init_conversation_and_welcome_message(agents_graph_mockings
     assert updated_state["agent_scratchpad"]["conversation_id"] == "39e81136-4525-4ea8-bd00-c22211110001"
     assert len(updated_state["history"]) >= 1
 
-    welcome_text = """Bonjour, je suis Studia, l'assistante virtuelle de Studi.
+    welcome_text = """Bonjour, je suis Studia, l'assistante virtuelle de Studi. Je prend le relais quand nos conseillers en formations ne sont pas disponibles.
     Merci de nous recontacter  Test User. 
     Je peux prendre un rendez-vous avec votre conseiller Test Owner.
     Je peux aussi répondre à vos questions à propos de nos formations.

@@ -7,10 +7,12 @@ This module provides helper functions for processing text before speech synthesi
 including text chunking, duration estimation, and timing calculations.
 """
 class ProcessText:
+    split_separators = [".", "!", "?", ";", ":"]
+    
     @staticmethod
     def chunk_text_by_sentences_size(text: str, max_words_by_sentence: int = 15, max_chars_by_sentence: int = 120) -> list[str]:
         """
-        Split text into chunks at natural sentence boundaries.
+        Split text into chunks at every separator found, then further split if chunks exceed limits.
         
         Args:
             text: The text to split
@@ -18,165 +20,74 @@ class ProcessText:
             max_chars_by_sentence: Maximum number of characters per chunk
             
         Returns:
-            A list of text chunks
+            A list of text chunks split at separators and respecting size limits
         """
         if not text:
             return []
         
-        # Phase 1: Extract individual sentences
-        sentences = []
+        # Phase 1: Split at every separator found
+        initial_chunks = []
         
-        # Find all sentences ending with punctuation
-        # This pattern keeps the sentence-ending punctuation with the sentence
-        pattern = r'[^.!?;:]+[.!?;:]'
-        matches = re.findall(pattern, text)
+        # Create pattern to split at any separator while keeping the separator with the chunk
+        separator_pattern = r'([^' + ''.join(ProcessText.split_separators) + r']*[' + ''.join(ProcessText.split_separators) + r'])'
         
-        # Process matches to get clean sentences
+        # Find all chunks ending with separators
+        matches = re.findall(separator_pattern, text)
+        
+        # Add all matches as chunks
         for match in matches:
-            # Remove leading/trailing whitespace
             clean_match = match.strip()
-            if clean_match:  # Only add non-empty matches
-                sentences.append(clean_match)
+            if clean_match:
+                initial_chunks.append(clean_match)
         
-        # Check if there's any text left after the last punctuation
+        # Handle any remaining text after the last separator
         if matches:
+            # Find where the last match ends in the original text
             last_match = matches[-1]
             last_match_end = text.rfind(last_match) + len(last_match)
             remaining_text = text[last_match_end:].strip()
             if remaining_text:
-                sentences.append(remaining_text)
-        # If no matches were found but there's text, treat the whole text as one sentence
+                initial_chunks.append(remaining_text)
+        # If no separators found, treat entire text as one chunk
         elif text.strip():
-            sentences.append(text.strip())
+            initial_chunks.append(text.strip())
         
-        # Phase 2: Process sentences into appropriately sized chunks
-        chunks = []
-
-        for sentence in sentences:
-            # If the sentence itself is too long, split it
-            if len(sentence.split()) > max_words_by_sentence or len(sentence) > max_chars_by_sentence:
-                words = sentence.split()
-                current_word_chunk = ""
-                for word in words:
-                    # If a single word exceeds max_chars, split the word itself
-                    if len(word) > max_chars_by_sentence:
-                        if current_word_chunk: # Add any preceding part of the word chunk
-                            chunks.append(current_word_chunk.strip())
-                            current_word_chunk = ""
-                        # Split the long word into character chunks
-                        for i in range(0, len(word), max_chars_by_sentence):
-                            char_chunk = word[i:i+max_chars_by_sentence]
-                            chunks.append(char_chunk)
-                    # Check if adding this word would exceed limits for the current_word_chunk
-                    elif current_word_chunk and \
-                         (len(current_word_chunk.split()) + 1 > max_words_by_sentence or \
-                          len(current_word_chunk) + len(word) + 1 > max_chars_by_sentence):
-                        chunks.append(current_word_chunk.strip())
-                        current_word_chunk = word
-                    else:
-                        current_word_chunk += " " + word if current_word_chunk else word
+        # Phase 2: Further split chunks that exceed word or character limits
+        final_chunks = []
+        
+        for chunk in initial_chunks:
+            # Check if chunk exceeds limits
+            word_count = len(chunk.split())
+            char_count = len(chunk)
             
-                # Add any remaining part of the sentence after word splitting
-                if current_word_chunk:
-                    # Preserve original sentence punctuation if it was split
-                    if re.search(r'[.!?]$', sentence) and not re.search(r'[.!?]$', current_word_chunk):
-                        punctuation = re.search(r'[.!?]$', sentence).group(0)
-                        current_word_chunk = current_word_chunk.rstrip() + punctuation
-                    chunks.append(current_word_chunk.strip())
+            if word_count <= max_words_by_sentence and char_count <= max_chars_by_sentence:
+                # Chunk fits within limits, add as-is
+                final_chunks.append(chunk)
             else:
-                # Sentence fits within limits, add it as its own chunk
-                chunks.append(sentence.strip())
-        
-        return chunks
-
-    @staticmethod
-    def estimate_speech_duration(text: str, chars_per_second: float = 15.0) -> float:
-        """
-        Estimate the duration of speech in milliseconds based on text length.
-        
-        Args:
-            text: The text to estimate
-            chars_per_second: Average characters spoken per second
-            
-        Returns:
-            Estimated duration in milliseconds
-        """
-        if not text:
-            return 0.0
-            
-        # Basic estimation based on character count
-        # This is a simple heuristic that can be improved with more sophisticated models
-        char_count = len(text)
-        
-        # Adjust for punctuation (pauses)
-        pause_chars = len(re.findall(r'[.!?,;:]', text))
-        effective_chars = char_count + (pause_chars * 5)  # Each punctuation adds ~5 char worth of time
-        
-        # Calculate duration in milliseconds
-        duration_ms = (effective_chars / chars_per_second) * 1000
-        
-        # Enforce minimum duration
-        return max(duration_ms, 50.0)  # At least 50ms
-
-    @staticmethod
-    def calculate_speech_timing(
-        text_chunk: str, 
-        previous_chunk_end_time: float = 0.0,
-        min_gap: float = 0.05
-    ) -> tuple[float, float]:
-        """
-        Calculate the start and end times for a speech chunk.
-        
-        Args:
-            text_chunk: The text chunk to calculate timing for
-            previous_chunk_end_time: When the previous chunk ends (milliseconds)
-            min_gap: Minimum gap between chunks (seconds)
-            
-        Returns:
-            tuple of (start_time_ms, end_time_ms)
-        """
-        # Start time is the previous end time plus the minimum gap
-        start_time_ms = previous_chunk_end_time + (min_gap * 1000)
-        
-        # Calculate the duration
-        duration_ms = ProcessText.estimate_speech_duration(text_chunk)
-        
-        # End time is the start time plus the duration
-        end_time_ms = start_time_ms + duration_ms
-        
-        return start_time_ms, end_time_ms
-
-    @staticmethod
-    def optimize_speech_timing(chunks: list[str]) -> list[tuple[str, float, float]]:
-        """
-        Optimize timing for a series of speech chunks for natural-sounding speech.
-        
-        Args:
-            chunks: list of text chunks to optimize timing for
-            
-        Returns:
-            list of tuples (chunk_text, start_time_ms, end_time_ms)
-        """
-        result = []
-        last_end_time = 0.0
-        
-        for i, chunk in enumerate(chunks):
-            # Calculate minimum gap based on punctuation
-            min_gap = 0.05  # Default minimum gap
-            
-            # If previous chunk ended with sentence-ending punctuation, add extra pause
-            if i > 0 and ProcessText.is_sentence_ending(chunks[i-1]):
-                min_gap = 0.3  # Longer pause after sentence endings
-            # If previous chunk ended with comma, add medium pause
-            elif i > 0 and chunks[i-1].strip().endswith(','):
-                min_gap = 0.15  # Medium pause after commas
+                # Chunk exceeds limits, split it by words
+                words = chunk.split()
+                current_chunk = ""
                 
-            # Calculate timing
-            start_time, end_time = ProcessText.calculate_speech_timing(chunk, last_end_time, min_gap)
-            result.append((chunk, start_time, end_time))
-            last_end_time = end_time
+                for word in words:
+                    # Check if adding this word would exceed limits
+                    test_chunk = current_chunk + (" " + word if current_chunk else word)
+                    test_word_count = len(test_chunk.split())
+                    test_char_count = len(test_chunk)
+                    
+                    if test_word_count <= max_words_by_sentence and test_char_count <= max_chars_by_sentence:
+                        # Word fits, add it to current chunk
+                        current_chunk = test_chunk
+                    else:
+                        # Word doesn't fit, save current chunk and start new one
+                        if current_chunk:
+                            final_chunks.append(current_chunk)
+                        current_chunk = word
+                
+                # Add any remaining chunk
+                if current_chunk:
+                    final_chunks.append(current_chunk)
         
-        return result
+        return final_chunks
 
     @staticmethod
     def is_sentence_ending(text: str) -> bool:

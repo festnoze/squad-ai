@@ -513,7 +513,7 @@ class AgentsGraph:
 
     async def _start_waiting_music_async(self):
         # Replace waiting message by a background music that loops
-        waiting_music_bytes = self._load_file_bytes("static/internal/waiting_message.wav")
+        waiting_music_bytes = self._load_file_bytes("static/internal/waiting_music.mp4")
         waiting_music_task = None
         if isinstance(self.outgoing_manager, OutgoingAudioManager):
             while self.outgoing_manager.audio_sender.is_sending:

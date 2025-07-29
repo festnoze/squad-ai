@@ -6,6 +6,7 @@ from api_client.request_models.user_request_model import UserRequestModel
 from api_client.request_models.conversation_request_model import ConversationRequestModel
 from api_client.request_models.query_asking_request_model import QueryAskingRequestModel, QueryNoConversationRequestModel
 from utils.envvar import EnvHelper
+from speech.text_processing import ProcessText
 
 class StudiRAGInferenceApiClient:
     """
@@ -106,7 +107,7 @@ class StudiRAGInferenceApiClient:
                 #timeout=custom_timeout
             ) as resp:
                 resp.raise_for_status()
-                async for segment in self._stream_by_segment(resp, interrupt_flag):
+                async for segment in self._stream_by_sentence(resp, interrupt_flag):
                     yield segment
 
         except httpx.ReadTimeout:
@@ -149,7 +150,7 @@ class StudiRAGInferenceApiClient:
                 timeout=self.timeout
             ) as resp:
                 resp.raise_for_status()
-                async for segment in self._stream_by_segment(resp, interrupt_flag):
+                async for segment in self._stream_by_sentence(resp, interrupt_flag):
                     yield segment
         except httpx.ReadTimeout:
             yield "Je suis désolé, mais je n'ai pas pu obtenir une réponse à temps. Pouvez-vous reformuler votre question?"
@@ -169,7 +170,7 @@ class StudiRAGInferenceApiClient:
     ### TOOLS ###
     
     @staticmethod
-    async def _stream_by_segment(response_stream: httpx.Response, interrupt_flag: Optional[dict[str, bool]] = None):
+    async def _stream_by_sentence(response_stream: httpx.Response, interrupt_flag: Optional[dict[str, bool]] = None):
         """Process the response stream byte by byte and yield segments"""
         text_buffer = ""
         
@@ -182,8 +183,8 @@ class StudiRAGInferenceApiClient:
             if chunk:
                 text = chunk.decode("utf-8", errors="ignore")
                 text_buffer += text
-                # Yield when we have a complete thought or enough words
-                if len(text_buffer.split()) > 10 or len(text_buffer) > 100:
+                # Yield when we have a complete sentence or too much characters
+                if any(separator in text_buffer for separator in ProcessText.split_separators) or len(text_buffer.split()) > 20 or len(text_buffer) > 100:
                     yield text_buffer
                     text_buffer = ""
         

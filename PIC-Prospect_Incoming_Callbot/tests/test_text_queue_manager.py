@@ -66,7 +66,16 @@ async def test_get_text_chunk_sentence_end(text_queue_manager : TextQueueManager
     assert chunk == "This is another sentence."
 
 
-async def test_get_text_chunk_word_limit(text_queue_manager : TextQueueManager):
+async def test_get_no_text_if_no_separator_are_present(text_queue_manager : TextQueueManager):
+    """Test getting a text chunk based on word limit"""
+    # Enqueue text with more than 10 words but no sentence end
+    await text_queue_manager.enqueue_text_async("One two three four five six seven")
+    
+    # Get a chunk - should return the first 10 words
+    chunk = await text_queue_manager.get_next_text_chunk_async(max_words_by_sentence=10, max_chars_by_sentence=100)
+    assert chunk == None
+
+async def test_get_text_if_no_separator_are_present_but_text_too_long(text_queue_manager : TextQueueManager):
     """Test getting a text chunk based on word limit"""
     # Enqueue text with more than 10 words but no sentence end
     await text_queue_manager.enqueue_text_async("One two three four five six seven eight nine ten eleven twelve thirteen")
@@ -74,9 +83,18 @@ async def test_get_text_chunk_word_limit(text_queue_manager : TextQueueManager):
     # Get a chunk - should return the first 10 words
     chunk = await text_queue_manager.get_next_text_chunk_async(max_words_by_sentence=10, max_chars_by_sentence=100)
     assert chunk == "One two three four five six seven eight nine ten"
+
+async def test_get_text_chunk_word_limit(text_queue_manager : TextQueueManager):
+    """Test getting a text chunk based on word limit"""
+    # Enqueue text with more than 10 words but no sentence end
+    await text_queue_manager.enqueue_text_async("One two three four five six seven eight nine ten eleven twelve thirteen.")
+    
+    # Get a chunk - should return the first 10 words
+    chunk = await text_queue_manager.get_next_text_chunk_async(max_words_by_sentence=10, max_chars_by_sentence=100)
+    assert chunk == "One two three four five six seven eight nine ten"
     
     # Queue should now only contain the remaining words
-    assert text_queue_manager.text_queue == "eleven twelve thirteen"
+    assert text_queue_manager.text_queue == "eleven twelve thirteen."
 
 
 async def test_get_text_chunk_empty_queue(text_queue_manager : TextQueueManager):
@@ -93,7 +111,11 @@ async def test_is_empty(text_queue_manager : TextQueueManager):
     assert text_queue_manager.is_empty() is False, "Queue should not be empty after enqueuing"
     
     await text_queue_manager.get_next_text_chunk_async()
-    assert text_queue_manager.is_empty() is True, "Queue should be empty after getting all text"
+    assert text_queue_manager.is_empty() is False, "Queue should not be empty after getting text because there's no separator"
+    
+    await text_queue_manager.enqueue_text_async(".")
+    await text_queue_manager.get_next_text_chunk_async()
+    assert text_queue_manager.is_empty() is True, "Queue should be empty after getting all text containing a separator"
 
 
 async def test_clear_queue_async(text_queue_manager : TextQueueManager):
