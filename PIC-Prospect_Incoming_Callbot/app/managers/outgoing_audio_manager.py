@@ -41,8 +41,7 @@ class OutgoingAudioManager(OutgoingManager):
             loop_interval: float = 0.05, # 50ms~
             max_words_by_stream_chunk: int = 20,
             max_chars_by_stream_chunk: int = 100,
-            cache_ttl_minutes: int = 5,
-            populate_welcome_cache: bool = True
+            cache_ttl_minutes: int = 5
         ):
         self.logger = logging.getLogger(__name__)
         super().__init__(output_channel = "audio", can_speech_be_interupted=can_speech_be_interupted)
@@ -63,18 +62,10 @@ class OutgoingAudioManager(OutgoingManager):
         self.max_words_by_stream_chunk = max_words_by_stream_chunk
         self.max_chars_by_stream_chunk = max_chars_by_stream_chunk
         self.cache_ttl_seconds = cache_ttl_minutes * 60
-        self.populate_welcome_cache = populate_welcome_cache
         
         # Create temp directory if it doesn't exist
         os.makedirs(self.outgoing_speech_dir, exist_ok=True)
 
-    async def initialize_async(self) -> None:
-        """
-        Async initialization to be called after instantiation.
-        Pre-populates cache with welcome texts if enabled.
-        """
-        if self.populate_welcome_cache:
-            await self._populate_permanent_cache_async()
 
     def set_websocket(self, websocket: WebSocket):
         self.websocket = websocket
@@ -126,42 +117,65 @@ class OutgoingAudioManager(OutgoingManager):
         timestamp = -1 if permanent else time.time()
         self._synthesis_cache[text] = (audio_bytes, timestamp)
 
-    async def _populate_permanent_cache_async(self) -> None:
+    @classmethod
+    async def populate_permanent_cache_at_startup_async(
+        cls, 
+        tts_provider: TextToSpeechProvider = None,
+        logger: logging.Logger = None
+    ) -> None:
         """
-        Pre-populate cache with permanent entries for common welcome texts.
-        These entries never expire and improve response time for frequent messages.
+        Class method to pre-populate cache at application startup.
+        Can be called without creating an instance.
         """
+        if logger is None:
+            logger = logging.getLogger(__name__)
+            
+        if tts_provider is None:
+            #TODO: to factorize with the one created in phone_call_websocket_events_handler
+            # Import here to avoid circular import and create default provider
+            from speech.text_to_speech import get_text_to_speech_provider
+            from utils.envvar import EnvHelper
+            tts_provider_name = EnvHelper.get_text_to_speech_provider() or "openai"
+            tts_provider = get_text_to_speech_provider(
+                provider_name=tts_provider_name, 
+                frame_rate=8000, 
+                channels=1, 
+                sample_width=2
+            )
+        
         try:
             # Import here to avoid circular import
             from agents.agents_graph import AgentsGraph
             
-            welcome_texts = [
+            texts_to_sythesize = [
                 AgentsGraph.start_welcome_text,
                 AgentsGraph.other_text
             ]
             
-            self.logger.info("Pre-populating permanent cache with welcome texts...")
+            logger.info("Pre-populating permanent TTS cache at startup...")
             
-            for text in welcome_texts:
-                if text and text.strip():  # Ensure text is not empty
+            for text_to_sythesize in texts_to_sythesize:
+                if text_to_sythesize and text_to_sythesize.strip():  # Ensure text is not empty
                     try:
                         # Synthesize the text
-                        audio_bytes = await self.tts_provider.synthesize_speech_to_bytes_async(text.strip())
+                        audio_bytes = await tts_provider.synthesize_speech_to_bytes_async(text_to_sythesize.strip())
                         
                         if audio_bytes:
                             # Cache permanently (never expires)
-                            self._cache_synthesis(text.strip(), audio_bytes, permanent=True)
-                            self.logger.info(f"Successfully cached permanent entry for: '{text[:50]}...'")
+                            timestamp = -1  # Permanent entry
+                            cls._synthesis_cache[text_to_sythesize.strip()] = (audio_bytes, timestamp)
+                            logger.info(f"Successfully cached permanent entry at startup: '{text_to_sythesize[:50]}...'")
                         else:
-                            self.logger.warning(f"Failed to synthesize welcome text: '{text[:50]}...'")
+                            logger.warning(f"Failed to synthesize welcome text at startup: '{text_to_sythesize[:50]}...'")
                             
                     except Exception as e:
-                        self.logger.error(f"Error synthesizing welcome text '{text[:50]}...': {e}")
+                        logger.error(f"Error synthesizing welcome text at startup '{text_to_sythesize[:50]}...': {e}")
                         
-            self.logger.info(f"Permanent cache population completed. Cached {len([t for t in welcome_texts if t and t.strip()])} welcome texts.")
+            logger.info(f"Permanent TTS cache population completed at startup. Cached {len([t for t in texts_to_sythesize if t and t.strip()])} permanent texts.")
             
         except Exception as e:
-            self.logger.error(f"Error during permanent cache population: {e}")
+            logger.error(f"Error during permanent cache population at startup: {e}")
+
 
     async def synthesize_next_audio_chunk_async(self) -> bytes | None:
         """
@@ -175,13 +189,13 @@ class OutgoingAudioManager(OutgoingManager):
             if not speech_chunk:
                 return None
             
-            # Check cache first
+            # Search the cache first
             cached_bytes = self._get_cached_synthesis(speech_chunk)
             if cached_bytes:
                 self.logger.info(f">>>>>> Using cached synthesis for chunk: '{speech_chunk}'")
                 return cached_bytes
             
-            # Cache miss, synthesize and cache the result
+            # Synthesize text audio and add it to cache
             speech_bytes = await self.tts_provider.synthesize_speech_to_bytes_async(speech_chunk)
             self.logger.info(f">>>>>> Synthesized speech for chunk: '{speech_chunk}'")
             if not speech_bytes:

@@ -14,13 +14,27 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import endpoints
 from utils.envvar import EnvHelper
 from phone_call_websocket_events_handler import PhoneCallWebsocketEventsHandlerFactory
+from managers.outgoing_audio_manager import OutgoingAudioManager
 
 class ApiConfig:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        # Startup logic
+        logger = logging.getLogger(__name__)
+        logger.info("Application startup.")
+        
+        # Pre-populate TTS cache with welcome texts
+        try:
+            await OutgoingAudioManager.populate_permanent_cache_at_startup_async()
+            logger.info("TTS cache pre-population completed at startup.")
+        except Exception as e:
+            logger.error(f"Failed to pre-populate TTS cache at startup: {e}")
+        
         try:
             yield
         finally:
+            # Shutdown logic
+            logger.info("Shutting down application.")
             if app:
                 app.state.shutdown()
 
@@ -120,16 +134,6 @@ class ApiConfig:
             with open(f"outputs/logs/{latest_log_file}", "r", encoding="utf-8") as file:
                 return file.read()
                 
-        async def startup_event():
-            """Handle application startup."""
-            logger.error("Application startup.")
-
-        async def shutdown_event():
-            """Handle application shutdown."""
-            logger.error("Shutting down application.")
-        
-        app.add_event_handler("startup", startup_event)
-        app.add_event_handler("shutdown", shutdown_event)
 
         return app
 

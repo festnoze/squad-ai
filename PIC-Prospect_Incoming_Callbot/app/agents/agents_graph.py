@@ -93,6 +93,7 @@ class AgentsGraph:
                 "lead_agent": "lead_agent",
                 "calendar_agent": "calendar_agent",
                 "rag_course_agent": "rag_course_agent",
+                "other_inquery": "other_inquery",
                 "wait_for_user_input": "wait_for_user_input",
                 END: END
             }
@@ -100,6 +101,7 @@ class AgentsGraph:
 
         workflow.add_edge("calendar_agent", END)
         workflow.add_edge("rag_course_agent", END)
+        workflow.add_edge("other_inquery", END)
 
         # Add checkpointer if state needs to be persisted (e.g., using SQLite)
         # checkpointer = MemorySaver() # Example using in-memory checkpointer
