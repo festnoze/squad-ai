@@ -82,7 +82,7 @@ class OutgoingAudioManager(OutgoingManager):
             self.logger.info(f"Updated stream SID to: {stream_sid}")
         return
 
-    def _get_cached_synthesis(self, text: str) -> bytes | None:
+    def get_synthesized_audio_from_cache(self, text: str) -> bytes | None:
         """
         Get cached synthesis result if available and not expired.
         Permanent entries (timestamp = -1) never expire.
@@ -124,25 +124,25 @@ class OutgoingAudioManager(OutgoingManager):
         Uses caching to avoid re-synthesizing the same text.
         """
         try:
-            # Process this text into optimal chunks for natural speech
+            # Get next sentense to speak
             speech_chunk = await self.text_queue_manager.get_next_text_chunk_async()
             if not speech_chunk:
                 return None
             
-            # Search the cache first
-            cached_bytes = self._get_cached_synthesis(speech_chunk)
+            # Search for the existing audio of the sentense from cache first
+            cached_bytes = self.get_synthesized_audio_from_cache(speech_chunk)
             if cached_bytes:
                 self.logger.info(f">>>>>> Using cached synthesis for chunk: '{speech_chunk}'")
                 return cached_bytes
             
-            # Synthesize text audio and add it to cache
+            # Else, synthesize the audio for the text
             speech_bytes = await self.tts_provider.synthesize_speech_to_bytes_async(speech_chunk)
             self.logger.info(f">>>>>> Synthesized speech for chunk: '{speech_chunk}'")
             if not speech_bytes:
                 self.logger.error(f"/!\\ Failed to synthesize speech for chunk: '{speech_chunk}'")
                 return None
             
-            # Cache the result
+            # Cache the synthesized audio for the text
             OutgoingAudioManager.add_synthesized_audio_to_cache(speech_chunk, speech_bytes)
                 
             return speech_bytes
