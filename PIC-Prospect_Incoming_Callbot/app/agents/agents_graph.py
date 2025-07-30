@@ -30,8 +30,10 @@ from llms.langchain_adapter_type import LangChainAdapterType
 from utils.envvar import EnvHelper
 
 class AgentsGraph:
-    start_welcome_text = ""
     waiting_music_bytes = None
+    start_welcome_text = "Bonjour, je suis Studia, l'assistante virtuelle de Studi. Je prend le relais quand nos conseillers en formations ne sont pas disponibles."
+    other_text = "Désolé, je n'ai pas compris votre demande. Merci de me poser une question ou me demander de prendre rendez-vous."
+
     def __init__(self, outgoing_manager: OutgoingManager, studi_rag_client: StudiRAGInferenceApiClient, salesforce_client: SalesforceApiClientInterface, call_sid: str):
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
@@ -80,6 +82,7 @@ class AgentsGraph:
         workflow.add_node("lead_agent", self.lead_agent_node)
         workflow.add_node("calendar_agent", self.calendar_agent_node)
         workflow.add_node("rag_course_agent", self.query_rag_api_about_trainings_agent_node)
+        workflow.add_node("other_inquery", self.other_inquery_node)
 
         # Add conditional edges
         workflow.add_conditional_edges(
@@ -124,7 +127,7 @@ class AgentsGraph:
             elif category == "training_course_query":
                 state['agent_scratchpad']["next_agent_needed"] = "rag_course_agent"
             elif category == "others":
-                state['agent_scratchpad']["next_agent_needed"] = "conversation_start"
+                state['agent_scratchpad']["next_agent_needed"] = "other_inquery"
             return state
         state['agent_scratchpad']["next_agent_needed"] = "wait_for_user_input"
         return state
@@ -153,11 +156,9 @@ class AgentsGraph:
     async def send_begin_of_welcome_message_node(self, state: PhoneConversationState) -> dict:
         """Send the begin of welcome message to the user"""
         call_sid = state.get('call_sid', 'N/A')
-        phone_number = state.get('caller_phone', 'N/A')
-        self.start_welcome_text = "Bonjour, je suis Studia, l'assistante virtuelle de Studi. Je prend le relais quand nos conseillers en formations ne sont pas disponibles."
-        
+        phone_number = state.get('caller_phone', 'N/A')        
         await self.outgoing_manager.enqueue_text_async(self.start_welcome_text)
-        self.logger.info(f"[{call_sid}] Sent begin of welcome message to {phone_number}")
+        self.logger.info(f"[{call_sid}] Sent 'begin of welcome message' to {phone_number}")
         return state
 
     async def init_conversation_node(self, state: PhoneConversationState) -> dict:
@@ -239,7 +240,7 @@ class AgentsGraph:
             await self.studi_rag_inference_api_client.add_external_ai_message_to_conversation_async(conv_id, full_welcome_text)
         else:
             self.logger.warning("/!\\ ERROR: No conversation ID found in state. Unable to add welcome msg to conversation properly.")
-        self.logger.info(f"[{call_sid}] Sent end of welcome message to {phone_number}")
+        self.logger.info(f"[{call_sid}] Sent 'end of welcome message' to {phone_number}")
         return state
     
     async def wait_for_user_input_node(self, state: PhoneConversationState) -> dict:
@@ -508,6 +509,14 @@ class AgentsGraph:
 
         return state
 
+    async def other_inquery_node(self, state: PhoneConversationState) -> dict:
+        """Handle other inquery"""
+        call_sid = state.get('call_sid', 'N/A')
+        phone_number = state.get('caller_phone', 'N/A')
+        await self.outgoing_manager.enqueue_text_async(self.other_text)
+        self.logger.info(f"[{call_sid}] Sent 'other' message to {phone_number}")
+        return state
+    
     def _load_file_bytes(self, file_path: str) -> bytes:
         with open(file_path, "rb") as f:
             return f.read()

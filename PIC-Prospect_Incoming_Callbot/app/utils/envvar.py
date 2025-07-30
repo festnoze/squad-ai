@@ -39,6 +39,11 @@ class EnvHelper:
     def get_do_audio_preprocessing():
         value = EnvHelper.get_env_variable_value_by_name('DO_AUDIO_PREPROCESSING')
         return value.lower() == 'true'
+    
+    @staticmethod
+    def get_keep_audio_files():        
+        value = EnvHelper.get_env_variable_value_by_name('KEEP_AUDIO_FILES')
+        return value.lower() == 'true'
 
     @staticmethod
     def get_text_to_speech_provider():

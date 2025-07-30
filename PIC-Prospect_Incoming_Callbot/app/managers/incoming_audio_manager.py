@@ -310,12 +310,12 @@ class IncomingAudioManager(IncomingManager):
 
             # Waiting message
             #await self.outgoing_manager.enqueue_text(random.choice(["Très bien, je vous demande un instant.", "Merci de patienter.", "Laissez-moi y réfléchir.", "Une petite seconde."]))
-            acknowledge_text = random.choice(["Très bien,", "C'est compris,", "D'accord,", "Entendu,", "Parfait,"])
-            acknowledge_text += random.choice([" Un instant s'il vous plait.", " Merci de patienter.", " Laissez-moi y réfléchir.", " Une petite seconde."])
+            acknowledge_text = random.choice(["Très bien, ", "Compris, ", "D'accord, ", "Entendu, ", "Parfait, "])
+            acknowledge_text += random.choice(["un instant s'il vous plait.", "je vous demande un instant.", "merci de patienter.", "laissez-moi y réfléchir.", "une petite seconde."])
             await self.outgoing_manager.enqueue_text_async(acknowledge_text)
             
             # 4. Transcribe speech to text
-            user_query_transcript = await self._perform_speech_to_text_transcription_async(audio_data, is_audio_file_to_delete=True)
+            user_query_transcript = await self._perform_speech_to_text_transcription_async(audio_data, keep_audio_file=EnvHelper.get_keep_audio_files())
             self.logger.info(f">>> Transcription finished. Heard text: \"{user_query_transcript}\"")
             
             # repeat_user_input = EnvHelper.get_repeat_user_input()
@@ -328,9 +328,13 @@ class IncomingAudioManager(IncomingManager):
                 await self.send_user_query_to_agents_graph_async(user_query_transcript)
             
             # If no user query transcript, enqueue back the text to speak previously removed
-            if not user_query_transcript and removed_text_to_speak:
-                await self.outgoing_manager.enqueue_text_async(removed_text_to_speak)
-                self.logger.info(f">>> Empty transcript. Enqueued back originaly removed text to speak: \"{removed_text_to_speak}\"")
+            if not user_query_transcript:
+                if removed_text_to_speak:
+                    await self.outgoing_manager.enqueue_text_async(removed_text_to_speak)
+                    self.logger.info(f">>> Empty transcript. Enqueued back originaly removed text to speak: \"{removed_text_to_speak}\"")
+                else:
+                    await self.outgoing_manager.enqueue_text_async(AgentsGraph.other_text)
+                    self.logger.info(">>> Empty transcript.")
 
         #await asyncio.sleep(0.1) # Pause incoming process to let others processes breathe
         return
@@ -378,7 +382,7 @@ class IncomingAudioManager(IncomingManager):
             self.logger.error(f"Error decoding/converting audio chunk: {decode_err}")
             return None
 
-    async def _perform_speech_to_text_transcription_async(self, audio_data: bytes, is_audio_file_to_delete : bool = True):
+    async def _perform_speech_to_text_transcription_async(self, audio_data: bytes, keep_audio_file : bool = False):
         try:
             wav_audio_filename = None
             # Check if the audio buffer has a high enough speech to noise ratio
@@ -433,7 +437,7 @@ class IncomingAudioManager(IncomingManager):
             self.logger.error(f"Error during transcription: {speech_err}", exc_info=True)
             return None
         finally:
-            if is_audio_file_to_delete and wav_audio_filename:
+            if not keep_audio_file and wav_audio_filename:
                 self._delete_temp_file(wav_audio_filename)
     
     def _delete_temp_file(self, file_name: str):

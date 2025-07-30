@@ -10,6 +10,7 @@ from speech.text_processing import ProcessText
 from speech.twilio_audio_sender import TwilioAudioSender
 from speech.text_to_speech import TextToSpeechProvider
 from managers.outgoing_manager import OutgoingManager
+from utils.envvar import EnvHelper
 #
 from utils.async_call_wrapper import AsyncCallWrapper
 
@@ -34,7 +35,6 @@ class OutgoingAudioManager(OutgoingManager):
             frame_rate: int = 8000,
             channels: int = 1,
             loop_interval: float = 0.05, # 50ms~
-            pause_between_chunks: float = 0.05, # 50ms~
             max_words_by_stream_chunk: int = 20,
             max_chars_by_stream_chunk: int = 100
         ):
@@ -45,7 +45,7 @@ class OutgoingAudioManager(OutgoingManager):
         
         self.tts_provider : TextToSpeechProvider = tts_provider  # Text-to-speech provider for converting text to audio
         self.sender_task = None
-        self.save_outgoing_audio_as_file = True
+        self.keep_audio_file = EnvHelper.get_keep_audio_files()
         self.frame_rate = frame_rate   # mu-law in 8/16kHz
         self.sample_width = sample_width    # mu-law in 8/16 bits
         self.channels = channels
@@ -54,7 +54,6 @@ class OutgoingAudioManager(OutgoingManager):
         self.websocket = websocket
         self.min_chars_for_interruptible_speech = min_chars_for_interruptible_speech
         self.loop_interval = loop_interval
-        self.pause_between_chunks = pause_between_chunks
         self.max_words_by_stream_chunk = max_words_by_stream_chunk
         self.max_chars_by_stream_chunk = max_chars_by_stream_chunk
         
@@ -150,7 +149,7 @@ class OutgoingAudioManager(OutgoingManager):
                     continue
                 
                 while not pre_synthesis_task.done():
-                    await asyncio.sleep(0.05)
+                    await asyncio.sleep(self.loop_interval)
 
                 speech_bytes = pre_synthesis_task.result()
                 pre_synthesis_task = None
@@ -162,7 +161,7 @@ class OutgoingAudioManager(OutgoingManager):
                 
                 text_chunks_processed += 1
 
-                if self.save_outgoing_audio_as_file:
+                if self.keep_audio_file:
                     self.save_as_wav_file(speech_bytes)
                 
                 # Send the current audio
@@ -175,7 +174,7 @@ class OutgoingAudioManager(OutgoingManager):
 
                 # Wait for the send to complete, but check for completion of next synthesis as well
                 while not send_audio_chunk_task.done():
-                    await asyncio.sleep(0.05)
+                    await asyncio.sleep(self.loop_interval)
                     
             except asyncio.CancelledError:
                 self.logger.info("Streaming worker task was cancelled")

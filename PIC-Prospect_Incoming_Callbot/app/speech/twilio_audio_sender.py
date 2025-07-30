@@ -101,7 +101,7 @@ class TwilioAudioSender:
                         
                         # Proportional delay: µ-law is 8000 samples/sec, 1 byte/sample (8000 bytes/sec)
                         delay_duration = len(segment_mulaw) / self.sample_rate
-                        await asyncio.sleep(delay_duration)
+                        await asyncio.sleep(delay_duration - 0.01)
 
                         if self.consecutive_errors > 0:
                             self.logger.debug(f"Successfully sent a segment after {self.consecutive_errors} prior errors.")
