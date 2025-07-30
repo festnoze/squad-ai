@@ -2,6 +2,8 @@ import os
 import logging
 import asyncio
 import uuid
+import time
+from typing import Dict, Tuple, Optional
 from fastapi import WebSocket
 import wave
 #
@@ -21,7 +23,10 @@ class OutgoingAudioManager(OutgoingManager):
     """
 
     # Tmp directory for outgoing audio files
-    outgoing_speech_dir = "./static/outgoing_audio"   
+    outgoing_speech_dir = "./static/outgoing_audio"
+    
+    # Speech synthesis cache: {text: (audio_bytes, timestamp)}
+    _synthesis_cache: Dict[str, Tuple[bytes, float]] = {}   
 
     def __init__(
             self,
@@ -36,7 +41,8 @@ class OutgoingAudioManager(OutgoingManager):
             channels: int = 1,
             loop_interval: float = 0.05, # 50ms~
             max_words_by_stream_chunk: int = 20,
-            max_chars_by_stream_chunk: int = 100
+            max_chars_by_stream_chunk: int = 100,
+            cache_ttl_minutes: int = 5
         ):
         self.logger = logging.getLogger(__name__)
         super().__init__(output_channel = "audio", can_speech_be_interupted=can_speech_be_interupted)
@@ -56,6 +62,7 @@ class OutgoingAudioManager(OutgoingManager):
         self.loop_interval = loop_interval
         self.max_words_by_stream_chunk = max_words_by_stream_chunk
         self.max_chars_by_stream_chunk = max_chars_by_stream_chunk
+        self.cache_ttl_seconds = cache_ttl_minutes * 60
         
         # Create temp directory if it doesn't exist
         os.makedirs(self.outgoing_speech_dir, exist_ok=True)
@@ -76,11 +83,34 @@ class OutgoingAudioManager(OutgoingManager):
             self.logger.info(f"Updated stream SID to: {stream_sid}")
         return
 
+    def _get_cached_synthesis(self, text: str) -> Optional[bytes]:
+        """
+        Get cached synthesis result if available and not expired.
+        """
+        if text not in self._synthesis_cache:
+            return None
+            
+        audio_bytes, timestamp = self._synthesis_cache[text]
+        current_time = time.time()
+        
+        if current_time - timestamp > self.cache_ttl_seconds:
+            # Cache expired, remove entry
+            del self._synthesis_cache[text]
+            return None
+            
+        return audio_bytes
+    
+    def _cache_synthesis(self, text: str, audio_bytes: bytes) -> None:
+        """
+        Cache synthesis result with current timestamp.
+        """
+        self._synthesis_cache[text] = (audio_bytes, time.time())
 
     async def synthesize_next_audio_chunk_async(self) -> bytes | None:
         """
         Gets the next text chunk and synthesizes it to audio bytes.
         Returns None if no text is available or tuple (speech_chunk, speech_bytes) if successful.
+        Uses caching to avoid re-synthesizing the same text.
         """
         try:
             # Process this text into optimal chunks for natural speech
@@ -88,11 +118,21 @@ class OutgoingAudioManager(OutgoingManager):
             if not speech_chunk:
                 return None
             
+            # Check cache first
+            cached_bytes = self._get_cached_synthesis(speech_chunk)
+            if cached_bytes:
+                self.logger.info(f">>>>>> Using cached synthesis for chunk: '{speech_chunk}'")
+                return cached_bytes
+            
+            # Cache miss, synthesize and cache the result
             speech_bytes = await self.tts_provider.synthesize_speech_to_bytes_async(speech_chunk)
             self.logger.info(f">>>>>> Synthesized speech for chunk: '{speech_chunk}'")
             if not speech_bytes:
                 self.logger.error(f"/!\\ Failed to synthesize speech for chunk: '{speech_chunk}'")
                 return None
+            
+            # Cache the result
+            self._cache_synthesis(speech_chunk, speech_bytes)
                 
             return speech_bytes
 
