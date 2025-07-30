@@ -57,6 +57,13 @@ class TwilioAudioSender:
             return False
 
         try:
+            # Ensure audio_chunk has an even number of bytes for 16-bit PCM
+            # Each 16-bit sample requires 2 bytes
+            if len(audio_chunk) % 2 != 0:
+                # Pad with a zero byte to make it even
+                audio_chunk = audio_chunk + b'\x00'
+                self.logger.debug(f"Padded PCM chunk from {len(audio_chunk)-1} to {len(audio_chunk)} bytes")
+            
             # Convert the entire 16-bit PCM audio_chunk to 8-bit μ-law.
             # Sample width is 2 for 16-bit PCM.
             full_mulaw_audio = audioop.lin2ulaw(audio_chunk, 2)

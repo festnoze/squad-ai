@@ -31,6 +31,7 @@ from utils.envvar import EnvHelper
 
 class AgentsGraph:
     start_welcome_text = ""
+    waiting_music_bytes = None
     def __init__(self, outgoing_manager: OutgoingManager, studi_rag_client: StudiRAGInferenceApiClient, salesforce_client: SalesforceApiClientInterface, call_sid: str):
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
@@ -513,12 +514,13 @@ class AgentsGraph:
 
     async def _start_waiting_music_async(self):
         # Replace waiting message by a background music that loops
-        waiting_music_bytes = self._load_file_bytes("static/internal/waiting_music.mp4")
+        if not self.waiting_music_bytes:
+            self.waiting_music_bytes = self._load_file_bytes("static/internal/waiting_music.pcm")
         waiting_music_task = None
         if isinstance(self.outgoing_manager, OutgoingAudioManager):
             while self.outgoing_manager.audio_sender.is_sending:
                 await asyncio.sleep(0.1) 
-            waiting_music_task = asyncio.create_task(self._loop_waiting_music_async(waiting_music_bytes))
+            waiting_music_task = asyncio.create_task(self._loop_waiting_music_async(self.waiting_music_bytes))
         return waiting_music_task
 
     async def _loop_waiting_music_async(self, music_bytes: bytes):
