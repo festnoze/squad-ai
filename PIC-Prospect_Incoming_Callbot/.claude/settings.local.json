@@ -7,7 +7,8 @@
       "WebFetch(domain:cloud.google.com)",
       "Bash(python -m pytest tests/test_text_processing.py::test_chunk_text_by_sized_sentences -v)",
       "Bash(python:*)",
-      "Bash(pylint:*)"
+      "Bash(pylint:*)",
+      "Bash(rm:*)"
     ],
     "deny": []
   }

@@ -32,7 +32,7 @@ from utils.envvar import EnvHelper
 class AgentsGraph:
     waiting_music_bytes = None
     start_welcome_text = "Bonjour, je suis Studia, l'assistante virtuelle de Studi. Je prend le relais quand nos conseillers en formations ne sont pas disponibles."
-    other_text = "Désolé, je n'ai pas compris votre demande. Merci de me poser une question ou me demander de prendre rendez-vous."
+    other_text = "Désolé, je n'ai pas compris votre demande. Merci de me poser une question ou de me demander de prendre rendez-vous."
 
     def __init__(self, outgoing_manager: OutgoingManager, studi_rag_client: StudiRAGInferenceApiClient, salesforce_client: SalesforceApiClientInterface, call_sid: str):
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')

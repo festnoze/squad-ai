@@ -3,11 +3,10 @@ import logging
 import asyncio
 import uuid
 import time
-from fastapi import WebSocket
 import wave
+from fastapi import WebSocket
 #
 from speech.text_queue_manager import TextQueueManager
-from speech.text_processing import ProcessText
 from speech.twilio_audio_sender import TwilioAudioSender
 from speech.text_to_speech import TextToSpeechProvider
 from managers.outgoing_manager import OutgoingManager
@@ -25,7 +24,7 @@ class OutgoingAudioManager(OutgoingManager):
     outgoing_speech_dir = "./static/outgoing_audio"
     
     # Speech synthesis cache: {text: (audio_bytes, timestamp)}
-    _synthesis_cache: dict[str, tuple[bytes, float]] = {}   
+    _synthesized_audio_cache: dict[str, tuple[bytes, float]] = {}   
 
     def __init__(
             self,
@@ -88,10 +87,10 @@ class OutgoingAudioManager(OutgoingManager):
         Get cached synthesis result if available and not expired.
         Permanent entries (timestamp = -1) never expire.
         """
-        if text not in self._synthesis_cache:
+        if text not in self._synthesized_audio_cache:
             return None
             
-        audio_bytes, timestamp = self._synthesis_cache[text]
+        audio_bytes, timestamp = self._synthesized_audio_cache[text]
         
         # Permanent entries never expire (timestamp = -1)
         if timestamp == -1:
@@ -100,12 +99,13 @@ class OutgoingAudioManager(OutgoingManager):
         current_time = time.time()
         if current_time - timestamp > self.cache_ttl_seconds:
             # Cache expired, remove entry
-            del self._synthesis_cache[text]
+            del self._synthesized_audio_cache[text]
             return None
             
         return audio_bytes
     
-    def _cache_synthesis(self, text: str, audio_bytes: bytes, permanent: bool = False) -> None:
+    @staticmethod
+    def add_synthesized_audio_to_cache(text: str, audio_bytes: bytes, permanent: bool = False) -> None:
         """
         Cache synthesis result with current timestamp or as permanent entry.
         
@@ -115,67 +115,7 @@ class OutgoingAudioManager(OutgoingManager):
             permanent: If True, cache permanently (never expires)
         """
         timestamp = -1 if permanent else time.time()
-        self._synthesis_cache[text] = (audio_bytes, timestamp)
-
-    @classmethod
-    async def populate_permanent_cache_at_startup_async(
-        cls, 
-        tts_provider: TextToSpeechProvider = None,
-        logger: logging.Logger = None
-    ) -> None:
-        """
-        Class method to pre-populate cache at application startup.
-        Can be called without creating an instance.
-        """
-        if logger is None:
-            logger = logging.getLogger(__name__)
-            
-        if tts_provider is None:
-            #TODO: to factorize with the one created in phone_call_websocket_events_handler
-            # Import here to avoid circular import and create default provider
-            from speech.text_to_speech import get_text_to_speech_provider
-            from utils.envvar import EnvHelper
-            tts_provider_name = EnvHelper.get_text_to_speech_provider() or "openai"
-            tts_provider = get_text_to_speech_provider(
-                provider_name=tts_provider_name, 
-                frame_rate=8000, 
-                channels=1, 
-                sample_width=2
-            )
-        
-        try:
-            # Import here to avoid circular import
-            from agents.agents_graph import AgentsGraph
-            
-            texts_to_sythesize = [
-                AgentsGraph.start_welcome_text,
-                AgentsGraph.other_text
-            ]
-            
-            logger.info("Pre-populating permanent TTS cache at startup...")
-            
-            for text_to_sythesize in texts_to_sythesize:
-                if text_to_sythesize and text_to_sythesize.strip():  # Ensure text is not empty
-                    try:
-                        # Synthesize the text
-                        audio_bytes = await tts_provider.synthesize_speech_to_bytes_async(text_to_sythesize.strip())
-                        
-                        if audio_bytes:
-                            # Cache permanently (never expires)
-                            timestamp = -1  # Permanent entry
-                            cls._synthesis_cache[text_to_sythesize.strip()] = (audio_bytes, timestamp)
-                            logger.info(f"Successfully cached permanent entry at startup: '{text_to_sythesize[:50]}...'")
-                        else:
-                            logger.warning(f"Failed to synthesize welcome text at startup: '{text_to_sythesize[:50]}...'")
-                            
-                    except Exception as e:
-                        logger.error(f"Error synthesizing welcome text at startup '{text_to_sythesize[:50]}...': {e}")
-                        
-            logger.info(f"Permanent TTS cache population completed at startup. Cached {len([t for t in texts_to_sythesize if t and t.strip()])} permanent texts.")
-            
-        except Exception as e:
-            logger.error(f"Error during permanent cache population at startup: {e}")
-
+        OutgoingAudioManager._synthesized_audio_cache[text] = (audio_bytes, timestamp)
 
     async def synthesize_next_audio_chunk_async(self) -> bytes | None:
         """
@@ -203,7 +143,7 @@ class OutgoingAudioManager(OutgoingManager):
                 return None
             
             # Cache the result
-            self._cache_synthesis(speech_chunk, speech_bytes)
+            OutgoingAudioManager.add_synthesized_audio_to_cache(speech_chunk, speech_bytes)
                 
             return speech_bytes
 

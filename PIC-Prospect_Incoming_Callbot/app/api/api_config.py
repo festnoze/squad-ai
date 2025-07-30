@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import endpoints
 from utils.envvar import EnvHelper
 from phone_call_websocket_events_handler import PhoneCallWebsocketEventsHandlerFactory
-from managers.outgoing_audio_manager import OutgoingAudioManager
+from speech.pregenerated_audio import PreGeneratedAudio
 
 class ApiConfig:
     @asynccontextmanager
@@ -25,7 +25,7 @@ class ApiConfig:
         
         # Pre-populate TTS cache with welcome texts
         try:
-            await OutgoingAudioManager.populate_permanent_cache_at_startup_async()
+            await PreGeneratedAudio.populate_permanent_cache_at_startup_async()
             logger.info("TTS cache pre-population completed at startup.")
         except Exception as e:
             logger.error(f"Failed to pre-populate TTS cache at startup: {e}")
