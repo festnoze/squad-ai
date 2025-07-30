@@ -82,27 +82,52 @@ class OutgoingAudioManager(OutgoingManager):
             self.logger.info(f"Updated stream SID to: {stream_sid}")
         return
 
-    def get_synthesized_audio_from_cache(self, text: str) -> bytes | None:
+    def get_synthesized_audio_from_cache(self, text: str, allow_partial: bool = False) -> bytes | None:
         """
         Get cached synthesis result if available and not expired.
         Permanent entries (timestamp = -1) never expire.
+        
+        Args:
+            text: The text to search for in cache
+            allow_partial: If True, allows partial matching using _find_partial_cached_audio
+            
+        Returns:
+            Audio bytes if found (complete or combined from parts), None otherwise
         """
-        if text not in self._synthesized_audio_cache:
-            return None
+        # First try exact match (existing behavior)
+        if text in self._synthesized_audio_cache:
+            audio_bytes, timestamp = self._synthesized_audio_cache[text]
             
-        audio_bytes, timestamp = self._synthesized_audio_cache[text]
-        
-        # Permanent entries never expire (timestamp = -1)
-        if timestamp == -1:
-            return audio_bytes
-        
-        current_time = time.time()
-        if current_time - timestamp > self.cache_ttl_seconds:
-            # Cache expired, remove entry
-            del self._synthesized_audio_cache[text]
-            return None
+            # Permanent entries never expire (timestamp = -1)
+            if timestamp == -1:
+                return audio_bytes
             
-        return audio_bytes
+            current_time = time.time()
+            if current_time - timestamp <= self.cache_ttl_seconds:
+                return audio_bytes
+            else:
+                # Cache expired, remove entry
+                del self._synthesized_audio_cache[text]
+        
+        # If exact match not found and partial matching is allowed
+        if allow_partial:
+            try:
+                audio_parts_found, remaining_text, parts_used = self._find_partial_cached_audio(text)
+                
+                if audio_parts_found and not remaining_text.strip():
+                    # All text was found in cache parts
+                    combined_audio = self._combine_audio_parts(audio_parts_found)
+                    if combined_audio:
+                        self.logger.info(f">>>>>> Using combined cached parts for: '{text}' (parts: {[p[:30]+'...' for p in parts_used]})")
+                        
+                        # Cache the combined result for future use
+                        self.add_synthesized_audio_to_cache(text, combined_audio)
+                        return combined_audio
+                
+            except Exception as e:
+                self.logger.error(f"Error in partial cache search for '{text[:50]}...': {e}")
+        
+        return None
     
     @staticmethod
     def add_synthesized_audio_to_cache(text: str, audio_bytes: bytes, permanent: bool = False) -> None:
@@ -117,38 +142,214 @@ class OutgoingAudioManager(OutgoingManager):
         timestamp = -1 if permanent else time.time()
         OutgoingAudioManager._synthesized_audio_cache[text] = (audio_bytes, timestamp)
 
+    def _combine_audio_parts(self, audio_parts: list[bytes]) -> bytes:
+        """
+        Combine multiple PCM audio parts into a single audio stream.
+        
+        Args:
+            audio_parts: List of PCM audio byte arrays to combine
+            
+        Returns:
+            Combined audio bytes, or empty bytes if combination fails
+        """
+        if not audio_parts:
+            return b""
+        
+        if len(audio_parts) == 1:
+            return audio_parts[0]
+        
+        try:
+            # For PCM audio, we can simply concatenate the byte arrays
+            combined_audio = b"".join(audio_parts)
+            self.logger.debug(f"Combined {len(audio_parts)} audio parts into {len(combined_audio)} bytes")
+            return combined_audio
+        except Exception as e:
+            self.logger.error(f"Failed to combine audio parts: {e}")
+            return b""
+
+    def _find_partial_cached_audio(self, text: str, max_recursion_depth: int = 5) -> tuple[list[bytes], str, list[str]]:
+        """
+        Recursively find cached audio parts for the beginning of the text.
+        
+        Args:
+            text: The text to search for cached parts
+            max_recursion_depth: Maximum recursion depth to prevent infinite loops
+            
+        Returns:
+            Tuple of (audio_parts_found, remaining_text, parts_used)
+            - audio_parts_found: List of audio bytes found in cache
+            - remaining_text: Text that still needs to be synthesized  
+            - parts_used: List of text parts that were found in cache
+        """
+        if not text.strip() or max_recursion_depth <= 0:
+            return [], text, []
+        
+        text = text.strip()
+        audio_parts_found = []
+        parts_used = []
+        
+        # First, try to find the complete text in cache
+        complete_audio = self.get_synthesized_audio_from_cache(text)
+        if complete_audio:
+            return [complete_audio], "", [text]
+        
+        # Split text into potential prefix parts (by sentences, then by words)
+        text_separators = ['. ', '! ', '? ', ', ', ' ']
+        potential_prefixes = []
+        
+        # Generate potential prefixes by different separators
+        for separator in text_separators:
+            parts = text.split(separator)
+            if len(parts) > 1:
+                for i in range(1, len(parts)):
+                    prefix = separator.join(parts[:i])
+                    if separator != ' ':  # Add back the separator except for spaces
+                        prefix += separator
+                    if prefix.strip() and len(prefix.strip()) >= 3:  # Minimum length
+                        potential_prefixes.append(prefix.strip())
+        
+        # Sort by length (longest first) to find the best match
+        potential_prefixes = sorted(set(potential_prefixes), key=len, reverse=True)
+        
+        # Try to find the longest prefix in cache
+        for prefix in potential_prefixes:
+            cached_audio = self.get_synthesized_audio_from_cache(prefix)
+            if cached_audio:
+                audio_parts_found.append(cached_audio)
+                parts_used.append(prefix)
+                
+                # Calculate remaining text
+                remaining_text = text[len(prefix):].strip()
+                
+                if remaining_text:
+                    # Recursively search for more parts in the remaining text
+                    more_audio_parts, final_remaining, more_parts = self._find_partial_cached_audio(
+                        remaining_text, max_recursion_depth - 1
+                    )
+                    audio_parts_found.extend(more_audio_parts)
+                    parts_used.extend(more_parts)
+                    remaining_text = final_remaining
+                
+                break
+        
+        # If no prefixes found, return the original text as remaining
+        if not audio_parts_found:
+            remaining_text = text
+        else:
+            remaining_text = remaining_text if 'remaining_text' in locals() else ""
+        
+        return audio_parts_found, remaining_text, parts_used
+
     async def synthesize_next_audio_chunk_async(self) -> bytes | None:
         """
-        Gets the next text chunk and synthesizes it to audio bytes.
-        Returns None if no text is available or tuple (speech_chunk, speech_bytes) if successful.
-        Uses caching to avoid re-synthesizing the same text.
+        Gets the next text chunk and synthesizes it to audio bytes with intelligent caching.
+        Uses partial cache matching to combine cached parts with newly synthesized audio.
+        Returns None if no text is available or audio bytes if successful.
         """
         try:
-            # Get next sentense to speak
+            # Get next sentence to speak
             speech_chunk = await self.text_queue_manager.get_next_text_chunk_async()
             if not speech_chunk:
                 return None
             
-            # Search for the existing audio of the sentense from cache first
-            cached_bytes = self.get_synthesized_audio_from_cache(speech_chunk)
+            speech_chunk = speech_chunk.strip()
+            
+            # Step 1: Try exact cache match first (fastest path)
+            cached_bytes = self.get_synthesized_audio_from_cache(speech_chunk, allow_partial=False)
             if cached_bytes:
-                self.logger.info(f">>>>>> Using cached synthesis for chunk: '{speech_chunk}'")
+                self.logger.info(f">>>>>> Using exact cached synthesis for: '{speech_chunk}'")
                 return cached_bytes
             
-            # Else, synthesize the audio for the text
-            speech_bytes = await self.tts_provider.synthesize_speech_to_bytes_async(speech_chunk)
-            self.logger.info(f">>>>>> Synthesized speech for chunk: '{speech_chunk}'")
-            if not speech_bytes:
-                self.logger.error(f"/!\\ Failed to synthesize speech for chunk: '{speech_chunk}'")
-                return None
-            
-            # Cache the synthesized audio for the text
-            OutgoingAudioManager.add_synthesized_audio_to_cache(speech_chunk, speech_bytes)
+            # Step 2: Try partial cache matching with intelligent combination
+            try:
+                audio_parts_found, remaining_text, parts_used = self._find_partial_cached_audio(speech_chunk)
                 
-            return speech_bytes
+                if audio_parts_found or remaining_text.strip():
+                    final_audio_parts = []
+                    synthesis_info = []
+                    
+                    # Add cached parts to final audio
+                    if audio_parts_found:
+                        final_audio_parts.extend(audio_parts_found)
+                        synthesis_info.extend([f"cached({part[:25]}...)" for part in parts_used])
+                    
+                    # Synthesize remaining text if any
+                    if remaining_text.strip():
+                        self.logger.info(f">>>>>> Synthesizing remaining text: '{remaining_text}'")
+                        remaining_audio = await self.tts_provider.synthesize_speech_to_bytes_async(remaining_text)
+                        
+                        if remaining_audio:
+                            final_audio_parts.append(remaining_audio)
+                            synthesis_info.append(f"synthesized({remaining_text[:25]}...)")
+                            
+                            # Cache the remaining part for future use 
+                            OutgoingAudioManager.add_synthesized_audio_to_cache(remaining_text.strip(), remaining_audio)
+                        else:
+                            self.logger.error(f"/!\\ Failed to synthesize remaining text: '{remaining_text}'")
+                            
+                            # If partial synthesis fails, fall back to complete synthesis
+                            return await self._fallback_complete_synthesis(speech_chunk)
+                    
+                    # Combine all parts if we have multiple parts
+                    if len(final_audio_parts) > 1:
+                        combined_audio = self._combine_audio_parts(final_audio_parts)
+                        if combined_audio:
+                            self.logger.info(f">>>>>> Combined audio from: {synthesis_info}")
+                            
+                            # Cache the complete combined result
+                            OutgoingAudioManager.add_synthesized_audio_to_cache(speech_chunk, combined_audio)
+                            return combined_audio
+                        else:
+                            self.logger.warning("Failed to combine audio parts, falling back to complete synthesis")
+                            return await self._fallback_complete_synthesis(speech_chunk)
+                    
+                    elif len(final_audio_parts) == 1:
+                        # Only one part (either cached or synthesized)
+                        audio_result = final_audio_parts[0]
+                        self.logger.info(f">>>>>> Using single audio part: {synthesis_info[0]}")
+                        
+                        # Cache if this was synthesized (not cached)
+                        if not audio_parts_found:  # This means it was synthesized
+                            OutgoingAudioManager.add_synthesized_audio_to_cache(speech_chunk, audio_result)
+                        
+                        return audio_result
+                
+            except Exception as e:
+                self.logger.error(f"Error in partial synthesis for '{speech_chunk[:50]}...': {e}")
+                # Fall back to complete synthesis on error
+                return await self._fallback_complete_synthesis(speech_chunk)
+            
+            # Step 3: Fall back to complete synthesis if no parts found
+            return await self._fallback_complete_synthesis(speech_chunk)
 
         except Exception as e:
             self.logger.error(f"Error in synthesize_next_audio_chunk_async: {e}")
+            return None
+    
+    async def _fallback_complete_synthesis(self, text: str) -> bytes | None:
+        """
+        Fallback method to synthesize complete text when partial synthesis fails.
+        
+        Args:
+            text: Complete text to synthesize
+            
+        Returns:
+            Synthesized audio bytes or None if synthesis fails
+        """
+        try:
+            self.logger.info(f">>>>>> Fallback: Synthesizing complete text: '{text}'")
+            speech_bytes = await self.tts_provider.synthesize_speech_to_bytes_async(text)
+            
+            if speech_bytes:
+                # Cache the complete synthesis
+                OutgoingAudioManager.add_synthesized_audio_to_cache(text, speech_bytes)
+                return speech_bytes
+            else:
+                self.logger.error(f"/!\\ Failed to synthesize complete text: '{text}'")
+                return None
+                
+        except Exception as e:
+            self.logger.error(f"Error in fallback synthesis for '{text[:50]}...': {e}")
             return None
 
      

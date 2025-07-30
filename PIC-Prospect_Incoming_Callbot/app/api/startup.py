@@ -17,3 +17,12 @@ for folder in ["outputs/logs", "static/outgoing_audio", "static/incoming_audio"]
 
 # Start the app
 app = ApiConfig.create_app()
+
+# import asyncio
+# from speech.speech_to_text import get_speech_to_text_provider
+# filename = "C:/Users/e.millerioux/Music/" + "2025_07_30_18_57_23.wav"
+# stt = get_speech_to_text_provider()
+
+# async def tmp():
+#     stt.transcribe_audio_async(filename)
+# transcript = asyncio.to_thread(

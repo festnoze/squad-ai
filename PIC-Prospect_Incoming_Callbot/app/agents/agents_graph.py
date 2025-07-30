@@ -33,6 +33,13 @@ class AgentsGraph:
     waiting_music_bytes = None
     start_welcome_text = "Bonjour, je suis Studia, l'assistante virtuelle de Studi. Je prend le relais quand nos conseillers en formations ne sont pas disponibles."
     other_text = "Désolé, je n'ai pas compris votre demande. Merci de me poser une question ou de me demander de prendre rendez-vous."
+    thank_you_text = "Merci de nous recontacter"
+    appointment_text = "Je peux prendre un rendez-vous avec votre conseiller"
+    questions_text = "Je peux aussi répondre à vos questions à propos de nos formations."
+    what_do_you_want_text = "Que souhaitez-vous faire ?"
+    technical_error_text = "Je rencontre un problème technique, le service est temporairement indisponible, merci de nous recontacter plus tard."
+    lead_agent_error_text = "Je rencontre un problème technique avec l'agent de contact."
+    rag_communication_error_text = "Je suis désolé, une erreur s'est produite lors de la communication avec le service."
 
     def __init__(self, outgoing_manager: OutgoingManager, studi_rag_client: StudiRAGInferenceApiClient, salesforce_client: SalesforceApiClientInterface, call_sid: str):
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -174,14 +181,12 @@ class AgentsGraph:
             await self.studi_rag_inference_api_client.test_client_connection_async()
         except Exception as e:
             self.logger.error(f"/!\\ Error testing connection to RAG API : {str(e)}")
-            err_msg = "Je rencontre un problème technique, le service est temporairement indisponible, merci de nous recontacter plus tard."
-            await self.outgoing_manager.enqueue_text_async(err_msg)    
+            await self.outgoing_manager.enqueue_text_async(self.technical_error_text)    
             return state
         
         conversation_id = await self.init_user_and_new_conversation_in_backend_api_async(state.get('caller_phone'), state.get('call_sid'))
         if not conversation_id:
-            err_msg = "Je rencontre un problème technique, le service est temporairement indisponible, merci de nous recontacter plus tard."
-            await self.outgoing_manager.enqueue_text_async(err_msg)    
+            await self.outgoing_manager.enqueue_text_async(self.technical_error_text)    
         self.logger.info(f"End init. RAG API for caller (User and a new conversation): {state.get('caller_phone')}")
 
         state["history"] = []
@@ -225,10 +230,10 @@ class AgentsGraph:
             owner_first_name = sf_account.get('Owner', {}).get('Name', '').strip()
             
             end_welcome_text = f"""
-            Merci de nous recontacter {civility} {first_name} {last_name}.
-            Je peux prendre un rendez-vous avec votre conseiller {owner_first_name}.
-            Je peux aussi répondre à vos questions à propos de nos formations.
-            Que souhaitez-vous faire ?
+            {self.thank_you_text} {civility} {first_name} {last_name}.
+            {self.appointment_text} {owner_first_name}.
+            {self.questions_text}
+            {self.what_do_you_want_text}
             """
         else:
             end_welcome_text = "Je suis là pour vous aider en l'absence de nos conseillers. Pour votre premier appel, je peux répondre à vos questions sur nos formations, ou planifier un rendez-vous avec un conseiller en formation."
@@ -281,9 +286,8 @@ class AgentsGraph:
 
         if not self.lead_agent_instance:
             self.logger.error(f"[{call_sid}] LeadAgent not initialized. Cannot process.")
-            response_text = "Je rencontre un problème technique avec l'agent de contact."
-            await self.outgoing_manager.enqueue_text_async(response_text)
-            return {"history": [("user", user_input), ("assistant", response_text)], "agent_scratchpad": {"error": "LeadAgent not initialized"}}
+            await self.outgoing_manager.enqueue_text_async(self.lead_agent_error_text)
+            return {"history": [("user", user_input), ("assistant", self.lead_agent_error_text)], "agent_scratchpad": {"error": "LeadAgent not initialized"}}
 
         try:
             # 1. Extract info using LLM (based on LeadAgent logic)
@@ -504,10 +508,9 @@ class AgentsGraph:
             return state
                 
         except Exception as e:
-            error_message = f"Je suis désolé, une erreur s'est produite lors de la communication avec le service."
             self.logger.error(f"Error in RAG API communication: {str(e)}")
             # Use enhanced text-to-speech for error messages too
-            await self.outgoing_manager.enqueue_text_async(error_message)
+            await self.outgoing_manager.enqueue_text_async(self.rag_communication_error_text)
 
         return state
 

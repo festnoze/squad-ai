@@ -16,6 +16,19 @@ class CalendarAgent:
     owner_name: str | None = None
     now: datetime | None = None
     
+    # Static text responses for calendar operations
+    availability_request_text = "Quels jours ou quelles heures de la journée vous conviendraient le mieux ?"
+    no_timeframes_text = "Quand souhaitez-vous réserver un rendez-vous ?"
+    slot_unavailable_text = "Ce créneau n'est pas disponible, souhaiteriez-vous un autre horaire ?"
+    confirmation_prefix_text = "Récapitulons : votre rendez-vous sera planifié le "
+    confirmation_suffix_text = "Merci de confirmer ce rendez-vous pour le valider."
+    date_not_found_text = "Je n'ai pas trouvé la date et l'heure du rendez-vous. Veuillez me préciser la date et l'heure du rendez-vous souhaité."
+    appointment_confirmed_prefix_text = "C'est confirmé ! Votre rendez-vous est maintenant planifié pour le "
+    appointment_confirmed_suffix_text = "Merci et au revoir."
+    appointment_failed_text = "Je n'ai pas pu planifier le rendez-vous. Souhaitez-vous essayer un autre créneau ?"
+    modification_not_supported_text = "Je ne suis pas en mesure de gérer les modifications de rendez-vous."
+    cancellation_not_supported_text = "Je ne suis pas en mesure de gérer les annulations de rendez-vous."
+    
     def __init__(self, salesforce_api_client: SalesforceApiClientInterface, classifier_llm: any, available_timeframes_llm: any = None, date_extractor_llm: any = None):
         self.logger = logging.getLogger(__name__)
         self.classifier_llm = classifier_llm
@@ -82,7 +95,7 @@ class CalendarAgent:
             return available_timeframes_answer["output"]
 
         if category == "Demande des disponibilités":
-            return "Quels jours ou quelles heures de la journée vous conviendraient le mieux ?"
+            return self.availability_request_text
 
         if category == "Proposition de rendez-vous":
             start_date = CalendarAgent.now.date()
@@ -91,31 +104,32 @@ class CalendarAgent:
             available_timeframes = CalendarAgent.get_available_timeframes_from_scheduled_slots(str(start_date), str(end_date), appointments)
 
             if not available_timeframes:
-                return "Quand souhaitez-vous réserver un rendez-vous ?"
-            return "Ce créneau n'est pas disponible, souhaiteriez-vous un autre horaire ?"
+                return self.no_timeframes_text
+            return self.slot_unavailable_text
 
         if category == "Demande de confirmation du rendez-vous":
             # extract date and time from user_input + chat history
             date_and_time: datetime | None = await self._extract_appointment_selected_date_and_time_async(user_input, chat_history)
             
             if date_and_time:
-                return "Récapitulons : votre rendez-vous sera planifié le " + self._to_french_date(date_and_time, include_weekday=True, include_year=False, include_hour=True) + ". Merci de confirmer ce rendez-vous pour le valider."
+                return self.confirmation_prefix_text + self._to_french_date(date_and_time, include_weekday=True, include_year=False, include_hour=True) + ". " + self.confirmation_suffix_text
             else:
-                return "Je n'ai pas trouvé la date et l'heure du rendez-vous. Veuillez me préciser la date et l'heure du rendez-vous souhaité."
+                return self.date_not_found_text
 
         if category == "Rendez-vous confirmé":
             appointment_slot_datetime: datetime = await self._extract_appointment_selected_date_and_time_async(user_input, chat_history)
             appointment_slot_datetime_str = self._to_str_iso(appointment_slot_datetime)
             success = await CalendarAgent.schedule_new_appointment_tool_async(appointment_slot_datetime_str)
-            #TODO: tmp removed for demo: if success is not None:
-            return "C'est confirmé ! Votre rendez-vous est maintenant planifié pour le " + self._to_french_date(appointment_slot_datetime, include_weekday=True, include_year=False, include_hour=True) + ". Merci et au revoir."
-            return "Je n'ai pas pu planifier le rendez-vous. Souhaitez-vous essayer un autre créneau ?"
+            if success is not None:
+                return self.appointment_confirmed_prefix_text + self._to_french_date(appointment_slot_datetime, include_weekday=True, include_year=False, include_hour=True) + ". " + self.appointment_confirmed_suffix_text
+            else:
+                return self.appointment_failed_text
 
         if category == "Demande de modification":
-            return "Je ne suis pas en mesure de gérer les modifications de rendez-vous."
+            return self.modification_not_supported_text
 
         if category == "Demande d'annulation":
-            return "Je ne suis pas en mesure de gérer les annulations de rendez-vous."
+            return self.cancellation_not_supported_text
 
         # Fallback – delegate to original agent behaviour (no change to signature)
         formatted_history = []
