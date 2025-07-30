@@ -107,6 +107,7 @@ async def websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid:
 
     try:
         call_handler: PhoneCallWebsocketEventsHandler = phone_call_websocket_events_handler_factory.get_new_phone_call_websocket_events_handler(websocket=ws)
+        await call_handler.initialize_async()  # Pre-populate TTS cache with welcome texts
         await call_handler.handle_websocket_all_receieved_events_async(calling_phone_number, call_sid)
         logger.info(f"WebSocket handler finished for call SID {call_sid}.")
 

@@ -3,7 +3,6 @@ import logging
 import asyncio
 import uuid
 import time
-from typing import Dict, Tuple, Optional
 from fastapi import WebSocket
 import wave
 #
@@ -26,7 +25,7 @@ class OutgoingAudioManager(OutgoingManager):
     outgoing_speech_dir = "./static/outgoing_audio"
     
     # Speech synthesis cache: {text: (audio_bytes, timestamp)}
-    _synthesis_cache: Dict[str, Tuple[bytes, float]] = {}   
+    _synthesis_cache: dict[str, tuple[bytes, float]] = {}   
 
     def __init__(
             self,
@@ -42,7 +41,8 @@ class OutgoingAudioManager(OutgoingManager):
             loop_interval: float = 0.05, # 50ms~
             max_words_by_stream_chunk: int = 20,
             max_chars_by_stream_chunk: int = 100,
-            cache_ttl_minutes: int = 5
+            cache_ttl_minutes: int = 5,
+            populate_welcome_cache: bool = True
         ):
         self.logger = logging.getLogger(__name__)
         super().__init__(output_channel = "audio", can_speech_be_interupted=can_speech_be_interupted)
@@ -63,9 +63,18 @@ class OutgoingAudioManager(OutgoingManager):
         self.max_words_by_stream_chunk = max_words_by_stream_chunk
         self.max_chars_by_stream_chunk = max_chars_by_stream_chunk
         self.cache_ttl_seconds = cache_ttl_minutes * 60
+        self.populate_welcome_cache = populate_welcome_cache
         
         # Create temp directory if it doesn't exist
         os.makedirs(self.outgoing_speech_dir, exist_ok=True)
+
+    async def initialize_async(self) -> None:
+        """
+        Async initialization to be called after instantiation.
+        Pre-populates cache with welcome texts if enabled.
+        """
+        if self.populate_welcome_cache:
+            await self._populate_permanent_cache_async()
 
     def set_websocket(self, websocket: WebSocket):
         self.websocket = websocket
@@ -83,16 +92,21 @@ class OutgoingAudioManager(OutgoingManager):
             self.logger.info(f"Updated stream SID to: {stream_sid}")
         return
 
-    def _get_cached_synthesis(self, text: str) -> Optional[bytes]:
+    def _get_cached_synthesis(self, text: str) -> bytes | None:
         """
         Get cached synthesis result if available and not expired.
+        Permanent entries (timestamp = -1) never expire.
         """
         if text not in self._synthesis_cache:
             return None
             
         audio_bytes, timestamp = self._synthesis_cache[text]
-        current_time = time.time()
         
+        # Permanent entries never expire (timestamp = -1)
+        if timestamp == -1:
+            return audio_bytes
+        
+        current_time = time.time()
         if current_time - timestamp > self.cache_ttl_seconds:
             # Cache expired, remove entry
             del self._synthesis_cache[text]
@@ -100,11 +114,54 @@ class OutgoingAudioManager(OutgoingManager):
             
         return audio_bytes
     
-    def _cache_synthesis(self, text: str, audio_bytes: bytes) -> None:
+    def _cache_synthesis(self, text: str, audio_bytes: bytes, permanent: bool = False) -> None:
         """
-        Cache synthesis result with current timestamp.
+        Cache synthesis result with current timestamp or as permanent entry.
+        
+        Args:
+            text: The text that was synthesized
+            audio_bytes: The synthesized audio data
+            permanent: If True, cache permanently (never expires)
         """
-        self._synthesis_cache[text] = (audio_bytes, time.time())
+        timestamp = -1 if permanent else time.time()
+        self._synthesis_cache[text] = (audio_bytes, timestamp)
+
+    async def _populate_permanent_cache_async(self) -> None:
+        """
+        Pre-populate cache with permanent entries for common welcome texts.
+        These entries never expire and improve response time for frequent messages.
+        """
+        try:
+            # Import here to avoid circular import
+            from agents.agents_graph import AgentsGraph
+            
+            welcome_texts = [
+                AgentsGraph.start_welcome_text,
+                AgentsGraph.other_text
+            ]
+            
+            self.logger.info("Pre-populating permanent cache with welcome texts...")
+            
+            for text in welcome_texts:
+                if text and text.strip():  # Ensure text is not empty
+                    try:
+                        # Synthesize the text
+                        audio_bytes = await self.tts_provider.synthesize_speech_to_bytes_async(text.strip())
+                        
+                        if audio_bytes:
+                            # Cache permanently (never expires)
+                            self._cache_synthesis(text.strip(), audio_bytes, permanent=True)
+                            self.logger.info(f"Successfully cached permanent entry for: '{text[:50]}...'")
+                        else:
+                            self.logger.warning(f"Failed to synthesize welcome text: '{text[:50]}...'")
+                            
+                    except Exception as e:
+                        self.logger.error(f"Error synthesizing welcome text '{text[:50]}...': {e}")
+                        
+            self.logger.info(f"Permanent cache population completed. Cached {len([t for t in welcome_texts if t and t.strip()])} welcome texts.")
+            
+        except Exception as e:
+            self.logger.error(f"Error during permanent cache population: {e}")
 
     async def synthesize_next_audio_chunk_async(self) -> bytes | None:
         """

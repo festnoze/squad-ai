@@ -112,6 +112,14 @@ class PhoneCallWebsocketEventsHandler:
 
         self.logger.info("IncomingPhoneCallHandler initialized successfully.")
 
+    async def initialize_async(self) -> None:
+        """
+        Async initialization that should be called after instantiation.
+        Pre-populates TTS cache with common welcome texts.
+        """
+        if self.outgoing_audio_processing:
+            await self.outgoing_audio_processing.initialize_async()
+
     def set_websocket(self, websocket: WebSocket):
         self.websocket = websocket
         self.incoming_audio_processing.set_websocket(websocket)
