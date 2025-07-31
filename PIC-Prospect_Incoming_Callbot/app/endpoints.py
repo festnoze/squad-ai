@@ -53,22 +53,34 @@ async def voice_incoming_call_endpoint(request: Request) -> HTMLResponse:
     #await authenticate_twilio_request(request)
     return await create_websocket_for_incoming_call_async(request)
 
+@router.get("/websocket-url")
+async def get_websocket_url_for_incoming_call(request: Request) -> HTMLResponse:
+    logger.info("Received GET request for websocket URL endpoint")
+    ws_url, phone_number, call_sid = await get_websocket_url_for_incoming_call_async(request)
+    logger.info(f"Returning websocket URL: {ws_url} for {phone_number}/{call_sid}")
+    return HTMLResponse(content=ws_url, media_type="text/plain")
+
+async def get_websocket_url_for_incoming_call_async(request: Request) -> tuple[str, str, str]:
+    """Handle incoming phone calls from Twilio"""
+    phone_number, call_sid, _ = await _extract_request_data_async(request)
+
+    x_forwarded_proto = request.headers.get("x-forwarded-proto")
+    is_secure = x_forwarded_proto == "https" or request.url.scheme == "https"
+    ws_scheme = "wss" if is_secure else "ws"
+    ws_url = f"{ws_scheme}://{request.url.netloc}/ws/phone/{phone_number}/sid/{call_sid}"
+    return ws_url, phone_number, call_sid
+
 async def create_websocket_for_incoming_call_async(request: Request) -> HTMLResponse:
     """Handle incoming phone calls from Twilio"""
     logger.info("Received POST request for voice webhook")
     try:
-        phone_number, call_sid, _ = await _extract_request_data_async(request)
+        ws_url, phone_number, call_sid = await get_websocket_url_for_incoming_call_async(request)
+        
         await verify_twilio_call_sid(call_sid, phone_number)
         logger.info(f"Call from: {phone_number}, CallSid: {call_sid}")
-
-        x_forwarded_proto = request.headers.get("x-forwarded-proto")
-        is_secure = x_forwarded_proto == "https" or request.url.scheme == "https"
-        ws_scheme = "wss" if is_secure else "ws"
-        ws_url = f"{ws_scheme}://{request.url.netloc}/ws/phone/{phone_number}/sid/{call_sid}"
         logger.info(f"[<--->] Connecting Twilio stream to WebSocket: {ws_url}")
 
         response = VoiceResponse()
-
         connect = Connect()
         #connect.stream(url=ws_url, track="both_tracks", parameters={
         connect.stream(url=ws_url, track="inbound_track", parameters={
@@ -85,18 +97,27 @@ async def create_websocket_for_incoming_call_async(request: Request) -> HTMLResp
         return HTMLResponse(content=str(response), media_type="application/xml", status_code=500)
 
 async def _extract_request_data_async(request: Request) -> tuple:
-    """Extract common data from the request form"""
-    form = await request.form()
-    phone_number: str = form.get("From", "Unknown From")
-    call_sid: str = form.get("CallSid", "Unknown CallSid")
-    body = form.get("Body", "")     
+    """Extract common data from the request form or query parameters"""
+    if request.method == "GET":
+        # Pour les requêtes GET, utiliser les paramètres de requête
+        phone_number: str = request.query_params.get("From", "Unknown From")
+        call_sid: str = request.query_params.get("CallSid", "Unknown CallSid")
+        body = request.query_params.get("Body", "")
+    else:
+        # Pour les requêtes POST, utiliser les données du formulaire
+        form = await request.form()
+        phone_number: str = form.get("From", "Unknown From")
+        call_sid: str = form.get("CallSid", "Unknown CallSid")
+        body = form.get("Body", "")     
     return phone_number, call_sid, body
 
 # ========= Incoming phone call WebSocket endpoint ========= #
 @router.websocket("/ws/phone/{calling_phone_number}/sid/{call_sid}")
 async def websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid: str) -> None:
     #await authenticate_twilio_request(ws)
-    await verify_twilio_call_sid(call_sid, calling_phone_number)
+    # Désactiver temporairement la vérification pour les tests avec TEST_AUDIO=true
+    if not EnvHelper.get_test_audio():
+        await verify_twilio_call_sid(call_sid, calling_phone_number)
     logger.info(f"WebSocket connection attempted for call SID {call_sid} from {ws.client.host}.")
     try:
         await ws.accept()

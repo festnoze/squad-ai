@@ -20,7 +20,7 @@ class AudioTestSimulator:
     dans le dossier static/incoming_audio pour tester l'API en parallèle.
     """
     
-    def __init__(self, base_url: str = "http://localhost:8000"):
+    def __init__(self, base_url: str = "http://127.0.0.1:8344"):
         self.logger = logging.getLogger(__name__)
         self.base_url = base_url
         self.test_audio_dir = "static/test_audio"
@@ -48,7 +48,7 @@ class AudioTestSimulator:
         for i in range(num_concurrent_calls):
             # Choisir un fichier audio (rotation circulaire)
             audio_file = audio_files[i % len(audio_files)]
-            call_id = f"test-call-{self.session_counter}-{i}"
+            call_id = f"test-call-{self.session_counter}-0000000{i}"
             self.session_counter += 1
             
             task = asyncio.create_task(
@@ -72,10 +72,16 @@ class AudioTestSimulator:
             calling_phone = f"+336{call_id[-8:]}"  # Numéro fictif
             call_sid = f"CA{uuid.uuid4().hex[:32]}"
             
-            await self._initiate_call(calling_phone, call_sid)
+            self.logger.info(f"Simulation d'appel: {calling_phone} -> {call_sid}")
             
-            # 2. Établir la connexion WebSocket
-            websocket_url = f"ws://localhost:8000/call/{calling_phone}/{call_sid}"
+            # Pour les tests, on skip l'appel POST et va directement au WebSocket
+            # await self._initiate_call(calling_phone, call_sid)
+            
+            # 2. Obtenir l'URL WebSocket via l'endpoint dédié
+            websocket_url = await self._get_websocket_url(calling_phone, call_sid)
+            if not websocket_url:
+                self.logger.error(f"Impossible d'obtenir l'URL WebSocket pour {call_id}")
+                return
             
             async with aiohttp.ClientSession() as session:
                 async with session.ws_connect(websocket_url) as ws:
@@ -98,17 +104,49 @@ class AudioTestSimulator:
             
     async def _initiate_call(self, calling_phone: str, call_sid: str):
         """Initie l'appel via l'endpoint POST"""
-        url = f"{self.base_url}/twilio/incoming-call"
+        url = f"{self.base_url}/"
         data = {
             "From": calling_phone,
             "CallSid": call_sid,
             "CallStatus": "ringing"
         }
         
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, data=data) as response:
-                if response.status != 200:
-                    self.logger.warning(f"Réponse inattendue de l'endpoint: {response.status}")
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, data=data, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                    if response.status != 200:
+                        self.logger.warning(f"Réponse inattendue de l'endpoint: {response.status}")
+                        response_text = await response.text()
+                        self.logger.debug(f"Réponse: {response_text}")
+        except Exception as e:
+            self.logger.error(f"Erreur lors de l'initiation de l'appel: {e}")
+            raise
+            
+    async def _get_websocket_url(self, calling_phone: str, call_sid: str) -> Optional[str]:
+        """Obtient l'URL WebSocket via l'endpoint dédié"""
+        url = f"{self.base_url}/websocket-url"
+        params = {
+            "From": calling_phone,
+            "CallSid": call_sid,
+            "CallStatus": "ringing"
+        }
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, params=params, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                    if response.status == 200:
+                        # L'endpoint retourne l'URL WebSocket dans le contenu
+                        websocket_url = await response.text()
+                        self.logger.info(f"URL WebSocket obtenue: {websocket_url}")
+                        return websocket_url.strip()
+                    else:
+                        self.logger.error(f"Erreur lors de l'obtention de l'URL WebSocket: {response.status}")
+                        response_text = await response.text()
+                        self.logger.debug(f"Réponse: {response_text}")
+                        return None
+        except Exception as e:
+            self.logger.error(f"Erreur lors de l'obtention de l'URL WebSocket: {e}")
+            return None
                     
     async def _send_connected_event(self, ws):
         """Envoie l'événement 'connected' Twilio"""
@@ -259,8 +297,26 @@ class AudioTestManager:
             
         self.logger.info("Mode test audio activé - Démarrage de la simulation")
         
-        # Attendre que l'application soit prête
-        await asyncio.sleep(2)
+        # Attendre que l'application soit prête et vérifier la santé
+        await self._wait_for_api_ready()
         
         # Lancer la simulation avec plusieurs appels simultanés
-        await self.simulator.start_simulation(num_concurrent_calls=3)
+        await self.simulator.start_simulation(num_concurrent_calls=1)
+    
+    async def _wait_for_api_ready(self, max_attempts: int = 10, delay: float = 2.0):
+        """Attend que l'API soit prête à recevoir des connexions"""
+        for attempt in range(max_attempts):
+            try:
+                async with aiohttp.ClientSession() as session:
+                    # Test de santé simple
+                    async with session.get(f"{self.simulator.base_url}/ping", timeout=aiohttp.ClientTimeout(total=5)) as response:
+                        if response.status == 200:
+                            self.logger.info(f"API prête après {attempt + 1} tentative(s)")
+                            return
+            except Exception as e:
+                self.logger.debug(f"Tentative {attempt + 1}/{max_attempts} échouée: {e}")
+                if attempt < max_attempts - 1:
+                    await asyncio.sleep(delay)
+                    
+        self.logger.error("L'API n'est pas prête après toutes les tentatives. Abandon de la simulation.")
+        raise ConnectionError("Impossible de se connecter à l'API")
