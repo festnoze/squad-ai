@@ -17,8 +17,23 @@ from phone_call_websocket_events_handler import PhoneCallWebsocketEventsHandlerF
 from speech.pregenerated_audio import PreGeneratedAudio
 
 class ApiConfig:
+    # TMP TODO to remove: allow rapid transcription of a specified audio files
+    # async def transcript_audio_async():
+    #     from speech.speech_to_text import get_speech_to_text_provider
+    #     filename = "C:/Users/e.millerioux/Music/" + "2025_07_30_19_12_25.wav"
+    #     #audio_bytes = open(filename, "rb").read()
+    #     stt = get_speech_to_text_provider()
+
+    #     transcription = await stt.transcribe_audio_async(filename) # asyncio.create_task(tmp(audio_bytes[:1000000]))
+                        
+    #     #save into file
+    #     with open("transcription2.txt", "w", encoding="utf-8") as f:
+    #         f.write(transcription)
+
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        #await ApiConfig.transcript_audio_async()
+
         # Startup logic
         logger = logging.getLogger(__name__)
         logger.info("Application startup.")
