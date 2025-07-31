@@ -83,6 +83,11 @@ class EnvHelper:
         value = EnvHelper.get_env_variable_value_by_name('REPEAT_USER_INPUT')
         return value.lower() == 'true'
 
+    @staticmethod
+    def get_test_audio():
+        value = EnvHelper.get_env_variable_value_by_name('TEST_AUDIO', fails_if_missing=False)
+        return value and value.lower() == 'true'
+
     
     ### Internal methods###
     #######################

@@ -42,6 +42,7 @@ class IncomingAudioManager(IncomingManager):
         # State tracking
         self.start_time = None
         self.conversation_id = None
+        self.websocket_creation_time = None
         self.stream_states : dict[str, ConversationState] = {}
         self.phones_by_call_sid = {}  # Map call_sid to phone numbers
         self.agents_graph : AgentsGraph = agents_graph
@@ -66,6 +67,9 @@ class IncomingAudioManager(IncomingManager):
 
     def set_websocket(self, websocket: WebSocket):
         self.websocket = websocket
+    
+    def set_websocket_creation_time(self, creation_time: float):
+        self.websocket_creation_time = creation_time
 
     def set_call_sid(self, call_sid: str) -> None:
         self.call_sid = call_sid      
@@ -494,7 +498,12 @@ class IncomingAudioManager(IncomingManager):
 
     def save_as_wav_file(self, audio_data: bytes):
         """Save PCM data (16-bit, 8kHz, mono) to a WAV file at the specified path."""
-        file_name = f"{uuid.uuid4()}.wav"
+        # Calculate milliseconds elapsed since websocket creation
+        elapsed_ms = 0
+        if self.websocket_creation_time:
+            elapsed_ms = int((time.time() - self.websocket_creation_time) * 1000)
+        
+        file_name = f"{uuid.uuid4()}-{elapsed_ms}.wav"
         with wave.open(os.path.join(self.incoming_speech_dir, file_name), "wb") as wav_file:
             wav_file.setnchannels(1)  # mono
             wav_file.setsampwidth(self.sample_width)  # 16-bit

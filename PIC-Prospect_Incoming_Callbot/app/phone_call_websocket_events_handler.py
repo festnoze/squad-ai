@@ -1,6 +1,7 @@
 import os
 import logging
 import json
+import time
 #
 from openai import OpenAI
 from fastapi import WebSocket, WebSocketDisconnect
@@ -53,6 +54,7 @@ class PhoneCallWebsocketEventsHandler:
         self.audio_buffer = b""
         self.current_stream = None
         self.start_time = None
+        self.websocket_creation_time = None
 
         # Environment and configuration settings
         self.OPENAI_API_KEY = EnvHelper.get_openai_api_key()
@@ -114,8 +116,10 @@ class PhoneCallWebsocketEventsHandler:
 
     def set_websocket(self, websocket: WebSocket):
         self.websocket = websocket
+        self.websocket_creation_time = time.time()  # Start the timer when websocket is set
         self.incoming_audio_processing.set_websocket(websocket)
         self.outgoing_audio_processing.set_websocket(websocket)
+        self.incoming_audio_processing.set_websocket_creation_time(self.websocket_creation_time)
 
     async def handle_websocket_all_receieved_events_async(self, calling_phone_number: str, call_sid: str) -> None:
         """Main method: handle a full audio conversation with I/O Twilio streams on a WebSocket."""
