@@ -115,10 +115,9 @@ async def _extract_request_data_async(request: Request) -> tuple:
 @router.websocket("/ws/phone/{calling_phone_number}/sid/{call_sid}")
 async def websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid: str) -> None:
     #await authenticate_twilio_request(ws)
-    # Désactiver temporairement la vérification pour les tests avec TEST_AUDIO=true
     if not EnvHelper.get_test_audio():
         await verify_twilio_call_sid(call_sid, calling_phone_number)
-    logger.info(f"WebSocket connection attempted for call SID {call_sid} from {ws.client.host}.")
+    logger.info(f"WebSocket connection for call SID {call_sid} from {ws.client.host}.")
     try:
         await ws.accept()
         logger.info(f"[SUCCESS] WebSocket connection accepted for call SID {call_sid}.")

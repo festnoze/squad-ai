@@ -88,6 +88,11 @@ class EnvHelper:
         value = EnvHelper.get_env_variable_value_by_name('TEST_AUDIO', fails_if_missing=False)
         return value and value.lower() == 'true'
 
+    @staticmethod
+    def get_test_call_count():
+        value = EnvHelper.get_env_variable_value_by_name('TEST_CALL_COUNT', fails_if_missing=False)
+        return int(value) if value else 1
+
     
     ### Internal methods###
     #######################

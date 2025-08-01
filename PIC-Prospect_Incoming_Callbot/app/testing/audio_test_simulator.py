@@ -12,6 +12,22 @@ from datetime import datetime
 import aiohttp
 
 from utils.envvar import EnvHelper
+from speech.twilio_audio_sender import TwilioAudioSender
+
+
+class WebSocketWrapper:
+    """Wrapper pour uniformiser l'interface WebSocket entre aiohttp client et FastAPI server"""
+    
+    def __init__(self, aiohttp_ws):
+        self.ws = aiohttp_ws
+        
+    async def send_text(self, data: str):
+        """Wrapper pour send_text qui utilise send_str d'aiohttp"""
+        await self.ws.send_str(data)
+        
+    def __getattr__(self, name):
+        """Délègue tous les autres attributs au WebSocket aiohttp"""
+        return getattr(self.ws, name)
 
 
 class AudioTestSimulator:
@@ -33,9 +49,9 @@ class AudioTestSimulator:
         self.channels = 1        # Mono
         self.chunk_duration_ms = 20  # 20ms chunks comme Twilio
         
-    async def start_simulation(self, num_concurrent_calls: int = 1):
+    async def start_simulation(self, concurrent_calls_count: int):
         """Démarre la simulation avec plusieurs appels simultanés"""
-        self.logger.info(f"Démarrage de la simulation audio avec {num_concurrent_calls} appels simultanés")
+        self.logger.info(f"Démarrage de la simulation audio avec {concurrent_calls_count} appels simultanés")
         
         # Obtenir la liste des fichiers audio
         audio_files = await self._get_audio_files()
@@ -45,14 +61,13 @@ class AudioTestSimulator:
             
         # Créer les tâches pour les appels simultanés
         tasks = []
-        for i in range(num_concurrent_calls):
-            # Choisir un fichier audio (rotation circulaire)
-            audio_file = audio_files[i % len(audio_files)]
+        for i in range(concurrent_calls_count):
             call_id = f"test-call-{self.session_counter}-0000000{i}"
             self.session_counter += 1
             
+            # Chaque appel concurrent va jouer TOUS les fichiers audio dans l'ordre chronologique
             task = asyncio.create_task(
-                self._simulate_single_call(call_id, audio_file, delay_start=i * 2)
+                self._simulate_single_call(call_id, audio_files, delay_start=i * 2)
             )
             tasks.append(task)
             
@@ -60,12 +75,12 @@ class AudioTestSimulator:
         await asyncio.gather(*tasks, return_exceptions=True)
         self.logger.info("Simulation terminée")
         
-    async def _simulate_single_call(self, call_id: str, audio_file: str, delay_start: int = 0):
-        """Simule un seul appel téléphonique"""
+    async def _simulate_single_call(self, call_id: str, audio_files: List[str], delay_start: int = 0):
+        """Simule un seul appel téléphonique avec tous les fichiers audio"""
         if delay_start > 0:
             await asyncio.sleep(delay_start)
             
-        self.logger.info(f"Démarrage de l'appel simulé {call_id} avec le fichier {audio_file}")
+        self.logger.info(f"Démarrage de l'appel simulé {call_id} avec {len(audio_files)} fichiers audio")
         
         try:
             # 1. Initier l'appel (POST endpoint)
@@ -84,7 +99,9 @@ class AudioTestSimulator:
                 return
             
             async with aiohttp.ClientSession() as session:
-                async with session.ws_connect(websocket_url) as ws:
+                async with session.ws_connect(websocket_url) as aiohttp_ws:
+                    # Wrapper pour uniformiser l'interface WebSocket
+                    ws = WebSocketWrapper(aiohttp_ws)
                     
                     # 3. Envoyer l'événement 'connected'
                     await self._send_connected_event(ws)
@@ -93,8 +110,14 @@ class AudioTestSimulator:
                     stream_sid = f"MZ{uuid.uuid4().hex[:32]}"
                     await self._send_start_event(ws, call_sid, stream_sid)
                     
-                    # 5. Lire et envoyer le fichier audio
-                    await self._send_audio_from_file(ws, audio_file, stream_sid)
+                    # 5. Créer le TwilioAudioSender et envoyer tous les fichiers audio
+                    audio_sender = TwilioAudioSender(
+                        websocket=ws,
+                        stream_sid=stream_sid,
+                        sample_rate=self.sample_rate,
+                        min_chunk_interval=self.chunk_duration_ms / 1000.0
+                    )
+                    await self._send_all_incoming_audio_events(audio_sender, audio_files)
                     
                     # 6. Envoyer l'événement 'stop'
                     await self._send_stop_event(ws)
@@ -155,7 +178,7 @@ class AudioTestSimulator:
             "protocol": "Call",
             "version": "1.0.0"
         }
-        await ws.send_str(json.dumps(event))
+        await ws.send_text(json.dumps(event))
         self.logger.debug("Événement 'connected' envoyé")
         
     async def _send_start_event(self, ws, call_sid: str, stream_sid: str):
@@ -176,7 +199,7 @@ class AudioTestSimulator:
             },
             "streamSid": stream_sid
         }
-        await ws.send_str(json.dumps(event))
+        await ws.send_text(json.dumps(event))
         self.logger.debug(f"Événement 'start' envoyé pour stream {stream_sid}")
         
     async def _send_stop_event(self, ws):
@@ -185,11 +208,20 @@ class AudioTestSimulator:
             "event": "stop",
             "sequenceNumber": "2"
         }
-        await ws.send_str(json.dumps(event))
+        await ws.send_text(json.dumps(event))
         self.logger.debug("Événement 'stop' envoyé")
         
-    async def _send_audio_from_file(self, ws, audio_file: str, stream_sid: str):
-        """Lit un fichier audio et l'envoie par chunks comme Twilio"""
+    async def _send_all_incoming_audio_events(self, audio_sender: TwilioAudioSender, audio_files: List[str]):
+        """Envoie tous les fichiers audio dans l'ordre chronologique"""
+        self.logger.info(f"Envoi de {len(audio_files)} fichiers audio dans l'ordre chronologique")
+        
+        for audio_file in audio_files:
+            await self._send_incoming_audio_event(audio_sender, audio_file)
+            
+        self.logger.info("Tous les fichiers audio ont été envoyés")
+        
+    async def _send_incoming_audio_event(self, audio_sender: TwilioAudioSender, audio_file: str):
+        """Lit un fichier audio et l'envoie via TwilioAudioSender"""
         file_path = os.path.join(self.test_audio_dir, audio_file)
         
         if not os.path.exists(file_path):
@@ -201,54 +233,24 @@ class AudioTestSimulator:
         start_delay = timing_ms / 1000.0 if timing_ms else 0
         
         self.logger.info(f"Envoi du fichier audio {audio_file} avec délai initial de {start_delay:.2f}s")
-        
-        # Attendre le délai initial basé sur le timing du fichier
         if start_delay > 0:
             await asyncio.sleep(start_delay)
             
         try:
-            # Lire le fichier WAV
             with wave.open(file_path, 'rb') as wav_file:
-                # Vérifier le format
                 if wav_file.getframerate() != self.sample_rate:
                     self.logger.warning(f"Taux d'échantillonnage inattendu: {wav_file.getframerate()} (attendu: {self.sample_rate})")
                     
-                # Calculer la taille des chunks
-                frames_per_chunk = int(self.sample_rate * self.chunk_duration_ms / 1000)
-                bytes_per_chunk = frames_per_chunk * wav_file.getsampwidth() * wav_file.getnchannels()
+                # Lire tout le fichier audio en une fois
+                all_frames = wav_file.readframes(wav_file.getnframes())
                 
-                sequence_number = 1
+                # Envoyer l'audio via TwilioAudioSender qui gère le chunking automatiquement
+                success = await audio_sender.send_audio_chunk_async(all_frames)
                 
-                # Lire et envoyer le fichier par chunks
-                while True:
-                    frames = wav_file.readframes(frames_per_chunk)
-                    if not frames:
-                        break
-                        
-                    # Convertir PCM en μ-law comme Twilio
-                    mulaw_data = audioop.lin2ulaw(frames, wav_file.getsampwidth())
-                    
-                    # Encoder en base64
-                    payload = base64.b64encode(mulaw_data).decode('utf-8')
-                    
-                    # Créer l'événement media
-                    media_event = {
-                        "event": "media",
-                        "sequenceNumber": str(sequence_number),
-                        "media": {
-                            "track": "inbound",
-                            "chunk": str(sequence_number), 
-                            "timestamp": str(sequence_number * self.chunk_duration_ms),
-                            "payload": payload
-                        },
-                        "streamSid": stream_sid
-                    }
-                    
-                    await ws.send_str(json.dumps(media_event))
-                    sequence_number += 1
-                    
-                    # Respecter le timing réel (20ms par chunk)
-                    await asyncio.sleep(self.chunk_duration_ms / 1000.0)
+                if success:
+                    self.logger.info(f"Fichier audio {audio_file} envoyé avec succès")
+                else:
+                    self.logger.error(f"Erreur lors de l'envoi du fichier audio {audio_file}")
                     
         except Exception as e:
             self.logger.error(f"Erreur lors de l'envoi du fichier audio {audio_file}: {e}", exc_info=True)
@@ -301,7 +303,7 @@ class AudioTestManager:
         await self._wait_for_api_ready()
         
         # Lancer la simulation avec plusieurs appels simultanés
-        await self.simulator.start_simulation(num_concurrent_calls=1)
+        await self.simulator.start_simulation(concurrent_calls_count=EnvHelper.get_test_call_count())
     
     async def _wait_for_api_ready(self, max_attempts: int = 10, delay: float = 2.0):
         """Attend que l'API soit prête à recevoir des connexions"""
