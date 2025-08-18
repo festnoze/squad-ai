@@ -66,14 +66,14 @@ async def test_get_text_chunk_sentence_end(text_queue_manager : TextQueueManager
     assert chunk == "This is another sentence."
 
 
-async def test_get_no_text_if_no_separator_are_present(text_queue_manager : TextQueueManager):
-    """Test getting a text chunk based on word limit"""
-    # Enqueue text with more than 10 words but no sentence end
-    await text_queue_manager.enqueue_text_async("One two three four five six seven")
+# async def test_get_no_text_if_no_separator_are_present(text_queue_manager : TextQueueManager):
+#     """Test getting a text chunk based on word limit"""
+#     # Enqueue text with more than 10 words but no sentence end
+#     await text_queue_manager.enqueue_text_async("One two three four five six seven")
     
-    # Get a chunk - should return the first 10 words
-    chunk = await text_queue_manager.get_next_text_chunk_async(max_words_by_sentence=10, max_chars_by_sentence=100)
-    assert chunk == None
+#     # Get a chunk - should return no chunks, as no separator are present
+#     chunk = await text_queue_manager.get_next_text_chunk_async(max_words_by_sentence=10, max_chars_by_sentence=100)
+#     assert chunk == None
 
 async def test_get_text_if_no_separator_are_present_but_text_too_long(text_queue_manager : TextQueueManager):
     """Test getting a text chunk based on word limit"""

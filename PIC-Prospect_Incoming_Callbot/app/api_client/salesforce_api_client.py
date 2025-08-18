@@ -118,7 +118,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
             if not self.authenticate():
                 raise Exception("Salesforce authentication failed. Cannot proceed with API call.")
 
-    async def schedule_new_appointment_async(self, subject: str, start_datetime: str, duration_minutes: int = 60, description: str | None = None, 
+    async def schedule_new_appointment_async(self, subject: str, start_datetime: str, duration_minutes: int = 30, description: str | None = None, 
                    location: str | None = None, owner_id: str | None = None, 
                    what_id: str | None = None, who_id: str | None = None) -> str | None:
         """Create an event in Salesforce and return the event ID if successful
@@ -198,23 +198,102 @@ class SalesforceApiClient(SalesforceApiClientInterface):
         async with httpx.AsyncClient() as client:
             try:
                 resp_event = await client.post(url_creation_event, headers=headers, data=json.dumps(payload_event))
-                
-                if resp_event.status_code == 201:
-                    event_id = resp_event.json().get('id')
+                event_id = None
+                if resp_event.status_code >= 200 and resp_event.status_code <= 299:
+                    event_id = resp_event.json().get('id', None)
                     self.logger.info("Event created successfully!")
                     self.logger.info(f"ID: {event_id}")
                     self.logger.info(f"{self._instance_url}/lightning/r/Event/{event_id}/view")
-                    return event_id
                 else:
                     self.logger.info(f"Error while creating the Event: {resp_event.status_code}")
                     try:
                         self.logger.info(json.dumps(resp_event.json(), indent=2, ensure_ascii=False))
                     except:
                         self.logger.info(resp_event.text)
-                    return None
             except Exception as e:
                 self.logger.error(f"Error creating event: {str(e)}")
+
+            # Verify the appointment was actually created
+            verified_event_id = await self.check_for_appointment_creation(
+                event_id=event_id,
+                expected_subject=subject,
+                start_datetime=start_datetime,
+                duration_minutes=duration_minutes
+            )
+            return verified_event_id
+
+    async def check_for_appointment_creation(self, event_id: str | None, expected_subject: str, start_datetime: str, duration_minutes: int = 60) -> str | None:
+        """Check if an appointment was successfully created by verifying its existence
+        
+        Args:
+            event_id: The ID of the created event to verify (can be None)
+            expected_subject: The expected subject of the appointment
+            start_datetime: Expected start date and time in ISO format (e.g., '2025-05-20T14:00:00Z')
+            duration_minutes: Expected duration in minutes (default: 60)
+            
+        Returns:
+            The event_id if the appointment exists and matches expected parameters, None otherwise
+        """
+
+        # Calculate end datetime for the search window
+        start_dt = self._get_french_datetime_from_str(start_datetime)
+        if start_dt is None:
+            self.logger.info("Error: Invalid start_datetime format for verification")
+            return None
+
+        # Convert back to UTC for API call
+        french_now = datetime.now(pytz.timezone('Europe/Paris'))
+        utc_offset_hours = (french_now.utcoffset().total_seconds() or 0) / 3600        
+        if utc_offset_hours != 0:
+            start_dt = start_dt - timedelta(hours=utc_offset_hours)
+
+        start_datetime_utc = self._to_utc_datetime(start_dt)
+        end_datetime_utc = self._calculate_end_datetime(start_datetime_utc, duration_minutes)
+        
+        # Create a small time window around the expected appointment time
+        search_start = start_datetime_utc - timedelta(minutes=5)  # 5 minutes before
+        search_end = end_datetime_utc + timedelta(minutes=5)      # 5 minutes after
+        
+        search_start_str = self._get_str_from_datetime(search_start)
+        search_end_str = self._get_str_from_datetime(search_end)
+        
+        if event_id:
+            self.logger.info(f"Verifying appointment creation for event ID: {event_id}")
+        else:
+            self.logger.info(f"Searching for appointment with subject: {expected_subject}")
+        
+        try:
+            # Get appointments in the time window
+            appointments = await self.get_scheduled_appointments_async(search_start_str, search_end_str)
+            
+            if appointments is None:
+                self.logger.info("Error: Failed to retrieve appointments for verification")
                 return None
+            
+            # Look for the specific appointment
+            for appointment in appointments:
+                # If event_id is provided, check both ID and subject
+                if event_id:
+                    if (appointment.get('Id') == event_id and 
+                        appointment.get('Subject') == expected_subject):
+                        self.logger.info(f"Appointment verification successful - Event ID: {event_id}")
+                        return event_id
+                else:
+                    # If event_id is None, only check subject and return the found event_id
+                    if appointment.get('Subject') == expected_subject:
+                        found_event_id = appointment.get('Id')
+                        self.logger.info(f"Appointment found with subject '{expected_subject}' - Event ID: {found_event_id}")
+                        return found_event_id
+            
+            if event_id:
+                self.logger.warning(f"Appointment not found during verification - Event ID: {event_id}")
+            else:
+                self.logger.warning(f"Appointment not found with subject: {expected_subject}")
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"Error during appointment verification: {str(e)}")
+            return None
 
     async def get_scheduled_appointments_async(self, start_datetime: str, end_datetime: str, owner_id: str | None = None) -> list | None:
         """Get events from Salesforce calendar between specified start and end datetimes

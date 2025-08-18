@@ -48,7 +48,7 @@ class ProcessText:
             remaining_text = text[last_match_end:].strip()
             if remaining_text:
                 initial_chunks.append(remaining_text)
-        # If no separators found, treat entire text as one chunk
+        # If no separators found, TODO: rather wait for a separator to be added, unless there to much words or chars.
         elif text.strip():
             initial_chunks.append(text.strip())
         

@@ -9,7 +9,14 @@
       "Bash(python:*)",
       "Bash(pylint:*)",
       "Bash(rm:*)",
-      "Bash(mkdir:*)"
+      "Bash(mkdir:*)",
+      "Bash(pytest:*)",
+      "Bash(.venvScriptsactivate)",
+      "Bash(venvScripts:*)",
+      "Bash(call venvScriptsactivate.bat)",
+      "Bash(source:*)",
+      "Bash(activate_venv.bat)",
+      "Bash(.venv/Scripts/activate)"
     ],
     "deny": []
   }

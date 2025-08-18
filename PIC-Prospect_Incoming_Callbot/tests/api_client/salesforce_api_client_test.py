@@ -2,6 +2,7 @@ import pytest
 import asyncio
 import os
 import logging
+from unittest.mock import patch, MagicMock, AsyncMock
 from datetime import datetime, timedelta
 #
 from app.api_client.salesforce_api_client import SalesforceApiClient
@@ -190,3 +191,270 @@ async def test_get_persons_async(salesforce_api_client: SalesforceApiClientInter
     if contacts:
         for contact in contacts:
             assert 'Id' in contact, "Contact should have an Id"
+
+
+@pytest.fixture
+def mock_salesforce_client():
+    """Create a mock Salesforce client for unit testing"""
+    client = SalesforceApiClient()
+    client._access_token = "mock_token"
+    client._instance_url = "https://mock-instance.salesforce.com"
+    return client
+
+
+class TestCheckForAppointmentCreation:
+    """Unit tests for check_for_appointment_creation method"""
+    
+    async def test_check_for_appointment_creation_with_valid_event_id(self):
+        """Test successful verification with a valid event_id"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        # Mock the get_scheduled_appointments_async method
+        mock_appointments = [
+            {
+                'Id': 'event_123',
+                'Subject': 'Test Meeting',
+                'StartDateTime': '2025-05-20T14:00:00+02:00',
+                'EndDateTime': '2025-05-20T15:00:00+02:00'
+            }
+        ]
+        
+        with patch.object(client, 'get_scheduled_appointments_async', new_callable=AsyncMock) as mock_get_appointments:
+            mock_get_appointments.return_value = mock_appointments
+            
+            result = await client.check_for_appointment_creation(
+                event_id='event_123',
+                expected_subject='Test Meeting',
+                start_datetime='2025-05-20T14:00:00Z',
+                duration_minutes=60
+            )
+            
+            assert result == 'event_123'
+            mock_get_appointments.assert_called_once()
+    
+    async def test_check_for_appointment_creation_with_none_event_id_found(self):
+        """Test searching by subject when event_id is None and appointment is found"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token" 
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        # Mock the get_scheduled_appointments_async method
+        mock_appointments = [
+            {
+                'Id': 'event_456',
+                'Subject': 'Team Standup',
+                'StartDateTime': '2025-05-20T09:00:00+02:00',
+                'EndDateTime': '2025-05-20T09:30:00+02:00'
+            }
+        ]
+        
+        with patch.object(client, 'get_scheduled_appointments_async', new_callable=AsyncMock) as mock_get_appointments:
+            mock_get_appointments.return_value = mock_appointments
+            
+            result = await client.check_for_appointment_creation(
+                event_id=None,
+                expected_subject='Team Standup',
+                start_datetime='2025-05-20T09:00:00Z',
+                duration_minutes=30
+            )
+            
+            assert result == 'event_456'
+            mock_get_appointments.assert_called_once()
+    
+    async def test_check_for_appointment_creation_with_none_event_id_not_found(self):
+        """Test searching by subject when event_id is None and appointment is not found"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        # Mock the get_scheduled_appointments_async method with different appointment
+        mock_appointments = [
+            {
+                'Id': 'event_789',
+                'Subject': 'Different Meeting',
+                'StartDateTime': '2025-05-20T10:00:00+02:00',
+                'EndDateTime': '2025-05-20T11:00:00+02:00'
+            }
+        ]
+        
+        with patch.object(client, 'get_scheduled_appointments_async', new_callable=AsyncMock) as mock_get_appointments:
+            mock_get_appointments.return_value = mock_appointments
+            
+            result = await client.check_for_appointment_creation(
+                event_id=None,
+                expected_subject='Expected Meeting',
+                start_datetime='2025-05-20T10:00:00Z',
+                duration_minutes=60
+            )
+            
+            assert result is None
+            mock_get_appointments.assert_called_once()
+    
+    async def test_check_for_appointment_creation_appointment_not_found(self):
+        """Test when appointment is not found with valid event_id"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        # Mock the get_scheduled_appointments_async method with different appointment
+        mock_appointments = [
+            {
+                'Id': 'different_event',
+                'Subject': 'Different Subject',
+                'StartDateTime': '2025-05-20T14:00:00+02:00',
+                'EndDateTime': '2025-05-20T15:00:00+02:00'
+            }
+        ]
+        
+        with patch.object(client, 'get_scheduled_appointments_async', new_callable=AsyncMock) as mock_get_appointments:
+            mock_get_appointments.return_value = mock_appointments
+            
+            result = await client.check_for_appointment_creation(
+                event_id='event_123',
+                expected_subject='Test Meeting',
+                start_datetime='2025-05-20T14:00:00Z',
+                duration_minutes=60
+            )
+            
+            assert result is None
+            mock_get_appointments.assert_called_once()
+    
+    async def test_check_for_appointment_creation_empty_appointments(self):
+        """Test when get_scheduled_appointments_async returns empty list"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        with patch.object(client, 'get_scheduled_appointments_async', new_callable=AsyncMock) as mock_get_appointments:
+            mock_get_appointments.return_value = []
+            
+            result = await client.check_for_appointment_creation(
+                event_id='event_123',
+                expected_subject='Test Meeting',
+                start_datetime='2025-05-20T14:00:00Z',
+                duration_minutes=60
+            )
+            
+            assert result is None
+            mock_get_appointments.assert_called_once()
+    
+    async def test_check_for_appointment_creation_invalid_datetime(self):
+        """Test with invalid start_datetime format"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        result = await client.check_for_appointment_creation(
+            event_id='event_123',
+            expected_subject='Test Meeting',
+            start_datetime='invalid-datetime-format',
+            duration_minutes=60
+        )
+        
+        assert result is None
+    
+    async def test_check_for_appointment_creation_api_error(self):
+        """Test when get_scheduled_appointments_async returns None (API error)"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        with patch.object(client, 'get_scheduled_appointments_async', new_callable=AsyncMock) as mock_get_appointments:
+            mock_get_appointments.return_value = None
+            
+            result = await client.check_for_appointment_creation(
+                event_id='event_123',
+                expected_subject='Test Meeting',
+                start_datetime='2025-05-20T14:00:00Z',
+                duration_minutes=60
+            )
+            
+            assert result is None
+            mock_get_appointments.assert_called_once()
+    
+    async def test_check_for_appointment_creation_exception_handling(self):
+        """Test exception handling in check_for_appointment_creation"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        with patch.object(client, 'get_scheduled_appointments_async', new_callable=AsyncMock) as mock_get_appointments:
+            mock_get_appointments.side_effect = Exception("API connection error")
+            
+            result = await client.check_for_appointment_creation(
+                event_id='event_123',
+                expected_subject='Test Meeting',
+                start_datetime='2025-05-20T14:00:00Z',
+                duration_minutes=60
+            )
+            
+            assert result is None
+            mock_get_appointments.assert_called_once()
+    
+    async def test_check_for_appointment_creation_subject_mismatch(self):
+        """Test when event_id matches but subject doesn't match"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        # Mock appointment with correct ID but wrong subject
+        mock_appointments = [
+            {
+                'Id': 'event_123',
+                'Subject': 'Wrong Subject',
+                'StartDateTime': '2025-05-20T14:00:00+02:00',
+                'EndDateTime': '2025-05-20T15:00:00+02:00'
+            }
+        ]
+        
+        with patch.object(client, 'get_scheduled_appointments_async', new_callable=AsyncMock) as mock_get_appointments:
+            mock_get_appointments.return_value = mock_appointments
+            
+            result = await client.check_for_appointment_creation(
+                event_id='event_123',
+                expected_subject='Expected Subject',
+                start_datetime='2025-05-20T14:00:00Z',
+                duration_minutes=60
+            )
+            
+            assert result is None
+            mock_get_appointments.assert_called_once()
+    
+    async def test_check_for_appointment_creation_multiple_appointments_found(self):
+        """Test when multiple appointments match the criteria"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        # Mock multiple appointments with same subject
+        mock_appointments = [
+            {
+                'Id': 'event_111',
+                'Subject': 'Daily Standup',
+                'StartDateTime': '2025-05-20T09:00:00+02:00',
+                'EndDateTime': '2025-05-20T09:30:00+02:00'
+            },
+            {
+                'Id': 'event_222', 
+                'Subject': 'Daily Standup',
+                'StartDateTime': '2025-05-20T09:15:00+02:00',
+                'EndDateTime': '2025-05-20T09:45:00+02:00'
+            }
+        ]
+        
+        with patch.object(client, 'get_scheduled_appointments_async', new_callable=AsyncMock) as mock_get_appointments:
+            mock_get_appointments.return_value = mock_appointments
+            
+            # Test with event_id=None - should return first match
+            result = await client.check_for_appointment_creation(
+                event_id=None,
+                expected_subject='Daily Standup',
+                start_datetime='2025-05-20T09:00:00Z',
+                duration_minutes=30
+            )
+            
+            # Should return the first matching appointment ID
+            assert result == 'event_111'
+            mock_get_appointments.assert_called_once()

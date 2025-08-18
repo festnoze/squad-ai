@@ -221,7 +221,6 @@ class CalendarAgent:
     @tool
     async def schedule_new_appointment(
             date_and_time: str,
-            duration: int = 30,
             object: str | None = None,
             description: str | None = None
         ) -> dict[str, any]:
@@ -229,13 +228,13 @@ class CalendarAgent:
         
         Args:
             date_and_time: Date and time for the new appointment
-            duration: Duration of the appointment in minutes
             object: Optional subject for the appointment
             description: Optional description for the appointment
             
         Returns:
             The scheduled appointment details
         """
+        duration = 30 # Default duration in minutes
         return await CalendarAgent.schedule_new_appointment_tool_async(date_and_time, duration, object, description)
 
     async def schedule_new_appointment_tool_async(
