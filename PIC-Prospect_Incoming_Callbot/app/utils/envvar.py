@@ -93,6 +93,11 @@ class EnvHelper:
         value = EnvHelper.get_env_variable_value_by_name('TEST_CALL_COUNT', fails_if_missing=False)
         return int(value) if value else 1
 
+    @staticmethod
+    def get_available_action_rag():
+        value = EnvHelper.get_env_variable_value_by_name('AVAILABLE_ACTION_RAG', fails_if_missing=False)
+        return value and value.lower() == 'true'
+
     
     ### Internal methods###
     #######################

@@ -42,7 +42,7 @@ async def test_agents_dispatching(agents_graph_mockings, user_input: str, chat_h
     agents.graph.rag_interrupt_flag = {"interrupted": False}
 
     # Act
-    result= await agents.analyse_user_input_for_dispatch_async(agents.router_llm, user_input, chat_history)
+    result= await agents.analyse_user_input_for_dispatch_async(agents.calendar_classifier_llm, user_input, chat_history)
     
     # Assert
     assert result == awaited_dispatch

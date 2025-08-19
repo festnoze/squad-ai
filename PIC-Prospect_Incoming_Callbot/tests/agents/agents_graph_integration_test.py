@@ -191,7 +191,7 @@ async def test_long_conversation_history_is_truncated(agents_graph_mockings):
             call_sid=agents_graph_mockings["call_sid"])
 
     # Mock the router LLM's ainvoke method to check the prompt
-    with patch.object(type(agents.router_llm), "ainvoke", new=AsyncMock(return_value=MagicMock(content="router llm response"))):
+    with patch.object(type(agents.calendar_classifier_llm), "ainvoke", new=AsyncMock(return_value=MagicMock(content="router llm response"))):
         
         # Create a long chat history that should be truncated
         # The new logic takes the last 8 messages and limits total chars to ~16k
@@ -215,10 +215,10 @@ async def test_long_conversation_history_is_truncated(agents_graph_mockings):
         await agents.graph.ainvoke(initial_state)
 
         # Assert
-        agents.router_llm.ainvoke.assert_called_once()
+        agents.calendar_classifier_llm.ainvoke.assert_called_once()
         
         # Check the prompt that was actually sent
-        sent_prompt = agents.router_llm.ainvoke.call_args[0][0]
+        sent_prompt = agents.calendar_classifier_llm.ainvoke.call_args[0][0]
         
         # The prompt should be significantly shorter than the original history
         # The limit is around 16000 characters for the history part.

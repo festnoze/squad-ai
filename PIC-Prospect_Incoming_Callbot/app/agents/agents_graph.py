@@ -32,7 +32,7 @@ from utils.envvar import EnvHelper
 class AgentsGraph:
     waiting_music_bytes = None
     start_welcome_text = "Bonjour, je suis Studia, l'assistante virtuelle de Studi. Je prend le relais quand nos conseillers en formations ne sont pas disponibles."
-    other_text = "Désolé, je n'ai pas compris votre demande. Merci de me poser une question ou de me demander de prendre rendez-vous."
+    other_text = "Désolé, je n'ai pas compris votre demande."
     thank_you_text = "Merci de nous recontacter"
     appointment_text = "Je peux prendre un rendez-vous avec votre conseiller"
     questions_text = "Je peux aussi répondre à vos questions à propos de nos formations."
@@ -41,7 +41,7 @@ class AgentsGraph:
     lead_agent_error_text = "Je rencontre un problème technique avec l'agent de contact."
     rag_communication_error_text = "Je suis désolé, une erreur s'est produite lors de la communication avec le service."
 
-    def __init__(self, outgoing_manager: OutgoingManager, studi_rag_client: StudiRAGInferenceApiClient, salesforce_client: SalesforceApiClientInterface, call_sid: str):
+    def __init__(self, outgoing_manager: OutgoingManager, studi_rag_client: StudiRAGInferenceApiClient, salesforce_client: SalesforceApiClientInterface, call_sid: str, has_waiting_music_on_calendar: bool = False, has_waiting_music_on_rag: bool = True):
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
         self.calendar_speech_cannot_be_interupted : bool = False
@@ -52,16 +52,19 @@ class AgentsGraph:
         self.salesforce_api_client: SalesforceApiClientInterface = salesforce_client
 
         self.outgoing_manager: OutgoingManager = outgoing_manager
-        
+        self.has_waiting_music_on_calendar: bool = has_waiting_music_on_calendar
+        self.has_waiting_music_on_rag: bool = has_waiting_music_on_rag
+        self.available_action_rag: bool = EnvHelper.get_available_action_rag()
+
         lid_config_file_path = os.path.join(os.path.dirname(__file__), 'configs', 'lid_api_config.yaml')
         self.lead_agent_instance = LeadAgent(config_path=lid_config_file_path)
         self.logger.info(f"Initialize Lead Agent succeed with config: {lid_config_file_path}")
         
         openai_api_key = EnvHelper.get_openai_api_key()
-        self.router_llm: BaseChatModel = LangChainFactory.create_llm_from_info(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4.1", timeout=30, temperature=0.1, api_key=openai_api_key))
+        self.calendar_classifier_llm: BaseChatModel = LangChainFactory.create_llm_from_info(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4.1", timeout=30, temperature=0.1, api_key=openai_api_key))
         self.calendar_timeframes_llm: BaseChatModel = LangChainFactory.create_llm_from_info(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4.1-mini", timeout=50, temperature=0.1, api_key=openai_api_key))
         
-        self.calendar_agent_instance = CalendarAgent(salesforce_api_client=self.salesforce_api_client, classifier_llm=self.router_llm, available_timeframes_llm=self.calendar_timeframes_llm, date_extractor_llm=self.calendar_timeframes_llm)
+        self.calendar_agent_instance = CalendarAgent(salesforce_api_client=self.salesforce_api_client, classifier_llm=self.calendar_classifier_llm, available_timeframes_llm=self.calendar_timeframes_llm, date_extractor_llm=self.calendar_timeframes_llm)
         self.logger.info("Initialize Calendar Agent succeed")
         
         self.sf_agent_instance = SFAgent()
@@ -88,27 +91,30 @@ class AgentsGraph:
 
         workflow.add_node("lead_agent", self.lead_agent_node)
         workflow.add_node("calendar_agent", self.calendar_agent_node)
-        workflow.add_node("rag_course_agent", self.query_rag_api_about_trainings_agent_node)
         workflow.add_node("other_inquery", self.other_inquery_node)
+        if self.available_action_rag: workflow.add_node("rag_course_agent", self.query_rag_api_about_trainings_agent_node)
 
+        paths = {
+            "conversation_start": "conversation_start",
+            "lead_agent": "lead_agent",
+            "calendar_agent": "calendar_agent",
+            "other_inquery": "other_inquery",
+            "wait_for_user_input": "wait_for_user_input",
+            END: END
+        }
+        if self.available_action_rag: 
+            paths["rag_course_agent"] = "rag_course_agent"
+            
         # Add conditional edges
         workflow.add_conditional_edges(
             "router",
             self.decide_next_step,
-            {
-                "conversation_start": "conversation_start",
-                "lead_agent": "lead_agent",
-                "calendar_agent": "calendar_agent",
-                "rag_course_agent": "rag_course_agent",
-                "other_inquery": "other_inquery",
-                "wait_for_user_input": "wait_for_user_input",
-                END: END
-            }
+            paths
         )
 
         workflow.add_edge("calendar_agent", END)
-        workflow.add_edge("rag_course_agent", END)
         workflow.add_edge("other_inquery", END)
+        if self.available_action_rag: workflow.add_edge("rag_course_agent", END)
 
         # Add checkpointer if state needs to be persisted (e.g., using SQLite)
         # checkpointer = MemorySaver() # Example using in-memory checkpointer
@@ -128,7 +134,7 @@ class AgentsGraph:
             return state
 
         if user_input:
-            category = await self.analyse_user_input_for_dispatch_async(self.router_llm, user_input, state["history"])
+            category = await self.analyse_user_input_for_dispatch_async(self.calendar_classifier_llm, user_input, state["history"])
             state["history"].append(("user", user_input))
 
             if category == "schedule_calendar_appointment":
@@ -155,7 +161,13 @@ class AgentsGraph:
         if len(chat_history_str) > max_msg_chars:
             chat_history_str = "\n".join([f"[{msg[0]}]: {msg[1][:1000]}..." for msg in chat_history[-max_msg_count:]])
             chat_history_str = "... " + chat_history_str[-max_msg_chars:]
-        prompt = prompt.format(user_input=user_input, chat_history=chat_history_str)
+        
+        actions_names = "'schedule_calendar_appointment', 'training_course_query'"
+        actions_descriptions = "'schedule_calendar_appointment' category matches if the user query is related to scheduling a calendar appointment."
+        if self.available_action_rag: 
+            actions_descriptions += "\n'training_course_query' category matches if the user query is related to a training course or its informations, like access conditions, fundings, ..."
+
+        prompt = prompt.format(user_input=user_input, chat_history=chat_history_str, actions_names=actions_names, actions_descriptions=actions_descriptions)
         
         response = await llm.ainvoke(prompt)
         
@@ -236,7 +248,7 @@ class AgentsGraph:
             {self.what_do_you_want_text}
             """
         else:
-            end_welcome_text = "Je suis là pour vous aider en l'absence de nos conseillers. Pour votre premier appel, je peux répondre à vos questions sur nos formations, ou planifier un rendez-vous avec un conseiller en formation."
+            end_welcome_text = "Pour votre premier appel, je peux répondre à vos questions sur nos formations, ou planifier un rendez-vous avec un conseiller en formation."
                 
         await self.outgoing_manager.enqueue_text_async(end_welcome_text)
 
@@ -395,14 +407,17 @@ class AgentsGraph:
                     self.logger.info(f"[{call_sid[-4:]}] Chat history has {len(chat_history)} messages. Truncating to the last {max_history_length}.")
                     chat_history = chat_history[-max_history_length:]
 
-                waiting_music_task = await self._start_waiting_music_async()
+                if self.has_waiting_music_on_calendar:
+                    waiting_music_task = await self._start_waiting_music_async()
 
                 calendar_agent_answer = await self.calendar_agent_instance.run_async(user_input, chat_history)
                 
                 if self.calendar_speech_cannot_be_interupted:
                     self.outgoing_manager.can_speech_be_interupted = False
                 await self.outgoing_manager.enqueue_text_async(calendar_agent_answer)
-                await self._stop_waiting_music_async(waiting_music_task)
+
+                if self.has_waiting_music_on_calendar:
+                    await self._stop_waiting_music_async(waiting_music_task)
 
                 state["history"].append(("assistant", calendar_agent_answer))
                 return state
@@ -474,7 +489,8 @@ class AgentsGraph:
             
             # await self.outgoing_manager.enqueue_text_async(random.choice(waiting_messages))
 
-            waiting_music_task = await self._start_waiting_music_async()
+            if self.has_waiting_music_on_rag:
+                waiting_music_task = await self._start_waiting_music_async()
 
             # Call but not await the RAG API to get the streaming response
             response = self.studi_rag_inference_api_client.rag_query_stream_async(
@@ -486,7 +502,8 @@ class AgentsGraph:
             was_interrupted = False
 
             async for chunk in response:
-                await self._stop_waiting_music_async(waiting_music_task)
+                if self.has_waiting_music_on_rag:
+                    await self._stop_waiting_music_async(waiting_music_task)
                 
                 # Vérifier si on a été interrompu entre les chunks
                 if was_interrupted:                    

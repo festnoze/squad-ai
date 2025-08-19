@@ -2,9 +2,8 @@
 Your aim is to analyse the following user query along with the chat history, then return a single word corresponding to the category it belongs to.
 Don't use the chat history content if the category of the user input is obvious on its own content.
 But, if the user query meaning is ambiguous or need a context to be understood and categorized, then use the chat history content. 
-The allowed values for categories are: ['schedule_calendar_appointment', 'training_course_query', 'greetings', 'non-sense', 'others'].
-'schedule_calendar_appointment' category matches if the user query is related to scheduling a calendar appointment.
-'training_course_query' category matches if the user query is related to a training course or its informations, like access conditions, fundings, ...
+The allowed values for categories are: [{actions_names}, 'greetings', 'non-sense', 'others'].
+{actions_descriptions}
 'greetings' category matches if the user query is a greeting (like: "Salut", "Bonjour", "Hi", "Hello", or "Bye", "Au revoir", ...).
 'non-sense' category matches if the user query does not make sense, either because it looks like an incomplete sentence or question, or because the words don't seems to fit well together for interpret the user intention.
 'others' category matches if the user query makes sense, but is not related to any of the previous categories.
