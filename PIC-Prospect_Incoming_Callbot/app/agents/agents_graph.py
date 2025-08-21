@@ -32,16 +32,17 @@ from utils.envvar import EnvHelper
 class AgentsGraph:
     waiting_music_bytes = None
     start_welcome_text = "Bonjour, je suis Studia, l'assistante virtuelle de Studi. Je prend le relais quand nos conseillers en formations ne sont pas disponibles."
-    other_text = "Désolé, je n'ai pas compris votre demande."
-    thank_you_text = "Merci de nous recontacter"
+    other_text = "Désolé, je n'ai pas compris. Merci de reformuler votre demande."
+    thank_you_text = "Merci de nous contacter à nouveau"
     appointment_text = "Je peux prendre un rendez-vous avec votre conseiller"
     questions_text = "Je peux aussi répondre à vos questions à propos de nos formations."
     what_do_you_want_text = "Que souhaitez-vous faire ?"
+    want_to_schedule_appointement = "Souhaitez-vous prendre rendez-vous ?"
     technical_error_text = "Je rencontre un problème technique, le service est temporairement indisponible, merci de nous recontacter plus tard."
     lead_agent_error_text = "Je rencontre un problème technique avec l'agent de contact."
     rag_communication_error_text = "Je suis désolé, une erreur s'est produite lors de la communication avec le service."
 
-    def __init__(self, outgoing_manager: OutgoingManager, studi_rag_client: StudiRAGInferenceApiClient, salesforce_client: SalesforceApiClientInterface, call_sid: str, has_waiting_music_on_calendar: bool = False, has_waiting_music_on_rag: bool = True):
+    def __init__(self, outgoing_manager: OutgoingManager, studi_rag_client: StudiRAGInferenceApiClient, salesforce_client: SalesforceApiClientInterface, call_sid: str):
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
         self.calendar_speech_cannot_be_interupted : bool = False
@@ -50,11 +51,11 @@ class AgentsGraph:
         
         self.studi_rag_inference_api_client = studi_rag_client
         self.salesforce_api_client: SalesforceApiClientInterface = salesforce_client
-
         self.outgoing_manager: OutgoingManager = outgoing_manager
-        self.has_waiting_music_on_calendar: bool = has_waiting_music_on_calendar
-        self.has_waiting_music_on_rag: bool = has_waiting_music_on_rag
-        self.available_action_rag: bool = EnvHelper.get_available_action_rag()
+        
+        self.has_waiting_music_on_calendar: bool = EnvHelper.get_waiting_music_on_calendar()
+        self.has_waiting_music_on_rag: bool = EnvHelper.get_waiting_music_on_rag()
+        self.available_actions: bool = EnvHelper.get_available_actions()
 
         lid_config_file_path = os.path.join(os.path.dirname(__file__), 'configs', 'lid_api_config.yaml')
         self.lead_agent_instance = LeadAgent(config_path=lid_config_file_path)
@@ -89,20 +90,29 @@ class AgentsGraph:
         workflow.add_node("wait_for_user_input", self.wait_for_user_input_node)
         workflow.add_edge("wait_for_user_input", END)
 
-        workflow.add_node("lead_agent", self.lead_agent_node)
-        workflow.add_node("calendar_agent", self.calendar_agent_node)
+        if 'create_lead' in self.available_actions: 
+            workflow.add_node("lead_agent", self.lead_agent_node)
+
+        if 'schedule_appointement' in self.available_actions: 
+            workflow.add_node("calendar_agent", self.calendar_agent_node)
+
+        if 'ask_rag' in self.available_actions: 
+            workflow.add_node("rag_course_agent", self.query_rag_api_about_trainings_agent_node)
+
         workflow.add_node("other_inquery", self.other_inquery_node)
-        if self.available_action_rag: workflow.add_node("rag_course_agent", self.query_rag_api_about_trainings_agent_node)
 
         paths = {
             "conversation_start": "conversation_start",
-            "lead_agent": "lead_agent",
-            "calendar_agent": "calendar_agent",
             "other_inquery": "other_inquery",
             "wait_for_user_input": "wait_for_user_input",
             END: END
         }
-        if self.available_action_rag: 
+
+        if 'schedule_appointement' in self.available_actions:
+            paths["calendar_agent"] = "calendar_agent"
+        if 'create_lead' in self.available_actions:
+            paths["lead_agent"] = "lead_agent"
+        if 'ask_rag' in self.available_actions:
             paths["rag_course_agent"] = "rag_course_agent"
             
         # Add conditional edges
@@ -112,9 +122,13 @@ class AgentsGraph:
             paths
         )
 
-        workflow.add_edge("calendar_agent", END)
+        if 'schedule_appointement' in self.available_actions:
+            workflow.add_edge("calendar_agent", END)
+        if 'create_lead' in self.available_actions:
+            workflow.add_edge("lead_agent", END)        
+        if 'ask_rag' in self.available_actions: 
+            workflow.add_edge("rag_course_agent", END)
         workflow.add_edge("other_inquery", END)
-        if self.available_action_rag: workflow.add_edge("rag_course_agent", END)
 
         # Add checkpointer if state needs to be persisted (e.g., using SQLite)
         # checkpointer = MemorySaver() # Example using in-memory checkpointer
@@ -134,16 +148,21 @@ class AgentsGraph:
             return state
 
         if user_input:
-            category = await self.analyse_user_input_for_dispatch_async(self.calendar_classifier_llm, user_input, state["history"])
-            state["history"].append(("user", user_input))
-
-            if category == "schedule_calendar_appointment":
+            
+            if len(self.available_actions) == 1 and self.available_actions[0] == 'schedule_appointement':
                 state['agent_scratchpad']["next_agent_needed"] = "calendar_agent"
-            elif category == "training_course_query":
-                state['agent_scratchpad']["next_agent_needed"] = "rag_course_agent"
-            elif category == "others":
-                state['agent_scratchpad']["next_agent_needed"] = "other_inquery"
-            return state
+                return state
+            
+            if len(self.available_actions) >= 1:                
+                category = await self.analyse_user_input_for_dispatch_async(self.calendar_classifier_llm, user_input, state["history"])
+                state["history"].append(("user", user_input))
+                if category == "schedule_calendar_appointment":
+                    state['agent_scratchpad']["next_agent_needed"] = "calendar_agent"
+                elif category == "training_course_query":
+                    state['agent_scratchpad']["next_agent_needed"] = "rag_course_agent"
+                elif category == "others":
+                    state['agent_scratchpad']["next_agent_needed"] = "other_inquery"
+                return state
         state['agent_scratchpad']["next_agent_needed"] = "wait_for_user_input"
         return state
 
@@ -162,9 +181,15 @@ class AgentsGraph:
             chat_history_str = "\n".join([f"[{msg[0]}]: {msg[1][:1000]}..." for msg in chat_history[-max_msg_count:]])
             chat_history_str = "... " + chat_history_str[-max_msg_chars:]
         
-        actions_names = "'schedule_calendar_appointment', 'training_course_query'"
-        actions_descriptions = "'schedule_calendar_appointment' category matches if the user query is related to scheduling a calendar appointment."
-        if self.available_action_rag: 
+        actions_names = ""
+        actions_descriptions = ""
+
+        if 'schedule_appointement' in self.available_actions:
+            actions_names += ", 'schedule_calendar_appointment'"
+            actions_descriptions += "\n'schedule_calendar_appointment' category matches if the user query is related to scheduling a calendar appointment."
+
+        if 'ask_rag' in self.available_actions:
+            actions_names += ", 'training_course_query'"
             actions_descriptions += "\n'training_course_query' category matches if the user query is related to a training course or its informations, like access conditions, fundings, ..."
 
         prompt = prompt.format(user_input=user_input, chat_history=chat_history_str, actions_names=actions_names, actions_descriptions=actions_descriptions)
@@ -241,14 +266,18 @@ class AgentsGraph:
             last_name = sf_account.get('LastName', '').strip()
             owner_first_name = sf_account.get('Owner', {}).get('Name', '').strip()
             
-            end_welcome_text = f"""
-            {self.thank_you_text} {civility} {first_name} {last_name}.
-            {self.appointment_text} {owner_first_name}.
-            {self.questions_text}
-            {self.what_do_you_want_text}
-            """
+            end_welcome_text = f"{self.thank_you_text} {civility} {first_name} {last_name}."
+            if 'schedule_appointement' in self.available_actions:
+                end_welcome_text += f"{self.appointment_text} {owner_first_name}."
+            if 'ask_rag' in self.available_actions:
+                end_welcome_text += f"\n{self.questions_text}"
+                
+            if len(self.available_actions) > 1:
+                end_welcome_text += f"\n{self.what_do_you_want_text}"
+            elif len(self.available_actions) == 1 and self.available_actions[0] == 'schedule_appointement':
+                end_welcome_text += f"\n{self.want_to_schedule_appointement}"
         else:
-            end_welcome_text = "Pour votre premier appel, je peux répondre à vos questions sur nos formations, ou planifier un rendez-vous avec un conseiller en formation."
+            end_welcome_text = "Pour votre premier appel, je vais vous demander quelques informations, afin de planifier un rendez-vous avec un conseiller en formation."
                 
         await self.outgoing_manager.enqueue_text_async(end_welcome_text)
 

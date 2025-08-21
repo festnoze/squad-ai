@@ -94,10 +94,19 @@ class EnvHelper:
         return int(value) if value else 1
 
     @staticmethod
-    def get_available_action_rag():
-        value = EnvHelper.get_env_variable_value_by_name('AVAILABLE_ACTION_RAG', fails_if_missing=False)
+    def get_available_actions() -> list[str]:
+        actions : list[str] = EnvHelper.get_env_variable_value_by_name('AVAILABLE_ACTIONS', fails_if_missing=False)
+        return actions.split(',') if actions else []
+
+    @staticmethod
+    def get_waiting_music_on_calendar():
+        value = EnvHelper.get_env_variable_value_by_name('WAITING_MUSIC_ON_CALENDAR', fails_if_missing=False)
         return value and value.lower() == 'true'
 
+    @staticmethod
+    def get_waiting_music_on_rag():
+        value = EnvHelper.get_env_variable_value_by_name('WAITING_MUSIC_ON_RAG', fails_if_missing=False)
+        return value and value.lower() == 'true'
     
     ### Internal methods###
     #######################

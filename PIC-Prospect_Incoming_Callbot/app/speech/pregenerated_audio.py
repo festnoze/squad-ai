@@ -38,6 +38,7 @@ class PreGeneratedAudio:
             AgentsGraph.appointment_text,
             AgentsGraph.questions_text,
             AgentsGraph.what_do_you_want_text,
+            AgentsGraph.want_to_schedule_appointement,
             AgentsGraph.technical_error_text,
             AgentsGraph.lead_agent_error_text,
             AgentsGraph.rag_communication_error_text,

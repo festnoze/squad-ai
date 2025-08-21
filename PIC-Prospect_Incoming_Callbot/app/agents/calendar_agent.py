@@ -23,7 +23,7 @@ class CalendarAgent:
     confirmation_prefix_text = "Récapitulons : votre rendez-vous sera planifié le "
     confirmation_suffix_text = "Merci de confirmer ce rendez-vous pour le valider."
     date_not_found_text = "Je n'ai pas trouvé la date et l'heure du rendez-vous. Veuillez me préciser la date et l'heure du rendez-vous souhaité."
-    appointment_confirmed_prefix_text = "C'est confirmé ! Votre rendez-vous est maintenant planifié pour le "
+    appointment_confirmed_prefix_text = "C'est confirmé, votre rendez-vous est maintenant planifié pour le "
     appointment_confirmed_suffix_text = "Merci et au revoir."
     appointment_failed_text = "Je n'ai pas pu planifier le rendez-vous. Souhaitez-vous essayer un autre créneau ?"
     modification_not_supported_text = "Je ne suis pas en mesure de gérer les modifications de rendez-vous."
@@ -121,7 +121,7 @@ class CalendarAgent:
             appointment_slot_datetime_str = self._to_str_iso(appointment_slot_datetime)
             success = await CalendarAgent.schedule_new_appointment_tool_async(appointment_slot_datetime_str)
             if success is not None:
-                return self.appointment_confirmed_prefix_text + self._to_french_date(appointment_slot_datetime, include_weekday=True, include_year=False, include_hour=True) + ". " + self.appointment_confirmed_suffix_text
+                return self.appointment_confirmed_prefix_text + self._to_french_date(appointment_slot_datetime, include_weekday=True, include_year=False, include_hour=True) + ", " + self.appointment_confirmed_suffix_text
             else:
                 return self.appointment_failed_text
 
