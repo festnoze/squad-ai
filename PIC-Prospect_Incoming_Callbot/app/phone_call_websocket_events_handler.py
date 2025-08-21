@@ -60,16 +60,16 @@ class PhoneCallWebsocketEventsHandler:
         self.OPENAI_API_KEY = EnvHelper.get_openai_api_key()
         os.environ['OPENAI_API_KEY'] = self.OPENAI_API_KEY
 
-        # Set Google Calendar credentials (needed for STT)
+        # Load Google credentials used for STT
         self.project_root = os.path.dirname(os.path.dirname(__file__))
-        self.google_calendar_credentials_filename = "secrets/google-calendar-credentials.json"
-        self.google_calendar_credentials_path = os.path.join(self.project_root, self.google_calendar_credentials_filename)
+        self.google_credentials_filepath = EnvHelper.get_google_credentials_filepath()
+        self.google_credentials_absolute_path = os.path.join(self.project_root, self.google_credentials_filepath)
 
-        if os.path.exists(self.google_calendar_credentials_path):
-            os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = self.google_calendar_credentials_path
-            self.logger.info(f"Set GOOGLE_APPLICATION_CREDENTIALS to: {self.google_calendar_credentials_path}")
+        if os.path.exists(self.google_credentials_absolute_path):
+            os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = self.google_credentials_absolute_path
+            self.logger.info(f"Set GOOGLE_APPLICATION_CREDENTIALS to: {self.google_credentials_absolute_path}")
         else:
-            self.logger.error(f"/!\\ Google calendar credentials file not found at {self.google_calendar_credentials_path}")
+            self.logger.error(f"/!\\ Google calendar credentials file not found at {self.google_credentials_absolute_path}")
 
         # Initialize dependencies
         tts_provider_name = EnvHelper.get_text_to_speech_provider()

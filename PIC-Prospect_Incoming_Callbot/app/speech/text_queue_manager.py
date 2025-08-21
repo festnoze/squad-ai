@@ -12,6 +12,7 @@ class TextQueueManager:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         self.text_queue = ""
+        self.last_text_chunk = ""
         self.total_enqueued_chars = 0
         self.total_processed_chars = 0
         # Use a lock to ensure thread-safety when modifying the queue content
@@ -50,7 +51,7 @@ class TextQueueManager:
         a simple heuristic (characters per second).
         """
         if not self.text_queue:
-            return None
+            self.last_text_chunk = ""
             
         async with self.lock:
             splitted_text = ProcessText.chunk_text_by_sentences_size(self.text_queue, max_words_by_sentence, max_chars_by_sentence)
@@ -58,7 +59,8 @@ class TextQueueManager:
                 return None
             self.text_queue = "".join(splitted_text[1:])
             self.total_processed_chars += len(splitted_text[0])
-            return splitted_text[0]
+            self.last_text_chunk = splitted_text[0]
+        return splitted_text[0]
             
     def is_empty(self) -> bool:
         """

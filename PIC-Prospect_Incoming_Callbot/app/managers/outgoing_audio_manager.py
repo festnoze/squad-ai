@@ -11,6 +11,7 @@ from speech.twilio_audio_sender import TwilioAudioSender
 from speech.text_to_speech import TextToSpeechProvider
 from managers.outgoing_manager import OutgoingManager
 from utils.envvar import EnvHelper
+from utils.audio_mixer import AudioMixer
 #
 from utils.async_call_wrapper import AsyncCallWrapper
 
@@ -61,6 +62,33 @@ class OutgoingAudioManager(OutgoingManager):
         self.max_words_by_stream_chunk = max_words_by_stream_chunk
         self.max_chars_by_stream_chunk = max_chars_by_stream_chunk
         self.cache_ttl_seconds = cache_ttl_minutes * 60
+        
+        # Background noise configuration
+        self.background_noise_enabled = EnvHelper.get_background_noise_enabled()
+        self.background_noise_volume = EnvHelper.get_background_noise_volume()
+        self.audio_mixer = None
+        
+        # Initialize audio mixer if background noise is enabled
+        if self.background_noise_enabled:
+            self.audio_mixer = AudioMixer(
+                sample_width=sample_width,
+                frame_rate=frame_rate,
+                channels=channels
+            )
+            # Try to load background noise (prioritize white noise)
+            background_noise_paths = [
+                "static/internal/white_noise.pcm",      # First priority: generated white noise
+                "static/internal/background_noise.pcm", # Custom background noise option
+                "static/internal/waiting_music.pcm"     # Fallback: existing waiting music
+            ]
+            for path in background_noise_paths:
+                if self.audio_mixer.load_background_noise(path):
+                    self.logger.info(f"Background noise loaded from: {path}")
+                    break
+            else:
+                self.logger.warning("No background noise file found, disabling background noise")
+                self.background_noise_enabled = False
+                self.audio_mixer = None
         
         # Create temp directory if it doesn't exist
         os.makedirs(self.outgoing_speech_dir, exist_ok=True)
@@ -120,7 +148,7 @@ class OutgoingAudioManager(OutgoingManager):
                     if combined_audio:
                         self.logger.info(f">>>>>> Using combined cached parts for: '{text}' (parts: {[p[:30]+'...' for p in parts_used]})")
                         
-                        # Cache the combined result for future use
+                        # Cache the combined result for future use (store clean audio without background noise)
                         self.add_synthesized_audio_to_cache(text, combined_audio)
                         return combined_audio
                 
@@ -240,6 +268,24 @@ class OutgoingAudioManager(OutgoingManager):
         
         return audio_parts_found, remaining_text, parts_used
 
+    def _apply_background_noise_if_any(self, audio_data: bytes) -> bytes:
+        "Apply background noise to audio data if background noise is enabled."
+        if not audio_data:
+            return audio_data
+            
+        if self.background_noise_enabled and self.audio_mixer and self.audio_mixer.has_background_noise_loaded():
+            try:
+                mixed_audio = self.audio_mixer.mix_audio_with_background(
+                    audio_data, 
+                    self.background_noise_volume
+                )
+                return mixed_audio
+            except Exception as e:
+                self.logger.error(f"Failed to apply background noise: {e}")
+                return audio_data
+        
+        return audio_data
+
     async def synthesize_next_audio_chunk_async(self) -> bytes | None:
         """
         Gets the next text chunk and synthesizes it to audio bytes with intelligent caching.
@@ -258,7 +304,7 @@ class OutgoingAudioManager(OutgoingManager):
             cached_bytes = self.get_synthesized_audio_from_cache(speech_chunk, allow_partial=False)
             if cached_bytes:
                 self.logger.info(f">>>>>> Using exact cached synthesis for: '{speech_chunk}'")
-                return cached_bytes
+                return self._apply_background_noise_if_any(cached_bytes)
             
             # Step 2: Try partial cache matching with intelligent combination
             try:
@@ -296,9 +342,9 @@ class OutgoingAudioManager(OutgoingManager):
                         if combined_audio:
                             self.logger.info(f">>>>>> Combined audio from: {synthesis_info}")
                             
-                            # Cache the complete combined result
+                            # Cache the complete combined result (without background noise)
                             OutgoingAudioManager.add_synthesized_audio_to_cache(speech_chunk, combined_audio)
-                            return combined_audio
+                            return self._apply_background_noise_if_any(combined_audio)
                         else:
                             self.logger.warning("Failed to combine audio parts, falling back to complete synthesis")
                             return await self._fallback_complete_synthesis(speech_chunk)
@@ -308,11 +354,11 @@ class OutgoingAudioManager(OutgoingManager):
                         audio_result = final_audio_parts[0]
                         self.logger.info(f">>>>>> Using single audio part: {synthesis_info[0]}")
                         
-                        # Cache if this was synthesized (not cached)
+                        # Cache if this was synthesized (not cached) - store without background noise
                         if not audio_parts_found:  # This means it was synthesized
                             OutgoingAudioManager.add_synthesized_audio_to_cache(speech_chunk, audio_result)
                         
-                        return audio_result
+                        return self._apply_background_noise_if_any(audio_result)
                 
             except Exception as e:
                 self.logger.error(f"Error in partial synthesis for '{speech_chunk[:50]}...': {e}")
@@ -341,9 +387,9 @@ class OutgoingAudioManager(OutgoingManager):
             speech_bytes = await self.tts_provider.synthesize_speech_to_bytes_async(text)
             
             if speech_bytes:
-                # Cache the complete synthesis
+                # Cache the complete synthesis (without background noise)
                 OutgoingAudioManager.add_synthesized_audio_to_cache(text, speech_bytes)
-                return speech_bytes
+                return self._apply_background_noise_if_any(speech_bytes)
             else:
                 self.logger.error(f"/!\\ Failed to synthesize complete text: '{text}'")
                 return None
@@ -490,10 +536,11 @@ class OutgoingAudioManager(OutgoingManager):
         
     async def clear_text_queue_async(self) -> str:
         if self.can_speech_be_interupted:
-            text = await self.text_queue_manager.clear_queue_async()
+            removed_text = self.text_queue_manager.last_text_chunk + " " + self.text_queue_manager.text_queue
+            await self.text_queue_manager.clear_queue_async()
             self.streaming_interuption_asked = True
             self.logger.info("Text queue cleared for interruption")
-            return text
+            return removed_text
         
     def has_text_to_be_sent(self) -> bool:
         """Check if the audio stream manager has text to send."""

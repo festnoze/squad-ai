@@ -13,7 +13,7 @@ goto step1
 
 :step1
 echo [1] Activate service account...
-call gcloud auth activate-service-account --key-file=service-account-1.json
+call gcloud auth activate-service-account --key-file=secrets/google-credentials-for-GCP-deploiement.json
 if errorlevel 1 pause
 
 :step2

@@ -47,19 +47,21 @@ class IncomingAudioManager(IncomingManager):
         self.phones_by_call_sid = {}  # Map call_sid to phone numbers
         self.agents_graph : AgentsGraph = agents_graph
         self.openai_client = None
-        self.rag_interrupt_flag = {"interrupted": False}
-        self.is_speaking = False
-        self.speak_anew_on_long_silence = False
+        self.rag_interrupt_flag: dict = {"interrupted": False}
+        self.is_speaking: bool = False
+        self.interuption_asked: bool = False
+        self.removed_text_to_speak: str | None = None
+        self.speak_anew_on_long_silence: bool = EnvHelper.get_speak_anew_on_long_silence()
+        self.max_silence_duration_before_reasking: int = EnvHelper.get_max_silence_duration_before_reasking()  # ms of silence before reasking
         
         # Audio processing parameters
         self.audio_buffer = b""
         self.consecutive_silence_duration_ms = 0.0
-        self.speech_threshold = 950  # RMS threshold for speech detection
-        self.required_silence_ms_to_answer = 700  # ms of silence to trigger transcript
-        self.min_audio_bytes_for_processing = 1000  # Minimum buffer size to process
-        self.max_audio_bytes_for_processing = 200000  # Maximum buffer size to process
-        self.max_silence_duration_before_reasking = 15 * 1000  # ms of silence before reasking
-        self.max_silence_duration_before_hangup = 70 * 1000  # ms of silence before hanging up the call
+        self.speech_threshold = EnvHelper.get_speech_threshold()  # RMS threshold for speech detection
+        self.required_silence_ms_to_answer = EnvHelper.get_required_silence_ms_to_answer()  # ms of silence to trigger transcript
+        self.min_audio_bytes_for_processing = EnvHelper.get_min_audio_bytes_for_processing()  # Minimum buffer size to process
+        self.max_audio_bytes_for_processing = EnvHelper.get_max_audio_bytes_for_processing()  # Maximum buffer size to process
+        self.max_silence_duration_before_hangup = EnvHelper.get_max_silence_duration_before_hangup()  # ms of silence before hanging up the call
         self.do_audio_preprocessing = EnvHelper.get_do_audio_preprocessing()
         
         # Create temp directory if it doesn't exist
@@ -236,29 +238,21 @@ class IncomingAudioManager(IncomingManager):
         # First, update the speaking state based on the queue status
         await self.update_is_speaking_state_async()
         
-        # Check for speech while system is speaking (interruption detection)
+        # Skip handling incoming speech in case the system is speaking (and interruption is allowed)
         if self.is_speaking and not self.outgoing_manager.can_speech_be_interupted:
             return
 
-        removed_text_to_speak = ""
-        if self.is_speaking and self.outgoing_manager.can_speech_be_interupted:
-            # Check if this chunk contains speech - use a lower threshold to detect speech earlier
-            is_silence, speech_to_noise_ratio = self.analyse_speech_for_silence(chunk, threshold=self.speech_threshold * 2.5)  # Less sensitive detection while speaking
-                
-            # If user is speaking while system is speaking, stop system speech, but only if user speak loud
-            if not is_silence:
-                self.logger.info(f"Speech interruption detected (level: {speech_to_noise_ratio}), stopping system speech")
-                removed_text_to_speak = await self.stop_speaking_async()
-                # Reset buffer to clear any previous speech before interruption
-                self.audio_buffer = b""
-                
-                # Log the interruption (but only the first time)
-                if self.consecutive_silence_duration_ms > 0:
-                    self.logger.info(f"\r>>> USER INTERRUPTION - Incoming speech while system was speaking ({speech_to_noise_ratio})")
-                self.consecutive_silence_duration_ms = 0.0
-        else:
-            # Use WebRTC VAD for better speech detection
-            is_silence, speech_to_noise_ratio = self.analyse_speech_for_silence(chunk, threshold=self.speech_threshold)
+        # Use WebRTC VAD for better speech detection
+        is_silence, speech_to_noise_ratio = self.analyse_speech_for_silence(chunk, threshold=self.speech_threshold)
+        
+        # If user is speaking while system is speaking, stop system speech
+        if self.is_speaking and not is_silence and self.outgoing_manager.can_speech_be_interupted and not self.interuption_asked:
+            self.removed_text_to_speak = await self.stop_speaking_async(speech_to_noise_ratio)
+            
+            # Log the interruption (but only the first time)
+            if self.consecutive_silence_duration_ms > 0:
+                self.logger.info(f"\r>>> USER INTERRUPTION - Incoming speech while system was speaking ({speech_to_noise_ratio})")
+            self.consecutive_silence_duration_ms = 0.0
 
         # 2a. Silence detection before adding to buffer
         has_speech_began = len(self.audio_buffer) > 0
@@ -303,19 +297,20 @@ class IncomingAudioManager(IncomingManager):
         # 3. Process audio
         # Conditions: if buffer large enough followed by a prolonged silence, or if buffer is too large
         if (is_long_silence_after_speech and has_reach_min_speech_length) or is_speech_too_long:
+            audio_data = self.audio_buffer
+            self.audio_buffer = b""
+            self.consecutive_silence_duration_ms = 0.0
             if is_speech_too_long:
                 self.logger.info(f"\nProcess incoming audio: [Buffer size limit reached]. (buffer size: {len(self.audio_buffer)} bytes).\n")
             else:
                 self.logger.info(f"\nProcess incoming audio: [Silence after speech detected]. (buffer size: {len(self.audio_buffer)} bytes).\n")
-            
-            audio_data = self.audio_buffer
-            self.audio_buffer = b""
-            self.consecutive_silence_duration_ms = 0.0
+            if self.interuption_asked:
+                self.interuption_asked = False
 
             # Waiting message
             #await self.outgoing_manager.enqueue_text(random.choice(["Très bien, je vous demande un instant.", "Merci de patienter.", "Laissez-moi y réfléchir.", "Une petite seconde."]))
-            acknowledge_text = random.choice(["Très bien, ", "Compris, ", "D'accord, ", "Entendu, ", "Parfait, "])
-            acknowledge_text += random.choice(["un instant s'il vous plait.", "je vous demande un instant.", "merci de patienter.", "laissez-moi y réfléchir.", "une petite seconde."])
+            acknowledge_text = random.choice(["Très bien", "Compris", "D'accord", "Entendu", "Parfait"]) + ", "
+            acknowledge_text += random.choice(["un instant s'il vous plait", "je vous demande un instant", "merci de patienter", "laissez-moi un moment", "une petite seconde"]) + "."
             await self.outgoing_manager.enqueue_text_async(acknowledge_text)
             
             # 4. Transcribe speech to text
@@ -329,17 +324,19 @@ class IncomingAudioManager(IncomingManager):
             
             # 5. Send user query to the agents graph (for processing and response)
             if user_query_transcript:
+                self.removed_text_to_speak = None
                 await self.send_user_query_to_agents_graph_async(user_query_transcript)
             
             # If no user query transcript, enqueue back the text to speak previously removed
             if not user_query_transcript:
-                if removed_text_to_speak:
-                    await self.outgoing_manager.enqueue_text_async(removed_text_to_speak)
-                    self.logger.info(f">>> Empty transcript. Enqueued back originaly removed text to speak: \"{removed_text_to_speak}\"")
+                if self.removed_text_to_speak:
+                    await self.outgoing_manager.enqueue_text_async(self.removed_text_to_speak)
+                    self.logger.info(f">>> Empty transcript. Enqueued back originaly removed text to speak: \"{self.removed_text_to_speak}\"")
+                    self.removed_text_to_speak = None
                 else:
                     await self.outgoing_manager.enqueue_text_async(AgentsGraph.other_text)
                     self.logger.info(">>> Empty transcript.")
-
+        
         #await asyncio.sleep(0.1) # Pause incoming process to let others processes breathe
         return
 
@@ -517,28 +514,21 @@ class IncomingAudioManager(IncomingManager):
         This provides a more accurate representation of when audio is actually being sent
         """
         is_sending_audio = self.outgoing_manager.is_sending()
-        if is_sending_audio != self.is_speaking:
-            if is_sending_audio:
-                self.is_speaking = True
-                # Log more detailed stats about the text queue
-                stats = self.outgoing_manager.get_streaming_stats()
-                text_stats = stats['text_queue']
-                self.logger.debug(f"Speaking started - Text queue: {text_stats['current_size_chars']} chars, " +
-                                f"{text_stats['total_chars_processed']} chars processed so far")
-            else:
-                self.is_speaking = False
-                self.logger.debug("Speaking stopped - Text queue empty")
+        if is_sending_audio != self.is_speaking and not self.interuption_asked:
+            self.is_speaking = is_sending_audio
     
-    async def stop_speaking_async(self) -> str:
+    async def stop_speaking_async(self, speech_to_noise_ratio) -> str:
         """Stop any ongoing speech and clear text queue and interrupt RAG streaming"""
-        if self.is_speaking:
-            # Interrupt RAG streaming with its tag if it's active
-            if hasattr(self, 'rag_interrupt_flag'):
-                self.rag_interrupt_flag["interrupted"] = True
-                self.logger.info("RAG streaming interrupted due to speech interruption")
-                
-            removed_text = await self.outgoing_manager.clear_text_queue_async()
-            self.logger.info("Cleared text queue due to speech interruption")
-            self.is_speaking = False
-            return removed_text
-        return ""
+        self.logger.info(f"Speech interruption detected (level: {speech_to_noise_ratio}), stopping system speech")
+        self.interuption_asked = True
+        # Interrupt RAG streaming with its tag if it's active
+        if hasattr(self, 'rag_interrupt_flag'):
+            self.rag_interrupt_flag["interrupted"] = True
+            self.logger.info("RAG streaming interrupted due to speech interruption")
+            
+        removed_text = await self.outgoing_manager.clear_text_queue_async()
+        self.logger.info(f"Cleared queued text due to speech interruption: '{removed_text}'")
+        self.is_speaking = False
+        # Reset buffer to clear any previous speech before interruption
+        self.audio_buffer = b"" 
+        return removed_text

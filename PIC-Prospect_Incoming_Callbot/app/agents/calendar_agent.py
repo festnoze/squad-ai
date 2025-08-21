@@ -121,7 +121,7 @@ class CalendarAgent:
             appointment_slot_datetime_str = self._to_str_iso(appointment_slot_datetime)
             success = await CalendarAgent.schedule_new_appointment_tool_async(appointment_slot_datetime_str)
             if success is not None:
-                return self.appointment_confirmed_prefix_text + self._to_french_date(appointment_slot_datetime, include_weekday=True, include_year=False, include_hour=True) + ", " + self.appointment_confirmed_suffix_text
+                return self.appointment_confirmed_prefix_text + self._to_french_date(appointment_slot_datetime, include_weekday=True, include_year=False, include_hour=True) + ". " + self.appointment_confirmed_suffix_text
             else:
                 return self.appointment_failed_text
 

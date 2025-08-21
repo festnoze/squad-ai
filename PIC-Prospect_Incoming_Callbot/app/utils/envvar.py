@@ -107,6 +107,55 @@ class EnvHelper:
     def get_waiting_music_on_rag():
         value = EnvHelper.get_env_variable_value_by_name('WAITING_MUSIC_ON_RAG', fails_if_missing=False)
         return value and value.lower() == 'true'
+
+    @staticmethod
+    def get_background_noise_enabled():
+        value = EnvHelper.get_env_variable_value_by_name('BACKGROUND_NOISE_ENABLED', fails_if_missing=False)
+        return value and value.lower() == 'true'
+
+    @staticmethod
+    def get_background_noise_volume():
+        value = EnvHelper.get_env_variable_value_by_name('BACKGROUND_NOISE_VOLUME', fails_if_missing=False)
+        return float(value) if value else 0.1
+
+    @staticmethod
+    def get_speech_threshold():
+        value = EnvHelper.get_env_variable_value_by_name('SPEECH_THRESHOLD', fails_if_missing=False)
+        return int(value) if value else 950
+
+    @staticmethod
+    def get_required_silence_ms_to_answer():
+        value = EnvHelper.get_env_variable_value_by_name('REQUIRED_SILENCE_MS_TO_ANSWER', fails_if_missing=False)
+        return int(value) if value else 700
+
+    @staticmethod
+    def get_min_audio_bytes_for_processing():
+        value = EnvHelper.get_env_variable_value_by_name('MIN_AUDIO_BYTES_FOR_PROCESSING', fails_if_missing=False)
+        return int(value) if value else 1000
+
+    @staticmethod
+    def get_max_audio_bytes_for_processing():
+        value = EnvHelper.get_env_variable_value_by_name('MAX_AUDIO_BYTES_FOR_PROCESSING', fails_if_missing=False)
+        return int(value) if value else 200000
+
+    @staticmethod
+    def get_max_silence_duration_before_reasking():
+        value = EnvHelper.get_env_variable_value_by_name('MAX_SILENCE_DURATION_BEFORE_REASKING', fails_if_missing=False)
+        return int(value) if value else 15000
+
+    @staticmethod
+    def get_max_silence_duration_before_hangup():
+        value = EnvHelper.get_env_variable_value_by_name('MAX_SILENCE_DURATION_BEFORE_HANGUP', fails_if_missing=False)
+        return int(value) if value else 70000
+
+    @staticmethod
+    def get_speak_anew_on_long_silence():
+        value = EnvHelper.get_env_variable_value_by_name('SPEAK_ANEW_ON_LONG_SILENCE', fails_if_missing=False)
+        return value and value.lower() == 'true'
+    
+    @staticmethod
+    def get_google_credentials_filepath():
+        return EnvHelper.get_env_variable_value_by_name('GOOGLE_CREDENTIALS_FILEPATH')
     
     ### Internal methods###
     #######################
