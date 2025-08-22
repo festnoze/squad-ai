@@ -24,15 +24,12 @@ class AudioMixer:
         self.channels = channels
         self._background_noise_cache: Optional[bytes] = None
         
+        if not self.load_background_noise("static/internal/ambiance-bureau.pcm"):
+            self.logger.error("/!\\ Failed to load background noise ! ")
+        
     def load_background_noise(self, file_path: str) -> bool:
         """
         Load background noise from a PCM file and cache it.
-        
-        Args:
-            file_path: Path to the background noise PCM file
-            
-        Returns:
-            True if loaded successfully, False otherwise
         """
         try:
             if not os.path.exists(file_path):
@@ -244,4 +241,4 @@ class AudioMixer:
         Returns:
             True if background noise is loaded, False otherwise
         """
-        return self._background_noise_cache is not None and len(self._background_noise_cache) > 0
+        return self._background_noise_cache and len(self._background_noise_cache) > 0

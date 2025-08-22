@@ -70,25 +70,7 @@ class OutgoingAudioManager(OutgoingManager):
         
         # Initialize audio mixer if background noise is enabled
         if self.background_noise_enabled:
-            self.audio_mixer = AudioMixer(
-                sample_width=sample_width,
-                frame_rate=frame_rate,
-                channels=channels
-            )
-            # Try to load background noise (prioritize white noise)
-            background_noise_paths = [
-                "static/internal/white_noise.pcm",      # First priority: generated white noise
-                "static/internal/background_noise.pcm", # Custom background noise option
-                "static/internal/waiting_music.pcm"     # Fallback: existing waiting music
-            ]
-            for path in background_noise_paths:
-                if self.audio_mixer.load_background_noise(path):
-                    self.logger.info(f"Background noise loaded from: {path}")
-                    break
-            else:
-                self.logger.warning("No background noise file found, disabling background noise")
-                self.background_noise_enabled = False
-                self.audio_mixer = None
+            self.audio_mixer = AudioMixer(sample_width=sample_width, frame_rate=frame_rate, channels=channels)
         
         # Create temp directory if it doesn't exist
         os.makedirs(self.outgoing_speech_dir, exist_ok=True)

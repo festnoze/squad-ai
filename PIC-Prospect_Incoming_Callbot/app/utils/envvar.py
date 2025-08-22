@@ -157,6 +157,16 @@ class EnvHelper:
     def get_google_credentials_filepath():
         return EnvHelper.get_env_variable_value_by_name('GOOGLE_CREDENTIALS_FILEPATH')
     
+    @staticmethod
+    def get_do_acknowledge_user_speech():
+        value = EnvHelper.get_env_variable_value_by_name('DO_ACKNOWLEDGE_USER_SPEECH', fails_if_missing=False)
+        return value and value.lower() == 'true'
+    
+    @staticmethod
+    def get_long_acknowledgement():
+        value = EnvHelper.get_env_variable_value_by_name('LONG_ACKNOWLEDGEMENT', fails_if_missing=False)
+        return value and value.lower() == 'true'
+    
     ### Internal methods###
     #######################
 
@@ -190,7 +200,7 @@ class EnvHelper:
             load_dotenv(custom_env_filename)
     
     @staticmethod
-    def get_env_variable_value_by_name(variable_name: str, load_env=True, fails_if_missing=True) -> str:
+    def get_env_variable_value_by_name(variable_name: str, load_env: bool = True, fails_if_missing: bool = True, remove_comments: bool = True) -> str:
         if variable_name not in os.environ:
             if load_env:
                 EnvHelper._init_load_env()
@@ -200,8 +210,13 @@ class EnvHelper:
                     raise ValueError(f'Variable named: "{variable_name}" is not set in the environment')
                 else:
                     return None
-            os.environ[variable_name] = variable_value            
-        return os.environ[variable_name]
+            os.environ[variable_name] = variable_value
+        
+        value = os.environ[variable_name]
+        if remove_comments and '#' in value:
+            value = value.split('#')[0].strip()
+        
+        return value
     
     def _get_llm_env_variables(skip_commented_lines:bool = True):
         return file.get_as_yaml('.llm.env.yaml', skip_commented_lines)

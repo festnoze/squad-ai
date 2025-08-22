@@ -307,11 +307,13 @@ class IncomingAudioManager(IncomingManager):
             if self.interuption_asked:
                 self.interuption_asked = False
 
-            # Waiting message
-            #await self.outgoing_manager.enqueue_text(random.choice(["Très bien, je vous demande un instant.", "Merci de patienter.", "Laissez-moi y réfléchir.", "Une petite seconde."]))
-            acknowledge_text = random.choice(["Très bien", "Compris", "D'accord", "Entendu", "Parfait"]) + ", "
-            acknowledge_text += random.choice(["un instant s'il vous plait", "je vous demande un instant", "merci de patienter", "laissez-moi un moment", "une petite seconde"]) + "."
-            await self.outgoing_manager.enqueue_text_async(acknowledge_text)
+            # Acknowledgement message
+            if EnvHelper.get_do_acknowledge_user_speech():
+                acknowledge_text = random.choice(["Très bien", "Compris", "D'accord", "Entendu", "Parfait"])
+                if EnvHelper.get_long_acknowledgement():
+                    acknowledge_text += ", " + random.choice(["un instant s'il vous plait", "je vous demande un instant", "merci de patienter", "laissez-moi un moment", "une petite seconde"])
+                acknowledge_text += "."
+                await self.outgoing_manager.enqueue_text_async(acknowledge_text)
             
             # 4. Transcribe speech to text
             user_query_transcript = await self._perform_speech_to_text_transcription_async(audio_data, keep_audio_file=EnvHelper.get_keep_audio_files())
