@@ -319,10 +319,9 @@ class IncomingAudioManager(IncomingManager):
             user_query_transcript = await self._perform_speech_to_text_transcription_async(audio_data, keep_audio_file=EnvHelper.get_keep_audio_files())
             self.logger.info(f">>> Transcription finished. Heard text: \"{user_query_transcript}\"")
             
-            # repeat_user_input = EnvHelper.get_repeat_user_input()
-            # if repeat_user_input : 
-            #     feedback_text = f" Vous avez dit : \"{user_query_transcript}\"."
-            #     await self.outgoing_manager.enqueue_text_async(feedback_text)
+            if EnvHelper.get_repeat_user_input() : 
+                feedback_text = f" Vous avez dit : \"{user_query_transcript}\"."
+                await self.outgoing_manager.enqueue_text_async(feedback_text)
             
             # 5. Send user query to the agents graph (for processing and response)
             if user_query_transcript:

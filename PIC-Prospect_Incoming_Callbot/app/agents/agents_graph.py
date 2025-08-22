@@ -101,7 +101,7 @@ class AgentsGraph:
 
         workflow.add_node("other_inquery", self.other_inquery_node)
 
-        paths = {
+        router_paths = {
             "conversation_start": "conversation_start",
             "other_inquery": "other_inquery",
             "wait_for_user_input": "wait_for_user_input",
@@ -109,17 +109,17 @@ class AgentsGraph:
         }
 
         if 'schedule_appointement' in self.available_actions:
-            paths["calendar_agent"] = "calendar_agent"
+            router_paths["calendar_agent"] = "calendar_agent"
         if 'create_lead' in self.available_actions:
-            paths["lead_agent"] = "lead_agent"
+            router_paths["lead_agent"] = "lead_agent"
         if 'ask_rag' in self.available_actions:
-            paths["rag_course_agent"] = "rag_course_agent"
+            router_paths["rag_course_agent"] = "rag_course_agent"
             
         # Add conditional edges
         workflow.add_conditional_edges(
             "router",
             self.decide_next_step,
-            paths
+            router_paths
         )
 
         if 'schedule_appointement' in self.available_actions:
@@ -147,8 +147,7 @@ class AgentsGraph:
             state['agent_scratchpad']["next_agent_needed"] = "conversation_start"
             return state
 
-        if user_input:
-            
+        if user_input:            
             if len(self.available_actions) == 1 and self.available_actions[0] == 'schedule_appointement':
                 state['agent_scratchpad']["next_agent_needed"] = "calendar_agent"
                 return state

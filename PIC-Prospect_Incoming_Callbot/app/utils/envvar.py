@@ -96,7 +96,7 @@ class EnvHelper:
     @staticmethod
     def get_available_actions() -> list[str]:
         actions : list[str] = EnvHelper.get_env_variable_value_by_name('AVAILABLE_ACTIONS', fails_if_missing=False)
-        return actions.split(',') if actions else []
+        return [action.strip() for action in actions.split(',')] if actions else []
 
     @staticmethod
     def get_waiting_music_on_calendar():
@@ -193,7 +193,7 @@ class EnvHelper:
         if not custom_env_files:
             return 
         
-        custom_env_filenames = [filename.strip() for filename in custom_env_files.split(",")]
+        custom_env_filenames = [filename.strip() for filename in custom_env_files.split(',')]
         for custom_env_filename in custom_env_filenames:
             if not os.path.exists(custom_env_filename):
                 raise FileNotFoundError(f"/!\\ Environment file: '{custom_env_filename}' was not found at the project root.")
