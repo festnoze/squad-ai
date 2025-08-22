@@ -16,7 +16,10 @@
       "Bash(call venvScriptsactivate.bat)",
       "Bash(source:*)",
       "Bash(activate_venv.bat)",
-      "Bash(.venv/Scripts/activate)"
+      "Bash(.venv/Scripts/activate)",
+      "Bash(del:*)",
+      "Bash(call activate_venv.bat)",
+      "Bash(\".venv\\Scripts\\activate\")"
     ],
     "deny": []
   }

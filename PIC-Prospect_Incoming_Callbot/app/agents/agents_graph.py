@@ -31,13 +31,15 @@ from utils.envvar import EnvHelper
 
 class AgentsGraph:
     waiting_music_bytes = None
-    start_welcome_text = "Bonjour, je suis Studia, l'assistante virtuelle de Studi. Je prend le relais quand nos conseillers en formations ne sont pas disponibles."
+    start_welcome_text = "Bonjour et bienvenue chez Studi. Je suis l'assistant virtuel de l'école."
+    unavailability_for_returning_prospect = "Votre conseiller attitré est actuellement indisponible"
+    unavailability_for_new_prospect = "Nos conseillers en formation sont actuellement indisponibles."
     other_text = "Désolé, je n'ai pas compris. Merci de reformuler votre demande."
-    thank_you_text = "Merci de nous contacter à nouveau"
-    appointment_text = "Je peux prendre un rendez-vous avec votre conseiller"
-    questions_text = "Je peux aussi répondre à vos questions à propos de nos formations."
+    thanks_to_come_back = "Merci de nous contacter à nouveau"
+    appointment_text = "Je vous propose de prendre rendez-vous"
+    questions_text = "ou de répondre à vos questions concernant nos formations."
     what_do_you_want_text = "Que souhaitez-vous faire ?"
-    want_to_schedule_appointement = "Souhaitez-vous prendre rendez-vous ?"
+    want_to_schedule_appointement = "Souhaitez-vous que je planifie un rendez-vous maintenant ?"
     technical_error_text = "Je rencontre un problème technique, le service est temporairement indisponible, merci de nous recontacter plus tard."
     lead_agent_error_text = "Je rencontre un problème technique avec l'agent de contact."
     rag_communication_error_text = "Je suis désolé, une erreur s'est produite lors de la communication avec le service."
@@ -80,6 +82,7 @@ class AgentsGraph:
         workflow.set_entry_point("router")
 
         workflow.add_node("router", self.router)
+
         workflow.add_node("conversation_start", self.send_begin_of_welcome_message_node)
         workflow.add_edge("conversation_start", "init_conversation")
         workflow.add_node("init_conversation", self.init_conversation_node)
@@ -87,6 +90,8 @@ class AgentsGraph:
         workflow.add_node("user_identification", self.user_identification_node)
         workflow.add_edge("user_identification", "conversation_start_end")
         workflow.add_node("conversation_start_end", self.send_end_of_welcome_message_node)
+        workflow.add_edge("conversation_start_end", END)
+
         workflow.add_node("wait_for_user_input", self.wait_for_user_input_node)
         workflow.add_edge("wait_for_user_input", END)
 
@@ -241,7 +246,9 @@ class AgentsGraph:
         sf_account_info = await self.salesforce_api_client.get_person_by_phone_async(phone_number)
         if not sf_account_info:
             sf_account_info = await self.salesforce_api_client.get_person_by_phone_async("+33600000000")
+            self.logger.error(f"[{call_sid}] No SalesForce account found for phone number: {phone_number}. Using default account. (LID creation WIP).")
         leads_info = await self.salesforce_api_client.get_leads_by_details_async(phone_number)
+
         state['agent_scratchpad']['sf_account_info'] = sf_account_info.get('data', {}) if sf_account_info else {}
         state['agent_scratchpad']['sf_leads_info'] = leads_info[0] if leads_info else {}
         self.logger.info(f"[{call_sid}] Stored sf_account_info: {sf_account_info.get('data', {}) if sf_account_info else "-no SF account found-"} in agent_scratchpad")
@@ -255,6 +262,12 @@ class AgentsGraph:
         sf_account = state.get('agent_scratchpad', {}).get('sf_account_info', {})
         leads_info = state.get('agent_scratchpad', {}).get('sf_leads_info', {})
         
+        # Message for sales unavailability
+        if sf_account:
+            await self.outgoing_manager.enqueue_text_async(self.unavailability_for_returning_prospect)
+        else:
+            await self.outgoing_manager.enqueue_text_async(self.unavailability_for_new_prospect)
+
         if sf_account:
             civility = sf_account.get('Salutation', '')
             if civility:
@@ -265,7 +278,7 @@ class AgentsGraph:
             last_name = sf_account.get('LastName', '').strip()
             owner_first_name = sf_account.get('Owner', {}).get('Name', '').strip()
             
-            end_welcome_text = f"{self.thank_you_text} {civility} {first_name} {last_name}."
+            end_welcome_text = f"{self.thanks_to_come_back} {civility} {first_name} {last_name}."
             if 'schedule_appointement' in self.available_actions:
                 end_welcome_text += f"{self.appointment_text} {owner_first_name}."
             if 'ask_rag' in self.available_actions:
