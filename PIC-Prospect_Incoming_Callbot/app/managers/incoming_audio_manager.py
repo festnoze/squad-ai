@@ -18,6 +18,7 @@ from utils.envvar import EnvHelper
 from agents.phone_conversation_state_model import ConversationState, PhoneConversationState
 from speech.speech_to_text import SpeechToTextProvider
 from agents.agents_graph import AgentsGraph
+from agents.text_registry import AgentTexts
 from managers.incoming_manager import IncomingManager
 from managers.outgoing_audio_manager import OutgoingManager
 
@@ -335,7 +336,7 @@ class IncomingAudioManager(IncomingManager):
                     self.logger.info(f">>> Empty transcript. Enqueued back originaly removed text to speak: \"{self.removed_text_to_speak}\"")
                     self.removed_text_to_speak = None
                 else:
-                    await self.outgoing_manager.enqueue_text_async(AgentsGraph.other_text)
+                    await self.outgoing_manager.enqueue_text_async(AgentTexts.other_text)
                     self.logger.info(">>> Empty transcript.")
         
         #await asyncio.sleep(0.1) # Pause incoming process to let others processes breathe

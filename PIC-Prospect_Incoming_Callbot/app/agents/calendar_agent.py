@@ -9,6 +9,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.messages import AIMessage, HumanMessage
 #
 from api_client.salesforce_api_client_interface import SalesforceApiClientInterface
+from agents.text_registry import AgentTexts
 
 class CalendarAgent:        
     salesforce_api_client: SalesforceApiClientInterface
@@ -16,18 +17,18 @@ class CalendarAgent:
     owner_name: str | None = None
     now: datetime | None = None
     
-    # Static text responses for calendar operations
-    availability_request_text = "Quels jours ou quelles heures de la journée vous conviendraient le mieux ?"
-    no_timeframes_text = "Quand souhaitez-vous réserver un rendez-vous ?"
-    slot_unavailable_text = "Ce créneau n'est pas disponible, souhaiteriez-vous un autre horaire ?"
-    confirmation_prefix_text = "Récapitulons : votre rendez-vous sera planifié le "
-    confirmation_suffix_text = "Merci de confirmer ce rendez-vous pour le valider."
-    date_not_found_text = "Je n'ai pas trouvé la date et l'heure du rendez-vous. Veuillez me préciser la date et l'heure du rendez-vous souhaité."
-    appointment_confirmed_prefix_text = "C'est confirmé, votre rendez-vous est maintenant planifié pour le "
-    appointment_confirmed_suffix_text = "Merci et au revoir."
-    appointment_failed_text = "Je n'ai pas pu planifier le rendez-vous. Souhaitez-vous essayer un autre créneau ?"
-    modification_not_supported_text = "Je ne suis pas en mesure de gérer les modifications de rendez-vous."
-    cancellation_not_supported_text = "Je ne suis pas en mesure de gérer les annulations de rendez-vous."
+    # Backward compatibility class attributes - delegate to TextRegistry
+    availability_request_text = AgentTexts.availability_request_text
+    no_timeframes_text = AgentTexts.no_timeframes_text
+    slot_unavailable_text = AgentTexts.slot_unavailable_text
+    confirmation_prefix_text = AgentTexts.confirmation_prefix_text
+    confirmation_suffix_text = AgentTexts.confirmation_suffix_text
+    date_not_found_text = AgentTexts.date_not_found_text
+    appointment_confirmed_prefix_text = AgentTexts.appointment_confirmed_prefix_text
+    appointment_confirmed_suffix_text = AgentTexts.appointment_confirmed_suffix_text
+    appointment_failed_text = AgentTexts.appointment_failed_text
+    modification_not_supported_text = AgentTexts.modification_not_supported_text
+    cancellation_not_supported_text = AgentTexts.cancellation_not_supported_text
     
     def __init__(self, salesforce_api_client: SalesforceApiClientInterface, classifier_llm: any, available_timeframes_llm: any = None, date_extractor_llm: any = None):
         self.logger = logging.getLogger(__name__)

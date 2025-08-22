@@ -28,21 +28,25 @@ from llms.llm_info import LlmInfo
 from llms.langchain_factory import LangChainFactory
 from llms.langchain_adapter_type import LangChainAdapterType
 from utils.envvar import EnvHelper
+from agents.text_registry import AgentTexts
 
 class AgentsGraph:
     waiting_music_bytes = None
-    start_welcome_text = "Bonjour et bienvenue chez Studi. Je suis l'assistant virtuel de l'école."
-    unavailability_for_returning_prospect = "Votre conseiller attitré est actuellement indisponible"
-    unavailability_for_new_prospect = "Nos conseillers en formation sont actuellement indisponibles."
-    other_text = "Désolé, je n'ai pas compris. Merci de reformuler votre demande."
-    thanks_to_come_back = "Merci de nous contacter à nouveau"
-    appointment_text = "Je vous propose de prendre rendez-vous"
-    questions_text = "ou de répondre à vos questions concernant nos formations."
-    what_do_you_want_text = "Que souhaitez-vous faire ?"
-    want_to_schedule_appointement = "Souhaitez-vous que je planifie un rendez-vous maintenant ?"
-    technical_error_text = "Je rencontre un problème technique, le service est temporairement indisponible, merci de nous recontacter plus tard."
-    lead_agent_error_text = "Je rencontre un problème technique avec l'agent de contact."
-    rag_communication_error_text = "Je suis désolé, une erreur s'est produite lors de la communication avec le service."
+    
+    # Backward compatibility class attributes - delegate to TextRegistry
+    start_welcome_text = AgentTexts.start_welcome_text
+    unavailability_for_returning_prospect = AgentTexts.unavailability_for_returning_prospect
+    unavailability_for_new_prospect = AgentTexts.unavailability_for_new_prospect
+    other_text = AgentTexts.other_text
+    thanks_to_come_back = AgentTexts.thanks_to_come_back
+    appointment_text = AgentTexts.appointment_text
+    questions_text = AgentTexts.questions_text
+    select_action_text = AgentTexts.select_action_text
+    yes_no_consent_text = AgentTexts.yes_no_consent_text
+    ask_question_text = AgentTexts.ask_question_text
+    technical_error_text = AgentTexts.technical_error_text
+    lead_agent_error_text = AgentTexts.lead_agent_error_text
+    rag_communication_error_text = AgentTexts.rag_communication_error_text
 
     def __init__(self, outgoing_manager: OutgoingManager, studi_rag_client: StudiRAGInferenceApiClient, salesforce_client: SalesforceApiClientInterface, call_sid: str):
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -262,12 +266,13 @@ class AgentsGraph:
         sf_account = state.get('agent_scratchpad', {}).get('sf_account_info', {})
         leads_info = state.get('agent_scratchpad', {}).get('sf_leads_info', {})
         
-        # Message for sales unavailability
+        # Message signaling: sales unavailability
         if sf_account:
             await self.outgoing_manager.enqueue_text_async(self.unavailability_for_returning_prospect)
         else:
             await self.outgoing_manager.enqueue_text_async(self.unavailability_for_new_prospect)
 
+        # Message signaling: available actions
         if sf_account:
             civility = sf_account.get('Salutation', '')
             if civility:
@@ -280,14 +285,16 @@ class AgentsGraph:
             
             end_welcome_text = f"{self.thanks_to_come_back} {civility} {first_name} {last_name}."
             if 'schedule_appointement' in self.available_actions:
-                end_welcome_text += f"{self.appointment_text} {owner_first_name}."
+                end_welcome_text += f"{self.appointment_text}"# {owner_first_name}."
             if 'ask_rag' in self.available_actions:
                 end_welcome_text += f"\n{self.questions_text}"
                 
             if len(self.available_actions) > 1:
-                end_welcome_text += f"\n{self.what_do_you_want_text}"
-            elif len(self.available_actions) == 1 and self.available_actions[0] == 'schedule_appointement':
-                end_welcome_text += f"\n{self.want_to_schedule_appointement}"
+                end_welcome_text += f"\n{self.select_action_text}"
+            elif self.available_actions[0] == 'schedule_appointement':
+                end_welcome_text += f"\n{self.yes_no_consent_text}"
+            elif self.available_actions[0] == 'ask_rag':
+                end_welcome_text += f"\n{self.ask_question_text}"
         else:
             end_welcome_text = "Pour votre premier appel, je vais vous demander quelques informations, afin de planifier un rendez-vous avec un conseiller en formation."
                 
