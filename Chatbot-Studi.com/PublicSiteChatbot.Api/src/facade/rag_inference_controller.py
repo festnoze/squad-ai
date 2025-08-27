@@ -67,7 +67,7 @@ async def get_user_last_conversation(user_id: str):
         if last_conv:
             return JSONResponse(content={"id": str(last_conv.id), "messages": last_conv.get_all_messages_as_json()},status_code=200)
         else:
-            return JSONResponse(content={"id": None, "messages": []},status_code=200)
+            return JSONResponse(content={"id": None, "messages": []},status_code=204)
     except Exception as e:
         print(f"Failed to get last user conversation: {e}")
         raise HTTPException(status_code=500, detail=str(e))

@@ -2,16 +2,13 @@ import uuid
 import logging
 from uuid import UUID
 from typing import Optional
-#
-from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
 from api_client.request_models.user_request_model import UserRequestModel, DeviceInfoRequestModel
 from api_client.request_models.conversation_request_model import ConversationRequestModel
 from api_client.request_models.query_asking_request_model import QueryAskingRequestModel
 
 class IncomingSMSHandler:
     def __init__(self):
-        self.logger = logging.getLogger(__name__)        
-        self.studi_rag_inference_api_client = StudiRAGInferenceApiClient()
+        self.logger = logging.getLogger(__name__)
 
     async def init_user_and_conversation_upon_incoming_sms(self, phone_number: str) -> Optional[str]:
         """ Initialize the user session: retrieve or create user and conversation and send a welcome message """

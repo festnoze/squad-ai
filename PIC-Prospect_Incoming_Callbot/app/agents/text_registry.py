@@ -8,7 +8,7 @@ class AgentTexts:
     start_welcome_text = "Bonjour et bienvenue chez Studi. Je suis l'assistant virtuel de lécole."
     unavailability_for_returning_prospect = "Votre conseiller attitré est actuellement indisponible."
     unavailability_for_new_prospect = "Nos conseillers en formation sont actuellement indisponibles."
-    other_text = "Désolé, je n'ai pas compris. Merci de reformuler votre demande."
+    ask_to_repeat_text = "Désolé, je n'ai pas bien entendu. Merci de répéter."
     thanks_to_come_back = "Merci de nous contacter à nouveau"
     appointment_text = "Je vous propose de prendre rendez-vous"
     questions_text = "ou de répondre à vos questions concernant nos formations."

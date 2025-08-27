@@ -14,7 +14,6 @@ from managers.incoming_audio_manager import IncomingAudioManager
 from managers.outgoing_audio_manager import OutgoingAudioManager
 #from managers.transcription_manager import TranscriptionManager
 #
-from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
 from api_client.salesforce_api_client_interface import SalesforceApiClientInterface
 from api_client.salesforce_api_client_fake import SalesforceApiClientFake
 from api_client.salesforce_api_client import SalesforceApiClient
@@ -77,10 +76,7 @@ class PhoneCallWebsocketEventsHandler:
         can_speech_be_interupted = EnvHelper.get_can_speech_be_interupted()
         self.tts_provider = get_text_to_speech_provider(provider_name=tts_provider_name, frame_rate=self.frame_rate, channels=self.channels, sample_width=self.sample_width)
         self.stt_provider = get_speech_to_text_provider(provider_name=stt_provider_name, language_code="fr-FR", frame_rate=self.frame_rate)
-        
-        self.studi_rag_inference_api_client = StudiRAGInferenceApiClient()
-        self.salesforce_client: SalesforceApiClientInterface = SalesforceApiClient()
-        
+                
         self.outgoing_audio_processing = OutgoingAudioManager(
                                     websocket=self.websocket, 
                                     tts_provider=self.tts_provider,
@@ -92,12 +88,7 @@ class PhoneCallWebsocketEventsHandler:
                                     channels=self.channels
                                 )
 
-        self.compiled_graph = AgentsGraph(
-                                    self.outgoing_audio_processing,
-                                    self.studi_rag_inference_api_client,
-                                    self.salesforce_client,
-                                    call_sid=None
-                                ).graph
+        self.compiled_graph = AgentsGraph(self.outgoing_audio_processing).graph
 
         self.incoming_audio_processing = IncomingAudioManager(
                                     websocket=self.websocket, 

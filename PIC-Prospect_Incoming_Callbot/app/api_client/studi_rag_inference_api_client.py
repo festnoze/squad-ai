@@ -2,13 +2,15 @@ import httpx
 import asyncio
 from uuid import UUID
 from typing import Any, Dict, AsyncGenerator, Optional
+from utils.envvar import EnvHelper
+from speech.text_processing import ProcessText
 from api_client.request_models.user_request_model import UserRequestModel
 from api_client.request_models.conversation_request_model import ConversationRequestModel
 from api_client.request_models.query_asking_request_model import QueryAskingRequestModel, QueryNoConversationRequestModel
-from utils.envvar import EnvHelper
-from speech.text_processing import ProcessText
+from api_client.conversation_persistence_interface import ConversationPersistenceInterface
+from api_client.rag_query_interface import RagQueryInterface
 
-class StudiRAGInferenceApiClient:
+class StudiRAGInferenceApiClient(ConversationPersistenceInterface, RagQueryInterface):
     """
     Async client for interacting with the /rag/inference endpoints.
     """
@@ -49,26 +51,26 @@ class StudiRAGInferenceApiClient:
         except httpx.TimeoutException as exc:
             raise RuntimeError(f"Timeout connecting to RAG inference server at {self.host_base_url}") from exc
 
-    async def create_or_retrieve_user_async(self, user_request_model: UserRequestModel, timeout: int = 10) -> Dict[str, Any]:
+    async def create_or_retrieve_user_async(self, user_request_model: UserRequestModel, timeout: int = 10) -> UUID:
         """PATCH /rag/inference/user/sync: Create or retrieve a user."""
         try:
             user_request_model_dict = user_request_model.to_dict()
             resp = await self.client.patch("/rag/inference/user/sync", json=user_request_model_dict, timeout=self.timeout)
             resp.raise_for_status()
-            return resp.json()
+            return UUID(resp.json().get("id", ConversationPersistenceInterface.NoneUuid))
         except httpx.ConnectError as exc:
             raise RuntimeError(f"Cannot connect to RAG inference server at {self.host_base_url}") from exc
 
-    async def create_new_conversation_async(self, conversation_request_model: ConversationRequestModel, timeout: int = 10) -> Dict[str, Any]:
+    async def create_new_conversation_async(self, conversation_request_model: ConversationRequestModel, timeout: int = 10) -> UUID:
         """POST /rag/inference/conversation/create: Create a new conversation."""
         try:
             resp = await self.client.post("/rag/inference/conversation/create", json=conversation_request_model.to_dict(), timeout=self.timeout)
             resp.raise_for_status()
-            return resp.json()
+            return UUID(resp.json().get("id", ConversationPersistenceInterface.NoneUuid))
         except httpx.ConnectError as exc:
             raise RuntimeError(f"Cannot connect to RAG inference server at {self.host_base_url}") from exc
 
-    async def get_user_last_conversation_async(self, user_id: UUID, timeout: int = 10) -> Dict[str, Any]:
+    async def get_user_last_conversation_async(self, user_id: UUID, timeout: int = 10) -> dict:
         """GET /rag/inference/conversation/last/user/{user_id}: Get the last conversation for a user."""
         try:
             resp = await self.client.get(f"/rag/inference/conversation/last/user/{str(user_id)}", timeout=self.timeout)
@@ -77,10 +79,10 @@ class StudiRAGInferenceApiClient:
         except httpx.ConnectError as exc:
             raise RuntimeError(f"Cannot connect to RAG inference server at {self.host_base_url}") from exc
 
-    async def add_external_ai_message_to_conversation_async(self, conversation_id: str, new_message: str, timeout: int = 10) -> Dict[str, Any]:
+    async def add_external_ai_message_to_conversation_async(self, conversation_id: str, new_message: str, timeout: int = 10) -> dict:
         """POST /rag/inference/conversation/add-message: Add a message to a conversation."""
         try:
-            request_model = QueryAskingRequestModel(conversation_id=UUID(conversation_id), user_query_content=new_message, display_waiting_message=False)
+            request_model = QueryAskingRequestModel(conversation_id=UUID(conversation_id) if conversation_id != ConversationPersistenceInterface.NoneUuid else None, user_query_content=new_message, display_waiting_message=False)
             resp = await self.client.post("/rag/inference/conversation/add-external-message", json=request_model.to_dict(), timeout=self.timeout)
             resp.raise_for_status()
             return resp.json()

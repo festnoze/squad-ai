@@ -13,10 +13,6 @@ from speech.speech_to_text import get_speech_to_text_provider
 from agents.agents_graph import AgentsGraph
 from managers.incoming_text_manager import IncomingTextManager
 from managers.outgoing_text_manager import OutgoingTextManager
-#
-from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
-from api_client.salesforce_api_client import SalesforceApiClient
-from api_client.salesforce_api_client_interface import SalesforceApiClientInterface
 
 class TerminalEventsHandler:
     # Class variables shared across instances
@@ -46,20 +42,13 @@ class TerminalEventsHandler:
         os.environ['OPENAI_API_KEY'] = self.OPENAI_API_KEY
 
         # Initialize dependencies
-        self.studi_rag_inference_api_client = StudiRAGInferenceApiClient()
-        self.salesforce_api_client: SalesforceApiClientInterface = SalesforceApiClient()
         
         self.outgoing_text_processing = OutgoingTextManager(
             call_sid=None,
             outgoing_text_func=outgoing_text_func
         )
 
-        self.compiled_graph = AgentsGraph(
-                                    self.outgoing_text_processing,
-                                    self.studi_rag_inference_api_client,
-                                    self.salesforce_api_client,
-                                    call_sid=None
-                                ).graph
+        self.compiled_graph = AgentsGraph(self.outgoing_text_processing).graph
 
         self.incoming_text_processing = IncomingTextManager(
                                     outgoing_manager=self.outgoing_text_processing,

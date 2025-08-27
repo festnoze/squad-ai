@@ -166,6 +166,10 @@ class EnvHelper:
     def get_long_acknowledgement():
         value = EnvHelper.get_env_variable_value_by_name('LONG_ACKNOWLEDGEMENT', fails_if_missing=False)
         return value and value.lower() == 'true'
+
+    @staticmethod
+    def get_conversation_persistence_type():
+        return EnvHelper.get_env_variable_value_by_name('CONVERSATION_PERSISTENCE_TYPE', fails_if_missing=False) or 'no'
     
     ### Internal methods###
     #######################

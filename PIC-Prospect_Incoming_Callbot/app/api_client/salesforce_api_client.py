@@ -196,9 +196,9 @@ class SalesforceApiClient(SalesforceApiClientInterface):
         url_creation_event = f"{self._instance_url}/services/data/{self._version_api}/sobjects/Event/"
         
         async with httpx.AsyncClient() as client:
+            event_id = None
             try:
                 resp_event = await client.post(url_creation_event, headers=headers, data=json.dumps(payload_event))
-                event_id = None
                 if resp_event.status_code >= 200 and resp_event.status_code <= 299:
                     event_id = resp_event.json().get('id', None)
                     self.logger.info("Event created successfully!")

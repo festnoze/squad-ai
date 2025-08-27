@@ -1,14 +1,14 @@
 from datetime import datetime, timezone
-from common_tools.models.conversation import Conversation
-from common_tools.models.message import Message
-from common_tools.models.user import User
-from common_tools.models.device_info import DeviceInfo
 import uuid
 from uuid import UUID
+from database.models.conversation import Conversation
+from database.models.message import Message
+from database.models.user import User
+from database.models.device_info import DeviceInfo
 
-from database_conversations.entities import ConversationEntity, MessageEntity, UserEntity, DeviceInfoEntity
+from database.entities import ConversationEntity, MessageEntity, UserEntity, DeviceInfoEntity
 
-class ConversationConverters:
+class ConversationEntityToDtoConverter:
     @staticmethod
     def convert_device_info_entity_to_model(device_info_entity: DeviceInfoEntity) -> DeviceInfo:
         return DeviceInfo(
@@ -42,7 +42,7 @@ class ConversationConverters:
     def convert_user_entity_to_model(user_entity: UserEntity) -> User:
         return User(
             name=user_entity.name,
-            device_info=ConversationConverters.convert_device_info_entity_to_model(user_entity.device_infos[-1]) if user_entity.device_infos and any(user_entity.device_infos) else None,
+            device_info=ConversationEntityToDtoConverter.convert_device_info_entity_to_model(user_entity.device_infos[-1]) if user_entity.device_infos and any(user_entity.device_infos) else None,
             id=user_entity.id,
             created_at=user_entity.created_at,
         )
@@ -85,7 +85,7 @@ class ConversationConverters:
     @staticmethod
     def convert_conversation_entity_to_model(conversation_entity: ConversationEntity) -> Conversation:
         if not conversation_entity: return None
-        user_model = ConversationConverters.convert_user_entity_to_model(conversation_entity.user)
+        user_model = ConversationEntityToDtoConverter.convert_user_entity_to_model(conversation_entity.user)
         
         # Sorted messages by ascending creation order
         sorted_messages_entities = sorted(conversation_entity.messages, key=lambda msg: msg.created_at)
@@ -109,7 +109,7 @@ class ConversationConverters:
         if conversation.id: entity.id=conversation.id
 
         entity.messages=[
-                ConversationConverters.convert_message_model_to_entity(message, conversation.id)
+                ConversationEntityToDtoConverter.convert_message_model_to_entity(message, conversation.id)
                 for message in conversation.messages
             ]
         return entity
