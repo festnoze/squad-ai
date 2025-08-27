@@ -33,8 +33,8 @@ class OutgoingAudioManager(OutgoingManager):
             tts_provider: TextToSpeechProvider,
             stream_sid: str = None,
             min_chunk_interval: float = 0.05,  # 50ms~
-            can_speech_be_interupted: bool = True,
-            min_chars_for_interruptible_speech: int = 5,
+            can_speech_be_interupted: bool = False,
+            min_chars_for_interruptible_speech: int = 2,
             sample_width: int = 1,
             frame_rate: int = 8000,
             channels: int = 1,

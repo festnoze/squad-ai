@@ -34,6 +34,10 @@ class OutgoingManager(abc.ABC):
         pass
     
     @abc.abstractmethod
+    def has_text_to_be_sent(self) -> bool:
+        pass
+    
+    @abc.abstractmethod
     def run_background_streaming_worker(self) -> None:
         """Start the data delivery process."""
         pass

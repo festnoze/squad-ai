@@ -229,20 +229,20 @@ class IncomingAudioManager(IncomingManager):
         if not self.stream_sid:
             self.logger.error("/!\\ 'media event' received before the 'start event'")
             return
+                      
+        # First, update the speaking state based on the queue status
+        await self.update_is_speaking_state_async()
         
+        # Skip handling incoming speech in case the system is speaking and interruption isn't allowed
+        if not self.outgoing_manager.can_speech_be_interupted and (self.is_speaking or self.outgoing_manager.has_text_to_be_sent()):
+            return
+
         # 1. Decode audio chunk
         chunk = self._decode_audio_chunk(audio_data)
         if chunk is None: 
             self.logger.warning("Received media event without valid audio chunk")
             return
-                        
-        # First, update the speaking state based on the queue status
-        await self.update_is_speaking_state_async()
-        
-        # Skip handling incoming speech in case the system is speaking (and interruption is allowed)
-        if self.is_speaking and not self.outgoing_manager.can_speech_be_interupted:
-            return
-
+          
         # Use WebRTC VAD for better speech detection
         is_silence, speech_to_noise_ratio = self.analyse_speech_for_silence(chunk, threshold=self.speech_threshold)
         
