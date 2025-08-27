@@ -46,6 +46,8 @@ class IncomingAudioManager(IncomingManager):
         self.websocket_creation_time = None
         self.stream_states : dict[str, ConversationState] = {}
         self.phones_by_call_sid = {}  # Map call_sid to phone numbers
+        # self.etalonnated_noise_for_stream_sid: dict[str, int] = {}  # List already etalonnated stream_sid 
+        # self.background_noises_for_stream_sid: dict[str, list[int]] = {}  # Map stream_sid with noise calibration data
         self.agents_graph : AgentsGraph = agents_graph
         self.openai_client = None
         self.rag_interrupt_flag: dict = {"interrupted": False}
@@ -86,7 +88,7 @@ class IncomingAudioManager(IncomingManager):
     def set_phone_number(self, phone_number: str, call_sid: str) -> None:
         self.phones_by_call_sid[call_sid] = phone_number
 
-    def is_speech(self, audio_chunk: bytes, frame_duration_ms=30) -> bool:
+    def _is_speech(self, audio_chunk: bytes, frame_duration_ms=20) -> bool:
         """
         Determine if audio chunk contains speech using WebRTC VAD
         
@@ -99,7 +101,7 @@ class IncomingAudioManager(IncomingManager):
         """
         # WebRTC VAD only accepts 10, 20, or 30 ms frames
         if frame_duration_ms not in (10, 20, 30):
-            frame_duration_ms = 30
+            frame_duration_ms = 20
             
         # Calculate frame size and ensure audio chunk is the right length
         frame_size = int(self.frame_rate * frame_duration_ms / 1000) * self.sample_width * self.channels
@@ -118,7 +120,7 @@ class IncomingAudioManager(IncomingManager):
             self.logger.error(f"/!\\ VAD error: {e}")
             # Fallback to RMS-based detection
             rms = audioop.rms(audio_chunk, self.sample_width)
-            return rms > 250  # Default threshold
+            return rms > self.speech_threshold  # Default threshold
     
     def perform_audio_preprocessing(self, audio_data: bytes) -> bytes:
         """
@@ -163,16 +165,11 @@ class IncomingAudioManager(IncomingManager):
             # Return original data if processing fails
             return audio_data
     
-    def analyse_speech_for_silence(self, audio_data: bytes, threshold=400) -> tuple[bool, int]:
+    def analyse_speech_for_silence(self, audio_data: bytes) -> tuple[bool, int]:
         """
         Detect silence vs speech using both VAD and RMS
-        
-        Args:
-            audio_data: Raw PCM audio bytes
-            threshold: RMS threshold for silence detection
-            
-        Returns:
-            Tuple of (is_silence, speech_to_noise_ratio)
+        Args: audio_data: Raw PCM audio bytes
+        Returns: Tuple of (is_silence, speech_to_noise_ratio)
         """
         # Get RMS value (volume)
         speech_to_noise_ratio = audioop.rms(audio_data, self.sample_width)
@@ -180,16 +177,14 @@ class IncomingAudioManager(IncomingManager):
         # Check using VAD (more accurate but may not work on all chunks)
         try:
             frame_size = len(audio_data)
-            if frame_size >= 480:  # At least 30ms at 8kHz, 16-bit mono
-                vad_result = self.is_speech(audio_data)
-                if vad_result:
-                    return False, speech_to_noise_ratio  # VAD detected speech
+            if frame_size >= 320:  # At least 20ms at 8kHz, 16-bit mono
+                vad_is_speech = self._is_speech(audio_data)
+                is_speech = vad_is_speech and speech_to_noise_ratio > self.speech_threshold
+                return not is_speech, speech_to_noise_ratio  # VAD detected speech
         except Exception:
             pass  # Fall back to RMS method
             
-        # RMS-based detection (fallback)
-        is_silence = speech_to_noise_ratio < threshold
-        return is_silence, speech_to_noise_ratio
+        return True, speech_to_noise_ratio
         
     async def init_conversation_async(self, call_sid: str, stream_sid: str) -> None:
         """Handle the 'start' event from Twilio which begins a new call."""
@@ -244,7 +239,22 @@ class IncomingAudioManager(IncomingManager):
             return
           
         # Use WebRTC VAD for better speech detection
-        is_silence, speech_to_noise_ratio = self.analyse_speech_for_silence(chunk, threshold=self.speech_threshold)
+        is_silence, speech_to_noise_ratio = self.analyse_speech_for_silence(chunk)
+        
+        # # Perform noise calibration for new streams (etalonnated_noise)
+        # if self.stream_sid not in self.etalonnated_noise_for_stream_sid:
+        #     if not self.stream_sid in self.background_noises_for_stream_sid:
+        #         self.background_noises_for_stream_sid[self.stream_sid] = []
+        #     if len(self.etalonnated_noise_for_stream_sid[self.stream_sid]) < 100:
+        #         self.etalonnated_noise_for_stream_sid[self.stream_sid].append(speech_to_noise_ratio)
+                
+        #     # Calculate average when we reach samples count
+        #     if len(self.etalonnated_noise_for_stream_sid[self.stream_sid]) >= 100:
+        #         calibration_data = self.etalonnated_noise_for_stream_sid[self.stream_sid]
+        #         average_noise = sum(calibration_data) / len(calibration_data)
+        #         self.logger.info(f"Noise calibration completed for stream {self.stream_sid}. Average noise level: {average_noise:.2f}")
+        #         # Replace list with the calculated average for memory efficiency
+        #         self.etalonnated_noise_for_stream_sid[self.stream_sid] = int(average_noise)
         
         # If user is speaking while system is speaking, stop system speech
         if self.is_speaking and not is_silence and self.outgoing_manager.can_speech_be_interupted and not self.interuption_asked:
