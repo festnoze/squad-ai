@@ -518,7 +518,10 @@ class OutgoingAudioManager(OutgoingManager):
         
     async def clear_text_queue_async(self) -> str:
         if self.can_speech_be_interupted:
-            removed_text = self.text_queue_manager.last_text_chunk + " " + self.text_queue_manager.text_queue
+            removed_text = ""
+            if self.text_queue_manager.last_text_chunk:
+                removed_text += self.text_queue_manager.last_text_chunk + " "
+            removed_text += self.text_queue_manager.text_queue
             await self.text_queue_manager.clear_queue_async()
             self.streaming_interuption_asked = True
             self.logger.info("Text queue cleared for interruption")

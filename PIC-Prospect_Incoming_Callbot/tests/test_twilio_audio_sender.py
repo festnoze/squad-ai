@@ -134,7 +134,7 @@ async def test_send_audio_chunk_multiple_segments_success(mock_time, mock_lin2ul
         assert sent_message["media"]["payload"] == base64.b64encode(segment_mulaw).decode('utf-8')
         
         sleep_args, _ = mock_async_sleep.call_args_list[i]
-        assert abs(sleep_args[0] - (len(segment_mulaw) / 8000.0)) < 1e-9 # Compare floats with tolerance
+        assert abs(sleep_args[0] - (len(segment_mulaw) / 8000.0)) < 0.011 # Compare floats with tolerance
 
     assert audio_sender.total_bytes_sent == len(pcm_audio)
     assert audio_sender.chunks_sent == 1

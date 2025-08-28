@@ -1,20 +1,20 @@
 from datetime import datetime, timedelta, timezone
-from typing import Optional
-from uuid import UUID
+from uuid import UUID, uuid4
 from database.generic_datacontext import GenericDataContext
 from database.models.conversation import Conversation, Message
-from database.models.device_info import DeviceInfo
-from database.entities import Base, ConversationEntity, MessageEntity, UserEntity, DeviceInfoEntity
+from database.entities import Base, ConversationEntity, UserEntity
 from database.conversation_converters import ConversationEntityToDtoConverter
 
 class ConversationRepository:
     def __init__(self, db_path_or_url='database/conversation_database.db'):
         self.data_context = GenericDataContext(Base, db_path_or_url)
 
-    async def create_new_conversation_empty_async(self, user_id:UUID) -> Optional[Conversation]:
+    async def create_new_conversation_empty_async(self, user_id:UUID, conversation_id: UUID|None = None) -> Conversation | None:
         try:
             user_entity: UserEntity = await self.data_context.get_entity_by_id_async(UserEntity, user_id)
-            conversation_entity = ConversationEntity(user_id= user_entity.id, user = user_entity, messages=[])
+            # Create conversation id if not provided
+            if not conversation_id: conversation_id = uuid4() 
+            conversation_entity = ConversationEntity(id=conversation_id, user_id= user_entity.id, user = user_entity, messages=[])
             conversation_entity = await self.data_context.add_entity_async(conversation_entity)
             return ConversationEntityToDtoConverter.convert_conversation_entity_to_model(conversation_entity)
         
@@ -35,12 +35,12 @@ class ConversationRepository:
             print(f"Failed to add message to conversation: {e}")
             return False
     
-    async def does_exist_conversation_by_id_async(self, conversation_id: Optional[UUID]) -> bool:
+    async def does_exist_conversation_by_id_async(self, conversation_id: UUID | None) -> bool:
         if conversation_id is None: 
             return False
         return await self.data_context.does_exist_entity_by_id_async(ConversationEntity, conversation_id)
             
-    async def get_conversation_by_id_async(self, conversation_id: UUID, fails_if_not_found = True) -> Optional[Conversation]:
+    async def get_conversation_by_id_async(self, conversation_id: UUID, fails_if_not_found = True) -> Conversation | None:
         conversation_entity = await self.data_context.get_entity_by_id_async(
                                             entity_class= ConversationEntity,
                                             entity_id= conversation_id,

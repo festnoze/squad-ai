@@ -458,3 +458,815 @@ class TestCheckForAppointmentCreation:
             # Should return the first matching appointment ID
             assert result == 'event_111'
             mock_get_appointments.assert_called_once()
+
+
+class TestScheduleAppointmentRetryMechanism:
+    """Unit tests for retry mechanism in schedule_new_appointment_async method"""
+    
+    async def test_retry_on_verification_failure_then_success(self):
+        """Test that the method retries when verification fails, then succeeds"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        call_count = 0
+        verify_count = 0
+        
+        async def mock_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            mock_response = MagicMock()
+            mock_response.status_code = 201
+            mock_response.json.return_value = {"id": f"event_{call_count}"}
+            return mock_response
+        
+        async def mock_verification(*args, **kwargs):
+            nonlocal verify_count
+            verify_count += 1
+            if verify_count == 1:
+                return None  # First verification fails
+            else:
+                return f"event_{verify_count}"  # Second verification succeeds
+        
+        with patch('httpx.AsyncClient') as mock_client_class:
+            mock_client = mock_client_class.return_value.__aenter__.return_value
+            mock_client.post = mock_post
+            
+            with patch.object(client, 'check_for_appointment_creation', new_callable=AsyncMock) as mock_verify:
+                mock_verify.side_effect = mock_verification
+                
+                result = await client.schedule_new_appointment_async(
+                    subject="Test Retry",
+                    start_datetime="2025-12-01T10:00:00Z",
+                    duration_minutes=30,
+                    max_retries=1,
+                    retry_delay=0.01  # Very short delay for testing
+                )
+                
+                assert result == "event_2"
+                assert call_count == 2  # Initial call + 1 retry
+                assert verify_count == 2  # Two verification attempts
+    
+    async def test_retry_exhaustion_returns_none(self):
+        """Test that method returns None when all retries are exhausted"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        call_count = 0
+        
+        async def mock_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            mock_response = MagicMock()
+            mock_response.status_code = 201
+            mock_response.json.return_value = {"id": f"event_{call_count}"}
+            return mock_response
+        
+        async def mock_verification_always_fail(*args, **kwargs):
+            return None  # Always fail verification
+        
+        with patch('httpx.AsyncClient') as mock_client_class:
+            mock_client = mock_client_class.return_value.__aenter__.return_value
+            mock_client.post = mock_post
+            
+            with patch.object(client, 'check_for_appointment_creation', new_callable=AsyncMock) as mock_verify:
+                mock_verify.side_effect = mock_verification_always_fail
+                
+                result = await client.schedule_new_appointment_async(
+                    subject="Test Retry Exhaustion",
+                    start_datetime="2025-12-01T10:00:00Z",
+                    duration_minutes=30,
+                    max_retries=2,
+                    retry_delay=0.01
+                )
+                
+                assert result is None
+                assert call_count == 3  # Initial call + 2 retries
+    
+    async def test_no_retry_on_immediate_success(self):
+        """Test that no retry occurs when verification succeeds immediately"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        call_count = 0
+        
+        async def mock_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            mock_response = MagicMock()
+            mock_response.status_code = 201
+            mock_response.json.return_value = {"id": "success_event"}
+            return mock_response
+        
+        async def mock_verification_success(*args, **kwargs):
+            return "success_event"  # Immediate success
+        
+        with patch('httpx.AsyncClient') as mock_client_class:
+            mock_client = mock_client_class.return_value.__aenter__.return_value
+            mock_client.post = mock_post
+            
+            with patch.object(client, 'check_for_appointment_creation', new_callable=AsyncMock) as mock_verify:
+                mock_verify.side_effect = mock_verification_success
+                
+                result = await client.schedule_new_appointment_async(
+                    subject="Test Immediate Success",
+                    start_datetime="2025-12-01T10:00:00Z",
+                    duration_minutes=30,
+                    max_retries=2,
+                    retry_delay=0.01
+                )
+                
+                assert result == "success_event"
+                assert call_count == 1  # Only one call, no retries needed
+    
+    async def test_retry_with_zero_max_retries(self):
+        """Test that no retry occurs when max_retries is 0"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        call_count = 0
+        
+        async def mock_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            mock_response = MagicMock()
+            mock_response.status_code = 201
+            mock_response.json.return_value = {"id": "event_1"}
+            return mock_response
+        
+        async def mock_verification_fail(*args, **kwargs):
+            return None  # Verification fails
+        
+        with patch('httpx.AsyncClient') as mock_client_class:
+            mock_client = mock_client_class.return_value.__aenter__.return_value
+            mock_client.post = mock_post
+            
+            with patch.object(client, 'check_for_appointment_creation', new_callable=AsyncMock) as mock_verify:
+                mock_verify.side_effect = mock_verification_fail
+                
+                result = await client.schedule_new_appointment_async(
+                    subject="Test Zero Retries",
+                    start_datetime="2025-12-01T10:00:00Z",
+                    duration_minutes=30,
+                    max_retries=0,  # No retries
+                    retry_delay=0.01
+                )
+                
+                assert result is None
+                assert call_count == 1  # Only initial call, no retries
+    
+    async def test_retry_with_creation_exception_then_success(self):
+        """Test retry when creation fails with exception, then succeeds"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        call_count = 0
+        
+        async def mock_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise Exception("Network error")  # First call fails
+            else:
+                mock_response = MagicMock()
+                mock_response.status_code = 201
+                mock_response.json.return_value = {"id": f"event_{call_count}"}
+                return mock_response
+        
+        async def mock_verification_success(*args, **kwargs):
+            # Only return success for successful creation attempts
+            if call_count > 1:
+                return f"event_{call_count}"
+            else:
+                return None  # First attempt failed, so no verification
+        
+        with patch('httpx.AsyncClient') as mock_client_class:
+            mock_client = mock_client_class.return_value.__aenter__.return_value
+            mock_client.post = mock_post
+            
+            with patch.object(client, 'check_for_appointment_creation', new_callable=AsyncMock) as mock_verify:
+                mock_verify.side_effect = mock_verification_success
+                
+                result = await client.schedule_new_appointment_async(
+                    subject="Test Exception Recovery",
+                    start_datetime="2025-12-01T10:00:00Z",
+                    duration_minutes=30,
+                    max_retries=1,
+                    retry_delay=0.01
+                )
+                
+                assert result == "event_2"
+                assert call_count == 2  # Initial call failed, retry succeeded
+    
+    async def test_retry_with_http_error_then_success(self):
+        """Test retry when creation fails with HTTP error, then succeeds"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        call_count = 0
+        
+        async def mock_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            mock_response = MagicMock()
+            if call_count == 1:
+                mock_response.status_code = 500
+                mock_response.text = "Server error"
+                mock_response.json.return_value = {"error": "Internal server error"}
+            else:
+                mock_response.status_code = 201
+                mock_response.json.return_value = {"id": f"event_{call_count}"}
+            return mock_response
+        
+        async def mock_verification_success(*args, **kwargs):
+            return f"event_{call_count}" if call_count > 1 else None
+        
+        with patch('httpx.AsyncClient') as mock_client_class:
+            mock_client = mock_client_class.return_value.__aenter__.return_value
+            mock_client.post = mock_post
+            
+            with patch.object(client, 'check_for_appointment_creation', new_callable=AsyncMock) as mock_verify:
+                mock_verify.side_effect = mock_verification_success
+                
+                result = await client.schedule_new_appointment_async(
+                    subject="Test HTTP Error Recovery",
+                    start_datetime="2025-12-01T10:00:00Z",
+                    duration_minutes=30,
+                    max_retries=1,
+                    retry_delay=0.01
+                )
+                
+                assert result == "event_2"
+                assert call_count == 2  # Initial call failed with HTTP error, retry succeeded
+    
+    async def test_retry_delay_timing(self):
+        """Test that retry delay is properly applied"""
+        import time
+        
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        start_time = None
+        retry_time = None
+        
+        call_count = 0
+        
+        async def mock_post(*args, **kwargs):
+            nonlocal call_count, start_time, retry_time
+            call_count += 1
+            if call_count == 1:
+                start_time = time.time()
+            elif call_count == 2:
+                retry_time = time.time()
+            
+            mock_response = MagicMock()
+            mock_response.status_code = 201
+            mock_response.json.return_value = {"id": f"event_{call_count}"}
+            return mock_response
+        
+        verify_count = 0
+        async def mock_verification(*args, **kwargs):
+            nonlocal verify_count
+            verify_count += 1
+            if verify_count == 1:
+                return None  # First verification fails
+            else:
+                return f"event_{verify_count}"
+        
+        with patch('httpx.AsyncClient') as mock_client_class:
+            mock_client = mock_client_class.return_value.__aenter__.return_value
+            mock_client.post = mock_post
+            
+            with patch.object(client, 'check_for_appointment_creation', new_callable=AsyncMock) as mock_verify:
+                mock_verify.side_effect = mock_verification
+                
+                await client.schedule_new_appointment_async(
+                    subject="Test Delay Timing",
+                    start_datetime="2025-12-01T10:00:00Z",
+                    duration_minutes=30,
+                    max_retries=1,
+                    retry_delay=0.1  # 100ms delay
+                )
+                
+                # Check that at least the delay time has passed between calls
+                time_diff = retry_time - start_time
+                assert time_diff >= 0.1, f"Delay was {time_diff}, expected at least 0.1"
+                assert call_count == 2
+    
+    async def test_retry_with_mixed_failure_scenarios(self):
+        """Test complex scenario with creation failure, verification failure, then success"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        call_count = 0
+        verify_count = 0
+        
+        async def mock_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            mock_response = MagicMock()
+            if call_count == 1:
+                # First call: HTTP error
+                mock_response.status_code = 503
+                mock_response.text = "Service unavailable"
+                mock_response.json.return_value = {"error": "Service unavailable"}
+            else:
+                # Subsequent calls: Success
+                mock_response.status_code = 201
+                mock_response.json.return_value = {"id": f"event_{call_count}"}
+            return mock_response
+        
+        async def mock_verification(*args, **kwargs):
+            nonlocal verify_count
+            verify_count += 1
+            if verify_count <= 2:
+                return None  # First two verifications fail
+            else:
+                return f"event_{call_count}"  # Third verification succeeds
+        
+        with patch('httpx.AsyncClient') as mock_client_class:
+            mock_client = mock_client_class.return_value.__aenter__.return_value
+            mock_client.post = mock_post
+            
+            with patch.object(client, 'check_for_appointment_creation', new_callable=AsyncMock) as mock_verify:
+                mock_verify.side_effect = mock_verification
+                
+                result = await client.schedule_new_appointment_async(
+                    subject="Test Mixed Failures",
+                    start_datetime="2025-12-01T10:00:00Z",
+                    duration_minutes=30,
+                    max_retries=3,  # Allow enough retries
+                    retry_delay=0.01
+                )
+                
+                assert result == "event_3"
+                assert call_count == 3  # 1 failed creation + 2 successful creations with failed verifications + 1 final success
+                assert verify_count == 3  # 3 verification attempts
+
+
+class TestScheduleAppointmentRetryParameterValidation:
+    """Tests for retry parameter validation and edge cases"""
+    
+    async def test_negative_max_retries(self):
+        """Test that negative max_retries behaves like zero retries"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        call_count = 0
+        
+        async def mock_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            mock_response = MagicMock()
+            mock_response.status_code = 201
+            mock_response.json.return_value = {"id": "event_1"}
+            return mock_response
+        
+        async def mock_verification_fail(*args, **kwargs):
+            return None  # Always fail
+        
+        with patch('httpx.AsyncClient') as mock_client_class:
+            mock_client = mock_client_class.return_value.__aenter__.return_value
+            mock_client.post = mock_post
+            
+            with patch.object(client, 'check_for_appointment_creation', new_callable=AsyncMock) as mock_verify:
+                mock_verify.side_effect = mock_verification_fail
+                
+                result = await client.schedule_new_appointment_async(
+                    subject="Test Negative Retries",
+                    start_datetime="2025-12-01T10:00:00Z",
+                    duration_minutes=30,
+                    max_retries=-1,  # Negative retries
+                    retry_delay=0.01
+                )
+                
+                assert result is None
+                assert call_count == 1  # Only initial call, no retries
+    
+    async def test_very_large_max_retries(self):
+        """Test with large max_retries value (should work but be reasonable)"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        call_count = 0
+        
+        async def mock_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            mock_response = MagicMock()
+            mock_response.status_code = 201
+            mock_response.json.return_value = {"id": f"event_{call_count}"}
+            return mock_response
+        
+        verify_count = 0
+        async def mock_verification(*args, **kwargs):
+            nonlocal verify_count
+            verify_count += 1
+            if verify_count <= 5:
+                return None  # Fail first 5 times
+            else:
+                return f"event_{call_count}"  # Then succeed
+        
+        with patch('httpx.AsyncClient') as mock_client_class:
+            mock_client = mock_client_class.return_value.__aenter__.return_value
+            mock_client.post = mock_post
+            
+            with patch.object(client, 'check_for_appointment_creation', new_callable=AsyncMock) as mock_verify:
+                mock_verify.side_effect = mock_verification
+                
+                result = await client.schedule_new_appointment_async(
+                    subject="Test Large Retries",
+                    start_datetime="2025-12-01T10:00:00Z",
+                    duration_minutes=30,
+                    max_retries=100,  # Large number of retries
+                    retry_delay=0.001  # Very short delay
+                )
+                
+                assert result == "event_6"
+                assert call_count == 6  # Should succeed after 6 attempts
+                assert verify_count == 6
+    
+    async def test_zero_retry_delay(self):
+        """Test with zero retry delay"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        call_count = 0
+        
+        async def mock_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            mock_response = MagicMock()
+            mock_response.status_code = 201
+            mock_response.json.return_value = {"id": f"event_{call_count}"}
+            return mock_response
+        
+        verify_count = 0
+        async def mock_verification(*args, **kwargs):
+            nonlocal verify_count
+            verify_count += 1
+            if verify_count == 1:
+                return None  # First fails
+            else:
+                return f"event_{call_count}"  # Then succeeds
+        
+        with patch('httpx.AsyncClient') as mock_client_class:
+            mock_client = mock_client_class.return_value.__aenter__.return_value
+            mock_client.post = mock_post
+            
+            with patch.object(client, 'check_for_appointment_creation', new_callable=AsyncMock) as mock_verify:
+                mock_verify.side_effect = mock_verification
+                
+                result = await client.schedule_new_appointment_async(
+                    subject="Test Zero Delay",
+                    start_datetime="2025-12-01T10:00:00Z",
+                    duration_minutes=30,
+                    max_retries=1,
+                    retry_delay=0.0  # Zero delay
+                )
+                
+                assert result == "event_2"
+                assert call_count == 2
+                assert verify_count == 2
+    
+    async def test_negative_retry_delay(self):
+        """Test with negative retry delay (should still work, delay treated as zero)"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        call_count = 0
+        
+        async def mock_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            mock_response = MagicMock()
+            mock_response.status_code = 201
+            mock_response.json.return_value = {"id": f"event_{call_count}"}
+            return mock_response
+        
+        verify_count = 0
+        async def mock_verification(*args, **kwargs):
+            nonlocal verify_count
+            verify_count += 1
+            if verify_count == 1:
+                return None
+            else:
+                return f"event_{call_count}"
+        
+        with patch('httpx.AsyncClient') as mock_client_class:
+            mock_client = mock_client_class.return_value.__aenter__.return_value
+            mock_client.post = mock_post
+            
+            with patch.object(client, 'check_for_appointment_creation', new_callable=AsyncMock) as mock_verify:
+                mock_verify.side_effect = mock_verification
+                
+                result = await client.schedule_new_appointment_async(
+                    subject="Test Negative Delay",
+                    start_datetime="2025-12-01T10:00:00Z",
+                    duration_minutes=30,
+                    max_retries=1,
+                    retry_delay=-0.5  # Negative delay
+                )
+                
+                assert result == "event_2"
+                assert call_count == 2
+                assert verify_count == 2
+    
+    async def test_default_retry_parameters(self):
+        """Test that default retry parameters work as expected"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        call_count = 0
+        
+        async def mock_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            mock_response = MagicMock()
+            mock_response.status_code = 201
+            mock_response.json.return_value = {"id": f"event_{call_count}"}
+            return mock_response
+        
+        verify_count = 0
+        async def mock_verification(*args, **kwargs):
+            nonlocal verify_count
+            verify_count += 1
+            if verify_count <= 2:  # Fail first 2 times (using default max_retries=2)
+                return None
+            else:
+                return f"event_{call_count}"
+        
+        with patch('httpx.AsyncClient') as mock_client_class:
+            mock_client = mock_client_class.return_value.__aenter__.return_value
+            mock_client.post = mock_post
+            
+            with patch.object(client, 'check_for_appointment_creation', new_callable=AsyncMock) as mock_verify:
+                mock_verify.side_effect = mock_verification
+                
+                # Call without specifying retry parameters (use defaults)
+                result = await client.schedule_new_appointment_async(
+                    subject="Test Default Parameters",
+                    start_datetime="2025-12-01T10:00:00Z",
+                    duration_minutes=30
+                    # max_retries and retry_delay use defaults (2 and 1.0)
+                )
+                
+                assert result == "event_3"
+                assert call_count == 3  # Initial + 2 default retries
+                assert verify_count == 3
+
+
+class TestScheduleAppointmentRetryIntegration:
+    """Integration tests for complete retry workflow scenarios"""
+    
+    async def test_realistic_transient_failure_scenario(self):
+        """Test a realistic scenario where Salesforce has temporary issues"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        call_count = 0
+        
+        async def mock_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            mock_response = MagicMock()
+            
+            # Simulate real-world failure patterns
+            if call_count == 1:
+                # First attempt: Service temporarily unavailable
+                mock_response.status_code = 503
+                mock_response.text = "Service temporarily unavailable"
+                mock_response.json.return_value = {
+                    "message": "Service temporarily unavailable",
+                    "errorCode": "SERVICE_UNAVAILABLE"
+                }
+            elif call_count == 2:
+                # Second attempt: Rate limit exceeded
+                mock_response.status_code = 429
+                mock_response.text = "API rate limit exceeded"
+                mock_response.json.return_value = {
+                    "message": "API rate limit exceeded",
+                    "errorCode": "REQUEST_LIMIT_EXCEEDED"
+                }
+            else:
+                # Third attempt: Success
+                mock_response.status_code = 201
+                mock_response.json.return_value = {"id": "final_success_event"}
+            
+            return mock_response
+        
+        verify_count = 0
+        async def mock_verification(*args, **kwargs):
+            nonlocal verify_count
+            verify_count += 1
+            
+            if verify_count <= 2:
+                return None  # First two verifications fail (creation failed anyway)
+            else:
+                return "final_success_event"  # Final verification succeeds
+        
+        with patch('httpx.AsyncClient') as mock_client_class:
+            mock_client = mock_client_class.return_value.__aenter__.return_value
+            mock_client.post = mock_post
+            
+            with patch.object(client, 'check_for_appointment_creation', new_callable=AsyncMock) as mock_verify:
+                mock_verify.side_effect = mock_verification
+                
+                result = await client.schedule_new_appointment_async(
+                    subject="Important Client Meeting",
+                    start_datetime="2025-12-01T14:00:00Z",
+                    duration_minutes=60,
+                    description="Critical client presentation",
+                    owner_id="005xx000001234567",
+                    max_retries=3,
+                    retry_delay=0.05  # Short delay for testing
+                )
+                
+                assert result == "final_success_event"
+                assert call_count == 3  # Service error, rate limit, then success
+                assert verify_count == 3
+    
+    async def test_network_timeout_recovery(self):
+        """Test recovery from network timeouts and connection issues"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        call_count = 0
+        
+        async def mock_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            
+            if call_count == 1:
+                # First attempt: Connection timeout
+                raise asyncio.TimeoutError("Connection timeout")
+            elif call_count == 2:
+                # Second attempt: Network error
+                raise Exception("Network unreachable")
+            else:
+                # Third attempt: Success
+                mock_response = MagicMock()
+                mock_response.status_code = 201
+                mock_response.json.return_value = {"id": "network_recovery_event"}
+                return mock_response
+        
+        async def mock_verification(*args, **kwargs):
+            # Only succeed when creation actually worked (call_count == 3)
+            if call_count >= 3:
+                return "network_recovery_event"
+            else:
+                return None  # Failed attempts don't pass verification
+        
+        with patch('httpx.AsyncClient') as mock_client_class:
+            mock_client = mock_client_class.return_value.__aenter__.return_value
+            mock_client.post = mock_post
+            
+            with patch.object(client, 'check_for_appointment_creation', new_callable=AsyncMock) as mock_verify:
+                mock_verify.side_effect = mock_verification
+                
+                result = await client.schedule_new_appointment_async(
+                    subject="Network Recovery Test",
+                    start_datetime="2025-12-01T15:00:00Z",
+                    duration_minutes=30,
+                    max_retries=2,
+                    retry_delay=0.02
+                )
+                
+                assert result == "network_recovery_event"
+                assert call_count == 3  # Timeout, network error, then success
+    
+    async def test_authentication_reauth_during_retry(self):
+        """Test that authentication is refreshed during retry attempts"""
+        client = SalesforceApiClient()
+        client._access_token = "initial_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        call_count = 0
+        auth_call_count = 0
+        
+        async def mock_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            mock_response = MagicMock()
+            mock_response.status_code = 201
+            mock_response.json.return_value = {"id": f"auth_test_{call_count}"}
+            return mock_response
+        
+        # Mock the _ensure_authenticated_async method to track calls
+        original_ensure_auth = client._ensure_authenticated_async
+        async def mock_ensure_auth():
+            nonlocal auth_call_count
+            auth_call_count += 1
+            client._access_token = f"refreshed_token_{auth_call_count}"
+            # Don't call original to avoid actual authentication
+        
+        verify_count = 0
+        async def mock_verification(*args, **kwargs):
+            nonlocal verify_count
+            verify_count += 1
+            if verify_count == 1:
+                return None  # First verification fails
+            else:
+                return f"auth_test_{call_count}"
+        
+        with patch('httpx.AsyncClient') as mock_client_class:
+            mock_client = mock_client_class.return_value.__aenter__.return_value
+            mock_client.post = mock_post
+            
+            with patch.object(client, '_ensure_authenticated_async', new_callable=AsyncMock) as mock_auth:
+                mock_auth.side_effect = mock_ensure_auth
+                
+                with patch.object(client, 'check_for_appointment_creation', new_callable=AsyncMock) as mock_verify:
+                    mock_verify.side_effect = mock_verification
+                    
+                    result = await client.schedule_new_appointment_async(
+                        subject="Auth Refresh Test",
+                        start_datetime="2025-12-01T16:00:00Z",
+                        duration_minutes=30,
+                        max_retries=1,
+                        retry_delay=0.01
+                    )
+                    
+                    assert result == "auth_test_2"
+                    assert call_count == 2  # Initial call + retry
+                    assert auth_call_count == 2  # Authentication called for both attempts
+                    assert verify_count == 2
+    
+    async def test_complete_failure_with_comprehensive_logging(self):
+        """Test complete failure scenario to ensure proper error logging"""
+        import logging
+        from io import StringIO
+        
+        # Capture log output
+        log_capture = StringIO()
+        handler = logging.StreamHandler(log_capture)
+        logger = logging.getLogger('app.api_client.salesforce_api_client')
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+        
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        call_count = 0
+        
+        async def mock_post(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            
+            # Always fail with different errors
+            if call_count == 1:
+                raise Exception("Database connection failed")
+            elif call_count == 2:
+                mock_response = MagicMock()
+                mock_response.status_code = 500
+                mock_response.text = "Internal server error"
+                mock_response.json.return_value = {"error": "Database timeout"}
+                return mock_response
+            else:
+                raise Exception("Service permanently unavailable")
+        
+        async def mock_verification(*args, **kwargs):
+            return None  # Always fail verification
+        
+        try:
+            with patch('httpx.AsyncClient') as mock_client_class:
+                mock_client = mock_client_class.return_value.__aenter__.return_value
+                mock_client.post = mock_post
+                
+                with patch.object(client, 'check_for_appointment_creation', new_callable=AsyncMock) as mock_verify:
+                    mock_verify.side_effect = mock_verification
+                    
+                    result = await client.schedule_new_appointment_async(
+                        subject="Complete Failure Test",
+                        start_datetime="2025-12-01T17:00:00Z",
+                        duration_minutes=30,
+                        max_retries=2,
+                        retry_delay=0.01
+                    )
+                    
+                    assert result is None
+                    assert call_count == 3  # All three attempts should have been made
+                    
+                    # Check that appropriate log messages were generated
+                    log_output = log_capture.getvalue()
+                    assert "Verification failed, retrying" in log_output
+                    assert "All retry attempts exhausted" in log_output
+        finally:
+            # Clean up logging
+            logger.removeHandler(handler)
+            handler.close()

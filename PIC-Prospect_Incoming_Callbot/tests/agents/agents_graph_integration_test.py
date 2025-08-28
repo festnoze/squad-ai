@@ -3,12 +3,13 @@ import pytest
 import pytz
 from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock, AsyncMock
-from app.agents.agents_graph import AgentsGraph
-from app.agents.phone_conversation_state_model import PhoneConversationState
-from app.managers.outgoing_manager import OutgoingManager
-from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
-from app.api_client.salesforce_api_client_interface import SalesforceApiClientInterface
-from app.agents.calendar_agent import CalendarAgent
+from agents.agents_graph import AgentsGraph
+from agents.phone_conversation_state_model import PhoneConversationState
+from managers.outgoing_manager import OutgoingManager
+from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
+from api_client.salesforce_api_client_interface import SalesforceApiClientInterface
+from agents.calendar_agent import CalendarAgent
+from agents.text_registry import AgentTexts
 
 async def test_graph_init_conversation_and_welcome_message(agents_graph_mockings):
     """Test that without user input, we get a welcome message and conversation_id is set."""
@@ -16,9 +17,10 @@ async def test_graph_init_conversation_and_welcome_message(agents_graph_mockings
     # Create the graph with mocked dependencies but use the real graph implementation
     agents_graph = AgentsGraph(
         outgoing_manager=agents_graph_mockings["outgoing_manager"],
-        studi_rag_client=agents_graph_mockings["studi_rag_client"],
+        call_sid=agents_graph_mockings["call_sid"],
         salesforce_client=agents_graph_mockings["salesforce_client"],
-        call_sid=agents_graph_mockings["call_sid"]
+        conversation_persistence=agents_graph_mockings["studi_rag_client"],
+        rag_query_service= agents_graph_mockings["studi_rag_client"]
     ).graph
 
     initial_state: PhoneConversationState = PhoneConversationState(
@@ -37,14 +39,10 @@ async def test_graph_init_conversation_and_welcome_message(agents_graph_mockings
     assert updated_state["agent_scratchpad"]["conversation_id"] == "39e81136-4525-4ea8-bd00-c22211110001"
     assert len(updated_state["history"]) >= 1
 
-    welcome_text = """Bonjour, je suis Studia, l'assistante virtuelle de Studi. Je prend le relais quand nos conseillers en formations ne sont pas disponibles.
-    Merci de nous recontacter  Test User. 
-    Je peux prendre un rendez-vous avec votre conseiller Test Owner.
-    Je peux aussi répondre à vos questions à propos de nos formations.
-    Que souhaitez-vous faire ?"""
+    welcome_text = AgentTexts.start_welcome_text + AgentTexts.unavailability_for_returning_prospect + AgentTexts.thanks_to_come_back + " Test." +  AgentTexts.appointment_text + " Test."
 
     first_history_msg = updated_state["history"][0][1].replace("\n\n", "\n")
-    for awaited_line, received_line in zip(welcome_text.split("\n"), first_history_msg.split("\n")):
+    for awaited_line, received_line in zip(welcome_text.split("\n"), first_history_msg.split(".")):
         assert awaited_line.strip() == received_line.strip()
     
     # Verify that the user and conversation creation methods were called
@@ -61,9 +59,10 @@ async def test_query_response_about_courses(agents_graph_mockings):
     # Create the graph with mocked dependencies but use the real graph implementation
     agents_graph = AgentsGraph(
         outgoing_manager=agents_graph_mockings["outgoing_manager"],
-        studi_rag_client=agents_graph_mockings["studi_rag_client"],
+        call_sid=agents_graph_mockings["call_sid"],
         salesforce_client=agents_graph_mockings["salesforce_client"],
-        call_sid=agents_graph_mockings["call_sid"]
+        conversation_persistence=agents_graph_mockings["studi_rag_client"],
+        rag_query_service= agents_graph_mockings["studi_rag_client"]
     ).graph
                     
     init_msg = "Welcome to Studi! How can I help you schedule an appointment today?"
@@ -245,30 +244,17 @@ def agents_graph_mockings():
     mock_studi_rag_client.rag_query_stream_async.return_value = "This is a mock RAG response about BTS programs."
         
     # Mock user creation/retrieval
-    mock_studi_rag_client.create_or_retrieve_user_async  = AsyncMock()
-    mock_studi_rag_client.create_or_retrieve_user_async .return_value = {
-        "id": "39e81136-4525-4ea8-bd00-c22211110000",
-        "user_name": "Test User",
-        "created_at": "2025-06-01T00:00:00Z"
-    }
+    mock_studi_rag_client.create_or_retrieve_user_async = AsyncMock()
+    mock_studi_rag_client.create_or_retrieve_user_async .return_value = "39e81136-4525-4ea8-bd00-c22211110000"
     
     # Mock conversation creation
     mock_studi_rag_client.create_new_conversation_async = AsyncMock()
-    mock_studi_rag_client.create_new_conversation_async.return_value = {
-        "id": "39e81136-4525-4ea8-bd00-c22211110001",
-        "user_id": "39e81136-4525-4ea8-bd00-c22211110000",
-        "created_at": "2025-06-02T00:00:00Z"
-    }
+    mock_studi_rag_client.create_new_conversation_async.return_value = "39e81136-4525-4ea8-bd00-c22211110001"
     
     # Mock adding messages to conversation
     mock_studi_rag_client.add_external_ai_message_to_conversation = AsyncMock()
     mock_studi_rag_client.add_external_ai_message_to_conversation.return_value = {
-        "id": "39e81136-4525-4ea8-bd00-c22211110002",
-        "conversation_id": "39e81136-4525-4ea8-bd00-c22211110001",
-        "user_id": "39e81136-4525-4ea8-bd00-c22211110000",
-        "content": "Message content",
-        "created_at": "2025-06-02T00:10:00Z",
-        "role": "assistant",
+        "id": "39e81136-4525-4ea8-bd00-c22211110001",
         "messages": [
             {
                 "role": "assistant",

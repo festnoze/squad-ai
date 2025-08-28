@@ -24,7 +24,7 @@ from api_client.salesforce_api_client import SalesforceApiClient
 from api_client.salesforce_api_client_interface import SalesforceApiClientInterface
 from api_client.rag_query_interface import RagQueryInterface
 from api_client.conversation_persistence_interface import ConversationPersistenceInterface
-from database.conversation_persistence_service import ConversationPersistenceServiceLocal
+from database.conversation_persistence_service import ConversationLocalPersistenceService
 from database.conversation_persistence_service_fake import ConversationPersistenceServiceFake
 
 from managers.outgoing_manager import OutgoingManager
@@ -34,6 +34,7 @@ from llms.llm_info import LlmInfo
 from llms.langchain_factory import LangChainFactory
 from llms.langchain_adapter_type import LangChainAdapterType
 from utils.envvar import EnvHelper
+from utils.twilio_sid_converter import TwilioCallSidConverter
 from agents.text_registry import AgentTexts
 
 class AgentsGraph:
@@ -53,7 +54,7 @@ class AgentsGraph:
         else:
             conversation_persistence_type = EnvHelper.get_conversation_persistence_type()
             if conversation_persistence_type == "local":
-                self.conversation_persistence = ConversationPersistenceServiceLocal()
+                self.conversation_persistence = ConversationLocalPersistenceService()
             elif conversation_persistence_type == "studi_rag":
                 self.conversation_persistence = StudiRAGInferenceApiClient()
             else:
@@ -89,11 +90,9 @@ class AgentsGraph:
 
         # Add nodes & fixed edges
         workflow.set_entry_point("router")
-
         workflow.add_node("router", self.router)
-
-        workflow.add_node("conversation_start", self.send_begin_of_welcome_message_node)
-        workflow.add_edge("conversation_start", "init_conversation")
+        workflow.add_node("begin_of_welcome_message", self.begin_of_welcome_message_node)
+        workflow.add_edge("begin_of_welcome_message", "init_conversation")
         workflow.add_node("init_conversation", self.init_conversation_node)
         workflow.add_edge("init_conversation", "user_identification")
         workflow.add_node("user_identification", self.user_identification_node)
@@ -126,7 +125,7 @@ class AgentsGraph:
         workflow.add_node("other_inquery", self.other_inquery_node)
 
         router_paths = {
-            "conversation_start": "conversation_start",
+            "begin_of_welcome_message": "begin_of_welcome_message",
             "other_inquery": "other_inquery",
             "wait_for_user_input": "wait_for_user_input",
             END: END
@@ -168,7 +167,7 @@ class AgentsGraph:
         
         user_input = state.get('user_input')
         if not state.get('agent_scratchpad', {}).get('conversation_id', None):
-            state['agent_scratchpad']["next_agent_needed"] = "conversation_start"
+            state['agent_scratchpad']["next_agent_needed"] = "begin_of_welcome_message"
             return state
 
         if user_input:            
@@ -222,12 +221,10 @@ class AgentsGraph:
         self.logger.info(f"#> Router Analysis decide to dispatch to: |###> {response.content} <###|")
         return response.content
 
-    async def send_begin_of_welcome_message_node(self, state: PhoneConversationState) -> dict:
-        """Send the begin of welcome message to the user"""
-        call_sid = state.get('call_sid', 'N/A')
-        phone_number = state.get('caller_phone', 'N/A')        
-        await self.outgoing_manager.enqueue_text_async(AgentTexts.start_welcome_text)
-        self.logger.info(f"[{call_sid}] Sent 'begin of welcome message' to {phone_number}")
+    async def begin_of_welcome_message_node(self, state: PhoneConversationState) -> dict:
+        """Send the begin of welcome message to the user"""     
+        await self._add_ai_answer_async(AgentTexts.start_welcome_text, state, persist=False)
+        self.logger.info(f"[{state.get('call_sid', '')}] Sent 'begin of welcome message' to {state.get('caller_phone', 'N/A') }")
         return state
 
     async def init_conversation_node(self, state: PhoneConversationState) -> dict:
@@ -241,19 +238,21 @@ class AgentsGraph:
             await self.rag_query_service.test_client_connection_async()
         except Exception as e:
             self.logger.error(f"/!\\ Error testing connection to RAG API : {str(e)}")
-            await self.outgoing_manager.enqueue_text_async(AgentTexts.technical_error_text)    
+            await self._add_ai_answer_async(AgentTexts.technical_error_text, state)    
             return state
         
         conversation_id = await self._init_user_and_new_conversation_in_backend_api_async(state.get('caller_phone'), state.get('call_sid'))
         if not conversation_id:
-            await self.outgoing_manager.enqueue_text_async(AgentTexts.technical_error_text)    
-        self.logger.info(f"End init. RAG API for caller (User and a new conversation): {state.get('caller_phone')}")
+            await self._add_ai_answer_async(AgentTexts.technical_error_text, state, persist=False)    
+        self.logger.info(f"Init. conversation persistence for phone: {state.get('caller_phone')}, call_sid: {state.get('call_sid')}")
 
-        state["history"] = []
-        
-        if state.get('agent_scratchpad') is None: 
-            state['agent_scratchpad'] = {}
+        # Late persistence of welcome message (cannot persist before conversation has been created)
+        if conversation_id:
+            await self.conversation_persistence.add_ai_message_to_conversation_async(conversation_id, AgentTexts.start_welcome_text)
+
+        if state.get('agent_scratchpad') is None: state['agent_scratchpad'] = {}
         state['agent_scratchpad']['conversation_id'] = conversation_id
+
         self.logger.info(f"Created conversation of id: {conversation_id}, sent welcome message.")
         return state
 
@@ -269,7 +268,9 @@ class AgentsGraph:
         )
         try:
             user_id = await self.conversation_persistence.create_or_retrieve_user_async(user_RM)
-            new_conversation_RM = ConversationRequestModel(user_id=user_id, messages=[])
+            # Use Twilio call Sid as uuid for conversation (converted with 'TwilioCallSidConverter') 
+            call_sid_uuid = TwilioCallSidConverter.call_sid_to_uuid(call_sid)
+            new_conversation_RM = ConversationRequestModel(user_id=user_id, messages=[], conversation_id=call_sid_uuid)
             self.logger.info(f"Creating new conversation for user: {user_id}")
             new_conv_id = await self.conversation_persistence.create_new_conversation_async(new_conversation_RM)
             return str(new_conv_id)
@@ -322,12 +323,12 @@ class AgentsGraph:
         elif self.available_actions[0] == 'ask_rag':
             end_welcome_text += f"\n{AgentTexts.ask_question_text}"
 
-        await self._add_ai_answer(end_welcome_text, state)
+        await self._add_ai_answer_async(end_welcome_text, state)
         return state
 
     async def user_new_node(self, state: PhoneConversationState) -> dict:
         """For new user: Case not handled. Ask the user to call during the opening hours"""
-        await self._add_ai_answer(AgentTexts.unavailability_for_new_prospect, state)
+        await self._add_ai_answer_async(AgentTexts.unavailability_for_new_prospect, state)
         return state
 
     async def send_end_of_welcome_message_node(self, state: PhoneConversationState) -> dict:
@@ -340,9 +341,9 @@ class AgentsGraph:
         
         # Message signaling: sales unavailability
         if sf_account:
-            await self.outgoing_manager.enqueue_text_async(AgentTexts.unavailability_for_returning_prospect)
+            await self._add_ai_answer_async(AgentTexts.unavailability_for_returning_prospect)
         else:
-            await self.outgoing_manager.enqueue_text_async(AgentTexts.unavailability_for_new_prospect)
+            await self._add_ai_answer_async(AgentTexts.unavailability_for_new_prospect)
 
         # Message signaling: available actions
         if sf_account:
@@ -370,15 +371,8 @@ class AgentsGraph:
         else:
             end_welcome_text = "Pour votre premier appel, je vais vous demander quelques informations, afin de planifier un rendez-vous avec un conseiller en formation."
                 
-        await self.outgoing_manager.enqueue_text_async(end_welcome_text)
+        await self._add_ai_answer_async(end_welcome_text)
 
-        full_welcome_text = AgentTexts.start_welcome_text + "\n" + end_welcome_text
-        state["history"].append(("assistant", full_welcome_text))
-        conv_id = state['agent_scratchpad'].get('conversation_id', None)
-        if conv_id:
-            await self.conversation_persistence.add_external_ai_message_to_conversation_async(conv_id, full_welcome_text)
-        else:
-            self.logger.warning("/!\\ ERROR: No conversation ID found in state. Unable to add welcome msg to conversation properly.")
         self.logger.info(f"[{call_sid}] Sent 'end of welcome message' to {phone_number}")
         return state
     
@@ -396,7 +390,7 @@ class AgentsGraph:
 
         if not self.lead_agent_instance:
             self.logger.error(f"[{call_sid}] LeadAgent not initialized. Cannot process.")
-            await self.outgoing_manager.enqueue_text_async(AgentTexts.lead_agent_error_text)
+            await self._add_ai_answer_async(AgentTexts.lead_agent_error_text)
             return {"history": [("user", user_input), ("assistant", AgentTexts.lead_agent_error_text)], "agent_scratchpad": {"error": "LeadAgent not initialized"}}
 
         try:
@@ -512,12 +506,12 @@ class AgentsGraph:
                 
                 if self.calendar_speech_cannot_be_interupted:
                     self.outgoing_manager.can_speech_be_interupted = False
-                await self.outgoing_manager.enqueue_text_async(calendar_agent_answer)
+
+                await self._add_ai_answer_async(calendar_agent_answer)
 
                 if self.has_waiting_music_on_calendar:
                     await self._stop_waiting_music_async(waiting_music_task)
 
-                state["history"].append(("assistant", calendar_agent_answer))
                 return state
                 
             except Exception as e:
@@ -585,7 +579,7 @@ class AgentsGraph:
             #                     "Laissez-moi un instant pour trouver la meilleure réponse.",
             #                     "Je rassemble les informations nécessaires."]
             
-            # await self.outgoing_manager.enqueue_text_async(random.choice(waiting_messages))
+            # await self._add_ai_answer_async(random.choice(waiting_messages))
 
             if self.has_waiting_music_on_rag:
                 waiting_music_task = await self._start_waiting_music_async()
@@ -618,14 +612,14 @@ class AgentsGraph:
             if full_answer:
                 self.logger.info(f"Full answer received from RAG API: '{full_answer}'")
                 state["history"].append(("assistant", full_answer))
-                #await self.conversation_persistence.add_external_ai_message_to_conversation(state['agent_scratchpad']['conversation_id'], full_answer)
+                await self.conversation_persistence.add_ai_message_to_conversation_async(state['agent_scratchpad']['conversation_id'], full_answer)
 
             return state
                 
         except Exception as e:
             self.logger.error(f"Error in RAG API communication: {str(e)}")
             # Use enhanced text-to-speech for error messages too
-            await self.outgoing_manager.enqueue_text_async(AgentTexts.rag_communication_error_text)
+            await self._add_ai_answer_async(AgentTexts.rag_communication_error_text, state)
 
         return state
 
@@ -633,20 +627,21 @@ class AgentsGraph:
         """Handle other inquery"""
         call_sid = state.get('call_sid', 'N/A')
         phone_number = state.get('caller_phone', 'N/A')
-        await self.outgoing_manager.enqueue_text_async(AgentTexts.ask_to_repeat_text)
+        await self._add_ai_answer_async(AgentTexts.ask_to_repeat_text, state)
         self.logger.info(f"[{call_sid}] Sent 'other' message to {phone_number}")
         return state
 
-
     ### Helper methods ###
 
-    async def _add_ai_answer(self, answer_text: str, state: PhoneConversationState) -> dict:
+    async def _add_ai_answer_async(self, answer_text: str, state: PhoneConversationState, persist: bool = True) -> dict:
         """Send the answer's text, add it to the state history and to the API for persistence"""
-        await self.outgoing_manager.enqueue_text_async(answer_text)
-        state["history"].append(("assistant", answer_text))
         conv_id = state['agent_scratchpad'].get('conversation_id', None)
-        if conv_id:
-            await self.conversation_persistence.add_external_ai_message_to_conversation_async(conv_id, answer_text)
+        state["history"].append(("assistant", answer_text))
+
+        await self.outgoing_manager.enqueue_text_async(answer_text)
+
+        if persist:
+            await self.conversation_persistence.add_ai_message_to_conversation_async(conv_id, answer_text)
         
         return state
     

@@ -207,3 +207,13 @@ class GenericDataContext:
             for table in reversed(self.base_entities.metadata.sorted_tables):
                 await transaction.execute(delete(table))
             await transaction.commit()
+
+    async def close_async(self):
+        """Close the async database engine and cleanup resources"""
+        try:
+            if hasattr(self, 'engine') and self.engine:
+                await self.engine.dispose()
+                self.logger.info("Database engine closed successfully")
+        except Exception as e:
+            self.logger.error(f"Error closing database engine: {e}")
+            raise

@@ -13,7 +13,7 @@ from database.user_repository import UserRepository
 class QuotaOverloadException(Exception):
     pass
 
-class ConversationPersistenceServiceLocal(ConversationPersistenceInterface):
+class ConversationLocalPersistenceService(ConversationPersistenceInterface):
     def __init__(self) -> None:
         self.user_repository: UserRepository = UserRepository()
         self.conversation_repository: ConversationRepository = ConversationRepository()
@@ -42,10 +42,11 @@ class ConversationPersistenceServiceLocal(ConversationPersistenceInterface):
     async def create_new_conversation_async(self, conversation_request_model: ConversationRequestModel, timeout: int = 10) -> UUID:
         user_id = conversation_request_model.user_id
         recent_conversation_count = await self.conversation_repository.get_recent_conversations_count_by_user_id_async(user_id)
-        if self.max_conversations_by_day and recent_conversation_count > self.max_conversations_by_day: 
+        if self.max_conversations_by_day and recent_conversation_count >= self.max_conversations_by_day: 
             raise QuotaOverloadException("You have reached the maximum number of conversations allowed per day.")
         
-        new_conversation = await self.conversation_repository.create_new_conversation_empty_async(user_id)
+        conv_id = conversation_request_model.conversation_id
+        new_conversation = await self.conversation_repository.create_new_conversation_empty_async(user_id, conv_id)
         new_conv = await self.conversation_repository.get_conversation_by_id_async(new_conversation.id)
         
         if conversation_request_model.messages and any(conversation_request_model.messages):
@@ -90,7 +91,7 @@ class ConversationPersistenceServiceLocal(ConversationPersistenceInterface):
             assert await self.conversation_repository.add_message_to_existing_conversation_async(conversation.id, conversation.last_message)
         return conversation
     
-    async def add_external_ai_message_to_conversation_async(self, conversation_id: str, new_message: str, timeout: int = 10) -> dict:
+    async def add_ai_message_to_conversation_async(self, conversation_id: str, new_message: str, timeout: int = 10) -> dict:
         conversation_uuid = UUID(conversation_id)
         conversation = await self.conversation_repository.get_conversation_by_id_async(conversation_uuid)
         if new_message:

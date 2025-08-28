@@ -13,7 +13,7 @@ from app.api_client.salesforce_api_client_interface import SalesforceApiClientIn
     ("schedule_calendar_appointment", "Je souhaite prendre rendez-vous", []),
     ("others", "Quelle est la météo ?", []), # Hors-sujet
     ("greetings", "Excuse moi", []), # Interupting
-    ("non-sense", "Je t'interomps", []), # Interupting
+    ("greetings", "Je t'interomps", []), # Interupting
     ("greetings", "Salut", []), # Greeting
     ("non-sense", "je souhaiterais connaitre", []), # Incomplete query 
     ("non-sense", "Elle formation vrai", []), # query with transcription error
@@ -31,9 +31,10 @@ async def test_agents_dispatching(agents_graph_mockings, user_input: str, chat_h
     # Create an instance of AgentsGraph with mocked dependencies
     agents = AgentsGraph(
         outgoing_manager=agents_graph_mockings["outgoing_manager"],
-        studi_rag_client=agents_graph_mockings["studi_rag_client"],
+        call_sid=agents_graph_mockings["call_sid"],
         salesforce_client=agents_graph_mockings["salesforce_client"],
-        call_sid=agents_graph_mockings["call_sid"]
+        conversation_persistence=agents_graph_mockings["studi_rag_client"],
+        rag_query_service= agents_graph_mockings["studi_rag_client"]
     )
     
     # Add necessary attributes for streaming

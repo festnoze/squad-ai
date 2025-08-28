@@ -120,7 +120,8 @@ class SalesforceApiClient(SalesforceApiClientInterface):
 
     async def schedule_new_appointment_async(self, subject: str, start_datetime: str, duration_minutes: int = 30, description: str | None = None, 
                    location: str | None = None, owner_id: str | None = None, 
-                   what_id: str | None = None, who_id: str | None = None) -> str | None:
+                   what_id: str | None = None, who_id: str | None = None,
+                   max_retries: int = 2, retry_delay: float = 1.0) -> str | None:
         """Create an event in Salesforce and return the event ID if successful
         
         Args:
@@ -132,6 +133,8 @@ class SalesforceApiClient(SalesforceApiClientInterface):
             owner_id: Optional Salesforce ID of the event owner
             what_id: Optional ID of related object (Account, Opportunity, etc.)
             who_id: Optional ID of associated person (Contact, Lead)
+            max_retries: Maximum number of retry attempts if verification fails (default: 3)
+            retry_delay: Delay in seconds before recursive retry attempt (default: 1.0)
             
         Returns:
             The ID of the created event if successful, None otherwise
@@ -194,9 +197,10 @@ class SalesforceApiClient(SalesforceApiClientInterface):
             payload_event['WhoId'] = who_id
         
         url_creation_event = f"{self._instance_url}/services/data/{self._version_api}/sobjects/Event/"
-        
+        event_id = None
+        exception_upon_creation = False
         async with httpx.AsyncClient() as client:
-            event_id = None
+            
             try:
                 resp_event = await client.post(url_creation_event, headers=headers, data=json.dumps(payload_event))
                 if resp_event.status_code >= 200 and resp_event.status_code <= 299:
@@ -211,7 +215,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
                     except:
                         self.logger.info(resp_event.text)
             except Exception as e:
-                self.logger.error(f"Error creating event: {str(e)}")
+                exception_upon_creation = True
 
             # Verify the appointment was actually created
             verified_event_id = await self.check_for_appointment_creation(
@@ -220,6 +224,32 @@ class SalesforceApiClient(SalesforceApiClientInterface):
                 start_datetime=start_datetime,
                 duration_minutes=duration_minutes
             )
+            
+            if not verified_event_id:
+                if exception_upon_creation:
+                    self.logger.error(f"Exception while creating event.")
+                
+                # Retry recursively if max_retries > 0
+                if max_retries > 0:
+                    self.logger.info(f"Verification failed, retrying in {retry_delay}s... ({max_retries} retries remaining)")
+                    await asyncio.sleep(retry_delay)
+                    
+                    # Recursive call with decremented max_retries
+                    return await self.schedule_new_appointment_async(
+                        subject=subject,
+                        start_datetime=start_datetime,
+                        duration_minutes=duration_minutes,
+                        description=description,
+                        location=location,
+                        owner_id=owner_id,
+                        what_id=what_id,
+                        who_id=who_id,
+                        max_retries=max_retries - 1,
+                        retry_delay=retry_delay
+                    )
+                else:
+                    self.logger.error("All retry attempts exhausted, appointment scheduling failed")
+                    
             return verified_event_id
 
     async def check_for_appointment_creation(self, event_id: str | None, expected_subject: str, start_datetime: str, duration_minutes: int = 60) -> str | None:

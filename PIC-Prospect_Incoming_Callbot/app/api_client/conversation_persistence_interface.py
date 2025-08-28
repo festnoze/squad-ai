@@ -50,7 +50,7 @@ class ConversationPersistenceInterface(ABC):
         pass
 
     @abstractmethod
-    async def add_external_ai_message_to_conversation_async(self, conversation_id: str, new_message: str, timeout: int = 10) -> dict:
+    async def add_ai_message_to_conversation_async(self, conversation_id: str, new_message: str, timeout: int = 10) -> dict:
         """Add an external AI message to a conversation.
         
         Args:

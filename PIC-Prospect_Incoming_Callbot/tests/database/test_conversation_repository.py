@@ -13,7 +13,7 @@ from database.entities import UserEntity, DeviceInfoEntity
 async def conversation_repository():
     """Create a ConversationRepository instance with concrete file database"""
     # Create a temporary database file
-    db_path = f'test_conversation_{uuid4()}.db'
+    db_path = f'tests/database/test_conversation_{uuid4()}.db'
     if not os.path.exists(db_path):
         try:
             # Create repository with real database
@@ -27,8 +27,7 @@ async def conversation_repository():
             if hasattr(repo, 'data_context') and repo.data_context:
                 await repo.data_context.close_async()
             if os.path.exists(db_path):
-                os.unlink(db_path)
-
+                os.remove(db_path)
 
 @pytest.fixture
 async def sample_user(conversation_repository):

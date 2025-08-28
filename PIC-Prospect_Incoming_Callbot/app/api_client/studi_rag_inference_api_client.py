@@ -79,7 +79,7 @@ class StudiRAGInferenceApiClient(ConversationPersistenceInterface, RagQueryInter
         except httpx.ConnectError as exc:
             raise RuntimeError(f"Cannot connect to RAG inference server at {self.host_base_url}") from exc
 
-    async def add_external_ai_message_to_conversation_async(self, conversation_id: str, new_message: str, timeout: int = 10) -> dict:
+    async def add_ai_message_to_conversation_async(self, conversation_id: str, new_message: str, timeout: int = 10) -> dict:
         """POST /rag/inference/conversation/add-message: Add a message to a conversation."""
         try:
             request_model = QueryAskingRequestModel(conversation_id=UUID(conversation_id) if conversation_id != ConversationPersistenceInterface.NoneUuid else None, user_query_content=new_message, display_waiting_message=False)

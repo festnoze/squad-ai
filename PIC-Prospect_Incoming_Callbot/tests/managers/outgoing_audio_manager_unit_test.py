@@ -23,6 +23,7 @@ def fixture(mocker):
     
     # Patch the send_audio_chunk method of audio_sender
     outgoing_audio_manager.audio_sender.send_audio_chunk_async = mocker.AsyncMock(return_value=True)
+    outgoing_audio_manager.can_speech_be_interupted = True
     
     return {
         'websocket': mock_websocket,
