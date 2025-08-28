@@ -29,6 +29,6 @@ class ConversationPersistenceServiceFake(ConversationPersistenceInterface):
     async def add_message_to_user_last_conversation_or_create_one_async(self, user_id:UUID, new_message:str) -> Conversation:
         return {}
     
-    async def add_ai_message_to_conversation_async(self, conversation_id: str, new_message: str, timeout: int = 10) -> dict:
+    async def add_message_to_conversation_async(self, conversation_id: str, new_message: str, role: str = "assistant", timeout: int = 10) -> dict:
         return {}
     

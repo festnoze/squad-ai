@@ -22,13 +22,18 @@ from agents.text_registry import AgentTexts
 from managers.incoming_manager import IncomingManager
 from managers.outgoing_audio_manager import OutgoingManager
 
+from api_client.conversation_persistence_interface import ConversationPersistenceInterface
+from database.conversation_persistence_local_service import ConversationPersistenceLocalService
+from database.conversation_persistence_service_fake import ConversationPersistenceServiceFake
+from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
+
 class IncomingAudioManager(IncomingManager):
     """Audio processing utilities for improving speech recognition quality and handling Twilio events"""
     
     # Tmp directory for incoming audio files
     incoming_speech_dir = "./static/incoming_audio"   
 
-    def __init__(self, websocket: WebSocket, stt_provider: SpeechToTextProvider,outgoing_manager: OutgoingManager, agents_graph : AgentsGraph, sample_width=2, frame_rate=8000, channels=1, vad_aggressiveness=3):
+    def __init__(self, websocket: WebSocket, stt_provider: SpeechToTextProvider,outgoing_manager: OutgoingManager, agents_graph : AgentsGraph, conversation_persistence: ConversationPersistenceInterface = None, sample_width=2, frame_rate=8000, channels=1, vad_aggressiveness=3):
         self.logger = logging.getLogger(__name__)
         self.websocket : WebSocket = websocket
         self.stt_provider : SpeechToTextProvider = stt_provider
@@ -69,6 +74,19 @@ class IncomingAudioManager(IncomingManager):
         
         # Create temp directory if it doesn't exist
         os.makedirs(self.incoming_speech_dir, exist_ok=True)
+
+        # Who handles conversation history persistence? local/ studi_rag/ desactivated (fake)
+        self.conversation_persistence: ConversationPersistenceInterface | None = None
+        if conversation_persistence:
+            self.conversation_persistence = conversation_persistence
+        else:
+            conversation_persistence_type = EnvHelper.get_conversation_persistence_type()
+            if conversation_persistence_type == "local":
+                self.conversation_persistence = ConversationPersistenceLocalService()
+            elif conversation_persistence_type == "studi_rag":
+                self.conversation_persistence = StudiRAGInferenceApiClient()
+            else:
+                self.conversation_persistence = ConversationPersistenceServiceFake()
 
     def set_websocket(self, websocket: WebSocket):
         self.websocket = websocket
@@ -369,6 +387,11 @@ class IncomingAudioManager(IncomingManager):
                 }
                 self.stream_states[self.stream_sid] = current_state
                         
+            # Persist user query
+            conv_id = current_state['agent_scratchpad'].get('conversation_id', None)
+            current_state["history"].append(("user", user_query))
+            await self.conversation_persistence.add_message_to_conversation_async(conv_id, user_query, "user")
+
             # Invoke the graph with current state to get the AI-generated welcome message
             updated_state = await self.agents_graph.ainvoke(current_state)
             self.stream_states[self.stream_sid] = updated_state

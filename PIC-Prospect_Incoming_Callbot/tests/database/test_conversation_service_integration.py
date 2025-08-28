@@ -4,7 +4,7 @@ import tempfile
 from uuid import uuid4, UUID
 from datetime import datetime, timezone
 
-from database.conversation_persistence_service import ConversationPersistenceServiceLocal, QuotaOverloadException
+from database.conversation_persistence_local_service import ConversationPersistenceServiceLocal, QuotaOverloadException
 from database.conversation_repository import ConversationRepository
 from database.user_repository import UserRepository
 from api_client.request_models.user_request_model import UserRequestModel, DeviceInfoRequestModel
@@ -252,14 +252,14 @@ class TestConversationServiceIntegration:
         assert result["message_count"] == 0
 
     @pytest.mark.asyncio
-    async def test_add_ai_message_to_conversation_async_success(self, conversation_service, test_conversation):
+    async def test_add_message_to_conversation_async_success(self, conversation_service, test_conversation):
         """Test successful addition of external AI message to conversation"""
         # Arrange
         conversation_id_str = str(test_conversation.id)
         message_content = "This is an AI response"
         
         # Act
-        result = await conversation_service.add_ai_message_to_conversation_async(conversation_id_str, message_content)
+        result = await conversation_service.add_message_to_conversation_async(conversation_id_str, message_content)
         
         # Assert
         assert isinstance(result, dict)
@@ -281,14 +281,14 @@ class TestConversationServiceIntegration:
         assert any(msg.content == message_content for msg in db_ai_messages)
 
     @pytest.mark.asyncio
-    async def test_add_ai_message_to_conversation_async_empty_message(self, conversation_service, test_conversation):
+    async def test_add_message_to_conversation_async_empty_message(self, conversation_service, test_conversation):
         """Test adding empty message to conversation"""
         # Arrange
         conversation_id_str = str(test_conversation.id)
         empty_message = ""
         
         # Act
-        result = await conversation_service.add_ai_message_to_conversation_async(conversation_id_str, empty_message)
+        result = await conversation_service.add_message_to_conversation_async(conversation_id_str, empty_message)
         
         # Assert
         assert isinstance(result, dict)
@@ -360,7 +360,7 @@ class TestConversationServiceIntegration:
             'create_or_retrieve_user_async',
             'create_new_conversation_async', 
             'get_user_last_conversation_async',
-            'add_ai_message_to_conversation_async'
+            'add_message_to_conversation_async'
         ]
         
         for method_name in interface_methods:

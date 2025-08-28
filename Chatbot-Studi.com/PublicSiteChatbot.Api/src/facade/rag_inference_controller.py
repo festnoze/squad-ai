@@ -121,7 +121,7 @@ async def conversation_add_external_assistant_message_async(external_question_re
         conversation = await AvailableService.add_external_message_to_conversation_async(
             external_question_request_model.conversation_id, 
             external_question_request_model.user_query_content,
-            "assistant"
+            external_question_request_model.role
         )
         return JSONResponse(content=conversation.get_all_messages_as_json(), status_code=200)
     

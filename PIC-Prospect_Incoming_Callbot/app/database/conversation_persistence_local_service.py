@@ -13,7 +13,7 @@ from database.user_repository import UserRepository
 class QuotaOverloadException(Exception):
     pass
 
-class ConversationLocalPersistenceService(ConversationPersistenceInterface):
+class ConversationPersistenceLocalService(ConversationPersistenceInterface):
     def __init__(self) -> None:
         self.user_repository: UserRepository = UserRepository()
         self.conversation_repository: ConversationRepository = ConversationRepository()
@@ -57,7 +57,7 @@ class ConversationLocalPersistenceService(ConversationPersistenceInterface):
                     elapsed_seconds=message_model.elapsed_seconds
                 )
                 new_conv.add_new_message(message.role, message.content)
-                assert await self.conversation_repository.add_message_to_existing_conversation_async(new_conv.id, new_conv.last_message)
+                await self.conversation_repository.add_message_to_existing_conversation_async(new_conv.id, new_conv.last_message)
         
         return new_conv.id
 
@@ -88,15 +88,15 @@ class ConversationLocalPersistenceService(ConversationPersistenceInterface):
 
         if new_message and conversation:
             conversation.add_new_message("user", new_message)
-            assert await self.conversation_repository.add_message_to_existing_conversation_async(conversation.id, conversation.last_message)
+            await self.conversation_repository.add_message_to_existing_conversation_async(conversation.id, conversation.last_message, "user")
         return conversation
     
-    async def add_ai_message_to_conversation_async(self, conversation_id: str, new_message: str, timeout: int = 10) -> dict:
+    async def add_message_to_conversation_async(self, conversation_id: str, new_message: str, role: str = "assistant", timeout: int = 10) -> dict:
         conversation_uuid = UUID(conversation_id)
         conversation = await self.conversation_repository.get_conversation_by_id_async(conversation_uuid)
         if new_message:
-            conversation.add_new_message("assistant", new_message)
-            assert await self.conversation_repository.add_message_to_existing_conversation_async(conversation.id, conversation.last_message)
+            conversation.add_new_message(role, new_message)
+            await self.conversation_repository.add_message_to_existing_conversation_async(conversation.id, new_message, role)
         
         return conversation.to_dict()
     
