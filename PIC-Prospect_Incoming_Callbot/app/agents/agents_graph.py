@@ -247,7 +247,7 @@ class AgentsGraph:
             await self.add_message_to_conversation_async(AgentTexts.technical_error_text, state, persist=False)    
         self.logger.info(f"Init. conversation persistence for phone: {state.get('caller_phone')}, call_sid: {state.get('call_sid')}")
 
-        # Late persistence of welcome message (cannot persist before conversation has been created)
+        # Late persistence of welcome message (because cannot have been persisted before as conversation has not been created then)
         if conversation_id:
             await self.conversation_persistence.add_message_to_conversation_async(conversation_id, AgentTexts.start_welcome_text)
 

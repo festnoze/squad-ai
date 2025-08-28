@@ -98,5 +98,5 @@ class ConversationPersistenceLocalService(ConversationPersistenceInterface):
             conversation.add_new_message(role, new_message)
             await self.conversation_repository.add_message_to_existing_conversation_async(conversation.id, new_message, role)
         
-        return conversation.to_dict()
+        return conversation.to_dict() if conversation else None
     

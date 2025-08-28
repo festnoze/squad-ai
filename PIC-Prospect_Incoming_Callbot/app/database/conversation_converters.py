@@ -71,16 +71,14 @@ class ConversationEntityToDtoConverter:
         )
 
     @staticmethod
-    def convert_message_model_to_entity(conversation_id: UUID, message: str, role: str = "assistant", created_at: datetime = None) -> MessageEntity:
+    def convert_message_model_to_entity(conversation_id: UUID, message: str, role: str = "assistant", id: UUID = None, created_at: datetime = None) -> MessageEntity:
         entity = MessageEntity(
             conversation_id=conversation_id,
             role=role,
             content=message,
             created_at=created_at or datetime.now(timezone.utc)
         )
-
-        if message.id: 
-            entity.id=message.id
+        if id: entity.id=id
         return entity
 
     @staticmethod
