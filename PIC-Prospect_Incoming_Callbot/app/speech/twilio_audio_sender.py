@@ -29,7 +29,7 @@ class TwilioAudioSender:
         self.start_time = time.time()
         self.total_send_duration = 0
         
-    async def send_audio_chunk_async(self, audio_chunk: bytes) -> bool:
+    async def send_audio_chunk_async(self, audio_chunk: bytes, progressive_volume_increase_duration: float = 0.0) -> bool:
         """
         Sends an audio chunk to Twilio by breaking it into smaller segments,
         with proportional delays and interruption support.
@@ -63,6 +63,25 @@ class TwilioAudioSender:
                 # Pad with a zero byte to make it even
                 audio_chunk = audio_chunk + b'\x00'
                 self.logger.debug(f"Padded PCM chunk from {len(audio_chunk)-1} to {len(audio_chunk)} bytes")
+            
+            # Apply progressive volume increase if requested
+            if progressive_volume_increase_duration > 0.0:
+                chunk_duration = 0.1  # 100ms chunks
+                chunk_size = int(self.sample_rate * chunk_duration * 2)  # for 8kHz mono 16-bit = 2x8bits
+                processed_chunks = []
+                
+                for i in range(0, len(audio_chunk), chunk_size):
+                    chunk = audio_chunk[i:i + chunk_size]
+                    chunk_index = i // chunk_size
+                    chunk_time = chunk_index * chunk_duration
+                    volume_factor = min(1.0, chunk_time / progressive_volume_increase_duration)
+                    
+                    # Apply volume scaling to this chunk (16-bit PCM, sample width = 2)
+                    scaled_chunk = audioop.mul(chunk, 2, volume_factor)
+                    processed_chunks.append(scaled_chunk)
+                
+                # Concatenate all processed chunks back into a single audio bytes object
+                audio_chunk = b''.join(processed_chunks)
             
             # Convert the entire 16-bit PCM audio_chunk to 8-bit μ-law.
             # Sample width is 2 for 16-bit PCM.

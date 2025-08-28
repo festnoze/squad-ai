@@ -624,8 +624,11 @@ class AgentsGraph:
         try:
             while not self.outgoing_manager.audio_sender.streaming_interruption_asked:
                 try:
-                    # Play the music chunk
-                    success = await self.outgoing_manager.audio_sender.send_audio_chunk_async(music_bytes)
+                    # Play the music chunk with progressive volume if enabled
+                    success = await self.outgoing_manager.audio_sender.send_audio_chunk_async(
+                        music_bytes, 
+                        progressive_volume_increase_duration=EnvHelper.get_waiting_music_increasing_volume_duration()
+                    )
                     
                     # If sending failed or was interrupted, break the loop
                     if not success or self.outgoing_manager.audio_sender.streaming_interruption_asked:
