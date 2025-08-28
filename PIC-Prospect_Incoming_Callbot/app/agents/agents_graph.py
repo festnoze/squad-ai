@@ -40,7 +40,8 @@ from agents.text_registry import AgentTexts
 
 class AgentsGraph:
     waiting_music_bytes = None
-
+    thanks_to_come_back = "Merci de nous recontacter"
+    
     def __init__(self, outgoing_manager: OutgoingManager, call_sid: str = None, salesforce_client: SalesforceApiClientInterface = None, conversation_persistence: ConversationPersistenceInterface = None, rag_query_service: RagQueryInterface = None):
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger(__name__)
@@ -309,8 +310,9 @@ class AgentsGraph:
         """For existing user: User identity confirmation"""        
         end_welcome_text = AgentTexts.unavailability_for_returning_prospect
 
+        
         first_name = state['agent_scratchpad']['sf_account_info'].get('FirstName', '').strip()
-        end_welcome_text += f"{AgentTexts.thanks_to_come_back} {first_name}."
+        end_welcome_text += f"{self.thanks_to_come_back} {first_name}."
 
         if 'schedule_appointement' in self.available_actions:
             end_welcome_text += f"{AgentTexts.appointment_text}"# {owner_first_name}."
@@ -332,51 +334,6 @@ class AgentsGraph:
         await self.add_message_to_conversation_async(AgentTexts.unavailability_for_new_prospect, state)
         return state
 
-    async def send_end_of_welcome_message_node(self, state: PhoneConversationState) -> dict:
-        """Send the end of welcome message to the user"""
-        call_sid = state.get('call_sid', 'N/A')
-        phone_number = state.get('caller_phone', 'N/A')
-
-        sf_account = state.get('agent_scratchpad', {}).get('sf_account_info', {})
-        leads_info = state.get('agent_scratchpad', {}).get('sf_leads_info', {})
-        
-        # Message signaling: sales unavailability
-        if sf_account:
-            await self.add_message_to_conversation_async(AgentTexts.unavailability_for_returning_prospect, state)
-        else:
-            await self.add_message_to_conversation_async(AgentTexts.unavailability_for_new_prospect, state)
-
-        # Message signaling: available actions
-        if sf_account:
-            civility = sf_account.get('Salutation', '')
-            if civility:
-                civility = civility.replace("Mme", "Madame").replace("Melle", "Mademoiselle").replace("Mr.", "Monsieur").replace("Ms.", "Madame").strip()
-            else:
-                civility = ''
-            first_name = sf_account.get('FirstName', '').strip()
-            last_name = sf_account.get('LastName', '').strip()
-            owner_first_name = sf_account.get('Owner', {}).get('Name', '').strip()
-            
-            end_welcome_text = f"{AgentTexts.thanks_to_come_back} {civility} {first_name} {last_name}."
-            if 'schedule_appointement' in self.available_actions:
-                end_welcome_text += f"{AgentTexts.appointment_text}"# {owner_first_name}."
-            if 'ask_rag' in self.available_actions:
-                end_welcome_text += f"\n{AgentTexts.questions_text}"
-                
-            if len(self.available_actions) > 1:
-                end_welcome_text += f"\n{AgentTexts.select_action_text}"
-            elif self.available_actions[0] == 'schedule_appointement':
-                end_welcome_text += f"\n{AgentTexts.yes_no_consent_text}"
-            elif self.available_actions[0] == 'ask_rag':
-                end_welcome_text += f"\n{AgentTexts.ask_question_text}"
-        else:
-            end_welcome_text = "Pour votre premier appel, je vais vous demander quelques informations, afin de planifier un rendez-vous avec un conseiller en formation."
-                
-        await self.add_message_to_conversation_async(end_welcome_text, state)
-
-        self.logger.info(f"[{call_sid}] Sent 'end of welcome message' to {phone_number}")
-        return state
-    
     async def wait_for_user_input_node(self, state: PhoneConversationState) -> dict:
         """Wait for user input"""
         return state

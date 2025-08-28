@@ -10,6 +10,7 @@ from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
 from api_client.salesforce_api_client_interface import SalesforceApiClientInterface
 from agents.calendar_agent import CalendarAgent
 from agents.text_registry import AgentTexts
+from agents.agents_graph import AgentsGraph
 
 async def test_graph_init_conversation_and_welcome_message(agents_graph_mockings):
     """Test that without user input, we get a welcome message and conversation_id is set."""
@@ -39,7 +40,7 @@ async def test_graph_init_conversation_and_welcome_message(agents_graph_mockings
     assert updated_state["agent_scratchpad"]["conversation_id"] == "39e81136-4525-4ea8-bd00-c22211110001"
     assert len(updated_state["history"]) >= 1
 
-    welcome_text = AgentTexts.start_welcome_text + AgentTexts.unavailability_for_returning_prospect + AgentTexts.thanks_to_come_back + " Test." +  AgentTexts.appointment_text + " Test."
+    welcome_text = AgentTexts.start_welcome_text + AgentTexts.unavailability_for_returning_prospect + AgentsGraph.thanks_to_come_back + " Test." +  AgentTexts.appointment_text + " Test."
 
     first_history_msg = updated_state["history"][0][1].replace("\n\n", "\n")
     for awaited_line, received_line in zip(welcome_text.split("\n"), first_history_msg.split(".")):

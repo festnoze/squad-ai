@@ -9,7 +9,7 @@ class AgentTexts:
     unavailability_for_returning_prospect = "Votre conseiller attitré est actuellement indisponible."
     unavailability_for_new_prospect = "Nos conseillers en formation sont actuellement indisponibles."
     ask_to_repeat_text = "Désolé, je n'ai pas bien entendu. Merci de répéter."
-    thanks_to_come_back = "Merci de nous contacter à nouveau"
+    #thanks_to_come_back = "Merci de nous recontacter "
     appointment_text = "Je vous propose de prendre rendez-vous"
     questions_text = "ou de répondre à vos questions concernant nos formations."
     select_action_text = "Que souhaitez-vous faire ?"
