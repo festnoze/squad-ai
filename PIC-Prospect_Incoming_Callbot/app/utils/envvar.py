@@ -181,6 +181,18 @@ class EnvHelper:
     def get_conversation_persistence_type() -> str:
         return EnvHelper.get_env_variable_value_by_name('CONVERSATION_PERSISTENCE_TYPE', fails_if_missing=False) or 'no'
     
+    @staticmethod
+    def get_admin_api_keys() -> list[str]:
+        """Get the list of allowed API keys for admin endpoints"""
+        keys_str = EnvHelper.get_env_variable_value_by_name('ADMIN_API_KEYS', fails_if_missing=False)
+        return [key.strip() for key in keys_str.split(',')] if keys_str else []
+    
+    @staticmethod
+    def is_valid_admin_api_key(api_key: str) -> bool:
+        """Check if the provided API key is valid for admin operations"""
+        allowed_keys = EnvHelper.get_admin_api_keys()
+        return api_key in allowed_keys and len(allowed_keys) > 0
+    
     ### Internal methods###
     #######################
 

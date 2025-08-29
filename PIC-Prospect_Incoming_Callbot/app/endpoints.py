@@ -1,6 +1,6 @@
 import os
 import logging
-from fastapi import APIRouter, WebSocket, Request, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, Request, WebSocketDisconnect, HTTPException
 from fastapi.responses import HTMLResponse
 from twilio.rest import Client
 from twilio.twiml.voice_response import VoiceResponse, Connect
@@ -10,7 +10,7 @@ from twilio.request_validator import RequestValidator
 from phone_call_websocket_events_handler import PhoneCallWebsocketEventsHandler, PhoneCallWebsocketEventsHandlerFactory
 from incoming_sms_handler import IncomingSMSHandler
 from utils.envvar import EnvHelper
-from fastapi import HTTPException
+from utils.endpoints_decorator import api_key_required
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -185,4 +185,43 @@ async def handle_incoming_sms_async(request: Request) -> HTMLResponse:
         logger.error(f"Error processing SMS webhook: {e}", exc_info=True)
         response = MessagingResponse()
         response.message("Une erreur s'est produite. Veuillez réessayer plus tard.")
-        return HTMLResponse(content=str(response), media_type="application/xml", status_code=500)    
+        return HTMLResponse(content=str(response), media_type="application/xml", status_code=500)
+
+# ========= Hot Change of Environment Variables Endpoint ========= #
+@router.get("/change_env_var")
+@api_key_required
+async def change_env_var_endpoint(request: Request):
+    """Change environment variable value via query parameter"""
+    logger.info("Received request to change environment variable")
+    try:
+        query_params = dict(request.query_params)
+        
+        if not query_params:
+            raise HTTPException(status_code=400, detail="No query parameters provided")
+        
+        # Process each query parameter as a potential env var change
+        updated_vars = []
+        missing_vars = []
+        
+        for var_name, new_value in query_params.items():
+            # Check if the environment variable already exists
+            if var_name not in os.environ:
+                missing_vars.append(var_name)
+                continue
+            
+            # Update the environment variable only if it exists
+            os.environ[var_name] = new_value
+            updated_vars.append(f"{var_name}={new_value}")
+            logger.info(f"Updated environment variable: {var_name} = {new_value}")
+        
+        # If any variables don't exist, return an error
+        if missing_vars:
+            error_msg = f"Environment variable(s) do not exist: {', '.join(missing_vars)}"
+            logger.error(error_msg)
+            raise HTTPException(status_code=404, detail=error_msg)
+        
+        return {"message": f"Successfully updated environment variables: {', '.join(updated_vars)}"}
+        
+    except Exception as e:
+        logger.error(f"Error changing environment variable: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error updating environment variables: {str(e)}")    

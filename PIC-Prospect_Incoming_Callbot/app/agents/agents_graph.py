@@ -322,7 +322,7 @@ class AgentsGraph:
 
         
         first_name = state['agent_scratchpad']['sf_account_info'].get('FirstName', '').strip()
-        end_welcome_text += f"{self.thanks_to_come_back} {first_name}."
+        end_welcome_text += f"{self.thanks_to_come_back}, {first_name}."
 
         if 'schedule_appointement' in self.available_actions:
             end_welcome_text += f"{AgentTexts.appointment_text}"# {owner_first_name}."
