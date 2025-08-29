@@ -101,11 +101,11 @@ class StudiRAGInferenceApiClient(ConversationPersistenceInterface, RagQueryInter
         try:
             # Set separate timeouts for connect and read operations
             #custom_timeout = httpx.Timeout(connect=self.connect_timeout, read=timeout, write=timeout, pool=self.connect_timeout)
-            
+            json = query_asking_request_model.to_dict()
             async with self.client.stream(
                 "POST", 
                 "/rag/inference/conversation/ask-question/phone/stream", 
-                json=query_asking_request_model.to_dict(),
+                json=json,
                 #timeout=custom_timeout
             ) as resp:
                 resp.raise_for_status()

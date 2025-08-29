@@ -627,7 +627,8 @@ class AgentsGraph:
                     # Play the music chunk with progressive volume if enabled
                     success = await self.outgoing_manager.audio_sender.send_audio_chunk_async(
                         music_bytes, 
-                        progressive_volume_increase_duration=EnvHelper.get_waiting_music_increasing_volume_duration()
+                        progressive_volume_increase_duration=EnvHelper.get_waiting_music_increasing_volume_duration(),
+                        sending_start_delay=EnvHelper.get_waiting_music_start_delay()
                     )
                     
                     # If sending failed or was interrupted, break the loop

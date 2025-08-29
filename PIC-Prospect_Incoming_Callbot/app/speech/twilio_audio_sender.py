@@ -29,7 +29,7 @@ class TwilioAudioSender:
         self.start_time = time.time()
         self.total_send_duration = 0
         
-    async def send_audio_chunk_async(self, audio_chunk: bytes, progressive_volume_increase_duration: float = 0.0) -> bool:
+    async def send_audio_chunk_async(self, audio_chunk: bytes, progressive_volume_increase_duration: float = 0.0, sending_start_delay: float = 0.0) -> bool:
         """
         Sends an audio chunk to Twilio by breaking it into smaller segments,
         with proportional delays and interruption support.
@@ -70,11 +70,20 @@ class TwilioAudioSender:
                 chunk_size = int(self.sample_rate * chunk_duration * 2)  # for 8kHz mono 16-bit = 2x8bits
                 processed_chunks = []
                 
+                # Add silent chunks if any sending_start_delay
+                if sending_start_delay > 0.0:
+                    silent_chunks_count = int(sending_start_delay / chunk_duration)
+                    silent_chunk = b'\x00' * chunk_size  # Silent chunk (zeros for 16-bit PCM)
+                    for _ in range(silent_chunks_count):
+                        processed_chunks.append(silent_chunk)
+                
+                # Process original audio chunks with adjusted timing
                 for i in range(0, len(audio_chunk), chunk_size):
                     chunk = audio_chunk[i:i + chunk_size]
                     chunk_index = i // chunk_size
-                    chunk_time = chunk_index * chunk_duration
-                    volume_factor = min(1.0, chunk_time / progressive_volume_increase_duration)
+                    # Adjust timing to account for silent pre-chunks
+                    chunk_time = (chunk_index * chunk_duration) + sending_start_delay
+                    volume_factor = min(1.0, max(0.0, (chunk_time - sending_start_delay) / progressive_volume_increase_duration))
                     
                     # Apply volume scaling to this chunk (16-bit PCM, sample width = 2)
                     scaled_chunk = audioop.mul(chunk, 2, volume_factor)

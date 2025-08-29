@@ -196,61 +196,67 @@ class SalesforceApiClient(SalesforceApiClientInterface):
         if who_id:
             payload_event['WhoId'] = who_id
         
-        url_creation_event = f"{self._instance_url}/services/data/{self._version_api}/sobjects/Event/"
+        async def _execute_appointment_creation():
+            url_creation_event = f"{self._instance_url}/services/data/{self._version_api}/sobjects/Event/"
+            async with httpx.AsyncClient() as client:
+                resp_event = await client.post(url_creation_event, headers=headers, data=json.dumps(payload_event))
+                resp_event.raise_for_status()
+                
+                event_id = resp_event.json().get('id', None)
+                self.logger.info("Event created successfully!")
+                self.logger.info(f"ID: {event_id}")
+                self.logger.info(f"{self._instance_url}/lightning/r/Event/{event_id}/view")
+                return event_id
+
         event_id = None
         exception_upon_creation = False
-        async with httpx.AsyncClient() as client:
-            
+        
+        try:
+            event_id = await self._with_auth_retry(_execute_appointment_creation)
+        except httpx.HTTPStatusError as http_err:
+            self.logger.info(f"Error while creating the Event: {http_err.response.status_code}")
             try:
-                resp_event = await client.post(url_creation_event, headers=headers, data=json.dumps(payload_event))
-                if resp_event.status_code >= 200 and resp_event.status_code <= 299:
-                    event_id = resp_event.json().get('id', None)
-                    self.logger.info("Event created successfully!")
-                    self.logger.info(f"ID: {event_id}")
-                    self.logger.info(f"{self._instance_url}/lightning/r/Event/{event_id}/view")
-                else:
-                    self.logger.info(f"Error while creating the Event: {resp_event.status_code}")
-                    try:
-                        self.logger.info(json.dumps(resp_event.json(), indent=2, ensure_ascii=False))
-                    except:
-                        self.logger.info(resp_event.text)
-            except Exception as e:
-                exception_upon_creation = True
+                self.logger.info(json.dumps(http_err.response.json(), indent=2, ensure_ascii=False))
+            except:
+                self.logger.info(http_err.response.text)
+            exception_upon_creation = True
+        except Exception as e:
+            exception_upon_creation = True
 
-            # Verify the appointment was actually created
-            verified_event_id = await self.check_for_appointment_creation(
-                event_id=event_id,
+        # Verify the appointment was actually created
+        verified_event_id = await self.check_for_appointment_creation(
+            event_id=event_id,
                 expected_subject=subject,
                 start_datetime=start_datetime,
                 duration_minutes=duration_minutes
-            )
+        )
+        
+        if not verified_event_id:
+            if exception_upon_creation:
+                self.logger.error(f"Exception while creating event.")
             
-            if not verified_event_id:
-                if exception_upon_creation:
-                    self.logger.error(f"Exception while creating event.")
+            # Retry recursively if max_retries > 0
+            if max_retries > 0:
+                self.logger.info(f"Verification failed, retrying in {retry_delay}s... ({max_retries} retries remaining)")
+                await asyncio.sleep(retry_delay)
                 
-                # Retry recursively if max_retries > 0
-                if max_retries > 0:
-                    self.logger.info(f"Verification failed, retrying in {retry_delay}s... ({max_retries} retries remaining)")
-                    await asyncio.sleep(retry_delay)
-                    
-                    # Recursive call with decremented max_retries
-                    return await self.schedule_new_appointment_async(
-                        subject=subject,
-                        start_datetime=start_datetime,
-                        duration_minutes=duration_minutes,
-                        description=description,
-                        location=location,
-                        owner_id=owner_id,
-                        what_id=what_id,
-                        who_id=who_id,
-                        max_retries=max_retries - 1,
-                        retry_delay=retry_delay
-                    )
-                else:
-                    self.logger.error("All retry attempts exhausted, appointment scheduling failed")
-                    
-            return verified_event_id
+                # Recursive call with decremented max_retries
+                return await self.schedule_new_appointment_async(
+                    subject=subject,
+                    start_datetime=start_datetime,
+                    duration_minutes=duration_minutes,
+                    description=description,
+                    location=location,
+                    owner_id=owner_id,
+                    what_id=what_id,
+                    who_id=who_id,
+                    max_retries=max_retries - 1,
+                    retry_delay=retry_delay
+                )
+            else:
+                self.logger.error("All retry attempts exhausted, appointment scheduling failed")
+                
+        return verified_event_id
 
     async def check_for_appointment_creation(self, event_id: str | None, expected_subject: str, start_datetime: str, duration_minutes: int = 60) -> str | None:
         """Check if an appointment was successfully created by verifying its existence
@@ -339,114 +345,124 @@ class SalesforceApiClient(SalesforceApiClientInterface):
         await self._ensure_authenticated_async()
         self.logger.info("Retrieving events...")
         
-        # Prepare headers
-        headers = {
-            'Authorization': f'Bearer {self._access_token}',
-            'Content-Type': 'application/json'
-        }
-        
-        # Build SOQL query
-        query = "SELECT Id, Subject, Description, StartDateTime, EndDateTime, Location, OwnerId, WhatId, WhoId "
-        query += "FROM Event "
-        query += f"WHERE StartDateTime >= {start_datetime} AND EndDateTime <= {end_datetime} "
-        
-        # Add owner filter if specified
-        if owner_id:
-            query += f"AND OwnerId = '{owner_id}' "
+        async def _execute_appointments_query():
+            # Prepare headers
+            headers = {
+                'Authorization': f'Bearer {self._access_token}',
+                'Content-Type': 'application/json'
+            }
             
-        query += "ORDER BY StartDateTime ASC "
-        
-        # URL encode the query
-        encoded_query = urllib.parse.quote(query)
-        self.logger.info(f"SOQL Query: {query}")
-        
-        # Create query URL
-        url_query = f"{self._instance_url}/services/data/{self._version_api}/query/?q={encoded_query}"
-        
-        start_date_formated = start_datetime if "T" in start_datetime else f"{start_datetime}T"
-        end_date_formated = end_datetime if "T" in end_datetime else f"{end_datetime}T"
-        #
-        if start_date_formated.endswith("T"): start_date_formated += "00:00:00"
-        if end_date_formated.endswith("T"): end_date_formated += "23:59:59"
-        #
-        if not start_date_formated.endswith("Z"): start_date_formated += "Z"
-        if not end_date_formated.endswith("Z"): end_date_formated += "Z"
-
-        # Send request
-        async with httpx.AsyncClient() as client:
-            try:
-                resp = await client.get(url_query, headers=headers)
+            # Build SOQL query
+            query = "SELECT Id, Subject, Description, StartDateTime, EndDateTime, Location, OwnerId, WhatId, WhoId "
+            query += "FROM Event "
+            query += f"WHERE StartDateTime >= {start_datetime} AND EndDateTime <= {end_datetime} "
+            
+            # Add owner filter if specified
+            if owner_id:
+                query += f"AND OwnerId = '{owner_id}' "
                 
-                if resp.status_code == 200:
-                    data = resp.json()
-                    local_tz = pytz.timezone('Europe/Paris')
+            query += "ORDER BY StartDateTime ASC "
+            
+            # URL encode the query
+            encoded_query = urllib.parse.quote(query)
+            self.logger.info(f"SOQL Query: {query}")
+            
+            # Create query URL
+            url_query = f"{self._instance_url}/services/data/{self._version_api}/query/?q={encoded_query}"
+            
+            start_date_formated = start_datetime if "T" in start_datetime else f"{start_datetime}T"
+            end_date_formated = end_datetime if "T" in end_datetime else f"{end_datetime}T"
+            #
+            if start_date_formated.endswith("T"): start_date_formated += "00:00:00"
+            if end_date_formated.endswith("T"): end_date_formated += "23:59:59"
+            #
+            if not start_date_formated.endswith("Z"): start_date_formated += "Z"
+            if not end_date_formated.endswith("Z"): end_date_formated += "Z"
 
-                    def convert_times(records):
-                        processed_events = []
-                        for event in records:
-                            if event.get('StartDateTime'):
-                                utc_dt = datetime.fromisoformat(event['StartDateTime'].replace('Z', '+00:00'))
-                                event['StartDateTime'] = utc_dt.astimezone(local_tz).isoformat()
-                            if event.get('EndDateTime'):
-                                utc_dt = datetime.fromisoformat(event['EndDateTime'].replace('Z', '+00:00'))
-                                event['EndDateTime'] = utc_dt.astimezone(local_tz).isoformat()
-                            processed_events.append(event)
-                        return processed_events
+            # Send request
+            async with httpx.AsyncClient() as client:
+                resp = await client.get(url_query, headers=headers)
+                resp.raise_for_status()
+                
+                data = resp.json()
+                local_tz = pytz.timezone('Europe/Paris')
 
-                    events = convert_times(data.get('records', []))
-                    total_size = data.get('totalSize', 0)
-                    self.logger.info(f"Retrieved {total_size} events")
+                def convert_times(records):
+                    processed_events = []
+                    for event in records:
+                        if event.get('StartDateTime'):
+                            utc_dt = datetime.fromisoformat(event['StartDateTime'].replace('Z', '+00:00'))
+                            event['StartDateTime'] = utc_dt.astimezone(local_tz).isoformat()
+                        if event.get('EndDateTime'):
+                            utc_dt = datetime.fromisoformat(event['EndDateTime'].replace('Z', '+00:00'))
+                            event['EndDateTime'] = utc_dt.astimezone(local_tz).isoformat()
+                        processed_events.append(event)
+                    return processed_events
+
+                events = convert_times(data.get('records', []))
+                total_size = data.get('totalSize', 0)
+                self.logger.info(f"Retrieved {total_size} events")
+                
+                # Handle pagination if needed
+                next_records_url = data.get('nextRecordsUrl')
+                while next_records_url:
+                    next_url = f"{self._instance_url}{next_records_url}"
+                    resp = await client.get(next_url, headers=headers)
+                    resp.raise_for_status()
                     
-                    # Handle pagination if needed
-                    next_records_url = data.get('nextRecordsUrl')
-                    while next_records_url:
-                        next_url = f"{self._instance_url}{next_records_url}"
-                        resp = await client.get(next_url, headers=headers)
-                        if resp.status_code == 200:
-                            next_data = resp.json()
-                            events.extend(convert_times(next_data.get('records', [])))
-                            next_records_url = next_data.get('nextRecordsUrl')
-                        else:
-                            self.logger.info(f"Error retrieving additional events: {resp.status_code}")
-                            break
-                    return events
-                else:
-                    self.logger.info(f"Error retrieving events: {resp.status_code}")
-                    try:
-                        self.logger.info(json.dumps(resp.json(), indent=2, ensure_ascii=False))
-                    except:
-                        self.logger.info(resp.text)
-                    return None
-            except Exception as e:
-                self.logger.info(f"Error retrieving events: {str(e)}")
-                return None
+                    next_data = resp.json()
+                    events.extend(convert_times(next_data.get('records', [])))
+                    next_records_url = next_data.get('nextRecordsUrl')
+                    
+                return events
+        
+        try:
+            return await self._with_auth_retry(_execute_appointments_query)
+        except httpx.HTTPStatusError as http_err:
+            self.logger.info(f"Error retrieving events: {http_err.response.status_code}")
+            try:
+                self.logger.info(json.dumps(http_err.response.json(), indent=2, ensure_ascii=False))
+            except:
+                self.logger.info(http_err.response.text)
+            return None
+        except Exception as e:
+            self.logger.info(f"Error retrieving events: {str(e)}")
+            return None
 
     async def delete_event_by_id_async(self, event_id: str) -> bool:
         await self._ensure_authenticated_async()
-        headers = {
-            'Authorization': f'Bearer {self._access_token}',
-            'Content-Type': 'application/json'
-        }
         
-        url_deletion_event = f"{self._instance_url}/services/data/{self._version_api}/sobjects/Event/{event_id}"
-        
-        async with httpx.AsyncClient() as client:
-            try:
+        async def _execute_event_deletion():
+            headers = {
+                'Authorization': f'Bearer {self._access_token}',
+                'Content-Type': 'application/json'
+            }
+            
+            url_deletion_event = f"{self._instance_url}/services/data/{self._version_api}/sobjects/Event/{event_id}"
+            
+            async with httpx.AsyncClient() as client:
                 resp_event = await client.delete(url_deletion_event, headers=headers)
+                resp_event.raise_for_status()
                 
                 if resp_event.status_code == 204:
                     self.logger.info("Event deleted successfully!")
                     return True
                 else:
-                    self.logger.info(f"Error while deleting the Event: {resp_event.status_code}")
-                    try:
-                        self.logger.info(json.dumps(resp_event.json(), indent=2, ensure_ascii=False))
-                    except:
-                        self.logger.info(resp_event.text)
+                    self.logger.info(f"Unexpected status code while deleting the Event: {resp_event.status_code}")
                     return False
-            except Exception as e:
-                self.logger.error(f"Error deleting event: {str(e)}")
-                return False
+        
+        try:
+            return await self._with_auth_retry(_execute_event_deletion)
+        except httpx.HTTPStatusError as http_err:
+            self.logger.info(f"Error while deleting the Event: {http_err.response.status_code}")
+            try:
+                self.logger.info(json.dumps(http_err.response.json(), indent=2, ensure_ascii=False))
+            except:
+                self.logger.info(http_err.response.text)
+            return False
+        except Exception as e:
+            self.logger.error(f"Error deleting event: {str(e)}")
+            return False
 
     async def get_person_by_phone_async(self, phone_number: str) -> dict | None:
         """
@@ -461,76 +477,90 @@ class SalesforceApiClient(SalesforceApiClientInterface):
             or None if no matching record is found.
         """
         await self._ensure_authenticated_async()
-        headers = {
-            'Authorization': f'Bearer {self._access_token}',
-            'Content-Type': 'application/json'
-        }
+        
+        async def _execute_person_search():
+            headers = {
+                'Authorization': f'Bearer {self._access_token}',
+                'Content-Type': 'application/json'
+            }
 
-        # For long-running apps, consider creating httpx.AsyncClient once and reusing it.
-        async with httpx.AsyncClient() as client:
-            # --- Try to find a Contact ---
-            contact_query = (
-                "SELECT Id, Contact.Salutation, Contact.FirstName, Contact.LastName, Contact.Email, Contact.Phone, Contact.MobilePhone, Account.Id, Account.Name, Owner.Id, Owner.Name "
-                "FROM Contact "
-                f"WHERE Phone = '{phone_number}' OR MobilePhone = '{phone_number}' "
-                "LIMIT 1"
-            )
-            self.logger.debug(f"SOQL Query (Contact): {contact_query}")
-            encoded_contact_query = urllib.parse.quote(contact_query)
-            url_contact_query = f"{self._instance_url}/services/data/{self._version_api}/query/?q={encoded_contact_query}"
+            # For long-running apps, consider creating httpx.AsyncClient once and reusing it.
+            async with httpx.AsyncClient() as client:
+                # --- Try to find a Contact ---
+                contact_query = (
+                    "SELECT Id, Contact.Salutation, Contact.FirstName, Contact.LastName, Contact.Email, Contact.Phone, Contact.MobilePhone, Account.Id, Account.Name, Owner.Id, Owner.Name "
+                    "FROM Contact "
+                    f"WHERE Phone = '{phone_number}' OR MobilePhone = '{phone_number}' "
+                    "LIMIT 1"
+                )
+                self.logger.debug(f"SOQL Query (Contact): {contact_query}")
+                encoded_contact_query = urllib.parse.quote(contact_query)
+                url_contact_query = f"{self._instance_url}/services/data/{self._version_api}/query/?q={encoded_contact_query}"
 
-            try:
-                resp = await client.get(url_contact_query, headers=headers)
-                resp.raise_for_status()
-                data = resp.json()
-                records = data.get('records', [])
-                if records:
-                    contact_data = records[0]
-                    self.logger.info(f"Found Contact: Id= {contact_data.get('Id')}, Name= {contact_data.get('FirstName')} {contact_data.get('LastName')}")
-                    return {'type': 'Contact', 'data': contact_data}
-            except httpx.HTTPStatusError as http_err:
-                self.logger.info(f"HTTP error querying Contact: {http_err} - Status: {http_err.response.status_code}")
                 try:
-                    self.logger.info(json.dumps(http_err.response.json(), indent=2, ensure_ascii=False))
-                except json.JSONDecodeError:
-                    self.logger.info(http_err.response.text)
-            except httpx.RequestError as req_err:
-                self.logger.info(f"Request error querying Contact: {str(req_err)}")
-            except Exception as e:
-                self.logger.info(f"Generic exception querying Contact: {str(e)}")
+                    resp = await client.get(url_contact_query, headers=headers)
+                    resp.raise_for_status()
+                    data = resp.json()
+                    records = data.get('records', [])
+                    if records:
+                        contact_data = records[0]
+                        self.logger.info(f"Found Contact: Id= {contact_data.get('Id')}, Name= {contact_data.get('FirstName')} {contact_data.get('LastName')}")
+                        return {'type': 'Contact', 'data': contact_data}
+                except httpx.HTTPStatusError as http_err:
+                    self.logger.info(f"HTTP error querying Contact: {http_err} - Status: {http_err.response.status_code}")
+                    try:
+                        self.logger.info(json.dumps(http_err.response.json(), indent=2, ensure_ascii=False))
+                    except json.JSONDecodeError:
+                        self.logger.info(http_err.response.text)
+                    raise http_err
+                except httpx.RequestError as req_err:
+                    self.logger.info(f"Request error querying Contact: {str(req_err)}")
+                    raise req_err
+                except Exception as e:
+                    self.logger.info(f"Generic exception querying Contact: {str(e)}")
+                    raise e
 
-            # --- If no Contact found, try to find a Lead ---
-            lead_query = (
-                "SELECT Id, Lead.FirstName, Lead.LastName, Lead.Email, Lead.Phone, Lead.MobilePhone, Lead.Company, Lead.Owner.Id, Lead.Owner.Name, Lead.Status, Lead.IsConverted "
-                "FROM Lead "
-                f"WHERE (Phone = '{phone_number}' OR MobilePhone = '{phone_number}') AND IsConverted = false "
-                "LIMIT 1"
-            )
-            self.logger.debug(f"SOQL Query (Lead): {lead_query}")
-            encoded_lead_query = urllib.parse.quote(lead_query)
-            url_lead_query = f"{self._instance_url}/services/data/{self._version_api}/query/?q={encoded_lead_query}"
+                # --- If no Contact found, try to find a Lead ---
+                lead_query = (
+                    "SELECT Id, Lead.FirstName, Lead.LastName, Lead.Email, Lead.Phone, Lead.MobilePhone, Lead.Company, Lead.Owner.Id, Lead.Owner.Name, Lead.Status, Lead.IsConverted "
+                    "FROM Lead "
+                    f"WHERE (Phone = '{phone_number}' OR MobilePhone = '{phone_number}') AND IsConverted = false "
+                    "LIMIT 1"
+                )
+                self.logger.debug(f"SOQL Query (Lead): {lead_query}")
+                encoded_lead_query = urllib.parse.quote(lead_query)
+                url_lead_query = f"{self._instance_url}/services/data/{self._version_api}/query/?q={encoded_lead_query}"
 
-            try:
-                resp = await client.get(url_lead_query, headers=headers)
-                resp.raise_for_status()
-                data = resp.json()
-                records = data.get('records', [])
-                if records:
-                    lead_data = records[0]
-                    self.logger.info(f"Found Lead: {lead_data.get('Id')} - {lead_data.get('FirstName')} {lead_data.get('LastName')}")
-                    return {'type': 'Lead', 'data': lead_data}
-            except httpx.HTTPStatusError as http_err:
-                self.logger.info(f"HTTP error querying Lead: {http_err} - Status: {http_err.response.status_code}")
                 try:
-                    self.logger.info(json.dumps(http_err.response.json(), indent=2, ensure_ascii=False))
-                except json.JSONDecodeError:
-                    self.logger.info(http_err.response.text)
-            except httpx.RequestError as req_err:
-                self.logger.info(f"Request error querying Lead: {str(req_err)}")
-            except Exception as e:
-                self.logger.info(f"Generic exception querying Lead: {str(e)}")
-            
-            self.logger.info(f"No Contact or non-converted Lead found for phone number: {phone_number}")
+                    resp = await client.get(url_lead_query, headers=headers)
+                    resp.raise_for_status()
+                    data = resp.json()
+                    records = data.get('records', [])
+                    if records:
+                        lead_data = records[0]
+                        self.logger.info(f"Found Lead: {lead_data.get('Id')} - {lead_data.get('FirstName')} {lead_data.get('LastName')}")
+                        return {'type': 'Lead', 'data': lead_data}
+                except httpx.HTTPStatusError as http_err:
+                    self.logger.info(f"HTTP error querying Lead: {http_err} - Status: {http_err.response.status_code}")
+                    try:
+                        self.logger.info(json.dumps(http_err.response.json(), indent=2, ensure_ascii=False))
+                    except json.JSONDecodeError:
+                        self.logger.info(http_err.response.text)
+                    raise http_err
+                except httpx.RequestError as req_err:
+                    self.logger.info(f"Request error querying Lead: {str(req_err)}")
+                    raise req_err
+                except Exception as e:
+                    self.logger.info(f"Generic exception querying Lead: {str(e)}")
+                    raise e
+                
+                self.logger.info(f"No Contact or non-converted Lead found for phone number: {phone_number}")
+                return None
+        
+        try:
+            return await self._with_auth_retry(_execute_person_search)
+        except (httpx.RequestError, Exception) as e:
+            self.logger.info(f"Error searching for person with phone {phone_number}: {str(e)}")
             return None
 
 
@@ -610,90 +640,134 @@ class SalesforceApiClient(SalesforceApiClientInterface):
         headers = {'Authorization': f'Bearer {self._access_token}'}
         schema = {}
 
-        async with httpx.AsyncClient() as client:
-            # 1. Get list of all SObjects metadata for URLs
-            all_sobjects_url = f"{self._instance_url}/services/data/{self._version_api}/sobjects/"
-            try:
+        async def _fetch_sobjects_list():
+            async with httpx.AsyncClient() as client:
+                all_sobjects_url = f"{self._instance_url}/services/data/{self._version_api}/sobjects/"
                 self.logger.info("Fetching list of all SObjects...")
                 resp = await client.get(all_sobjects_url, headers=headers)
                 resp.raise_for_status()
-                all_sobjects_data = resp.json()
-            except httpx.HTTPStatusError as http_err_main:
-                self.logger.error(f"HTTP error getting SObject list: {http_err_main} - Status: {http_err_main.response.status_code}")
-                try: self.logger.error(json.dumps(http_err_main.response.json(), indent=2))
-                except: self.logger.error(http_err_main.response.text)
-                return None
-            except Exception as e_main:
-                self.logger.error(f"Error fetching SObject list: {str(e_main)}")
-                return None
+                return resp.json()
 
-            # Determine the list of SObjects to describe
-            target_sobjects_info = []
-            all_sobjects_metadata_list = all_sobjects_data.get('sobjects', [])
+        try:
+            all_sobjects_data = await self._with_auth_retry(_fetch_sobjects_list)
+        except httpx.HTTPStatusError as http_err_main:
+            self.logger.error(f"HTTP error getting SObject list: {http_err_main} - Status: {http_err_main.response.status_code}")
+            try: self.logger.error(json.dumps(http_err_main.response.json(), indent=2))
+            except: self.logger.error(http_err_main.response.text)
+            return None
+        except Exception as e_main:
+            self.logger.error(f"Error fetching SObject list: {str(e_main)}")
+            return None
 
-            if sobjects_to_describe:
-                s_name_to_url_map = {s_info['name']: s_info['urls']['describe'] 
-                                     for s_info in all_sobjects_metadata_list 
-                                     if 'name' in s_info and 'urls' in s_info and 'describe' in s_info['urls']}
-                for s_name in sobjects_to_describe:
-                    if s_name in s_name_to_url_map:
-                        target_sobjects_info.append({'name': s_name, 'describe_url_path': s_name_to_url_map[s_name]})
-                    else: # Fallback to constructing the URL if not found (e.g. object not in global list, or list was partial)
-                        target_sobjects_info.append({'name': s_name, 'describe_url_path': f"/services/data/{self._version_api}/sobjects/{s_name}/describe/"})
-                self.logger.info(f"Will describe {len(target_sobjects_info)} specified SObjects: {', '.join(s_name for s_name in sobjects_to_describe)}")
-            else:
-                target_sobjects_info = [{'name': s_info['name'], 'describe_url_path': s_info['urls']['describe']}
-                                       for s_info in all_sobjects_metadata_list
-                                       if 'name' in s_info and 'urls' in s_info and 'describe' in s_info['urls']]
-                self.logger.info(f"Found {len(target_sobjects_info)} SObjects. Describing all can be very slow and consume many API calls.")
+        # Determine the list of SObjects to describe
+        target_sobjects_info = []
+        all_sobjects_metadata_list = all_sobjects_data.get('sobjects', [])
 
-            total_objects_to_describe = len(target_sobjects_info)
-            for i, sobject_item in enumerate(target_sobjects_info):
-                s_name = sobject_item['name']
-                describe_url = f"{self._instance_url}{sobject_item['describe_url_path']}"
-                
-                self.logger.info(f"Describing SObject {i+1}/{total_objects_to_describe}: {s_name}...")
-                try:
+        if sobjects_to_describe:
+            s_name_to_url_map = {s_info['name']: s_info['urls']['describe'] 
+                                 for s_info in all_sobjects_metadata_list 
+                                 if 'name' in s_info and 'urls' in s_info and 'describe' in s_info['urls']}
+            for s_name in sobjects_to_describe:
+                if s_name in s_name_to_url_map:
+                    target_sobjects_info.append({'name': s_name, 'describe_url_path': s_name_to_url_map[s_name]})
+                else: # Fallback to constructing the URL if not found (e.g. object not in global list, or list was partial)
+                    target_sobjects_info.append({'name': s_name, 'describe_url_path': f"/services/data/{self._version_api}/sobjects/{s_name}/describe/"})
+            self.logger.info(f"Will describe {len(target_sobjects_info)} specified SObjects: {', '.join(s_name for s_name in sobjects_to_describe)}")
+        else:
+            target_sobjects_info = [{'name': s_info['name'], 'describe_url_path': s_info['urls']['describe']}
+                                   for s_info in all_sobjects_metadata_list
+                                   if 'name' in s_info and 'urls' in s_info and 'describe' in s_info['urls']]
+            self.logger.info(f"Found {len(target_sobjects_info)} SObjects. Describing all can be very slow and consume many API calls.")
+
+        total_objects_to_describe = len(target_sobjects_info)
+        for i, sobject_item in enumerate(target_sobjects_info):
+            s_name = sobject_item['name']
+            describe_url = f"{self._instance_url}{sobject_item['describe_url_path']}"
+            
+            self.logger.info(f"Describing SObject {i+1}/{total_objects_to_describe}: {s_name}...")
+            
+            async def _describe_sobject():
+                async with httpx.AsyncClient() as client:
                     desc_resp = await client.get(describe_url, headers=headers)
                     desc_resp.raise_for_status()
-                    s_description = desc_resp.json()
+                    return desc_resp.json()
+            
+            try:
+                s_description = await self._with_auth_retry(_describe_sobject)
+                
+                fields_info = {}
+                for field in s_description.get('fields', []):
+                    field_name = field.get('name')
+                    is_pk = (field_name == 'Id')
+                    is_fk = field.get('type') == 'reference' and bool(field.get('referenceTo'))
                     
-                    fields_info = {}
-                    for field in s_description.get('fields', []):
-                        field_name = field.get('name')
-                        is_pk = (field_name == 'Id')
-                        is_fk = field.get('type') == 'reference' and bool(field.get('referenceTo'))
-                        
-                        if include_fields or is_pk or is_fk:
-                            fields_info[field_name] = {
-                                'label': field.get('label'),
-                                'type': field.get('type'),
-                                'length': field.get('length', 0) if field.get('type') in ['string', 'textarea', 'phone', 'url', 'email', 'picklist', 'multipicklist', 'combobox', 'id', 'reference'] else None,
-                                'precision': field.get('precision') if field.get('type') in ['currency', 'double', 'percent', 'int', 'long'] else None,
-                                'scale': field.get('scale') if field.get('type') in ['currency', 'double', 'percent'] else None,
-                                'nillable': field.get('nillable'),
-                                'custom': field.get('custom'),
-                                'is_primary_key': is_pk,
-                                'is_foreign_key': is_fk,
-                                'references_to': field.get('referenceTo', []) if is_fk else []
-                            }
-                    schema[s_name] = {'fields': fields_info}
-                    
-                    # Brief pause to avoid hitting rate limits too hard
-                    if total_objects_to_describe > 10 and i < total_objects_to_describe - 1:
-                        await asyncio.sleep(0.2) # 200ms delay
+                    if include_fields or is_pk or is_fk:
+                        fields_info[field_name] = {
+                            'label': field.get('label'),
+                            'type': field.get('type'),
+                            'length': field.get('length', 0) if field.get('type') in ['string', 'textarea', 'phone', 'url', 'email', 'picklist', 'multipicklist', 'combobox', 'id', 'reference'] else None,
+                            'precision': field.get('precision') if field.get('type') in ['currency', 'double', 'percent', 'int', 'long'] else None,
+                            'scale': field.get('scale') if field.get('type') in ['currency', 'double', 'percent'] else None,
+                            'nillable': field.get('nillable'),
+                            'custom': field.get('custom'),
+                            'is_primary_key': is_pk,
+                            'is_foreign_key': is_fk,
+                            'references_to': field.get('referenceTo', []) if is_fk else []
+                        }
+                schema[s_name] = {'fields': fields_info}
+                
+                # Brief pause to avoid hitting rate limits too hard
+                if total_objects_to_describe > 10 and i < total_objects_to_describe - 1:
+                    await asyncio.sleep(0.2) # 200ms delay
 
-                except httpx.HTTPStatusError as http_err_desc:
-                    error_detail = "Unknown error"
-                    try: error_detail = json.dumps(http_err_desc.response.json(), indent=2)
-                    except: error_detail = http_err_desc.response.text
-                    self.logger.info(f"HTTP error describing SObject {s_name}: {http_err_desc} - Status: {http_err_desc.response.status_code}. Details: {error_detail[:500]}")
-                    schema[s_name] = {'error': f'Failed to describe: {str(http_err_desc)}'}
-                except Exception as e_desc:
-                    self.logger.info(f"Error describing SObject {s_name}: {str(e_desc)}")
-                    schema[s_name] = {'error': f'Failed to describe: {str(e_desc)}'}
+            except httpx.HTTPStatusError as http_err_desc:
+                error_detail = "Unknown error"
+                try: error_detail = json.dumps(http_err_desc.response.json(), indent=2)
+                except: error_detail = http_err_desc.response.text
+                self.logger.info(f"HTTP error describing SObject {s_name}: {http_err_desc} - Status: {http_err_desc.response.status_code}. Details: {error_detail[:500]}")
+                schema[s_name] = {'error': f'Failed to describe: {str(http_err_desc)}'}
+            except Exception as e_desc:
+                self.logger.info(f"Error describing SObject {s_name}: {str(e_desc)}")
+                schema[s_name] = {'error': f'Failed to describe: {str(e_desc)}'}
         
         return schema
+
+    async def _with_auth_retry(self, func, *args, **kwargs):
+        """
+        Execute an async function with automatic 401 retry logic.
+        If the function raises a 401 HTTPStatusError, re-authenticate and retry once.
+        
+        Args:
+            func: The async function to execute
+            *args: Positional arguments to pass to func
+            **kwargs: Keyword arguments to pass to func
+            
+        Returns:
+            The result of the function call
+            
+        Raises:
+            The original exception if retry fails or if error is not 401
+        """
+        try:
+            return await func(*args, **kwargs)
+        except httpx.HTTPStatusError as http_err:
+            if http_err.response.status_code == 401:
+                self.logger.info(f"Received 401 authentication error, attempting to re-authenticate and retry...")
+                
+                # Re-authenticate
+                if self.authenticate():
+                    self.logger.info("Re-authentication successful, retrying original request...")
+                    try:
+                        return await func(*args, **kwargs)
+                    except Exception as retry_err:
+                        self.logger.error(f"Retry after re-authentication failed: {str(retry_err)}")
+                        raise retry_err
+                else:
+                    self.logger.error("Re-authentication failed, cannot retry request")
+                    raise http_err
+            else:
+                # Not a 401 error, re-raise original exception
+                raise http_err
 
     ## Internal helpers ##
 
@@ -738,28 +812,31 @@ class SalesforceApiClient(SalesforceApiClientInterface):
             self.logger.info("Critical Error: _query_salesforce called without prior successful authentication.")
             return None
 
-        headers = {'Authorization': f'Bearer {self._access_token}'}
-        encoded_query = urllib.parse.quote(soql_query)
-        url_query = f"{self._instance_url}/services/data/{self._version_api}/query/?q={encoded_query}"
-        
-        # self.logger.info(f"Executing SOQL: {soql_query}") # Verbose, enable for deep debugging
-        async with httpx.AsyncClient() as client:
-            try:
+        async def _execute_query():
+            headers = {'Authorization': f'Bearer {self._access_token}'}
+            encoded_query = urllib.parse.quote(soql_query)
+            url_query = f"{self._instance_url}/services/data/{self._version_api}/query/?q={encoded_query}"
+            
+            # self.logger.info(f"Executing SOQL: {soql_query}") # Verbose, enable for deep debugging
+            async with httpx.AsyncClient() as client:
                 resp = await client.get(url_query, headers=headers)
                 resp.raise_for_status() # Will raise HTTPStatusError for 4xx/5xx status codes
                 return resp.json()
-            except httpx.HTTPStatusError as http_err:
-                error_message = f"SOQL Query HTTP error: {http_err} - Status: {http_err.response.status_code}. Query: {soql_query}"
-                self.logger.info(error_message)
-                try: 
-                    error_details = http_err.response.json()
-                    self.logger.info(json.dumps(error_details, indent=2, ensure_ascii=False))
-                except json.JSONDecodeError:
-                    self.logger.info(f"Response text: {http_err.response.text}")
-                return None
-            except Exception as e:
-                self.logger.info(f"SOQL Query general error: {str(e)}. Query: {soql_query}")
-                return None
+        
+        try:
+            return await self._with_auth_retry(_execute_query)
+        except httpx.HTTPStatusError as http_err:
+            error_message = f"SOQL Query HTTP error: {http_err} - Status: {http_err.response.status_code}. Query: {soql_query}"
+            self.logger.info(error_message)
+            try: 
+                error_details = http_err.response.json()
+                self.logger.info(json.dumps(error_details, indent=2, ensure_ascii=False))
+            except json.JSONDecodeError:
+                self.logger.info(f"Response text: {http_err.response.text}")
+            return None
+        except Exception as e:
+            self.logger.info(f"SOQL Query general error: {str(e)}. Query: {soql_query}")
+            return None
 
     async def get_leads_by_details_async(self, email: str | None = None, first_name: str | None = None, last_name: str | None = None, company_name: str | None = None) -> list[dict] | None:
         """

@@ -114,6 +114,11 @@ class EnvHelper:
         return float(value) if value else 0.0
 
     @staticmethod
+    def get_waiting_music_start_delay() -> float:
+        value = EnvHelper.get_env_variable_value_by_name('WAITING_MUSIC_START_DELAY', fails_if_missing=False)
+        return float(value) if value else 0.0
+
+    @staticmethod
     def get_background_noise_enabled() -> bool:
         value = EnvHelper.get_env_variable_value_by_name('BACKGROUND_NOISE_ENABLED', fails_if_missing=False)
         return value and value.lower() == 'true'
