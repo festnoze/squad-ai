@@ -55,6 +55,16 @@ class AgentsGraph:
             self.conversation_persistence = conversation_persistence
         else:
             conversation_persistence_type = EnvHelper.get_conversation_persistence_type()
+            self.available_actions: bool = EnvHelper.get_available_actions()
+            
+            # Check for inconsistent states
+            if 'ask_rag' in self.available_actions: 
+                assert conversation_persistence_type == "studi_rag", \
+                    "when 'ask_rag' action is available, conversation persistence type must be 'studi_rag' but is: " + conversation_persistence_type
+            else:
+                assert conversation_persistence_type != "studi_rag", \
+                    "when 'ask_rag' action is not available, conversation persistence type cannot be 'studi_rag' but is: " + conversation_persistence_type
+            
             if conversation_persistence_type == "local":
                 self.conversation_persistence = ConversationPersistenceLocalService()
             elif conversation_persistence_type == "studi_rag":
@@ -302,7 +312,7 @@ class AgentsGraph:
         state.get('agent_scratchpad', {})['next_agent_needed'] = "user_identified" if sf_account_info else "user_new"
         return state
 
-    async def user_identification_decide_next_step(self, state: PhoneConversationState) -> dict:
+    async def user_identification_decide_next_step(self, state: PhoneConversationState) -> str:
         """Decide next step based on user identification"""
         return state.get('agent_scratchpad', {}).get('next_agent_needed')
 

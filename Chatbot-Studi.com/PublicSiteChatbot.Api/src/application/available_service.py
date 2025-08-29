@@ -185,7 +185,7 @@ class AvailableService:
     @staticmethod
     async def add_external_message_to_conversation_async(conversation_id:UUID, new_message:str, user_role: str = "assistant") -> Conversation:
         conversation = await AvailableService.conversation_repository.get_conversation_by_id_async(conversation_id)
-        if new_message and user_role:
+        if conversation and new_message and user_role:
             conversation.add_new_message(user_role, new_message)
             assert await AvailableService.conversation_repository.add_message_to_existing_conversation_async(conversation.id, conversation.last_message)
         return conversation

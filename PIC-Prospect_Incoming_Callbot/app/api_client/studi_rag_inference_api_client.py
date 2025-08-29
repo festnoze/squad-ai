@@ -82,12 +82,20 @@ class StudiRAGInferenceApiClient(ConversationPersistenceInterface, RagQueryInter
     async def add_message_to_conversation_async(self, conversation_id: str, new_message: str, role: str = "assistant", timeout: int = 10) -> dict:
         """POST /rag/inference/conversation/add-message: Add a message to a conversation."""
         try:
-            request_model = QueryAskingRequestModel(conversation_id=UUID(conversation_id) if conversation_id != ConversationPersistenceInterface.NoneUuid else None, user_query_content=new_message, role=role, display_waiting_message=False)
+            # Validate conversation_id to create UUID
+            if not conversation_id or conversation_id == ConversationPersistenceInterface.NoneUuid:
+                raise ValueError("conversation_id is required and cannot be NoneUuid")
+            conversation_uuid = UUID(conversation_id)            
+            request_model = QueryAskingRequestModel(conversation_id=conversation_uuid, user_query_content=new_message, role=role, display_waiting_message=False)
             resp = await self.client.post("/rag/inference/conversation/add-external-message", json=request_model.to_dict(), timeout=self.timeout)
             resp.raise_for_status()
             return resp.json()
+        except ValueError as exc:
+            raise exc
         except httpx.ConnectError as exc:
             raise RuntimeError(f"Cannot connect to RAG inference server at {self.host_base_url}") from exc
+        except httpx.TimeoutException as exc:
+            raise RuntimeError(f"Timeout connecting to RAG inference server at {self.host_base_url}") from exc
 
     async def rag_query_stream_async(self, query_asking_request_model: QueryAskingRequestModel, interrupt_flag: dict | None = None, timeout: int = 80) -> AsyncGenerator[str, None]:
         """

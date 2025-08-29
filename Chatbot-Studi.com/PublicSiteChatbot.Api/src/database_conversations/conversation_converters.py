@@ -90,7 +90,7 @@ class ConversationConverters:
         # Sorted messages by ascending creation order
         sorted_messages_entities = sorted(conversation_entity.messages, key=lambda msg: msg.created_at)
         sorted_messages = [
-          ConversationEntityToDtoConverter.convert_message_entity_to_model(message)
+          ConversationConverters.convert_message_entity_to_model(message)
           for message in sorted_messages_entities  
         ]
         return Conversation(
