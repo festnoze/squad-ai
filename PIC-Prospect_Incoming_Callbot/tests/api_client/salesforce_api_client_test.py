@@ -224,7 +224,7 @@ class TestCheckForAppointmentCreation:
         with patch.object(client, 'get_scheduled_appointments_async', new_callable=AsyncMock) as mock_get_appointments:
             mock_get_appointments.return_value = mock_appointments
             
-            result = await client.check_for_appointment_creation(
+            result = await client.verify_appointment_existance(
                 event_id='event_123',
                 expected_subject='Test Meeting',
                 start_datetime='2025-05-20T14:00:00Z',
@@ -253,7 +253,7 @@ class TestCheckForAppointmentCreation:
         with patch.object(client, 'get_scheduled_appointments_async', new_callable=AsyncMock) as mock_get_appointments:
             mock_get_appointments.return_value = mock_appointments
             
-            result = await client.check_for_appointment_creation(
+            result = await client.verify_appointment_existance(
                 event_id=None,
                 expected_subject='Team Standup',
                 start_datetime='2025-05-20T09:00:00Z',
@@ -282,7 +282,7 @@ class TestCheckForAppointmentCreation:
         with patch.object(client, 'get_scheduled_appointments_async', new_callable=AsyncMock) as mock_get_appointments:
             mock_get_appointments.return_value = mock_appointments
             
-            result = await client.check_for_appointment_creation(
+            result = await client.verify_appointment_existance(
                 event_id=None,
                 expected_subject='Expected Meeting',
                 start_datetime='2025-05-20T10:00:00Z',
@@ -311,7 +311,7 @@ class TestCheckForAppointmentCreation:
         with patch.object(client, 'get_scheduled_appointments_async', new_callable=AsyncMock) as mock_get_appointments:
             mock_get_appointments.return_value = mock_appointments
             
-            result = await client.check_for_appointment_creation(
+            result = await client.verify_appointment_existance(
                 event_id='event_123',
                 expected_subject='Test Meeting',
                 start_datetime='2025-05-20T14:00:00Z',
@@ -330,7 +330,7 @@ class TestCheckForAppointmentCreation:
         with patch.object(client, 'get_scheduled_appointments_async', new_callable=AsyncMock) as mock_get_appointments:
             mock_get_appointments.return_value = []
             
-            result = await client.check_for_appointment_creation(
+            result = await client.verify_appointment_existance(
                 event_id='event_123',
                 expected_subject='Test Meeting',
                 start_datetime='2025-05-20T14:00:00Z',
@@ -346,7 +346,7 @@ class TestCheckForAppointmentCreation:
         client._access_token = "mock_token"
         client._instance_url = "https://mock-instance.salesforce.com"
         
-        result = await client.check_for_appointment_creation(
+        result = await client.verify_appointment_existance(
             event_id='event_123',
             expected_subject='Test Meeting',
             start_datetime='invalid-datetime-format',
@@ -364,7 +364,7 @@ class TestCheckForAppointmentCreation:
         with patch.object(client, 'get_scheduled_appointments_async', new_callable=AsyncMock) as mock_get_appointments:
             mock_get_appointments.return_value = None
             
-            result = await client.check_for_appointment_creation(
+            result = await client.verify_appointment_existance(
                 event_id='event_123',
                 expected_subject='Test Meeting',
                 start_datetime='2025-05-20T14:00:00Z',
@@ -383,7 +383,7 @@ class TestCheckForAppointmentCreation:
         with patch.object(client, 'get_scheduled_appointments_async', new_callable=AsyncMock) as mock_get_appointments:
             mock_get_appointments.side_effect = Exception("API connection error")
             
-            result = await client.check_for_appointment_creation(
+            result = await client.verify_appointment_existance(
                 event_id='event_123',
                 expected_subject='Test Meeting',
                 start_datetime='2025-05-20T14:00:00Z',
@@ -412,7 +412,7 @@ class TestCheckForAppointmentCreation:
         with patch.object(client, 'get_scheduled_appointments_async', new_callable=AsyncMock) as mock_get_appointments:
             mock_get_appointments.return_value = mock_appointments
             
-            result = await client.check_for_appointment_creation(
+            result = await client.verify_appointment_existance(
                 event_id='event_123',
                 expected_subject='Expected Subject',
                 start_datetime='2025-05-20T14:00:00Z',
@@ -448,7 +448,7 @@ class TestCheckForAppointmentCreation:
             mock_get_appointments.return_value = mock_appointments
             
             # Test with event_id=None - should return first match
-            result = await client.check_for_appointment_creation(
+            result = await client.verify_appointment_existance(
                 event_id=None,
                 expected_subject='Daily Standup',
                 start_datetime='2025-05-20T09:00:00Z',

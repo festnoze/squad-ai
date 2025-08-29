@@ -129,9 +129,14 @@ class EnvHelper:
         return float(value) if value else 0.1
 
     @staticmethod
+    def get_perform_background_noise_calibration() -> bool:
+        value = EnvHelper.get_env_variable_value_by_name('PERFORM_BACKGROUND_NOISE_CALIBRATION', fails_if_missing=False)
+        return value and value.lower() == 'true'
+
+    @staticmethod
     def get_speech_threshold() -> int:
         value = EnvHelper.get_env_variable_value_by_name('SPEECH_THRESHOLD', fails_if_missing=False)
-        return int(value) if value else 950
+        return int(value) if value else 500
 
     @staticmethod
     def get_required_silence_ms_to_answer() -> int:

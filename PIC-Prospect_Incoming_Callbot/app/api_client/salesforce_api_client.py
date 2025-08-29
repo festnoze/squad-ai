@@ -144,6 +144,17 @@ class SalesforceApiClient(SalesforceApiClientInterface):
             self.logger.info("Error: Required event fields (subject, start_datetime) are missing")
             return None
 
+        # Check the calendar availability before creating the appointement
+        verified_event_id = await self.verify_appointment_existance(
+            event_id=None,
+            expected_subject=subject,
+            start_datetime=start_datetime,
+            duration_minutes=duration_minutes
+        )
+        if verified_event_id:
+            self.logger.error(f"Error during scheduling new appointment: an appointment already exists at the same time {start_datetime}, of Id: {verified_event_id}")
+            return None
+
         # Convert to UTC
         start_dt = self._get_french_datetime_from_str(start_datetime)
         if start_dt is None:
@@ -224,7 +235,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
             exception_upon_creation = True
 
         # Verify the appointment was actually created
-        verified_event_id = await self.check_for_appointment_creation(
+        verified_event_id = await self.verify_appointment_existance(
             event_id=event_id,
                 expected_subject=subject,
                 start_datetime=start_datetime,
@@ -258,7 +269,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
                 
         return verified_event_id
 
-    async def check_for_appointment_creation(self, event_id: str | None, expected_subject: str, start_datetime: str, duration_minutes: int = 60) -> str | None:
+    async def verify_appointment_existance(self, event_id: str | None, expected_subject: str, start_datetime: str, duration_minutes: int = 60) -> str | None:
         """Check if an appointment was successfully created by verifying its existence
         
         Args:

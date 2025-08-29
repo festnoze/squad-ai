@@ -40,13 +40,13 @@ class CalendarAgent:
 
         # The global calendar scheduler agent with tools
         
-        prompt = self._load_available_timeframes_prompt()
-        prompts = ChatPromptTemplate.from_messages([
-            ("system", prompt),
+        available_timeframes_prompt = self._load_available_timeframes_prompt()
+        available_timeframes_prompts = ChatPromptTemplate.from_messages([
+            ("system", available_timeframes_prompt),
             MessagesPlaceholder(variable_name="agent_scratchpad"),
         ])
         tools_available_timeframes = [CalendarAgent.get_available_timeframes_async]
-        agent = create_tool_calling_agent(self.available_timeframes_llm, tools_available_timeframes, prompts)
+        agent = create_tool_calling_agent(self.available_timeframes_llm, tools_available_timeframes, available_timeframes_prompts)
         self.available_timeframes_agent = AgentExecutor(agent=agent, tools=tools_available_timeframes, verbose=True)
 
         # self.tools = [self.get_appointments, self.schedule_new_appointment]
@@ -79,6 +79,13 @@ class CalendarAgent:
         self.logger.info(f"Category detected: {category}")
 
         # === Category-specific handling ===
+
+        # # Fix bug: where appointment date and time is not extracted correctly
+        # if category == "Rendez-vous confirmé":
+        #     appointment_slot_datetime: datetime = await self._extract_appointment_selected_date_and_time_async(user_input, chat_history)
+        #     if appointment_slot_datetime is None:
+        #         category = "Proposition de créneaux"
+
         if category == "Proposition de créneaux":            
             if chat_history is None: 
                 chat_history = []

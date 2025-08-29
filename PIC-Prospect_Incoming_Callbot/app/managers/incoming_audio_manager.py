@@ -51,8 +51,8 @@ class IncomingAudioManager(IncomingManager):
         self.websocket_creation_time = None
         self.stream_states : dict[str, ConversationState] = {}
         self.phones_by_call_sid = {}  # Map call_sid to phone numbers
-        # self.etalonnated_noise_for_stream_sid: dict[str, int] = {}  # List already etalonnated stream_sid 
-        # self.background_noises_for_stream_sid: dict[str, list[int]] = {}  # Map stream_sid with noise calibration data
+        self.average_noise_by_stream_sid: dict[str, int] = {}  # List already etalonnated stream_sid 
+        self.speech_to_noise_ratio_samples_by_stream_sid: dict[str, list[int]] = {}  # Map stream_sid with noise calibration data
         self.agents_graph : AgentsGraph = agents_graph
         self.openai_client = None
         self.rag_interrupt_flag: dict = {"interrupted": False}
@@ -65,13 +65,14 @@ class IncomingAudioManager(IncomingManager):
         # Audio processing parameters
         self.audio_buffer = b""
         self.consecutive_silence_duration_ms = 0.0
-        self.speech_threshold = EnvHelper.get_speech_threshold()  # RMS threshold for speech detection
+        self.speech_threshold_base = EnvHelper.get_speech_threshold()
+        self.speech_threshold = self.speech_threshold_base + 300 # Add 300 as default background noise value on startup (to be calibrated later)
         self.required_silence_ms_to_answer = EnvHelper.get_required_silence_ms_to_answer()  # ms of silence to trigger transcript
         self.min_audio_bytes_for_processing = EnvHelper.get_min_audio_bytes_for_processing()  # Minimum buffer size to process
         self.max_audio_bytes_for_processing = EnvHelper.get_max_audio_bytes_for_processing()  # Maximum buffer size to process
         self.max_silence_duration_before_hangup = EnvHelper.get_max_silence_duration_before_hangup()  # ms of silence before hanging up the call
         self.do_audio_preprocessing = EnvHelper.get_do_audio_preprocessing()
-        
+        self.perform_background_noise_calibration = EnvHelper.get_perform_background_noise_calibration()
         # Create temp directory if it doesn't exist
         os.makedirs(self.incoming_speech_dir, exist_ok=True)
 
@@ -194,14 +195,11 @@ class IncomingAudioManager(IncomingManager):
         
         # Check using VAD (more accurate but may not work on all chunks)
         try:
-            frame_size = len(audio_data)
-            if frame_size >= 320:  # At least 20ms at 8kHz, 16-bit mono
-                vad_is_speech = self._is_speech(audio_data)
-                is_speech = vad_is_speech and speech_to_noise_ratio > self.speech_threshold
+            if len(audio_data) >= 320:  # At least 20ms at 8kHz, 16-bit mono
+                is_speech = speech_to_noise_ratio > self.speech_threshold and self._is_speech(audio_data)
                 return not is_speech, speech_to_noise_ratio  # VAD detected speech
         except Exception:
-            pass  # Fall back to RMS method
-            
+            pass  # Fall back to RMS method            
         return True, speech_to_noise_ratio
         
     async def init_conversation_async(self, call_sid: str, stream_sid: str) -> None:
@@ -243,50 +241,40 @@ class IncomingAudioManager(IncomingManager):
             self.logger.error("/!\\ 'media event' received before the 'start event'")
             return
                       
-        # First, update the speaking state based on the queue status
+        # 1- Update the speaking state based on the queue status
         await self.update_is_speaking_state_async()
-        
-        # Skip handling incoming speech in case the system is speaking and interruption isn't allowed
-        if not self.outgoing_manager.can_speech_be_interupted and (self.is_speaking or self.outgoing_manager.has_text_to_be_sent()):
-            return
 
-        # 1. Decode audio chunk
+        # 2. Decode audio chunk
         chunk = self._decode_audio_chunk(audio_data)
         if chunk is None: 
             self.logger.warning("Received media event without valid audio chunk")
             return
-          
-        # Use WebRTC VAD for better speech detection
+
+        # 3- Perform speech detection (using WebRTC VAD)
         is_silence, speech_to_noise_ratio = self.analyse_speech_for_silence(chunk)
+        #self.logger.info(f"Speech detection: {'speech' if not is_silence else 'silence'}, S/N ratio: {speech_to_noise_ratio:.2f}")
         
-        # # Perform noise calibration for new streams (etalonnated_noise)
-        # if self.stream_sid not in self.etalonnated_noise_for_stream_sid:
-        #     if not self.stream_sid in self.background_noises_for_stream_sid:
-        #         self.background_noises_for_stream_sid[self.stream_sid] = []
-        #     if len(self.etalonnated_noise_for_stream_sid[self.stream_sid]) < 100:
-        #         self.etalonnated_noise_for_stream_sid[self.stream_sid].append(speech_to_noise_ratio)
-                
-        #     # Calculate average when we reach samples count
-        #     if len(self.etalonnated_noise_for_stream_sid[self.stream_sid]) >= 100:
-        #         calibration_data = self.etalonnated_noise_for_stream_sid[self.stream_sid]
-        #         average_noise = sum(calibration_data) / len(calibration_data)
-        #         self.logger.info(f"Noise calibration completed for stream {self.stream_sid}. Average noise level: {average_noise:.2f}")
-        #         # Replace list with the calculated average for memory efficiency
-        #         self.etalonnated_noise_for_stream_sid[self.stream_sid] = int(average_noise)
-        
-        # If user is speaking while system is speaking, stop system speech
+        # 4- Perform background noise calibration (at call start)
+        if self.perform_background_noise_calibration:
+            self._perform_background_noise_calibration(self.stream_sid, speech_to_noise_ratio)
+
+        # 5- Skip handling incoming speech if system is speaking - and interruption isn't allowed
+        if not self.outgoing_manager.can_speech_be_interupted and (self.is_speaking or self.outgoing_manager.has_text_to_be_sent()):
+            return
+
+        # 6- If user is speaking while system is speaking, stop system speech
         if self.is_speaking and not is_silence and self.outgoing_manager.can_speech_be_interupted and not self.interuption_asked:
             self.removed_text_to_speak = await self.stop_speaking_async(speech_to_noise_ratio)
             
             # Log the interruption (but only the first time)
             if self.consecutive_silence_duration_ms > 0:
-                self.logger.info(f"\r>>> USER INTERRUPTION - Incoming speech while system was speaking ({speech_to_noise_ratio})")
+                self.logger.info(f"\r>>> USER INTERRUPTION - Incoming speech while system was speaking ({speech_to_noise_ratio:.2f})")
             self.consecutive_silence_duration_ms = 0.0
 
-        # 2a. Silence detection before adding to buffer
+        # 7- Silence detection consecutive to user speech beginning
         has_speech_began = len(self.audio_buffer) > 0
 
-        # Count consecutive silence (while system is not speaking only)
+        # Count consecutive silence (if system is not speaking)
         if is_silence and not self.is_speaking:
             chunk_duration_ms = (len(chunk) / self.sample_width) / self.frame_rate * 1000
             self.consecutive_silence_duration_ms += chunk_duration_ms
@@ -301,10 +289,10 @@ class IncomingAudioManager(IncomingManager):
 
             if(random.randint(0, 100) < 1): # Log every 1%
                 self.logger.debug(
-                    f"\nSpeech detected - RMS: {speech_to_noise_ratio}/{self.speech_threshold}, "
+                    f"\nSpeech detected - RMS: {speech_to_noise_ratio:.2f} / {self.speech_threshold:.2f}, "
                     f"Buffer size: {len(self.audio_buffer)} bytes")
 
-        # 2b. Speak anew if the user remains silent for long enough
+        # 8- Speak anew if the user remains silent for long enough
         if (self.speak_anew_on_long_silence 
         and self.consecutive_silence_duration_ms >= self.max_silence_duration_before_reasking 
         and self.consecutive_silence_duration_ms % self.max_silence_duration_before_reasking <= 10):
@@ -313,7 +301,7 @@ class IncomingAudioManager(IncomingManager):
             await asyncio.sleep(0.05)
             return
 
-        # 2c. Hangup the call if the user remains silent for too long
+        # 9- Hangup the call if the user remains silent for too long
         if self.consecutive_silence_duration_ms >= self.max_silence_duration_before_hangup:
             self.logger.info(f">>> User silence duration of {self.consecutive_silence_duration_ms:.1f}ms exceeded max. allowed silence of {self.max_silence_duration_before_hangup:.1f}ms.")
             await self._hangup_call_async()
@@ -323,7 +311,7 @@ class IncomingAudioManager(IncomingManager):
         has_reach_min_speech_length = len(self.audio_buffer) >= self.min_audio_bytes_for_processing
         is_speech_too_long = len(self.audio_buffer) > self.max_audio_bytes_for_processing
         
-        # 3. Process audio
+        # 10- Process audio
         # Conditions: if buffer large enough followed by a prolonged silence, or if buffer is too large
         if (is_long_silence_after_speech and has_reach_min_speech_length) or is_speech_too_long:
             audio_data = self.audio_buffer
@@ -344,7 +332,7 @@ class IncomingAudioManager(IncomingManager):
                 acknowledge_text += "."
                 await self.outgoing_manager.enqueue_text_async(acknowledge_text)
             
-            # 4. Transcribe speech to text
+            # 11- Transcribe speech to text
             user_query_transcript = await self._perform_speech_to_text_transcription_async(audio_data, keep_audio_file=EnvHelper.get_keep_audio_files())
             self.logger.info(f">>> Transcription finished. Heard text: \"{user_query_transcript}\"")
             
@@ -352,12 +340,12 @@ class IncomingAudioManager(IncomingManager):
                 feedback_text = f" Vous avez dit : \"{user_query_transcript}\"."
                 await self.outgoing_manager.enqueue_text_async(feedback_text)
             
-            # 5. Send user query to the agents graph (for processing and response)
+            # 12- Send user query to the agents graph (for processing and response)
             if user_query_transcript:
                 self.removed_text_to_speak = None
                 await self.send_user_query_to_agents_graph_async(user_query_transcript)
             
-            # If no user query transcript, enqueue back the text to speak previously removed
+            # 13- If transcript of user query is empty (no speech detected), enqueue back the text to speak previously removed
             if not user_query_transcript:
                 if self.removed_text_to_speak:
                     await self.outgoing_manager.enqueue_text_async(self.removed_text_to_speak)
@@ -405,6 +393,27 @@ class IncomingAudioManager(IncomingManager):
 
         except Exception as e:
             self.logger.error(f"Error in user query to agents graph: {e}", exc_info=True)
+
+    def _perform_background_noise_calibration(self, stream_sid, speech_to_noise_ratio, samples_count_to_average = 600, min_noise_level = 10):
+        if stream_sid in self.average_noise_by_stream_sid:
+            return
+
+        if not stream_sid in self.speech_to_noise_ratio_samples_by_stream_sid:
+            self.speech_to_noise_ratio_samples_by_stream_sid[stream_sid] = []
+        if len(self.speech_to_noise_ratio_samples_by_stream_sid[stream_sid]) < samples_count_to_average:
+            self.speech_to_noise_ratio_samples_by_stream_sid[stream_sid].append(speech_to_noise_ratio)
+            
+        # Calculate the speech to noise ratio average when we reach samples count
+        if len(self.speech_to_noise_ratio_samples_by_stream_sid[stream_sid]) >= samples_count_to_average:
+            calibration_data = self.speech_to_noise_ratio_samples_by_stream_sid[stream_sid]
+            calibration_data = [x for x in calibration_data if x >= min_noise_level] # Exclude no noise samples
+            if not any(calibration_data): calibration_data = [min_noise_level]
+            average_noise = int(round(sum(calibration_data) / len(calibration_data)))
+            self.logger.info(f"Noise calibration completed for stream {stream_sid}. Average noise level: {average_noise:.2f}")
+            # Replace list with the calculated average for memory efficiency
+            self.average_noise_by_stream_sid[stream_sid] = average_noise
+            del self.speech_to_noise_ratio_samples_by_stream_sid[stream_sid]
+            self.speech_threshold = self.speech_threshold_base + average_noise
 
     def _decode_audio_chunk(self, data : dict):
         try:
