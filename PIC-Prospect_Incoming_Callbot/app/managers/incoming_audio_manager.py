@@ -73,6 +73,8 @@ class IncomingAudioManager(IncomingManager):
         self.max_silence_duration_before_hangup = EnvHelper.get_max_silence_duration_before_hangup()  # ms of silence before hanging up the call
         self.do_audio_preprocessing = EnvHelper.get_do_audio_preprocessing()
         self.perform_background_noise_calibration = EnvHelper.get_perform_background_noise_calibration()
+        self.keep_audio_file = EnvHelper.get_keep_audio_files()
+
         # Create temp directory if it doesn't exist
         os.makedirs(self.incoming_speech_dir, exist_ok=True)
 
@@ -333,7 +335,7 @@ class IncomingAudioManager(IncomingManager):
                 await self.outgoing_manager.enqueue_text_async(acknowledge_text)
             
             # 11- Transcribe speech to text
-            user_query_transcript = await self._perform_speech_to_text_transcription_async(audio_data, keep_audio_file=EnvHelper.get_keep_audio_files())
+            user_query_transcript = await self._perform_speech_to_text_transcription_async(audio_data)
             self.logger.info(f">>> Transcription finished. Heard text: \"{user_query_transcript}\"")
             
             if EnvHelper.get_repeat_user_input() : 
@@ -413,7 +415,7 @@ class IncomingAudioManager(IncomingManager):
             # Replace list with the calculated average for memory efficiency
             self.average_noise_by_stream_sid[stream_sid] = average_noise
             del self.speech_to_noise_ratio_samples_by_stream_sid[stream_sid]
-            self.speech_threshold = self.speech_threshold_base + average_noise
+            self.speech_threshold = max(self.speech_threshold_base * 1.3, average_noise * 1.5)
 
     def _decode_audio_chunk(self, data : dict):
         try:
@@ -427,7 +429,7 @@ class IncomingAudioManager(IncomingManager):
             self.logger.error(f"Error decoding/converting audio chunk: {decode_err}")
             return None
 
-    async def _perform_speech_to_text_transcription_async(self, audio_data: bytes, keep_audio_file : bool = False):
+    async def _perform_speech_to_text_transcription_async(self, audio_data: bytes):
         try:
             wav_audio_filename = None
             # Check if the audio buffer has a high enough speech to noise ratio
@@ -482,7 +484,7 @@ class IncomingAudioManager(IncomingManager):
             self.logger.error(f"Error during transcription: {speech_err}", exc_info=True)
             return None
         finally:
-            if not keep_audio_file and wav_audio_filename:
+            if not self.keep_audio_file and wav_audio_filename:
                 self._delete_temp_file(wav_audio_filename)
     
     def _delete_temp_file(self, file_name: str):

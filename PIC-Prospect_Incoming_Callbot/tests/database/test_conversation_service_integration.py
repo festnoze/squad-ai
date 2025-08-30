@@ -4,7 +4,7 @@ import tempfile
 from uuid import uuid4, UUID
 from datetime import datetime, timezone
 
-from database.conversation_persistence_local_service import ConversationPersistenceServiceLocal, QuotaOverloadException
+from database.conversation_persistence_local_service import ConversationPersistenceLocalService, QuotaOverloadException
 from database.conversation_repository import ConversationRepository
 from database.user_repository import UserRepository
 from api_client.request_models.user_request_model import UserRequestModel, DeviceInfoRequestModel
@@ -31,8 +31,8 @@ async def test_db_path():
 
 @pytest.fixture
 async def conversation_service(test_db_path):
-    """Create a ConversationPersistenceServiceLocal instance with real repositories"""
-    service = ConversationPersistenceServiceLocal()
+    """Create a ConversationPersistenceLocalService instance with real repositories"""
+    service = ConversationPersistenceLocalService()
     
     # Use real repositories with test database
     service.conversation_repository = ConversationRepository(test_db_path)
@@ -350,7 +350,7 @@ class TestConversationServiceIntegration:
 
     @pytest.mark.asyncio 
     async def test_interface_compliance(self, conversation_service):
-        """Test that ConversationPersistenceServiceLocal properly implements ConversationPersistenceInterface"""
+        """Test that ConversationPersistenceLocalService properly implements ConversationPersistenceInterface"""
         from api_client.conversation_persistence_interface import ConversationPersistenceInterface
 
         assert issubclass(conversation_service.__class__, ConversationPersistenceInterface)

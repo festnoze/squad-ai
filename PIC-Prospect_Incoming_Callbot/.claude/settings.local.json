@@ -19,7 +19,8 @@
       "Bash(.venv/Scripts/activate)",
       "Bash(del:*)",
       "Bash(call activate_venv.bat)",
-      "Bash(\".venv\\Scripts\\activate\")"
+      "Bash(\".venv\\Scripts\\activate\")",
+      "Bash(PYTHONPATH=app python:*)"
     ],
     "deny": []
   }
