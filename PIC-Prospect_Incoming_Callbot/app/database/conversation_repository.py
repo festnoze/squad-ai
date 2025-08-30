@@ -22,11 +22,13 @@ class ConversationRepository:
             print(f"Failed to create conversation: {e}")
             return None
     
-    async def add_message_to_existing_conversation_async(self, conversation_id: UUID, message: str, role: str = "assistant") -> bool:
+    async def add_message_to_existing_conversation_async(self, conversation_id: UUID, message: Message) -> bool:
         try:
             if not await self.does_exist_conversation_by_id_async(conversation_id):
                 raise ValueError(f"Conversation with id: {conversation_id} does not exist.")
-            new_message_entity = ConversationEntityToDtoConverter.convert_message_model_to_entity(conversation_id, message, role)
+            new_message_entity = ConversationEntityToDtoConverter.convert_message_model_to_entity(
+                conversation_id, message.content, message.role, message.id, message.created_at, message.elapsed_seconds
+            )
             res = await self.data_context.add_entity_async(new_message_entity)
             return True
         except ValueError:

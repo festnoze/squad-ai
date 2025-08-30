@@ -12,6 +12,7 @@ from api_client.request_models.conversation_request_model import ConversationReq
 from database.models.conversation import Conversation, Message
 from database.models.user import User
 from database.models.device_info import DeviceInfo
+from api_client.conversation_persistence_interface import ConversationPersistenceInterface
 
 
 @pytest.fixture
@@ -252,7 +253,7 @@ class TestConversationServiceIntegration:
         assert result["message_count"] == 0
 
     @pytest.mark.asyncio
-    async def test_add_message_to_conversation_async_success(self, conversation_service, test_conversation):
+    async def test_add_message_to_conversation_async_success(self, conversation_service: ConversationPersistenceInterface, test_conversation: Conversation):
         """Test successful addition of external AI message to conversation"""
         # Arrange
         conversation_id_str = str(test_conversation.id)

@@ -1,0 +1,13 @@
+{
+  "include": [
+    "app",
+    "tests"
+  ],
+  "extraPaths": [
+    "./app"
+  ],
+  "pythonVersion": "3.12",
+  "pythonPlatform": "Windows",
+  "typeCheckingMode": "basic",
+  "useLibraryCodeForTypes": true
+}
