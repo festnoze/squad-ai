@@ -4,7 +4,7 @@ from app.agents.agents_graph import AgentsGraph
 from app.managers.outgoing_manager import OutgoingManager
 from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
 from app.api_client.salesforce_api_client_interface import SalesforceApiClientInterface
-
+from app.endpoints import change_env_var_values
 
 @pytest.mark.parametrize("awaited_dispatch, user_input, chat_history", [
     
@@ -26,8 +26,11 @@ from app.api_client.salesforce_api_client_interface import SalesforceApiClientIn
 ])
 async def test_agents_dispatching(agents_graph_mockings, user_input: str, chat_history: list[tuple[str, str]], awaited_dispatch: str):
     """Test that the agents graph dispatch to the targeted agent."""
+    
     # Arrange
-
+    # Set available actions to schedule_calendar_appointment and ask rag
+    await change_env_var_values({"AVAILABLE_ACTIONS": "schedule_appointement, ask_rag"})
+    
     # Create an instance of AgentsGraph with mocked dependencies
     agents = AgentsGraph(
         outgoing_manager=agents_graph_mockings["outgoing_manager"],

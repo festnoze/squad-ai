@@ -33,7 +33,7 @@ async def test_graph_init_conversation_and_welcome_message(agents_graph_mockings
     )
 
     # Then invoke the graph with initial state to get the AI-generated welcome message
-    updated_state: PhoneConversationState = await agents_graph.ainvoke(initial_state)
+    updated_state: dict = await agents_graph.ainvoke(initial_state)
     
     # Assert
     assert "conversation_id" in updated_state["agent_scratchpad"]

@@ -100,9 +100,9 @@ async def _extract_request_data_async(request: Request) -> tuple:
     """Extract common data from the request form or query parameters"""
     if request.method == "GET":
         # Pour les requêtes GET, utiliser les paramètres de requête
-        phone_number: str = request.query_params.get("From", "Unknown From")
-        call_sid: str = request.query_params.get("CallSid", "Unknown CallSid")
-        body = request.query_params.get("Body", "")
+        phone_number: str = request.var_to_update.get("From", "Unknown From")
+        call_sid: str = request.var_to_update.get("CallSid", "Unknown CallSid")
+        body = request.var_to_update.get("Body", "")
     else:
         # Pour les requêtes POST, utiliser les données du formulaire
         form = await request.form()
@@ -192,18 +192,22 @@ async def handle_incoming_sms_async(request: Request) -> HTMLResponse:
 @api_key_required
 async def change_env_var_endpoint(request: Request):
     """Change environment variable value via query parameter"""
+    query_params = dict(request.query_params)
+    return await change_env_var_values(query_params)
+
+async def change_env_var_values(var_to_update: dict):
+    """Change environment variable value via query parameter"""
     logger.info("Received request to change environment variable")
-    try:
-        query_params = dict(request.query_params)
-        
-        if not query_params:
-            raise HTTPException(status_code=400, detail="No query parameters provided")
-        
+    
+    if not var_to_update:
+        raise HTTPException(status_code=400, detail="No query parameters provided")
+
+    try: 
         # Process each query parameter as a potential env var change
         updated_vars = []
         missing_vars = []
         
-        for var_name, new_value in query_params.items():
+        for var_name, new_value in var_to_update.items():
             # Check if the environment variable already exists
             if var_name not in os.environ:
                 missing_vars.append(var_name)

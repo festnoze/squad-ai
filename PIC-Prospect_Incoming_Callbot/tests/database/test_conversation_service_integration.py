@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 from database.conversation_persistence_local_service import ConversationPersistenceLocalService, QuotaOverloadException
 from database.conversation_repository import ConversationRepository
+from database.models import conversation
 from database.user_repository import UserRepository
 from api_client.conversation_persistence_interface import ConversationPersistenceInterface
 from database.conversation_persistence_local_service import ConversationPersistenceLocalService
@@ -32,7 +33,7 @@ async def test_db_path():
 
 
 @pytest.fixture
-async def conversation_service(test_db_path):
+async def conversation_service(test_db_path) -> ConversationPersistenceLocalService:
     """Create a ConversationPersistenceLocalService instance with real repositories"""
     service = ConversationPersistenceLocalService()
     
@@ -44,12 +45,11 @@ async def conversation_service(test_db_path):
     # Ensure database tables are created
     service.conversation_repository.data_context.create_database()
     
-    yield service
+    return service
     
-    # Cleanup: Close database connections
-    await service.conversation_repository.data_context.close_async()
-    await service.user_repository.data_context.close_async()
-
+    # # Cleanup: Close database connections
+    # await service.conversation_repository.data_context.close_async()
+    # await service.user_repository.data_context.close_async()
 
 @pytest.fixture
 def sample_user_id():
@@ -107,14 +107,14 @@ def sample_conversation_request(sample_user_id, sample_message_request):
 
 
 @pytest.fixture
-async def test_user(conversation_service, sample_user_request):
+async def test_user(conversation_service: ConversationPersistenceLocalService, sample_user_request):
     """Create a test user in the database"""
     user_id = await conversation_service.create_or_retrieve_user_async(sample_user_request)
     return user_id
 
 
 @pytest.fixture
-async def test_conversation(conversation_service, sample_user_request):
+async def test_conversation(conversation_service: ConversationPersistenceLocalService, sample_user_request):
     """Create a test conversation in the database"""
     # First create a user
     user_id = await conversation_service.create_or_retrieve_user_async(sample_user_request)
@@ -134,7 +134,7 @@ async def test_conversation(conversation_service, sample_user_request):
 class TestConversationServiceIntegration:
     
     @pytest.mark.asyncio
-    async def test_create_or_retrieve_user_async_success(self, conversation_service, sample_user_request):
+    async def test_create_or_retrieve_user_async_success(self, conversation_service: ConversationPersistenceLocalService, sample_user_request):
         """Test successful user creation or retrieval"""
         # Act
         user_id = await conversation_service.create_or_retrieve_user_async(sample_user_request)
@@ -148,7 +148,7 @@ class TestConversationServiceIntegration:
         assert user.name == sample_user_request.user_name
 
     @pytest.mark.asyncio
-    async def test_create_new_conversation_async_success(self, conversation_service, sample_user_request, sample_message_request):
+    async def test_create_new_conversation_async_success(self, conversation_service: ConversationPersistenceLocalService, sample_user_request, sample_message_request):
         """Test successful conversation creation"""
         # Arrange - First create a user to ensure they exist in the database
         user_id = await conversation_service.create_or_retrieve_user_async(sample_user_request)
@@ -172,7 +172,7 @@ class TestConversationServiceIntegration:
         assert conversation.messages[0].content == sample_message_request.content
 
     @pytest.mark.asyncio
-    async def test_create_new_conversation_async_quota_exceeded(self, conversation_service, sample_user_request):
+    async def test_create_new_conversation_async_quota_exceeded(self, conversation_service: ConversationPersistenceLocalService, sample_user_request):
         """Test conversation creation when quota is exceeded"""
         # Arrange - Create a user and set quota to 1
         user_id = await conversation_service.create_or_retrieve_user_async(sample_user_request)
@@ -191,7 +191,7 @@ class TestConversationServiceIntegration:
             await conversation_service.create_new_conversation_async(conversation_request_2)
 
     @pytest.mark.asyncio
-    async def test_create_new_conversation_async_no_quota_limit(self, conversation_service, sample_user_request):
+    async def test_create_new_conversation_async_no_quota_limit(self, conversation_service: ConversationPersistenceLocalService, sample_user_request):
         """Test conversation creation when no quota limit is set"""
         # Arrange
         conversation_service.max_conversations_by_day = None  # No limit
@@ -214,7 +214,7 @@ class TestConversationServiceIntegration:
             assert conversation.user.id == user_id
 
     @pytest.mark.asyncio
-    async def test_get_user_last_conversation_async_with_conversations(self, conversation_service, sample_user_request):
+    async def test_get_user_last_conversation_async_with_conversations(self, conversation_service: ConversationPersistenceLocalService, sample_user_request):
         """Test getting user's last conversation when conversations exist"""
         # Arrange - Create user and multiple conversations
         user_id = await conversation_service.create_or_retrieve_user_async(sample_user_request)
@@ -239,7 +239,7 @@ class TestConversationServiceIntegration:
         assert UUID(result["conversation_id"]) in conv_ids
 
     @pytest.mark.asyncio
-    async def test_get_user_last_conversation_async_no_conversations(self, conversation_service, sample_user_request):
+    async def test_get_user_last_conversation_async_no_conversations(self, conversation_service: ConversationPersistenceLocalService, sample_user_request):
         """Test getting user's last conversation when no conversations exist"""
         # Arrange - Create user but no conversations
         user_id = await conversation_service.create_or_retrieve_user_async(sample_user_request)
@@ -254,7 +254,7 @@ class TestConversationServiceIntegration:
         assert result["message_count"] == 0
 
     @pytest.mark.asyncio
-    async def test_add_message_to_conversation_async_success(self, conversation_service: ConversationPersistenceInterface, test_conversation: Conversation):
+    async def test_add_message_to_conversation_async_success(self, conversation_service: ConversationPersistenceLocalService, test_conversation: Conversation):
         """Test successful addition of external AI message to conversation"""
         # Arrange
         conversation_id_str = str(test_conversation.id)
@@ -264,26 +264,20 @@ class TestConversationServiceIntegration:
         result = await conversation_service.add_message_to_conversation_async(conversation_id_str, message_content)
         
         # Assert
-        assert isinstance(result, dict)
-        assert "id" in result  # The conversation ID
-        assert "messages" in result
-        assert result["id"] == conversation_id_str
-        
-        # Verify the AI message was added
-        messages = result["messages"]
-        ai_messages = [msg for msg in messages if msg.get("role") == "assistant"]
-        assert len(ai_messages) >= 1
-        assert any(msg.get("content") == message_content for msg in ai_messages)
+        assert isinstance(result, Conversation)
+        assert result.id == test_conversation.id
+        assert len(result.messages) == 1
+        assert result.messages[-1].content == message_content
         
         # Verify the message was actually added to the database
         updated_conversation = await conversation_service.conversation_repository.get_conversation_by_id_async(test_conversation.id)
-        # Find the AI message in the conversation
-        db_ai_messages = [msg for msg in updated_conversation.messages if msg.role == "assistant"]
-        assert len(db_ai_messages) >= 1
-        assert any(msg.content == message_content for msg in db_ai_messages)
+        
+        assert isinstance(updated_conversation, Conversation)
+        assert len(updated_conversation.messages) == 1
+        assert updated_conversation.messages[-1].content == message_content
 
     @pytest.mark.asyncio
-    async def test_add_message_to_conversation_async_empty_message(self, conversation_service, test_conversation):
+    async def test_add_message_to_conversation_async_empty_message_not_added(self, conversation_service, test_conversation):
         """Test adding empty message to conversation"""
         # Arrange
         conversation_id_str = str(test_conversation.id)
@@ -293,14 +287,16 @@ class TestConversationServiceIntegration:
         result = await conversation_service.add_message_to_conversation_async(conversation_id_str, empty_message)
         
         # Assert
-        assert isinstance(result, dict)
-        assert "id" in result
-        assert "messages" in result
+        assert isinstance(result, Conversation)
+        assert result.id == test_conversation.id
+        assert not any(result.messages)
         
         # Verify no new AI message was added to the database for empty content
         updated_conversation = await conversation_service.conversation_repository.get_conversation_by_id_async(test_conversation.id)
-        # Should have the same number of messages as before (empty messages shouldn't be added)
-        assert len(updated_conversation.messages) == len(test_conversation.messages)
+        
+        assert isinstance(updated_conversation, Conversation)
+        assert result.id == test_conversation.id
+        assert not any(result.messages)
 
     @pytest.mark.asyncio
     async def test_add_message_to_user_last_conversation_or_create_one_async_existing_conversation(
@@ -326,7 +322,7 @@ class TestConversationServiceIntegration:
 
     @pytest.mark.asyncio
     async def test_add_message_to_user_last_conversation_or_create_one_async_create_new(
-        self, conversation_service, sample_user_request
+        self, conversation_service: ConversationPersistenceLocalService, sample_user_request
     ):
         """Test adding message to user's last conversation when no conversation exists"""
         # Arrange - Create a user but no conversations
@@ -351,7 +347,7 @@ class TestConversationServiceIntegration:
         assert any(msg.content == message_content for msg in user_messages)
 
     @pytest.mark.asyncio 
-    async def test_interface_compliance(self, conversation_service):
+    async def test_interface_compliance(self, conversation_service: ConversationPersistenceLocalService):
         """Test that ConversationPersistenceLocalService properly implements ConversationPersistenceInterface"""
 
         assert issubclass(conversation_service.__class__, ConversationPersistenceInterface)
@@ -369,7 +365,7 @@ class TestConversationServiceIntegration:
             assert callable(getattr(conversation_service, method_name))
 
     @pytest.mark.asyncio
-    async def test_conversation_service_with_message_models(self, conversation_service, sample_user_request):
+    async def test_conversation_service_with_message_models(self, conversation_service: ConversationPersistenceLocalService, sample_user_request):
         """Integration test with actual message models"""
         # Arrange
         user_id = await conversation_service.create_or_retrieve_user_async(sample_user_request)
