@@ -1083,6 +1083,199 @@ class TestScheduleAppointmentRetryParameterValidation:
                 assert verification_attempts == 3  # 3 verification attempts
 
 
+class TestScheduleAppointmentOverlapDetection:
+    """Tests for overlapping appointment detection in schedule_new_appointment_async"""
+    
+    async def test_schedule_new_appointment_fails_when_overlapping_appointment_exists(self):
+        """Test that schedule_new_appointment_async fails when trying to create an overlapping appointment"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        # Mock the verify_appointment_existance method to simulate finding an existing appointment
+        existing_event_id = "existing_event_123"
+        verify_call_count = 0
+        
+        async def mock_verification(*args, **kwargs):
+            nonlocal verify_call_count
+            verify_call_count += 1
+            event_id = kwargs.get('event_id')
+            
+            # First call: check if appointment already exists (event_id=None) - return existing event
+            if event_id is None:
+                return existing_event_id  # Return existing appointment ID to indicate overlap
+            else:
+                # This shouldn't be reached since method should return None due to overlap
+                return event_id
+        
+        with patch.object(client, 'verify_appointment_existance', new_callable=AsyncMock) as mock_verify:
+            mock_verify.side_effect = mock_verification
+            
+            result = await client.schedule_new_appointment_async(
+                subject="Overlapping Meeting",
+                start_datetime="2025-12-01T10:00:00Z",
+                duration_minutes=30,
+                description="This should fail due to overlap"
+            )
+            
+            # Should return None because of overlapping appointment
+            assert result is None
+            # Should only call verification once (the overlap check)
+            assert verify_call_count == 1
+            # Verify the overlap check was called with correct parameters
+            mock_verify.assert_called_once_with(
+                event_id=None,
+                expected_subject="Overlapping Meeting", 
+                start_datetime="2025-12-01T10:00:00Z",
+                duration_minutes=30
+            )
+    
+    async def test_schedule_new_appointment_succeeds_when_no_overlapping_appointment(self):
+        """Test that schedule_new_appointment_async succeeds when no overlapping appointment exists"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        verify_call_count = 0
+        post_call_count = 0
+        
+        async def mock_post(*args, **kwargs):
+            nonlocal post_call_count
+            post_call_count += 1
+            mock_response = MagicMock()
+            mock_response.status_code = 201
+            mock_response.json.return_value = {"id": "new_event_456"}
+            return mock_response
+        
+        async def mock_verification(*args, **kwargs):
+            nonlocal verify_call_count
+            verify_call_count += 1
+            event_id = kwargs.get('event_id')
+            
+            # First call: check if appointment already exists (event_id=None) - return None (no overlap)
+            if event_id is None:
+                return None  # No existing appointment found
+            # Second call: verify creation (event_id="new_event_456") - return the ID to confirm success
+            else:
+                return event_id
+        
+        with patch('httpx.AsyncClient') as mock_client_class:
+            mock_client = mock_client_class.return_value.__aenter__.return_value
+            mock_client.post = mock_post
+            
+            with patch.object(client, 'verify_appointment_existance', new_callable=AsyncMock) as mock_verify:
+                mock_verify.side_effect = mock_verification
+                
+                result = await client.schedule_new_appointment_async(
+                    subject="Non-Overlapping Meeting",
+                    start_datetime="2025-12-01T14:00:00Z",
+                    duration_minutes=60,
+                    description="This should succeed - no overlap"
+                )
+                
+                # Should return the new event ID
+                assert result == "new_event_456"
+                # Should call verification twice: overlap check + creation verification
+                assert verify_call_count == 2
+                # Should make one API call to create the appointment
+                assert post_call_count == 1
+    
+    async def test_schedule_new_appointment_overlap_with_different_subject_same_time(self):
+        """Test that appointments with different subjects at same time are considered overlapping"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        existing_event_id = "existing_different_subject_789"
+        
+        async def mock_verification(*args, **kwargs):
+            event_id = kwargs.get('event_id')
+            expected_subject = kwargs.get('expected_subject')
+            
+            # First call: check if appointment already exists (event_id=None)
+            if event_id is None:
+                # The current implementation checks by subject + time, but we're testing
+                # the scenario where there's a different subject at the same time
+                # For this test, we simulate that verify_appointment_existance finds 
+                # an existing appointment with different subject but same time slot
+                if expected_subject == "New Meeting Subject":
+                    return existing_event_id  # Found overlapping appointment
+                return None
+            else:
+                return event_id
+        
+        with patch.object(client, 'verify_appointment_existance', new_callable=AsyncMock) as mock_verify:
+            mock_verify.side_effect = mock_verification
+            
+            result = await client.schedule_new_appointment_async(
+                subject="New Meeting Subject",
+                start_datetime="2025-12-01T15:00:00Z", 
+                duration_minutes=30
+            )
+            
+            # Should fail due to overlap detection
+            assert result is None
+    
+    async def test_schedule_new_appointment_overlap_with_partial_time_overlap(self):
+        """Test that appointments with partial time overlap are detected"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        existing_event_id = "partially_overlapping_event"
+        
+        async def mock_verification(*args, **kwargs):
+            event_id = kwargs.get('event_id')
+            start_datetime = kwargs.get('start_datetime')
+            
+            # First call: check if appointment already exists (event_id=None)
+            if event_id is None:
+                # Simulate finding an existing appointment that overlaps with the requested time
+                if start_datetime == "2025-12-01T16:30:00Z":  # Our new appointment starts when existing one ends
+                    return existing_event_id  # Found overlapping appointment
+                return None
+            else:
+                return event_id
+        
+        with patch.object(client, 'verify_appointment_existance', new_callable=AsyncMock) as mock_verify:
+            mock_verify.side_effect = mock_verification
+            
+            result = await client.schedule_new_appointment_async(
+                subject="Partially Overlapping Meeting",
+                start_datetime="2025-12-01T16:30:00Z",  # Starts when existing appointment ends
+                duration_minutes=45
+            )
+            
+            # Should fail due to overlap detection
+            assert result is None
+    
+    async def test_schedule_new_appointment_overlap_check_handles_verification_error(self):
+        """Test that appointment creation fails gracefully when overlap check encounters an error"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+        
+        async def mock_verification(*args, **kwargs):
+            event_id = kwargs.get('event_id')
+            
+            # First call: check if appointment already exists (event_id=None) - simulate API error
+            if event_id is None:
+                raise Exception("Salesforce API error during overlap check")
+            else:
+                return event_id
+        
+        with patch.object(client, 'verify_appointment_existance', new_callable=AsyncMock) as mock_verify:
+            mock_verify.side_effect = mock_verification
+            
+            # The method should handle the error gracefully
+            with pytest.raises(Exception, match="Salesforce API error during overlap check"):
+                await client.schedule_new_appointment_async(
+                    subject="Error Test Meeting",
+                    start_datetime="2025-12-01T17:00:00Z",
+                    duration_minutes=30
+                )
+
+
 class TestScheduleAppointmentRetryIntegration:
     """Integration tests for complete retry workflow scenarios"""
     

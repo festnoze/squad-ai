@@ -226,12 +226,13 @@ class CalendarAgent:
         scheduled_slots = await CalendarAgent.salesforce_api_client.get_scheduled_appointments_async(start_date, end_date, CalendarAgent.owner_id)
         return CalendarAgent.get_available_timeframes_from_scheduled_slots(start_date, end_date, scheduled_slots)
 
+    @staticmethod
     @tool
     async def schedule_new_appointment(
             date_and_time: str,
             object: str | None = None,
             description: str | None = None
-        ) -> dict[str, any]:
+        ) -> str | None:
         """Schedule a new appointment with the owner at the specified date and time.
         
         Args:
@@ -245,12 +246,13 @@ class CalendarAgent:
         duration = 30 # Default duration in minutes
         return await CalendarAgent.schedule_new_appointment_tool_async(date_and_time, duration, object, description)
 
+    @staticmethod
     async def schedule_new_appointment_tool_async(
             date_and_time: str,
             duration: int = 30,
             object: str | None = None,
             description: str | None = None
-        ) -> dict[str, any]:
+        ) -> str | None:
         object = object if object else "Demande de conseil en formation prospect"
         description = description if description else "RV pris par l'IA après appel entrant du prospect"
         if not date_and_time.endswith("Z"):
@@ -337,32 +339,33 @@ class CalendarAgent:
             self.logger.warning(f"CalendarAgent categorisation failed: {e}")
             return "Proposition de créneaux"
         
-    def _get_french_slots(self, slots: list[str]) -> str:
-        results = []
-        for slot in slots:
-            results.append(self._get_french_slot(slot))
-        return results
+    # OBSOLETE: TODO to remove
+    # def _get_french_slots(self, slots: list[str]) -> list[str]:
+    #     results : list[str] = []
+    #     for slot in slots:
+    #         results.append(self._get_french_slot(slot))
+    #     return results
 
-    def _get_french_slot(self, slot: str) -> str:
-        # Expects slot in "YYYY-MM-DD HH:MM-HH:MM"
-        date_part, time_part = slot.split(" ")
-        start_time, end_time = time_part.split("-")
-        dt = datetime.strptime(date_part, "%Y-%m-%d")
-        jours = [
-            "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"
-        ]
-        mois = [
-            "", "janvier", "février", "mars", "avril", "mai", "juin",
-            "juillet", "août", "septembre", "octobre", "novembre", "décembre"
-        ]
-        jour = jours[dt.weekday()]
-        mois_nom = mois[dt.month]        
-        jour_num = str(dt.day) # Remove leading zero for day
-        debut_h, debut_m = start_time.split(":")
-        fin_h, fin_m = end_time.split(":")
-        debut_m_str = '' if debut_m == '00' else f' {debut_m}'
-        fin_m_str = '' if fin_m == '00' else f' {fin_m}'
-        return f"{jour} {jour_num} {mois_nom} entre {int(debut_h)} heure{'s' if int(debut_h) != 1 else ''}{debut_m_str} et {int(fin_h)} heure{'s' if int(fin_h) != 1 else ''}{fin_m_str}"
+    # def _get_french_slot(self, slot: str) -> str:
+    #     # Expects slot in "YYYY-MM-DD HH:MM-HH:MM"
+    #     date_part, time_part = slot.split(" ")
+    #     start_time, end_time = time_part.split("-")
+    #     dt = datetime.strptime(date_part, "%Y-%m-%d")
+    #     jours = [
+    #         "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"
+    #     ]
+    #     mois = [
+    #         "", "janvier", "février", "mars", "avril", "mai", "juin",
+    #         "juillet", "août", "septembre", "octobre", "novembre", "décembre"
+    #     ]
+    #     jour = jours[dt.weekday()]
+    #     mois_nom = mois[dt.month]        
+    #     jour_num = str(dt.day) # Remove leading zero for day
+    #     debut_h, debut_m = start_time.split(":")
+    #     fin_h, fin_m = end_time.split(":")
+    #     debut_m_str = '' if debut_m == '00' else f' {debut_m}'
+    #     fin_m_str = '' if fin_m == '00' else f' {fin_m}'
+    #     return f"{jour} {jour_num} {mois_nom} entre {int(debut_h)} heure{'s' if int(debut_h) != 1 else ''}{debut_m_str} et {int(fin_h)} heure{'s' if int(fin_h) != 1 else ''}{fin_m_str}"
 
     def _to_french_date(self, dt: datetime, include_weekday: bool = True, include_year: bool = False, include_hour: bool = False) -> str:
         french_days = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
@@ -379,13 +382,14 @@ class CalendarAgent:
         minute_str = '' if dt.minute == 0 else f' {dt.minute}'
         return f"{dt.hour} heure{'s' if int(dt.hour) != 1 else ''}{minute_str}".strip()
 
+    @staticmethod
     def get_available_timeframes_from_scheduled_slots(
         start_date: str,
         end_date: str,
-        scheduled_slots: list[dict[str, any]],
+        scheduled_slots: list[dict],
         slot_duration_minutes: int = 30,
         max_weekday: int = 5,
-        availability_timeframe: list[tuple[str, str]] = None,
+        availability_timeframe: list[tuple[str, str]] = [],
         adjust_end_time: bool = False,
     ) -> list[str]:
         """

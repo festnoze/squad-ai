@@ -21,7 +21,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
     _private_key_file = 'salesforce_server_private.key'
     _is_sandbox = True
 
-    def __init__(self, client_id: str = None, username: str = None, private_key_file: str = None, is_sandbox: bool = True):
+    def __init__(self, client_id: str | None = None, username: str | None = None, private_key_file: str | None = None, is_sandbox: bool = True):
         self.logger = logging.getLogger(__name__)
         self._client_id = client_id or self._client_id
         self._username = username or self._username
