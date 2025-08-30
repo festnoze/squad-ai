@@ -50,7 +50,20 @@ class ConversationPersistenceInterface(ABC):
         pass
 
     @abstractmethod
-    async def add_message_to_conversation_async(self, conversation_id: str, new_message: str, role: str = "assistant", timeout: int = 10) -> dict:
+    async def add_message_to_user_last_conversation_or_create_one_async(self, user_id:UUID, new_message:str) -> Conversation:
+        """Add a user message to the user's last conversation or create a new one.
+        
+        Args:
+            user_id: The UUID of the user to add the message to
+            new_message: The message content to add to the conversation
+            
+        Returns:
+            Conversation object containing the added message
+        """
+        pass
+    
+    @abstractmethod
+    async def add_message_to_conversation_async(self, conversation_id: str, new_message_content: str, role: str = "assistant", timeout: int = 10) -> dict | None:
         """Add an external AI message to a conversation.
         
         Args:

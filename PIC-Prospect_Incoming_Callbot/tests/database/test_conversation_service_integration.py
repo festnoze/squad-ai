@@ -7,12 +7,13 @@ from datetime import datetime, timezone
 from database.conversation_persistence_local_service import ConversationPersistenceLocalService, QuotaOverloadException
 from database.conversation_repository import ConversationRepository
 from database.user_repository import UserRepository
+from api_client.conversation_persistence_interface import ConversationPersistenceInterface
+from database.conversation_persistence_local_service import ConversationPersistenceLocalService
 from api_client.request_models.user_request_model import UserRequestModel, DeviceInfoRequestModel
 from api_client.request_models.conversation_request_model import ConversationRequestModel, MessageRequestModel
 from database.models.conversation import Conversation, Message
 from database.models.user import User
 from database.models.device_info import DeviceInfo
-from api_client.conversation_persistence_interface import ConversationPersistenceInterface
 
 
 @pytest.fixture
@@ -303,7 +304,7 @@ class TestConversationServiceIntegration:
 
     @pytest.mark.asyncio
     async def test_add_message_to_user_last_conversation_or_create_one_async_existing_conversation(
-        self, conversation_service, test_conversation
+        self, conversation_service: ConversationPersistenceLocalService, test_conversation: Conversation
     ):
         """Test adding message to user's last conversation when conversation exists"""
         # Arrange
@@ -352,7 +353,6 @@ class TestConversationServiceIntegration:
     @pytest.mark.asyncio 
     async def test_interface_compliance(self, conversation_service):
         """Test that ConversationPersistenceLocalService properly implements ConversationPersistenceInterface"""
-        from api_client.conversation_persistence_interface import ConversationPersistenceInterface
 
         assert issubclass(conversation_service.__class__, ConversationPersistenceInterface)
         

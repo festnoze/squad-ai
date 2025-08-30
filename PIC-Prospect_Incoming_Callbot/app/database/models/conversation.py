@@ -34,8 +34,10 @@ class Conversation:
     def add_message(self, message: Message) -> None:
         self.messages.append(message)
     
-    def add_new_message(self, role: str, content: str, elapsed_seconds: int=0) -> None:
-        self.messages.append(Message(role, content, elapsed_seconds))
+    def add_new_message(self, role: str, content: str, elapsed_seconds: int=0) -> Message:
+        new_message = Message(role, content, elapsed_seconds)
+        self.messages.append(new_message)
+        return new_message
 
     @property
     def last_message(self) -> Message:

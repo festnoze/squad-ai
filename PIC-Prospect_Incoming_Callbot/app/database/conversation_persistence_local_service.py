@@ -73,7 +73,7 @@ class ConversationPersistenceLocalService(ConversationPersistenceInterface):
             }
         return {"conversation_id": None, "user_id": str(user_id), "message_count": 0}
     
-    async def add_message_to_user_last_conversation_or_create_one_async(self, user_id:UUID, new_message:str) -> dict:
+    async def add_message_to_user_last_conversation_or_create_one_async(self, user_id:UUID, new_message:str) -> Conversation | None:
         conversations = await self.conversation_repository.get_all_user_conversations_async(user_id)
         if any(conversations):
             conversation = conversations[-1]
@@ -88,15 +88,14 @@ class ConversationPersistenceLocalService(ConversationPersistenceInterface):
 
         if new_message and conversation:
             conversation.add_new_message("user", new_message)
-            await self.conversation_repository.add_message_to_existing_conversation_async(conversation.id, conversation.last_message, "user")
+            await self.conversation_repository.add_message_to_existing_conversation_async(conversation.id, conversation.last_message)
         return conversation
     
-    async def add_message_to_conversation_async(self, conversation_id: str, new_message: str, role: str = "assistant", timeout: int = 10) -> dict:
+    async def add_message_to_conversation_async(self, conversation_id: str, new_message_content: str, role: str = "assistant", timeout: int = 10) -> Conversation | None:
         conversation_uuid = UUID(conversation_id)
         conversation = await self.conversation_repository.get_conversation_by_id_async(conversation_uuid)
-        if new_message:
-            conversation.add_new_message(role, new_message)
-            await self.conversation_repository.add_message_to_existing_conversation_async(conversation.id, new_message, role)
-        
-        return conversation.to_dict() if conversation else None
+        if new_message_content and conversation:
+            new_message = conversation.add_new_message(role, new_message_content)
+            await self.conversation_repository.add_message_to_existing_conversation_async(conversation.id, new_message)      
+        return conversation
     
