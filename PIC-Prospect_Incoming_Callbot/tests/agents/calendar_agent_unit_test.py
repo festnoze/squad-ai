@@ -77,7 +77,7 @@ async def test_calendar_agent_classification(sf_client_mock, user_input, chat_hi
 
 async def test_proposition_de_creneaux_calls_get_appointments(sf_client_mock):
     openai_api_key = EnvHelper.get_openai_api_key()
-    calendar_timeframes_llm = LangChainFactory.create_llm_from_info(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4.1-mini", timeout=50, temperature=0.1, api_key=openai_api_key))
+    calendar_timeframes_llm = LangChainFactory.create_llm_from_info(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4.1", timeout=50, temperature=0.1, api_key=openai_api_key))
     agent = CalendarAgent(sf_client_mock, FakeLLM("Proposition de créneaux"), calendar_timeframes_llm)
     CalendarAgent.now = datetime(2025, 6, 19)
     agent._set_user_info("uid", "John", "Doe", "john@ex.com", "ownerId", "Alice")

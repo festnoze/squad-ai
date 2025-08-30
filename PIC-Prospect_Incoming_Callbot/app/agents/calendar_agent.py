@@ -15,7 +15,7 @@ class CalendarAgent:
     salesforce_api_client: SalesforceApiClientInterface
     owner_id: str | None = None
     owner_name: str | None = None
-    now: datetime | None = None
+    now: datetime = datetime.now(tz=pytz.timezone('Europe/Paris'))
     
     # Backward compatibility class attributes - delegate to TextRegistry
     availability_request_text = AgentTexts.availability_request_text

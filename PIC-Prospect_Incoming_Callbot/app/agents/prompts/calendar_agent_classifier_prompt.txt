@@ -61,7 +61,7 @@ Voici quelques phrases typiques des réponses de l'IA :
 - La phrase type pour la catégorie "Proposition de créneaux" : "Je vous propose les créneaux suivants : xx. Avez-vous une préférence ?"
 - La phrase type pour la catégorie "Demande des disponibilités" : "Quels jours ou quelles heures de la journée vous conviendraient le mieux ?"
 - La phrase type pour la catégorie "Demande de confirmation du rendez-vous" : "Récapitulons : votre rendez-vous sera planifié le xx à xx heures. Merci de confirmer ce rendez-vous pour le valider."
-- La phrase type pour la catégorie "Rendez-vous confirmé" : "C'est confirmé ! Votre rendez-vous est maintenant planifié pour le xx à xx heures. Merci et au revoir."
+- La phrase type pour la catégorie "Rendez-vous confirmé" : "C'est confirmé, votre rendez-vous est maintenant planifié pour le xx à xx heures. Merci et au revoir."
 </Phrases type>
 
 <Historique de la conversation>

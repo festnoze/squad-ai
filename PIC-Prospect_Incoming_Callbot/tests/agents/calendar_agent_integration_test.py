@@ -46,7 +46,7 @@ from llms.langchain_adapter_type import LangChainAdapterType
                 ("AI", "Veuillez confirmer le rendez-vous du jeudi 20 juin à 14 heures.")
             ],
             "Rendez-vous confirmé",
-            "C'est confirmé ! Votre rendez-vous est maintenant planifié pour le jeudi 20 juin à 14 heures. Merci et au revoir.",
+            "C'est confirmé, votre rendez-vous est maintenant planifié pour le jeudi 20 juin à 14 heures. Merci et au revoir.",
             True # Exact match
         ),
         
@@ -59,7 +59,7 @@ from llms.langchain_adapter_type import LangChainAdapterType
                 ("AI", "Je vous propose le créneaux du jeudi 20 juin à 14 heures. Si ce créneau vous convient, merci de me confirmer afin de finaliser sa réservation.")
             ],
             "Proposition de créneaux", 
-            "Je suis désolé, aucun créneau n'est disponible entre le 24 juin 2025 et le 28 juin 2025. Souhaitez-vous regarder une autre date ?",
+            "Je suis désolé, aucun créneau n'est disponible entre le 24 juin et le 28 juin. Souhaitez-vous regarder une autre date ?",
             False # Semantic matching
         ),
 
@@ -115,7 +115,7 @@ from llms.langchain_adapter_type import LangChainAdapterType
                 ("AI", "Veuillez confirmer le rendez-vous du vendredi 21 juin à 10 heures.")
             ],
             "Rendez-vous confirmé", 
-            "C'est confirmé ! Votre rendez-vous est maintenant planifié pour le vendredi 21 juin à 10 heures. Merci et au revoir.", 
+            "C'est confirmé, votre rendez-vous est maintenant planifié pour le vendredi 21 juin à 10 heures. Merci et au revoir.", 
             True # Exact match
         ),
         
@@ -125,7 +125,7 @@ from llms.langchain_adapter_type import LangChainAdapterType
             "Je voudrais prendre rendez-vous la semaine prochaine", 
             [], 
             "Proposition de créneaux", # Agent indicates no slots
-            "Je suis désolé, aucun créneau n'est disponible entre le 24 juin 2025 et le 28 juin 2025. Souhaitez-vous regarder une autre date ?",
+            "Je suis désolé, aucun créneau n'est disponible entre le 24 juin et le 28 juin. Souhaitez-vous regarder une autre date ?",
             False # Semantic match
         ),
         
@@ -284,7 +284,7 @@ async def test_complete_conversation_exchange(sf_client_mock, llm_instance, simi
         {
             "user_input": "Je confirme le rendez-vous",
             "category": "Rendez-vous confirmé",
-            "expected_response": "C'est confirmé ! Votre rendez-vous est maintenant planifié pour après-demain, le vendredi 21 juin à 15 heures. Merci et au revoir.",
+            "expected_response": "C'est confirmé, votre rendez-vous est maintenant planifié pour après-demain, le vendredi 21 juin à 15 heures. Merci et au revoir.",
             "await_exact_match": True
         }
     ]
