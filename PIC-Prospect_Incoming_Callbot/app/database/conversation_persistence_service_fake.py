@@ -32,4 +32,3 @@ class ConversationPersistenceServiceFake(ConversationPersistenceInterface):
     async def add_message_to_conversation_async(self, conversation_id: str, new_message_content: str, role: str = "assistant", timeout: int = 10) -> dict | None:
         conversation_uuid = UUID(conversation_id)
         return {"conversation_id": str(conversation_uuid), "user_id": None, "message_count": 1, "created_at": None}
-    

@@ -2,6 +2,7 @@ import httpx
 import asyncio
 from uuid import UUID
 from typing import Any, Dict, AsyncGenerator, Optional
+from database.models.user import User
 from utils.envvar import EnvHelper
 from speech.text_processing import ProcessText
 from api_client.request_models.user_request_model import UserRequestModel
@@ -9,6 +10,8 @@ from api_client.request_models.conversation_request_model import ConversationReq
 from api_client.request_models.query_asking_request_model import QueryAskingRequestModel, QueryNoConversationRequestModel
 from api_client.conversation_persistence_interface import ConversationPersistenceInterface
 from api_client.rag_query_interface import RagQueryInterface
+from database.models.conversation import Conversation
+from database.models.message import Message
 
 class StudiRAGInferenceApiClient(ConversationPersistenceInterface, RagQueryInterface):
     """
@@ -92,6 +95,54 @@ class StudiRAGInferenceApiClient(ConversationPersistenceInterface, RagQueryInter
             return resp.json()
         except ValueError as exc:
             raise exc
+        except httpx.ConnectError as exc:
+            raise RuntimeError(f"Cannot connect to RAG inference server at {self.host_base_url}") from exc
+        except httpx.TimeoutException as exc:
+            raise RuntimeError(f"Timeout connecting to RAG inference server at {self.host_base_url}") from exc
+
+    async def add_message_to_user_last_conversation_or_create_one_async(self, user_id: UUID, new_message: str) -> 'Conversation':
+        """Add a user message to the user's last conversation or create a new one.
+        
+        Args:
+            user_id: The UUID of the user to add the message to
+            new_message: The message content to add to the conversation
+            
+        Returns:
+            Conversation object containing the added message
+        """
+        try:
+            # Get user's last conversation
+            last_conversation = await self.get_user_last_conversation_async(user_id)
+            
+            # If user has a conversation, add message to it
+            if last_conversation and last_conversation.get('id'):
+                conversation_id = last_conversation['id']
+                await self.add_message_to_conversation_async(str(conversation_id), new_message, role="user")
+                
+                # Return a Conversation object - we need to import it
+                from database.models.conversation import Conversation
+                return Conversation(
+                    id=conversation_id,
+                    user=User(id=user_id),
+                    messages=last_conversation.get('messages', []) + [{'content': new_message, 'role': 'user'}]
+                )
+            else:
+                # Create new conversation and add message
+                from api_client.request_models.conversation_request_model import ConversationRequestModel
+                conversation_request = ConversationRequestModel(user_id=user_id)
+                conversation_id = await self.create_new_conversation_async(conversation_request)
+                
+                # Add the message to the new conversation
+                await self.add_message_to_conversation_async(str(conversation_id), new_message, role="user")
+                
+                # Return a Conversation object
+                from database.models.conversation import Conversation
+                return Conversation(
+                    id=conversation_id,
+                    user=User(id=user_id),
+                    messages=[Message(content= new_message, role= 'user')]
+                )
+                
         except httpx.ConnectError as exc:
             raise RuntimeError(f"Cannot connect to RAG inference server at {self.host_base_url}") from exc
         except httpx.TimeoutException as exc:
