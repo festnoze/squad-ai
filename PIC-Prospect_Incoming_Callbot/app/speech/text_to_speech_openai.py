@@ -1,22 +1,32 @@
+import base64
+import io
 from typing import Literal
+
 from openai import AsyncOpenAI
 from openai._types import NOT_GIVEN
-import base64, io
-
 from utils.envvar import EnvHelper
 
-TTSModel        = Literal[
+TTSModel = Literal[
     "gpt-4o-realtime-preview",
     "gpt-4o-mini-realtime-preview",
     "gpt-4o-mini-tts",
     "tts-1",
     "tts-1-hd",
 ]
-VoicePreset     = Literal[
-    "alloy", "ash", "ballad", "coral", "echo",
-    "fable", "onyx", "nova", "sage", "shimmer",
+VoicePreset = Literal[
+    "alloy",
+    "ash",
+    "ballad",
+    "coral",
+    "echo",
+    "fable",
+    "onyx",
+    "nova",
+    "sage",
+    "shimmer",
 ]
-ResponseFormat  = Literal["pcm","mp3","wav","flac","opus","aac"]
+ResponseFormat = Literal["pcm", "mp3", "wav", "flac", "opus", "aac"]
+
 
 class TTS_OpenAI:
     _client: AsyncOpenAI = AsyncOpenAI(api_key=EnvHelper.get_openai_api_key())
@@ -32,9 +42,7 @@ class TTS_OpenAI:
         convert_to_pcm_rate: int | None = None,
     ) -> bytes:
         if model in {"gpt-4o-realtime-preview", "gpt-4o-mini-realtime-preview"}:
-            return await TTS_OpenAI._generate_realtime_bytes(
-                model=model, text=text, voice=voice
-            )
+            return await TTS_OpenAI._generate_realtime_bytes(model=model, text=text, voice=voice)
         if model.startswith("tts-1"):
             instructions = NOT_GIVEN
         resp = await TTS_OpenAI._client.audio.speech.create(
@@ -59,18 +67,25 @@ class TTS_OpenAI:
         client = TTS_OpenAI._client
         pcm_chunks: list[bytes] = []
         async with client.beta.realtime.connect(model=model) as conn:
-            await conn.session.update(session={
-                "modalities": ["audio"],
-                "output_audio_format": "pcm16",
-            })
-            await conn.conversation.item.create(item={
-                "type": "message", "role": "user",
-                "content": [{"type": "input_text", "text": text}],
-            })
-            await conn.response.create(response={
-                "modalities": ["audio"],
-                "voice": voice,
-            })
+            await conn.session.update(
+                session={
+                    "modalities": ["audio"],
+                    "output_audio_format": "pcm16",
+                }
+            )
+            await conn.conversation.item.create(
+                item={
+                    "type": "message",
+                    "role": "user",
+                    "content": [{"type": "input_text", "text": text}],
+                }
+            )
+            await conn.response.create(
+                response={
+                    "modalities": ["audio"],
+                    "voice": voice,
+                }
+            )
             async for event in conn:
                 if event.type == "response.audio.delta":
                     pcm_chunks.append(base64.b64decode(event.delta))
@@ -87,6 +102,7 @@ class TTS_OpenAI:
         channels: int = 1,
     ) -> bytes:
         from pydub import AudioSegment
+
         audio = AudioSegment.from_raw(
             io.BytesIO(audio_bytes),
             frame_rate=from_rate,

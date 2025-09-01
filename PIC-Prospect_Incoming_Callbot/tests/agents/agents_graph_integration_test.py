@@ -147,7 +147,7 @@ async def test_first_answer_to_calendar_appointment(agents_graph_mockings):
         init_msg = "Bonjour, je suis votre assistant Studi. Comment puis-je vous aider aujourd'hui ?"
         user_input = "Je voudrais prendre rendez-vous avec un conseiller pour discuter de mon inscription"
         
-        # Create initial state                    
+        # Create initial state
         initial_state: PhoneConversationState = PhoneConversationState(
             call_sid=agents_graph_mockings["call_sid"],
             caller_phone=agents_graph_mockings["phone_number"],

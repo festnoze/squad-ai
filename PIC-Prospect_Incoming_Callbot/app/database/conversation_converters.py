@@ -1,12 +1,13 @@
-from datetime import datetime, timezone
 import uuid
+from datetime import UTC, datetime
 from uuid import UUID
+
+from database.entities import ConversationEntity, DeviceInfoEntity, MessageEntity, UserEntity
 from database.models.conversation import Conversation
+from database.models.device_info import DeviceInfo
 from database.models.message import Message
 from database.models.user import User
-from database.models.device_info import DeviceInfo
 
-from database.entities import ConversationEntity, MessageEntity, UserEntity, DeviceInfoEntity
 
 class ConversationEntityToDtoConverter:
     @staticmethod
@@ -33,30 +34,37 @@ class ConversationEntityToDtoConverter:
             os=device_info.os,
             browser=device_info.browser,
             is_mobile=device_info.is_mobile,
-            created_at=device_info.created_at if device_info.created_at else datetime.now(timezone.utc)
+            created_at=device_info.created_at if device_info.created_at else datetime.now(UTC),
         )
-        if device_info.id: entity.id = device_info.id
+        if device_info.id:
+            entity.id = device_info.id
         return entity
-    
+
     @staticmethod
     def convert_user_entity_to_model(user_entity: UserEntity) -> User:
         return User(
             name=user_entity.name,
-            device_info=ConversationEntityToDtoConverter.convert_device_info_entity_to_model(user_entity.device_infos[-1]) if user_entity.device_infos and any(user_entity.device_infos) else None,
+            device_info=ConversationEntityToDtoConverter.convert_device_info_entity_to_model(
+                user_entity.device_infos[-1]
+            )
+            if user_entity.device_infos and any(user_entity.device_infos)
+            else None,
             id=user_entity.id,
             created_at=user_entity.created_at,
         )
 
     @staticmethod
     def convert_user_model_to_entity(user: User) -> UserEntity:
-        if user.id is None: user.id = uuid.uuid4()
+        if user.id is None:
+            user.id = uuid.uuid4()
 
         new_user_entity = UserEntity(
             name=user.name,
-            created_at=user.created_at if user.created_at else datetime.now(timezone.utc),
+            created_at=user.created_at if user.created_at else datetime.now(UTC),
             id=user.id,
         )
-        if user.id: new_user_entity.id=user.id
+        if user.id:
+            new_user_entity.id = user.id
 
         return new_user_entity
 
@@ -67,51 +75,61 @@ class ConversationEntityToDtoConverter:
             content=message_entity.content,
             elapsed_seconds=message_entity.elapsed_seconds,
             id=message_entity.id,
-            created_at=message_entity.created_at
+            created_at=message_entity.created_at,
         )
 
     @staticmethod
-    def convert_message_model_to_entity(conversation_id: UUID, message: str, role: str = "assistant", id: UUID = None, created_at: datetime = None, elapsed_seconds: int = 0) -> MessageEntity:
+    def convert_message_model_to_entity(
+        conversation_id: UUID,
+        message: str,
+        role: str = "assistant",
+        id: UUID = None,
+        created_at: datetime = None,
+        elapsed_seconds: int = 0,
+    ) -> MessageEntity:
         entity = MessageEntity(
             conversation_id=conversation_id,
             role=role,
             content=message,
             elapsed_seconds=elapsed_seconds,
-            created_at=created_at or datetime.now(timezone.utc)
+            created_at=created_at or datetime.now(UTC),
         )
-        if id: entity.id=id
+        if id:
+            entity.id = id
         return entity
 
     @staticmethod
     def convert_conversation_entity_to_model(conversation_entity: ConversationEntity) -> Conversation:
-        if not conversation_entity: return None
+        if not conversation_entity:
+            return None
         user_model = ConversationEntityToDtoConverter.convert_user_entity_to_model(conversation_entity.user)
-        
+
         # Sorted messages by ascending creation order
         sorted_messages_entities = sorted(conversation_entity.messages, key=lambda msg: msg.created_at)
         sorted_messages = [
-          ConversationEntityToDtoConverter.convert_message_entity_to_model(message)
-          for message in sorted_messages_entities  
+            ConversationEntityToDtoConverter.convert_message_entity_to_model(message)
+            for message in sorted_messages_entities
         ]
         return Conversation(
             user=user_model,
             messages=sorted_messages,
             id=conversation_entity.id,
-            created_at=conversation_entity.created_at
+            created_at=conversation_entity.created_at,
         )
 
     @staticmethod
     def convert_conversation_model_to_entity(conversation: Conversation) -> ConversationEntity:
         entity = ConversationEntity(
             user_id=conversation.user.id if conversation.user and conversation.user.id else None,
-            created_at=conversation.created_at if conversation.created_at else datetime.now(timezone.utc),
+            created_at=conversation.created_at if conversation.created_at else datetime.now(UTC),
         )
-        if conversation.id: entity.id=conversation.id
+        if conversation.id:
+            entity.id = conversation.id
 
-        entity.messages=[
-                ConversationEntityToDtoConverter.convert_message_model_to_entity(
-                    conversation.id, message.content, message.role, message.id, message.created_at, message.elapsed_seconds
-                )
-                for message in conversation.messages
-            ]
+        entity.messages = [
+            ConversationEntityToDtoConverter.convert_message_model_to_entity(
+                conversation.id, message.content, message.role, message.id, message.created_at, message.elapsed_seconds
+            )
+            for message in conversation.messages
+        ]
         return entity

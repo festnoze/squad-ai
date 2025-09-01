@@ -1,47 +1,43 @@
-from contextlib import asynccontextmanager
-import os
-from typing import Optional, List
 import logging
+import os
+from contextlib import asynccontextmanager
 
-from sqlalchemy.sql.expression import BinaryExpression
 from sqlalchemy import create_engine, delete, func, select
-from sqlalchemy import Column, String, Integer, ForeignKey, Table, DateTime
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import relationship, declarative_base
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import sessionmaker, joinedload
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import joinedload, sessionmaker
+from sqlalchemy.sql.expression import BinaryExpression
+
 
 class GenericDataContext:
-    def __init__(self, base_entities, db_path_or_url='database.db', log_queries_to_terminal=False):
+    def __init__(self, base_entities, db_path_or_url="database.db", log_queries_to_terminal=False):
         db_full_path_and_name = None
-        if 'http' not in db_path_or_url:
-            source_path = os.environ.get("PYTHONPATH", "").split(';')[-1]
-            db_full_path_and_name = os.path.join(source_path.replace('\\', '/'), db_path_or_url.replace('\\', '/')).replace('\\', '/')
-        
+        if "http" not in db_path_or_url:
+            source_path = os.environ.get("PYTHONPATH", "").split(";")[-1]
+            db_full_path_and_name = os.path.join(
+                source_path.replace("\\", "/"), db_path_or_url.replace("\\", "/")
+            ).replace("\\", "/")
+
         self.base_entities = base_entities
         self.db_path_or_url = db_full_path_and_name or db_path_or_url
-        self.sqlite_sync_db_path = f'sqlite:///{self.db_path_or_url}'
-        self.sqlite_async_db_path = f'sqlite+aiosqlite:///{self.db_path_or_url}'
+        self.sqlite_sync_db_path = f"sqlite:///{self.db_path_or_url}"
+        self.sqlite_async_db_path = f"sqlite+aiosqlite:///{self.db_path_or_url}"
         self.logger = logging.getLogger(__name__)
 
-        if 'http' not in self.db_path_or_url and not os.path.exists(self.db_path_or_url):
+        if "http" not in self.db_path_or_url and not os.path.exists(self.db_path_or_url):
             self.logger.error(f"/!\\ Database file not found at path: {self.db_path_or_url}")
             self.create_database()
 
         self.engine = create_async_engine(self.sqlite_async_db_path, echo=log_queries_to_terminal)
-        self.SessionLocal = sessionmaker(
-                                bind=self.engine,
-                                expire_on_commit=False,
-                                class_=AsyncSession)
+        self.SessionLocal = sessionmaker(bind=self.engine, expire_on_commit=False, class_=AsyncSession)
 
     def create_database(self):
         self.logger.info(">>> Recreating full database & tables")
-        if 'http' not in self.db_path_or_url:
+        if "http" not in self.db_path_or_url:
             parent_dir = os.path.dirname(self.db_path_or_url)
             if parent_dir and not os.path.exists(parent_dir):
                 os.makedirs(parent_dir, exist_ok=True)
                 self.logger.info(f"Created directory: {parent_dir}")
-        
+
         sync_engine = create_engine(self.sqlite_sync_db_path, echo=True)
         with sync_engine.begin() as conn:
             self.base_entities.metadata.create_all(bind=conn)
@@ -58,7 +54,7 @@ class GenericDataContext:
             raise
         finally:
             await transaction.close()
-    
+
     @asynccontextmanager
     async def read_db_async(self):
         async with self.SessionLocal() as session:
@@ -75,21 +71,43 @@ class GenericDataContext:
                 yield connection
             except Exception as e:
                 raise RuntimeError(f"Error during read operation: {e}")
-            
+
     async def does_exist_entity_by_id_async(self, entity_class, entity_id) -> bool:
-        id_from_db = await self.get_first_entity_async(entity_class, 
-                                                filters=[entity_class.id == entity_id], 
-                                                selected_columns=[entity_class.id], 
-                                                fails_if_not_found=False) 
+        id_from_db = await self.get_first_entity_async(
+            entity_class,
+            filters=[entity_class.id == entity_id],
+            selected_columns=[entity_class.id],
+            fails_if_not_found=False,
+        )
         return id_from_db is not None
 
-    async def get_entity_by_id_async(self, entity_class, entity_id, selected_columns: Optional[List] = None, to_join_list: Optional[List] = None, fails_if_not_found=True):
+    async def get_entity_by_id_async(
+        self,
+        entity_class,
+        entity_id,
+        selected_columns: list | None = None,
+        to_join_list: list | None = None,
+        fails_if_not_found=True,
+    ):
         filters = [entity_class.id == entity_id]
-        return await self.get_first_entity_async(entity_class=entity_class, filters=filters, selected_columns=selected_columns, to_join_list=to_join_list, fails_if_not_found=fails_if_not_found)
-    
-    async def get_first_entity_async(self, entity_class, filters: Optional[List[BinaryExpression]] = None, selected_columns: Optional[List] = None, to_join_list: Optional[List] = None, fails_if_not_found: bool = True):
+        return await self.get_first_entity_async(
+            entity_class=entity_class,
+            filters=filters,
+            selected_columns=selected_columns,
+            to_join_list=to_join_list,
+            fails_if_not_found=fails_if_not_found,
+        )
+
+    async def get_first_entity_async(
+        self,
+        entity_class,
+        filters: list[BinaryExpression] | None = None,
+        selected_columns: list | None = None,
+        to_join_list: list | None = None,
+        fails_if_not_found: bool = True,
+    ):
         query = select(*selected_columns) if selected_columns else select(entity_class)
-        
+
         if filters:
             for filter_condition in filters:
                 query = query.filter(filter_condition)
@@ -124,7 +142,7 @@ class GenericDataContext:
                 self.logger.error(f'/!\\ Fails to retrieve first entity with filters: "{filters_str}" - Error: {e}')
                 raise
 
-    async def get_all_entities_async(self, entity_class, filters: Optional[List[BinaryExpression]] = None):
+    async def get_all_entities_async(self, entity_class, filters: list[BinaryExpression] | None = None):
         query = select(entity_class)
         if filters:
             for filter_condition in filters:
@@ -137,8 +155,8 @@ class GenericDataContext:
             except Exception as e:
                 self.logger.error(f"/!\\ Fails to retrieve entities: {e}")
                 raise
-            
-    async def count_entities_async(self, entity_class, filters: Optional[List[BinaryExpression]] = None):
+
+    async def count_entities_async(self, entity_class, filters: list[BinaryExpression] | None = None):
         query = select(func.count())
         if filters:
             for filter_condition in filters:
@@ -155,7 +173,7 @@ class GenericDataContext:
     async def add_entity_async(self, entity) -> any:
         results = await self.add_entities_async(entity)
         return results[0]
-    
+
     async def add_entities_async(self, *args) -> list:
         async with self.new_transaction_async() as transaction:
             try:
@@ -164,7 +182,7 @@ class GenericDataContext:
                     transaction.add(entity)
                 await transaction.commit()
                 return list(args)
-            
+
             except Exception as e:
                 self.logger.error(f"/!\\ Fails to add entities: {e}")
                 raise
@@ -174,8 +192,8 @@ class GenericDataContext:
             try:
                 result = await transaction.execute(select(entity_class).filter(entity_class.id == entity_id))
                 entity = result.scalars().first()
-                if not entity: 
-                    raise ValueError(f"{entity_class.__name__} with id: {str(entity_id)} not found")
+                if not entity:
+                    raise ValueError(f"{entity_class.__name__} with id: {entity_id!s} not found")
 
                 for key, value in kwargs.items():
                     if hasattr(entity, key):
@@ -194,8 +212,8 @@ class GenericDataContext:
                 entity = result.scalars().first()
                 if not entity:
                     raise ValueError(f"{entity_class.__name__} not found")
-                
-                await transaction.delete(entity)    
+
+                await transaction.delete(entity)
                 await transaction.commit()
             except Exception as e:
                 self.logger.error(f"/!\\ Fails to delete entity: {e}")
@@ -211,7 +229,7 @@ class GenericDataContext:
     async def close_async(self):
         """Close the async database engine and cleanup resources"""
         try:
-            if hasattr(self, 'engine') and self.engine:
+            if hasattr(self, "engine") and self.engine:
                 await self.engine.dispose()
                 self.logger.info("Database engine closed successfully")
         except Exception as e:

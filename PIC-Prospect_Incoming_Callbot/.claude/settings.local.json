@@ -20,7 +20,13 @@
       "Bash(del:*)",
       "Bash(call activate_venv.bat)",
       "Bash(\".venv\\Scripts\\activate\")",
-      "Bash(PYTHONPATH=app python:*)"
+      "Bash(PYTHONPATH=app python:*)",
+      "Bash(code:*)",
+      "Bash(pip install:*)",
+      "Bash(ruff check:*)",
+      "Bash(ruff format:*)",
+      "Bash(deptry:*)",
+      "Bash(mkdocs serve:*)"
     ],
     "deny": []
   }

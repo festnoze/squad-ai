@@ -7,5 +7,64 @@
     "python.testing.pytestEnabled": true,
     "python.testing.autoTestDiscoverOnSaveEnabled": false,
     "python.testing.cwd": "${workspaceFolder}",
-    "claudeCodeChat.permissions.yoloMode": false
+    "claudeCodeChat.permissions.yoloMode": false,
+    
+    // Ruff configuration
+    "ruff.enable": true,
+    "ruff.organizeImports": true,
+    "ruff.fixAll": true,
+    "ruff.showNotifications": "always",
+    "ruff.lint.enable": true,
+    "ruff.lint.run": "onType",
+    "ruff.format.args": ["--config", "pyproject.toml"],
+    "ruff.lint.args": ["--config", "pyproject.toml", "--show-source"],
+    "ruff.path": [],
+    "ruff.severity": {
+        "convention": "Information",
+        "refactor": "Hint", 
+        "warning": "Warning",
+        "error": "Error"
+    },
+    
+    // Python linting and formatting with Ruff
+    "python.linting.enabled": true,
+    "python.linting.ruffEnabled": true,
+    "python.linting.pylintEnabled": false,
+    "python.linting.flake8Enabled": false,
+    "python.linting.mypyEnabled": false,
+    "python.linting.banditEnabled": false,
+    "python.formatting.provider": "none",
+    
+    // Editor configuration for Python
+    "[python]": {
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+            "source.fixAll.ruff": "explicit",
+            "source.organizeImports.ruff": "explicit"
+        },
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.rulers": [120]
+    },
+    
+    // Problem matchers and display
+    "problems.decorations.enabled": true,
+    "problems.showCurrentInStatus": true,
+    
+    // Python analysis settings
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.autoSearchPaths": true,
+    "python.analysis.extraPaths": ["${workspaceFolder}/app"],
+    "python.analysis.typeCheckingMode": "off",
+    
+    // File associations and patterns
+    "files.associations": {
+        "*.py": "python"
+    },
+    "files.watcherExclude": {
+        "**/.git/objects/**": true,
+        "**/node_modules/**": true,
+        "**/.venv/**": true,
+        "**/__pycache__/**": true,
+        "**/*.pyc": true
+    }
 }

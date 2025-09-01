@@ -1,10 +1,10 @@
 import re
 import uuid
-from typing import Union
+
 
 class TwilioCallSidConverter:
     @staticmethod
-    def uuid_to_call_sid(uuid_value: Union[str, uuid.UUID]) -> str:
+    def uuid_to_call_sid(uuid_value: str | uuid.UUID) -> str:
         if isinstance(uuid_value, uuid.UUID):
             hex_str: str = uuid_value.hex.lower()
         elif isinstance(uuid_value, str):

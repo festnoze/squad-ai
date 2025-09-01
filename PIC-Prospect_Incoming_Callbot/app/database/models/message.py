@@ -1,6 +1,7 @@
-from datetime import datetime
 import uuid
+from datetime import datetime
 from uuid import UUID
+
 
 class Message:
     id: UUID
@@ -9,7 +10,9 @@ class Message:
     elapsed_seconds: int
     created_at: datetime
 
-    def __init__(self, role: str, content: str, elapsed_seconds: int = 0, id: UUID = None, created_at: datetime = None) -> None:
+    def __init__(
+        self, role: str, content: str, elapsed_seconds: int = 0, id: UUID = None, created_at: datetime = None
+    ) -> None:
         self.id = id if id is not None else uuid.uuid4()
         self.role = role
         self.content = content
@@ -18,15 +21,15 @@ class Message:
 
     def __str__(self) -> str:
         return f"{self.role}: {self.content[:70]}..."
-    
+
     def __repr__(self) -> str:
         return f"{self.role}: {self.content[:70]}..."
-    
+
     def to_dict(self) -> dict:
         return {
             "id": str(self.id),
             "role": self.role,
             "content": self.content,
             "elapsed_seconds": self.elapsed_seconds,
-            "created_at": self.created_at.isoformat() if self.created_at else None
+            "created_at": self.created_at.isoformat() if self.created_at else None,
         }

@@ -1,7 +1,7 @@
 import logging
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .salesforce_api_client_interface import SalesforceApiClientInterface
 
@@ -15,16 +15,16 @@ class SalesforceApiClientFake(SalesforceApiClientInterface):
     # --- Set-up -----------------------------------------------------------------
     def __init__(
         self,
-        client_id: Optional[str] = None,
-        username: Optional[str] = None,
-        private_key_file: Optional[str] = None,
+        client_id: str | None = None,
+        username: str | None = None,
+        private_key_file: str | None = None,
         is_sandbox: bool = True,
     ) -> None:
         self.logger = logging.getLogger(__name__)
 
         # Very small bit of state so tests that poke at these attrs keep working
-        self._access_token: Optional[str] = None
-        self._instance_url: Optional[str] = None
+        self._access_token: str | None = None
+        self._instance_url: str | None = None
 
         # Perform a fake eager authentication so the token & url are already set
         self.authenticate()
@@ -36,7 +36,7 @@ class SalesforceApiClientFake(SalesforceApiClientInterface):
         self._instance_url = "https://fake.my.salesforce.com"
         return True
 
-    async def _ensure_authenticated_async(self) -> None:  # noqa: D401
+    async def _ensure_authenticated_async(self) -> None:
         """No-op helper that guarantees a token is present."""
         if not (self._access_token and self._instance_url):
             self.authenticate()
@@ -63,13 +63,16 @@ class SalesforceApiClientFake(SalesforceApiClientInterface):
         start_datetime: str,
         end_datetime: str,
         owner_id: str | None = None,
-    ) -> List[Dict[str, Any]] | None:
+    ) -> list[dict[str, Any]] | None:
         """Return at least one dummy appointment so `any(appointments)` is True."""
         await self._ensure_authenticated_async()
-        
-        is_btw_time_less_one_hour = datetime.strptime(end_datetime, "%Y-%m-%dT%H:%M:%SZ") - datetime.strptime(start_datetime, "%Y-%m-%dT%H:%M:%SZ") < timedelta(hours=1)
-        if is_btw_time_less_one_hour: return []
-        
+
+        is_btw_time_less_one_hour = datetime.strptime(end_datetime, "%Y-%m-%dT%H:%M:%SZ") - datetime.strptime(
+            start_datetime, "%Y-%m-%dT%H:%M:%SZ"
+        ) < timedelta(hours=1)
+        if is_btw_time_less_one_hour:
+            return []
+
         return [
             {
                 "Id": "EVT000000000001",
@@ -77,8 +80,9 @@ class SalesforceApiClientFake(SalesforceApiClientInterface):
                 "Description": "Fake Meeting Description",
                 "StartDateTime": start_datetime,
                 "EndDateTime": (
-                    (datetime.strptime(start_datetime, "%Y-%m-%dT%H:%M:%SZ") + timedelta(minutes=30))
-                    .strftime("%Y-%m-%dT%H:%M:%SZ")
+                    (datetime.strptime(start_datetime, "%Y-%m-%dT%H:%M:%SZ") + timedelta(minutes=30)).strftime(
+                        "%Y-%m-%dT%H:%M:%SZ"
+                    )
                 ),
             }
         ]
@@ -87,7 +91,7 @@ class SalesforceApiClientFake(SalesforceApiClientInterface):
         return True
 
     # --- People -----------------------------------------------------------------
-    async def get_person_by_phone_async(self, phone_number: str) -> Dict[str, Any] | None:  # type: ignore[override]
+    async def get_person_by_phone_async(self, phone_number: str) -> dict[str, Any] | None:  # type: ignore[override]
         """Return a fake Contact whose phone matches the query."""
         await self._ensure_authenticated_async()
 
@@ -105,7 +109,7 @@ class SalesforceApiClientFake(SalesforceApiClientInterface):
             },
         }
 
-    async def get_persons_async(self) -> List[Dict[str, Any]]:  # type: ignore[override]
+    async def get_persons_async(self) -> list[dict[str, Any]]:  # type: ignore[override]
         await self._ensure_authenticated_async()
         return [
             {
@@ -123,7 +127,7 @@ class SalesforceApiClientFake(SalesforceApiClientInterface):
         phone: str | None = None,
         first_name: str | None = None,
         last_name: str | None = None,
-    ) -> List[Dict[str, Any]] | None:
+    ) -> list[dict[str, Any]] | None:
         """Return a fake lead list; if company_name == 'Studi' include one lead."""
         await self._ensure_authenticated_async()
 
@@ -142,9 +146,8 @@ class SalesforceApiClientFake(SalesforceApiClientInterface):
     # --- Metadata ---------------------------------------------------------------
     async def discover_database_async(
         self,
-        sobjects_to_describe: List[str] | None = None,
+        sobjects_to_describe: list[str] | None = None,
         include_fields: bool = True,
-    ) -> Dict[str, Any] | None:
+    ) -> dict[str, Any] | None:
         await self._ensure_authenticated_async()
         return {"Account": {"fields": {}}, "Contact": {"fields": {}}}
-

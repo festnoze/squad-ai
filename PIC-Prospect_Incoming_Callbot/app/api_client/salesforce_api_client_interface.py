@@ -1,5 +1,5 @@
-
 from abc import ABC, abstractmethod
+
 
 class SalesforceApiClientInterface(ABC):
     @abstractmethod
@@ -12,11 +12,19 @@ class SalesforceApiClientInterface(ABC):
         pass
 
     @abstractmethod
-    async def schedule_new_appointment_async(self, subject: str, start_datetime: str, duration_minutes: int = 60, description: str | None = None, 
-                   location: str | None = None, owner_id: str | None = None, 
-                   what_id: str | None = None, who_id: str | None = None) -> str | None:
+    async def schedule_new_appointment_async(
+        self,
+        subject: str,
+        start_datetime: str,
+        duration_minutes: int = 60,
+        description: str | None = None,
+        location: str | None = None,
+        owner_id: str | None = None,
+        what_id: str | None = None,
+        who_id: str | None = None,
+    ) -> str | None:
         """Create an event in Salesforce and return the event ID if successful
-        
+
         Args:
             subject: The subject/title of the event
             start_datetime: Start date and time in ISO format (e.g., '2025-05-20T14:00:00Z')
@@ -26,25 +34,27 @@ class SalesforceApiClientInterface(ABC):
             owner_id: Optional Salesforce ID of the event owner
             what_id: Optional ID of related object (Account, Opportunity, etc.)
             who_id: Optional ID of associated person (Contact, Lead)
-            
+
         Returns:
             The ID of the created event if successful, None otherwise
-        """        
+        """
         pass
-    
+
     @abstractmethod
     async def delete_event_by_id_async(self, event_id: str) -> bool:
         pass
 
     @abstractmethod
-    async def get_scheduled_appointments_async(self, start_datetime: str, end_datetime: str, owner_id: str | None = None) -> list | None:
+    async def get_scheduled_appointments_async(
+        self, start_datetime: str, end_datetime: str, owner_id: str | None = None
+    ) -> list | None:
         """Get events from Salesforce calendar between specified start and end datetimes
-        
+
         Args:
             start_datetime: Start date and time in ISO format (e.g., '2025-05-20T14:00:00Z')
             end_datetime: End date and time in ISO format (e.g., '2025-05-20T15:00:00Z')
             owner_id: Optional Salesforce ID to filter events by owner
-            
+
         Returns:
             List of events if successful, None otherwise
         """
@@ -76,7 +86,13 @@ class SalesforceApiClientInterface(ABC):
         pass
 
     @abstractmethod
-    async def get_leads_by_details_async(self, email: str | None = None, first_name: str | None = None, last_name: str | None = None, company_name: str | None = None) -> list[dict] | None:
+    async def get_leads_by_details_async(
+        self,
+        email: str | None = None,
+        first_name: str | None = None,
+        last_name: str | None = None,
+        company_name: str | None = None,
+    ) -> list[dict] | None:
         """
         Retrieve a list of Leads from Salesforce by details (asynchronous).
 
@@ -92,7 +108,9 @@ class SalesforceApiClientInterface(ABC):
         pass
 
     @abstractmethod
-    async def discover_database_async(self, sobjects_to_describe: list[str] | None = None, include_fields: bool = True) -> dict | None:
+    async def discover_database_async(
+        self, sobjects_to_describe: list[str] | None = None, include_fields: bool = True
+    ) -> dict | None:
         """
         Discovers the schema of Salesforce SObjects.
 

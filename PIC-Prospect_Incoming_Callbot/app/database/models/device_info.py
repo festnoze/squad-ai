@@ -1,7 +1,7 @@
-from typing import Optional
-from uuid import UUID
 import uuid
 from datetime import datetime
+from uuid import UUID
+
 
 class DeviceInfo:
     id: UUID
@@ -14,7 +14,18 @@ class DeviceInfo:
     is_mobile: bool
     created_at: datetime
 
-    def __init__(self, ip: str, user_agent: str, platform: str, app_version: str, os: str, browser: str, is_mobile: bool, id: Optional[UUID] = None, created_at: datetime = None) -> None:
+    def __init__(
+        self,
+        ip: str,
+        user_agent: str,
+        platform: str,
+        app_version: str,
+        os: str,
+        browser: str,
+        is_mobile: bool,
+        id: UUID | None = None,
+        created_at: datetime = None,
+    ) -> None:
         self.ip = ip
         self.user_agent = user_agent
         self.platform = platform
@@ -27,10 +38,10 @@ class DeviceInfo:
 
     def __repr__(self) -> str:
         return f"DeviceInfo: {self.ip} ({self.id})"
-    
+
     def __str__(self) -> str:
         return self.__repr__()
-    
+
     def to_dict(self) -> dict:
         return {
             "id": str(self.id),
@@ -41,5 +52,5 @@ class DeviceInfo:
             "os": self.os,
             "browser": self.browser,
             "is_mobile": self.is_mobile,
-            "created_at": self.created_at.isoformat() if self.created_at else None
+            "created_at": self.created_at.isoformat() if self.created_at else None,
         }

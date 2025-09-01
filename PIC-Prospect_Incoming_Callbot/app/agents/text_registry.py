@@ -1,15 +1,12 @@
-from typing import List
-
-
 class AgentTexts:
     """Centralized registry for all agent static texts used in TTS pregeneration."""
-    
+
     # AgentsGraph texts
     start_welcome_text = "Bonjour et bienvenue chez Studi. Je suis l'assistant virtuel de lécole."
     unavailability_for_returning_prospect = "Votre conseiller attitré est actuellement indisponible."
     unavailability_for_new_prospect = "Nos conseillers en formation sont actuellement indisponibles."
     ask_to_repeat_text = "Désolé, je n'ai pas bien entendu. Merci de répéter."
-    #thanks_to_come_back = "Merci de nous recontacter "
+    # thanks_to_come_back = "Merci de nous recontacter "
     appointment_text = "Je vous propose de prendre rendez-vous"
     questions_text = "ou de répondre à vos questions concernant nos formations."
     select_action_text = "Que souhaitez-vous faire ?"
@@ -18,7 +15,7 @@ class AgentTexts:
     technical_error_text = "Je rencontre un problème technique, le service est temporairement indisponible, merci de nous recontacter plus tard."
     lead_agent_error_text = "Je rencontre un problème technique avec l'agent de contact."
     rag_communication_error_text = "Je suis désolé, une erreur s'est produite lors de la communication avec le service."
-    
+
     # CalendarAgent texts
     availability_request_text = "Quels jours ou quelles heures de la journée vous conviendraient le mieux ?"
     no_timeframes_text = "Quand souhaitez-vous réserver un rendez-vous ?"
@@ -31,14 +28,14 @@ class AgentTexts:
     appointment_failed_text = "Je n'ai pas pu planifier le rendez-vous. Souhaitez-vous essayer un autre créneau ?"
     modification_not_supported_text = "Je ne suis pas en mesure de gérer les modifications de rendez-vous."
     cancellation_not_supported_text = "Je ne suis pas en mesure de gérer les annulations de rendez-vous."
-    
+
     @classmethod
-    def get_all_texts(cls) -> List[str]:
+    def get_all_texts(cls) -> list[str]:
         """Get all text values for pregeneration."""
         # Get all class attributes that are strings (excluding methods and special attributes)
         texts = []
         for attr_name in dir(cls):
-            if not attr_name.startswith('_') and not callable(getattr(cls, attr_name)):
+            if not attr_name.startswith("_") and not callable(getattr(cls, attr_name)):
                 attr_value = getattr(cls, attr_name)
                 if isinstance(attr_value, str):
                     texts.append(attr_value)
