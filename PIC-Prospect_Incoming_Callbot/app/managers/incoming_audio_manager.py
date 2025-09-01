@@ -75,29 +75,17 @@ class IncomingAudioManager(IncomingManager):
         self.interuption_asked: bool = False
         self.removed_text_to_speak: str | None = None
         self.speak_anew_on_long_silence: bool = EnvHelper.get_speak_anew_on_long_silence()
-        self.max_silence_duration_before_reasking: int = (
-            EnvHelper.get_max_silence_duration_before_reasking()
-        )  # ms of silence before reasking
+        self.max_silence_duration_before_reasking: int = EnvHelper.get_max_silence_duration_before_reasking()  # ms of silence before reasking
 
         # Audio processing parameters
-        self.audio_buffer = b""
+        self.audio_buffer: bytes = b""
         self.consecutive_silence_duration_ms = 0.0
         self.speech_threshold_base = EnvHelper.get_speech_threshold()
-        self.speech_threshold = (
-            self.speech_threshold_base + 300
-        )  # Add 300 as default background noise value on startup (to be calibrated later)
-        self.required_silence_ms_to_answer = (
-            EnvHelper.get_required_silence_ms_to_answer()
-        )  # ms of silence to trigger transcript
-        self.min_audio_bytes_for_processing = (
-            EnvHelper.get_min_audio_bytes_for_processing()
-        )  # Minimum buffer size to process
-        self.max_audio_bytes_for_processing = (
-            EnvHelper.get_max_audio_bytes_for_processing()
-        )  # Maximum buffer size to process
-        self.max_silence_duration_before_hangup = (
-            EnvHelper.get_max_silence_duration_before_hangup()
-        )  # ms of silence before hanging up the call
+        self.speech_threshold = self.speech_threshold_base * 1.5 # Add default background noise value on startup (will be calibrated later on)
+        self.required_silence_ms_to_answer = EnvHelper.get_required_silence_ms_to_answer()  # ms of silence to trigger transcript
+        self.min_audio_bytes_for_processing = EnvHelper.get_min_audio_bytes_for_processing()  # Minimum buffer size to process
+        self.max_audio_bytes_for_processing = EnvHelper.get_max_audio_bytes_for_processing()  # Maximum buffer size to process
+        self.max_silence_duration_before_hangup = EnvHelper.get_max_silence_duration_before_hangup()  # ms of silence before hanging up the call
         self.do_audio_preprocessing = EnvHelper.get_do_audio_preprocessing()
         self.perform_background_noise_calibration = EnvHelper.get_perform_background_noise_calibration()
         self.keep_audio_file = EnvHelper.get_keep_audio_files()
@@ -301,9 +289,7 @@ class IncomingAudioManager(IncomingManager):
 
             # Log the interruption (but only the first time)
             if self.consecutive_silence_duration_ms > 0:
-                self.logger.info(
-                    f"\r>>> USER INTERRUPTION - Incoming speech while system was speaking ({speech_to_noise_ratio:.2f})"
-                )
+                self.logger.info(f"\r>>> USER INTERRUPTION - Incoming speech while system was speaking ({speech_to_noise_ratio:.2f})")
             self.consecutive_silence_duration_ms = 0.0
 
         # 7- Silence detection consecutive to user speech beginning
@@ -314,19 +300,15 @@ class IncomingAudioManager(IncomingManager):
             chunk_duration_ms = (len(chunk) / self.sample_width) / self.frame_rate * 1000
             self.consecutive_silence_duration_ms += chunk_duration_ms
 
-        # Add chunk to buffer if speech has begun or this is a speech chunk
-        if has_speech_began or not is_silence:
+        # Add chunk to buffer if speech has begun or if chunk is detected as the first speech chunk
+
+        # Reset silence counter upon the first speech chunk and activate has_speech_began
+        if not is_silence and not has_speech_began:
+            has_speech_began = True
+            self.consecutive_silence_duration_ms = 0.0
+
+        if has_speech_began:
             self.audio_buffer += chunk
-
-            # Only reset silence counter if the current chunk contains speech
-            if not is_silence:
-                self.consecutive_silence_duration_ms = 0.0
-
-            if random.randint(0, 100) < 1:  # Log every 1%
-                self.logger.debug(
-                    f"\nSpeech detected - RMS: {speech_to_noise_ratio:.2f} / {self.speech_threshold:.2f}, "
-                    f"Buffer size: {len(self.audio_buffer)} bytes"
-                )
 
         # 8- Speak anew if the user remains silent for long enough
         if (
@@ -334,9 +316,7 @@ class IncomingAudioManager(IncomingManager):
             and self.consecutive_silence_duration_ms >= self.max_silence_duration_before_reasking
             and self.consecutive_silence_duration_ms % self.max_silence_duration_before_reasking <= 10
         ):
-            self.logger.info(
-                f">>> User silence duration of {self.consecutive_silence_duration_ms:.1f}ms exceeded max. silence before speaking anew: {self.max_silence_duration_before_reasking:.1f}ms."
-            )
+            self.logger.info(f">>> User silence duration of {self.consecutive_silence_duration_ms:.1f}ms exceeded max. silence before speaking anew: {self.max_silence_duration_before_reasking:.1f}ms.")
             await self.outgoing_manager.enqueue_text_async(
                 "Comment puis-je vous aider ? Je peux répondre à vos questions concernant nos formations, ou prendre rendez-vous avec un conseiller."
             )
@@ -345,48 +325,26 @@ class IncomingAudioManager(IncomingManager):
 
         # 9- Hangup the call if the user remains silent for too long
         if self.consecutive_silence_duration_ms >= self.max_silence_duration_before_hangup:
-            self.logger.info(
-                f">>> User silence duration of {self.consecutive_silence_duration_ms:.1f}ms exceeded max. allowed silence of {self.max_silence_duration_before_hangup:.1f}ms."
-            )
+            self.logger.info(f">>> User silence duration of {self.consecutive_silence_duration_ms:.1f}ms exceeded max. allowed silence of {self.max_silence_duration_before_hangup:.1f}ms.")
             await self._hangup_call_async()
             return
 
-        is_long_silence_after_speech = (
-            has_speech_began and self.consecutive_silence_duration_ms >= self.required_silence_ms_to_answer
-        )
+        is_long_silence_after_speech = has_speech_began and self.consecutive_silence_duration_ms >= self.required_silence_ms_to_answer
         has_reach_min_speech_length = len(self.audio_buffer) >= self.min_audio_bytes_for_processing
         is_speech_too_long = len(self.audio_buffer) > self.max_audio_bytes_for_processing
 
         # 10- Process audio
         # Conditions: if buffer large enough followed by a prolonged silence, or if buffer is too large
         if (is_long_silence_after_speech and has_reach_min_speech_length) or is_speech_too_long:
-            audio_data = self.audio_buffer
+            audio_data: bytes = self.audio_buffer
             self.audio_buffer = b""
             self.consecutive_silence_duration_ms = 0.0
             if is_speech_too_long:
-                self.logger.info(
-                    f"\nProcess incoming audio: [Buffer size limit reached]. (buffer size: {len(self.audio_buffer)} bytes).\n"
-                )
+                self.logger.info(f"\nProcess incoming audio: [Buffer size limit reached]. (buffer size: {len(self.audio_buffer)} bytes).\n")
             else:
-                self.logger.info(
-                    f"\nProcess incoming audio: [Silence after speech detected]. (buffer size: {len(self.audio_buffer)} bytes).\n"
-                )
+                self.logger.info(f"\nProcess incoming audio: [Silence after speech detected]. (buffer size: {len(self.audio_buffer)} bytes).\n")
             if self.interuption_asked:
                 self.interuption_asked = False
-
-            # Acknowledgement message
-            if EnvHelper.get_do_acknowledge_user_speech():
-                acknowledge_text = random.choice(["Très bien", "Compris", "D'accord", "Entendu", "Parfait"])
-                if EnvHelper.get_long_acknowledgement():
-                    acknowledge_text += ", " + random.choice([
-                        "un instant s'il vous plait",
-                        "je vous demande un instant",
-                        "merci de patienter",
-                        "laissez-moi un moment",
-                        "une petite seconde",
-                    ])
-                acknowledge_text += "."
-                await self.outgoing_manager.enqueue_text_async(acknowledge_text)
 
             # 11- Transcribe speech to text
             user_query_transcript = await self._perform_speech_to_text_transcription_async(audio_data)
@@ -399,15 +357,14 @@ class IncomingAudioManager(IncomingManager):
             # 12- Send user query to the agents graph (for processing and response)
             if user_query_transcript:
                 self.removed_text_to_speak = None
+                await self._send_acknowledgement_message_async()
                 await self.send_user_query_to_agents_graph_async(user_query_transcript)
 
             # 13- If transcript of user query is empty (no speech detected), enqueue back the text to speak previously removed
             if not user_query_transcript:
                 if self.removed_text_to_speak:
                     await self.outgoing_manager.enqueue_text_async(self.removed_text_to_speak)
-                    self.logger.info(
-                        f'>>> Empty transcript. Enqueued back originaly removed text to speak: "{self.removed_text_to_speak}"'
-                    )
+                    self.logger.info(f'>>> Empty transcript. Enqueued back originaly removed text to speak: "{self.removed_text_to_speak}"')
                     self.removed_text_to_speak = None
                 else:
                     await self.outgoing_manager.enqueue_text_async(AgentTexts.ask_to_repeat_text)
@@ -416,12 +373,27 @@ class IncomingAudioManager(IncomingManager):
         # await asyncio.sleep(0.1) # Pause incoming process to let others processes breathe
         return
 
+    async def _send_acknowledgement_message_async(self):
+        """Acknowledgement message"""
+        if EnvHelper.get_do_acknowledge_user_speech():
+            acknowledge_text = random.choice(["Très bien", "Compris", "D'accord", "Entendu", "Parfait"])
+            if EnvHelper.get_long_acknowledgement():
+                acknowledge_text += ", " + random.choice([
+                    "un instant s'il vous plait",
+                    "je vous demande un instant",
+                    "merci de patienter",
+                    "laissez-moi un moment",
+                    "une petite seconde",
+                ])
+            acknowledge_text += "."
+            await self.outgoing_manager.enqueue_text_async(acknowledge_text)
+
     async def send_user_query_to_agents_graph_async(self, user_query: str):
         try:
             self.logger.info(f"Sending incoming user query to agents graph. Transcription: '{user_query}'")
 
             if self.stream_sid in self.stream_states:
-                current_state: PhoneConversationState = self.stream_states[self.stream_sid]
+                current_state: ConversationState = self.stream_states[self.stream_sid]
                 current_state["user_input"] = user_query
             else:
                 current_state: PhoneConversationState = {
@@ -452,9 +424,7 @@ class IncomingAudioManager(IncomingManager):
         except Exception as e:
             self.logger.error(f"Error in user query to agents graph: {e}", exc_info=True)
 
-    def _perform_background_noise_calibration(
-        self, stream_sid, speech_to_noise_ratio, samples_count_to_average=600, min_noise_level=10
-    ):
+    def _perform_background_noise_calibration(self, stream_sid, speech_to_noise_ratio, samples_count_to_average=600, min_noise_level=10):
         if stream_sid in self.average_noise_by_stream_sid:
             return
 
@@ -469,14 +439,12 @@ class IncomingAudioManager(IncomingManager):
             calibration_data = [x for x in calibration_data if x >= min_noise_level]  # Exclude no noise samples
             if not any(calibration_data):
                 calibration_data = [min_noise_level]
-            average_noise = int(round(sum(calibration_data) / len(calibration_data)))
-            self.logger.info(
-                f"Noise calibration completed for stream {stream_sid}. Average noise level: {average_noise:.2f}"
-            )
+            average_noise = round(sum(calibration_data) / len(calibration_data))
+            self.logger.info(f">>> Noise calibration completed for stream {stream_sid}. Average noise level: {average_noise:.2f}")
             # Replace list with the calculated average for memory efficiency
             self.average_noise_by_stream_sid[stream_sid] = average_noise
             del self.speech_to_noise_ratio_samples_by_stream_sid[stream_sid]
-            self.speech_threshold = max(self.speech_threshold_base * 1.3, average_noise * 1.5)
+            self.speech_threshold = max(self.speech_threshold_base * 1.5, average_noise * 1.5)
 
     def _decode_audio_chunk(self, data: dict):
         try:
@@ -493,27 +461,18 @@ class IncomingAudioManager(IncomingManager):
     async def _perform_speech_to_text_transcription_async(self, audio_data: bytes):
         try:
             wav_audio_filename = None
-            # Check if the audio buffer has a high enough speech to noise ratio
-            speech_to_noise_ratio = audioop.rms(audio_data, self.sample_width)
-            if speech_to_noise_ratio < self.speech_threshold:
-                if random.random() < 0.1:  # log 1/10 of the time
-                    self.logger.info(
-                        f"[Silence/Noise] Low speech/noise ratio detected: {speech_to_noise_ratio}. Transcription skipped"
-                    )
-                return None
-
-            self.logger.info(
-                f"[Speech] High speech/noise ratio detected: {speech_to_noise_ratio}. Processing transcription."
-            )
+            # # Check if the audio buffer has a high enough speech to noise ratio
+            # speech_to_noise_ratio = audioop.rms(audio_data, self.sample_width)
+            # if speech_to_noise_ratio < self.speech_threshold:
+            #     if random.random() < 0.1:  # log 1/10 of the time
+            #         self.logger.info(f"[Silence/Noise] Low speech/noise ratio detected: {speech_to_noise_ratio}. Transcription skipped")
+            #     return None
+            # self.logger.info(f"[Speech] High speech/noise ratio detected: {speech_to_noise_ratio}. Processing transcription.")
 
             # Apply audio preprocessing to improve quality
             self.logger.info("Applying audio preprocessing...")
-            processed_audio = (
-                self.perform_audio_preprocessing(audio_data) if self.do_audio_preprocessing else audio_data
-            )
-            self.logger.info(
-                f"Audio preprocessing complete. Original size: {len(audio_data)} bytes, Processed size: {len(processed_audio)} bytes"
-            )
+            processed_audio = self.perform_audio_preprocessing(audio_data) if self.do_audio_preprocessing else audio_data
+            self.logger.info(f"Audio preprocessing complete. Original size: {len(audio_data)} bytes, Processed size: {len(processed_audio)} bytes")
 
             # Save the processed audio to a file
             wav_audio_filename = self.save_as_wav_file(processed_audio)
@@ -560,7 +519,7 @@ class IncomingAudioManager(IncomingManager):
         try:
             os.remove(os.path.join(self.incoming_speech_dir, file_name))
         except Exception as e:
-            self.logger.error(f"Error deleting temp file {file_name}: {e}")
+            self.logger.exception(f"Error deleting temp file {file_name}: {e}")
 
     async def speak_and_send_ask_for_feedback_async(self, transcript):
         response_text = (

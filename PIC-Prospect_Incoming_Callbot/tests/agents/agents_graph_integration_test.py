@@ -3,7 +3,6 @@ import pytest
 import pytz
 from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock, AsyncMock
-from agents.agents_graph import AgentsGraph
 from agents.phone_conversation_state_model import PhoneConversationState
 from managers.outgoing_manager import OutgoingManager
 from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
@@ -11,6 +10,7 @@ from api_client.salesforce_api_client_interface import SalesforceApiClientInterf
 from agents.calendar_agent import CalendarAgent
 from agents.text_registry import AgentTexts
 from agents.agents_graph import AgentsGraph
+from app.endpoints import change_env_var_values
 
 async def test_graph_init_conversation_and_welcome_message(agents_graph_mockings):
     """Test that without user input, we get a welcome message and conversation_id is set."""
@@ -57,6 +57,9 @@ async def test_graph_init_conversation_and_welcome_message(agents_graph_mockings
 async def test_query_response_about_courses(agents_graph_mockings):
     """Test that with a user input query about courses, the history contains the query and the answer."""
     # Arrange
+    # Set available actions to schedule_calendar_appointment and ask rag
+    await change_env_var_values({"AVAILABLE_ACTIONS": "schedule_appointement, ask_rag"})
+
     # Create the graph with mocked dependencies but use the real graph implementation
     agents_graph = AgentsGraph(
         outgoing_manager=agents_graph_mockings["outgoing_manager"],
@@ -65,7 +68,7 @@ async def test_query_response_about_courses(agents_graph_mockings):
         conversation_persistence=agents_graph_mockings["studi_rag_client"],
         rag_query_service= agents_graph_mockings["studi_rag_client"]
     ).graph
-                    
+
     init_msg = "Welcome to Studi! How can I help you schedule an appointment today?"
     user_input = "Quels BTS en RH ?"
     # Create a state with conversation_id already set and user input about BTS in HR

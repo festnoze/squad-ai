@@ -1,4 +1,6 @@
 import asyncio
+from asyncio import Task
+
 import logging
 import os
 
@@ -188,7 +190,7 @@ class AgentsGraph:
         self.logger.info(f"[{self.call_sid}] Agents graph compiled successfully.")
         return app_graph
 
-    async def router(self, state: PhoneConversationState) -> dict:
+    async def router(self, state: PhoneConversationState) -> PhoneConversationState:
         if not state.get("agent_scratchpad", None):
             state["agent_scratchpad"] = {}
 
@@ -217,9 +219,7 @@ class AgentsGraph:
         state["agent_scratchpad"]["next_agent_needed"] = "wait_for_user_input"
         return state
 
-    async def analyse_user_input_for_dispatch_async(
-        self, llm: any, user_input: str, chat_history: list[dict[str, str]]
-    ) -> str:
+    async def analyse_user_input_for_dispatch_async(self, llm: any, user_input: str, chat_history: list[dict[str, str]]) -> str:
         """Analyse the user input and dispatch to the right agent"""
         with open("app/agents/prompts/analyse_user_general_classifier_prompt.txt", encoding="utf-8") as file:
             prompt = file.read()
@@ -257,15 +257,13 @@ class AgentsGraph:
         self.logger.info(f"#> Router Analysis decide to dispatch to: |###> {response.content} <###|")
         return response.content
 
-    async def begin_of_welcome_message_node(self, state: PhoneConversationState) -> dict:
+    async def begin_of_welcome_message_node(self, state: PhoneConversationState) -> PhoneConversationState:
         """Send the begin of welcome message to the user"""
         await self.add_message_to_conversation_async(AgentTexts.start_welcome_text, state, persist=False)
-        self.logger.info(
-            f"[{state.get('call_sid', '')}] Sent 'begin of welcome message' to {state.get('caller_phone', 'N/A')}"
-        )
+        self.logger.info(f"[{state.get('call_sid', '')}] Sent 'begin of welcome message' to {state.get('caller_phone', 'N/A')}")
         return state
 
-    async def init_conversation_node(self, state: PhoneConversationState) -> dict:
+    async def init_conversation_node(self, state: PhoneConversationState) -> PhoneConversationState:
         """Initializes the conversation in the backend API."""
         if state.get("agent_scratchpad", {}).get("conversation_id", None) is not None:
             return state
@@ -290,9 +288,7 @@ class AgentsGraph:
 
         # Late persistence of welcome message (because cannot have been persisted before as conversation has not been created then)
         if conversation_id:
-            await self.conversation_persistence.add_message_to_conversation_async(
-                conversation_id, AgentTexts.start_welcome_text
-            )
+            await self.conversation_persistence.add_message_to_conversation_async(conversation_id, AgentTexts.start_welcome_text)
 
         if state.get("agent_scratchpad") is None:
             state["agent_scratchpad"] = {}
@@ -328,7 +324,7 @@ class AgentsGraph:
             self.logger.error(f"Error creating conversation: {e!s}")
             return None
 
-    async def user_identification_node(self, state: PhoneConversationState) -> dict:
+    async def user_identification_node(self, state: PhoneConversationState) -> PhoneConversationState:
         self.logger.info("Initializing SF Agent")
         call_sid = state.get("call_sid", "N/A")
         phone_number = state.get("caller_phone", "N/A")
@@ -356,11 +352,11 @@ class AgentsGraph:
         state.get("agent_scratchpad", {})["next_agent_needed"] = "user_identified" if sf_account_info else "user_new"
         return state
 
-    async def user_identification_decide_next_step(self, state: PhoneConversationState) -> str:
+    async def user_identification_decide_next_step(self, state: PhoneConversationState) -> str | None:
         """Decide next step based on user identification"""
         return state.get("agent_scratchpad", {}).get("next_agent_needed")
 
-    async def user_identified_node(self, state: PhoneConversationState) -> dict:
+    async def user_identified_node(self, state: PhoneConversationState) -> PhoneConversationState:
         """For existing user: User identity confirmation"""
         end_welcome_text = AgentTexts.unavailability_for_returning_prospect
 
@@ -382,16 +378,16 @@ class AgentsGraph:
         await self.add_message_to_conversation_async(end_welcome_text, state)
         return state
 
-    async def user_new_node(self, state: PhoneConversationState) -> dict:
+    async def user_new_node(self, state: PhoneConversationState) -> PhoneConversationState:
         """For new user: Case not handled. Ask the user to call during the opening hours"""
         await self.add_message_to_conversation_async(AgentTexts.unavailability_for_new_prospect, state)
         return state
 
-    async def wait_for_user_input_node(self, state: PhoneConversationState) -> dict:
+    async def wait_for_user_input_node(self, state: PhoneConversationState) -> PhoneConversationState:
         """Wait for user input"""
         return state
 
-    async def lead_agent_node(self, state: PhoneConversationState) -> dict:
+    async def lead_agent_node(self, state: PhoneConversationState) -> PhoneConversationState:
         """Handles lead qualification and information gathering using LeadAgent."""
         call_sid = state.get("call_sid", "N/A")
         self.logger.info(f"[{call_sid}] Entering Lead Agent node")
@@ -402,10 +398,11 @@ class AgentsGraph:
         if not self.lead_agent_instance:
             self.logger.error(f"[{call_sid}] LeadAgent not initialized. Cannot process.")
             await self.add_message_to_conversation_async(AgentTexts.lead_agent_error_text, state)
-            return {
-                "history": [("user", user_input), ("assistant", AgentTexts.lead_agent_error_text)],
-                "agent_scratchpad": {"error": "LeadAgent not initialized"},
-            }
+            return state
+            # {
+            #     "history": [("user", user_input), ("assistant", AgentTexts.lead_agent_error_text)],
+            #     "agent_scratchpad": {"error": "LeadAgent not initialized"},
+            # }
 
         try:
             # 1. Extract info using LLM (based on LeadAgent logic)
@@ -472,10 +469,7 @@ class AgentsGraph:
             updated_scratchpad["lead_missing_fields"] = missing_fields
             updated_scratchpad["lead_last_status"] = next_step
 
-            return {
-                "history": [("user", user_input), ("assistant", response_text)],
-                "agent_scratchpad": updated_scratchpad,
-            }
+            return state
 
         except Exception as e:
             self.logger.error(f"[{call_sid[-4:]}] Error in Lead Agent node: {e}", exc_info=True)
@@ -483,12 +477,9 @@ class AgentsGraph:
             # Include the error in the scratchpad for debugging if needed
             error_scratchpad = state.get("agent_scratchpad", {})
             error_scratchpad["error"] = str(e)
-            return {
-                "history": [("user", user_input), ("assistant", response_text)],
-                "agent_scratchpad": error_scratchpad,
-            }
+            return state
 
-    async def calendar_agent_node(self, state: PhoneConversationState) -> dict:
+    async def calendar_agent_node(self, state: PhoneConversationState) -> PhoneConversationState:
         """Handles calendar operations using CalendarAgent."""
         call_sid = state.get("call_sid", "N/A")
         user_input = state.get("user_input", "")
@@ -519,7 +510,7 @@ class AgentsGraph:
                     chat_history = chat_history[-max_history_length:]
 
                 if self.has_waiting_music_on_calendar:
-                    waiting_music_task = await self._start_waiting_music_async()
+                    waiting_music_task: Task | None = await self._start_waiting_music_async()
 
                 calendar_agent_answer = await self.calendar_agent_instance.run_async(user_input, chat_history)
 
@@ -530,12 +521,10 @@ class AgentsGraph:
 
                 if self.has_waiting_music_on_calendar:
                     await self._stop_waiting_music_async(waiting_music_task)
-
-                return state
-
             except Exception as e:
                 self.logger.error(f"[{call_sid[-4:]}] Error in Calendar Agent node: {e}", exc_info=True)
-                return state
+
+        return state
 
     async def router_decide_next_step(self, state: PhoneConversationState) -> str:
         """Determines the next node to visit based on the current state."""
@@ -570,7 +559,7 @@ class AgentsGraph:
         self.logger.info(f"[~{call_sid[-4:]}] No specific routing condition met, ending graph run.")
         return END
 
-    async def query_rag_api_about_trainings_agent_node(self, state: PhoneConversationState) -> dict:
+    async def query_rag_api_about_trainings_agent_node(self, state: PhoneConversationState) -> PhoneConversationState | str:
         """Handle the course agent node."""
         call_sid = state.get("call_sid", "N/A")
         user_query = state.get("user_input", "")
@@ -601,7 +590,7 @@ class AgentsGraph:
             # await self._add_ai_answer_async(random.choice(waiting_messages), state)
 
             if self.has_waiting_music_on_rag:
-                waiting_music_task = await self._start_waiting_music_async()
+                waiting_music_task: Task | None = await self._start_waiting_music_async()
 
             # Call but not await the RAG API to get the streaming response
             response = self.rag_query_service.rag_query_stream_async(
@@ -643,7 +632,7 @@ class AgentsGraph:
 
         return state
 
-    async def other_inquery_node(self, state: PhoneConversationState) -> dict:
+    async def other_inquery_node(self, state: PhoneConversationState) -> PhoneConversationState:
         """Handle other inquery"""
         call_sid = state.get("call_sid", "N/A")
         phone_number = state.get("caller_phone", "N/A")
@@ -660,7 +649,7 @@ class AgentsGraph:
         role: str = "assistant",
         speak_out_text: bool = True,
         persist: bool = True,
-    ) -> dict:
+    ) -> PhoneConversationState:
         """Send the answer's text, add it to the state history and to the API for persistence"""
         conv_id = state["agent_scratchpad"].get("conversation_id", None)
         state["history"].append((role, text))
@@ -677,7 +666,7 @@ class AgentsGraph:
         with open(file_path, "rb") as f:
             return f.read()
 
-    async def _start_waiting_music_async(self):
+    async def _start_waiting_music_async(self) -> Task | None:
         # Replace waiting message by a background music that loops
         if not self.waiting_music_bytes:
             self.waiting_music_bytes = self._load_file_bytes("static/internal/waiting_music.pcm")
@@ -715,7 +704,7 @@ class AgentsGraph:
             self.logger.error(f"Error in waiting music loop: {e}")
             # Don't re-raise non-cancellation exceptions to avoid disrupting the call
 
-    async def _stop_waiting_music_async(self, waiting_music_task: asyncio.Task):
+    async def _stop_waiting_music_async(self, waiting_music_task: Task | None):
         if waiting_music_task and not waiting_music_task.done():
             # Signal interruption
             self.outgoing_manager.audio_sender.streaming_interruption_asked = True

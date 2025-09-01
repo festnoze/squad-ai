@@ -138,17 +138,28 @@ class CalendarAgent:
             )
 
             if date_and_time:
-                return (
-                    self.confirmation_prefix_text
-                    + self._to_french_date(date_and_time, include_weekday=True, include_year=False, include_hour=True)
-                    + ". "
-                    + self.confirmation_suffix_text
-                )
+                existing_event_id = await self.salesforce_api_client.verify_appointment_existance_async(
+                    event_id=None, start_datetime=date_and_time.isoformat(), duration_minutes=30)
+                if existing_event_id:
+                    available_timeframes_answer = await self.available_timeframes_agent.ainvoke({
+                        "current_date_str": self._to_french_date(
+                            CalendarAgent.now, include_weekday=True, include_year=True, include_hour=True
+                        ),
+                        "owner_name": CalendarAgent.owner_name,
+                        "user_input": "Quels sont les prochains crénaux disponibles ?",
+                        "chat_history": ""
+                    })
+
+                    available_slots_text = available_timeframes_answer["output"]
+                    return AgentTexts.appointment_unavailable_slot_text + available_slots_text
+
+                french_date = self._to_french_date(date_and_time, include_weekday=True, include_year=False, include_hour=True)
+                return self.confirmation_prefix_text + french_date + ". " + self.confirmation_suffix_text
             else:
                 return self.date_not_found_text
 
         if category == "Rendez-vous confirmé":
-            appointment_slot_datetime: datetime = await self._extract_appointment_selected_date_and_time_async(
+            appointment_slot_datetime: datetime | None = await self._extract_appointment_selected_date_and_time_async(
                 user_input, chat_history
             )
             appointment_slot_datetime_str = self._to_str_iso(appointment_slot_datetime)
@@ -304,18 +315,6 @@ class CalendarAgent:
             object, date_and_time, duration, description, owner_id=CalendarAgent.owner_id, who_id=CalendarAgent.user_id
         )
 
-    def _load_prompt(self):
-        with open("app/agents/prompts/calendar_agent_prompt.txt", encoding="utf-8") as f:
-            return f.read()
-
-    def _load_classifier_prompt(self):
-        with open("app/agents/prompts/calendar_agent_classifier_prompt.txt", encoding="utf-8") as f:
-            return f.read()
-
-    def _load_available_timeframes_prompt(self):
-        with open("app/agents/prompts/calendar_agent_available_timeframes_prompt.txt", encoding="utf-8") as f:
-            return f.read()
-
     def _set_user_info(self, user_id, first_name, last_name, email, owner_id, owner_name):
         """
         Initialize the Calendar Agent with user information and configuration.
@@ -455,7 +454,7 @@ class CalendarAgent:
         scheduled_slots: list[dict],
         slot_duration_minutes: int = 30,
         max_weekday: int = 5,
-        availability_timeframe: list[tuple[str, str]] = [],
+        availability_timeframe: list[tuple[str, str]] | None = None,
         adjust_end_time: bool = False,
     ) -> list[str]:
         """
@@ -505,8 +504,6 @@ class CalendarAgent:
 
                 # Combine date with time to create full datetime objects for the timeframe
                 # Add timezone info (Europe/Paris) to make them compatible with occ_start and occ_end
-                import pytz
-
                 french_tz = pytz.timezone("Europe/Paris")
                 timeframe_start = french_tz.localize(datetime.combine(start_date_only, start_hour_dt.time()))
                 timeframe_end = french_tz.localize(datetime.combine(start_date_only, end_hour_dt.time()))
@@ -521,10 +518,6 @@ class CalendarAgent:
                         )
                         available_ranges.append(formatted_range)
                         continue
-
-                # Find available slots within this timeframe
-                available_slots: list[datetime] = []
-                current_slot = timeframe_start
 
                 # Build a list of free intervals within the timeframe, excluding taken slots
                 free_intervals = []
@@ -568,20 +561,18 @@ class CalendarAgent:
 
         return unique_ranges
 
-    async def _extract_appointment_selected_date_and_time_async(
-        self, user_input: str, chat_history: list[dict[str, str]]
-    ) -> datetime:
+    async def _extract_appointment_selected_date_and_time_async(self, user_input: str, chat_history: list[dict]) -> datetime | None:
         prompt = ChatPromptTemplate.from_template("""
         Extract the exact date and time specified by the user for the appointment from the following conversation.
         Only return the date and time in the following format: YYYY-MM-DDTHH:MM:SSZ.
         The now date and time is: {now}
         Note that the appointment date and time can only be in the future, and in the near future (less than 2 months from now).
-        
+
         Current conversation:
         {chat_history}
-        
+
         Latest user input: {input}
-        
+
         Extract only the date and time in ISO format, nothing else.
         If no clear date/time is mentioned, return 'not-found'.
         """)
@@ -603,5 +594,28 @@ class CalendarAgent:
         except ValueError:
             return None
 
-    def _to_str_iso(self, dt: datetime) -> str:
+    def _to_str_iso(self, dt: datetime | None) -> str:
+        if not dt:
+            return "not-found"
         return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    calendar_agent_prompt: str = ""
+    def _load_calendar_agent_prompt(self):
+        if not CalendarAgent.calendar_agent_prompt:
+            with open("app/agents/prompts/calendar_agent_prompt.txt", encoding="utf-8") as f:
+                CalendarAgent.calendar_agent_prompt = f.read()
+        return CalendarAgent.calendar_agent_prompt
+
+    classifier_prompt: str = ""
+    def _load_classifier_prompt(self):
+        if not CalendarAgent.classifier_prompt:
+            with open("app/agents/prompts/calendar_agent_classifier_prompt.txt", encoding="utf-8") as f:
+                CalendarAgent.classifier_prompt = f.read()
+        return CalendarAgent.classifier_prompt
+
+    available_timeframes_prompt: str = ""
+    def _load_available_timeframes_prompt(self):
+        if not CalendarAgent.available_timeframes_prompt:
+            with open("app/agents/prompts/calendar_agent_available_timeframes_prompt.txt", encoding="utf-8") as f:
+                CalendarAgent.available_timeframes_prompt = f.read()
+        return CalendarAgent.available_timeframes_prompt

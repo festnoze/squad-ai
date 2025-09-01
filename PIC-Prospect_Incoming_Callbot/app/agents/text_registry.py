@@ -25,6 +25,7 @@ class AgentTexts:
     date_not_found_text = "Je n'ai pas trouvé la date et l'heure du rendez-vous. Veuillez me préciser la date et l'heure du rendez-vous souhaité."
     appointment_confirmed_prefix_text = "C'est confirmé, votre rendez-vous est maintenant planifié pour le "
     appointment_confirmed_suffix_text = "Merci et au revoir."
+    appointment_unavailable_slot_text = "Je suis désolé, ce créneau n'est pas disponible. A la place, "
     appointment_failed_text = "Je n'ai pas pu planifier le rendez-vous. Souhaitez-vous essayer un autre créneau ?"
     modification_not_supported_text = "Je ne suis pas en mesure de gérer les modifications de rendez-vous."
     cancellation_not_supported_text = "Je ne suis pas en mesure de gérer les annulations de rendez-vous."

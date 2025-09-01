@@ -9,7 +9,6 @@ class ConversationState(TypedDict):
     history: Annotated[Sequence[tuple[str, str]], operator.add]
     agent_scratchpad: dict[str, any]
 
-
 class PhoneConversationState(ConversationState):
     """Represents the state of the phone conversation at any point."""
 

@@ -158,7 +158,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
             return None
 
         # Check the calendar availability before creating the appointement
-        verified_event_id = await self.verify_appointment_existance(
+        verified_event_id = await self.verify_appointment_existance_async(
             event_id=None, expected_subject=subject, start_datetime=start_datetime, duration_minutes=duration_minutes
         )
         if verified_event_id:
@@ -246,7 +246,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
             exception_upon_creation = True
 
         # Verify the appointment was actually created
-        verified_event_id = await self.verify_appointment_existance(
+        verified_event_id = await self.verify_appointment_existance_async(
             event_id=event_id,
             expected_subject=subject,
             start_datetime=start_datetime,
@@ -282,9 +282,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
 
         return verified_event_id
 
-    async def verify_appointment_existance(
-        self, event_id: str | None, expected_subject: str, start_datetime: str, duration_minutes: int = 60
-    ) -> str | None:
+    async def verify_appointment_existance_async(self, event_id: str | None = None, expected_subject: str | None = None, start_datetime: str = "", duration_minutes: int = 30) -> str | None:
         """Check if an appointment was successfully created by verifying its existence
 
         Args:
@@ -336,16 +334,14 @@ class SalesforceApiClient(SalesforceApiClientInterface):
             for appointment in appointments:
                 # If event_id is provided, check both ID and subject
                 if event_id:
-                    if appointment.get("Id") == event_id and appointment.get("Subject") == expected_subject:
+                    if appointment.get("Id") == event_id:
                         self.logger.info(f"Appointment verification successful - Event ID: {event_id}")
                         return event_id
                 else:
                     # If event_id is None, only check subject and return the found event_id
                     if appointment.get("Subject") == expected_subject:
                         found_event_id = appointment.get("Id")
-                        self.logger.info(
-                            f"Appointment found with subject '{expected_subject}' - Event ID: {found_event_id}"
-                        )
+                        self.logger.info(f"Appointment found with subject '{expected_subject}' - Event ID: {found_event_id}")
                         return found_event_id
 
             if event_id:

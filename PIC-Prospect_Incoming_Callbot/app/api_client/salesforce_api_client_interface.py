@@ -132,3 +132,7 @@ class SalesforceApiClientInterface(ABC):
             list cannot be fetched.
         """
         pass
+
+    @abstractmethod
+    async def verify_appointment_existance_async(self, event_id: str | None = None, expected_subject: str | None = None, start_datetime: str = "", duration_minutes: int = 30) -> str | None:
+        pass
