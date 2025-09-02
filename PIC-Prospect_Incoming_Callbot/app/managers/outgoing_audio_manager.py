@@ -56,7 +56,7 @@ class OutgoingAudioManager(OutgoingManager):
 
         self.tts_provider: TextToSpeechProvider = tts_provider  # Text-to-speech provider for converting text to audio
         self.sender_task = None
-        self.keep_audio_file = EnvHelper.get_keep_audio_files()
+        self.keep_outgoing_audio_file = EnvHelper.get_keep_outgoing_audio_file()
         self.frame_rate = frame_rate  # mu-law in 8/16kHz
         self.sample_width = sample_width  # mu-law in 8/16 bits
         self.channels = channels
@@ -81,6 +81,10 @@ class OutgoingAudioManager(OutgoingManager):
         # Create temp directory if it doesn't exist
         os.makedirs(self.outgoing_speech_dir, exist_ok=True)
 
+        # Initialize latency tracking attributes
+        self.call_sid = None
+        self.phone_number = None
+
     def set_websocket(self, websocket: WebSocket):
         self.websocket = websocket
         self.audio_sender.websocket = websocket
@@ -96,6 +100,14 @@ class OutgoingAudioManager(OutgoingManager):
         else:
             self.logger.info(f"Updated stream SID to: {stream_sid}")
         return
+
+    def set_call_sid(self, call_sid: str) -> None:
+        """Set the call SID for latency tracking"""
+        self.call_sid = call_sid
+
+    def set_phone_number(self, phone_number: str) -> None:
+        """Set the phone number for latency tracking"""
+        self.phone_number = phone_number
 
     def get_synthesized_audio_from_cache(self, text: str, allow_partial: bool = False) -> bytes | None:
         """
@@ -308,7 +320,12 @@ class OutgoingAudioManager(OutgoingManager):
                     # Synthesize remaining text if any
                     if remaining_text.strip():
                         self.logger.info(f">>>>>> Synthesizing remaining text: '{remaining_text}'")
-                        remaining_audio = await self.tts_provider.synthesize_speech_to_bytes_async(remaining_text)
+                        remaining_audio = await self.tts_provider.synthesize_speech_to_bytes_async(
+                            remaining_text,
+                            call_sid=self.call_sid,
+                            stream_sid=self.audio_sender.stream_sid,
+                            phone_number=self.phone_number,
+                        )
 
                         if remaining_audio:
                             final_audio_parts.append(remaining_audio)
@@ -370,7 +387,9 @@ class OutgoingAudioManager(OutgoingManager):
         """
         try:
             self.logger.info(f">>>>>> Fallback: Synthesizing complete text: '{text}'")
-            speech_bytes = await self.tts_provider.synthesize_speech_to_bytes_async(text)
+            speech_bytes = await self.tts_provider.synthesize_speech_to_bytes_async(
+                text, call_sid=self.call_sid, stream_sid=self.audio_sender.stream_sid, phone_number=self.phone_number
+            )
 
             if speech_bytes:
                 # Cache the complete synthesis (without background noise)
@@ -446,8 +465,8 @@ class OutgoingAudioManager(OutgoingManager):
 
                 text_chunks_processed += 1
 
-                if self.keep_audio_file:
-                    self.save_as_wav_file(speech_bytes)
+                if self.keep_outgoing_audio_file:
+                    self._save_as_wav_file(speech_bytes)
 
                 # Send the current audio
                 send_audio_chunk_task = asyncio.create_task(self.audio_sender.send_audio_chunk_async(speech_bytes))
@@ -471,9 +490,10 @@ class OutgoingAudioManager(OutgoingManager):
                 errors += 1
                 await asyncio.sleep(0.5)  # Sleep a bit longer on error
 
-    def save_as_wav_file(self, audio_data: bytes):
+    def _save_as_wav_file(self, audio_data: bytes, file_name: str | None = None):
         """Save PCM data (16-bit, 8kHz, mono) to a WAV file at the specified path."""
-        file_name = f"{uuid.uuid4()}.wav"
+        if not file_name:
+            file_name = f"{uuid.uuid4()}.wav"
         with wave.open(os.path.join(self.outgoing_speech_dir, file_name), "wb") as wav_file:
             wav_file.setnchannels(1)  # mono
             wav_file.setsampwidth(self.sample_width)  # 16-bit

@@ -15,7 +15,10 @@ class ConversationRepository:
         self, user_id: UUID, conversation_id: UUID | None = None
     ) -> Conversation | None:
         try:
-            user_entity: UserEntity = await self.data_context.get_entity_by_id_async(UserEntity, user_id)
+            user_entity: UserEntity | None = await self.data_context.get_entity_by_id_async(UserEntity, user_id)
+            if not user_entity:
+                raise ValueError(f"User with id {user_id} does not exist")
+
             # Create conversation id if not provided
             if not conversation_id:
                 conversation_id = uuid4()

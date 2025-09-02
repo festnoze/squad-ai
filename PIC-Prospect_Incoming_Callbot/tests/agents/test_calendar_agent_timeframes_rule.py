@@ -1,6 +1,6 @@
 """
 Tests for the CalendarAgent timeframes inclusion rule:
-"Inclut aujourd'hui si il est moins de 18h, ainsi que le prochain jour ouvré. 
+"Inclut aujourd'hui si il est moins de 16h, ainsi que le prochain jour ouvré. 
 Attention, si nous sommes le vendredi, le prochain jour ouvré sera le lundi suivant (soit J+3)."
 
 These tests verify that:
@@ -64,7 +64,7 @@ class TestCalendarAgentTimeframesRule:
         # Load the prompt and verify it contains the rule
         prompt_content = agent._load_available_timeframes_prompt()
         
-        assert "Inclut aujourd'hui si il est moins de 18h" in prompt_content
+        assert "Inclut aujourd'hui si il est moins de 16h" in prompt_content
         assert "le prochain jour ouvré" in prompt_content
         assert "si nous sommes le vendredi, le prochain jour ouvré sera le lundi suivant (soit J+3)" in prompt_content
     
@@ -72,8 +72,7 @@ class TestCalendarAgentTimeframesRule:
         # Test various times and their French format
         (datetime(2025, 1, 15, 9, 0, 0), "mercredi 15 janvier 2025 à 9 heures"),
         (datetime(2025, 1, 15, 14, 30, 0), "mercredi 15 janvier 2025 à 14 heures 30"),
-        (datetime(2025, 1, 17, 17, 59, 0), "vendredi 17 janvier 2025 à 17 heures 59"),
-        (datetime(2025, 1, 17, 18, 0, 0), "vendredi 17 janvier 2025 à 18 heures"),
+        (datetime(2025, 1, 17, 15, 59, 0), "vendredi 17 janvier 2025 à 15 heures 59"),
     ])
     def test_current_date_formatting_for_prompt(self, test_time, expected_french_time):
         """Test that dates are correctly formatted in French for the prompt"""

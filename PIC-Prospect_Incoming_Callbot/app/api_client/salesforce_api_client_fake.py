@@ -63,7 +63,7 @@ class SalesforceApiClientFake(SalesforceApiClientInterface):
         start_datetime: str,
         end_datetime: str,
         owner_id: str | None = None,
-    ) -> list[dict[str, Any]] | None:
+    ) -> list[dict[str, Any]]:
         """Return at least one dummy appointment so `any(appointments)` is True."""
         await self._ensure_authenticated_async()
 

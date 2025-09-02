@@ -61,7 +61,7 @@ class CalendarAgent:
         )
         self.available_timeframes_agent = AgentExecutor(agent=agent, tools=tools_available_timeframes, verbose=True)
 
-        # self.tools = [self.get_appointments, self.schedule_new_appointment]
+        # self.tools = [self.get_appointments, self.schedule_new_appointment_tool]
         #
         # self.prompt = self._load_prompt()
         # self.prompts = ChatPromptTemplate.from_messages([
@@ -160,7 +160,7 @@ class CalendarAgent:
                 user_input, chat_history
             )
             appointment_slot_datetime_str = self._to_str_iso(appointment_slot_datetime)
-            success = await CalendarAgent.schedule_new_appointment_tool_async(appointment_slot_datetime_str)
+            success = await CalendarAgent.schedule_new_appointment_async(appointment_slot_datetime_str)
             if success is not None:
                 return (
                     self.appointment_confirmed_prefix_text
@@ -270,46 +270,40 @@ class CalendarAgent:
         if not end_date.endswith("Z"):
             end_date += "Z"
 
-        scheduled_slots = await CalendarAgent.salesforce_api_client.get_scheduled_appointments_async(
-            start_date, end_date, CalendarAgent.owner_id
-        )
+        scheduled_slots = await CalendarAgent.salesforce_api_client.get_scheduled_appointments_async(start_date, end_date, CalendarAgent.owner_id)
         return CalendarAgent.get_available_timeframes_from_scheduled_slots(start_date, end_date, scheduled_slots)
 
     @staticmethod
     @tool
-    async def schedule_new_appointment(
-        date_and_time: str, object: str | None = None, description: str | None = None
+    async def schedule_new_appointment_tool(
+        date_and_time: str, user_subject: str | None = None, description: str | None = None
     ) -> str | None:
         """Schedule a new appointment with the owner at the specified date and time.
 
         Args:
             date_and_time: Date and time for the new appointment
-            object: Optional subject for the appointment
+            user_subject: Optional subject defined by the user for the appointment
             description: Optional description for the appointment
 
         Returns:
             The scheduled appointment details
         """
         duration = 30  # Default duration in minutes
-        return await CalendarAgent.schedule_new_appointment_tool_async(date_and_time, duration, object, description)
+        return await CalendarAgent.schedule_new_appointment_async(date_and_time, duration, user_subject, description)
 
     @staticmethod
-    async def schedule_new_appointment_tool_async(date_and_time: str, duration: int = 30, user_subject: str | None = None, description: str | None = None) -> str | None:
+    async def schedule_new_appointment_async(date_and_time: str, duration: int = 30, user_subject: str | None = None, description: str | None = None) -> str | None:
         subject = "RDV Callbot - " + CalendarAgent.first_name + " " + CalendarAgent.last_name
         if user_subject:
             subject += ": " + user_subject
-        description = description if description else "RV pris par l'IA après appel entrant du prospect"
+        description = description if description else "Rendez-vous pris directement par l'IA lors d'un appel entrant du lead en dehors des heures ouvrées."
         if not date_and_time.endswith("Z"):
             date_and_time += "Z"
 
-        logger = logging.getLogger(__name__)
-        logger.info(
-            f"########### Called 'schedule_new_appointment' tool for {CalendarAgent.owner_id} at: {date_and_time}."
-        )
-
         # TODO: manage "CalendarAgent.*" variables another way for multi-calls handling.
         return await CalendarAgent.salesforce_api_client.schedule_new_appointment_async(
-            subject, date_and_time, duration, description, owner_id=CalendarAgent.owner_id, who_id=CalendarAgent.user_id
+            subject, date_and_time, duration, description,
+            owner_id=CalendarAgent.owner_id, who_id=CalendarAgent.user_id
         )
 
     def _set_user_info(self, user_id, first_name, last_name, email, owner_id, owner_name):

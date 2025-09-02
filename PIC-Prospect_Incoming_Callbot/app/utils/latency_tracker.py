@@ -123,15 +123,28 @@ class LatencyTracker:
         except Exception as e:
             self.logger.error(f"Erreur lors de la sauvegarde de la métrique: {e}")
     
-    def _check_thresholds(self, metric: LatencyMetric) -> None:
-        """Vérifie les seuils et déclenche les alertes"""
+    def calculate_criticality(self, metric: LatencyMetric) -> str:
+        """Calculate criticality level based on thresholds"""
         warning_threshold = self.thresholds.get_warning_threshold(metric.operation_type)
         critical_threshold = self.thresholds.get_critical_threshold(metric.operation_type)
         
         if metric.latency_ms > critical_threshold:
+            return "critical"
+        elif metric.latency_ms > warning_threshold:
+            return "warning"
+        else:
+            return "normal"
+    
+    def _check_thresholds(self, metric: LatencyMetric) -> None:
+        """Vérifie les seuils et déclenche les alertes"""
+        criticality = self.calculate_criticality(metric)
+        
+        if criticality == "critical":
+            critical_threshold = self.thresholds.get_critical_threshold(metric.operation_type)
             self.logger.warning(f"CRITICAL LATENCY: {metric} (threshold: {critical_threshold}ms)")
             self._trigger_alerts(metric, "critical")
-        elif metric.latency_ms > warning_threshold:
+        elif criticality == "warning":
+            warning_threshold = self.thresholds.get_warning_threshold(metric.operation_type)
             self.logger.warning(f"HIGH LATENCY: {metric} (threshold: {warning_threshold}ms)")
             self._trigger_alerts(metric, "warning")
     

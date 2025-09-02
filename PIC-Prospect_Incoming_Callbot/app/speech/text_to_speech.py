@@ -18,7 +18,7 @@ class TextToSpeechProvider(ABC):
 
     @abstractmethod
     @measure_latency(OperationType.TTS)
-    async def synthesize_speech_to_bytes_async(self, text: str) -> bytes:
+    async def synthesize_speech_to_bytes_async(self, text: str, call_sid: str = None, stream_sid: str = None, phone_number: str = None) -> bytes:
         """Speech-to-text using specified the provider, and return it as bytes"""
         pass
 
@@ -72,7 +72,7 @@ class GoogleTTSProvider(TextToSpeechProvider):
         )
 
     @measure_latency(OperationType.TTS, provider="google")
-    async def synthesize_speech_to_bytes_async(self, text: str) -> bytes:
+    async def synthesize_speech_to_bytes_async(self, text: str, call_sid: str = None, stream_sid: str = None, phone_number: str = None) -> bytes:
         try:
             synthesis_input = self.google_tts.SynthesisInput(text=text)
             response = self.client.synthesize_speech(
@@ -114,7 +114,7 @@ class OpenAITTSProvider(TextToSpeechProvider):
         self.model = EnvHelper.get_text_to_speech_model() or "tts-1"
 
     @measure_latency(OperationType.TTS, provider="openai")
-    async def synthesize_speech_to_bytes_async(self, text: str) -> bytes:
+    async def synthesize_speech_to_bytes_async(self, text: str, call_sid: str = None, stream_sid: str = None, phone_number: str = None) -> bytes:
         try:
             audio_bytes = await TTS_OpenAI.generate_speech_async(
                 model=self.model,

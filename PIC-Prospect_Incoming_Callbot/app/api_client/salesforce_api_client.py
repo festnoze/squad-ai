@@ -382,9 +382,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
             return None
 
     @measure_latency(OperationType.SALESFORCE, provider="salesforce")
-    async def get_scheduled_appointments_async(
-        self, start_datetime: str, end_datetime: str, owner_id: str | None = None
-    ) -> list | None:
+    async def get_scheduled_appointments_async(self, start_datetime: str, end_datetime: str, owner_id: str | None = None) -> list:
         """Get events from Salesforce calendar between specified start and end datetimes
 
         Args:
@@ -398,7 +396,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
         await self._ensure_authenticated_async()
         self.logger.info("Retrieving events...")
 
-        async def _execute_appointments_query():
+        async def _execute_appointments_query() -> list:
             # Prepare headers
             headers = {"Authorization": f"Bearer {self._access_token}", "Content-Type": "application/json"}
 
@@ -476,12 +474,12 @@ class SalesforceApiClient(SalesforceApiClientInterface):
             self.logger.info(f"Error retrieving events: {http_err.response.status_code}")
             try:
                 self.logger.info(json.dumps(http_err.response.json(), indent=2, ensure_ascii=False))
-            except:
+            except Exception:
                 self.logger.info(http_err.response.text)
-            return None
+            return []
         except Exception as e:
             self.logger.info(f"Error retrieving events: {e!s}")
-            return None
+            return []
 
     @measure_latency(OperationType.SALESFORCE, provider="salesforce")
     async def delete_event_by_id_async(self, event_id: str) -> bool:

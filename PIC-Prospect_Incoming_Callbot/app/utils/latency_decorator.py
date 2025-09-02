@@ -14,6 +14,7 @@ def measure_latency(
     provider: Optional[str] = None,
     call_sid_attr: Optional[str] = None,
     stream_sid_attr: Optional[str] = None,
+    phone_number_attr: Optional[str] = None,
     metadata: Optional[dict] = None
 ):
     """
@@ -25,6 +26,7 @@ def measure_latency(
         provider: Nom du fournisseur de service (e.g., "google", "openai")
         call_sid_attr: Nom de l'attribut contenant le call_sid dans self
         stream_sid_attr: Nom de l'attribut contenant le stream_sid dans self
+        phone_number_attr: Nom de l'attribut contenant le phone_number dans self
         metadata: Métadonnées additionnelles à inclure dans la métrique
     
     Usage:
@@ -53,15 +55,10 @@ def measure_latency(
                     end_time = time.perf_counter()
                     latency_ms = (end_time - start_time) * 1000
                     
-                    # Extraire call_sid et stream_sid si disponibles
-                    call_sid = None
-                    stream_sid = None
-                    if args and hasattr(args[0], '__dict__'):  # Premier argument est généralement 'self'
-                        obj = args[0]
-                        if call_sid_attr and hasattr(obj, call_sid_attr):
-                            call_sid = getattr(obj, call_sid_attr)
-                        if stream_sid_attr and hasattr(obj, stream_sid_attr):
-                            stream_sid = getattr(obj, stream_sid_attr)
+                    # Extraire call_sid, stream_sid et phone_number
+                    call_sid, stream_sid, phone_number = _extract_call_stream_ids_and_phone(
+                        args, call_sid_attr, stream_sid_attr, phone_number_attr, kwargs
+                    )
                     
                     metric = LatencyMetric(
                         operation_type=operation_type,
@@ -71,9 +68,13 @@ def measure_latency(
                         call_sid=call_sid,
                         stream_sid=stream_sid,
                         provider=provider,
+                        phone_number=phone_number,
                         error_message=error_message,
                         metadata=metadata or {}
                     )
+                    
+                    # Calculer la criticité
+                    metric.criticality = latency_tracker.calculate_criticality(metric)
                     
                     latency_tracker.add_metric(metric)
             
@@ -96,15 +97,10 @@ def measure_latency(
                     end_time = time.perf_counter()
                     latency_ms = (end_time - start_time) * 1000
                     
-                    # Extraire call_sid et stream_sid si disponibles
-                    call_sid = None
-                    stream_sid = None
-                    if args and hasattr(args[0], '__dict__'):  # Premier argument est généralement 'self'
-                        obj = args[0]
-                        if call_sid_attr and hasattr(obj, call_sid_attr):
-                            call_sid = getattr(obj, call_sid_attr)
-                        if stream_sid_attr and hasattr(obj, stream_sid_attr):
-                            stream_sid = getattr(obj, stream_sid_attr)
+                    # Extraire call_sid, stream_sid et phone_number
+                    call_sid, stream_sid, phone_number = _extract_call_stream_ids_and_phone(
+                        args, call_sid_attr, stream_sid_attr, phone_number_attr, kwargs
+                    )
                     
                     metric = LatencyMetric(
                         operation_type=operation_type,
@@ -114,9 +110,13 @@ def measure_latency(
                         call_sid=call_sid,
                         stream_sid=stream_sid,
                         provider=provider,
+                        phone_number=phone_number,
                         error_message=error_message,
                         metadata=metadata or {}
                     )
+                    
+                    # Calculer la criticité
+                    metric.criticality = latency_tracker.calculate_criticality(metric)
                     
                     latency_tracker.add_metric(metric)
             
@@ -135,6 +135,7 @@ class LatencyContextManager:
         provider: Optional[str] = None,
         call_sid: Optional[str] = None,
         stream_sid: Optional[str] = None,
+        phone_number: Optional[str] = None,
         metadata: Optional[dict] = None
     ):
         self.operation_type = operation_type
@@ -142,6 +143,7 @@ class LatencyContextManager:
         self.provider = provider
         self.call_sid = call_sid
         self.stream_sid = stream_sid
+        self.phone_number = phone_number
         self.metadata = metadata or {}
         self.start_time: Optional[float] = None
     
@@ -167,9 +169,13 @@ class LatencyContextManager:
             call_sid=self.call_sid,
             stream_sid=self.stream_sid,
             provider=self.provider,
+            phone_number=self.phone_number,
             error_message=error_message,
             metadata=self.metadata
         )
+        
+        # Calculer la criticité
+        metric.criticality = latency_tracker.calculate_criticality(metric)
         
         latency_tracker.add_metric(metric)
 
@@ -181,6 +187,7 @@ def measure_latency_context(
     provider: Optional[str] = None,
     call_sid: Optional[str] = None,
     stream_sid: Optional[str] = None,
+    phone_number: Optional[str] = None,
     metadata: Optional[dict] = None
 ) -> LatencyContextManager:
     """
@@ -197,21 +204,48 @@ def measure_latency_context(
         provider=provider,
         call_sid=call_sid,
         stream_sid=stream_sid,
+        phone_number=phone_number,
         metadata=metadata
     )
 
 
-def _extract_call_stream_ids(args, call_sid_attr, stream_sid_attr):
-    """Fonction helper pour extraire call_sid et stream_sid depuis les arguments"""
+def _extract_call_stream_ids_and_phone(args, call_sid_attr, stream_sid_attr, phone_number_attr=None, kwargs=None):
+    """Fonction helper pour extraire call_sid, stream_sid et phone_number depuis les arguments ou kwargs"""
     call_sid = None
     stream_sid = None
-    if args and hasattr(args[0], '__dict__'):  # Premier argument est généralement 'self'
+    phone_number = None
+    
+    # First try to get from kwargs if available
+    if kwargs:
+        call_sid = kwargs.get('call_sid')
+        stream_sid = kwargs.get('stream_sid')
+        phone_number = kwargs.get('phone_number')
+    
+    # If not found in kwargs, try from object attributes
+    if (call_sid is None or stream_sid is None or phone_number is None) and args and hasattr(args[0], '__dict__'):
         obj = args[0]
-        if call_sid_attr and hasattr(obj, call_sid_attr):
+        
+        # Extraire call_sid
+        if call_sid is None and call_sid_attr and hasattr(obj, call_sid_attr):
             call_sid = getattr(obj, call_sid_attr)
-        if stream_sid_attr and hasattr(obj, stream_sid_attr):
+        
+        # Extraire stream_sid
+        if stream_sid is None and stream_sid_attr and hasattr(obj, stream_sid_attr):
             stream_sid = getattr(obj, stream_sid_attr)
-    return call_sid, stream_sid
+        
+        # Extraire phone_number directement ou depuis phones_by_call_sid
+        if phone_number is None:
+            if phone_number_attr and hasattr(obj, phone_number_attr):
+                phone_number = getattr(obj, phone_number_attr)
+            elif call_sid and hasattr(obj, 'phones_by_call_sid'):
+                phones_by_call_sid = getattr(obj, 'phones_by_call_sid')
+                if isinstance(phones_by_call_sid, dict):
+                    phone_number = phones_by_call_sid.get(call_sid)
+            elif hasattr(obj, 'phone_number'):
+                # Fallback direct attribute
+                phone_number = getattr(obj, 'phone_number')
+            
+    return call_sid, stream_sid, phone_number
 
 
 
@@ -221,6 +255,7 @@ def measure_streaming_latency(
     provider: Optional[str] = None,
     call_sid_attr: Optional[str] = None,
     stream_sid_attr: Optional[str] = None,
+    phone_number_attr: Optional[str] = None,
     metadata: Optional[dict] = None
 ):
     """
@@ -266,7 +301,9 @@ def measure_streaming_latency(
                             latency_ms = (end_time - start_time) * 1000
                             
                             # Extraire les métadonnées
-                            call_sid, stream_sid = _extract_call_stream_ids(args, call_sid_attr, stream_sid_attr)
+                            call_sid, stream_sid, phone_number = _extract_call_stream_ids_and_phone(
+                                args, call_sid_attr, stream_sid_attr, phone_number_attr, kwargs
+                            )
                             
                             metric = LatencyMetric(
                                 operation_type=operation_type,
@@ -276,9 +313,13 @@ def measure_streaming_latency(
                                 call_sid=call_sid,
                                 stream_sid=stream_sid,
                                 provider=provider,
+                                phone_number=phone_number,
                                 error_message=error_message,
                                 metadata={**(metadata or {}), "metric_type": "time_to_first_token"}
                             )
+                            
+                            # Calculer la criticité
+                            metric.criticality = latency_tracker.calculate_criticality(metric)
                             
                             latency_tracker.add_metric(metric)
                             first_chunk_yielded = True
@@ -293,7 +334,9 @@ def measure_streaming_latency(
                         status = OperationStatus.ERROR
                         error_message = str(e)
                         
-                        call_sid, stream_sid = _extract_call_stream_ids(args, call_sid_attr, stream_sid_attr)
+                        call_sid, stream_sid, phone_number = _extract_call_stream_ids_and_phone(
+                            args, call_sid_attr, stream_sid_attr, phone_number_attr, kwargs
+                        )
                         
                         metric = LatencyMetric(
                             operation_type=operation_type,
@@ -303,9 +346,13 @@ def measure_streaming_latency(
                             call_sid=call_sid,
                             stream_sid=stream_sid,
                             provider=provider,
+                            phone_number=phone_number,
                             error_message=error_message,
                             metadata={**(metadata or {}), "metric_type": "time_to_first_token"}
                         )
+                        
+                        # Calculer la criticité
+                        metric.criticality = latency_tracker.calculate_criticality(metric)
                         
                         latency_tracker.add_metric(metric)
                     raise
@@ -328,7 +375,9 @@ def measure_streaming_latency(
                             end_time = time.perf_counter()
                             latency_ms = (end_time - start_time) * 1000
                             
-                            call_sid, stream_sid = _extract_call_stream_ids(args, call_sid_attr, stream_sid_attr)
+                            call_sid, stream_sid, phone_number = _extract_call_stream_ids_and_phone(
+                            args, call_sid_attr, stream_sid_attr, phone_number_attr, kwargs
+                        )
                             
                             metric = LatencyMetric(
                                 operation_type=operation_type,
@@ -338,9 +387,13 @@ def measure_streaming_latency(
                                 call_sid=call_sid,
                                 stream_sid=stream_sid,
                                 provider=provider,
+                                phone_number=phone_number,
                                 error_message=error_message,
                                 metadata={**(metadata or {}), "metric_type": "time_to_first_token"}
                             )
+                            
+                            # Calculer la criticité
+                            metric.criticality = latency_tracker.calculate_criticality(metric)
                             
                             latency_tracker.add_metric(metric)
                             first_chunk_yielded = True
@@ -354,7 +407,9 @@ def measure_streaming_latency(
                         status = OperationStatus.ERROR
                         error_message = str(e)
                         
-                        call_sid, stream_sid = _extract_call_stream_ids(args, call_sid_attr, stream_sid_attr)
+                        call_sid, stream_sid, phone_number = _extract_call_stream_ids_and_phone(
+                            args, call_sid_attr, stream_sid_attr, phone_number_attr, kwargs
+                        )
                         
                         metric = LatencyMetric(
                             operation_type=operation_type,
@@ -364,9 +419,13 @@ def measure_streaming_latency(
                             call_sid=call_sid,
                             stream_sid=stream_sid,
                             provider=provider,
+                            phone_number=phone_number,
                             error_message=error_message,
                             metadata={**(metadata or {}), "metric_type": "time_to_first_token"}
                         )
+                        
+                        # Calculer la criticité
+                        metric.criticality = latency_tracker.calculate_criticality(metric)
                         
                         latency_tracker.add_metric(metric)
                     raise

@@ -16,7 +16,7 @@ class SpeechToTextProvider(ABC):
 
     @abstractmethod
     @measure_latency(OperationType.STT)
-    async def transcribe_audio_async(self, file_name: str) -> str:
+    async def transcribe_audio_async(self, file_name: str, call_sid: str = None, stream_sid: str = None, phone_number: str = None) -> str:
         """Transcribe audio file to text using the specified provider"""
         pass
 
@@ -33,7 +33,7 @@ class GoogleSTTProvider(SpeechToTextProvider):
         self.temp_dir = temp_dir
 
     @measure_latency(OperationType.STT, provider="google")
-    async def transcribe_audio_async(self, file_name: str) -> str:
+    async def transcribe_audio_async(self, file_name: str, call_sid: str = None, stream_sid: str = None, phone_number: str = None) -> str:
         """Transcribe audio file using Google STT API."""
         try:
             return GoogleSTTProvider.transcribe_audio_static(
@@ -81,7 +81,7 @@ class OpenAISTTProvider(SpeechToTextProvider):
         self.openai_client = AsyncOpenAI(api_key=EnvHelper.get_openai_api_key())
 
     @measure_latency(OperationType.STT, provider="openai")
-    async def transcribe_audio_async(self, file_name: str) -> str:
+    async def transcribe_audio_async(self, file_name: str, call_sid: str = None, stream_sid: str = None, phone_number: str = None) -> str:
         """Transcribe audio file using OpenAI STT API."""
         try:
             return await OpenAISTTProvider.transcribe_audio_static_async(
@@ -121,7 +121,7 @@ class HybridSTTProvider(SpeechToTextProvider):
         self.temp_dir = temp_dir
 
     @measure_latency(OperationType.STT, provider="hybrid")
-    async def transcribe_audio_async(self, file_name: str) -> str:
+    async def transcribe_audio_async(self, file_name: str, call_sid: str = None, stream_sid: str = None, phone_number: str = None) -> str:
         try:
             return await HybridSTTProvider.transcribe_audio_static_async(
                 self.openai_client,

@@ -43,8 +43,13 @@ class EnvHelper:
         return value.lower() == "true"
 
     @staticmethod
-    def get_keep_audio_files() -> bool:
-        value = EnvHelper.get_env_variable_value_by_name("KEEP_AUDIO_FILES")
+    def get_keep_incoming_audio_files() -> bool:
+        value = EnvHelper.get_env_variable_value_by_name("KEEP_INCOMING_AUDIO_FILES")
+        return value.lower() == "true"
+
+    @staticmethod
+    def get_keep_outgoing_audio_file() -> bool:
+        value = EnvHelper.get_env_variable_value_by_name("KEEP_OUTGOING_AUDIO_FILES")
         return value.lower() == "true"
 
     @staticmethod
@@ -280,4 +285,7 @@ class EnvHelper:
 
     @staticmethod
     def get_latency_metrics_file_path() -> str:
-        return EnvHelper.get_env_variable_value_by_name("LATENCY_METRICS_FILE_PATH", fails_if_missing=False) or "outputs/logs/latency_metrics.jsonl"
+        return (
+            EnvHelper.get_env_variable_value_by_name("LATENCY_METRICS_FILE_PATH", fails_if_missing=False)
+            or "outputs/logs/latency_metrics.jsonl"
+        )

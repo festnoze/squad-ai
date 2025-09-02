@@ -45,9 +45,7 @@ class SalesforceApiClientInterface(ABC):
         pass
 
     @abstractmethod
-    async def get_scheduled_appointments_async(
-        self, start_datetime: str, end_datetime: str, owner_id: str | None = None
-    ) -> list | None:
+    async def get_scheduled_appointments_async(self, start_datetime: str, end_datetime: str, owner_id: str | None = None) -> list:
         """Get events from Salesforce calendar between specified start and end datetimes
 
         Args:

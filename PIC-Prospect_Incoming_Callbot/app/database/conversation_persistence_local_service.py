@@ -106,10 +106,10 @@ class ConversationPersistenceLocalService(ConversationPersistenceInterface):
 
     async def add_message_to_conversation_async(
         self, conversation_id: str, new_message_content: str, role: str = "assistant", timeout: int = 10
-    ) -> Conversation | None:
+    ) -> dict | None:
         conversation_uuid = UUID(conversation_id)
         conversation = await self.conversation_repository.get_conversation_by_id_async(conversation_uuid)
         if new_message_content and conversation:
             new_message = conversation.add_new_message(role, new_message_content)
             await self.conversation_repository.add_message_to_existing_conversation_async(conversation.id, new_message)
-        return conversation
+        return {"messages": [message.to_dict() for message in conversation.messages]} if conversation else None

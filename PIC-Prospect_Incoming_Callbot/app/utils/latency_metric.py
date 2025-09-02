@@ -29,6 +29,8 @@ class LatencyMetric:
     call_sid: str | None = None
     stream_sid: str | None = None
     provider: str | None = None  # e.g., "google", "openai", "salesforce"
+    phone_number: str | None = None  # The caller's phone number
+    criticality: str = "normal"  # "normal", "warning", "critical"
     error_message: str | None = None
     metadata: dict[str, any] = field(default_factory=dict)
     
@@ -43,6 +45,8 @@ class LatencyMetric:
             "call_sid": self.call_sid,
             "stream_sid": self.stream_sid,
             "provider": self.provider,
+            "phone_number": self.phone_number,
+            "criticality": self.criticality,
             "error_message": self.error_message,
             "metadata": self.metadata
         }
@@ -59,6 +63,8 @@ class LatencyMetric:
             call_sid=data.get("call_sid"),
             stream_sid=data.get("stream_sid"),
             provider=data.get("provider"),
+            phone_number=data.get("phone_number"),
+            criticality=data.get("criticality", "normal"),
             error_message=data.get("error_message"),
             metadata=data.get("metadata", {})
         )
