@@ -175,7 +175,8 @@ class SalesforceApiClient(SalesforceApiClientInterface):
         if start_dt is None:
             self.logger.info("Error: Invalid start_datetime format")
             return None
-        # TODO NOW: tmp to fix timezone issue in docker container
+        
+        # Manually set timezone, because of issue within the docker container
         french_now = datetime.now(pytz.timezone("Europe/Paris"))
         utc_offset_hours = (french_now.utcoffset().total_seconds() or 0) / 3600
         if utc_offset_hours != 0:
@@ -289,16 +290,18 @@ class SalesforceApiClient(SalesforceApiClientInterface):
 
     @measure_latency(OperationType.SALESFORCE, provider="salesforce")
     async def verify_appointment_existance_async(self, event_id: str | None = None, expected_subject: str | None = None, start_datetime: str = "", duration_minutes: int = 30) -> str | None:
-        """Check if an appointment was successfully created by verifying its existence
+        """Check if an appointment exists based on provided criteria
 
         Args:
-            event_id: The ID of the created event to verify (can be None)
-            expected_subject: The expected subject of the appointment
+            event_id: The ID of a specific event to verify (optional)
+            expected_subject: The expected subject of the appointment (optional)
             start_datetime: Expected start date and time in ISO format (e.g., '2025-05-20T14:00:00Z')
-            duration_minutes: Expected duration in minutes (default: 60)
+            duration_minutes: Expected duration in minutes (default: 30)
 
         Returns:
-            The event_id if the appointment exists and matches expected parameters, None otherwise
+            - If event_id is specified: returns event_id if found and matches criteria, None otherwise
+            - If expected_subject is specified: returns event_id of the first appointment matching subject, None if not found
+            - If neither is specified: returns event_id of the first appointment found in time window, None if none found
         """
 
         # Calculate end datetime for the search window
@@ -324,9 +327,11 @@ class SalesforceApiClient(SalesforceApiClientInterface):
         search_end_str = self._get_str_from_datetime(search_end)
 
         if event_id:
-            self.logger.info(f"Verifying appointment creation for event ID: {event_id}")
-        else:
+            self.logger.info(f"Verifying appointment with event ID: {event_id}")
+        elif expected_subject:
             self.logger.info(f"Searching for appointment with subject: {expected_subject}")
+        else:
+            self.logger.info("Searching for any appointment in the specified time window")
 
         try:
             # Get appointments in the time window
@@ -336,24 +341,40 @@ class SalesforceApiClient(SalesforceApiClientInterface):
                 self.logger.info("Error: Failed to retrieve appointments for verification")
                 return None
 
-            # Look for the specific appointment
+            if not appointments:
+                self.logger.info("No appointments found in the specified time window")
+                return None
+
+            # Look for the specific appointment based on criteria
             for appointment in appointments:
-                # If event_id is provided, check both ID and subject
+                # If event_id is specified, check if it matches
                 if event_id:
                     if appointment.get("Id") == event_id:
+                        # Also check subject if provided
+                        if expected_subject and appointment.get("Subject") != expected_subject:
+                            continue
                         self.logger.info(f"Appointment verification successful - Event ID: {event_id}")
                         return event_id
-                else:
-                    # If event_id is None, only check subject and return the found event_id
+                # If expected_subject is specified but no event_id, check subject match
+                elif expected_subject:
                     if appointment.get("Subject") == expected_subject:
                         found_event_id = appointment.get("Id")
                         self.logger.info(f"Appointment found with subject '{expected_subject}' - Event ID: {found_event_id}")
                         return found_event_id
 
+            # If neither event_id nor expected_subject specified, return first appointment's ID
+            if not event_id and not expected_subject:
+                first_appointment_id = appointments[0].get("Id")
+                first_appointment_subject = appointments[0].get("Subject", "No subject")
+                self.logger.info(f"First appointment found - Event ID: {first_appointment_id}, Subject: '{first_appointment_subject}'")
+                return first_appointment_id
+
+            # If we reach here, no matching appointment was found
             if event_id:
-                self.logger.warning(f"Appointment not found during verification - Event ID: {event_id}")
-            else:
+                self.logger.warning(f"Appointment not found with event ID: {event_id}")
+            elif expected_subject:
                 self.logger.warning(f"Appointment not found with subject: {expected_subject}")
+            
             return None
 
         except Exception as e:

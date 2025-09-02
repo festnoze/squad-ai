@@ -119,7 +119,7 @@ class CalendarAgent:
         if category == "Proposition de rendez-vous":
             start_date = CalendarAgent.now.date()
             end_date = start_date + timedelta(days=2)
-            appointments = await CalendarAgent.get_appointments_async(str(start_date), str(end_date))
+            appointments = await CalendarAgent.get_appointments_async.ainvoke({"start_date": str(start_date), "end_date": str(end_date)})
             available_timeframes = CalendarAgent.get_available_timeframes_from_scheduled_slots(
                 str(start_date), str(end_date), appointments
             )
@@ -264,7 +264,7 @@ class CalendarAgent:
             start_date += "Z"
 
         if len(end_date) == 10:
-            end_date += " 00:00:00"
+            end_date += " 23:59:59"
         if " " in end_date:
             end_date = end_date.replace(" ", "T")
         if not end_date.endswith("Z"):
