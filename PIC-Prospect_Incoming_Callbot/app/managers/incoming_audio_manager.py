@@ -81,7 +81,7 @@ class IncomingAudioManager(IncomingManager):
         self.audio_buffer: bytes = b""
         self.consecutive_silence_duration_ms = 0.0
         self.speech_threshold_base = EnvHelper.get_speech_threshold()
-        self.speech_threshold = self.speech_threshold_base * 1.5 # Add default background noise value on startup (will be calibrated later on)
+        self.speech_threshold = self.speech_threshold_base * 2 # Set default speech threshold on startup (will be calibrated on call start)
         self.required_silence_ms_to_answer = EnvHelper.get_required_silence_ms_to_answer()  # ms of silence to trigger transcript
         self.min_audio_bytes_for_processing = EnvHelper.get_min_audio_bytes_for_processing()  # Minimum buffer size to process
         self.max_audio_bytes_for_processing = EnvHelper.get_max_audio_bytes_for_processing()  # Maximum buffer size to process
@@ -303,7 +303,7 @@ class IncomingAudioManager(IncomingManager):
         # Add chunk to buffer if speech has begun or if chunk is detected as the first speech chunk
 
         # Reset silence counter upon the first speech chunk and activate has_speech_began
-        if not is_silence and not has_speech_began:
+        if not is_silence:
             has_speech_began = True
             self.consecutive_silence_duration_ms = 0.0
 

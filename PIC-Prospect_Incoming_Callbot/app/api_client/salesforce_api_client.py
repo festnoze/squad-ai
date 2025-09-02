@@ -222,17 +222,27 @@ class SalesforceApiClient(SalesforceApiClientInterface):
             payload_event["WhoId"] = who_id
 
         async def _execute_appointment_creation():
-            url_creation_event = f"{self._instance_url}/services/data/{self._version_api}/sobjects/Event/"
-            async with httpx.AsyncClient() as client:
-                resp_event = await client.post(url_creation_event, headers=headers, data=json.dumps(payload_event))
-                resp_event.raise_for_status()
+            try:
+                url_creation_event = f"{self._instance_url}/services/data/{self._version_api}/sobjects/Event/"
+                async with httpx.AsyncClient() as client:
+                    resp_event = await client.post(url_creation_event, headers=headers, data=json.dumps(payload_event))
+                    resp_event.raise_for_status()
 
-                event_id = resp_event.json().get("id", None)
-                self.logger.info("Event created successfully!")
-                self.logger.info(f"ID: {event_id}")
-                self.logger.info(f"{self._instance_url}/lightning/r/Event/{event_id}/view")
-                return event_id
+                    event_id = resp_event.json().get("id", None)
+                    self.logger.info("Event created successfully!")
+                    self.logger.info(f"ID: {event_id}")
+                    self.logger.info(f"{self._instance_url}/lightning/r/Event/{event_id}/view")
+                    return event_id
+            finally:
+                verified_event_id = await self.verify_appointment_existance_async(
+                    event_id=None, expected_subject=None, start_datetime=start_datetime, duration_minutes=duration_minutes
+                )
+                if verified_event_id:
+                    return verified_event_id
+                else:
+                    raise Exception("Appointment creation failed")
 
+        #####
         event_id = None
         exception_upon_creation = False
 
@@ -242,21 +252,13 @@ class SalesforceApiClient(SalesforceApiClientInterface):
             self.logger.info(f"Error while creating the Event: {http_err.response.status_code}")
             try:
                 self.logger.info(json.dumps(http_err.response.json(), indent=2, ensure_ascii=False))
-            except:
+            except Exception:
                 self.logger.info(http_err.response.text)
             exception_upon_creation = True
         except Exception:
             exception_upon_creation = True
 
-        # Verify the appointment was actually created
-        verified_event_id = await self.verify_appointment_existance_async(
-            event_id=event_id,
-            expected_subject=subject,
-            start_datetime=start_datetime,
-            duration_minutes=duration_minutes,
-        )
-
-        if not verified_event_id:
+        if not event_id:
             if exception_upon_creation:
                 self.logger.error("Exception while creating event.")
 
@@ -283,7 +285,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
             else:
                 self.logger.error("All retry attempts exhausted, appointment scheduling failed")
 
-        return verified_event_id
+        return event_id
 
     @measure_latency(OperationType.SALESFORCE, provider="salesforce")
     async def verify_appointment_existance_async(self, event_id: str | None = None, expected_subject: str | None = None, start_datetime: str = "", duration_minutes: int = 30) -> str | None:

@@ -1,5 +1,6 @@
 import asyncio
 import functools
+import inspect
 import time
 from typing import Any, Callable, Optional, Union
 
@@ -198,3 +199,178 @@ def measure_latency_context(
         stream_sid=stream_sid,
         metadata=metadata
     )
+
+
+def _extract_call_stream_ids(args, call_sid_attr, stream_sid_attr):
+    """Fonction helper pour extraire call_sid et stream_sid depuis les arguments"""
+    call_sid = None
+    stream_sid = None
+    if args and hasattr(args[0], '__dict__'):  # Premier argument est généralement 'self'
+        obj = args[0]
+        if call_sid_attr and hasattr(obj, call_sid_attr):
+            call_sid = getattr(obj, call_sid_attr)
+        if stream_sid_attr and hasattr(obj, stream_sid_attr):
+            stream_sid = getattr(obj, stream_sid_attr)
+    return call_sid, stream_sid
+
+
+
+def measure_streaming_latency(
+    operation_type: OperationType,
+    operation_name: Optional[str] = None,
+    provider: Optional[str] = None,
+    call_sid_attr: Optional[str] = None,
+    stream_sid_attr: Optional[str] = None,
+    metadata: Optional[dict] = None
+):
+    """
+    Décorateur spécialisé pour mesurer la latence "time to first token" 
+    des générateurs et générateurs asynchrones.
+    
+    Ce décorateur mesure le temps écoulé entre l'appel de la fonction
+    et le moment où elle yield son premier élément (time to first token).
+    
+    Args:
+        operation_type: Type d'opération (STT, TTS, SALESFORCE, RAG)
+        operation_name: Nom de l'opération (par défaut utilise le nom de la méthode)
+        provider: Nom du fournisseur de service (e.g., "google", "openai")
+        call_sid_attr: Nom de l'attribut contenant le call_sid dans self
+        stream_sid_attr: Nom de l'attribut contenant le stream_sid dans self
+        metadata: Métadonnées additionnelles à inclure dans la métrique
+    
+    Usage:
+        @measure_streaming_latency(OperationType.RAG, provider="studi_rag")
+        async def rag_query_stream_async(self, ...):
+            # Code qui yield des chunks
+            async for chunk in response:
+                yield chunk
+    """
+    def decorator(func: Callable) -> Callable:
+        operation_name_final = operation_name or func.__name__
+        
+        if inspect.isasyncgenfunction(func) or asyncio.iscoroutinefunction(func):
+            # Le décorateur doit créer une fonction async generator
+            @functools.wraps(func)
+            async def async_generator_wrapper(*args, **kwargs):
+                start_time = time.perf_counter()
+                first_chunk_yielded = False
+                status = OperationStatus.SUCCESS
+                error_message = None
+                
+                try:
+                    # Appeler la fonction originale qui est un async generator
+                    async for chunk in func(*args, **kwargs):
+                        if not first_chunk_yielded:
+                            # Mesurer le time to first token
+                            end_time = time.perf_counter()
+                            latency_ms = (end_time - start_time) * 1000
+                            
+                            # Extraire les métadonnées
+                            call_sid, stream_sid = _extract_call_stream_ids(args, call_sid_attr, stream_sid_attr)
+                            
+                            metric = LatencyMetric(
+                                operation_type=operation_type,
+                                operation_name=f"{operation_name_final}_first_token",
+                                latency_ms=latency_ms,
+                                status=status,
+                                call_sid=call_sid,
+                                stream_sid=stream_sid,
+                                provider=provider,
+                                error_message=error_message,
+                                metadata={**(metadata or {}), "metric_type": "time_to_first_token"}
+                            )
+                            
+                            latency_tracker.add_metric(metric)
+                            first_chunk_yielded = True
+                        
+                        yield chunk
+                        
+                except Exception as e:
+                    if not first_chunk_yielded:
+                        # Erreur avant le premier chunk
+                        end_time = time.perf_counter()
+                        latency_ms = (end_time - start_time) * 1000
+                        status = OperationStatus.ERROR
+                        error_message = str(e)
+                        
+                        call_sid, stream_sid = _extract_call_stream_ids(args, call_sid_attr, stream_sid_attr)
+                        
+                        metric = LatencyMetric(
+                            operation_type=operation_type,
+                            operation_name=f"{operation_name_final}_first_token",
+                            latency_ms=latency_ms,
+                            status=status,
+                            call_sid=call_sid,
+                            stream_sid=stream_sid,
+                            provider=provider,
+                            error_message=error_message,
+                            metadata={**(metadata or {}), "metric_type": "time_to_first_token"}
+                        )
+                        
+                        latency_tracker.add_metric(metric)
+                    raise
+            
+            return async_generator_wrapper
+            
+        else:
+            # Version synchrone pour les générateurs sync
+            @functools.wraps(func)
+            def sync_generator_wrapper(*args, **kwargs):
+                start_time = time.perf_counter()
+                first_chunk_yielded = False
+                status = OperationStatus.SUCCESS
+                error_message = None
+                
+                try:
+                    # Appeler la fonction originale qui est un generator
+                    for chunk in func(*args, **kwargs):
+                        if not first_chunk_yielded:
+                            end_time = time.perf_counter()
+                            latency_ms = (end_time - start_time) * 1000
+                            
+                            call_sid, stream_sid = _extract_call_stream_ids(args, call_sid_attr, stream_sid_attr)
+                            
+                            metric = LatencyMetric(
+                                operation_type=operation_type,
+                                operation_name=f"{operation_name_final}_first_token",
+                                latency_ms=latency_ms,
+                                status=status,
+                                call_sid=call_sid,
+                                stream_sid=stream_sid,
+                                provider=provider,
+                                error_message=error_message,
+                                metadata={**(metadata or {}), "metric_type": "time_to_first_token"}
+                            )
+                            
+                            latency_tracker.add_metric(metric)
+                            first_chunk_yielded = True
+                        
+                        yield chunk
+                        
+                except Exception as e:
+                    if not first_chunk_yielded:
+                        end_time = time.perf_counter()
+                        latency_ms = (end_time - start_time) * 1000
+                        status = OperationStatus.ERROR
+                        error_message = str(e)
+                        
+                        call_sid, stream_sid = _extract_call_stream_ids(args, call_sid_attr, stream_sid_attr)
+                        
+                        metric = LatencyMetric(
+                            operation_type=operation_type,
+                            operation_name=f"{operation_name_final}_first_token",
+                            latency_ms=latency_ms,
+                            status=status,
+                            call_sid=call_sid,
+                            stream_sid=stream_sid,
+                            provider=provider,
+                            error_message=error_message,
+                            metadata={**(metadata or {}), "metric_type": "time_to_first_token"}
+                        )
+                        
+                        latency_tracker.add_metric(metric)
+                    raise
+            
+            return sync_generator_wrapper
+    
+    return decorator

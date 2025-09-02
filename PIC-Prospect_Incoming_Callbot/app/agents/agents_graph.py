@@ -402,10 +402,6 @@ class AgentsGraph:
             self.logger.error(f"[{call_sid}] LeadAgent not initialized. Cannot process.")
             await self.add_message_to_conversation_async(AgentTexts.lead_agent_error_text, state)
             return state
-            # {
-            #     "history": [("user", user_input), ("assistant", AgentTexts.lead_agent_error_text)],
-            #     "agent_scratchpad": {"error": "LeadAgent not initialized"},
-            # }
 
         try:
             # 1. Extract info using LLM (based on LeadAgent logic)
@@ -505,10 +501,10 @@ class AgentsGraph:
                 chat_history = state.get("history", [])
 
                 # Limit the history to the last 10 messages to avoid context overflow
-                max_history_length = 4
+                max_history_length = 10
                 if len(chat_history) > max_history_length:
                     self.logger.info(
-                        f"[{call_sid[-4:]}] Chat history has {len(chat_history)} messages. Truncating to the last {max_history_length}."
+                        f"[{call_sid[-1*max_history_length:]}] Chat history has {len(chat_history)} messages. Truncating to the last {max_history_length}."
                     )
                     chat_history = chat_history[-max_history_length:]
 

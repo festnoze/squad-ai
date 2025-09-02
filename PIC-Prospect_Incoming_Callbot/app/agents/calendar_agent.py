@@ -74,7 +74,7 @@ class CalendarAgent:
         # self.agent_executor = AgentExecutor(agent=self.agent, tools=self.tools, verbose=True)
         # response = self.agent_executor.invoke({"input": "quel jour sommes nous ?", "chat_history": []})['output']
 
-    async def run_async(self, user_input: str, chat_history: list[dict] = None) -> str:
+    async def run_async(self, user_input: str, chat_history: list[dict] | None = None) -> str:
         """High-level dispatcher orchestrating calendar actions according to the category.
 
         Args:
@@ -86,7 +86,6 @@ class CalendarAgent:
         """
         if chat_history is None:
             chat_history = []
-
         category = await self.categorize_for_dispatch_async(user_input, chat_history)
         self.logger.info(f"Category detected: {category}")
 
@@ -99,8 +98,6 @@ class CalendarAgent:
         #         category = "Proposition de créneaux"
 
         if category == "Proposition de créneaux":
-            if chat_history is None:
-                chat_history = []
             formatted_history = []
             for message in chat_history:
                 formatted_history.append(f"{message[0]}: {message[1]}")
@@ -297,10 +294,10 @@ class CalendarAgent:
         return await CalendarAgent.schedule_new_appointment_tool_async(date_and_time, duration, object, description)
 
     @staticmethod
-    async def schedule_new_appointment_tool_async(
-        date_and_time: str, duration: int = 30, object: str | None = None, description: str | None = None
-    ) -> str | None:
-        object = object if object else "Demande de conseil en formation prospect"
+    async def schedule_new_appointment_tool_async(date_and_time: str, duration: int = 30, user_subject: str | None = None, description: str | None = None) -> str | None:
+        subject = "RDV Callbot - " + CalendarAgent.first_name + " " + CalendarAgent.last_name
+        if user_subject:
+            subject += ": " + user_subject
         description = description if description else "RV pris par l'IA après appel entrant du prospect"
         if not date_and_time.endswith("Z"):
             date_and_time += "Z"
@@ -312,7 +309,7 @@ class CalendarAgent:
 
         # TODO: manage "CalendarAgent.*" variables another way for multi-calls handling.
         return await CalendarAgent.salesforce_api_client.schedule_new_appointment_async(
-            object, date_and_time, duration, description, owner_id=CalendarAgent.owner_id, who_id=CalendarAgent.user_id
+            subject, date_and_time, duration, description, owner_id=CalendarAgent.owner_id, who_id=CalendarAgent.user_id
         )
 
     def _set_user_info(self, user_id, first_name, last_name, email, owner_id, owner_name):
@@ -329,9 +326,9 @@ class CalendarAgent:
         self.logger.info(
             f"Setting user info for CalendarAgent to: {first_name} {last_name} {email}, for owner: {owner_name}"
         )
-        self.first_name = first_name
-        self.last_name = last_name
-        self.email = email
+        CalendarAgent.first_name = first_name
+        CalendarAgent.last_name = last_name
+        CalendarAgent.email = email
 
         CalendarAgent.user_id = user_id
         CalendarAgent.owner_id = owner_id

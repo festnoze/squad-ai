@@ -13,7 +13,7 @@ from api_client.request_models.query_asking_request_model import (
 from api_client.request_models.user_request_model import UserRequestModel
 from speech.text_processing import ProcessText
 from utils.envvar import EnvHelper
-from utils.latency_decorator import measure_latency
+from utils.latency_decorator import measure_latency, measure_streaming_latency
 from utils.latency_metric import OperationType
 
 from database.models.conversation import Conversation
@@ -180,7 +180,7 @@ class StudiRAGInferenceApiClient(ConversationPersistenceInterface, RagQueryInter
         except httpx.TimeoutException as exc:
             raise RuntimeError(f"Timeout connecting to RAG inference server at {self.host_base_url}") from exc
 
-    @measure_latency(OperationType.RAG, provider="studi_rag")
+    @measure_streaming_latency(OperationType.RAG, provider="studi_rag")
     async def rag_query_stream_async(
         self, query_asking_request_model: QueryAskingRequestModel, interrupt_flag: dict | None = None, timeout: int = 80
     ) -> AsyncGenerator[str, None]:
@@ -233,7 +233,7 @@ class StudiRAGInferenceApiClient(ConversationPersistenceInterface, RagQueryInter
         except httpx.ConnectError as exc:
             raise RuntimeError(f"Cannot connect to RAG inference server at {self.host_base_url}") from exc
 
-    @measure_latency(OperationType.RAG, provider="studi_rag")
+    @measure_streaming_latency(OperationType.RAG, provider="studi_rag")
     async def rag_query_no_conversation_streaming_async(
         self,
         query_no_conversation_request_model: QueryNoConversationRequestModel,

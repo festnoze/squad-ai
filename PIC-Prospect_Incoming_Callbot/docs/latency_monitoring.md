@@ -74,7 +74,9 @@ SLACK_CHANNEL=#alerts
 
 Le système est automatiquement initialisé au démarrage de l'application et les décorateurs sont déjà appliqués aux méthodes critiques.
 
-### Décorateur manuel
+### Décorateurs manuels
+
+#### Décorateur standard
 
 Pour mesurer une nouvelle méthode :
 
@@ -87,6 +89,26 @@ async def my_salesforce_method(self):
     # Votre code ici
     pass
 ```
+
+#### Décorateur streaming (Time to First Token)
+
+Pour mesurer les générateurs et le "time to first token" :
+
+```python
+from utils.latency_decorator import measure_streaming_latency
+from utils.latency_metric import OperationType
+
+@measure_streaming_latency(OperationType.RAG, provider="studi_rag")
+async def my_streaming_method(self):
+    # Code qui yield des chunks
+    await some_processing()
+    async for chunk in response:
+        yield chunk  # <-- Le décorateur mesure jusqu'ici
+```
+
+**Différence importante :**
+- `@measure_latency` : Mesure le temps total d'exécution de la méthode
+- `@measure_streaming_latency` : Mesure le "time to first token" (temps jusqu'au premier `yield`)
 
 ### Context manager
 
@@ -166,6 +188,7 @@ report_manager.add_reporter(reporter)
 
 ### Structure JSON
 
+#### Métrique standard
 ```json
 {
   "operation_type": "speech_to_text",
@@ -181,6 +204,24 @@ report_manager.add_reporter(reporter)
 }
 ```
 
+#### Métrique streaming (Time to First Token)
+```json
+{
+  "operation_type": "rag_inference",
+  "operation_name": "rag_query_stream_async_first_token",
+  "latency_ms": 850.0,
+  "status": "success",
+  "timestamp": "2025-01-01T12:00:00Z",
+  "call_sid": "CA123456789",
+  "stream_sid": "ST987654321",
+  "provider": "studi_rag",
+  "error_message": null,
+  "metadata": {
+    "metric_type": "time_to_first_token"
+  }
+}
+```
+
 ### Champs disponibles
 
 - `operation_type` : Type d'opération (speech_to_text, text_to_speech, salesforce_api, rag_inference)
@@ -193,6 +234,7 @@ report_manager.add_reporter(reporter)
 - `provider` : Fournisseur de service (google, openai, salesforce, etc.)
 - `error_message` : Message d'erreur (si status = error)
 - `metadata` : Métadonnées additionnelles
+  - `metric_type: "time_to_first_token"` : Identifie les métriques de streaming
 
 ## Alertes
 
@@ -246,11 +288,16 @@ Les alertes et informations sont également dans les logs standards de l'applica
    - Vérifier `LATENCY_TRACKING_ENABLED=true`
    - Vérifier que les décorateurs sont appliqués
 
-2. **Pas d'alertes Slack**
+2. **Métriques streaming incorrectes**
+   - Utiliser `@measure_streaming_latency` pour les générateurs
+   - Vérifier que `metadata.metric_type = "time_to_first_token"`
+   - S'assurer que la méthode retourne bien un générateur
+
+3. **Pas d'alertes Slack**
    - Vérifier la configuration du webhook
    - Vérifier les seuils critiques
 
-3. **Erreurs d'export**
+4. **Erreurs d'export**
    - Vérifier la connectivité aux systèmes externes
    - Vérifier les credentials InfluxDB/Prometheus
 
