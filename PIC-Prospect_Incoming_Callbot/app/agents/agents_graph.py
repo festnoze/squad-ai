@@ -3,6 +3,7 @@ from asyncio import Task
 
 import logging
 import os
+from typing import Hashable
 
 from api_client.conversation_persistence_interface import ConversationPersistenceInterface
 from api_client.rag_query_interface import RagQueryInterface
@@ -157,10 +158,12 @@ class AgentsGraph:
 
         workflow.add_node("other_inquery", self.other_inquery_node)
 
-        router_paths = {
+        router_paths : dict[Hashable, str] = {
             "begin_of_welcome_message": "begin_of_welcome_message",
             "other_inquery": "other_inquery",
             "wait_for_user_input": "wait_for_user_input",
+            "user_identified": "user_identified",
+            "user_new": "user_new",
             END: END,
         }
 

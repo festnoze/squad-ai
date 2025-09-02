@@ -9,6 +9,8 @@ import httpx
 import pytz
 from api_client.salesforce_api_client_interface import SalesforceApiClientInterface
 from utils.envvar import EnvHelper
+from utils.latency_decorator import measure_latency
+from utils.latency_metric import OperationType
 
 
 class SalesforceApiClient(SalesforceApiClientInterface):
@@ -122,6 +124,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
             if not self.authenticate():
                 raise Exception("Salesforce authentication failed. Cannot proceed with API call.")
 
+    @measure_latency(OperationType.SALESFORCE, provider="salesforce")
     async def schedule_new_appointment_async(
         self,
         subject: str,
@@ -282,6 +285,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
 
         return verified_event_id
 
+    @measure_latency(OperationType.SALESFORCE, provider="salesforce")
     async def verify_appointment_existance_async(self, event_id: str | None = None, expected_subject: str | None = None, start_datetime: str = "", duration_minutes: int = 30) -> str | None:
         """Check if an appointment was successfully created by verifying its existence
 
@@ -354,6 +358,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
             self.logger.error(f"Error during appointment verification: {e!s}")
             return None
 
+    @measure_latency(OperationType.SALESFORCE, provider="salesforce")
     async def get_scheduled_appointments_async(
         self, start_datetime: str, end_datetime: str, owner_id: str | None = None
     ) -> list | None:
@@ -455,6 +460,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
             self.logger.info(f"Error retrieving events: {e!s}")
             return None
 
+    @measure_latency(OperationType.SALESFORCE, provider="salesforce")
     async def delete_event_by_id_async(self, event_id: str) -> bool:
         await self._ensure_authenticated_async()
 
@@ -487,6 +493,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
             self.logger.error(f"Error deleting event: {e!s}")
             return False
 
+    @measure_latency(OperationType.SALESFORCE, provider="salesforce")
     async def get_person_by_phone_async(self, phone_number: str) -> dict | None:
         """
         Retrieve a Contact or Lead from Salesforce by phone number (asynchronous).

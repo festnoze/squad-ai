@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 
 from speech.text_to_speech_openai import TTS_OpenAI
 from utils.envvar import EnvHelper
+from utils.latency_decorator import measure_latency
+from utils.latency_metric import OperationType
 
 
 class TextToSpeechProvider(ABC):
@@ -15,6 +17,7 @@ class TextToSpeechProvider(ABC):
     temp_dir: str = None
 
     @abstractmethod
+    @measure_latency(OperationType.TTS)
     async def synthesize_speech_to_bytes_async(self, text: str) -> bytes:
         """Speech-to-text using specified the provider, and return it as bytes"""
         pass
@@ -68,6 +71,7 @@ class GoogleTTSProvider(TextToSpeechProvider):
             audio_encoding=self.google_tts.AudioEncoding.LINEAR16, sample_rate_hertz=16000
         )
 
+    @measure_latency(OperationType.TTS, provider="google")
     async def synthesize_speech_to_bytes_async(self, text: str) -> bytes:
         try:
             synthesis_input = self.google_tts.SynthesisInput(text=text)
@@ -109,6 +113,7 @@ class OpenAITTSProvider(TextToSpeechProvider):
         )
         self.model = EnvHelper.get_text_to_speech_model() or "tts-1"
 
+    @measure_latency(OperationType.TTS, provider="openai")
     async def synthesize_speech_to_bytes_async(self, text: str) -> bytes:
         try:
             audio_bytes = await TTS_OpenAI.generate_speech_async(

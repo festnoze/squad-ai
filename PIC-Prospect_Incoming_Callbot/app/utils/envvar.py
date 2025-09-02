@@ -239,11 +239,11 @@ class EnvHelper:
     @staticmethod
     def get_env_variable_value_by_name(
         variable_name: str, load_env: bool = True, fails_if_missing: bool = True, remove_comments: bool = True
-    ) -> str:
+    ) -> str | None:
         if variable_name not in os.environ:
             if load_env:
                 EnvHelper._init_load_env()
-            variable_value: str = os.getenv(variable_name, None)
+            variable_value: str | None = os.getenv(variable_name, None)
             if not variable_value:
                 if fails_if_missing:
                     raise ValueError(f'Variable named: "{variable_name}" is not set in the environment')
@@ -257,5 +257,27 @@ class EnvHelper:
 
         return value
 
-    def _get_llm_env_variables(skip_commented_lines: bool = True):
-        return file.get_as_yaml(".llm.env.yaml", skip_commented_lines)
+    @staticmethod
+    def get_remove_logs_upon_startup() -> bool:
+        value = EnvHelper.get_env_variable_value_by_name("REMOVE_LOGS_UPON_STARTUP", fails_if_missing=False)
+        return value is not None and value.lower() == "true"
+
+    # Latency tracking configuration methods
+    @staticmethod
+    def get_latency_tracking_enabled() -> bool:
+        value = EnvHelper.get_env_variable_value_by_name("LATENCY_TRACKING_ENABLED", fails_if_missing=False)
+        return value is not None and value.lower() == "true"
+
+    @staticmethod
+    def get_latency_logging_enabled() -> bool:
+        value = EnvHelper.get_env_variable_value_by_name("LATENCY_LOGGING_ENABLED", fails_if_missing=False)
+        return value is not None and value.lower() == "true"
+
+    @staticmethod
+    def get_latency_file_logging_enabled() -> bool:
+        value = EnvHelper.get_env_variable_value_by_name("LATENCY_FILE_LOGGING_ENABLED", fails_if_missing=False)
+        return value is not None and value.lower() == "true"
+
+    @staticmethod
+    def get_latency_metrics_file_path() -> str:
+        return EnvHelper.get_env_variable_value_by_name("LATENCY_METRICS_FILE_PATH", fails_if_missing=False) or "outputs/logs/latency_metrics.jsonl"

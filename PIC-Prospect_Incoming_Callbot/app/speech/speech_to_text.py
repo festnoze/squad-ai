@@ -3,6 +3,8 @@ import os
 from abc import ABC, abstractmethod
 
 from utils.envvar import EnvHelper
+from utils.latency_decorator import measure_latency
+from utils.latency_metric import OperationType
 
 
 class SpeechToTextProvider(ABC):
@@ -13,6 +15,7 @@ class SpeechToTextProvider(ABC):
     frame_rate: int = 8000
 
     @abstractmethod
+    @measure_latency(OperationType.STT)
     async def transcribe_audio_async(self, file_name: str) -> str:
         """Transcribe audio file to text using the specified provider"""
         pass
@@ -29,6 +32,7 @@ class GoogleSTTProvider(SpeechToTextProvider):
         self.frame_rate = frame_rate
         self.temp_dir = temp_dir
 
+    @measure_latency(OperationType.STT, provider="google")
     async def transcribe_audio_async(self, file_name: str) -> str:
         """Transcribe audio file using Google STT API."""
         try:
@@ -76,6 +80,7 @@ class OpenAISTTProvider(SpeechToTextProvider):
         self.temp_dir = temp_dir
         self.openai_client = AsyncOpenAI(api_key=EnvHelper.get_openai_api_key())
 
+    @measure_latency(OperationType.STT, provider="openai")
     async def transcribe_audio_async(self, file_name: str) -> str:
         """Transcribe audio file using OpenAI STT API."""
         try:
@@ -115,6 +120,7 @@ class HybridSTTProvider(SpeechToTextProvider):
         self.frame_rate = frame_rate
         self.temp_dir = temp_dir
 
+    @measure_latency(OperationType.STT, provider="hybrid")
     async def transcribe_audio_async(self, file_name: str) -> str:
         try:
             return await HybridSTTProvider.transcribe_audio_static_async(

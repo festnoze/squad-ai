@@ -1,6 +1,5 @@
 {
   "Que souhaitez-vous faire ?": "9991f8d972dd",
-  "Je rencontre un problème technique, le service est temporairement indisponible, merci de nous recontacter plus tard.": "869ae183ebe6",
   "Je rencontre un problème technique avec l'agent de contact.": "8a91ec7c263f",
   "Je suis désolé, une erreur s'est produite lors de la communication avec le service.": "5fa1386ff5d9",
   "Quels jours ou quelles heures de la journée vous conviendraient le mieux ?": "04ee2678b861",
@@ -21,5 +20,7 @@
   "Bonjour et bienvenue chez Studi. Je suis l'assistant virtuel de lécole.": "b2518c860bbc",
   "Votre conseiller attitré est actuellement indisponible.": "d12f0b8843e0",
   "Est-ce que cela vous convient ?": "e2b2583532d2",
-  "Désolé, je n'ai pas bien entendu. Merci de répéter.": "ba3378954f8f"
+  "Désolé, je n'ai pas bien entendu. Merci de répéter.": "ba3378954f8f",
+  "Je suis désolé, ce créneau n'est pas disponible. A la place, ": "4e828b888fd6",
+  "Je rencontre un problème technique, le service est temporairement indisponible, merci de nous recontacter plus tard. Merci et au revoir.": "a2c75689f56c"
 }

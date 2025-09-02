@@ -12,7 +12,7 @@ class AgentTexts:
     select_action_text = "Que souhaitez-vous faire ?"
     yes_no_consent_text = "Est-ce que cela vous convient ?"
     ask_question_text = "Comment puis-je vous aider ?"
-    technical_error_text = "Je rencontre un problème technique, le service est temporairement indisponible, merci de nous recontacter plus tard."
+    technical_error_text = "Je rencontre un problème technique, le service est temporairement indisponible, merci de nous recontacter plus tard. Merci et au revoir."
     lead_agent_error_text = "Je rencontre un problème technique avec l'agent de contact."
     rag_communication_error_text = "Je suis désolé, une erreur s'est produite lors de la communication avec le service."
 
