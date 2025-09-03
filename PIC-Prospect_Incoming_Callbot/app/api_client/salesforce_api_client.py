@@ -303,7 +303,8 @@ class SalesforceApiClient(SalesforceApiClientInterface):
             - If expected_subject is specified: returns event_id of the first appointment matching subject, None if not found
             - If neither is specified: returns event_id of the first appointment found in time window, None if none found
         """
-
+        if not start_datetime.endswith("Z"): start_datetime += "Z"
+        
         # Calculate end datetime for the search window
         start_dt = self._get_french_datetime_from_str(start_datetime)
         if start_dt is None:

@@ -42,6 +42,8 @@ ignore = [
     "E731",
     # BlankLineContainsWhitespace
     "W293",
+    # Multiple statements on one line (colon)
+    "E701",
 ]
 
 [lint.per-file-ignores]

@@ -130,9 +130,7 @@ class CalendarAgent:
 
         if category == "Demande de confirmation du rendez-vous":
             # extract date and time from user_input + chat history
-            date_and_time: datetime | None = await self._extract_appointment_selected_date_and_time_async(
-                user_input, chat_history
-            )
+            date_and_time: datetime | None = await self._extract_appointment_selected_date_and_time_async(user_input, chat_history)
 
             if date_and_time:
                 existing_event_id = await self.salesforce_api_client.verify_appointment_existance_async(
