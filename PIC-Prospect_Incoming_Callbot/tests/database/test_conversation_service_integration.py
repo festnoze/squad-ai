@@ -264,10 +264,11 @@ class TestConversationServiceIntegration:
         result = await conversation_service.add_message_to_conversation_async(conversation_id_str, message_content)
         
         # Assert
-        assert isinstance(result, Conversation)
-        assert result.id == test_conversation.id
-        assert len(result.messages) == 1
-        assert result.messages[-1].content == message_content
+        assert isinstance(result, dict)
+        assert "messages" in result
+        assert len(result['messages']) == 1
+        assert isinstance(result['messages'][0], dict)
+        assert result['messages'][-1]['content'] == message_content
         
         # Verify the message was actually added to the database
         updated_conversation = await conversation_service.conversation_repository.get_conversation_by_id_async(test_conversation.id)
@@ -287,16 +288,15 @@ class TestConversationServiceIntegration:
         result = await conversation_service.add_message_to_conversation_async(conversation_id_str, empty_message)
         
         # Assert
-        assert isinstance(result, Conversation)
-        assert result.id == test_conversation.id
-        assert not any(result.messages)
+        assert isinstance(result, dict)
+        assert "messages" in result
+        assert not any(result['messages'])
         
         # Verify no new AI message was added to the database for empty content
         updated_conversation = await conversation_service.conversation_repository.get_conversation_by_id_async(test_conversation.id)
         
         assert isinstance(updated_conversation, Conversation)
-        assert result.id == test_conversation.id
-        assert not any(result.messages)
+        assert not any(updated_conversation.messages)
 
     @pytest.mark.asyncio
     async def test_add_message_to_user_last_conversation_or_create_one_async_existing_conversation(

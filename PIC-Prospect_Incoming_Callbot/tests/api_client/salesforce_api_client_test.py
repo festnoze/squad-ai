@@ -17,18 +17,28 @@ def salesforce_api_client() -> SalesforceApiClientInterface:
 
 def test_authenticate(salesforce_api_client: SalesforceApiClientInterface):
     """Test that the salesforce_api_client can authenticate with Salesforce"""
-    assert salesforce_api_client._access_token is not None, "Access token should be available after initialization"
-    assert salesforce_api_client._instance_url is not None, "Instance URL should be available after initialization"
+    assert salesforce_api_client._access_token is not None, (
+        "Access token should be available after initialization"
+    )
+    assert salesforce_api_client._instance_url is not None, (
+        "Instance URL should be available after initialization"
+    )
 
     salesforce_api_client._access_token = None
     salesforce_api_client._instance_url = None
     result = salesforce_api_client.authenticate()
     assert result is True, "Re-authentication should succeed"
-    assert salesforce_api_client._access_token is not None, "Access token should be available after re-authentication"
-    assert salesforce_api_client._instance_url is not None, "Instance URL should be available after re-authentication"
+    assert salesforce_api_client._access_token is not None, (
+        "Access token should be available after re-authentication"
+    )
+    assert salesforce_api_client._instance_url is not None, (
+        "Instance URL should be available after re-authentication"
+    )
 
 
-async def test_get_person_by_phone_async(salesforce_api_client: SalesforceApiClientInterface):
+async def test_get_person_by_phone_async(
+    salesforce_api_client: SalesforceApiClientInterface,
+):
     """Test retrieving a person by phone number"""
     phone_number = "+33668422388"
     result = await salesforce_api_client.get_person_by_phone_async(phone_number)
@@ -38,7 +48,9 @@ async def test_get_person_by_phone_async(salesforce_api_client: SalesforceApiCli
     if result is not None:
         # We found a person
         assert "type" in result, "Result should have a 'type' field"
-        assert result["type"] in ["Contact", "Lead"], "Type should be either 'Contact' or 'Lead'"
+        assert result["type"] in ["Contact", "Lead"], (
+            "Type should be either 'Contact' or 'Lead'"
+        )
         assert "data" in result, "Result should have a 'data' field"
 
         # Verify the data structure based on the type
@@ -46,7 +58,8 @@ async def test_get_person_by_phone_async(salesforce_api_client: SalesforceApiCli
             assert "Id" in result["data"], "Contact should have an Id"
             # Phone should match our search query (either in Phone or MobilePhone)
             phone_match = (
-                result["data"].get("Phone") == phone_number or result["data"].get("MobilePhone") == phone_number
+                result["data"].get("Phone") == phone_number
+                or result["data"].get("MobilePhone") == phone_number
             )
             assert phone_match, "Contact phone should match the search query"
 
@@ -54,7 +67,8 @@ async def test_get_person_by_phone_async(salesforce_api_client: SalesforceApiCli
             assert "Id" in result["data"], "Lead should have an Id"
             # Phone should match our search query (either in Phone or MobilePhone)
             phone_match = (
-                result["data"].get("Phone") == phone_number or result["data"].get("MobilePhone") == phone_number
+                result["data"].get("Phone") == phone_number
+                or result["data"].get("MobilePhone") == phone_number
             )
             assert phone_match, "Lead phone should match the search query"
     else:
@@ -62,7 +76,9 @@ async def test_get_person_by_phone_async(salesforce_api_client: SalesforceApiCli
         logging.info(f"No person found with phone number: {phone_number}")
 
 
-async def test_get_leads_by_details_async(salesforce_api_client: SalesforceApiClientInterface):
+async def test_get_leads_by_details_async(
+    salesforce_api_client: SalesforceApiClientInterface,
+):
     """Test retrieving leads by details including phone number"""
     # Use the specified phone number
     phone_number = "+33668422388"
@@ -77,26 +93,39 @@ async def test_get_leads_by_details_async(salesforce_api_client: SalesforceApiCl
     result = await salesforce_api_client.get_leads_by_details_async()
 
     # Log the result for debugging
-    logging.info(f"get_leads_by_details_async initial result count: {len(result) if result is not None else 'None'}")
+    logging.info(
+        f"get_leads_by_details_async initial result count: {len(result) if result is not None else 'None'}"
+    )
 
     # If we got results, let's try to find our phone number
     if result is not None and len(result) > 0:
         # Check if any lead has our phone number
         matching_leads = [
-            lead for lead in result if lead.get("Phone") == phone_number or lead.get("MobilePhone") == phone_number
+            lead
+            for lead in result
+            if lead.get("Phone") == phone_number
+            or lead.get("MobilePhone") == phone_number
         ]
 
         if matching_leads:
-            logging.info(f"Found {len(matching_leads)} leads with phone number {phone_number}")
+            logging.info(
+                f"Found {len(matching_leads)} leads with phone number {phone_number}"
+            )
             for lead in matching_leads:
                 assert "Id" in lead, "Lead should have an Id"
-                assert not lead.get("IsConverted", False), "Lead should not be converted"
+                assert not lead.get("IsConverted", False), (
+                    "Lead should not be converted"
+                )
         else:
-            logging.info(f"No leads found with phone number {phone_number} in the initial results")
+            logging.info(
+                f"No leads found with phone number {phone_number} in the initial results"
+            )
 
     # Approach 2: Try with some specific criteria that might match our phone number's owner
     # For example, try with a company name that might be associated with this phone
-    result_by_company = await salesforce_api_client.get_leads_by_details_async(company_name="Studi")
+    result_by_company = await salesforce_api_client.get_leads_by_details_async(
+        company_name="Studi"
+    )
 
     # Log the result for debugging
     logging.info(
@@ -110,17 +139,23 @@ async def test_get_leads_by_details_async(salesforce_api_client: SalesforceApiCl
         for lead in result_by_company:
             assert "Id" in lead, "Lead should have an Id"
             assert "Company" in lead, "Lead should have a Company field"
-            assert lead["Company"] == "Studi", "Company should match our search criteria"
+            assert lead["Company"] == "Studi", (
+                "Company should match our search criteria"
+            )
 
 
-async def test_schedule_new_appointment_async(salesforce_api_client: SalesforceApiClientInterface):
+async def test_schedule_new_appointment_async(
+    salesforce_api_client: SalesforceApiClientInterface,
+):
     """Test scheduling a new appointment"""
     now = datetime.now()
     start_datetime = now + timedelta(days=1)  # Tomorrow
     start_datetime_str = start_datetime.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     subject = "Test Appointment from Automated Tests"
-    description = "This is a test appointment created by automated tests. Please ignore."
+    description = (
+        "This is a test appointment created by automated tests. Please ignore."
+    )
     owner_id = "005Aa00000K990ZIAR"
     who_id = "003Aa00000jW2RBIA0"
 
@@ -135,7 +170,9 @@ async def test_schedule_new_appointment_async(salesforce_api_client: SalesforceA
     )
 
     # Verify we got an event ID back
-    assert event_id is not None, "Should receive an event ID when scheduling an appointment"
+    assert event_id is not None, (
+        "Should receive an event ID when scheduling an appointment"
+    )
     assert isinstance(event_id, str), "Event ID should be a string"
 
     # Delete the created event ID
@@ -149,7 +186,9 @@ async def test_schedule_new_appointment_async(salesforce_api_client: SalesforceA
         # False
     ],
 )
-async def test_get_scheduled_appointments_async(salesforce_api_client: SalesforceApiClientInterface, fixed_date: bool):
+async def test_get_scheduled_appointments_async(
+    salesforce_api_client: SalesforceApiClientInterface, fixed_date: bool
+):
     """Test retrieving scheduled appointments"""
     # Get appointments for the next 7 days
     if fixed_date:
@@ -179,8 +218,12 @@ async def test_get_scheduled_appointments_async(salesforce_api_client: Salesforc
         for appointment in appointments:
             assert "Id" in appointment, "Appointment should have an Id"
             assert "Subject" in appointment, "Appointment should have a Subject"
-            assert "StartDateTime" in appointment, "Appointment should have a StartDateTime"
-            assert "EndDateTime" in appointment, "Appointment should have an EndDateTime"
+            assert "StartDateTime" in appointment, (
+                "Appointment should have a StartDateTime"
+            )
+            assert "EndDateTime" in appointment, (
+                "Appointment should have an EndDateTime"
+            )
 
 
 async def test_get_persons_async(salesforce_api_client: SalesforceApiClientInterface):
@@ -211,7 +254,7 @@ def mock_salesforce_client():
 
 
 class TestCheckForAppointmentCreation:
-    """Unit tests for verify_appointment_existance method"""
+    """Unit tests for verify_appointment_existance_async method"""
 
     async def test_verify_appointment_existance_with_valid_event_id(self):
         """Test successful verification with a valid event_id"""
@@ -229,7 +272,9 @@ class TestCheckForAppointmentCreation:
             }
         ]
 
-        with patch.object(client, "get_scheduled_appointments_async", new_callable=AsyncMock) as mock_get_appointments:
+        with patch.object(
+            client, "get_scheduled_appointments_async", new_callable=AsyncMock
+        ) as mock_get_appointments:
             mock_get_appointments.return_value = mock_appointments
 
             result = await client.verify_appointment_existance_async(
@@ -258,7 +303,9 @@ class TestCheckForAppointmentCreation:
             }
         ]
 
-        with patch.object(client, "get_scheduled_appointments_async", new_callable=AsyncMock) as mock_get_appointments:
+        with patch.object(
+            client, "get_scheduled_appointments_async", new_callable=AsyncMock
+        ) as mock_get_appointments:
             mock_get_appointments.return_value = mock_appointments
 
             result = await client.verify_appointment_existance_async(
@@ -287,7 +334,9 @@ class TestCheckForAppointmentCreation:
             }
         ]
 
-        with patch.object(client, "get_scheduled_appointments_async", new_callable=AsyncMock) as mock_get_appointments:
+        with patch.object(
+            client, "get_scheduled_appointments_async", new_callable=AsyncMock
+        ) as mock_get_appointments:
             mock_get_appointments.return_value = mock_appointments
 
             result = await client.verify_appointment_existance_async(
@@ -316,7 +365,9 @@ class TestCheckForAppointmentCreation:
             }
         ]
 
-        with patch.object(client, "get_scheduled_appointments_async", new_callable=AsyncMock) as mock_get_appointments:
+        with patch.object(
+            client, "get_scheduled_appointments_async", new_callable=AsyncMock
+        ) as mock_get_appointments:
             mock_get_appointments.return_value = mock_appointments
 
             result = await client.verify_appointment_existance_async(
@@ -335,7 +386,9 @@ class TestCheckForAppointmentCreation:
         client._access_token = "mock_token"
         client._instance_url = "https://mock-instance.salesforce.com"
 
-        with patch.object(client, "get_scheduled_appointments_async", new_callable=AsyncMock) as mock_get_appointments:
+        with patch.object(
+            client, "get_scheduled_appointments_async", new_callable=AsyncMock
+        ) as mock_get_appointments:
             mock_get_appointments.return_value = []
 
             result = await client.verify_appointment_existance_async(
@@ -369,7 +422,9 @@ class TestCheckForAppointmentCreation:
         client._access_token = "mock_token"
         client._instance_url = "https://mock-instance.salesforce.com"
 
-        with patch.object(client, "get_scheduled_appointments_async", new_callable=AsyncMock) as mock_get_appointments:
+        with patch.object(
+            client, "get_scheduled_appointments_async", new_callable=AsyncMock
+        ) as mock_get_appointments:
             mock_get_appointments.return_value = None
 
             result = await client.verify_appointment_existance_async(
@@ -383,12 +438,14 @@ class TestCheckForAppointmentCreation:
             mock_get_appointments.assert_called_once()
 
     async def test_verify_appointment_existance_exception_handling(self):
-        """Test exception handling in verify_appointment_existance"""
+        """Test exception handling in verify_appointment_existance_async"""
         client = SalesforceApiClient()
         client._access_token = "mock_token"
         client._instance_url = "https://mock-instance.salesforce.com"
 
-        with patch.object(client, "get_scheduled_appointments_async", new_callable=AsyncMock) as mock_get_appointments:
+        with patch.object(
+            client, "get_scheduled_appointments_async", new_callable=AsyncMock
+        ) as mock_get_appointments:
             mock_get_appointments.side_effect = Exception("API connection error")
 
             result = await client.verify_appointment_existance_async(
@@ -417,7 +474,9 @@ class TestCheckForAppointmentCreation:
             }
         ]
 
-        with patch.object(client, "get_scheduled_appointments_async", new_callable=AsyncMock) as mock_get_appointments:
+        with patch.object(
+            client, "get_scheduled_appointments_async", new_callable=AsyncMock
+        ) as mock_get_appointments:
             mock_get_appointments.return_value = mock_appointments
 
             result = await client.verify_appointment_existance_async(
@@ -452,7 +511,9 @@ class TestCheckForAppointmentCreation:
             },
         ]
 
-        with patch.object(client, "get_scheduled_appointments_async", new_callable=AsyncMock) as mock_get_appointments:
+        with patch.object(
+            client, "get_scheduled_appointments_async", new_callable=AsyncMock
+        ) as mock_get_appointments:
             mock_get_appointments.return_value = mock_appointments
 
             # Test with event_id=None - should return first match
@@ -504,7 +565,9 @@ class TestScheduleAppointmentRetryMechanism:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance", new_callable=AsyncMock) as mock_verify:
+            with patch.object(
+                client, "verify_appointment_existance_async", new_callable=AsyncMock
+            ) as mock_verify:
                 mock_verify.side_effect = mock_verification
 
                 result = await client.schedule_new_appointment_async(
@@ -544,7 +607,9 @@ class TestScheduleAppointmentRetryMechanism:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance", new_callable=AsyncMock) as mock_verify:
+            with patch.object(
+                client, "verify_appointment_existance_async", new_callable=AsyncMock
+            ) as mock_verify:
                 mock_verify.side_effect = mock_verification_always_fail
 
                 result = await client.schedule_new_appointment_async(
@@ -582,13 +647,17 @@ class TestScheduleAppointmentRetryMechanism:
             if verify_count == 1:
                 return None  # First call: check if appointment already exists (should return None)
             else:
-                return "success_event"  # Second call: verification after creation succeeds
+                return (
+                    "success_event"  # Second call: verification after creation succeeds
+                )
 
         with patch("httpx.AsyncClient") as mock_client_class:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance", new_callable=AsyncMock) as mock_verify:
+            with patch.object(
+                client, "verify_appointment_existance_async", new_callable=AsyncMock
+            ) as mock_verify:
                 mock_verify.side_effect = mock_verification_success
 
                 result = await client.schedule_new_appointment_async(
@@ -625,7 +694,9 @@ class TestScheduleAppointmentRetryMechanism:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance", new_callable=AsyncMock) as mock_verify:
+            with patch.object(
+                client, "verify_appointment_existance_async", new_callable=AsyncMock
+            ) as mock_verify:
                 mock_verify.side_effect = mock_verification_fail
 
                 result = await client.schedule_new_appointment_async(
@@ -669,7 +740,9 @@ class TestScheduleAppointmentRetryMechanism:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance", new_callable=AsyncMock) as mock_verify:
+            with patch.object(
+                client, "verify_appointment_existance_async", new_callable=AsyncMock
+            ) as mock_verify:
                 mock_verify.side_effect = mock_verification_success
 
                 result = await client.schedule_new_appointment_async(
@@ -711,7 +784,9 @@ class TestScheduleAppointmentRetryMechanism:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance", new_callable=AsyncMock) as mock_verify:
+            with patch.object(
+                client, "verify_appointment_existance_async", new_callable=AsyncMock
+            ) as mock_verify:
                 mock_verify.side_effect = mock_verification_success
 
                 result = await client.schedule_new_appointment_async(
@@ -723,7 +798,9 @@ class TestScheduleAppointmentRetryMechanism:
                 )
 
                 assert result == "event_2"
-                assert call_count == 2  # Initial call failed with HTTP error, retry succeeded
+                assert (
+                    call_count == 2
+                )  # Initial call failed with HTTP error, retry succeeded
 
     async def test_retry_delay_timing(self):
         """Test that retry delay is properly applied"""
@@ -769,7 +846,9 @@ class TestScheduleAppointmentRetryMechanism:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance", new_callable=AsyncMock) as mock_verify:
+            with patch.object(
+                client, "verify_appointment_existance_async", new_callable=AsyncMock
+            ) as mock_verify:
                 mock_verify.side_effect = mock_verification
 
                 await client.schedule_new_appointment_async(
@@ -783,7 +862,9 @@ class TestScheduleAppointmentRetryMechanism:
                 # Check that at least the delay time has passed between calls
                 if retry_time and start_time:
                     time_diff = retry_time - start_time
-                    assert time_diff >= 0.1, f"Delay was {time_diff}, expected at least 0.1"
+                    assert time_diff >= 0.1, (
+                        f"Delay was {time_diff}, expected at least 0.1"
+                    )
                 assert call_count == 2
 
     async def test_retry_with_mixed_failure_scenarios(self):
@@ -826,13 +907,17 @@ class TestScheduleAppointmentRetryMechanism:
             elif verify_count == 4:
                 return None  # Verification after second call (event_2 created) fails
             else:
-                return event_id  # Return the actual event_id for successful verification
+                return (
+                    event_id  # Return the actual event_id for successful verification
+                )
 
         with patch("httpx.AsyncClient") as mock_client_class:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance", new_callable=AsyncMock) as mock_verify:
+            with patch.object(
+                client, "verify_appointment_existance_async", new_callable=AsyncMock
+            ) as mock_verify:
                 mock_verify.side_effect = mock_verification
 
                 result = await client.schedule_new_appointment_async(
@@ -876,7 +961,9 @@ class TestScheduleAppointmentRetryParameterValidation:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance", new_callable=AsyncMock) as mock_verify:
+            with patch.object(
+                client, "verify_appointment_existance_async", new_callable=AsyncMock
+            ) as mock_verify:
                 mock_verify.side_effect = mock_verification_fail
 
                 result = await client.schedule_new_appointment_async(
@@ -907,7 +994,9 @@ class TestScheduleAppointmentRetryParameterValidation:
             return mock_response
 
         verify_count = 0
-        verification_attempts = 0  # Count only actual verification attempts (not existence checks)
+        verification_attempts = (
+            0  # Count only actual verification attempts (not existence checks)
+        )
 
         async def mock_verification(*args, **kwargs):
             nonlocal verify_count, verification_attempts
@@ -929,7 +1018,9 @@ class TestScheduleAppointmentRetryParameterValidation:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance", new_callable=AsyncMock) as mock_verify:
+            with patch.object(
+                client, "verify_appointment_existance_async", new_callable=AsyncMock
+            ) as mock_verify:
                 mock_verify.side_effect = mock_verification
 
                 result = await client.schedule_new_appointment_async(
@@ -980,7 +1071,9 @@ class TestScheduleAppointmentRetryParameterValidation:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance", new_callable=AsyncMock) as mock_verify:
+            with patch.object(
+                client, "verify_appointment_existance_async", new_callable=AsyncMock
+            ) as mock_verify:
                 mock_verify.side_effect = mock_verification
 
                 result = await client.schedule_new_appointment_async(
@@ -1031,7 +1124,9 @@ class TestScheduleAppointmentRetryParameterValidation:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance", new_callable=AsyncMock) as mock_verify:
+            with patch.object(
+                client, "verify_appointment_existance_async", new_callable=AsyncMock
+            ) as mock_verify:
                 mock_verify.side_effect = mock_verification
 
                 result = await client.schedule_new_appointment_async(
@@ -1063,7 +1158,9 @@ class TestScheduleAppointmentRetryParameterValidation:
             return mock_response
 
         verify_count = 0
-        verification_attempts = 0  # Count only actual verification attempts (not existence checks)
+        verification_attempts = (
+            0  # Count only actual verification attempts (not existence checks)
+        )
 
         async def mock_verification(*args, **kwargs):
             nonlocal verify_count, verification_attempts
@@ -1085,7 +1182,9 @@ class TestScheduleAppointmentRetryParameterValidation:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance", new_callable=AsyncMock) as mock_verify:
+            with patch.object(
+                client, "verify_appointment_existance_async", new_callable=AsyncMock
+            ) as mock_verify:
                 mock_verify.side_effect = mock_verification
 
                 # Call without specifying retry parameters (use defaults)
@@ -1104,13 +1203,15 @@ class TestScheduleAppointmentRetryParameterValidation:
 class TestScheduleAppointmentOverlapDetection:
     """Tests for overlapping appointment detection in schedule_new_appointment_async"""
 
-    async def test_schedule_new_appointment_fails_when_overlapping_appointment_exists(self):
+    async def test_schedule_new_appointment_fails_when_overlapping_appointment_exists(
+        self,
+    ):
         """Test that schedule_new_appointment_async fails when trying to create an overlapping appointment"""
         client = SalesforceApiClient()
         client._access_token = "mock_token"
         client._instance_url = "https://mock-instance.salesforce.com"
 
-        # Mock the verify_appointment_existance method to simulate finding an existing appointment
+        # Mock the verify_appointment_existance_async method to simulate finding an existing appointment
         existing_event_id = "existing_event_123"
         verify_call_count = 0
 
@@ -1126,7 +1227,9 @@ class TestScheduleAppointmentOverlapDetection:
                 # This shouldn't be reached since method should return None due to overlap
                 return event_id
 
-        with patch.object(client, "verify_appointment_existance", new_callable=AsyncMock) as mock_verify:
+        with patch.object(
+            client, "verify_appointment_existance_async", new_callable=AsyncMock
+        ) as mock_verify:
             mock_verify.side_effect = mock_verification
 
             result = await client.schedule_new_appointment_async(
@@ -1148,7 +1251,9 @@ class TestScheduleAppointmentOverlapDetection:
                 duration_minutes=30,
             )
 
-    async def test_schedule_new_appointment_succeeds_when_no_overlapping_appointment(self):
+    async def test_schedule_new_appointment_succeeds_when_no_overlapping_appointment(
+        self,
+    ):
         """Test that schedule_new_appointment_async succeeds when no overlapping appointment exists"""
         client = SalesforceApiClient()
         client._access_token = "mock_token"
@@ -1181,7 +1286,9 @@ class TestScheduleAppointmentOverlapDetection:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance", new_callable=AsyncMock) as mock_verify:
+            with patch.object(
+                client, "verify_appointment_existance_async", new_callable=AsyncMock
+            ) as mock_verify:
                 mock_verify.side_effect = mock_verification
 
                 result = await client.schedule_new_appointment_async(
@@ -1198,7 +1305,9 @@ class TestScheduleAppointmentOverlapDetection:
                 # Should make one API call to create the appointment
                 assert post_call_count == 1
 
-    async def test_schedule_new_appointment_overlap_with_different_subject_same_time(self):
+    async def test_schedule_new_appointment_overlap_with_different_subject_same_time(
+        self,
+    ):
         """Test that appointments with different subjects at same time are considered overlapping"""
         client = SalesforceApiClient()
         client._access_token = "mock_token"
@@ -1214,7 +1323,7 @@ class TestScheduleAppointmentOverlapDetection:
             if event_id is None:
                 # The current implementation checks by subject + time, but we're testing
                 # the scenario where there's a different subject at the same time
-                # For this test, we simulate that verify_appointment_existance finds
+                # For this test, we simulate that verify_appointment_existance_async finds
                 # an existing appointment with different subject but same time slot
                 if expected_subject == "New Meeting Subject":
                     return existing_event_id  # Found overlapping appointment
@@ -1222,11 +1331,15 @@ class TestScheduleAppointmentOverlapDetection:
             else:
                 return event_id
 
-        with patch.object(client, "verify_appointment_existance", new_callable=AsyncMock) as mock_verify:
+        with patch.object(
+            client, "verify_appointment_existance_async", new_callable=AsyncMock
+        ) as mock_verify:
             mock_verify.side_effect = mock_verification
 
             result = await client.schedule_new_appointment_async(
-                subject="New Meeting Subject", start_datetime="2025-12-01T15:00:00Z", duration_minutes=30
+                subject="New Meeting Subject",
+                start_datetime="2025-12-01T15:00:00Z",
+                duration_minutes=30,
             )
 
             # Should fail due to overlap detection
@@ -1247,13 +1360,17 @@ class TestScheduleAppointmentOverlapDetection:
             # First call: check if appointment already exists (event_id=None)
             if event_id is None:
                 # Simulate finding an existing appointment that overlaps with the requested time
-                if start_datetime == "2025-12-01T16:30:00Z":  # Our new appointment starts when existing one ends
+                if (
+                    start_datetime == "2025-12-01T16:30:00Z"
+                ):  # Our new appointment starts when existing one ends
                     return existing_event_id  # Found overlapping appointment
                 return None
             else:
                 return event_id
 
-        with patch.object(client, "verify_appointment_existance", new_callable=AsyncMock) as mock_verify:
+        with patch.object(
+            client, "verify_appointment_existance_async", new_callable=AsyncMock
+        ) as mock_verify:
             mock_verify.side_effect = mock_verification
 
             result = await client.schedule_new_appointment_async(
@@ -1265,7 +1382,9 @@ class TestScheduleAppointmentOverlapDetection:
             # Should fail due to overlap detection
             assert result is None
 
-    async def test_schedule_new_appointment_overlap_check_handles_verification_error(self):
+    async def test_schedule_new_appointment_overlap_check_handles_verification_error(
+        self,
+    ):
         """Test that appointment creation fails gracefully when overlap check encounters an error"""
         client = SalesforceApiClient()
         client._access_token = "mock_token"
@@ -1280,13 +1399,19 @@ class TestScheduleAppointmentOverlapDetection:
             else:
                 return event_id
 
-        with patch.object(client, "verify_appointment_existance", new_callable=AsyncMock) as mock_verify:
+        with patch.object(
+            client, "verify_appointment_existance_async", new_callable=AsyncMock
+        ) as mock_verify:
             mock_verify.side_effect = mock_verification
 
             # The method should handle the error gracefully
-            with pytest.raises(Exception, match="Salesforce API error during overlap check"):
+            with pytest.raises(
+                Exception, match="Salesforce API error during overlap check"
+            ):
                 await client.schedule_new_appointment_async(
-                    subject="Error Test Meeting", start_datetime="2025-12-01T17:00:00Z", duration_minutes=30
+                    subject="Error Test Meeting",
+                    start_datetime="2025-12-01T17:00:00Z",
+                    duration_minutes=30,
                 )
 
 
@@ -1344,13 +1469,17 @@ class TestScheduleAppointmentRetryIntegration:
             elif event_id == "final_success_event":
                 return "final_success_event"  # Final verification succeeds
             else:
-                return None  # Other verifications fail (shouldn't happen with HTTP errors)
+                return (
+                    None  # Other verifications fail (shouldn't happen with HTTP errors)
+                )
 
         with patch("httpx.AsyncClient") as mock_client_class:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance", new_callable=AsyncMock) as mock_verify:
+            with patch.object(
+                client, "verify_appointment_existance_async", new_callable=AsyncMock
+            ) as mock_verify:
                 mock_verify.side_effect = mock_verification
 
                 result = await client.schedule_new_appointment_async(
@@ -1403,7 +1532,9 @@ class TestScheduleAppointmentRetryIntegration:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance", new_callable=AsyncMock) as mock_verify:
+            with patch.object(
+                client, "verify_appointment_existance_async", new_callable=AsyncMock
+            ) as mock_verify:
                 mock_verify.side_effect = mock_verification
 
                 result = await client.schedule_new_appointment_async(
@@ -1463,10 +1594,14 @@ class TestScheduleAppointmentRetryIntegration:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "_ensure_authenticated_async", new_callable=AsyncMock) as mock_auth:
+            with patch.object(
+                client, "_ensure_authenticated_async", new_callable=AsyncMock
+            ) as mock_auth:
                 mock_auth.side_effect = mock_ensure_auth
 
-                with patch.object(client, "verify_appointment_existance", new_callable=AsyncMock) as mock_verify:
+                with patch.object(
+                    client, "verify_appointment_existance_async", new_callable=AsyncMock
+                ) as mock_verify:
                     mock_verify.side_effect = mock_verification
 
                     result = await client.schedule_new_appointment_async(
@@ -1479,8 +1614,12 @@ class TestScheduleAppointmentRetryIntegration:
 
                     assert result == "auth_test_2"
                     assert call_count == 2  # Initial call + retry
-                    assert auth_call_count == 2  # Authentication called for both attempts
-                    assert verify_count == 4  # 2 existence checks + 2 verification checks
+                    assert (
+                        auth_call_count == 2
+                    )  # Authentication called for both attempts
+                    assert (
+                        verify_count == 4
+                    )  # 2 existence checks + 2 verification checks
 
     async def test_complete_failure_with_comprehensive_logging(self):
         """Test complete failure scenario to ensure proper error logging"""
@@ -1524,7 +1663,9 @@ class TestScheduleAppointmentRetryIntegration:
                 mock_client = mock_client_class.return_value.__aenter__.return_value
                 mock_client.post = mock_post
 
-                with patch.object(client, "verify_appointment_existance", new_callable=AsyncMock) as mock_verify:
+                with patch.object(
+                    client, "verify_appointment_existance_async", new_callable=AsyncMock
+                ) as mock_verify:
                     mock_verify.side_effect = mock_verification
 
                     result = await client.schedule_new_appointment_async(

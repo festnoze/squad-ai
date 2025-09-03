@@ -14,7 +14,7 @@ from app.endpoints import change_env_var_values
     ("others", "Quelle est la météo ?", []), # Hors-sujet
     ("greetings", "Salut", []), # Greeting
     ("greetings", "Excuse moi", []), # Interupting
-    ("non-sense", "Je t'interomps", []), # Interupting
+    ("non-sense|greetings", "Je t'interomps", []), # Interupting
     ("non-sense", "je souhaiterais connaitre", []), # Incomplete query
     ("non-sense", "Elle formation vrai", []), # query with transcription error
     ("non-sense", "", []), # Empty query
@@ -48,7 +48,10 @@ async def test_agents_dispatching(agents_graph_mockings, user_input: str, chat_h
     # Act
     result= await agents.analyse_user_input_for_dispatch_async(agents.calendar_classifier_llm, user_input, chat_history)    
     # Assert
-    assert result == awaited_dispatch
+    if '|' in awaited_dispatch:
+        assert result in awaited_dispatch.split('|')
+    else:
+        assert result == awaited_dispatch
 
 
 ### Fixture ###

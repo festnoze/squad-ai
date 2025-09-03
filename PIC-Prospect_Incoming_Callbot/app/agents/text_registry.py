@@ -1,4 +1,4 @@
-class AgentTexts:
+class TextRegistry:
     """Centralized registry for all agent static texts used in TTS pregeneration."""
 
     # AgentsGraph texts

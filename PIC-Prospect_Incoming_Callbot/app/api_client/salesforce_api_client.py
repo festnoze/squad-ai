@@ -160,6 +160,12 @@ class SalesforceApiClient(SalesforceApiClientInterface):
             self.logger.info("Error: Required event fields (subject, start_datetime) are missing")
             return None
 
+        # Validate retry parameters
+        if max_retries < 0:
+            max_retries = 0  # Treat negative retries as zero
+        if retry_delay < 0:
+            retry_delay = 0  # Treat negative delay as zero
+
         # Check the calendar availability before creating the appointement
         verified_event_id = await self.verify_appointment_existance_async(
             event_id=None, expected_subject=subject, start_datetime=start_datetime, duration_minutes=duration_minutes
@@ -223,25 +229,25 @@ class SalesforceApiClient(SalesforceApiClientInterface):
             payload_event["WhoId"] = who_id
 
         async def _execute_appointment_creation():
-            try:
-                url_creation_event = f"{self._instance_url}/services/data/{self._version_api}/sobjects/Event/"
-                async with httpx.AsyncClient() as client:
-                    resp_event = await client.post(url_creation_event, headers=headers, data=json.dumps(payload_event))
-                    resp_event.raise_for_status()
+            url_creation_event = f"{self._instance_url}/services/data/{self._version_api}/sobjects/Event/"
+            async with httpx.AsyncClient() as client:
+                resp_event = await client.post(url_creation_event, headers=headers, data=json.dumps(payload_event))
+                resp_event.raise_for_status()
 
-                    event_id = resp_event.json().get("id", None)
-                    self.logger.info("Event created successfully!")
-                    self.logger.info(f"ID: {event_id}")
-                    self.logger.info(f"{self._instance_url}/lightning/r/Event/{event_id}/view")
-                    return event_id
-            finally:
+                event_id = resp_event.json().get("id", None)
+                self.logger.info("Event created successfully!")
+                self.logger.info(f"ID: {event_id}")
+                self.logger.info(f"{self._instance_url}/lightning/r/Event/{event_id}/view")
+
+                # Verify the appointment was created successfully
                 verified_event_id = await self.verify_appointment_existance_async(
-                    event_id=None, expected_subject=None, start_datetime=start_datetime, duration_minutes=duration_minutes
+                    event_id=event_id, expected_subject=subject, start_datetime=start_datetime, duration_minutes=duration_minutes
                 )
                 if verified_event_id:
                     return verified_event_id
                 else:
-                    raise Exception("Appointment creation failed")
+                    # Verification failed, return None to trigger retry
+                    return None
 
         #####
         event_id = None

@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 
 #
-from agents.text_registry import AgentTexts
+from agents.text_registry import TextRegistry
 
 from app.agents.calendar_agent import CalendarAgent
 from llms.langchain_adapter_type import LangChainAdapterType
@@ -53,7 +53,10 @@ from llms.llm_info import LlmInfo
                     "Je vous propose le créneaux du jeudi 20 juin à 14 heures. Si ce créneau vous convient, merci de me confirmer afin de finaliser sa réservation.",
                 ),
                 ("human", "Oui, ce créneau me convient parfaitement"),
-                ("AI", "Veuillez confirmer le rendez-vous du jeudi 20 juin à 14 heures."),
+                (
+                    "AI",
+                    "Veuillez confirmer le rendez-vous du jeudi 20 juin à 14 heures.",
+                ),
             ],
             "Rendez-vous confirmé",
             "C'est confirmé, votre rendez-vous est maintenant planifié pour le jeudi 20 juin à 14 heures. Merci et au revoir.",
@@ -72,7 +75,7 @@ from llms.llm_info import LlmInfo
                 ),
             ],
             "Demande des disponibilités",
-            AgentTexts.availability_request_text,
+            TextRegistry.availability_request_text,
             False,  # Semantic matching
             False,  # exist_appointment
         ),
@@ -101,7 +104,10 @@ from llms.llm_info import LlmInfo
                     "Je vous propose le créneaux du jeudi 20 juin à 14 heures. Si ce créneau vous convient, merci de me confirmer afin de finaliser sa réservation.",
                 ),
                 ("human", "Quelles sont vos autres disponibilités ?"),
-                ("AI", "Quels jours ou quelles heures de la journée vous conviendraient le mieux ?"),
+                (
+                    "AI",
+                    "Quels jours ou quelles heures de la journée vous conviendraient le mieux ?",
+                ),
             ],
             "Demande de confirmation du rendez-vous",
             "Récapitulons : votre rendez-vous sera planifié le vendredi 21 juin à 10 heures. Merci de confirmer ce rendez-vous pour le valider.",
@@ -118,7 +124,10 @@ from llms.llm_info import LlmInfo
                     "Je vous propose le créneaux du jeudi 20 juin à 14 heures. Si ce créneau vous convient, merci de me confirmer afin de finaliser sa réservation.",
                 ),
                 ("human", "Quelles sont vos autres disponibilités ?"),
-                ("AI", "Quels jours ou quelles heures de la journée vous conviendraient le mieux ?"),
+                (
+                    "AI",
+                    "Quels jours ou quelles heures de la journée vous conviendraient le mieux ?",
+                ),
             ],
             "Proposition de créneaux",
             "Je vous propose les créneaux suivants : lundi 24 juin, de 9 heures à 12 heures ou de 13 heures à 16 heures, ou mardi 25 juin, de 9 heures à 12 heures. Avez-vous une préférence ?",
@@ -135,9 +144,15 @@ from llms.llm_info import LlmInfo
                     "Je vous propose le créneaux du jeudi 20 juin à 14 heures. Si ce créneau vous convient, merci de me confirmer afin de finaliser sa réservation.",
                 ),
                 ("human", "Quelles sont vos autres disponibilités ?"),
-                ("AI", "Quels jours ou quelles heures de la journée vous conviendraient le mieux ?"),
+                (
+                    "AI",
+                    "Quels jours ou quelles heures de la journée vous conviendraient le mieux ?",
+                ),
                 ("human", "Je préfère vendredi à 10h"),
-                ("AI", "Veuillez confirmer le rendez-vous du vendredi 21 juin à 10 heures."),
+                (
+                    "AI",
+                    "Veuillez confirmer le rendez-vous du vendredi 21 juin à 10 heures.",
+                ),
             ],
             "Rendez-vous confirmé",
             "C'est confirmé, votre rendez-vous est maintenant planifié pour le vendredi 21 juin à 10 heures. Merci et au revoir.",
@@ -231,7 +246,10 @@ from llms.llm_info import LlmInfo
                     "Je vous propose le créneaux du jeudi 20 juin à 14 heures. Si ce créneau vous convient, merci de me confirmer afin de finaliser sa réservation.",
                 ),
                 ("human", "Oui, ce créneau me convient parfaitement"),
-                ("AI", "Veuillez confirmer le rendez-vous du jeudi 20 juin à 14 heures."),
+                (
+                    "AI",
+                    "Veuillez confirmer le rendez-vous du jeudi 20 juin à 14 heures.",
+                ),
             ],
             "Proposition de créneaux",  # Agent should ask for new preferences
             "Je vous propose le créneau suivant : vendredi, le 21 juin, de 9 heures à 12 heures. Avez-vous une préférence ?",
@@ -262,12 +280,21 @@ async def test_calendar_agent_integration_classification_plus_outputed_answer(
     # Create the agent with mocked dependencies
     agent = CalendarAgent(sf_client_mock, llm_instance)
     CalendarAgent.now = datetime(2024, 6, 19, 19, 0)
-    agent._set_user_info("test_user_id", "Test", "User", "test@example.com", "test_owner_id", "TestOwnerName")
+    agent._set_user_info(
+        "test_user_id",
+        "Test",
+        "User",
+        "test@example.com",
+        "test_owner_id",
+        "TestOwnerName",
+    )
     # Set the value returned by 'verify_appointment_existance_async' from SalesforceApiClient
     sf_client_mock.exist_appointment = exist_appointment
 
     # First, ensure the agent classifies the user input correctly
-    actual_category = await agent.categorize_for_dispatch_async(user_input, chat_history)
+    actual_category = await agent.categorize_for_dispatch_async(
+        user_input, chat_history
+    )
     assert actual_category == expected_category, (
         f"Expected category '{expected_category}', but got '{actual_category}' for input '{user_input}'."
     )
@@ -280,11 +307,17 @@ async def test_calendar_agent_integration_classification_plus_outputed_answer(
             f"Expected exact response:\n{expected_answer}\nGot:\n{actual_response}"
         )
     else:
-        is_similar = await similarity_evaluator.is_semantically_similar(expected_answer, actual_response)
-        assert is_similar, f"Expected a response semantically similar to:\n{expected_answer}\nGot:\n{actual_response}"
+        is_similar = await similarity_evaluator.is_semantically_similar(
+            expected_answer, actual_response
+        )
+        assert is_similar, (
+            f"Expected a response semantically similar to:\n{expected_answer}\nGot:\n{actual_response}"
+        )
 
 
-async def test_complete_conversation_exchange(sf_client_mock, llm_instance, similarity_evaluator):
+async def test_complete_conversation_exchange(
+    sf_client_mock, llm_instance, similarity_evaluator
+):
     """
     Tests a complete conversation flow from initial contact to appointment confirmation.
     This test simulates a realistic conversation between a user and the calendar agent.
@@ -292,7 +325,14 @@ async def test_complete_conversation_exchange(sf_client_mock, llm_instance, simi
     # Create the agent with mocked dependencies
     agent = CalendarAgent(sf_client_mock, llm_instance)
     CalendarAgent.now = datetime(2024, 6, 19, 20, 0)
-    agent._set_user_info("test_user_id", "Test", "User", "test@example.com", "test_owner_id", "TestOwnerName")
+    agent._set_user_info(
+        "test_user_id",
+        "Test",
+        "User",
+        "test@example.com",
+        "test_owner_id",
+        "TestOwnerName",
+    )
 
     # Define the conversation flow with expected categories and responses
     conversation_flow = [
@@ -337,7 +377,9 @@ async def test_complete_conversation_exchange(sf_client_mock, llm_instance, simi
     chat_history = []
     for step in conversation_flow:
         # Mock the categorize_for_dispatch_async method to return our predefined category for this step
-        with patch.object(agent, "categorize_for_dispatch_async", return_value=step["category"]):
+        with patch.object(
+            agent, "categorize_for_dispatch_async", return_value=step["category"]
+        ):
             # Call the method under test
             actual_response = await agent.run_async(step["user_input"], chat_history)
 
@@ -382,25 +424,32 @@ def sf_client_mock():
     class _DummyClient:
         exist_appointment = False
 
-        async def get_scheduled_appointments_async(self, start_datetime=None, end_datetime=None, *args, **kwargs) -> list:
+        async def get_scheduled_appointments_async(
+            self, start_datetime=None, end_datetime=None, *args, **kwargs
+        ) -> list:
             # Check if the specific date range is requested
-            if str(start_datetime)[:10] == "2024-06-24" and str(end_datetime)[:10] == "2024-06-28":
+            if (
+                str(start_datetime)[:10] == "2024-06-24"
+                and str(end_datetime)[:10] == "2024-06-28"
+            ):
                 # Return 3 appointments, each 9 hours long, one per day
                 appointments = []
                 for day in range(5):
                     start = datetime(2024, 6, 24, 9, 0, 0) + timedelta(days=day)
                     end = start + timedelta(hours=9)
-                    appointments.append({
-                        "Id": f"appt_{day + 1}",
-                        "StartDateTime": start.isoformat() + "Z",
-                        "EndDateTime": end.isoformat() + "Z",
-                        "Subject": f"Mock Appointment {day + 1}",
-                        "Description": f"Mock Appointment {day + 1}",
-                        "Location": f"Mock Appointment {day + 1}",
-                        "OwnerId": "test_owner_id",
-                        "WhatId": "test_what_id",
-                        "WhoId": "test_who_id",
-                    })
+                    appointments.append(
+                        {
+                            "Id": f"appt_{day + 1}",
+                            "StartDateTime": start.isoformat() + "Z",
+                            "EndDateTime": end.isoformat() + "Z",
+                            "Subject": f"Mock Appointment {day + 1}",
+                            "Description": f"Mock Appointment {day + 1}",
+                            "Location": f"Mock Appointment {day + 1}",
+                            "OwnerId": "test_owner_id",
+                            "WhatId": "test_what_id",
+                            "WhoId": "test_who_id",
+                        }
+                    )
                 return appointments
             return []
 
