@@ -18,6 +18,7 @@ class OutgoingManager(abc.ABC):
         self.output_channel = output_channel
         self.can_speech_be_interupted = can_speech_be_interupted
         self.is_running = False
+        self.audio_sender = None
 
     @abc.abstractmethod
     async def enqueue_text_async(self, text: str) -> bool:
@@ -35,18 +36,14 @@ class OutgoingManager(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def has_text_to_be_sent(self) -> bool:
-        pass
-
-    @abc.abstractmethod
     def run_background_streaming_worker(self) -> None:
         """Start the data delivery process."""
         pass
 
     @abc.abstractmethod
-    def stop_background_streaming_worker_async(self) -> None:
+    async def stop_background_streaming_worker_async(self) -> None:
         """Stop the data delivery process."""
-        self.is_running = False
+        pass
 
     @abc.abstractmethod
     async def _background_streaming_worker_async(self) -> None:

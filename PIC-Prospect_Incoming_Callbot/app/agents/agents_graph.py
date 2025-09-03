@@ -4,6 +4,8 @@ import os
 from asyncio import Task
 from typing import Hashable
 
+from sqlalchemy.sql.selectable import elem
+
 from api_client.conversation_persistence_interface import (
     ConversationPersistenceInterface,
 )
@@ -189,6 +191,9 @@ class AgentsGraph:
             )
 
         workflow.add_node("other_inquery", self.other_inquery_node)
+        workflow.add_node(
+            "no_appointment_requested", self.no_appointment_requested_node
+        )
 
         router_paths: dict[Hashable, str] = {
             "begin_of_welcome_message": "begin_of_welcome_message",
@@ -196,6 +201,7 @@ class AgentsGraph:
             "wait_for_user_input": "wait_for_user_input",
             "user_identified": "user_identified",
             "user_new": "user_new",
+            "no_appointment_requested": "no_appointment_requested",
             END: END,
         }
 
@@ -218,6 +224,7 @@ class AgentsGraph:
         if "ask_rag" in self.available_actions:
             workflow.add_edge("rag_course_agent", END)
         workflow.add_edge("other_inquery", END)
+        workflow.add_edge("no_appointment_requested", END)
 
         # Add checkpointer if state needs to be persisted (e.g., using SQLite)
         # checkpointer = MemorySaver() # Example using in-memory checkpointer
@@ -236,23 +243,33 @@ class AgentsGraph:
             state["agent_scratchpad"]["next_agent_needed"] = "begin_of_welcome_message"
             return state
 
-        if user_input:
-            if len(self.available_actions) == 1 and self.available_actions[0] == "schedule_appointement":
-                state["agent_scratchpad"]["next_agent_needed"] = "calendar_agent"
-                return state
+        if not user_input:
+            state["agent_scratchpad"]["next_agent_needed"] = "wait_for_user_input"
+            return state
 
-            if len(self.available_actions) >= 1:
-                category = await self.analyse_user_input_for_dispatch_async(self.calendar_classifier_llm, user_input, state["history"])
-                state["history"].append(("user", user_input))
-                if category == "schedule_calendar_appointment":
-                    state["agent_scratchpad"]["next_agent_needed"] = "calendar_agent"
-                elif category == "training_course_query":
-                    state["agent_scratchpad"]["next_agent_needed"] = "rag_course_agent"
-                elif category == "others":
-                    state["agent_scratchpad"]["next_agent_needed"] = "other_inquery"
-                return state
-        state["agent_scratchpad"]["next_agent_needed"] = "wait_for_user_input"
+        # Single possible action: schedule new appointment
+        if len(self.available_actions) == 1 and self.available_actions[0] == "schedule_appointement":
+            # Verify if last assistant message was a consent request
+            history = state.get("history", [])
+            is_consent_asked, does_consent = await self._check_appointment_consent_request(user_input, history)
+
+            if is_consent_asked and not does_consent:
+                state["agent_scratchpad"]["next_agent_needed"] = "no_appointment_requested"
+            else:
+                state["agent_scratchpad"]["next_agent_needed"] = "calendar_agent"
+
+        # Multiple possible actions: schedule appointment or ask RAG for training infos
+        elif len(self.available_actions) >= 1:
+            category = await self.analyse_user_input_for_dispatch_async(self.calendar_classifier_llm, user_input, state["history"])
+            state["history"].append(("user", user_input))
+            if category == "schedule_calendar_appointment":
+                state["agent_scratchpad"]["next_agent_needed"] = "calendar_agent"
+            elif category == "training_course_query":
+                state["agent_scratchpad"]["next_agent_needed"] = "rag_course_agent"
+            elif category == "others":
+                state["agent_scratchpad"]["next_agent_needed"] = "other_inquery"
         return state
+        
 
     async def analyse_user_input_for_dispatch_async(
         self, llm: any, user_input: str, chat_history: list[dict[str, str]]
@@ -306,6 +323,57 @@ class AgentsGraph:
         )
         return response.content
 
+    async def _check_appointment_consent_request(
+        self, user_input: str, history: list
+    ) -> tuple[bool, bool]:
+        """Check if the last assistant message was a consent request and analyze user response.
+
+        Returns:
+            tuple[bool, bool]: (is_consent_asked, does_consent)
+            - is_consent_asked: True if last assistant message was asking for consent
+            - consent_result: "oui" or "non" if consent was asked, None otherwise
+        """
+        if not history:
+            return False, False
+
+        # Look for last assistant message
+        last_assistant_message = None
+        for role, message in reversed(history):
+            if role == "assistant":
+                last_assistant_message = message
+                break
+
+        if last_assistant_message and last_assistant_message.endswith(TextRegistry.yes_no_consent_text):
+            does_consent = await self._analyse_appointment_consent_async(user_input, history)
+            return True, does_consent
+        return False, False
+
+    async def _analyse_appointment_consent_async(
+        self, user_input: str, chat_history: list[dict[str, str]]
+    ) -> bool:
+        """Analyse if user accepts or refuses the appointment proposal"""
+        prompt = self._load_analyse_appointment_consent_prompt()
+        chat_history_str = "\n".join(
+            [f"[{msg[0]}]: {msg[1][:1000]}..." for msg in chat_history]
+        )
+        prompt = prompt.format(user_input=user_input, chat_history=chat_history_str)
+
+        response = await self.calendar_classifier_llm.ainvoke(prompt)
+        self.logger.info(
+            f"#> Appointment Consent Analysis result: |###> {response.content} <###|"
+        )
+        return response.content.strip().lower() == "oui"
+
+    analyse_appointment_consent_prompt: str = ""
+    def _load_analyse_appointment_consent_prompt(self):
+        if not AgentsGraph.analyse_appointment_consent_prompt:
+            with open(
+                "app/agents/prompts/appointment_consent_classifier_prompt.txt",
+                encoding="utf-8",
+            ) as f:
+                AgentsGraph.analyse_appointment_consent_prompt = f.read()
+        return AgentsGraph.analyse_appointment_consent_prompt
+
     async def begin_of_welcome_message_node(
         self, state: PhoneConversationState
     ) -> PhoneConversationState:
@@ -334,7 +402,7 @@ class AgentsGraph:
         except Exception:
             self.logger.exception("/!\\ Error testing connection to RAG API.")
             await self.add_AI_response_message_to_conversation_async(
-                TextRegistry.technical_error_text, state
+                TextRegistry.technical_error_text, state, persist=False
             )
             return state
 
@@ -763,16 +831,6 @@ class AgentsGraph:
                 display_waiting_message=False,
             )
 
-            # waiting_messages = ["Je suis en train de chercher les informations pour répondre à votre demande.",
-            #                     "Je recherche les éléments d'informations pour vous répondre.",
-            #                     "Je recherche dans ma base de connaissances.",
-            #                     "Un instant, je consulte mes sources d'informations.",
-            #                     "Laissez-moi vérifier quelques détails.",
-            #                     "Laissez-moi un instant pour trouver la meilleure réponse.",
-            #                     "Je rassemble les informations nécessaires."]
-
-            # await self._add_ai_answer_async(random.choice(waiting_messages), state)
-
             if self.has_waiting_music_on_rag:
                 waiting_music_task: (
                     Task | None
@@ -830,6 +888,20 @@ class AgentsGraph:
             TextRegistry.ask_to_repeat_text, state
         )
         self.logger.info(f"[{call_sid}] Sent 'other' message to {phone_number}")
+        return state
+
+    async def no_appointment_requested_node(
+        self, state: PhoneConversationState
+    ) -> PhoneConversationState:
+        """Handle case where user refuses appointment"""
+        call_sid = state.get("call_sid", "N/A")
+        phone_number = state.get("caller_phone", "N/A")
+        await self.add_AI_response_message_to_conversation_async(
+            TextRegistry.no_appointment_requested_text, state
+        )
+        self.logger.info(
+            f"[{call_sid}] User refused appointment, sent closure message to {phone_number}"
+        )
         return state
 
     ### Helper methods ###
@@ -902,8 +974,7 @@ class AgentsGraph:
                     await asyncio.sleep(0.1)
 
                 except asyncio.CancelledError:
-                    # Task was cancelled, exit cleanly
-                    break
+                    break  # Task was cancelled, exit cleanly
 
         except Exception as e:
             self.logger.error(f"Error in waiting music loop: {e}")

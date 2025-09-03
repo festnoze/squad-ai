@@ -163,9 +163,7 @@ class AudioMixer:
             # Mix the audio by adding samples
             mixed_audio = self._mix_pcm_audio(speech_audio, background_adjusted)
 
-            self.logger.debug(
-                f"Mixed {len(speech_audio)} bytes of speech with background noise (volume: {background_volume})"
-            )
+            self.logger.debug(f"Mixed {len(speech_audio)} bytes of speech with background noise (volume: {background_volume})")
             return mixed_audio
 
         except Exception as e:

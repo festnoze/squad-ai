@@ -30,6 +30,7 @@ class TextRegistry:
     appointment_failed_text = "Je n'ai pas pu planifier le rendez-vous. Souhaitez-vous essayer un autre créneau ?"
     modification_not_supported_text = "Je ne suis pas en mesure de gérer les modifications de rendez-vous."
     cancellation_not_supported_text = "Je ne suis pas en mesure de gérer les annulations de rendez-vous."
+    no_appointment_requested_text = "Votre appel a bien été prise en compte, votre conseiller en formation vous recontactera dès que possible. Merci et au revoir."
 
     @classmethod
     def get_all_texts(cls) -> list[str]:

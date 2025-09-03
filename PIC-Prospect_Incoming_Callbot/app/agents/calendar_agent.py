@@ -404,9 +404,7 @@ class CalendarAgent:
             owner_id: Owner's (advisor) ID
             owner_name: Owner's (advisor) name
         """
-        self.logger.info(
-            f"Setting user info for CalendarAgent to: {first_name} {last_name} {email}, for owner: {owner_name}"
-        )
+        self.logger.info(f"Setting user info for CalendarAgent to: {first_name} {last_name} {email}, for owner: {owner_name}")
         CalendarAgent.first_name = first_name
         CalendarAgent.last_name = last_name
         CalendarAgent.email = email
@@ -710,7 +708,6 @@ class CalendarAgent:
         return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     calendar_agent_prompt: str = ""
-
     def _load_calendar_agent_prompt(self):
         if not CalendarAgent.calendar_agent_prompt:
             with open(

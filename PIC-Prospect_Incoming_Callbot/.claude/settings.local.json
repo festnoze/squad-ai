@@ -26,7 +26,8 @@
       "Bash(ruff check:*)",
       "Bash(ruff format:*)",
       "Bash(deptry:*)",
-      "Bash(mkdocs serve:*)"
+      "Bash(mkdocs serve:*)",
+      "Bash(find:*)"
     ],
     "deny": []
   }

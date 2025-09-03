@@ -63,9 +63,7 @@ class OutgoingTextManager(OutgoingManager):
                     try:
                         text_chunk = self.text_queue.get_nowait()
                         if text_chunk is None:  # Sentinel value to stop
-                            self.logger.info(
-                                f"Received None sentinel in text queue for stream {self.stream_sid}. Stopping."
-                            )
+                            self.logger.info(f"Received None sentinel in text queue for stream {self.stream_sid}. Stopping.")
                             break
 
                         self.outgoing_text(text_chunk)
@@ -73,6 +71,7 @@ class OutgoingTextManager(OutgoingManager):
                         self.text_queue.task_done()
                     except TimeoutError:
                         if not self.is_streaming and self.text_queue.empty():
+                            # Cette ligne est trop longue (> 180 caractères) donc on la laisse sur plusieurs lignes
                             self.logger.info(
                                 f"Text sending loop for stream {self.stream_sid} timed out and queue is empty, streaming stopped."
                             )
@@ -86,9 +85,7 @@ class OutgoingTextManager(OutgoingManager):
         except asyncio.CancelledError:
             self.logger.info(f"Text sending task cancelled for stream {self.stream_sid}.")
         finally:
-            self.logger.info(
-                f"Exiting _send_text_from_queue for stream {self.stream_sid}. Remaining items in queue: {self.text_queue.qsize()}"
-            )
+            self.logger.info(f"Exiting _send_text_from_queue for stream {self.stream_sid}. Remaining items in queue: {self.text_queue.qsize()}")
 
     def outgoing_text(self, text: str) -> None:
         if self._outgoing_text_func:

@@ -240,9 +240,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
                 self.logger.info(f"{self._instance_url}/lightning/r/Event/{event_id}/view")
 
                 # Verify the appointment was created successfully
-                verified_event_id = await self.verify_appointment_existance_async(
-                    event_id=event_id, expected_subject=subject, start_datetime=start_datetime, duration_minutes=duration_minutes
-                )
+                verified_event_id = await self.verify_appointment_existance_async(event_id=event_id, expected_subject=subject, start_datetime=start_datetime, duration_minutes=duration_minutes)
                 if verified_event_id:
                     return verified_event_id
                 else:
@@ -271,9 +269,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
 
             # Retry recursively if max_retries > 0
             if max_retries > 0:
-                self.logger.info(
-                    f"Verification failed, retrying in {retry_delay}s... ({max_retries} retries remaining)"
-                )
+                self.logger.info(f"Verification failed, retrying in {retry_delay}s... ({max_retries} retries remaining)")
                 await asyncio.sleep(retry_delay)
 
                 # Recursive call with decremented max_retries
@@ -566,9 +562,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
                         )
                         return {"type": "Contact", "data": contact_data}
                 except httpx.HTTPStatusError as http_err:
-                    self.logger.info(
-                        f"HTTP error querying Contact: {http_err} - Status: {http_err.response.status_code}"
-                    )
+                    self.logger.info(f"HTTP error querying Contact: {http_err} - Status: {http_err.response.status_code}")
                     try:
                         self.logger.info(json.dumps(http_err.response.json(), indent=2, ensure_ascii=False))
                     except json.JSONDecodeError:
@@ -599,9 +593,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
                     records = data.get("records", [])
                     if records:
                         lead_data = records[0]
-                        self.logger.info(
-                            f"Found Lead: {lead_data.get('Id')} - {lead_data.get('FirstName')} {lead_data.get('LastName')}"
-                        )
+                        self.logger.info(f"Found Lead: {lead_data.get('Id')} - {lead_data.get('FirstName')} {lead_data.get('LastName')}")
                         return {"type": "Lead", "data": lead_data}
                 except httpx.HTTPStatusError as http_err:
                     self.logger.info(f"HTTP error querying Lead: {http_err} - Status: {http_err.response.status_code}")
@@ -659,9 +651,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
                 records = data.get("records", [])
                 all_contacts = []
                 for record in records:
-                    self.logger.info(
-                        f"Found Contact: {record.get('Id')} - {record.get('FirstName')} {record.get('LastName')}"
-                    )
+                    self.logger.info(f"Found Contact: {record.get('Id')} - {record.get('FirstName')} {record.get('LastName')}")
                     all_contacts.append(record)
                 return all_contacts
             except httpx.HTTPStatusError as http_err:
@@ -716,9 +706,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
         try:
             all_sobjects_data = await self._with_auth_retry(_fetch_sobjects_list)
         except httpx.HTTPStatusError as http_err_main:
-            self.logger.error(
-                f"HTTP error getting SObject list: {http_err_main} - Status: {http_err_main.response.status_code}"
-            )
+            self.logger.error(f"HTTP error getting SObject list: {http_err_main} - Status: {http_err_main.response.status_code}")
             try:
                 self.logger.error(json.dumps(http_err_main.response.json(), indent=2))
             except:

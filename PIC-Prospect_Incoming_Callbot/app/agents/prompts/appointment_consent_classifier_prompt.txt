@@ -1,0 +1,14 @@
+<Instructions>
+Analysez la réponse de l'utilisateur pour déterminer s'il accepte ou refuse la proposition de prise de rendez-vous.
+Retournez uniquement "oui" si l'utilisateur accepte la proposition (exemples: "oui", "d'accord", "parfait", "ça me convient", "c'est bon", "très bien", "ok", "oui merci", "avec plaisir").
+Retournez uniquement "non" si l'utilisateur refuse ou exprime des réserves (exemples: "non", "pas maintenant", "plus tard", "je ne peux pas", "ce n'est pas le bon moment", "non merci", "pas pour l'instant").
+En cas d'ambiguïté ou de réponse peu claire, retournez "non".
+</Instructions>
+
+<Historique de conversation>
+{chat_history}
+</Historique de conversation>
+
+<Réponse utilisateur>
+{user_input}
+</Réponse utilisateur>

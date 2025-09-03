@@ -64,9 +64,7 @@ class IncomingAudioManager(IncomingManager):
         self.frame_rate = frame_rate
         self.channels = channels
         self.vad = webrtcvad.Vad(vad_aggressiveness)
-        self.logger.info(
-            f"Initialized IncomingAudioProcessing with VAD aggressiveness {vad_aggressiveness}"
-        )
+        self.logger.info(f"Initialized IncomingAudioProcessing with VAD aggressiveness {vad_aggressiveness}")
         self.stream_sid = None
 
         # State tracking
@@ -146,16 +144,12 @@ class IncomingAudioManager(IncomingManager):
     def set_call_sid(self, call_sid: str) -> None:
         self.call_sid = call_sid
         self.outgoing_manager.set_call_sid(call_sid)
-        self.logger.info(
-            f"Updated Incoming / Outgoing AudioManagers to call SID: {call_sid}"
-        )
+        self.logger.info(f"Updated Incoming / Outgoing AudioManagers to call SID: {call_sid}")
 
     def set_stream_sid(self, stream_sid: str) -> None:
         self.stream_sid = stream_sid
         self.outgoing_manager.update_stream_sid(stream_sid)
-        self.logger.info(
-            f"Updated Incoming / Outgoing AudioManagers to stream SID: {stream_sid}"
-        )
+        self.logger.info(f"Updated Incoming / Outgoing AudioManagers to stream SID: {stream_sid}")
 
     def set_phone_number(self, phone_number: str, call_sid: str) -> None:
         self.phones_by_call_sid[call_sid] = phone_number
@@ -271,9 +265,7 @@ class IncomingAudioManager(IncomingManager):
         if phone_number is None:
             self.logger.error(f"Phone number not found for call SID: {call_sid}")
             return None
-        self.logger.info(
-            f"--- Call started --- \nPhone number: {phone_number}, CallSid: {call_sid}, StreamSid: {stream_sid}."
-        )
+        self.logger.info(f"--- Call started --- \nPhone number: {phone_number}, CallSid: {call_sid}, StreamSid: {stream_sid}.")
 
         # Get or Create the state for the graph
         if stream_sid in self.stream_states:
@@ -341,9 +333,7 @@ class IncomingAudioManager(IncomingManager):
 
             # Log the interruption (but only the first time)
             if self.consecutive_silence_duration_ms > 0:
-                self.logger.info(
-                    f"\r>>> USER INTERRUPTION - Incoming speech while system was speaking ({speech_to_noise_ratio:.2f})"
-                )
+                self.logger.info(f"\r>>> USER INTERRUPTION - Incoming speech while system was speaking ({speech_to_noise_ratio:.2f})")
             self.consecutive_silence_duration_ms = 0.0
 
         # 7- Silence detection consecutive to user speech beginning
@@ -489,9 +479,7 @@ class IncomingAudioManager(IncomingManager):
         self, user_query: str, user_query_audio_filename: str | None = None
     ):
         try:
-            self.logger.info(
-                f"Sending incoming user query to agents graph. Transcription: '{user_query}'"
-            )
+            self.logger.info(f"Sending incoming user query to agents graph. Transcription: '{user_query}'")
 
             if self.stream_sid in self.stream_states:
                 current_state: ConversationState = self.stream_states[self.stream_sid]
@@ -545,9 +533,7 @@ class IncomingAudioManager(IncomingManager):
                 await self._hangup_call_async()
 
         except Exception as e:
-            self.logger.error(
-                f"Error in user query to agents graph: {e}", exc_info=True
-            )
+            self.logger.error(f"Error in user query to agents graph: {e}", exc_info=True)
 
     def _perform_background_noise_calibration(
         self,
@@ -583,9 +569,7 @@ class IncomingAudioManager(IncomingManager):
             if not any(calibration_data):
                 calibration_data = [min_noise_level]
             average_noise = round(sum(calibration_data) / len(calibration_data))
-            self.logger.info(
-                f">>> Noise calibration completed for stream {stream_sid}. Average noise level: {average_noise:.2f}"
-            )
+            self.logger.info(f">>> Noise calibration completed for stream {stream_sid}. Average noise level: {average_noise:.2f}")
             # Replace list with the calculated average for memory efficiency
             self.average_noise_by_stream_sid[stream_sid] = average_noise
             del self.speech_to_noise_ratio_samples_by_stream_sid[stream_sid]
@@ -674,15 +658,11 @@ class IncomingAudioManager(IncomingManager):
                 watermark.lower() in transcript.lower()
                 for watermark in known_watermarks
             ):
-                self.logger.warning(
-                    f"!!! Detected watermark in transcript, ignoring: '{transcript}'"
-                )
+                self.logger.warning(f"!!! Detected watermark in transcript, ignoring: '{transcript}'")
                 transcript = None
 
         except Exception as speech_err:
-            self.logger.error(
-                f"Error during transcription: {speech_err}", exc_info=True
-            )
+            self.logger.error(f"Error during transcription: {speech_err}", exc_info=True)
             transcript = None
         finally:
             if wav_audio_filename and not self.keep_incoming_audio_files:
@@ -751,9 +731,7 @@ class IncomingAudioManager(IncomingManager):
                             "/!\\ call_sid not set; unable to hang up Twilio phone call"
                         )
             except Exception as e:
-                self.logger.error(
-                    f"/!\\ Error hanging up call via Twilio: {e}", exc_info=True
-                )
+                self.logger.error(f"/!\\ Error hanging up call via Twilio: {e}", exc_info=True)
 
     def save_as_wav_file(self, audio_data: bytes):
         """Save PCM data (16-bit, 8kHz, mono) to a WAV file at the specified path."""
@@ -783,9 +761,7 @@ class IncomingAudioManager(IncomingManager):
 
     async def stop_speaking_async(self, speech_to_noise_ratio) -> str:
         """Stop any ongoing speech and clear text queue and interrupt RAG streaming"""
-        self.logger.info(
-            f"Speech interruption detected (level: {speech_to_noise_ratio}), stopping system speech"
-        )
+        self.logger.info(f"Speech interruption detected (level: {speech_to_noise_ratio}), stopping system speech")
         self.interuption_asked = True
         # Interrupt RAG streaming with its tag if it's active
         if hasattr(self, "rag_interrupt_flag"):
@@ -793,9 +769,7 @@ class IncomingAudioManager(IncomingManager):
             self.logger.info("RAG streaming interrupted due to speech interruption")
 
         removed_text = await self.outgoing_manager.clear_text_queue_async()
-        self.logger.info(
-            f"Cleared queued text due to speech interruption: '{removed_text}'"
-        )
+        self.logger.info(f"Cleared queued text due to speech interruption: '{removed_text}'")
         self.is_speaking = False
         # Reset buffer to clear any previous speech before interruption
         self.audio_buffer = b""
