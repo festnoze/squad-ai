@@ -18,6 +18,9 @@ from speech.text_to_speech import get_text_to_speech_provider
 
 #
 from utils.envvar import EnvHelper
+from utils.latency_decorator import measure_latency_context
+from utils.latency_metric import OperationType, OperationStatus
+from utils.latency_tracker import latency_tracker
 
 
 class PhoneCallWebsocketEventsHandler:
@@ -40,6 +43,12 @@ class PhoneCallWebsocketEventsHandler:
         # Flags to track speaking state
         self.is_speaking = False  # Flag to track if system is currently speaking
         self.rag_interrupt_flag = {"interrupted": False}  # Flag to interrupt RAG streaming
+        
+        # Call duration tracking
+        self.call_duration_context = None
+        self.current_call_sid = None
+        self.current_phone_number = None
+        self.media_event_counter = 0  # Counter for periodic call duration checks
 
         # Set audio processing parameters as instance variables
         self.frame_rate = 8000  # Sample rate in Hz (8kHz is standard for telephony)
@@ -122,6 +131,99 @@ class PhoneCallWebsocketEventsHandler:
         self.incoming_audio_processing.set_websocket(websocket)
         self.outgoing_audio_processing.set_websocket(websocket)
         self.incoming_audio_processing.set_websocket_creation_time(self.websocket_creation_time)
+        
+        # Prepare call duration tracking (will be started when we have call_sid and phone_number)
+        self._prepare_call_duration_tracking()
+    
+    def _prepare_call_duration_tracking(self):
+        """Prepare call duration tracking context manager."""
+        if not self.call_duration_context:
+            self.call_duration_context = measure_latency_context(
+                operation_type=OperationType.CALL_DURATION,
+                operation_name="websocket_call_duration",
+                provider="twilio",
+                call_sid=self.current_call_sid,
+                phone_number=self.current_phone_number,
+                metadata={"tracking_method": "websocket_lifecycle"}
+            )
+    
+    def _start_call_duration_tracking(self, call_sid: str, phone_number: str):
+        """Start call duration tracking with complete call information."""
+        self.current_call_sid = call_sid
+        self.current_phone_number = phone_number
+        
+        # Update existing context manager with call information or create new one
+        if self.call_duration_context:
+            # Update the existing context manager with call info
+            self.call_duration_context.call_sid = call_sid
+            self.call_duration_context.phone_number = phone_number
+        else:
+            self.call_duration_context = measure_latency_context(
+                operation_type=OperationType.CALL_DURATION,
+                operation_name="websocket_call_duration",
+                provider="twilio",
+                call_sid=call_sid,
+                phone_number=phone_number,
+                metadata={"tracking_method": "websocket_lifecycle"}
+            )
+        
+        # Enter the context if not already entered
+        if not hasattr(self.call_duration_context, 'start_time') or self.call_duration_context.start_time is None:
+            self.call_duration_context.__enter__()
+            self.logger.debug(f"[{call_sid}] Started call duration tracking")
+    
+    def _finish_call_duration_tracking(self, disconnect_reason: str = "normal"):
+        """Finish call duration tracking and record the metric."""
+        if self.call_duration_context:
+            try:
+                # Update metadata with disconnect reason
+                if hasattr(self.call_duration_context, 'metadata'):
+                    self.call_duration_context.metadata["disconnect_reason"] = disconnect_reason
+                
+                # Exit the context manager to record the metric
+                self.call_duration_context.__exit__(None, None, None)
+                self.logger.debug(f"[{self.current_call_sid or 'N/A'}] Finished call duration tracking - {disconnect_reason}")
+            except Exception as e:
+                self.logger.error(f"Error finishing call duration tracking: {e}")
+            finally:
+                self.call_duration_context = None
+    
+    async def _check_call_duration_and_hangup_if_critical(self):
+        """Check if call duration has exceeded critical threshold and hangup if necessary."""
+        if self.websocket_creation_time and self.current_call_sid:
+            import time
+            current_duration_ms = (time.time() - self.websocket_creation_time) * 1000
+            critical_threshold = latency_tracker.thresholds.get_critical_threshold(OperationType.CALL_DURATION)
+            
+            if current_duration_ms >= critical_threshold:
+                self.logger.warning(f"[{self.current_call_sid}] Call duration {current_duration_ms:.0f}ms exceeded critical threshold {critical_threshold:.0f}ms. Hanging up automatically.")
+                
+                # Record a critical duration metric before hangup
+                from utils.latency_metric import LatencyMetric, OperationStatus
+                metric = LatencyMetric(
+                    operation_type=OperationType.CALL_DURATION,
+                    operation_name="critical_duration_hangup",
+                    latency_ms=current_duration_ms,
+                    status=OperationStatus.SUCCESS,
+                    call_sid=self.current_call_sid,
+                    phone_number=self.current_phone_number,
+                    provider="twilio",
+                    error_message=None,
+                    metadata={
+                        "tracking_method": "critical_threshold_check",
+                        "disconnect_reason": "critical_duration_exceeded",
+                        "threshold_exceeded": critical_threshold
+                    }
+                )
+                metric.criticality = "critical"
+                latency_tracker.add_metric(metric)
+                
+                # Trigger hangup through the incoming audio manager
+                if self.incoming_audio_processing:
+                    await self.incoming_audio_processing._hangup_call_async()
+                
+                return True
+        return False
 
     async def handle_websocket_all_receieved_events_async(self, calling_phone_number: str, call_sid: str) -> None:
         """Main method: handle a full audio conversation with I/O Twilio streams on a WebSocket."""
@@ -134,6 +236,7 @@ class PhoneCallWebsocketEventsHandler:
         # Store the caller's phone number and call SID so we can retrieve them later
         self.incoming_audio_processing.set_call_sid(call_sid)
         self.incoming_audio_processing.set_phone_number(calling_phone_number, call_sid)
+        self._start_call_duration_tracking(call_sid, calling_phone_number)
 
         self.outgoing_audio_processing.run_background_streaming_worker()
         self.logger.info("Audio stream manager initialized and started with optimized parameters")
@@ -150,6 +253,7 @@ class PhoneCallWebsocketEventsHandler:
                     self.logger.info(
                         f"WebSocket disconnected: {self.websocket.client.host}:{self.websocket.client.port} - Code: {disconnect_err.code}"
                     )
+                    self._finish_call_duration_tracking("websocket_disconnect")
                     break
 
                 event = data.get("event")
@@ -169,14 +273,16 @@ class PhoneCallWebsocketEventsHandler:
 
         except Exception as e:
             self.logger.error(f"Unhandled error in WebSocket handler: {e}", exc_info=True)
+            self._finish_call_duration_tracking("websocket_error")
         finally:
             await self.outgoing_audio_processing.stop_background_streaming_worker_async()
             if self.current_stream and self.current_stream in self.stream_states:
                 self.logger.warning(f"Cleaning up state for stream {self.current_stream} due to handler exit/error.")
                 del self.stream_states[self.current_stream]
-            self.logger.info(
-                f"WebSocket handler finished for {self.websocket.client.host}:{self.websocket.client.port} (Stream: {self.current_stream})"
-            )
+            # Ensure call duration tracking is finished in case it wasn't already
+            if self.call_duration_context:
+                self._finish_call_duration_tracking("websocket_cleanup")
+            self.logger.info(f"WebSocket handler finished for {self.websocket.client.host}:{self.websocket.client.port} (Stream: {self.current_stream})")
 
     def _handle_connected_event(self):
         """Handle the 'connected' event from Twilio."""
@@ -184,19 +290,23 @@ class PhoneCallWebsocketEventsHandler:
 
     async def _handle_start_event_async(self, start_data: dict) -> str:
         """Handle the 'start' event from Twilio which begins a new call."""
-        call_sid = start_data.get("callSid")
-        stream_sid = start_data.get("streamSid")
+        call_sid = start_data.get("callSid", "N.C")
+        stream_sid = start_data.get("streamSid", "N.C")
         await self.incoming_audio_processing.init_conversation_async(call_sid, stream_sid)
         self.outgoing_audio_processing.update_stream_sid(stream_sid)
         return stream_sid
 
     async def _handle_media_event_async(self, media_data: dict) -> None:
         """Handle the 'media' event from Twilio which contains audio data."""
-        # Process transcription in parallel with existing audio handling
-        # await self.transcription_manager.process_media_event_async(media_data)
-
-        # Continue with existing audio processing
+        # Process the media event
         await self.incoming_audio_processing.process_incoming_data_async(media_data)
+        
+        # Periodically check call duration (every 100 media events ~= every 2-3 seconds)
+        self.media_event_counter += 1
+        if self.media_event_counter % 100 == 0:
+            hangup_triggered = await self._check_call_duration_and_hangup_if_critical()
+            if hangup_triggered:
+                return  # Stop processing if hangup was triggered
 
     def _is_websocket_connected(self) -> bool:
         """Check if the websocket is still connected"""
@@ -223,6 +333,10 @@ class PhoneCallWebsocketEventsHandler:
             return
 
         self.logger.info(f"Received stop event for stream: {self.current_stream}")
+        
+        # Finish call duration tracking for normal stop event
+        self._finish_call_duration_tracking("twilio_stop_event")
+        
         if self.current_stream in self.stream_states:
             del self.stream_states[self.current_stream]
             self.logger.info(f"Cleaned up state for stream {self.current_stream}")

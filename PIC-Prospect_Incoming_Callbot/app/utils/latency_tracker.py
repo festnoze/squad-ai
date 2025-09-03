@@ -32,6 +32,10 @@ class LatencyThresholds:
             OperationType.RAG: {
                 "warning": 3000,  # 3s
                 "critical": 8000  # 8s
+            },
+            OperationType.CALL_DURATION: {
+                "warning": 150_000,  # 2.5 minutes
+                "critical": 300_000  # 5 minutes
             }
         }
     

@@ -9,6 +9,7 @@ class OperationType(Enum):
     TTS = "text_to_speech"
     SALESFORCE = "salesforce_api"
     RAG = "rag_inference"
+    CALL_DURATION = "call_duration"
 
 
 class OperationStatus(Enum):

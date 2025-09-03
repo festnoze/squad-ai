@@ -140,6 +140,7 @@ async def websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid:
         logger.error(f"[FAIL] Failed to accept WebSocket connection for call SID {call_sid}: {e}", exc_info=True)
         return
 
+    call_handler = None
     try:
         call_handler: PhoneCallWebsocketEventsHandler = (
             phone_call_websocket_events_handler_factory.get_new_phone_call_websocket_events_handler(websocket=ws)
@@ -149,14 +150,23 @@ async def websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid:
 
     except WebSocketDisconnect:
         logger.info(f"WebSocket disconnected: {ws.client.host}:{ws.client.port}")
+        # Ensure call duration tracking is finished on disconnect
+        if call_handler and call_handler.call_duration_context:
+            call_handler._finish_call_duration_tracking("endpoint_websocket_disconnect")
     except Exception as e:
         logger.error(f"Error in WebSocket handler: {e}", exc_info=True)
+        # Ensure call duration tracking is finished on error
+        if call_handler and call_handler.call_duration_context:
+            call_handler._finish_call_duration_tracking("endpoint_error")
         try:
             await ws.close(code=1011)
         except RuntimeError:
             logger.error("Error closing WebSocket connection", exc_info=True)
             pass
     finally:
+        # Final safety check to ensure call duration tracking is finished
+        if call_handler and call_handler.call_duration_context:
+            call_handler._finish_call_duration_tracking("endpoint_cleanup")
         logger.info(f"WebSocket endpoint finished for: {ws.client.host}:{ws.client.port}")
         # Pre-build a new handler for the next call
         phone_call_websocket_events_handler_factory.build_new_phone_call_websocket_events_handler()

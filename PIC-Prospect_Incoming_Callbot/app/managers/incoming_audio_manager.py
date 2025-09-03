@@ -85,36 +85,20 @@ class IncomingAudioManager(IncomingManager):
         self.is_speaking: bool = False
         self.interuption_asked: bool = False
         self.removed_text_to_speak: str | None = None
-        self.speak_anew_on_long_silence: bool = (
-            EnvHelper.get_speak_anew_on_long_silence()
-        )
-        self.max_silence_duration_before_reasking: int = (
-            EnvHelper.get_max_silence_duration_before_reasking()
-        )  # ms of silence before reasking
+        self.speak_anew_on_long_silence: bool = EnvHelper.get_speak_anew_on_long_silence()
+        self.max_silence_duration_before_reasking: int = EnvHelper.get_max_silence_duration_before_reasking()  # ms of silence before reasking
 
         # Audio processing parameters
         self.audio_buffer: bytes = b""
         self.consecutive_silence_duration_ms = 0.0
         self.speech_threshold_base = EnvHelper.get_speech_threshold()
-        self.speech_threshold = (
-            self.speech_threshold_base * 2
-        )  # Set default speech threshold on startup (will be calibrated on call start)
-        self.required_silence_ms_to_answer = (
-            EnvHelper.get_required_silence_ms_to_answer()
-        )  # ms of silence to trigger transcript
-        self.min_audio_bytes_for_processing = (
-            EnvHelper.get_min_audio_bytes_for_processing()
-        )  # Minimum buffer size to process
-        self.max_audio_bytes_for_processing = (
-            EnvHelper.get_max_audio_bytes_for_processing()
-        )  # Maximum buffer size to process
-        self.max_silence_duration_before_hangup = (
-            EnvHelper.get_max_silence_duration_before_hangup()
-        )  # ms of silence before hanging up the call
+        self.speech_threshold = self.speech_threshold_base * 2  # Set default speech threshold on startup (will be calibrated on call start)
+        self.required_silence_ms_to_answer = EnvHelper.get_required_silence_ms_to_answer()  # ms of silence to trigger transcript
+        self.min_audio_bytes_for_processing = EnvHelper.get_min_audio_bytes_for_processing()  # Minimum buffer size to process
+        self.max_audio_bytes_for_processing = EnvHelper.get_max_audio_bytes_for_processing()  # Maximum buffer size to process
+        self.max_silence_duration_before_hangup = EnvHelper.get_max_silence_duration_before_hangup()  # ms of silence before hanging up the call
         self.do_audio_preprocessing = EnvHelper.get_do_audio_preprocessing()
-        self.perform_background_noise_calibration = (
-            EnvHelper.get_perform_background_noise_calibration()
-        )
+        self.perform_background_noise_calibration = EnvHelper.get_perform_background_noise_calibration()
         self.keep_incoming_audio_files = EnvHelper.get_keep_incoming_audio_files()
 
         # Create temp directory if it doesn't exist
@@ -399,9 +383,7 @@ class IncomingAudioManager(IncomingManager):
 
         # 10- Process audio
         # Conditions: if buffer large enough followed by a prolonged silence, or if buffer is too large
-        if (
-            is_long_silence_after_speech and has_reach_min_speech_length
-        ) or is_speech_too_long:
+        if (is_long_silence_after_speech and has_reach_min_speech_length) or is_speech_too_long:
             audio_data: bytes = self.audio_buffer
             self.audio_buffer = b""
             self.consecutive_silence_duration_ms = 0.0
@@ -480,12 +462,12 @@ class IncomingAudioManager(IncomingManager):
     ):
         try:
             self.logger.info(f"Sending incoming user query to agents graph. Transcription: '{user_query}'")
-
+            current_state: ConversationState | PhoneConversationState
             if self.stream_sid in self.stream_states:
-                current_state: ConversationState = self.stream_states[self.stream_sid]
+                current_state = self.stream_states[self.stream_sid]
                 current_state["user_input"] = user_query
             else:
-                current_state: PhoneConversationState = {
+                current_state = {
                     "call_sid": self.call_sid,
                     "caller_phone": self.phones_by_call_sid[self.call_sid],
                     "user_input": user_query,
