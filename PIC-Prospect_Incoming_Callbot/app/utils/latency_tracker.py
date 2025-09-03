@@ -137,6 +137,13 @@ class LatencyTracker:
     
     def _check_thresholds(self, metric: LatencyMetric) -> None:
         """Vérifie les seuils et déclenche les alertes"""
+        # Always trigger alerts for error metrics
+        if metric.status == OperationStatus.ERROR:
+            self.logger.error(f"ERROR METRIC: {metric}")
+            self._trigger_alerts(metric, "error")
+            return
+        
+        # Check latency thresholds for successful operations
         criticality = self.calculate_criticality(metric)
         
         if criticality == "critical":
@@ -203,6 +210,7 @@ class LatencyTracker:
             self.logger.info(f"Métriques exportées vers {file_path}")
         except Exception as e:
             self.logger.error(f"Erreur lors de l'export des métriques: {e}")
+            raise
     
     def reset_stats(self) -> None:
         """Remet à zéro toutes les statistiques"""

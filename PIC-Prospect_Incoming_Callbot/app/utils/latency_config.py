@@ -20,12 +20,60 @@ from utils.latency_reporter import (
 from utils.latency_tracker import LatencyThresholds, latency_tracker
 
 
+class ThresholdManager:
+    """Manager for threshold operations with string-based operation types"""
+    
+    def __init__(self, thresholds: Optional[LatencyThresholds] = None):
+        # Use provided thresholds or get from global latency tracker
+        self.thresholds = thresholds or latency_tracker.thresholds
+    
+    def get_warning_threshold(self, operation_name: str) -> Optional[float]:
+        """Get warning threshold for an operation by string name"""
+        try:
+            operation_type = OperationType(operation_name.lower())
+            return self.thresholds.get_warning_threshold(operation_type)
+        except ValueError:
+            return None
+    
+    def get_critical_threshold(self, operation_name: str) -> Optional[float]:
+        """Get critical threshold for an operation by string name"""
+        try:
+            operation_type = OperationType(operation_name.lower())
+            return self.thresholds.get_critical_threshold(operation_type)
+        except ValueError:
+            return None
+    
+    def exceeds_warning_threshold(self, operation_name: str, latency_ms: float) -> bool:
+        """Check if latency exceeds warning threshold for an operation"""
+        warning_threshold = self.get_warning_threshold(operation_name)
+        if warning_threshold is None:
+            return False
+        return latency_ms > warning_threshold
+    
+    def exceeds_critical_threshold(self, operation_name: str, latency_ms: float) -> bool:
+        """Check if latency exceeds critical threshold for an operation"""
+        critical_threshold = self.get_critical_threshold(operation_name)
+        if critical_threshold is None:
+            return False
+        return latency_ms > critical_threshold
+    
+    def calculate_criticality(self, operation_name: str, latency_ms: float) -> str:
+        """Calculate criticality level (normal/warning/critical) for string-based operation names"""
+        if self.exceeds_critical_threshold(operation_name, latency_ms):
+            return "critical"
+        elif self.exceeds_warning_threshold(operation_name, latency_ms):
+            return "warning"
+        else:
+            return "normal"
+
+
 class LatencyConfig:
     """Gestionnaire de configuration pour le système de monitoring de latence"""
     
     def __init__(self):
         self.thresholds = LatencyThresholds()
         self.configured = False
+        self.is_initialized = False
     
     def configure_custom_thresholds(self, custom_thresholds: Dict[str, Dict[str, float]]) -> None:
         """
@@ -34,21 +82,37 @@ class LatencyConfig:
         Args:
             custom_thresholds: Dict avec la structure:
                 {
-                    "STT": {"warning": 2000, "critical": 5000},
-                    "TTS": {"warning": 1500, "critical": 3000},
-                    "SALESFORCE": {"warning": 1000, "critical": 3000},
-                    "RAG": {"warning": 3000, "critical": 8000}
+                    "speech_to_text": {"warning": 2000, "critical": 5000},
+                    "text_to_speech": {"warning": 1500, "critical": 3000},
+                    "salesforce_api": {"warning": 1000, "critical": 3000},
+                    "rag_inference": {"warning": 3000, "critical": 8000}
                 }
         """
         for operation_type_str, thresholds in custom_thresholds.items():
             try:
+                # Validate thresholds
+                warning = thresholds.get("warning")
+                critical = thresholds.get("critical")
+                
+                if warning is not None and warning < 0:
+                    raise ValueError("Thresholds must be positive values")
+                if critical is not None and critical < 0:
+                    raise ValueError("Thresholds must be positive values")
+                if warning is not None and critical is not None and warning >= critical:
+                    raise ValueError("Warning threshold must be less than critical threshold")
+                
                 operation_type = OperationType(operation_type_str.lower())
-                if "warning" in thresholds:
-                    self.thresholds.thresholds[operation_type]["warning"] = thresholds["warning"]
-                if "critical" in thresholds:
-                    self.thresholds.thresholds[operation_type]["critical"] = thresholds["critical"]
-            except ValueError:
+                if warning is not None:
+                    self.thresholds.thresholds[operation_type]["warning"] = float(warning)
+                if critical is not None:
+                    self.thresholds.thresholds[operation_type]["critical"] = float(critical)
+            except ValueError as e:
+                if "must be" in str(e):
+                    raise  # Re-raise validation errors
                 print(f"Type d'opération inconnu: {operation_type_str}")
+        
+        # Sync configured thresholds to the latency tracker
+        latency_tracker.thresholds = self.thresholds
     
     def configure_from_environment(self) -> None:
         """Configure le système depuis les variables d'environnement"""
@@ -159,6 +223,11 @@ class LatencyConfig:
         # Mettre à jour les seuils du tracker
         latency_tracker.thresholds = self.thresholds
         
+        # Update tracker configuration from environment
+        latency_tracker.enabled = EnvHelper.get_latency_tracking_enabled()
+        latency_tracker.log_metrics = EnvHelper.get_latency_logging_enabled()
+        latency_tracker.save_to_file = EnvHelper.get_latency_file_logging_enabled()
+        
         # Configurer les reporters depuis l'environnement
         self.setup_prometheus_reporter()
         self.setup_influxdb_reporter()
@@ -168,6 +237,7 @@ class LatencyConfig:
         setup_latency_reporting()
         
         self.configured = True
+        self.is_initialized = True
         print("Système de monitoring de latence initialisé avec succès")
         
         # Afficher la configuration
@@ -195,6 +265,10 @@ class LatencyConfig:
         
         print("=" * 50 + "\n")
     
+    def get_threshold_manager(self) -> ThresholdManager:
+        """Get a ThresholdManager that uses the current configuration"""
+        return ThresholdManager(self.thresholds)
+    
     def get_current_stats(self) -> Dict:
         """Retourne les statistiques actuelles de latence"""
         return {
@@ -209,3 +283,8 @@ class LatencyConfig:
 
 # Instance globale de configuration
 latency_config = LatencyConfig()
+
+
+def get_threshold_manager() -> ThresholdManager:
+    """Get a ThresholdManager that uses the global latency tracker's thresholds"""
+    return ThresholdManager()

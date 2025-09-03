@@ -1,17 +1,15 @@
 """
 Tests unitaires pour le système de monitoring de latence.
 """
+import pytest
 import asyncio
-import tempfile
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
-
-import pytest
-
+from collections import deque
 from utils.latency_config import latency_config
 from utils.latency_decorator import measure_latency, measure_latency_context, measure_streaming_latency
 from utils.latency_metric import LatencyMetric, OperationType, OperationStatus
-from utils.latency_reporter import PrometheusReporter, SlackReporter, report_manager
+from utils.latency_reporter import PrometheusReporter, SlackReporter
 from utils.latency_tracker import LatencyTracker, LatencyThresholds, latency_tracker
 
 import os
@@ -162,6 +160,7 @@ class TestLatencyTracker:
         
         # Créer un tracker avec une petite taille pour le test
         latency_tracker.metrics = deque(maxlen=3)
+
         
         try:
             # Ajouter plus de métriques que la taille max
@@ -831,9 +830,9 @@ class TestLatencyConfig:
         assert stt_warning == 2000  # Valeur par défaut
         assert stt_critical == 5000  # Valeur valide depuis l'environnement
     
-    @patch('utils.latency_reporter.PrometheusReporter')
-    @patch('utils.latency_reporter.InfluxDBReporter')
-    @patch('utils.latency_reporter.SlackReporter')
+    @patch('utils.latency_config.PrometheusReporter')
+    @patch('utils.latency_config.InfluxDBReporter')
+    @patch('utils.latency_config.SlackReporter')
     @patch.dict('os.environ', {
         'PROMETHEUS_PUSHGATEWAY_URL': 'http://localhost:9091',
         'INFLUXDB_URL': 'http://localhost:8086',
@@ -851,7 +850,7 @@ class TestLatencyConfig:
         config.initialize_latency_system()
         
         # Vérifier que les reporters ont été créés
-        mock_prometheus.assert_called_once_with('http://localhost:9091')
+        mock_prometheus.assert_called_once_with('http://localhost:9091', 'prospect_callbot')
         mock_influx.assert_called_once_with(
             'http://localhost:8086',
             'test_token',
@@ -1167,10 +1166,12 @@ class TestLatencySystemIntegration:
     def setup_method(self):
         """Setup avant chaque test"""
         latency_tracker.metrics.clear()
+        latency_tracker.stats_by_operation.clear()
         latency_tracker.enabled = True
         latency_tracker.alert_callbacks.clear()
         # Réinitialiser les seuils par défaut
         latency_config.thresholds = LatencyThresholds()
+        latency_tracker.thresholds = latency_config.thresholds
     
     async def test_full_system_workflow_sync_function(self):
         """Test workflow complet : mesure sync -> tracker -> seuils -> export"""
@@ -1351,9 +1352,9 @@ class TestLatencySystemIntegration:
         tts_avg = latency_tracker.get_average_latency(OperationType.TTS, minutes=5)
         rag_avg = latency_tracker.get_average_latency(OperationType.RAG, minutes=5)
         
-        assert 40 <= stt_avg <= 80  # ~50ms
-        assert 100 <= tts_avg <= 150  # ~120ms 
-        assert 400 <= rag_avg <= 500  # ~450ms
+        assert stt_avg is not None and 40 <= stt_avg <= 80  # ~50ms
+        assert tts_avg is not None and 100 <= tts_avg <= 150  # ~120ms 
+        assert rag_avg is not None and 400 <= rag_avg <= 500  # ~450ms
     
     async def test_full_system_with_errors_and_recovery(self):
         """Test système complet avec gestion d'erreurs"""
