@@ -32,9 +32,9 @@ class LatencyMetric:
     phone_number: str | None = None  # The caller's phone number
     criticality: str = "normal"  # "normal", "warning", "critical"
     error_message: str | None = None
-    metadata: dict[str, any] = field(default_factory=dict)
+    metadata: dict = field(default_factory=dict)
     
-    def to_dict(self) -> dict[str, any]:
+    def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization"""
         return {
             "operation_type": self.operation_type.value,
@@ -52,7 +52,7 @@ class LatencyMetric:
         }
     
     @classmethod
-    def from_dict(cls, data: dict[str, any]) -> "LatencyMetric":
+    def from_dict(cls, data: dict) -> "LatencyMetric":
         """Create from dictionary"""
         return cls(
             operation_type=OperationType(data["operation_type"]),

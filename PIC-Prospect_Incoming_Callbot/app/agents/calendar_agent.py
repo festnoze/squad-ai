@@ -457,13 +457,13 @@ class CalendarAgent:
             scheduled_slots: List of occupied slots from Salesforce
             slot_duration_minutes: Duration of each slot in minutes
             max_weekday: Maximum weekday (0=Monday, 6=Sunday), default is 5 (only weekdays)
-            availability_timeframe: List of tuples with opening hours [("09:00", "12:00"), ("13:00", "18:00")]
+            availability_timeframe: List of tuples with opening hours [("09:00", "12:00"), ("13:00", "16:00")]
                                    Default is morning 9-12 and afternoon 13-18
             adjust_end_time: If True, adjust the end time of each availability timeframe by subtracting
                                the slot duration to ensure the last appointment fits fully.
         """
         if availability_timeframe is None:
-            availability_timeframe = [("09:00", "12:00"), ("13:00", "18:00")]
+            availability_timeframe = [("09:00", "12:00"), ("13:00", "16:00")]
 
         # Parse start and end dates
         start_date_only = datetime.fromisoformat(start_date.replace("Z", "")).date()

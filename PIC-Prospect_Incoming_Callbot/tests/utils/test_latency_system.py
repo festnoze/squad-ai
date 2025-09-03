@@ -14,6 +14,8 @@ from utils.latency_metric import LatencyMetric, OperationType, OperationStatus
 from utils.latency_reporter import PrometheusReporter, SlackReporter, report_manager
 from utils.latency_tracker import LatencyTracker, LatencyThresholds, latency_tracker
 
+import os
+from utils.latency_config import LatencyConfig
 
 class TestLatencyMetric:
     """Tests pour la classe LatencyMetric"""
@@ -735,15 +737,16 @@ class TestLatencyConfig:
         
         assert tts_warning == 1800
         assert tts_critical == 3500
-    
-    @patch('utils.envvar.EnvHelper.get_latency_tracking_enabled', return_value=False)
-    @patch('utils.envvar.EnvHelper.get_latency_logging_enabled', return_value=True)
-    @patch('utils.envvar.EnvHelper.get_latency_file_logging_enabled', return_value=False)
-    def test_system_initialization_from_environment(self, mock_file_logging, mock_logging, mock_tracking):
+
+    def test_system_initialization_from_environment(self):
         """Test initialisation du système depuis les variables d'environnement"""
-        from utils.latency_config import LatencyConfig
-        
-        config: LatencyConfig = LatencyConfig()
+        # Assert
+        os.environ['LATENCY_TRACKING_ENABLED'] = 'false'
+        os.environ['LATENCY_LOGGING_ENABLED'] = 'true'
+        os.environ['LATENCY_FILE_LOGGING_ENABLED'] = 'false'
+
+        # Act
+        config = LatencyConfig()
         config.initialize_latency_system()
         
         # Vérifier que le tracking a été désactivé

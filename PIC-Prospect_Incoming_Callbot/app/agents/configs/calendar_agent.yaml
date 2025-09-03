@@ -6,6 +6,6 @@ appointments:
   duration_minutes: 30
   working_hours:
     start: 09:00
-    end: 18:00
+    end: 16:00
   days_ahead: 2
   max_slots: 3
