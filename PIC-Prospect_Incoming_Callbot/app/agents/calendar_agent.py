@@ -33,6 +33,7 @@ class CalendarAgent:
     appointment_failed_text = TextRegistry.appointment_failed_text
     modification_not_supported_text = TextRegistry.modification_not_supported_text
     cancellation_not_supported_text = TextRegistry.cancellation_not_supported_text
+    appointment_too_far_text = TextRegistry.appointment_too_far_text
 
     def __init__(
         self,
@@ -108,6 +109,13 @@ class CalendarAgent:
         #         category = "Proposition de créneaux"
 
         if category == "Proposition de créneaux":
+            # Check if user is requesting a date more than 30 days from now
+            requested_date = await self._extract_appointment_selected_date_and_time_async(user_input, chat_history)
+            if requested_date:
+                days_from_now = (requested_date.date() - CalendarAgent.now.date()).days
+                if days_from_now > 30:
+                    return self.appointment_too_far_text
+
             formatted_history = []
             for message in chat_history:
                 formatted_history.append(f"{message[0]}: {message[1]}")

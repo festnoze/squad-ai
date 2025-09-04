@@ -638,7 +638,7 @@ class AgentsGraph:
         self.logger.info(f"[{call_sid}] Entering Calendar Agent node")
 
         # Get SF account info from scratchpad
-        sf_account_info = state.get("agent_scratchpad", {}).get("sf_account_info", {})
+        sf_account_info: dict = state.get("agent_scratchpad", {}).get("sf_account_info", {})
 
         if sf_account_info:
             try:
@@ -656,26 +656,18 @@ class AgentsGraph:
                 # Limit the history to the last 10 messages to avoid context overflow
                 max_history_length = 10
                 if len(chat_history) > max_history_length:
-                    self.logger.info(
-                        f"[{call_sid[-1 * max_history_length :]}] Chat history has {len(chat_history)} messages. Truncating to the last {max_history_length}."
-                    )
+                    self.logger.info(f"[{call_sid[-1 * max_history_length :]}] Chat history has {len(chat_history)} messages. Truncating to the last {max_history_length}.")
                     chat_history = chat_history[-max_history_length:]
 
                 if self.has_waiting_music_on_calendar:
-                    waiting_music_task: (
-                        Task | None
-                    ) = await self._start_waiting_music_async()
+                    waiting_music_task = await self._start_waiting_music_async()
 
-                calendar_agent_answer = await self.calendar_agent_instance.run_async(
-                    user_input, chat_history
-                )
+                calendar_agent_answer = await self.calendar_agent_instance.run_async(user_input, chat_history)
 
                 if self.calendar_speech_cannot_be_interupted:
                     self.outgoing_manager.can_speech_be_interupted = False
 
-                await self.add_AI_response_message_to_conversation_async(
-                    calendar_agent_answer, state
-                )
+                await self.add_AI_response_message_to_conversation_async(calendar_agent_answer, state)
 
                 # Calendar agent successful response - reset error counter
                 self.consecutive_error_manager.reset_consecutive_error_count(state)
@@ -683,13 +675,8 @@ class AgentsGraph:
                 if self.has_waiting_music_on_calendar:
                     await self._stop_waiting_music_async(waiting_music_task)
             except Exception as e:
-                self.logger.error(
-                    f"[{call_sid[-4:]}] Error in Calendar Agent node: {e}",
-                    exc_info=True,
-                )
-                # Calendar agent failure is an error - increment counter
+                self.logger.error(f"[{call_sid[-4:]}] Error in Calendar Agent node: {e}", exc_info=True)
                 self.consecutive_error_manager.increment_consecutive_error_count(state)
-
         return state
 
     async def router_decide_next_step(self, state: PhoneConversationState) -> str:

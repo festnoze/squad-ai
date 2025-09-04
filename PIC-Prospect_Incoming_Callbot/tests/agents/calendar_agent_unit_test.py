@@ -104,3 +104,41 @@ async def test_user_confirmation_calls_schedule_new_appointment(sf_client_mock, 
     agent._set_user_info("uid", "John", "Doe", "john@ex.com", "ownerId", "Alice")
     await agent.run_async(user_input, chat_history)
     sf_client_mock.schedule_new_appointment_async.assert_awaited()
+
+
+@pytest.mark.parametrize(
+    "user_input, chat_history, requested_date, expected_result",
+    [
+        # Test case 1: Appointment within 30 days should proceed normally
+        ("Je voudrais un rendez-vous dans 2 semaines", [], "2025-07-05T10:00:00Z", "normal_flow"),
+        # Test case 2: Appointment exactly at 30 days should proceed normally
+        ("Je voudrais un rendez-vous dans 30 jours", [], "2025-07-19T10:00:00Z", "normal_flow"),
+        # Test case 3: Appointment at 31 days should be rejected
+        ("Je voudrais un rendez-vous dans un mois et demi", [], "2025-07-20T10:00:00Z", "too_far"),
+        # Test case 4: Appointment way in the future should be rejected
+        ("Je voudrais un rendez-vous en septembre", [], "2025-09-15T10:00:00Z", "too_far"),
+    ]
+)
+async def test_appointment_too_far_validation(sf_client_mock, user_input, chat_history, requested_date, expected_result):
+    """Test that appointments requested more than 30 days in the future are rejected."""
+    # Set up fake LLMs
+    classifier_llm = FakeLLM("Proposition de créneaux")  # Always classify as "Proposition de créneaux"
+    date_extractor_llm = FakeLLM(requested_date)  # Return the date we want to test
+    
+    agent = CalendarAgent(sf_client_mock, classifier_llm, None, date_extractor_llm)
+    
+    # Set a fixed "now" date for consistent testing - June 19, 2025
+    CalendarAgent.now = datetime(2025, 6, 19)
+    agent._set_user_info("uid", "John", "Doe", "john@ex.com", "ownerId", "Alice")
+    
+    # Call run_async with the test input
+    result = await agent.run_async(user_input, chat_history)
+    
+    # Validate the result based on expected behavior
+    if expected_result == "too_far":
+        # Should return the appointment_too_far_text
+        assert result == agent.appointment_too_far_text
+        assert result == "Il n'est pas possible de prendre de rendez-vous à plus de 30 jours"
+    else:
+        # Should proceed with normal flow (not return the too_far message)
+        assert result != agent.appointment_too_far_text

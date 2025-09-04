@@ -41,15 +41,16 @@ twilio_client = Client(EnvHelper.get_twilio_sid(), EnvHelper.get_twilio_auth())
 
 
 async def verify_twilio_call_sid(call_sid: str, from_number: str) -> None:
-    call = twilio_client.calls(call_sid).fetch()
-    if call.status not in ("in-progress", "in-queue", "ringing"):
-        err_msg = f"Call status is neither in-progress, in-queue nor ringing. Call status is: {call.status}"
-        logger.error(err_msg)
-        raise HTTPException(status_code=403, detail=err_msg)
-    if call.from_formatted != from_number:
-        err_msg = f"Wrong phone number: {from_number} different from {call.from_formatted}"
-        logger.error(err_msg)
-        raise HTTPException(status_code=403, detail=err_msg)
+    if not EnvHelper.get_test_audio():
+        call = twilio_client.calls(call_sid).fetch()
+        if call.status not in ("in-progress", "in-queue", "ringing"):
+            err_msg = f"Call status is neither in-progress, in-queue nor ringing. Call status is: {call.status}"
+            logger.error(err_msg)
+            raise HTTPException(status_code=403, detail=err_msg)
+        if call.from_formatted != from_number:
+            err_msg = f"Wrong phone number: {from_number} different from {call.from_formatted}"
+            logger.error(err_msg)
+            raise HTTPException(status_code=403, detail=err_msg)
 
 
 # ========= Incoming phone call endpoint ========= #
@@ -71,7 +72,6 @@ async def get_websocket_url_for_incoming_call(request: Request) -> HTMLResponse:
 async def get_websocket_url_for_incoming_call_async(request: Request) -> tuple[str, str, str]:
     """Handle incoming phone calls from Twilio"""
     phone_number, call_sid, _ = await _extract_request_data_async(request)
-
     x_forwarded_proto = request.headers.get("x-forwarded-proto")
     is_secure = x_forwarded_proto == "https" or request.url.scheme == "https"
     ws_scheme = "wss" if is_secure else "ws"
@@ -112,17 +112,22 @@ async def create_websocket_for_incoming_call_async(request: Request) -> HTMLResp
 
 async def _extract_request_data_async(request: Request) -> tuple:
     """Extract common data from the request form or query parameters"""
+    phone_number: str = "Unknown From"
+    call_sid: str = "Unknown CallSid"
+    body: str = ""
     if request.method == "GET":
         # Pour les requêtes GET, utiliser les paramètres de requête
-        phone_number: str = request.var_to_update.get("From", "Unknown From")
-        call_sid: str = request.var_to_update.get("CallSid", "Unknown CallSid")
+        phone_number = request.var_to_update.get("From", "Unknown From")
+        call_sid = request.var_to_update.get("CallSid", "Unknown CallSid")
         body = request.var_to_update.get("Body", "")
-    else:
+    elif request.method == "POST":
         # Pour les requêtes POST, utiliser les données du formulaire
         form = await request.form()
-        phone_number: str = form.get("From", "Unknown From")
-        call_sid: str = form.get("CallSid", "Unknown CallSid")
+        phone_number = form.get("From", "Unknown From")
+        call_sid = form.get("CallSid", "Unknown CallSid")
         body = form.get("Body", "")
+    else:
+        raise HTTPException(status_code=405, detail="Method not allowed")
     return phone_number, call_sid, body
 
 
@@ -130,8 +135,7 @@ async def _extract_request_data_async(request: Request) -> tuple:
 @router.websocket("/ws/phone/{calling_phone_number}/sid/{call_sid}")
 async def websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid: str) -> None:
     # await authenticate_twilio_request(ws)
-    if not EnvHelper.get_test_audio():
-        await verify_twilio_call_sid(call_sid, calling_phone_number)
+    await verify_twilio_call_sid(call_sid, calling_phone_number)
     logger.info(f"WebSocket connection for call SID {call_sid} from {ws.client.host}.")
     try:
         await ws.accept()
