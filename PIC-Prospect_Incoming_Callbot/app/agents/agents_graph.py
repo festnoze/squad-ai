@@ -3,6 +3,7 @@ import logging
 import os
 from asyncio import Task
 from typing import Hashable
+from uuid import UUID
 
 from sqlalchemy.sql.selectable import elem
 
@@ -809,9 +810,7 @@ class AgentsGraph:
 
         conversation_id = state.get("agent_scratchpad", {}).get("conversation_id", None)
         if not conversation_id:
-            self.logger.error(
-                f"[~{call_sid[-4:]}] No conversation ID found, ending graph run."
-            )
+            self.logger.error(f"[~{call_sid[-4:]}] No conversation ID found, ending graph run.")
             return END
 
         try:
@@ -820,22 +819,18 @@ class AgentsGraph:
             }  # Reset the interrupt flag before starting new streaming
 
             rag_query_RM = QueryAskingRequestModel(
-                conversation_id=conversation_id,
+                conversation_id=UUID(conversation_id),
                 user_query_content=user_query,
-                display_waiting_message=False,
-            )
+                display_waiting_message=False)
 
             if self.has_waiting_music_on_rag:
-                waiting_music_task: (
-                    Task | None
-                ) = await self._start_waiting_music_async()
+                waiting_music_task: Task | None = await self._start_waiting_music_async()
 
             # Call but not await the RAG API to get the streaming response
             response = self.rag_query_service.rag_query_stream_async(
                 query_asking_request_model=rag_query_RM,
                 interrupt_flag=self.rag_interrupt_flag,
-                timeout=120,
-            )
+                timeout=120)
 
             full_answer = ""
             was_interrupted = False
@@ -858,18 +853,14 @@ class AgentsGraph:
 
             if full_answer:
                 self.logger.info(f"Full answer received from RAG API: '{full_answer}'")
-                await self.add_AI_response_message_to_conversation_async(
-                    full_answer, state, speak_out_text=False
-                )
+                await self.add_AI_response_message_to_conversation_async(full_answer, state, speak_out_text=False)
 
             return state
 
         except Exception as e:
             self.logger.error(f"Error in RAG API communication: {e!s}")
             # Use enhanced text-to-speech for error messages too
-            await self.add_AI_response_message_to_conversation_async(
-                TextRegistry.rag_communication_error_text, state
-            )
+            await self.add_AI_response_message_to_conversation_async(TextRegistry.rag_communication_error_text, state)
             return state
 
     async def other_inquery_node(
@@ -878,9 +869,7 @@ class AgentsGraph:
         """Handle other inquery"""
         call_sid = state.get("call_sid", "N/A")
         phone_number = state.get("caller_phone", "N/A")
-        await self.add_AI_response_message_to_conversation_async(
-            TextRegistry.ask_to_repeat_text, state
-        )
+        await self.add_AI_response_message_to_conversation_async(TextRegistry.ask_to_repeat_text, state)
         self.logger.info(f"[{call_sid}] Sent 'other' message to {phone_number}")
         return state
 
@@ -890,12 +879,8 @@ class AgentsGraph:
         """Handle case where user refuses appointment"""
         call_sid = state.get("call_sid", "N/A")
         phone_number = state.get("caller_phone", "N/A")
-        await self.add_AI_response_message_to_conversation_async(
-            TextRegistry.no_appointment_requested_text, state
-        )
-        self.logger.info(
-            f"[{call_sid}] User refused appointment, sent closure message to {phone_number}"
-        )
+        await self.add_AI_response_message_to_conversation_async(TextRegistry.no_appointment_requested_text, state)
+        self.logger.info(f"[{call_sid}] User refused appointment, sent closure message to {phone_number}")
         return state
 
     ### Helper methods ###
