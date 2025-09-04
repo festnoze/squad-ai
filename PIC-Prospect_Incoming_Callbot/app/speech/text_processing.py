@@ -12,9 +12,7 @@ class ProcessText:
     split_separators = [".", "!", "?", ";", ":"]
 
     @staticmethod
-    def chunk_text_by_sentences_size(
-        text: str, max_words_by_sentence: int = 15, max_chars_by_sentence: int = 120
-    ) -> list[str]:
+    def chunk_text_by_sentences_size(text: str, max_words_by_sentence: int = 15, max_chars_by_sentence: int = 120) -> list[str]:
         """
         Split text into chunks at every separator found, then further split if chunks exceed limits.
 

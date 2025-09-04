@@ -176,9 +176,7 @@ class ApiConfig:
         )
 
         # Configure file handler to log to level: INFO
-        file_handler = logging.FileHandler(
-            f"{logs_dir}{app_name} {datetime.now().strftime('%Y-%m-%d %Hh%Mm%Ss')}.log", encoding="utf-8"
-        )
+        file_handler = logging.FileHandler(f"{logs_dir}{app_name} {datetime.now().strftime('%Y-%m-%d %Hh%Mm%Ss')}.log", encoding="utf-8")
         file_handler.setLevel(logging.INFO)
         file_handler.setFormatter(formatter)
         root_logger.addHandler(file_handler)

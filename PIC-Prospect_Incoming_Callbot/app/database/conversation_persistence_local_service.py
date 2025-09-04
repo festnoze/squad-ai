@@ -42,9 +42,7 @@ class ConversationPersistenceLocalService(ConversationPersistenceInterface):
         user_id = await self.user_repository.create_or_update_user_async(user)
         return user_id
 
-    async def create_new_conversation_async(
-        self, conversation_request_model: ConversationRequestModel, timeout: int = 10
-    ) -> UUID:
+    async def create_new_conversation_async(self, conversation_request_model: ConversationRequestModel, timeout: int = 10) -> UUID:
         user_id = conversation_request_model.user_id
         recent_conversation_count = await self.conversation_repository.get_recent_conversations_count_by_user_id_async(
             user_id
@@ -84,9 +82,7 @@ class ConversationPersistenceLocalService(ConversationPersistenceInterface):
             }
         return {"conversation_id": None, "user_id": str(user_id), "message_count": 0}
 
-    async def add_message_to_user_last_conversation_or_create_one_async(
-        self, user_id: UUID, new_message: str
-    ) -> Conversation | None:
+    async def add_message_to_user_last_conversation_or_create_one_async(self, user_id: UUID, new_message: str) -> Conversation | None:
         conversations = await self.conversation_repository.get_all_user_conversations_async(user_id)
         if any(conversations):
             conversation = conversations[-1]

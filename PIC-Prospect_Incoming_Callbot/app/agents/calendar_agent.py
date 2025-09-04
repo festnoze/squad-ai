@@ -84,9 +84,7 @@ class CalendarAgent:
         # self.agent_executor = AgentExecutor(agent=self.agent, tools=self.tools, verbose=True)
         # response = self.agent_executor.invoke({"input": "quel jour sommes nous ?", "chat_history": []})['output']
 
-    async def run_async(
-        self, user_input: str, chat_history: list[dict] | None = None
-    ) -> str:
+    async def run_async(self, user_input: str, chat_history: list[dict] | None = None) -> str:
         """High-level dispatcher orchestrating calendar actions according to the category.
 
         Args:
@@ -264,9 +262,7 @@ class CalendarAgent:
         )
 
     @tool
-    async def get_appointments_async(
-        start_date: str, end_date: str
-    ) -> list[dict[str, any]]:
+    async def get_appointments_async(start_date: str, end_date: str) -> list[dict[str, any]]:
         """Get the existing appointments between the start and end dates for the owner.
 
         Args:
@@ -304,9 +300,7 @@ class CalendarAgent:
         return scheduled_slots
 
     @tool
-    async def get_available_timeframes_async(
-        start_date: str, end_date: str
-    ) -> list[str]:
+    async def get_available_timeframes_async(start_date: str, end_date: str) -> list[str]:
         """Get available appointment timeframes between start_date and end_date.
 
         Args:
@@ -413,9 +407,7 @@ class CalendarAgent:
         CalendarAgent.owner_id = owner_id
         CalendarAgent.owner_name = owner_name
 
-    async def categorize_for_dispatch_async(
-        self, user_input: str, chat_history: list[dict[str, str]] | None = None
-    ) -> str:
+    async def categorize_for_dispatch_async(self, user_input: str, chat_history: list[dict[str, str]] | None = None) -> str:
         """Classify the user's request into one of the rendez-vous workflow categories.
 
         The categorisation relies primarily on the underlying LLM but falls back to

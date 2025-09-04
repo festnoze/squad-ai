@@ -80,9 +80,7 @@ class StudiRAGInferenceApiClient(ConversationPersistenceInterface, RagQueryInter
         except httpx.ConnectError as exc:
             raise RuntimeError(f"Cannot connect to RAG inference server at {self.host_base_url}") from exc
 
-    async def create_new_conversation_async(
-        self, conversation_request_model: ConversationRequestModel, timeout: int = 10
-    ) -> UUID:
+    async def create_new_conversation_async(self, conversation_request_model: ConversationRequestModel, timeout: int = 10) -> UUID:
         """POST /rag/inference/conversation/create: Create a new conversation."""
         try:
             resp = await self.client.post(
@@ -129,9 +127,7 @@ class StudiRAGInferenceApiClient(ConversationPersistenceInterface, RagQueryInter
         except httpx.TimeoutException as exc:
             raise RuntimeError(f"Timeout connecting to RAG inference server at {self.host_base_url}") from exc
 
-    async def add_message_to_user_last_conversation_or_create_one_async(
-        self, user_id: UUID, new_message: str
-    ) -> "Conversation":
+    async def add_message_to_user_last_conversation_or_create_one_async(self, user_id: UUID, new_message: str) -> "Conversation":
         """Add a user message to the user's last conversation or create a new one.
 
         Args:

@@ -5,11 +5,10 @@ import threading
 from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Set
+from typing import Callable, Dict, List, Optional
 
 from utils.envvar import EnvHelper
 from utils.latency_metric import LatencyMetric, OperationType, OperationStatus
-
 
 class LatencyThresholds:
     """Configuration des seuils de latence pour chaque type d'opération"""

@@ -94,21 +94,10 @@ class TTS_OpenAI:
         return b"".join(pcm_chunks)
 
     @staticmethod
-    def _convert_rate(
-        audio_bytes: bytes,
-        from_rate: int,
-        to_rate: int,
-        sample_width: int = 2,
-        channels: int = 1,
-    ) -> bytes:
+    def _convert_rate(audio_bytes: bytes, from_rate: int, to_rate: int, sample_width: int = 2, channels: int = 1) -> bytes:
         from pydub import AudioSegment
 
-        audio = AudioSegment.from_raw(
-            io.BytesIO(audio_bytes),
-            frame_rate=from_rate,
-            sample_width=sample_width,
-            channels=channels,
-        )
+        audio = AudioSegment.from_raw(io.BytesIO(audio_bytes), frame_rate=from_rate, sample_width=sample_width, channels=channels)
         audio = audio.set_frame_rate(to_rate)
         buf = io.BytesIO()
         audio.export(buf, format="raw")

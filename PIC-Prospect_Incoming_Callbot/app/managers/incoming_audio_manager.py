@@ -232,10 +232,7 @@ class IncomingAudioManager(IncomingManager):
         # Check using VAD (more accurate but may not work on all chunks)
         try:
             if len(audio_data) >= 320:  # At least 20ms at 8kHz, 16-bit mono
-                is_speech = (
-                    speech_to_noise_ratio > self.speech_threshold
-                    and self._is_speech(audio_data)
-                )
+                is_speech = speech_to_noise_ratio > self.speech_threshold and self._is_speech(audio_data)
                 return not is_speech, speech_to_noise_ratio  # VAD detected speech
         except Exception:
             pass  # Fall back to RMS method
@@ -294,26 +291,17 @@ class IncomingAudioManager(IncomingManager):
 
         # 4- Perform background noise calibration (at call start)
         if self.perform_background_noise_calibration:
-            self._perform_background_noise_calibration(
-                self.stream_sid, speech_to_noise_ratio
-            )
+            self._perform_background_noise_calibration(self.stream_sid, speech_to_noise_ratio)
 
         # 5- Skip handling incoming speech if system is speaking - and interruption isn't allowed
-        if not self.outgoing_manager.can_speech_be_interupted and (
-            self.is_speaking or self.outgoing_manager.has_text_to_be_sent()
-        ):
+        if not self.outgoing_manager.can_speech_be_interupted and (self.is_speaking or self.outgoing_manager.has_text_to_be_sent()):
             return
 
         # 6- If user is speaking while system is speaking, stop system speech
-        if (
-            self.is_speaking
-            and not is_silence
-            and self.outgoing_manager.can_speech_be_interupted
-            and not self.interuption_asked
+        if (self.is_speaking and not is_silence 
+            and self.outgoing_manager.can_speech_be_interupted and not self.interuption_asked
         ):
-            self.removed_text_to_speak = await self.stop_speaking_async(
-                speech_to_noise_ratio
-            )
+            self.removed_text_to_speak = await self.stop_speaking_async(speech_to_noise_ratio)
 
             # Log the interruption (but only the first time)
             if self.consecutive_silence_duration_ms > 0:
@@ -330,56 +318,34 @@ class IncomingAudioManager(IncomingManager):
             )
             self.consecutive_silence_duration_ms += chunk_duration_ms
 
-        # Add chunk to buffer if speech has begun or if chunk is detected as the first speech chunk
-
         # Reset silence counter upon the first speech chunk and activate has_speech_began
         if not is_silence:
             has_speech_began = True
             self.consecutive_silence_duration_ms = 0.0
 
+        # Add chunk to buffer if speech has begun or if chunk is detected as the first speech chunk
         if has_speech_began:
             self.audio_buffer += chunk
 
         # 8- Speak anew if the user remains silent for long enough
-        if (
-            self.speak_anew_on_long_silence
-            and self.consecutive_silence_duration_ms
-            >= self.max_silence_duration_before_reasking
-            and self.consecutive_silence_duration_ms
-            % self.max_silence_duration_before_reasking
-            <= 10
+        if (self.speak_anew_on_long_silence
+            and self.consecutive_silence_duration_ms >= self.max_silence_duration_before_reasking
+            and self.consecutive_silence_duration_ms % self.max_silence_duration_before_reasking <= 10
         ):
-            self.logger.info(
-                f">>> User silence duration of {self.consecutive_silence_duration_ms:.1f}ms exceeded max. silence before speaking anew: {self.max_silence_duration_before_reasking:.1f}ms."
-            )
-            await self.outgoing_manager.enqueue_text_async(
-                "Comment puis-je vous aider ? Je peux répondre à vos questions concernant nos formations, ou prendre rendez-vous avec un conseiller."
-            )
+            self.logger.info(f">>> User silence duration of {self.consecutive_silence_duration_ms:.1f}ms exceeded max. silence before speaking anew: {self.max_silence_duration_before_reasking:.1f}ms.")
+            await self.outgoing_manager.enqueue_text_async(TextRegistry.ask_to_repeat_text)
             await asyncio.sleep(0.05)
             return
 
         # 9- Hangup the call if the user remains silent for too long
-        if (
-            self.consecutive_silence_duration_ms
-            >= self.max_silence_duration_before_hangup
-        ):
-            self.logger.info(
-                f">>> User silence duration of {self.consecutive_silence_duration_ms:.1f}ms exceeded max. allowed silence of {self.max_silence_duration_before_hangup:.1f}ms."
-            )
+        if self.consecutive_silence_duration_ms >= self.max_silence_duration_before_hangup:
+            self.logger.info(f">>> User silence duration of {self.consecutive_silence_duration_ms:.1f}ms exceeded max. allowed silence of {self.max_silence_duration_before_hangup:.1f}ms.")
             await self._hangup_call_async()
             return
 
-        is_long_silence_after_speech = (
-            has_speech_began
-            and self.consecutive_silence_duration_ms
-            >= self.required_silence_ms_to_answer
-        )
-        has_reach_min_speech_length = (
-            len(self.audio_buffer) >= self.min_audio_bytes_for_processing
-        )
-        is_speech_too_long = (
-            len(self.audio_buffer) > self.max_audio_bytes_for_processing
-        )
+        is_long_silence_after_speech = has_speech_began and self.consecutive_silence_duration_ms >= self.required_silence_ms_to_answer
+        has_reach_min_speech_length = len(self.audio_buffer) >= self.min_audio_bytes_for_processing
+        is_speech_too_long = len(self.audio_buffer) > self.max_audio_bytes_for_processing
 
         # 10- Process audio
         # Conditions: if buffer large enough followed by a prolonged silence, or if buffer is too large
@@ -388,24 +354,15 @@ class IncomingAudioManager(IncomingManager):
             self.audio_buffer = b""
             self.consecutive_silence_duration_ms = 0.0
             if is_speech_too_long:
-                self.logger.info(
-                    f"\nProcess incoming audio: [Buffer size limit reached]. (buffer size: {len(self.audio_buffer)} bytes).\n"
-                )
+                self.logger.info(f"\nProcess incoming audio: [Buffer size limit reached]. (buffer size: {len(self.audio_buffer)} bytes).\n")
             else:
-                self.logger.info(
-                    f"\nProcess incoming audio: [Silence after speech detected]. (buffer size: {len(self.audio_buffer)} bytes).\n"
-                )
+                self.logger.info(f"\nProcess incoming audio: [Silence after speech detected]. (buffer size: {len(self.audio_buffer)} bytes).\n")
             if self.interuption_asked:
                 self.interuption_asked = False
 
             # 11- Transcribe speech to text
-            (
-                user_query_transcript,
-                user_query_audio_filename,
-            ) = await self._perform_speech_to_text_transcription_async(audio_data)
-            self.logger.info(
-                f'>>> Transcription finished. Heard text: "{user_query_transcript}"'
-            )
+            user_query_transcript, user_query_audio_filename = await self._perform_speech_to_text_transcription_async(audio_data)
+            self.logger.info(f'>>> Transcription finished. Heard text: "{user_query_transcript}"')
 
             if EnvHelper.get_repeat_user_input():
                 feedback_text = f' Vous avez dit : "{user_query_transcript}".'
@@ -415,28 +372,18 @@ class IncomingAudioManager(IncomingManager):
             if user_query_transcript:
                 self.removed_text_to_speak = None
                 await self._send_acknowledgement_message_async()
-                await self.send_user_query_to_agents_graph_async(
-                    user_query_transcript, user_query_audio_filename
-                )
+                await self.send_user_query_to_agents_graph_async(user_query_transcript, user_query_audio_filename)
 
             # 13- If transcript of user query is empty (no speech detected), enqueue back the text to speak previously removed
             if not user_query_transcript:
                 if self.removed_text_to_speak:
-                    await self.outgoing_manager.enqueue_text_async(
-                        self.removed_text_to_speak
-                    )
-                    self.logger.info(
-                        f'>>> Empty transcript. Enqueued back originaly removed text to speak: "{self.removed_text_to_speak}"'
-                    )
+                    await self.outgoing_manager.enqueue_text_async(self.removed_text_to_speak)
+                    self.logger.info(f'>>> Empty transcript. Enqueued back originaly removed text to speak: "{self.removed_text_to_speak}"')
                     self.removed_text_to_speak = None
                 else:
-                    await self.outgoing_manager.enqueue_text_async(
-                        TextRegistry.ask_to_repeat_text
-                    )
+                    await self.outgoing_manager.enqueue_text_async(TextRegistry.ask_to_repeat_text)
                     self.logger.info(">>> Empty transcript.")
 
-        # await asyncio.sleep(0.1) # Pause incoming process to let others processes breathe
-        return
 
     async def _send_acknowledgement_message_async(self):
         """Acknowledgement message"""
@@ -457,9 +404,7 @@ class IncomingAudioManager(IncomingManager):
             acknowledge_text += "."
             await self.outgoing_manager.enqueue_text_async(acknowledge_text)
 
-    async def send_user_query_to_agents_graph_async(
-        self, user_query: str, user_query_audio_filename: str | None = None
-    ):
+    async def send_user_query_to_agents_graph_async(self, user_query: str, user_query_audio_filename: str | None = None):
         try:
             self.logger.info(f"Sending incoming user query to agents graph. Transcription: '{user_query}'")
             current_state: ConversationState | PhoneConversationState
@@ -529,25 +474,13 @@ class IncomingAudioManager(IncomingManager):
 
         if stream_sid not in self.speech_to_noise_ratio_samples_by_stream_sid:
             self.speech_to_noise_ratio_samples_by_stream_sid[stream_sid] = []
-        if (
-            len(self.speech_to_noise_ratio_samples_by_stream_sid[stream_sid])
-            < samples_count_to_average
-        ):
-            self.speech_to_noise_ratio_samples_by_stream_sid[stream_sid].append(
-                speech_to_noise_ratio
-            )
+        if len(self.speech_to_noise_ratio_samples_by_stream_sid[stream_sid]) < samples_count_to_average:
+            self.speech_to_noise_ratio_samples_by_stream_sid[stream_sid].append(speech_to_noise_ratio)
 
         # Calculate the speech to noise ratio average when we reach samples count
-        if (
-            len(self.speech_to_noise_ratio_samples_by_stream_sid[stream_sid])
-            >= samples_count_to_average
-        ):
-            calibration_data = self.speech_to_noise_ratio_samples_by_stream_sid[
-                stream_sid
-            ]
-            calibration_data = [
-                x for x in calibration_data if x >= min_noise_level
-            ]  # Exclude no noise samples
+        if len(self.speech_to_noise_ratio_samples_by_stream_sid[stream_sid]) >= samples_count_to_average:
+            calibration_data = self.speech_to_noise_ratio_samples_by_stream_sid[stream_sid]
+            calibration_data = [x for x in calibration_data if x >= min_noise_level]  # Exclude no noise samples
             if not any(calibration_data):
                 calibration_data = [min_noise_level]
             average_noise = round(sum(calibration_data) / len(calibration_data))
@@ -571,9 +504,7 @@ class IncomingAudioManager(IncomingManager):
             self.logger.error(f"Error decoding/converting audio chunk: {decode_err}")
             return None
 
-    async def _perform_speech_to_text_transcription_async(
-        self, audio_data: bytes
-    ) -> tuple[str | None, str | None]:
+    async def _perform_speech_to_text_transcription_async(self, audio_data: bytes) -> tuple[str | None, str | None]:
         transcript: str | None = None
         wav_audio_filename: str | None = None
 
@@ -593,9 +524,7 @@ class IncomingAudioManager(IncomingManager):
                 if self.do_audio_preprocessing
                 else audio_data
             )
-            self.logger.info(
-                f"Audio preprocessing complete. Original size: {len(audio_data)} bytes, Processed size: {len(processed_audio)} bytes"
-            )
+            self.logger.info(f"Audio preprocessing complete. Original size: {len(audio_data)} bytes, Processed size: {len(processed_audio)} bytes")
 
             # Save the processed audio to a file
             wav_audio_filename = self.save_as_wav_file(processed_audio)
@@ -636,10 +565,7 @@ class IncomingAudioManager(IncomingManager):
                 transcript = None
 
             # Check if transcript contains any of the known watermarks
-            elif any(
-                watermark.lower() in transcript.lower()
-                for watermark in known_watermarks
-            ):
+            elif any(watermark.lower() in transcript.lower() for watermark in known_watermarks):
                 self.logger.warning(f"!!! Detected watermark in transcript, ignoring: '{transcript}'")
                 transcript = None
 
@@ -666,10 +592,7 @@ class IncomingAudioManager(IncomingManager):
         )
 
     async def speak_and_send_ask_for_feedback_async(self, transcript):
-        response_text = (
-            "Instructions : Fait un feedback reformulé de façon synthétique de la demande utilisateur suivante, afin de t'assurer de ta bonne comphéhension de celle-ci : "
-            + transcript
-        )
+        response_text = "Instructions : Fait un feedback reformulé de façon synthétique de la demande utilisateur suivante, afin de t'assurer de ta bonne comphéhension de celle-ci : " + transcript
         response = self.openai_client.chat.completions.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": response_text}],
@@ -686,7 +609,7 @@ class IncomingAudioManager(IncomingManager):
             self.logger.info("### HANGING UP ### Make phone call ends.")
 
             # Speak out "Au revoir" to the user first
-            self.outgoing_manager.enqueue_text_async("Au revoir")
+            await self.outgoing_manager.enqueue_text_async("Au revoir")
             time.sleep(1)
             # Close the websocket first
             try:

@@ -36,9 +36,7 @@ class GoogleSTTProvider(SpeechToTextProvider):
     async def transcribe_audio_async(self, file_name: str, call_sid: str = None, stream_sid: str = None, phone_number: str = None) -> str:
         """Transcribe audio file using Google STT API."""
         try:
-            return GoogleSTTProvider.transcribe_audio_static(
-                self.temp_dir, self.speech, self.google_client, file_name, self.language_code, self.frame_rate
-            )
+            return GoogleSTTProvider.transcribe_audio_static(self.temp_dir, self.speech, self.google_client, file_name, self.language_code, self.frame_rate)
         except Exception as e:
             self.logger.error(f"Error transcribing audio with Google: {e}", exc_info=True)
             return ""

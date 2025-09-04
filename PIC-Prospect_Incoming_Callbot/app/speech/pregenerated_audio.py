@@ -88,11 +88,7 @@ class PreGeneratedAudio:
             obsolete_texts = set(audio_index.keys()) - set(texts_to_pregenerate)
             for obsolete_text in obsolete_texts:
                 obsolete_hash = audio_index[obsolete_text]
-                obsolete_file_path = (
-                    PreGeneratedAudio._get_pregenerated_file_path_from_hash(
-                        obsolete_hash, tts_provider_name, tts_provider.voice
-                    )
-                )
+                obsolete_file_path = PreGeneratedAudio._get_pregenerated_file_path_from_hash(obsolete_hash, tts_provider_name, tts_provider.voice)
 
                 if os.path.exists(obsolete_file_path):
                     try:
@@ -145,9 +141,7 @@ class PreGeneratedAudio:
                         f"Synthesizing and saving: {text[:50]}..."
                     )
                     try:
-                        audio_bytes = (
-                            await tts_provider.synthesize_speech_to_bytes_async(text)
-                        )
+                        audio_bytes = await tts_provider.synthesize_speech_to_bytes_async(text)
                         if audio_bytes:
                             # Save to pregenerated file and update index
                             PreGeneratedAudio.save_pregenerated_audio(
@@ -426,12 +420,7 @@ class PreGeneratedAudio:
     @staticmethod
     def _get_index_file_path(provider_name: str, voice: str) -> str:
         """Get the index file path for a given provider and voice"""
-        index_path = (
-            Path(PreGeneratedAudio.pregenerated_dir)
-            / provider_name
-            / voice
-            / "index.json"
-        )
+        index_path = Path(PreGeneratedAudio.pregenerated_dir) / provider_name / voice / "index.json"
         return str(index_path)
 
     @staticmethod
@@ -439,10 +428,5 @@ class PreGeneratedAudio:
         hash_key: str, provider_name: str, voice: str
     ) -> str:
         """Get the pregenerated file path from a hash"""
-        file_path = (
-            Path(PreGeneratedAudio.pregenerated_dir)
-            / provider_name
-            / voice
-            / f"{hash_key}.pcm"
-        )
+        file_path = Path(PreGeneratedAudio.pregenerated_dir) / provider_name / voice / f"{hash_key}.pcm"
         return str(file_path)

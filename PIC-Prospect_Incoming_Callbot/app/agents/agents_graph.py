@@ -77,9 +77,7 @@ class AgentsGraph:
         if conversation_persistence:
             self.conversation_persistence = conversation_persistence
         else:
-            conversation_persistence_type = (
-                EnvHelper.get_conversation_persistence_type()
-            )
+            conversation_persistence_type = EnvHelper.get_conversation_persistence_type()
             # Check for inconsistent states
             if "ask_rag" in self.available_actions:
                 assert conversation_persistence_type == "studi_rag", (
@@ -100,13 +98,9 @@ class AgentsGraph:
                 self.conversation_persistence = ConversationPersistenceServiceFake()
 
         self.rag_query_service = rag_query_service or StudiRAGInferenceApiClient()
-        self.salesforce_api_client: SalesforceApiClientInterface = (
-            salesforce_client or SalesforceApiClient()
-        )
+        self.salesforce_api_client: SalesforceApiClientInterface = salesforce_client or SalesforceApiClient()
         self.outgoing_manager: OutgoingManager = outgoing_manager
-        self.has_waiting_music_on_calendar: bool = (
-            EnvHelper.get_waiting_music_on_calendar()
-        )
+        self.has_waiting_music_on_calendar: bool = EnvHelper.get_waiting_music_on_calendar()
         self.has_waiting_music_on_rag: bool = EnvHelper.get_waiting_music_on_rag()
         lid_config_file_path = os.path.join(
             os.path.dirname(__file__), "configs", "lid_api_config.yaml"
