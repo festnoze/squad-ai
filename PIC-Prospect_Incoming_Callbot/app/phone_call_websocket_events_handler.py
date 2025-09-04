@@ -108,13 +108,14 @@ class PhoneCallWebsocketEventsHandler:
             channels=self.channels,
         )
 
-        self.compiled_graph = AgentsGraph(self.outgoing_audio_processing).graph
+        self.agents_graph = AgentsGraph(self.outgoing_audio_processing)
+        self.compiled_graph = self.agents_graph.graph
 
         self.incoming_audio_processing = IncomingAudioManager(
             websocket=self.websocket,
             stt_provider=self.stt_provider,
             outgoing_manager=self.outgoing_audio_processing,
-            agents_graph=self.compiled_graph,
+            agents_graph=self.agents_graph,
             sample_width=self.sample_width,
             frame_rate=self.frame_rate,
             vad_aggressiveness=3,

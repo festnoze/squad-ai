@@ -27,7 +27,8 @@
       "Bash(ruff format:*)",
       "Bash(deptry:*)",
       "Bash(mkdocs serve:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "WebSearch"
     ],
     "deny": []
   }

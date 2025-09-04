@@ -14,7 +14,7 @@ class OutgoingTextManager(OutgoingManager):
         self.logger = logging.getLogger(__name__)
         self.logger.info(f"OutgoingTextManager initialized for call_sid: {call_sid}")
         self._outgoing_text_func = outgoing_text_func
-        self.stream_sid = ""
+        self.stream_sid: str = ""
 
     async def enqueue_text_async(self, text: str):
         """
@@ -112,6 +112,9 @@ class OutgoingTextManager(OutgoingManager):
         """
         return not self.text_queue.empty()
 
+    def set_call_sid(self, call_sid: str) -> None:
+        self.call_sid = call_sid
+
     def update_stream_sid(self, stream_sid: str) -> None:
         """
         Updates the stream SID when it changes (e.g., when a new call starts or ends)
@@ -123,6 +126,9 @@ class OutgoingTextManager(OutgoingManager):
         else:
             self.logger.info(f"Updated stream SID to: {stream_sid}")
         return
+
+    def set_phone_number(self, phone_number: str) -> None:
+        self.phone_number = phone_number
 
     def is_sending(self) -> bool:
         """Returns True if an audio stream is currently outgoing."""

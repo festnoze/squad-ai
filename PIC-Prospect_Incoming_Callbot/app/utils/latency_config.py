@@ -211,16 +211,14 @@ class LatencyConfig:
             print(f"Reporter Slack configuré: {channel}")
     
     def initialize_latency_system(self) -> None:
-        """Initialize le système de monitoring de latence complet"""
+        """Initialize the complete latency monitoring system"""
         if self.configured:
             return
         
-        print("Initialisation du système de monitoring de latence...")
+        print("Initializing latency monitoring system...")
         
-        # Configurer les seuils depuis l'environnement
         self.configure_from_environment()
         
-        # Mettre à jour les seuils du tracker
         latency_tracker.thresholds = self.thresholds
         
         # Update tracker configuration from environment
@@ -228,49 +226,47 @@ class LatencyConfig:
         latency_tracker.log_metrics = EnvHelper.get_latency_logging_enabled()
         latency_tracker.save_to_file = EnvHelper.get_latency_file_logging_enabled()
         
-        # Configurer les reporters depuis l'environnement
+        # Configure the reporters from environment
         self.setup_prometheus_reporter()
         self.setup_influxdb_reporter()
         self.setup_slack_reporter()
         
-        # Connecter le reporting au tracker
+        # Connect the reporting to the tracker
         setup_latency_reporting()
         
         self.configured = True
         self.is_initialized = True
-        print("Système de monitoring de latence initialisé avec succès")
+        print("Latency monitoring system initialized successfully")
         
-        # Afficher la configuration
-        self.print_configuration()
+        self.print_configuration(print_thresholds=False)
     
-    def print_configuration(self) -> None:
-        """Affiche la configuration actuelle"""
-        print("\n=== Configuration du monitoring de latence ===")
-        print(f"Tracking activé: {latency_tracker.enabled}")
-        print(f"Logging activé: {latency_tracker.log_metrics}")
-        print(f"Sauvegarde fichier: {latency_tracker.save_to_file}")
+    def print_configuration(self, print_thresholds: bool = True) -> None:
+        """Print the current configuration"""
+        print("\n=== Latency monitoring configuration ===")
+        print(f"Tracking enabled: {latency_tracker.enabled}")
+        print(f"Logging enabled: {latency_tracker.log_metrics}")
+        print(f"File logging enabled: {latency_tracker.save_to_file}")
         
         if latency_tracker.save_to_file:
-            print(f"Fichier de métriques: {latency_tracker.metrics_file_path}")
+            print(f"Metrics file path: {latency_tracker.metrics_file_path}")
         
-        print("\nSeuils de latence (ms):")
-        for op_type, thresholds in self.thresholds.thresholds.items():
-            print(f"  {op_type.value}:")
-            print(f"    Warning: {thresholds['warning']}ms")
-            print(f"    Critical: {thresholds['critical']}ms")
+        if print_thresholds:
+            print("\nLatency thresholds (ms):")
+            for op_type, thresholds in self.thresholds.thresholds.items():
+                print(f"  {op_type.value}:")
+                print(f"    Warning: {thresholds['warning']}ms")
+                print(f"    Critical: {thresholds['critical']}ms")
         
-        print(f"\nReporters configurés: {len(report_manager.reporters)}")
+        print(f"\nReporters configured: {len(report_manager.reporters)}")
         for reporter in report_manager.reporters:
             print(f"  - {reporter.__class__.__name__}")
-        
-        print("=" * 50 + "\n")
     
     def get_threshold_manager(self) -> ThresholdManager:
         """Get a ThresholdManager that uses the current configuration"""
         return ThresholdManager(self.thresholds)
     
     def get_current_stats(self) -> Dict:
-        """Retourne les statistiques actuelles de latence"""
+        """Get current latency statistics"""
         return {
             "total_metrics": len(latency_tracker.metrics),
             "stats_by_operation": dict(latency_tracker.stats_by_operation),

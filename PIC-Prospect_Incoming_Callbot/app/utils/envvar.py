@@ -173,6 +173,11 @@ class EnvHelper:
         return int(value) if value else 70000
 
     @staticmethod
+    def get_max_consecutive_errors() -> int:
+        value = EnvHelper.get_env_variable_value_by_name("MAX_CONSECUTIVE_ERRORS", fails_if_missing=False)
+        return int(value) if value else 3
+
+    @staticmethod
     def get_speak_anew_on_long_silence() -> bool:
         value = EnvHelper.get_env_variable_value_by_name("SPEAK_ANEW_ON_LONG_SILENCE", fails_if_missing=False)
         return value and value.lower() == "true"

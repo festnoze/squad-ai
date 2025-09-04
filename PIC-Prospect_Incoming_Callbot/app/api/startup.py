@@ -15,8 +15,6 @@ if EnvHelper.get_remove_logs_upon_startup():
             shutil.rmtree(folder)
         os.makedirs(folder, exist_ok=True)
 
-# Initialize latency monitoring system
-print("Initializing latency monitoring system...")
 latency_config.initialize_latency_system()
 
 # Start the app

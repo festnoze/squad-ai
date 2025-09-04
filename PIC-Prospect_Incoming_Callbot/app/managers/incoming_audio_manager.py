@@ -8,40 +8,27 @@ import random
 import time
 import uuid
 import wave
-
 import webrtcvad
+#
 from agents.agents_graph import AgentsGraph
-from agents.phone_conversation_state_model import (
-    ConversationState,
-    PhoneConversationState,
-)
+from agents.phone_conversation_state_model import ConversationState, PhoneConversationState
 from agents.text_registry import TextRegistry
-from api_client.conversation_persistence_interface import (
-    ConversationPersistenceInterface,
-)
+from api_client.conversation_persistence_interface import ConversationPersistenceInterface
 from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
 from fastapi import WebSocket
 from pydub import AudioSegment
 from pydub.effects import normalize
 from speech.speech_to_text import SpeechToTextProvider
-
-#
 from utils.envvar import EnvHelper
-
-from database.conversation_persistence_local_service import (
-    ConversationPersistenceLocalService,
-)
-from database.conversation_persistence_service_fake import (
-    ConversationPersistenceServiceFake,
-)
+from database.conversation_persistence_local_service import ConversationPersistenceLocalService
+from database.conversation_persistence_service_fake import ConversationPersistenceServiceFake
 from managers.incoming_manager import IncomingManager
 from managers.outgoing_audio_manager import OutgoingManager
-
 
 class IncomingAudioManager(IncomingManager):
     """Audio processing utilities for improving speech recognition quality and handling Twilio events"""
 
-    # Tmp directory for incoming audio files
+    # Default directory for incoming audio files
     incoming_speech_dir = "./static/incoming_audio"
 
     def __init__(
@@ -64,14 +51,16 @@ class IncomingAudioManager(IncomingManager):
         self.frame_rate = frame_rate
         self.channels = channels
         self.vad = webrtcvad.Vad(vad_aggressiveness)
-        self.logger.info(f"Initialized IncomingAudioProcessing with VAD aggressiveness {vad_aggressiveness}")
-        self.stream_sid = None
+        self.logger.info(
+            f"Initialized IncomingAudioProcessing with VAD aggressiveness {vad_aggressiveness}"
+        )
+        self.stream_sid: str = ""
 
         # State tracking
         self.start_time = None
         self.conversation_id = None
         self.websocket_creation_time = None
-        self.stream_states: dict[str, ConversationState] = {}
+        self.stream_states: dict[str, PhoneConversationState] = {}
         self.phones_by_call_sid = {}  # Map call_sid to phone numbers
         self.average_noise_by_stream_sid: dict[
             str, int
@@ -85,18 +74,22 @@ class IncomingAudioManager(IncomingManager):
         self.is_speaking: bool = False
         self.interuption_asked: bool = False
         self.removed_text_to_speak: str | None = None
-        self.speak_anew_on_long_silence: bool = EnvHelper.get_speak_anew_on_long_silence()
-        self.max_silence_duration_before_reasking: int = EnvHelper.get_max_silence_duration_before_reasking()  # ms of silence before reasking
+        self.speak_anew_on_long_silence: bool = (
+            EnvHelper.get_speak_anew_on_long_silence()
+        )
+        self.max_silence_duration_before_reasking: int = (
+            EnvHelper.get_max_silence_duration_before_reasking()
+        )  # ms of silence before reasking
 
         # Audio processing parameters
         self.audio_buffer: bytes = b""
         self.consecutive_silence_duration_ms = 0.0
         self.speech_threshold_base = EnvHelper.get_speech_threshold()
-        self.speech_threshold = self.speech_threshold_base * 2  # Set default speech threshold on startup (will be calibrated on call start)
-        self.required_silence_ms_to_answer = EnvHelper.get_required_silence_ms_to_answer()  # ms of silence to trigger transcript
-        self.min_audio_bytes_for_processing = EnvHelper.get_min_audio_bytes_for_processing()  # Minimum buffer size to process
-        self.max_audio_bytes_for_processing = EnvHelper.get_max_audio_bytes_for_processing()  # Maximum buffer size to process
-        self.max_silence_duration_before_hangup = EnvHelper.get_max_silence_duration_before_hangup()  # ms of silence before hanging up the call
+        self.speech_threshold = self.speech_threshold_base * 2
+        self.required_silence_ms_to_answer = EnvHelper.get_required_silence_ms_to_answer()
+        self.min_audio_bytes_for_processing = EnvHelper.get_min_audio_bytes_for_processing()
+        self.max_audio_bytes_for_processing = EnvHelper.get_max_audio_bytes_for_processing()
+        self.max_silence_duration_before_hangup = EnvHelper.get_max_silence_duration_before_hangup()
         self.do_audio_preprocessing = EnvHelper.get_do_audio_preprocessing()
         self.perform_background_noise_calibration = EnvHelper.get_perform_background_noise_calibration()
         self.keep_incoming_audio_files = EnvHelper.get_keep_incoming_audio_files()
@@ -109,9 +102,7 @@ class IncomingAudioManager(IncomingManager):
         if conversation_persistence:
             self.conversation_persistence = conversation_persistence
         else:
-            conversation_persistence_type = (
-                EnvHelper.get_conversation_persistence_type()
-            )
+            conversation_persistence_type = EnvHelper.get_conversation_persistence_type()
             if conversation_persistence_type == "local":
                 self.conversation_persistence = ConversationPersistenceLocalService()
             elif conversation_persistence_type == "studi_rag":
@@ -267,6 +258,7 @@ class IncomingAudioManager(IncomingManager):
         try:
             updated_state = await self.agents_graph.ainvoke(current_state)
             self.stream_states[stream_sid] = updated_state
+            self.agents_graph.consecutive_error_manager.reset_consecutive_error_count(current_state)
 
         except Exception as e:
             self.logger.error(f"Error in initial graph invocation: {e}", exc_info=True)
@@ -287,7 +279,6 @@ class IncomingAudioManager(IncomingManager):
 
         # 3- Perform speech detection (using WebRTC VAD)
         is_silence, speech_to_noise_ratio = self.analyse_speech_for_silence(chunk)
-        # self.logger.info(f"Speech detection: {'speech' if not is_silence else 'silence'}, S/N ratio: {speech_to_noise_ratio:.2f}")
 
         # 4- Perform background noise calibration (at call start)
         if self.perform_background_noise_calibration:
@@ -298,14 +289,16 @@ class IncomingAudioManager(IncomingManager):
             return
 
         # 6- If user is speaking while system is speaking, stop system speech
-        if (self.is_speaking and not is_silence 
-            and self.outgoing_manager.can_speech_be_interupted and not self.interuption_asked
-        ):
-            self.removed_text_to_speak = await self.stop_speaking_async(speech_to_noise_ratio)
+        if self.is_speaking and not is_silence and self.outgoing_manager.can_speech_be_interupted and not self.interuption_asked:
+            self.removed_text_to_speak = await self.stop_speaking_async(
+                speech_to_noise_ratio
+            )
 
             # Log the interruption (but only the first time)
             if self.consecutive_silence_duration_ms > 0:
-                self.logger.info(f"\r>>> USER INTERRUPTION - Incoming speech while system was speaking ({speech_to_noise_ratio:.2f})")
+                self.logger.info(
+                    f"\r>>> USER INTERRUPTION - Incoming speech while system was speaking ({speech_to_noise_ratio:.2f})"
+                )
             self.consecutive_silence_duration_ms = 0.0
 
         # 7- Silence detection consecutive to user speech beginning
@@ -313,9 +306,7 @@ class IncomingAudioManager(IncomingManager):
 
         # Count consecutive silence (if system is not speaking)
         if is_silence and not self.is_speaking:
-            chunk_duration_ms = (
-                (len(chunk) / self.sample_width) / self.frame_rate * 1000
-            )
+            chunk_duration_ms = (len(chunk) / self.sample_width) / self.frame_rate * 1000
             self.consecutive_silence_duration_ms += chunk_duration_ms
 
         # Reset silence counter upon the first speech chunk and activate has_speech_began
@@ -343,13 +334,23 @@ class IncomingAudioManager(IncomingManager):
             await self._hangup_call_async()
             return
 
-        is_long_silence_after_speech = has_speech_began and self.consecutive_silence_duration_ms >= self.required_silence_ms_to_answer
-        has_reach_min_speech_length = len(self.audio_buffer) >= self.min_audio_bytes_for_processing
-        is_speech_too_long = len(self.audio_buffer) > self.max_audio_bytes_for_processing
+        is_long_silence_after_speech = (
+            has_speech_began
+            and self.consecutive_silence_duration_ms
+            >= self.required_silence_ms_to_answer
+        )
+        has_reach_min_speech_length = (
+            len(self.audio_buffer) >= self.min_audio_bytes_for_processing
+        )
+        is_speech_too_long = (
+            len(self.audio_buffer) > self.max_audio_bytes_for_processing
+        )
 
         # 10- Process audio
         # Conditions: if buffer large enough followed by a prolonged silence, or if buffer is too large
-        if (is_long_silence_after_speech and has_reach_min_speech_length) or is_speech_too_long:
+        if (
+            is_long_silence_after_speech and has_reach_min_speech_length
+        ) or is_speech_too_long:
             audio_data: bytes = self.audio_buffer
             self.audio_buffer = b""
             self.consecutive_silence_duration_ms = 0.0
@@ -374,35 +375,58 @@ class IncomingAudioManager(IncomingManager):
                 await self._send_acknowledgement_message_async()
                 await self.send_user_query_to_agents_graph_async(user_query_transcript, user_query_audio_filename)
 
-            # 13- If transcript of user query is empty (no speech detected), enqueue back the text to speak previously removed
+            # 13- If transcript of user query is empty (no speech detected), handle as error and check threshold
             if not user_query_transcript:
+                await self._handle_empty_transcript_async()
+
+    async def _send_acknowledgement_message_async(self):
+        """Acknowledgement message"""
+        if EnvHelper.get_do_acknowledge_user_speech():
+            acknowledge_text = random.choice(["Très bien", "Compris", "D'accord", "Entendu", "Parfait"])
+            if EnvHelper.get_long_acknowledgement():
+                acknowledge_text += ", " + random.choice(["un instant s'il vous plait", "je vous demande un instant", "merci de patienter", "laissez-moi un moment", "une petite seconde"])
+            acknowledge_text += "."
+            await self.outgoing_manager.enqueue_text_async(acknowledge_text)
+
+    async def _handle_empty_transcript_async(self):
+        """Handle empty transcript as an error and check if max consecutive errors reached."""
+        try:
+            # Get current conversation state to track errors
+            current_state: PhoneConversationState
+            if self.stream_sid in self.stream_states:
+                current_state = self.stream_states[self.stream_sid]
+            else:
+                # Create minimal state for error tracking
+                current_state = PhoneConversationState(
+                    call_sid=self.call_sid,
+                    caller_phone=self.phones_by_call_sid.get(self.call_sid, "N/A"),
+                    user_input="",
+                    history=[],
+                    agent_scratchpad={},
+                )
+                self.stream_states[self.stream_sid] = current_state
+
+            # Increment consecutive error count
+            self.agents_graph.consecutive_error_manager.increment_consecutive_error_count(current_state)
+
+            # Check if max errors reached
+            if self.agents_graph.consecutive_error_manager.is_max_consecutive_errors_reached(current_state):
+                await self.outgoing_manager.enqueue_text_async(TextRegistry.max_consecutive_errors_text)
+                self.logger.warning(">>> Empty transcript - Max consecutive errors reached. Sent technical difficulties message.")
+                self.agents_graph.consecutive_error_manager.reset_consecutive_error_count(current_state)
+            else:
                 if self.removed_text_to_speak:
                     await self.outgoing_manager.enqueue_text_async(self.removed_text_to_speak)
-                    self.logger.info(f'>>> Empty transcript. Enqueued back originaly removed text to speak: "{self.removed_text_to_speak}"')
+                    self.logger.info(f'>>> Empty transcript. Enqueued back originally removed text to speak: "{self.removed_text_to_speak}"')
                     self.removed_text_to_speak = None
                 else:
                     await self.outgoing_manager.enqueue_text_async(TextRegistry.ask_to_repeat_text)
                     self.logger.info(">>> Empty transcript.")
 
-
-    async def _send_acknowledgement_message_async(self):
-        """Acknowledgement message"""
-        if EnvHelper.get_do_acknowledge_user_speech():
-            acknowledge_text = random.choice(
-                ["Très bien", "Compris", "D'accord", "Entendu", "Parfait"]
-            )
-            if EnvHelper.get_long_acknowledgement():
-                acknowledge_text += ", " + random.choice(
-                    [
-                        "un instant s'il vous plait",
-                        "je vous demande un instant",
-                        "merci de patienter",
-                        "laissez-moi un moment",
-                        "une petite seconde",
-                    ]
-                )
-            acknowledge_text += "."
-            await self.outgoing_manager.enqueue_text_async(acknowledge_text)
+        except Exception as e:
+            self.logger.error(f"Error handling empty transcript: {e}", exc_info=True)
+            # Fallback to simple handling if error tracking fails
+            await self.outgoing_manager.enqueue_text_async(TextRegistry.ask_to_repeat_text)
 
     async def send_user_query_to_agents_graph_async(self, user_query: str, user_query_audio_filename: str | None = None):
         try:
@@ -425,42 +449,50 @@ class IncomingAudioManager(IncomingManager):
             conv_id = current_state["agent_scratchpad"].get("conversation_id", None)
             if not conv_id:
                 self.logger.error("/!\\ Conversation id not found in current state")
+                # Missing conversation ID is a system error - increment counter
+                self.agents_graph.consecutive_error_manager.increment_consecutive_error_count(current_state)
+
+                # Check if max errors reached
+                if self.agents_graph.consecutive_error_manager.is_max_consecutive_errors_reached(current_state):
+                    await self.outgoing_manager.enqueue_text_async(TextRegistry.max_consecutive_errors_text)
+                    self.logger.warning(">>> Missing conversation ID - Max consecutive errors reached. Sent technical difficulties message.")
+                    # Reset error count after handling
+                    self.agents_graph.consecutive_error_manager.reset_consecutive_error_count(current_state)
                 return
 
             current_state["history"].append(("user", user_query))
-            messages: (
-                dict | None
-            ) = await self.conversation_persistence.add_message_to_conversation_async(
-                conv_id, user_query, "user"
-            )
-            user_query_msg_id: str | None = (
-                messages["messages"][-1]["id"] if messages else None
-            )
+            messages: dict | None = await self.conversation_persistence.add_message_to_conversation_async(conv_id, user_query, "user")
+            user_query_msg_id: str | None = messages["messages"][-1]["id"] if messages else None
 
             # Rename incoming speech file to match message id from SQL database
             if user_query_msg_id and user_query_audio_filename:
-                self._rename_incoming_speech_file(
-                    user_query_audio_filename, user_query_msg_id + ".wav"
-                )
+                self._rename_incoming_speech_file(user_query_audio_filename, user_query_msg_id + ".wav")
 
             # Invoke the graph with current state to get the AI-generated welcome message
             updated_state = await self.agents_graph.ainvoke(current_state)
             self.stream_states[self.stream_sid] = updated_state
+            self.agents_graph.consecutive_error_manager.reset_consecutive_error_count(updated_state)
 
             # If the agents graph response ends with "au revoir.", do hang-up
             if updated_state["history"][-1][1].endswith("au revoir."):
-                self.logger.info(
-                    ">>> Agents graph response ends with 'au revoir.', hanging up the call."
-                )
-                while (
-                    self.outgoing_manager.has_text_to_be_sent()
-                    or self.outgoing_manager.is_sending()
-                ):
+                self.logger.info(">>> Agents graph response ends with 'au revoir.', hanging up the call.")
+                while self.outgoing_manager.has_text_to_be_sent() or self.outgoing_manager.is_sending():
                     await asyncio.sleep(0.3)
                 await self._hangup_call_async()
 
         except Exception as e:
             self.logger.error(f"Error in user query to agents graph: {e}", exc_info=True)
+            # Agents graph communication failure - increment error counter
+            if self.stream_sid in self.stream_states:
+                current_state = self.stream_states[self.stream_sid]
+                self.agents_graph.consecutive_error_manager.increment_consecutive_error_count(current_state)
+
+                # Check if max errors reached and handle it
+                if self.agents_graph.consecutive_error_manager.is_max_consecutive_errors_reached(current_state):
+                    await self.outgoing_manager.enqueue_text_async(TextRegistry.max_consecutive_errors_text)
+                    self.logger.warning(">>> Agents graph error - Max consecutive errors reached. Sent technical difficulties message.")
+                    # Reset error count after handling
+                    self.agents_graph.consecutive_error_manager.reset_consecutive_error_count(current_state)
 
     def _perform_background_noise_calibration(
         self,
@@ -488,9 +520,7 @@ class IncomingAudioManager(IncomingManager):
             # Replace list with the calculated average for memory efficiency
             self.average_noise_by_stream_sid[stream_sid] = average_noise
             del self.speech_to_noise_ratio_samples_by_stream_sid[stream_sid]
-            self.speech_threshold = max(
-                self.speech_threshold_base * 1.5, average_noise * 1.5
-            )
+            self.speech_threshold = max(self.speech_threshold_base * 1.5, average_noise * 1.5)
 
     def _decode_audio_chunk(self, data: dict):
         try:
@@ -504,7 +534,9 @@ class IncomingAudioManager(IncomingManager):
             self.logger.error(f"Error decoding/converting audio chunk: {decode_err}")
             return None
 
-    async def _perform_speech_to_text_transcription_async(self, audio_data: bytes) -> tuple[str | None, str | None]:
+    async def _perform_speech_to_text_transcription_async(
+        self, audio_data: bytes
+    ) -> tuple[str | None, str | None]:
         transcript: str | None = None
         wav_audio_filename: str | None = None
 
@@ -565,13 +597,17 @@ class IncomingAudioManager(IncomingManager):
                 transcript = None
 
             # Check if transcript contains any of the known watermarks
-            elif any(watermark.lower() in transcript.lower() for watermark in known_watermarks):
+            elif any(
+                watermark.lower() in transcript.lower()
+                for watermark in known_watermarks
+            ):
                 self.logger.warning(f"!!! Detected watermark in transcript, ignoring: '{transcript}'")
                 transcript = None
 
         except Exception as speech_err:
             self.logger.error(f"Error during transcription: {speech_err}", exc_info=True)
             transcript = None
+            # Speech-to-text failure - this will be handled as empty transcript in calling method
         finally:
             if wav_audio_filename and not self.keep_incoming_audio_files:
                 self._delete_incoming_speech_file(wav_audio_filename)
@@ -592,7 +628,10 @@ class IncomingAudioManager(IncomingManager):
         )
 
     async def speak_and_send_ask_for_feedback_async(self, transcript):
-        response_text = "Instructions : Fait un feedback reformulé de façon synthétique de la demande utilisateur suivante, afin de t'assurer de ta bonne comphéhension de celle-ci : " + transcript
+        response_text = (
+            "Instructions : Fait un feedback reformulé de façon synthétique de la demande utilisateur suivante, afin de t'assurer de ta bonne comphéhension de celle-ci : "
+            + transcript
+        )
         response = self.openai_client.chat.completions.create(
             model="gpt-4o",
             messages=[{"role": "user", "content": response_text}],
@@ -632,9 +671,7 @@ class IncomingAudioManager(IncomingManager):
                     if not twilio_sid or not twilio_auth:
                         self.logger.error("/!\\ Twilio credentials not configured")
                     else:
-                        self.logger.error(
-                            "/!\\ call_sid not set; unable to hang up Twilio phone call"
-                        )
+                        self.logger.error("/!\\ call_sid not set; unable to hang up Twilio phone call")
             except Exception as e:
                 self.logger.error(f"/!\\ Error hanging up call via Twilio: {e}", exc_info=True)
 
@@ -646,9 +683,7 @@ class IncomingAudioManager(IncomingManager):
             elapsed_ms = int((time.time() - self.websocket_creation_time) * 1000)
 
         file_name = f"{uuid.uuid4()}-{elapsed_ms}.wav"
-        with wave.open(
-            os.path.join(self.incoming_speech_dir, file_name), "wb"
-        ) as wav_file:
+        with wave.open(os.path.join(self.incoming_speech_dir, file_name), "wb") as wav_file:
             wav_file.setnchannels(1)  # mono
             wav_file.setsampwidth(self.sample_width)  # 16-bit
             wav_file.setframerate(self.frame_rate)  # 8kHz

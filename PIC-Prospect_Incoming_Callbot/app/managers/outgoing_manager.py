@@ -59,6 +59,16 @@ class OutgoingManager(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def set_call_sid(self, call_sid: str) -> None:
+        """Set the call SID for latency tracking"""
+        pass
+
+    @abc.abstractmethod
+    def set_phone_number(self, phone_number: str) -> None:
+        """Set the phone number for latency tracking"""
+        pass
+
+    @abc.abstractmethod
     def is_sending(self) -> bool:
         """
         Returns True if the data delivery process is currently running.

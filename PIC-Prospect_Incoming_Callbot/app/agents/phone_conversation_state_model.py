@@ -6,7 +6,7 @@ from typing import Annotated, TypedDict
 class ConversationState(TypedDict):
     """Represents the state of the conversation at any point."""
 
-    history: Annotated[Sequence[tuple[str, str]], operator.add]
+    history: Sequence[tuple[str, str]]
     agent_scratchpad: dict[str, str]
 
 class PhoneConversationState(ConversationState):
