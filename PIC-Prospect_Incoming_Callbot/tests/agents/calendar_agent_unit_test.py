@@ -1,15 +1,16 @@
+from datetime import datetime
 from unittest.mock import AsyncMock
+
 import pytest
-from datetime import datetime, timedelta
-from langchain_core.runnables import Runnable
 from langchain_core.messages import AIMessage
+from langchain_core.runnables import Runnable
+
+from app.agents.agents_graph import EnvHelper, LangChainAdapterType, LangChainFactory, LlmInfo
 from app.agents.calendar_agent import CalendarAgent
-from app.agents.agents_graph import LangChainFactory
-from app.agents.agents_graph import LlmInfo
-from app.agents.agents_graph import LangChainAdapterType
-from app.agents.agents_graph import EnvHelper
+from app.agents.text_registry import TextRegistry
 
 LLM_SHOULD_FAIL = object()  # Marker object to indicate LLM failure in tests
+
 
 class FakeLLM(Runnable):
     def __init__(self, fake_value_to_return: str = "fake llm response", raise_exception: bool = False):
@@ -29,11 +30,13 @@ class FakeLLM(Runnable):
             raise Exception("LLM invoke failed for test")
         return AIMessage(content=self._fake_value_to_return)
 
+
 @pytest.fixture
 def sf_client_mock():
     class _DummyClient:
         get_scheduled_appointments_async = AsyncMock(return_value=[])
         schedule_new_appointment_async = AsyncMock(return_value={"Id": "001"})
+        verify_appointment_existance_async = AsyncMock(return_value=None)  # No existing appointment
 
     return _DummyClient()
 
@@ -47,14 +50,13 @@ def sf_client_mock():
         ("Je voudrais réserver pour jeudi 10h", [], "Proposition de rendez-vous", "Proposition de rendez-vous"),
         ("Pouvez-vous confirmer notre RDV de demain ?", [], "Demande de confirmation du rendez-vous", "Demande de confirmation du rendez-vous"),
         ("Oui, c'est confirmé pour moi.", [], "Rendez-vous confirmé", "Rendez-vous confirmé"),
-
         # Default fallback to "Proposition de créneaux" when LLM fails and no strong heuristic matches
         ("Bonjour, comment allez-vous ?", [], LLM_SHOULD_FAIL, "Proposition de créneaux"),
         ("Une question d'ordre général.", [], LLM_SHOULD_FAIL, "Proposition de créneaux"),
-    ]
+    ],
 )
 async def test_calendar_agent_classification(sf_client_mock, user_input, chat_history, llm_behavior, expected_category):
-    """Tests the categorize_for_dispatch_async method for both LLM and heuristic paths."""
+    """Tests the categorize_request_for_dispatch_async method for both LLM and heuristic paths."""
     # Setup fake LLM based on llm_behavior parameter
     if llm_behavior is LLM_SHOULD_FAIL:
         llm_instance = FakeLLM(raise_exception=True)
@@ -65,11 +67,11 @@ async def test_calendar_agent_classification(sf_client_mock, user_input, chat_hi
     agent = CalendarAgent(sf_client_mock, llm_instance)
     # Set deterministic time for output
     CalendarAgent.now = datetime(2025, 6, 19)
-    # User info is needed because categorize_for_dispatch_async formats a prompt with owner_name
+    # User info is needed because categorize_request_for_dispatch_async formats a prompt with owner_name
     agent._set_user_info("test_user_id", "Test", "User", "test@example.com", "test_owner_id", "TestOwnerName")
 
     # Call the method under test
-    actual_category = await agent.categorize_for_dispatch_async(user_input, chat_history)
+    actual_category = await agent.categorize_request_for_dispatch_async(user_input, chat_history)
 
     # Assert that the correct category is returned
     assert actual_category == expected_category
@@ -83,21 +85,24 @@ async def test_proposition_de_creneaux_calls_get_appointments(sf_client_mock):
     agent._set_user_info("uid", "John", "Doe", "john@ex.com", "ownerId", "Alice")
 
     await agent.run_async("Je voudrais un rendez-vous", [])
-    
+
     sf_client_mock.get_scheduled_appointments_async.assert_awaited()
 
 
 @pytest.mark.parametrize(
     "user_input, chat_history",
     [
-        ("Parfait, c'est confirmé",
-        [
-            ("human", "Je voudrais prendre rendez-vous demain"),
-            ("AI", "Bien sur, je peux vous proposer demain entre 9h et 11h ou entre 14h et 16h. Avez-vous une préférence ?"),
-            ("human", "oui, demain à 10h"),
-            ("AI", "Parfait, je vais planifier votre rendez-vous pour demain, mardi 10 juin de 10h à 10h30 concernant une demande de conseil en formation. Confirmez-vous ce rendez-vous ?")
-        ])
-    ])
+        (
+            "Parfait, c'est confirmé",
+            [
+                ("human", "Je voudrais prendre rendez-vous demain"),
+                ("AI", "Bien sur, je peux vous proposer demain entre 9h et 11h ou entre 14h et 16h. Avez-vous une préférence ?"),
+                ("human", "oui, demain à 10h"),
+                ("AI", "Parfait, je vais planifier votre rendez-vous pour demain, mardi 10 juin de 10h à 10h30 concernant une demande de conseil en formation. Confirmez-vous ce rendez-vous ?"),
+            ],
+        )
+    ],
+)
 async def test_user_confirmation_calls_schedule_new_appointment(sf_client_mock, user_input, chat_history):
     agent = CalendarAgent(sf_client_mock, FakeLLM("Rendez-vous confirmé"), FakeLLM(""), FakeLLM("2025-06-10T10:00:00Z"))
     CalendarAgent.now = datetime(2025, 6, 9)
@@ -107,38 +112,47 @@ async def test_user_confirmation_calls_schedule_new_appointment(sf_client_mock, 
 
 
 @pytest.mark.parametrize(
-    "user_input, chat_history, requested_date, expected_result",
+    "user_input, chat_history, requested_date, category, expected_result",
     [
-        # Test case 1: Appointment within 30 days should proceed normally
-        ("Je voudrais un rendez-vous dans 2 semaines", [], "2025-07-05T10:00:00Z", "normal_flow"),
-        # Test case 2: Appointment exactly at 30 days should proceed normally
-        ("Je voudrais un rendez-vous dans 30 jours", [], "2025-07-19T10:00:00Z", "normal_flow"),
-        # Test case 3: Appointment at 31 days should be rejected
-        ("Je voudrais un rendez-vous dans un mois et demi", [], "2025-07-20T10:00:00Z", "too_far"),
-        # Test case 4: Appointment way in the future should be rejected
-        ("Je voudrais un rendez-vous en septembre", [], "2025-09-15T10:00:00Z", "too_far"),
-    ]
+        # Test "Proposition de créneaux" category
+        ("Je voudrais un rendez-vous dans 2 semaines", [], "2025-07-05T10:00:00Z", "Proposition de créneaux", "normal_flow"),
+        ("Je voudrais un rendez-vous dans 30 jours", [], "2025-07-19T10:00:00Z", "Proposition de créneaux", "normal_flow"),
+        ("Je voudrais un rendez-vous dans un mois et demi", [], "2025-07-20T10:00:00Z", "Proposition de créneaux", "too_far"),
+        ("Je voudrais un rendez-vous en septembre", [], "2025-09-15T10:00:00Z", "Proposition de créneaux", "too_far"),
+        # Test "Proposition de rendez-vous" category
+        ("Je voudrais réserver pour dans 2 semaines", [], "2025-07-05T10:00:00Z", "Proposition de rendez-vous", "normal_flow"),
+        ("Je voudrais réserver pour dans 30 jours", [], "2025-07-19T10:00:00Z", "Proposition de rendez-vous", "normal_flow"),
+        ("Je voudrais réserver pour dans un mois et demi", [], "2025-07-20T10:00:00Z", "Proposition de rendez-vous", "too_far"),
+        ("Je voudrais réserver pour septembre", [], "2025-09-15T10:00:00Z", "Proposition de rendez-vous", "too_far"),
+        # Test "Demande de confirmation du rendez-vous" category
+        ("Oui, confirmé pour dans 2 semaines", [], "2025-07-05T10:00:00Z", "Demande de confirmation du rendez-vous", "normal_flow"),
+        ("Oui, confirmé pour dans 30 jours", [], "2025-07-19T10:00:00Z", "Demande de confirmation du rendez-vous", "normal_flow"),
+        ("Oui, confirmé pour dans un mois et demi", [], "2025-07-20T10:00:00Z", "Demande de confirmation du rendez-vous", "too_far"),
+        ("Oui, confirmé pour septembre", [], "2025-09-15T10:00:00Z", "Demande de confirmation du rendez-vous", "too_far"),
+        # Test "Rendez-vous confirmé" category
+        ("Parfait, dans 2 semaines", [], "2025-07-05T10:00:00Z", "Rendez-vous confirmé", "normal_flow"),
+        ("Parfait, dans 30 jours", [], "2025-07-19T10:00:00Z", "Rendez-vous confirmé", "normal_flow"),
+        ("Parfait, dans un mois et demi", [], "2025-07-20T10:00:00Z", "Rendez-vous confirmé", "too_far"),
+        ("Parfait, en septembre", [], "2025-09-15T10:00:00Z", "Rendez-vous confirmé", "too_far"),
+    ],
 )
-async def test_appointment_too_far_validation(sf_client_mock, user_input, chat_history, requested_date, expected_result):
-    """Test that appointments requested more than 30 days in the future are rejected."""
+async def test_appointment_too_far_validation(sf_client_mock, user_input, chat_history, requested_date, category, expected_result):
+    """Test that appointments requested more than 30 days in the future are rejected across all relevant categories."""
     # Set up fake LLMs
-    classifier_llm = FakeLLM("Proposition de créneaux")  # Always classify as "Proposition de créneaux"
+    classifier_llm = FakeLLM(category)  # Classify as the category we want to test
     date_extractor_llm = FakeLLM(requested_date)  # Return the date we want to test
-    
+
     agent = CalendarAgent(sf_client_mock, classifier_llm, None, date_extractor_llm)
-    
+
     # Set a fixed "now" date for consistent testing - June 19, 2025
     CalendarAgent.now = datetime(2025, 6, 19)
     agent._set_user_info("uid", "John", "Doe", "john@ex.com", "ownerId", "Alice")
-    
+
     # Call run_async with the test input
     result = await agent.run_async(user_input, chat_history)
-    
+
     # Validate the result based on expected behavior
     if expected_result == "too_far":
-        # Should return the appointment_too_far_text
-        assert result == agent.appointment_too_far_text
-        assert result == "Il n'est pas possible de prendre de rendez-vous à plus de 30 jours"
+        assert result == TextRegistry.appointment_too_far_text
     else:
-        # Should proceed with normal flow (not return the too_far message)
-        assert result != agent.appointment_too_far_text
+        assert result != TextRegistry.appointment_too_far_text

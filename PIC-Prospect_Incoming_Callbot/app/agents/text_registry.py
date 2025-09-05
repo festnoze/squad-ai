@@ -16,7 +16,7 @@ class TextRegistry:
     technical_error_text = "Je rencontre un problème technique, le service est temporairement indisponible, merci de nous recontacter plus tard. Merci et au revoir."
     lead_agent_error_text = "Je rencontre un problème technique avec l'agent de contact."
     rag_communication_error_text = "Je suis désolé, une erreur s'est produite lors de la communication avec le service."
-    max_consecutive_errors_text = "Nous rencontrons actuellement des difficultés à prendre en compte votre demande. Veuillez nous excuser pour le désagréement. Merci de nous recontacter ultérieurement, sinon, votre conseiller vous recontactera dès que possible."
+    max_consecutive_errors_text = "Nous rencontrons actuellement des difficultés à prendre en compte votre demande. Veuillez nous excuser pour le désagréement. Votre appel a été pris en compte et votre conseiller vous recontactera dès que possible. Merci et au revoir."
 
     # CalendarAgent texts
     availability_request_text = "Quels jours ou quelles heures de la journée vous conviendraient le mieux ?"
@@ -32,7 +32,7 @@ class TextRegistry:
     modification_not_supported_text = "Je ne suis pas en mesure de gérer les modifications de rendez-vous."
     cancellation_not_supported_text = "Je ne suis pas en mesure de gérer les annulations de rendez-vous."
     no_appointment_requested_text = "Votre appel a bien été prise en compte, votre conseiller en formation vous recontactera dès que possible. Merci et au revoir."
-    appointment_too_far_text = "Il n'est pas possible de prendre de rendez-vous à plus de 30 jours"
+    appointment_too_far_text = "Désolé, il n'est pas possible de prendre de rendez-vous à plus de 30 jours. Quels autres créneaux vous conviendraient ?"
 
     @classmethod
     def get_all_texts(cls) -> list[str]:

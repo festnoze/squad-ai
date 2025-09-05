@@ -16,9 +16,9 @@ Suis les 4 étapes suivantes :
 
 <Sortie attendu>
 Réponds en renvoyant uniquement une phrase contenant la liste des 3 premières fenêtres de créneaux disponibles, en français, en respectant le format de l'exemple suivant :
-"Je vous propose les créneaux suivants : demain, le jeudi 2 juin, de 9 heures à 11 heures 30, ou de 14 heures à 15 heures 30, ou après-demain, le vendredi 3 juin, de 9 heures à 11 heures 30. Avez-vous une préférence ?"
+"Je vous propose les créneaux suivants : demain, jeudi 2 juin, de 9 heures à 11 heures 30, ou de 14 heures à 15 heures 30, ou vendredi 3 juin, de 9 heures à 11 heures 30. Avez-vous une préférence ?"
 Si plusieurs créneaux sont disponibles le même jour, ne pas répéter le jour, comme dans l'exemple ci-dessus.
-Règle de présentation d'un créneau : écris en français, commence par ajouter la relation à aujourd'hui (mais uniquement si il s'agit de aujourd'hui, demain, ou après-demain, sinon rien), suivis du jour de la semaine (comme : "lundi"), du numéro du jour (comme : 7), du nom du mois (comme : "mars"), suivis de l'heure de début et de fin de chaque créneau (comme : "de 9 heures à 12 heures"). Ne jamais préciser l'année.
+Règle de présentation d'un créneau : écris en français, commence par ajouter la relation à aujourd'hui (mais uniquement si il s'agit de aujourd'hui, ou demain, sinon rien), suivis du jour de la semaine (comme : "lundi"), du numéro du jour (comme : 7), du nom du mois (comme : "mars"), suivis de l'heure de début et de fin de chaque créneau (comme : "de 9 heures à 12 heures"). Ne jamais préciser l'année.
 Si aucun créneau disponible n'est trouvé, retourne une phrase indiquant qu'aucun créneau n'est disponible entre les dates recherchées, en formatant les dates au format français (ex: "Je suis désolé, aucun créneau n'est disponible entre le 7 et le 12 juin"), suivi de : "Souhaitez-vous regarder une autre date ?"
 </Sortie attendu>
 

@@ -6,13 +6,13 @@ from sqlalchemy import create_engine, delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import joinedload, sessionmaker
 from sqlalchemy.sql.expression import BinaryExpression
-
+from utils.envvar import EnvHelper
 
 class GenericDataContext:
     def __init__(self, base_entities, db_path_or_url="database.db", log_queries_to_terminal=False):
         db_full_path_and_name = None
         if "http" not in db_path_or_url:
-            source_path = os.environ.get("PYTHONPATH", "").split(";")[-1]
+            source_path = EnvHelper.get_python_paths()[0]
             db_full_path_and_name = os.path.join(
                 source_path.replace("\\", "/"), db_path_or_url.replace("\\", "/")
             ).replace("\\", "/")

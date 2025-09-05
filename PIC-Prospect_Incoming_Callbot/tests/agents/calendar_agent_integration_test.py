@@ -24,8 +24,8 @@ from llms.llm_info import LlmInfo
             "Je voudrais prendre rendez-vous",
             [],
             "Proposition de créneaux",
-            "Je vous propose les créneaux suivants : demain, le jeudi 20 juin, de 9 heures à 12 heures ou de 13 heures à 16 heures, ou après-demain, le vendredi 21 juin, de 9 heures à 12 heures. Avez-vous une préférence ?",
-            False,  # Semantic matching
+            "Je vous propose les créneaux suivants : demain, jeudi 20 juin, de 9 heures à 11 heures 30, ou de 13 heures à 15 heures 30, ou vendredi 21 juin, de 9 heures à 11 heures 30. Avez-vous une préférence ?",
+            True,  # Exact match
             False,  # exist_appointment
         ),
         # A2: User confirms the appointment
@@ -35,7 +35,7 @@ from llms.llm_info import LlmInfo
                 ("human", "Je voudrais prendre rendez-vous"),
                 (
                     "AI",
-                    "Je vous propose les créneaux suivants : jeudi 20 juin, de 9 heures à 12 heures ou de 14 heures à 15 heures, ou vendredi 21 juin, de 16 heures à 17 heures. Avez-vous une préférence ?",
+                    "Je vous propose les créneaux suivants : jeudi 20 juin, de 9 heures à 11 heures 30 ou de 14 heures à 14 heures 30. Avez-vous une préférence ?",
                 ),
             ],
             "Demande de confirmation du rendez-vous",
@@ -130,7 +130,7 @@ from llms.llm_info import LlmInfo
                 ),
             ],
             "Proposition de créneaux",
-            "Je vous propose les créneaux suivants : lundi 24 juin, de 9 heures à 12 heures ou de 13 heures à 16 heures, ou mardi 25 juin, de 9 heures à 12 heures. Avez-vous une préférence ?",
+            "Je vous propose les créneaux suivants : lundi 24 juin, de 9 heures à 11 heures 30, ou de 13 heures à 15 heures 30, ou mardi 25 juin, de 9 heures à 11 heures 30. Avez-vous une préférence ?",
             True,  # Exact match
             True,  # exist_appointment
         ),
@@ -180,8 +180,8 @@ from llms.llm_info import LlmInfo
                 ),
             ],
             "Proposition de créneaux",  # Agent will propose new slots
-            "Je vous propose les créneaux suivants : lundi 1 juillet, de 9 heures à 12 heures ou de 13 heures à 16 heures, ou mardi 2 juillet, de 9 heures à 12 heures. Avez-vous une préférence ?",
-            True,  # Exact match
+            "Je vous propose les créneaux suivants : lundi 1 juillet, de 9 heures à 11 heures 30, ou de 13 heures à 15 heures 30, ou mardi 2 juillet, de 9 heures à 11 heures 30. Avez-vous une préférence ?",
+            False,  # Semantic match
             True,  # exist_appointment
         ),
         # ===== SCENARIO D: DIRECT SLOT REQUEST =====
@@ -200,8 +200,8 @@ from llms.llm_info import LlmInfo
             "Je voudrais prendre rendez-vous lundi prochain à 9h",
             [],
             "Demande de confirmation du rendez-vous",  # Agent indicates slot is not available and proposes alternatives
-            "Je suis désolé, ce créneau n'est pas disponible. A la place, Je vous propose les créneaux suivants : demain, le jeudi 20 juin, de 9 heures à 12 heures ou de 13 heures à 16 heures, ou après-demain, le vendredi 21 juin, de 9 heures à 12 heures. Avez-vous une préférence ?",
-            True,  # Exact match
+            "Je suis désolé, ce créneau n'est pas disponible. A la place, Je vous propose les créneaux suivants : demain, le jeudi 20 juin, de 9 heures à 11 heures 30 ou de 13 heures à 15 heures 30, ou le vendredi 21 juin, de 9 heures à 11 heures 30. Avez-vous une préférence ?",
+            False,  # Semantic match
             True,  # exist_appointment
         ),
         ### NOT HANDLED RIGHT NOW ###
@@ -252,8 +252,8 @@ from llms.llm_info import LlmInfo
                 ),
             ],
             "Proposition de créneaux",  # Agent should ask for new preferences
-            "Je vous propose le créneau suivant : vendredi, le 21 juin, de 9 heures à 12 heures. Avez-vous une préférence ?",
-            True,  # Exact match
+            "Je vous propose les créneaux suivants : vendredi 21 juin, de 9 heures à 11 heures 30. Avez-vous une préférence ?",
+            False,  # Semantic match
             True,  # exist_appointment
         ),
     ],
@@ -292,32 +292,20 @@ async def test_calendar_agent_integration_classification_plus_outputed_answer(
     sf_client_mock.exist_appointment = exist_appointment
 
     # First, ensure the agent classifies the user input correctly
-    actual_category = await agent.categorize_for_dispatch_async(
-        user_input, chat_history
-    )
-    assert actual_category == expected_category, (
-        f"Expected category '{expected_category}', but got '{actual_category}' for input '{user_input}'."
-    )
+    actual_category = await agent.categorize_request_for_dispatch_async(user_input, chat_history)
+    assert actual_category == expected_category, f"Expected category '{expected_category}', but got '{actual_category}' for input '{user_input}'."
 
     # Then, verify the agent's full response
     actual_response = await agent.run_async(user_input, chat_history)
 
     if await_exact_match:
-        assert actual_response == expected_answer, (
-            f"Expected exact response:\n{expected_answer}\nGot:\n{actual_response}"
-        )
+        assert actual_response == expected_answer, f"Expected exact response:\n{expected_answer}\nGot:\n{actual_response}"
     else:
-        is_similar = await similarity_evaluator.is_semantically_similar(
-            expected_answer, actual_response
-        )
-        assert is_similar, (
-            f"Expected a response semantically similar to:\n{expected_answer}\nGot:\n{actual_response}"
-        )
+        is_similar = await similarity_evaluator.is_semantically_similar(expected_answer, actual_response)
+        assert is_similar, f"Expected a response semantically similar to:\n{expected_answer}\nGot:\n{actual_response}"
 
 
-async def test_complete_conversation_exchange(
-    sf_client_mock, llm_instance, similarity_evaluator
-):
+async def test_complete_conversation_exchange(sf_client_mock, llm_instance, similarity_evaluator):
     """
     Tests a complete conversation flow from initial contact to appointment confirmation.
     This test simulates a realistic conversation between a user and the calendar agent.
@@ -340,7 +328,7 @@ async def test_complete_conversation_exchange(
         {
             "user_input": "Bonjour, je voudrais prendre rendez-vous avec mon conseiller",
             "category": "Proposition de créneaux",
-            "expected_response": "Je vous propose les créneaux suivants : demain, le jeudi 20 juin, de 9 heures à 12 heures ou de 13 heures à 16 heures, ou après-demain, le vendredi 21 juin, de 9 heures à 12 heures. Avez-vous une préférence ?",
+            "expected_response": "Je vous propose les créneaux suivants : demain, le jeudi 20 juin, de 9 heures à 11 heures 30 ou de 13 heures à 15 heures 30, ou vendredi 21 juin, de 9 heures à 11 heures 30. Avez-vous une préférence ?",
             "await_exact_match": True,
         },
         # Step 2: User asks for different availabilities
@@ -354,7 +342,7 @@ async def test_complete_conversation_exchange(
         {
             "user_input": "Je préférerais vendredi après-midi",
             "category": "Proposition de créneaux",
-            "expected_response": "Je vous propose le créneau suivant : vendredi, le 21 juin, de 13 heures à 16 heures. Avez-vous une préférence ?",
+            "expected_response": "Je vous propose le créneau suivant : vendredi, le 21 juin, de 13 heures à 15 heures 30. Avez-vous une préférence ?",
             "await_exact_match": False,
         },
         # Step 4: User specifies a slot
@@ -376,25 +364,17 @@ async def test_complete_conversation_exchange(
     # Execute the conversation flow
     chat_history = []
     for step in conversation_flow:
-        # Mock the categorize_for_dispatch_async method to return our predefined category for this step
-        with patch.object(
-            agent, "categorize_for_dispatch_async", return_value=step["category"]
-        ):
+        # Mock the categorize_request_for_dispatch_async method to return our predefined category for this step
+        with patch.object(agent, "categorize_request_for_dispatch_async", return_value=step["category"]):
             # Call the method under test
             actual_response = await agent.run_async(step["user_input"], chat_history)
 
             # Verify the response using exact match or semantic similarity based on the parameter
             if step["await_exact_match"]:
-                assert actual_response == step["expected_response"], (
-                    f"Step {conversation_flow.index(step) + 1}: Expected: '{step['expected_response']}', Got: '{actual_response}'"
-                )
+                assert actual_response == step["expected_response"], f"Step {conversation_flow.index(step) + 1}: Expected: '{step['expected_response']}', Got: '{actual_response}'"
             else:
-                is_similar = await similarity_evaluator.is_semantically_similar(
-                    step["expected_response"], actual_response
-                )
-                assert is_similar, (
-                    f"Step {conversation_flow.index(step) + 1}: Expected a response similar to '{step['expected_response']}', but got '{actual_response}'"
-                )
+                is_similar = await similarity_evaluator.is_semantically_similar(step["expected_response"], actual_response)
+                assert is_similar, f"Step {conversation_flow.index(step) + 1}: Expected a response similar to '{step['expected_response']}', but got '{actual_response}'"
 
             # Update chat history for the next step
             chat_history.append(("human", step["user_input"]))
@@ -424,14 +404,9 @@ def sf_client_mock():
     class _DummyClient:
         exist_appointment = False
 
-        async def get_scheduled_appointments_async(
-            self, start_datetime=None, end_datetime=None, *args, **kwargs
-        ) -> list:
+        async def get_scheduled_appointments_async(self, start_datetime=None, end_datetime=None, *args, **kwargs) -> list:
             # Check if the specific date range is requested
-            if (
-                str(start_datetime)[:10] == "2024-06-24"
-                and str(end_datetime)[:10] == "2024-06-28"
-            ):
+            if str(start_datetime)[:10] == "2024-06-24" and str(end_datetime)[:10] == "2024-06-28":
                 # Return 3 appointments, each 9 hours long, one per day
                 appointments = []
                 for day in range(5):

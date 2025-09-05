@@ -40,24 +40,18 @@ class TestConsentValidationLogic:
         """Test that the consent analysis method correctly processes positive responses"""
         # Arrange
         mock_llm = MockLLM("oui")
-        agents_graph = AgentsGraph.__new__(
-            AgentsGraph
-        )  # Create instance without calling __init__
+        agents_graph = AgentsGraph.__new__(AgentsGraph) # Don't call init
         agents_graph.calendar_classifier_llm = mock_llm
         agents_graph.logger = Mock()  # Add mock logger
 
-        chat_history = [
-            ("user", "Je voudrais un rendez-vous"),
-            ("assistant", TextRegistry.yes_no_consent_text),
-        ]
+        chat_history = [("user", "Je voudrais un rendez-vous"),
+                        ("assistant", TextRegistry.yes_no_consent_text)]
 
         # Act
-        result = await agents_graph._analyse_appointment_consent_async(
-            "d'accord", chat_history
-        )
+        result = await agents_graph._analyse_appointment_consent_async("d'accord", chat_history)
 
         # Assert
-        assert result == "oui"
+        assert result
         assert mock_llm.call_count == 1
         assert "d'accord" in mock_llm.last_prompt
         assert "Je voudrais un rendez-vous" in mock_llm.last_prompt
@@ -66,9 +60,7 @@ class TestConsentValidationLogic:
         """Test that the consent analysis method correctly processes negative responses"""
         # Arrange
         mock_llm = MockLLM("non")
-        agents_graph = AgentsGraph.__new__(
-            AgentsGraph
-        )  # Create instance without calling __init__
+        agents_graph = AgentsGraph.__new__(AgentsGraph) # Don't call init
         agents_graph.calendar_classifier_llm = mock_llm
         agents_graph.logger = Mock()  # Add mock logger
 
@@ -83,7 +75,7 @@ class TestConsentValidationLogic:
         )
 
         # Assert
-        assert result == "non"
+        assert not result
         assert mock_llm.call_count == 1
         assert "pas maintenant" in mock_llm.last_prompt
 
@@ -106,7 +98,7 @@ class TestConsentValidationLogic:
         """Test that user input is correctly included in the LLM prompt"""
         # Arrange
         mock_llm = MockLLM("oui")
-        agents_graph = AgentsGraph.__new__(AgentsGraph)
+        agents_graph = AgentsGraph.__new__(AgentsGraph) # Don't call init
         agents_graph.calendar_classifier_llm = mock_llm
         agents_graph.logger = Mock()  # Add mock logger
 
@@ -309,9 +301,7 @@ class TestRouterIntegrationScenarios:
             ("je ne peux pas", "non", "no_appointment_requested"),
         ],
     )
-    async def test_complete_consent_validation_router_flow(
-        self, user_response, llm_response, expected_node
-    ):
+    async def test_complete_consent_validation_router_flow(self, user_response, llm_response, expected_node):
         """Test the complete router flow with consent validation"""
         # Arrange
         mock_llm = MockLLM(llm_response)
@@ -350,10 +340,7 @@ class TestRouterIntegrationScenarios:
         )
 
         # Act - Simulate the router logic for single schedule_appointement action
-        if (
-            len(agents_graph.available_actions) == 1
-            and agents_graph.available_actions[0] == "schedule_appointement"
-        ):
+        if len(agents_graph.available_actions) == 1 and agents_graph.available_actions[0] == "schedule_appointement":
             # Find last assistant message
             history = state.get("history", [])
             last_assistant_message = None
@@ -366,10 +353,8 @@ class TestRouterIntegrationScenarios:
             # Check if consent validation should be triggered
             if last_assistant_message == TextRegistry.yes_no_consent_text:
                 # Analyze consent
-                consent = await agents_graph._analyse_appointment_consent_async(
-                    user_response, history
-                )
-                if consent == "oui":
+                does_consent = await agents_graph._analyse_appointment_consent_async(user_response, history)
+                if does_consent:
                     next_agent = "calendar_agent"
                 else:
                     next_agent = "no_appointment_requested"
@@ -409,10 +394,7 @@ class TestRouterIntegrationScenarios:
         )
 
         # Act - Simulate router logic
-        if (
-            len(agents_graph.available_actions) == 1
-            and agents_graph.available_actions[0] == "schedule_appointement"
-        ):
+        if len(agents_graph.available_actions) == 1 and agents_graph.available_actions[0] == "schedule_appointement":
             history = state.get("history", [])
             last_assistant_message = None
             if history and len(history) > 0:
@@ -423,14 +405,9 @@ class TestRouterIntegrationScenarios:
 
             # Should NOT trigger consent validation
             if last_assistant_message == TextRegistry.yes_no_consent_text:
-                consent = await agents_graph._analyse_appointment_consent_async(
-                    "oui", history
-                )
-                next_agent = (
-                    "calendar_agent" if consent == "oui" else "no_appointment_requested"
-                )
+                consent = await agents_graph._analyse_appointment_consent_async("oui", history)
+                next_agent = "calendar_agent" if consent == "oui" else "no_appointment_requested"
             else:
-                # Default behavior - direct to calendar
                 next_agent = "calendar_agent"
 
             state["agent_scratchpad"]["next_agent_needed"] = next_agent

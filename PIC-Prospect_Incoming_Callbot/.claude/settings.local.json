@@ -32,7 +32,8 @@
       "Read(/C:\\Dev\\squad-ai\\PIC-Prospect_Incoming_Callbot\\app\\agents/**)",
       "Read(/C:\\Dev\\squad-ai\\PIC-Prospect_Incoming_Callbot\\app\\agents/**)",
       "Read(/C:\\Dev\\squad-ai\\PIC-Prospect_Incoming_Callbot/**)",
-      "Read(/C:\\Dev\\squad-ai\\PIC-Prospect_Incoming_Callbot\\tests\\agents/**)"
+      "Read(/C:\\Dev\\squad-ai\\PIC-Prospect_Incoming_Callbot\\tests\\agents/**)",
+      "Read(/C:\\Dev\\squad-ai\\PIC-Prospect_Incoming_Callbot\\app\\agents/**)"
     ],
     "deny": []
   }

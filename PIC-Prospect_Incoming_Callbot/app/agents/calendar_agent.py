@@ -8,7 +8,7 @@ import pytz
 from api_client.salesforce_api_client_interface import SalesforceApiClientInterface
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain.tools import tool
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.language_models import BaseLanguageModel
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
@@ -21,40 +21,21 @@ class CalendarAgent:
     owner_name: str | None = None
     now: datetime = datetime.now(tz=pytz.timezone("Europe/Paris"))
 
-    # Backward compatibility class attributes - delegate to TextRegistry
-    availability_request_text = TextRegistry.availability_request_text
-    no_timeframes_text = TextRegistry.no_timeframes_text
-    slot_unavailable_text = TextRegistry.slot_unavailable_text
-    confirmation_prefix_text = TextRegistry.confirmation_prefix_text
-    confirmation_suffix_text = TextRegistry.confirmation_suffix_text
-    date_not_found_text = TextRegistry.date_not_found_text
-    appointment_confirmed_prefix_text = TextRegistry.appointment_confirmed_prefix_text
-    appointment_confirmed_suffix_text = TextRegistry.appointment_confirmed_suffix_text
-    appointment_failed_text = TextRegistry.appointment_failed_text
-    modification_not_supported_text = TextRegistry.modification_not_supported_text
-    cancellation_not_supported_text = TextRegistry.cancellation_not_supported_text
-    appointment_too_far_text = TextRegistry.appointment_too_far_text
-
     def __init__(
         self,
         salesforce_api_client: SalesforceApiClientInterface,
-        classifier_llm: any,
-        available_timeframes_llm: any = None,
-        date_extractor_llm: any = None,
+        classifier_llm: BaseLanguageModel,
+        available_timeframes_llm: BaseLanguageModel | None = None,
+        date_extractor_llm: BaseLanguageModel | None = None,
     ):
         self.logger = logging.getLogger(__name__)
         self.classifier_llm = classifier_llm
-        self.available_timeframes_llm = (
-            available_timeframes_llm if available_timeframes_llm else classifier_llm
-        )
-        self.date_extractor_llm = (
-            date_extractor_llm if date_extractor_llm else self.available_timeframes_llm
-        )
+        self.available_timeframes_llm = available_timeframes_llm if available_timeframes_llm else classifier_llm
+        self.date_extractor_llm = date_extractor_llm if date_extractor_llm else self.available_timeframes_llm
         CalendarAgent.salesforce_api_client = salesforce_api_client
         CalendarAgent.now = datetime.now(tz=pytz.timezone("Europe/Paris"))
 
-        # The global calendar scheduler agent with tools
-
+        # Init. calendar agent to retrieve available timeframes
         available_timeframes_prompt = self._load_available_timeframes_prompt()
         available_timeframes_prompts = ChatPromptTemplate.from_messages(
             [
@@ -63,27 +44,8 @@ class CalendarAgent:
             ]
         )
         tools_available_timeframes = [CalendarAgent.get_available_timeframes_async]
-        agent = create_tool_calling_agent(
-            self.available_timeframes_llm,
-            tools_available_timeframes,
-            available_timeframes_prompts,
-        )
-        self.available_timeframes_agent = AgentExecutor(
-            agent=agent, tools=tools_available_timeframes, verbose=True
-        )
-
-        # self.tools = [self.get_appointments, self.schedule_new_appointment_tool]
-        #
-        # self.prompt = self._load_prompt()
-        # self.prompts = ChatPromptTemplate.from_messages([
-        #     ("system", self.prompt),
-        #     MessagesPlaceholder(variable_name="chat_history"),
-        #     ("human", "{input}"),
-        #     MessagesPlaceholder(variable_name="agent_scratchpad"),
-        # ])
-        # self.agent = create_tool_calling_agent(self.date_extractor_llm, self.tools, self.prompts)
-        # self.agent_executor = AgentExecutor(agent=self.agent, tools=self.tools, verbose=True)
-        # response = self.agent_executor.invoke({"input": "quel jour sommes nous ?", "chat_history": []})['output']
+        agent = create_tool_calling_agent(self.available_timeframes_llm, tools_available_timeframes, available_timeframes_prompts)
+        self.available_timeframes_agent = AgentExecutor(agent=agent, tools=tools_available_timeframes, verbose=True)
 
     async def run_async(self, user_input: str, chat_history: list[dict] | None = None) -> str:
         """High-level dispatcher orchestrating calendar actions according to the category.
@@ -97,37 +59,25 @@ class CalendarAgent:
         """
         if chat_history is None:
             chat_history = []
-        category = await self.categorize_for_dispatch_async(user_input, chat_history)
+        category = await self.categorize_request_for_dispatch_async(user_input, chat_history)
         self.logger.info(f"Category detected: {category}")
 
-        # === Category-specific handling ===
+        # Check first if user is requesting a date more than 30 days from now
+        requested_date: datetime | None = await self._extract_appointment_selected_date_and_time_async(user_input, chat_history)
+        if requested_date:
+            days_from_now = (requested_date.date() - CalendarAgent.now.date()).days
+            if days_from_now > 30:
+                return TextRegistry.appointment_too_far_text
 
-        # # Fix bug: where appointment date and time is not extracted correctly
-        # if category == "Rendez-vous confirmé":
-        #     appointment_slot_datetime: datetime = await self._extract_appointment_selected_date_and_time_async(user_input, chat_history)
-        #     if appointment_slot_datetime is None:
-        #         category = "Proposition de créneaux"
-
+        # === Category-specific handling === #
         if category == "Proposition de créneaux":
-            # Check if user is requesting a date more than 30 days from now
-            requested_date = await self._extract_appointment_selected_date_and_time_async(user_input, chat_history)
-            if requested_date:
-                days_from_now = (requested_date.date() - CalendarAgent.now.date()).days
-                if days_from_now > 30:
-                    return self.appointment_too_far_text
-
             formatted_history = []
             for message in chat_history:
                 formatted_history.append(f"{message[0]}: {message[1]}")
 
             available_timeframes_answer = await self.available_timeframes_agent.ainvoke(
                 {
-                    "current_date_str": self._to_french_date(
-                        CalendarAgent.now,
-                        include_weekday=True,
-                        include_year=True,
-                        include_hour=True,
-                    ),
+                    "current_date_str": self._to_french_date(CalendarAgent.now, include_weekday=True, include_year=True, include_hour=True),
                     "owner_name": CalendarAgent.owner_name,
                     "user_input": user_input,
                     "chat_history": "- " + "\n- ".join(formatted_history),
@@ -137,114 +87,59 @@ class CalendarAgent:
             return available_timeframes_answer["output"]
 
         if category == "Demande des disponibilités":
-            return self.availability_request_text
+            return TextRegistry.availability_request_text
 
         if category == "Proposition de rendez-vous":
             start_date = CalendarAgent.now.date()
             end_date = start_date + timedelta(days=2)
-            appointments = await CalendarAgent.get_appointments_async.ainvoke(
-                {"start_date": str(start_date), "end_date": str(end_date)}
-            )
-            available_timeframes = (
-                CalendarAgent.get_available_timeframes_from_scheduled_slots(
-                    str(start_date), str(end_date), appointments
-                )
-            )
+            appointments = await CalendarAgent.get_appointments_async.ainvoke({"start_date": str(start_date), "end_date": str(end_date)})
+            available_timeframes = CalendarAgent.get_available_timeframes_from_scheduled_slots(str(start_date), str(end_date), appointments)
 
             if not available_timeframes:
-                return self.no_timeframes_text
-            return self.slot_unavailable_text
+                return TextRegistry.no_timeframes_text
+            return TextRegistry.slot_unavailable_text
 
         if category == "Demande de confirmation du rendez-vous":
-            # extract date and time from user_input + chat history
-            date_and_time: datetime | None = await self._extract_appointment_selected_date_and_time_async(user_input, chat_history)
-
-            if date_and_time:
-                existing_event_id = (
-                    await self.salesforce_api_client.verify_appointment_existance_async(
-                        event_id=None,
-                        start_datetime=date_and_time.isoformat(),
-                        duration_minutes=30,
-                    )
-                )
+            if requested_date:
+                existing_event_id = await self.salesforce_api_client.verify_appointment_existance_async(event_id=None, start_datetime=requested_date.isoformat(), duration_minutes=30)
                 if existing_event_id:
                     available_timeframes_answer = await self.available_timeframes_agent.ainvoke(
                         {
-                            "current_date_str": self._to_french_date(
-                                CalendarAgent.now,
-                                include_weekday=True,
-                                include_year=True,
-                                include_hour=True,
-                            ),
+                            "current_date_str": self._to_french_date(CalendarAgent.now, include_weekday=True, include_year=True, include_hour=True),
                             "owner_name": CalendarAgent.owner_name,
                             "user_input": "Quels sont les prochains crénaux disponibles ?",
                             "chat_history": "",
                         }
                     )
-
                     available_slots_text = available_timeframes_answer["output"]
-                    return (
-                        TextRegistry.appointment_unavailable_slot_text
-                        + available_slots_text
-                    )
+                    return TextRegistry.appointment_unavailable_slot_text + available_slots_text
 
-                french_date = self._to_french_date(
-                    date_and_time,
-                    include_weekday=True,
-                    include_year=False,
-                    include_hour=True,
-                )
-                return (
-                    self.confirmation_prefix_text
-                    + french_date
-                    + ". "
-                    + self.confirmation_suffix_text
-                )
+                french_date = self._to_french_date(requested_date, include_weekday=True, include_year=False, include_hour=True)
+                return TextRegistry.confirmation_prefix_text + french_date + ". " + TextRegistry.confirmation_suffix_text
             else:
-                return self.date_not_found_text
+                return TextRegistry.date_not_found_text
 
         if category == "Rendez-vous confirmé":
-            appointment_slot_datetime: datetime | None = await self._extract_appointment_selected_date_and_time_async(user_input, chat_history)
-            appointment_slot_datetime_str = self._to_str_iso(appointment_slot_datetime)
-            success = await CalendarAgent.schedule_new_appointment_async(
-                appointment_slot_datetime_str
-            )
-            if success is not None:
-                return (
-                    self.appointment_confirmed_prefix_text
-                    + self._to_french_date(
-                        appointment_slot_datetime,
-                        include_weekday=True,
-                        include_year=False,
-                        include_hour=True,
+            requested_date: datetime | None = await self._extract_appointment_selected_date_and_time_async(user_input, chat_history)
+            if requested_date:
+                requested_date_str = self._to_str_iso(requested_date)
+                success = await CalendarAgent.schedule_new_appointment_async(requested_date_str)
+                if success:
+                    return (
+                        TextRegistry.appointment_confirmed_prefix_text
+                        + self._to_french_date(requested_date, include_weekday=True, include_year=False, include_hour=True)
+                        + ". "
+                        + TextRegistry.appointment_confirmed_suffix_text
                     )
-                    + ". "
-                    + self.appointment_confirmed_suffix_text
-                )
-            else:
-                return self.appointment_failed_text
+            return TextRegistry.appointment_failed_text
 
         if category == "Demande de modification":
-            return self.modification_not_supported_text
+            return TextRegistry.modification_not_supported_text
 
         if category == "Demande d'annulation":
-            return self.cancellation_not_supported_text
+            return TextRegistry.cancellation_not_supported_text
 
-        # Fallback – delegate to original agent behaviour (no change to signature)
-        formatted_history = []
-        for message in chat_history:
-            if "AI" in message:
-                formatted_history.append(AIMessage(content=message["AI"]))
-            elif "human" in message:
-                formatted_history.append(HumanMessage(content=message["human"]))
-        try:
-            response = await self.agent_executor.ainvoke(
-                {"input": user_input, "chat_history": formatted_history}
-            )
-            return response.get("output", "") if response else ""
-        except Exception as e:
-            self.logger.error(f"/!\\ Error executing calendar agent with tools: {e}")
-            return ""
+        return TextRegistry.ask_to_repeat_text
 
     @tool
     def get_owner_name() -> str:
@@ -262,12 +157,7 @@ class CalendarAgent:
 
     @staticmethod
     def get_current_date_tool() -> str:
-        return CalendarAgent._to_french_date(
-            CalendarAgent.now,
-            include_weekday=True,
-            include_year=True,
-            include_hour=True,
-        )
+        return CalendarAgent._to_french_date(CalendarAgent.now, include_weekday=True, include_year=True, include_hour=True)
 
     @tool
     async def get_appointments_async(start_date: str, end_date: str) -> list[dict[str, any]]:
@@ -282,29 +172,19 @@ class CalendarAgent:
         """
         # Get the existing appointments from Salesforce API
         # TODO: manage "CalendarAgent.owner_id" another way to allow multi-calls handling.
-        scheduled_slots = (
-            await CalendarAgent.salesforce_api_client.get_scheduled_appointments_async(
-                start_date, end_date, CalendarAgent.owner_id
-            )
-        )
+        scheduled_slots = await CalendarAgent.salesforce_api_client.get_scheduled_appointments_async(start_date, end_date, CalendarAgent.owner_id)
 
         # Log the result
         logger = logging.getLogger(__name__)
-        logger.info(
-            f"Called 'get_appointments' tool for owner {CalendarAgent.owner_id} between {start_date} and {end_date}."
-        )
+        logger.info(f"Called 'get_appointments' tool for owner {CalendarAgent.owner_id} between {start_date} and {end_date}.")
         if scheduled_slots:
             slot_details = []
             for slot in scheduled_slots:
                 slot_detail = f"- De {slot.get('StartDateTime')} à {slot.get('EndDateTime')} - Sujet: {slot.get('Subject', '-')} - Description: {slot.get('Description', '-')} - Location: {slot.get('Location', '-')} - OwnerId: {slot.get('OwnerId', '-')} - WhatId: {slot.get('WhatId', '-')} - WhoId: {slot.get('WhoId', '-')}"
                 slot_details.append(slot_detail)
-            logger.info(
-                f"Here is the list of the owner calendar taken slots: \n{chr(10).join(slot_details)}"
-            )
+            logger.info(f"Here is the list of the owner calendar taken slots: \n{chr(10).join(slot_details)}")
         else:
-            logger.info(
-                "No appointments found for the owner between the specified dates."
-            )
+            logger.info("No appointments found for the owner between the specified dates.")
         return scheduled_slots
 
     @tool
@@ -332,14 +212,8 @@ class CalendarAgent:
         if not end_date.endswith("Z"):
             end_date += "Z"
 
-        scheduled_slots = (
-            await CalendarAgent.salesforce_api_client.get_scheduled_appointments_async(
-                start_date, end_date, CalendarAgent.owner_id
-            )
-        )
-        return CalendarAgent.get_available_timeframes_from_scheduled_slots(
-            start_date, end_date, scheduled_slots
-        )
+        scheduled_slots = await CalendarAgent.salesforce_api_client.get_scheduled_appointments_async(start_date, end_date, CalendarAgent.owner_id)
+        return CalendarAgent.get_available_timeframes_from_scheduled_slots(start_date, end_date, scheduled_slots)
 
     @staticmethod
     @tool
@@ -359,43 +233,21 @@ class CalendarAgent:
             The scheduled appointment details
         """
         duration = 30  # Default duration in minutes
-        return await CalendarAgent.schedule_new_appointment_async(
-            date_and_time, duration, user_subject, description
-        )
+        return await CalendarAgent.schedule_new_appointment_async(date_and_time, duration, user_subject, description)
 
     @staticmethod
-    async def schedule_new_appointment_async(
-        date_and_time: str,
-        duration: int = 30,
-        user_subject: str | None = None,
-        description: str | None = None,
-    ) -> str | None:
-        subject = (
-            "RDV Callbot - " + CalendarAgent.first_name + " " + CalendarAgent.last_name
-        )
+    async def schedule_new_appointment_async(date_and_time: str, duration: int = 30, user_subject: str | None = None, description: str | None = None) -> str | None:
+        subject = "RDV Callbot - " + CalendarAgent.first_name + " " + CalendarAgent.last_name
         if user_subject:
             subject += ": " + user_subject
-        description = (
-            description
-            if description
-            else "Rendez-vous pris directement par l'IA lors d'un appel entrant du lead en dehors des heures ouvrées."
-        )
+        description = description if description else "Rendez-vous pris directement par l'IA lors d'un appel entrant du lead en dehors des heures ouvrées."
         if not date_and_time.endswith("Z"):
             date_and_time += "Z"
 
         # TODO: manage "CalendarAgent.*" variables another way for multi-calls handling.
-        return await CalendarAgent.salesforce_api_client.schedule_new_appointment_async(
-            subject,
-            date_and_time,
-            duration,
-            description,
-            owner_id=CalendarAgent.owner_id,
-            who_id=CalendarAgent.user_id,
-        )
+        return await CalendarAgent.salesforce_api_client.schedule_new_appointment_async(subject, date_and_time, duration, description, owner_id=CalendarAgent.owner_id, who_id=CalendarAgent.user_id)
 
-    def _set_user_info(
-        self, user_id, first_name, last_name, email, owner_id, owner_name
-    ):
+    def _set_user_info(self, user_id, first_name, last_name, email, owner_id, owner_name):
         """
         Initialize the Calendar Agent with user information and configuration.
 
@@ -410,12 +262,11 @@ class CalendarAgent:
         CalendarAgent.first_name = first_name
         CalendarAgent.last_name = last_name
         CalendarAgent.email = email
-
         CalendarAgent.user_id = user_id
         CalendarAgent.owner_id = owner_id
         CalendarAgent.owner_name = owner_name
 
-    async def categorize_for_dispatch_async(self, user_input: str, chat_history: list[dict[str, str]] | None = None) -> str:
+    async def categorize_request_for_dispatch_async(self, user_input: str, chat_history: list[dict[str, str]] | None = None) -> str:
         """Classify the user's request into one of the rendez-vous workflow categories.
 
         The categorisation relies primarily on the underlying LLM but falls back to
@@ -459,9 +310,7 @@ class CalendarAgent:
 
         try:
             resp = await self.classifier_llm.ainvoke(classifier_prompt)
-            llm_category = (
-                resp.content.strip() if hasattr(resp, "content") else str(resp).strip()
-            )
+            llm_category = resp.content.strip() if hasattr(resp, "content") else str(resp).strip()
             return llm_category
         except Exception as e:
             self.logger.warning(f"CalendarAgent categorisation failed: {e}")
@@ -495,37 +344,9 @@ class CalendarAgent:
     #     fin_m_str = '' if fin_m == '00' else f' {fin_m}'
     #     return f"{jour} {jour_num} {mois_nom} entre {int(debut_h)} heure{'s' if int(debut_h) != 1 else ''}{debut_m_str} et {int(fin_h)} heure{'s' if int(fin_h) != 1 else ''}{fin_m_str}"
 
-    def _to_french_date(
-        self,
-        dt: datetime,
-        include_weekday: bool = True,
-        include_year: bool = False,
-        include_hour: bool = False,
-    ) -> str:
-        french_days = [
-            "lundi",
-            "mardi",
-            "mercredi",
-            "jeudi",
-            "vendredi",
-            "samedi",
-            "dimanche",
-        ]
-        french_months = [
-            "",
-            "janvier",
-            "février",
-            "mars",
-            "avril",
-            "mai",
-            "juin",
-            "juillet",
-            "août",
-            "septembre",
-            "octobre",
-            "novembre",
-            "décembre",
-        ]
+    def _to_french_date(self, dt: datetime, include_weekday: bool = True, include_year: bool = False, include_hour: bool = False) -> str:
+        french_days = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+        french_months = ["", "janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
         french_date = ""
         if include_weekday:
             french_date += f"{french_days[dt.weekday()]} "
@@ -574,12 +395,7 @@ class CalendarAgent:
         # Prepare occupied slots for quick lookup
         scheduled_slots_dt = []
         for slot in scheduled_slots:
-            scheduled_slots_dt.append(
-                (
-                    datetime.fromisoformat(slot["StartDateTime"].replace("Z", "")),
-                    datetime.fromisoformat(slot["EndDateTime"].replace("Z", "")),
-                )
-            )
+            scheduled_slots_dt.append((datetime.fromisoformat(slot["StartDateTime"].replace("Z", "")), datetime.fromisoformat(slot["EndDateTime"].replace("Z", ""))))
 
         delta = timedelta(minutes=slot_duration_minutes)
         available_ranges = []
@@ -600,12 +416,8 @@ class CalendarAgent:
                 # Combine date with time to create full datetime objects for the timeframe
                 # Add timezone info (Europe/Paris) to make them compatible with occ_start and occ_end
                 french_tz = pytz.timezone("Europe/Paris")
-                timeframe_start = french_tz.localize(
-                    datetime.combine(start_date_only, start_hour_dt.time())
-                )
-                timeframe_end = french_tz.localize(
-                    datetime.combine(start_date_only, end_hour_dt.time())
-                )
+                timeframe_start = french_tz.localize(datetime.combine(start_date_only, start_hour_dt.time()))
+                timeframe_end = french_tz.localize(datetime.combine(start_date_only, end_hour_dt.time()))
 
                 # Always adjust the end time by subtracting slot_duration_minutes to exclude the last slot
                 timeframe_end -= delta
@@ -618,9 +430,7 @@ class CalendarAgent:
                 free_intervals = []
                 interval_start = timeframe_start
                 # Sort taken slots for the day and timeframe
-                day_slots = [
-                    s for s in scheduled_slots_dt if s[0].date() == start_date_only
-                ]
+                day_slots = [s for s in scheduled_slots_dt if s[0].date() == start_date_only]
                 day_slots = sorted(day_slots, key=lambda x: x[0])
                 for occ_start, occ_end in day_slots:
                     if occ_start.tzinfo is None:
@@ -658,9 +468,7 @@ class CalendarAgent:
 
         return unique_ranges
 
-    async def _extract_appointment_selected_date_and_time_async(
-        self, user_input: str, chat_history: list[dict]
-    ) -> datetime | None:
+    async def _extract_appointment_selected_date_and_time_async(self, user_input: str, chat_history: list[dict]) -> datetime | None:
         prompt = ChatPromptTemplate.from_template("""
         Extract the exact date and time specified by the user for the appointment from the following conversation.
         Only return the date and time in the following format: YYYY-MM-DDTHH:MM:SSZ.
@@ -677,19 +485,12 @@ class CalendarAgent:
         """)
 
         chain = prompt | self.date_extractor_llm | StrOutputParser()
-        chat_history_str = "- " + "\n- ".join(
-            (msg[0] + ": " + msg[1]) for msg in chat_history
-        )
+        chat_history_str = "- " + "\n- ".join((msg[0] + ": " + msg[1]) for msg in chat_history)
         response = await chain.ainvoke(
             {
                 "input": user_input,
                 "chat_history": chat_history_str,
-                "now": self._to_french_date(
-                    CalendarAgent.now,
-                    include_weekday=True,
-                    include_year=True,
-                    include_hour=True,
-                ),
+                "now": self._to_french_date(CalendarAgent.now, include_weekday=True, include_year=True, include_hour=True),
             }
         )
 
@@ -708,11 +509,10 @@ class CalendarAgent:
         return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     calendar_agent_prompt: str = ""
+
     def _load_calendar_agent_prompt(self):
         if not CalendarAgent.calendar_agent_prompt:
-            with open(
-                "app/agents/prompts/calendar_agent_prompt.txt", encoding="utf-8"
-            ) as f:
+            with open("app/agents/prompts/calendar_agent_prompt.txt", encoding="utf-8") as f:
                 CalendarAgent.calendar_agent_prompt = f.read()
         return CalendarAgent.calendar_agent_prompt
 
@@ -720,10 +520,7 @@ class CalendarAgent:
 
     def _load_classifier_prompt(self):
         if not CalendarAgent.classifier_prompt:
-            with open(
-                "app/agents/prompts/calendar_agent_classifier_prompt.txt",
-                encoding="utf-8",
-            ) as f:
+            with open("app/agents/prompts/calendar_agent_classifier_prompt.txt", encoding="utf-8") as f:
                 CalendarAgent.classifier_prompt = f.read()
         return CalendarAgent.classifier_prompt
 
@@ -731,9 +528,6 @@ class CalendarAgent:
 
     def _load_available_timeframes_prompt(self):
         if not CalendarAgent.available_timeframes_prompt:
-            with open(
-                "app/agents/prompts/calendar_agent_available_timeframes_prompt.txt",
-                encoding="utf-8",
-            ) as f:
+            with open("app/agents/prompts/calendar_agent_available_timeframes_prompt.txt", encoding="utf-8") as f:
                 CalendarAgent.available_timeframes_prompt = f.read()
         return CalendarAgent.available_timeframes_prompt
