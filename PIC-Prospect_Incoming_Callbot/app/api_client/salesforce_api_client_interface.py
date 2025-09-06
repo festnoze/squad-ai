@@ -134,3 +134,50 @@ class SalesforceApiClientInterface(ABC):
     @abstractmethod
     async def verify_appointment_existance_async(self, event_id: str | None = None, expected_subject: str | None = None, start_datetime: str = "", duration_minutes: int = 30) -> str | None:
         pass
+
+    @abstractmethod
+    async def get_opportunities_by_contact_async(self, contact_id: str) -> list[dict] | None:
+        """
+        Retrieve Opportunities related to a specific Contact via Account relationship.
+        
+        Args:
+            contact_id: The ID of the Salesforce Contact.
+            
+        Returns:
+            A list of Opportunity dictionaries related to the contact's account, 
+            or None if an error occurs. Returns empty list if no opportunities found.
+        """
+        pass
+
+    @abstractmethod
+    async def get_user_by_id_async(self, user_id: str) -> dict | None:
+        """
+        Retrieve detailed information about a Salesforce User by ID.
+        
+        Args:
+            user_id: The ID of the Salesforce User.
+            
+        Returns:
+            A dictionary containing user information, or None if user not found or error occurs.
+        """
+        pass
+
+    @abstractmethod
+    async def get_complete_contact_info_by_phone_async(self, phone_number: str) -> dict | None:
+        """
+        Aggregated method to retrieve complete contact information from a phone number.
+        
+        This method combines multiple sub-methods:
+        1. Search for contact by phone number
+        2. Get opportunities related to the contact
+        3. Get the most recent opportunity
+        4. Get user associated with the opportunity (or contact owner if no opportunity)
+        
+        Args:
+            phone_number: The phone number to search for.
+            
+        Returns:
+            A dictionary containing contact, opportunities, and user information,
+            or None if no contact found or error occurs.
+        """
+        pass

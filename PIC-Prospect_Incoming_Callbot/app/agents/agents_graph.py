@@ -78,20 +78,12 @@ class AgentsGraph:
         if conversation_persistence:
             self.conversation_persistence = conversation_persistence
         else:
-            conversation_persistence_type = (
-                EnvHelper.get_conversation_persistence_type()
-            )
+            conversation_persistence_type = EnvHelper.get_conversation_persistence_type()
             # Check for inconsistent states
             if "ask_rag" in self.available_actions:
-                assert conversation_persistence_type == "studi_rag", (
-                    "when 'ask_rag' action is available, conversation persistence type must be 'studi_rag' but is: "
-                    + conversation_persistence_type
-                )
+                assert conversation_persistence_type == "studi_rag", "when 'ask_rag' action is available, conversation persistence type must be 'studi_rag' but is: " + conversation_persistence_type
             else:
-                assert conversation_persistence_type != "studi_rag", (
-                    "when 'ask_rag' action is not available, conversation persistence type cannot be 'studi_rag' but is: "
-                    + conversation_persistence_type
-                )
+                assert conversation_persistence_type != "studi_rag", "when 'ask_rag' action is not available, conversation persistence type cannot be 'studi_rag' but is: " + conversation_persistence_type
 
             if conversation_persistence_type == "local":
                 self.conversation_persistence = ConversationPersistenceLocalService()
@@ -101,42 +93,30 @@ class AgentsGraph:
                 self.conversation_persistence = ConversationPersistenceServiceFake()
 
         self.rag_query_service = rag_query_service or StudiRAGInferenceApiClient()
-        self.salesforce_api_client: SalesforceApiClientInterface = (
-            salesforce_client or SalesforceApiClient()
-        )
+        self.salesforce_api_client: SalesforceApiClientInterface = salesforce_client or SalesforceApiClient()
         self.outgoing_manager: OutgoingManager = outgoing_manager
-        self.has_waiting_music_on_calendar: bool = (
-            EnvHelper.get_waiting_music_on_calendar()
-        )
+        self.has_waiting_music_on_calendar: bool = EnvHelper.get_waiting_music_on_calendar()
         self.has_waiting_music_on_rag: bool = EnvHelper.get_waiting_music_on_rag()
-        lid_config_file_path = os.path.join(
-            os.path.dirname(__file__), "configs", "lid_api_config.yaml"
-        )
+        lid_config_file_path = os.path.join(os.path.dirname(__file__), "configs", "lid_api_config.yaml")
         self.lead_agent_instance = LeadAgent(config_path=lid_config_file_path)
-        self.logger.info(
-            f"Initialize Lead Agent succeed with config: {lid_config_file_path}"
-        )
+        self.logger.info(f"Initialize Lead Agent succeed with config: {lid_config_file_path}")
         openai_api_key = EnvHelper.get_openai_api_key()
-        self.calendar_classifier_llm: BaseChatModel = (
-            LangChainFactory.create_llm_from_info(
-                LlmInfo(
-                    type=LangChainAdapterType.OpenAI,
-                    model="gpt-4.1",
-                    timeout=30,
-                    temperature=0.1,
-                    api_key=openai_api_key,
-                )
+        self.calendar_classifier_llm: BaseChatModel = LangChainFactory.create_llm_from_info(
+            LlmInfo(
+                type=LangChainAdapterType.OpenAI,
+                model="gpt-4.1",
+                timeout=30,
+                temperature=0.1,
+                api_key=openai_api_key,
             )
         )
-        self.calendar_timeframes_llm: BaseChatModel = (
-            LangChainFactory.create_llm_from_info(
-                LlmInfo(
-                    type=LangChainAdapterType.OpenAI,
-                    model="gpt-4.1-mini",
-                    timeout=50,
-                    temperature=0.1,
-                    api_key=openai_api_key,
-                )
+        self.calendar_timeframes_llm: BaseChatModel = LangChainFactory.create_llm_from_info(
+            LlmInfo(
+                type=LangChainAdapterType.OpenAI,
+                model="gpt-4.1-mini",
+                timeout=50,
+                temperature=0.1,
+                api_key=openai_api_key,
             )
         )
 
@@ -297,20 +277,13 @@ class AgentsGraph:
             prompt = file.read()
 
         # TODO: to improve using langchain history summarization, or our own existing in the RAG API.
-        chat_history_str = "\n".join(
-            [f"[{msg[0]}]: {msg[1][:1000]}..." for msg in chat_history]
-        )
+        chat_history_str = "\n".join([f"[{msg[0]}]: {msg[1][:1000]}..." for msg in chat_history])
 
         # Reduce to max_history_chars and to max_msg_count total messages to avoid exceeding the context window length of the LLM.
         max_msg_chars = 16000
         max_msg_count = 8
         if len(chat_history_str) > max_msg_chars:
-            chat_history_str = "\n".join(
-                [
-                    f"[{msg[0]}]: {msg[1][:1000]}..."
-                    for msg in chat_history[-max_msg_count:]
-                ]
-            )
+            chat_history_str = "\n".join([f"[{msg[0]}]: {msg[1][:1000]}..." for msg in chat_history[-max_msg_count:]])
             chat_history_str = "... " + chat_history_str[-max_msg_chars:]
 
         actions_names = ""
@@ -333,9 +306,7 @@ class AgentsGraph:
 
         response = await llm.ainvoke(prompt)
 
-        self.logger.info(
-            f"#> Router Analysis decide to dispatch to: |###> {response.content} <###|"
-        )
+        self.logger.info(f"#> Router Analysis decide to dispatch to: |###> {response.content} <###|")
         return response.content
 
     async def _check_appointment_consent_request(self, user_input: str, history: list) -> tuple[bool, bool]:
@@ -357,9 +328,7 @@ class AgentsGraph:
                 break
 
         if last_assistant_message and last_assistant_message.endswith(TextRegistry.yes_no_consent_text):
-            does_consent = await self._analyse_appointment_consent_async(
-                user_input, history
-            )
+            does_consent = await self._analyse_appointment_consent_async(user_input, history)
             return True, does_consent
         return False, False
 
@@ -401,17 +370,13 @@ class AgentsGraph:
             await self.rag_query_service.test_client_connection_async()
         except Exception:
             self.logger.exception("/!\\ Error testing connection to RAG API.")
-            await self.add_AI_response_message_to_conversation_async(
-                TextRegistry.technical_error_text, state, persist=False
-            )
+            await self.add_AI_response_message_to_conversation_async(TextRegistry.technical_error_text, state, persist=False)
             return state
 
         conversation_id = await self._init_user_and_new_conversation_in_backend_api_async(state.get("caller_phone"), state.get("call_sid"))
         if not conversation_id:
             self.logger.error(f"Error initializing conversation for phone: {state.get('caller_phone')}, call_sid: {state.get('call_sid')}. Conversation id is not defined.")
-            await self.add_AI_response_message_to_conversation_async(
-                TextRegistry.technical_error_text, state, persist=False
-            )
+            await self.add_AI_response_message_to_conversation_async(TextRegistry.technical_error_text, state, persist=False)
 
         # Late persistence of welcome message (because it cannot have been persisted before, as conversation has not been created then)
         if conversation_id:
@@ -427,9 +392,7 @@ class AgentsGraph:
 
     async def _init_user_and_new_conversation_in_backend_api_async(self, calling_phone_number: str, call_sid: str) -> str | None:
         """Initialize the user session in the backend API: create user and conversation"""
-        user_name_val = "Twilio incoming call " + (
-            calling_phone_number or "Unknown User"
-        )
+        user_name_val = "Twilio incoming call " + (calling_phone_number or "Unknown User")
         ip_val = calling_phone_number or "Unknown IP"
         user_RM = UserRequestModel(
             user_id=None,
@@ -445,9 +408,7 @@ class AgentsGraph:
             ),
         )
         try:
-            user_id = await self.conversation_persistence.create_or_retrieve_user_async(
-                user_RM
-            )
+            user_id = await self.conversation_persistence.create_or_retrieve_user_async(user_RM)
             # Use Twilio call Sid as uuid for conversation (converted with 'TwilioCallSidConverter')
             call_sid_uuid = TwilioCallSidConverter.call_sid_to_uuid(call_sid)
             new_conversation_RM = ConversationRequestModel(user_id=user_id, messages=[], conversation_id=call_sid_uuid)
@@ -458,46 +419,80 @@ class AgentsGraph:
             self.logger.error(f"Error creating conversation: {e!s}")
             return None
 
+    def _mapping_complete_contact_info_to_sf_account_info(self, complete_info: dict) -> dict:
+        """
+        Adapter method to convert the complete contact info structure to the expected sf_account_info structure.
+
+        This maintains backward compatibility with existing downstream consumers while using the enhanced
+        contact information that includes the most relevant user (from opportunity or contact owner).
+
+        Args:
+            complete_info: Result from get_complete_contact_info_by_phone_async
+
+        Returns:
+            Dictionary in the expected sf_account_info format with enhanced Owner information
+        """
+        if not complete_info:
+            return {}
+
+        contact_data = complete_info.get("contact", {})
+        assigned_user = complete_info.get("assigned_user")
+        user_source = complete_info.get("user_source")
+
+        # Start with the original contact data structure
+        adapted_info = contact_data.copy()
+
+        # Override the Owner information with the assigned user from opportunity (if available)
+        if assigned_user:
+            adapted_info["Owner"] = {"Id": assigned_user.get("Id", ""), "Name": assigned_user.get("Name", "")}
+            self.logger.info(f"Using enhanced Owner info from {user_source}: {assigned_user.get('Name')}")
+        else:
+            # Fallback to original Owner structure if no assigned user found
+            if "Owner" not in adapted_info or not adapted_info.get("Owner"):
+                adapted_info["Owner"] = {"Id": "", "Name": ""}
+
+        return adapted_info
+
     async def user_identification_node(self, state: PhoneConversationState) -> PhoneConversationState:
         self.logger.info("Initializing SF Agent")
         call_sid = state.get("call_sid", "N/A")
         phone_number = state.get("caller_phone", "N/A")
-        # accounts = await self.salesforce_api_client.get_persons_async()
-        sf_account_info = await self.salesforce_api_client.get_person_by_phone_async(phone_number)
+
+        # Use the new aggregated method that links through opportunities to find the most relevant user
+        complete_contact_info = await self.salesforce_api_client.get_complete_contact_info_by_phone_async(phone_number)
 
         # Single retry upon failure to retrieve SalesForce account
-        if not sf_account_info:
+        if not complete_contact_info:
             self.logger.info(f"[{call_sid}] No SalesForce account found for phone number: {phone_number}. Retry once to retrieve.")
-            sf_account_info = await self.salesforce_api_client.get_person_by_phone_async(phone_number)
-            if not sf_account_info:
+            complete_contact_info = await self.salesforce_api_client.get_complete_contact_info_by_phone_async(phone_number)
+            if not complete_contact_info:
                 self.logger.warning(f"[{call_sid}] No SalesForce account found after retry for phone number: {phone_number}. New user: needs LID creation.")
+
+        # Keep the leads info call for backward compatibility (though the new method includes this logic)
         leads_info = await self.salesforce_api_client.get_leads_by_details_async(phone_number)
 
-        state["agent_scratchpad"]["sf_account_info"] = sf_account_info.get("data", {}) if sf_account_info else {}
-        state["agent_scratchpad"]["sf_leads_info"] = leads_info[0] if leads_info else {}
-        self.logger.info(f"[{call_sid}] Stored sf_account_info: {sf_account_info.get('data', {}) if sf_account_info else '-no SF account found-'} in agent_scratchpad")
+        # Adapt the complete contact info to the expected sf_account_info structure
+        sf_account_info = self._mapping_complete_contact_info_to_sf_account_info(complete_contact_info)
 
-        state.get("agent_scratchpad", {})["next_agent_needed"] = "user_identified" if sf_account_info else "user_new"
+        state["agent_scratchpad"]["sf_account_info"] = sf_account_info
+        state["agent_scratchpad"]["sf_leads_info"] = leads_info[0] if leads_info else {}
+        state["agent_scratchpad"]["sf_complete_info"] = complete_contact_info  # Store complete info for potential future use
+
+        self.logger.info(f"[{call_sid}] Stored enhanced sf_account_info with {complete_contact_info.get('user_source', 'unknown')} user: {sf_account_info.get('Owner', {}).get('Name', 'N/A')} in agent_scratchpad")
+
+        state.get("agent_scratchpad", {})["next_agent_needed"] = "user_identified" if complete_contact_info else "user_new"
         return state
 
     async def user_identification_decide_next_step(self, state: PhoneConversationState) -> str | None:
         """Decide next step based on user identification"""
         return state.get("agent_scratchpad", {}).get("next_agent_needed")
 
-    async def user_identified_node(
-        self, state: PhoneConversationState
-    ) -> PhoneConversationState:
+    async def user_identified_node(self, state: PhoneConversationState) -> PhoneConversationState:
         """For existing user: User identity confirmation"""
         first_name = state["agent_scratchpad"]["sf_account_info"].get("FirstName", "").strip()
         end_welcome_text = f"{self.thanks_to_come_back}, {first_name}."
 
-        salesman_first_name = (
-            state["agent_scratchpad"]["sf_account_info"]
-            .get("Owner", {})
-            .get("Name", "enformation DUPONT")
-            .split(" ")[0]
-            .strip()
-        )
+        salesman_first_name = state["agent_scratchpad"]["sf_account_info"].get("Owner", {}).get("Name", "enformation DUPONT").split(" ")[0].strip()
         end_welcome_text += f" Votre conseiller, {salesman_first_name}, est actuellement indisponible."
 
         if "schedule_appointement" in self.available_actions:
@@ -516,30 +511,22 @@ class AgentsGraph:
         await self.add_AI_response_message_to_conversation_async(end_welcome_text, state)
         return state
 
-    async def user_new_node(
-        self, state: PhoneConversationState
-    ) -> PhoneConversationState:
+    async def user_new_node(self, state: PhoneConversationState) -> PhoneConversationState:
         """For new user: Case not handled. Ask the user to call during the opening hours"""
         await self.add_AI_response_message_to_conversation_async(TextRegistry.unavailability_for_new_prospect, state)
         return state
 
-    async def wait_for_user_input_node(
-        self, state: PhoneConversationState
-    ) -> PhoneConversationState:
+    async def wait_for_user_input_node(self, state: PhoneConversationState) -> PhoneConversationState:
         """Wait for user input"""
         return state
 
-    async def lead_agent_node(
-        self, state: PhoneConversationState
-    ) -> PhoneConversationState:
+    async def lead_agent_node(self, state: PhoneConversationState) -> PhoneConversationState:
         """Handles lead qualification and information gathering using LeadAgent."""
         call_sid = state.get("call_sid", "N/A")
         self.logger.info(f"[{call_sid}] Entering Lead Agent node")
         user_input = state["user_input"]
         # Retrieve previously extracted info from scratchpad if continuing interaction
-        current_extracted_info = state.get("agent_scratchpad", {}).get(
-            "lead_extracted_info", {}
-        )
+        current_extracted_info = state.get("agent_scratchpad", {}).get("lead_extracted_info", {})
 
         if not self.lead_agent_instance:
             self.logger.error(f"[{call_sid}] LeadAgent not initialized. Cannot process.")
@@ -573,9 +560,7 @@ class AgentsGraph:
             self.logger.debug(f"[{call_sid}] Formatted request data: {request_data}")
 
             # 4. Validate request (based on LeadAgent logic)
-            is_valid, validation_error = self.lead_agent_instance._validate_request(
-                request_data
-            )
+            is_valid, validation_error = self.lead_agent_instance._validate_request(request_data)
             self.logger.info(f"[{call_sid}] Request validation - Valid: {is_valid}, Error: {validation_error}")
 
             # 5. Determine response and next step
@@ -599,11 +584,7 @@ class AgentsGraph:
                         next_step = "lead_captured"  # Indicate success
                     else:
                         # Attempt to get error detail from response body if possible
-                        error_detail = (
-                            result.text[:100]
-                            if hasattr(result, "text")
-                            else "No details"
-                        )
+                        error_detail = result.text[:100] if hasattr(result, "text") else "No details"
                         response_text = f"Désolé, une erreur est survenue ({result.status_code}: {error_detail}) lors de la création de votre fiche. Veuillez réessayer plus tard."
                         next_step = "api_error"
                 except Exception as api_exc:
@@ -620,18 +601,14 @@ class AgentsGraph:
             return state
 
         except Exception as e:
-            self.logger.error(
-                f"[{call_sid[-4:]}] Error in Lead Agent node: {e}", exc_info=True
-            )
+            self.logger.error(f"[{call_sid[-4:]}] Error in Lead Agent node: {e}", exc_info=True)
             response_text = "Je rencontre un problème pour traiter votre demande."
             # Include the error in the scratchpad for debugging if needed
             error_scratchpad = state.get("agent_scratchpad", {})
             error_scratchpad["error"] = str(e)
             return state
 
-    async def calendar_agent_node(
-        self, state: PhoneConversationState
-    ) -> PhoneConversationState:
+    async def calendar_agent_node(self, state: PhoneConversationState) -> PhoneConversationState:
         """Handles calendar operations using CalendarAgent."""
         call_sid = state.get("call_sid", "N/A")
         user_input = state.get("user_input", "")
@@ -694,49 +671,33 @@ class AgentsGraph:
         lead_status = state.get("agent_scratchpad", {}).get("lead_last_status")
         if lead_status:
             if lead_status == "lead_captured":
-                self.logger.info(
-                    f"[~{call_sid[-4:]}] Lead captured, ending conversation."
-                )
+                self.logger.info(f"[~{call_sid[-4:]}] Lead captured, ending conversation.")
                 return END
             elif lead_status == "api_error":
-                self.logger.warning(
-                    f"[~{call_sid[-4:]}] API error occurred, ending conversation."
-                )
+                self.logger.warning(f"[~{call_sid[-4:]}] API error occurred, ending conversation.")
                 return END
             elif lead_status == "ask_user_for_info":
-                self.logger.info(
-                    f"[~{call_sid[-4:]}] Need more lead info from user, ending graph run."
-                )
+                self.logger.info(f"[~{call_sid[-4:]}] Need more lead info from user, ending graph run.")
                 return END
 
         # Check calendar agent status
         if state.get("agent_scratchpad", {}).get("appointment_created"):
-            self.logger.info(
-                f"[~{call_sid[-4:]}] Appointment created, ending conversation."
-            )
+            self.logger.info(f"[~{call_sid[-4:]}] Appointment created, ending conversation.")
             return END
 
         # Default behavior
-        self.logger.info(
-            f"[~{call_sid[-4:]}] No specific routing condition met, ending graph run."
-        )
+        self.logger.info(f"[~{call_sid[-4:]}] No specific routing condition met, ending graph run.")
         return END
 
-    async def query_rag_api_about_trainings_agent_node(
-        self, state: PhoneConversationState
-    ) -> PhoneConversationState | str:
+    async def query_rag_api_about_trainings_agent_node(self, state: PhoneConversationState) -> PhoneConversationState | str:
         """Handle the course agent node."""
         call_sid = state.get("call_sid", "N/A")
         user_query = state.get("user_input", "")
-        self.logger.info(
-            f"> Ongoing RAG query on training course information. User request: '{user_query}' for: [{call_sid[-4:]}]."
-        )
+        self.logger.info(f"> Ongoing RAG query on training course information. User request: '{user_query}' for: [{call_sid[-4:]}].")
 
         conversation_id = state.get("agent_scratchpad", {}).get("conversation_id", None)
         if not conversation_id:
-            self.logger.error(
-                f"[~{call_sid[-4:]}] No conversation ID found, ending graph run."
-            )
+            self.logger.error(f"[~{call_sid[-4:]}] No conversation ID found, ending graph run.")
             return END
 
         try:
@@ -779,9 +740,7 @@ class AgentsGraph:
 
             if full_answer:
                 self.logger.info(f"Full answer received from RAG API: '{full_answer}'")
-                await self.add_AI_response_message_to_conversation_async(
-                    full_answer, state, speak_out_text=False
-                )
+                await self.add_AI_response_message_to_conversation_async(full_answer, state, speak_out_text=False)
                 # RAG agent successful response - reset error counter
                 self.consecutive_error_manager.reset_consecutive_error_count(state)
 
@@ -791,14 +750,10 @@ class AgentsGraph:
             self.logger.error(f"Error in RAG API communication: {e!s}")
             # RAG agent failure is an error - increment counter
             self.consecutive_error_manager.increment_consecutive_error_count(state)
-            await self.add_AI_response_message_to_conversation_async(
-                TextRegistry.rag_communication_error_text, state
-            )
+            await self.add_AI_response_message_to_conversation_async(TextRegistry.rag_communication_error_text, state)
             return state
 
-    async def other_inquery_node(
-        self, state: PhoneConversationState
-    ) -> PhoneConversationState:
+    async def other_inquery_node(self, state: PhoneConversationState) -> PhoneConversationState:
         """Handle other inquery"""
         call_sid = state.get("call_sid", "N/A")
         phone_number = state.get("caller_phone", "N/A")
@@ -806,9 +761,7 @@ class AgentsGraph:
         self.logger.info(f"[{call_sid}] Sent 'other' message to {phone_number}")
         return state
 
-    async def no_appointment_requested_node(
-        self, state: PhoneConversationState
-    ) -> PhoneConversationState:
+    async def no_appointment_requested_node(self, state: PhoneConversationState) -> PhoneConversationState:
         """Handle case where user refuses appointment"""
         call_sid = state.get("call_sid", "N/A")
         phone_number = state.get("caller_phone", "N/A")
@@ -816,9 +769,7 @@ class AgentsGraph:
         self.logger.info(f"[{call_sid}] User refused appointment, sent closure message to {phone_number}")
         return state
 
-    async def max_consecutive_errors_reached_node(
-        self, state: PhoneConversationState
-    ) -> PhoneConversationState:
+    async def max_consecutive_errors_reached_node(self, state: PhoneConversationState) -> PhoneConversationState:
         """Handle case where maximum consecutive errors have been reached"""
         call_sid = state.get("call_sid", "N/A")
         phone_number = state.get("caller_phone", "N/A")

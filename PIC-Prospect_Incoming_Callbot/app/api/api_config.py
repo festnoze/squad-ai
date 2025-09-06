@@ -74,7 +74,7 @@ class ApiConfig:
         app.state.shutdown = lambda: None
 
         load_dotenv()
-        EnvHelper._init_load_env()
+        EnvHelper.load_all_env_var()
 
         app.include_router(endpoints.router)
 
@@ -107,9 +107,7 @@ class ApiConfig:
                 endpoint_output = await call_next(request)
 
                 # Handle the endpoint output and build the HTTP response
-                if isinstance(endpoint_output, (StreamingResponse, StarletteResponse)) or not hasattr(
-                    endpoint_output, "body_iterator"
-                ):
+                if isinstance(endpoint_output, (StreamingResponse, StarletteResponse)) or not hasattr(endpoint_output, "body_iterator"):
                     return endpoint_output
 
                 if endpoint_output.body == b"" or endpoint_output.status_code == 204:

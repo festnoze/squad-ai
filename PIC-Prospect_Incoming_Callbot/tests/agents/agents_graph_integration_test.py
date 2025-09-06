@@ -11,6 +11,7 @@ from agents.text_registry import TextRegistry
 from api_client.salesforce_api_client_interface import SalesforceApiClientInterface
 from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
 from managers.outgoing_manager import OutgoingManager
+from utils.envvar import EnvHelper
 
 from app.endpoints import change_env_var_values
 
@@ -40,27 +41,18 @@ async def test_graph_init_conversation_and_welcome_message(agents_graph_mockings
 
     # Assert
     assert "conversation_id" in updated_state["agent_scratchpad"]
-    assert (
-        updated_state["agent_scratchpad"]["conversation_id"]
-        == "39e81136-4525-4ea8-bd00-c22211110001"
-    )
+    assert updated_state["agent_scratchpad"]["conversation_id"] == "39e81136-4525-4ea8-bd00-c22211110001"
     assert len(updated_state["history"]) >= 1
 
     # Check that the welcome message contains expected components
     first_history_msg = updated_state["history"][0][1]
 
     # Check that the message starts with the welcome text
-    assert first_history_msg.startswith(TextRegistry.start_welcome_text), (
-        f"Expected message to start with '{TextRegistry.start_welcome_text}', but got: {first_history_msg}"
-    )
+    assert first_history_msg.startswith(TextRegistry.start_welcome_text), f"Expected message to start with '{TextRegistry.start_welcome_text}', but got: {first_history_msg}"
 
     # Verify that the user and conversation creation methods were called
-    agents_graph_mockings[
-        "studi_rag_client"
-    ].create_or_retrieve_user_async.assert_called_once()
-    agents_graph_mockings[
-        "studi_rag_client"
-    ].create_new_conversation_async.assert_called_once()
+    agents_graph_mockings["studi_rag_client"].create_or_retrieve_user_async.assert_called_once()
+    agents_graph_mockings["studi_rag_client"].create_new_conversation_async.assert_called_once()
 
     # Verify outgoing_manager was called with welcome message
     agents_graph_mockings["outgoing_manager"].enqueue_text_async.assert_called()
@@ -70,7 +62,8 @@ async def test_query_response_about_courses(agents_graph_mockings):
     """Test that with a user input query about courses, the history contains the query and the answer."""
     # Arrange
     # Set available actions to schedule_calendar_appointment and ask rag
-    await change_env_var_values({"AVAILABLE_ACTIONS": "schedule_appointement, ask_rag"})
+    available_actions = "schedule_appointement, ask_rag"
+    await change_env_var_values({"AVAILABLE_ACTIONS": available_actions})
 
     # Create the graph with mocked dependencies but use the real graph implementation
     agents_graph = AgentsGraph(
@@ -93,15 +86,11 @@ async def test_query_response_about_courses(agents_graph_mockings):
     )
 
     # Mock the add_external_ai_message_to_conversation method
-    agents_graph_mockings[
-        "studi_rag_client"
-    ].add_external_ai_message_to_conversation = AsyncMock()
+    agents_graph_mockings["studi_rag_client"].add_external_ai_message_to_conversation = AsyncMock()
 
     # Set up the RAG client to return a response about BTS in HR
     bts_response = "Le BTS Gestion des Ressources Humaines (GRH) est une formation qui prépare aux métiers des ressources humaines. Cette formation de niveau Bac+2 vous permettra d'acquérir des compétences en gestion administrative du personnel, en recrutement, et en formation professionnelle."
-    agents_graph_mockings[
-        "studi_rag_client"
-    ].rag_query_stream_async.return_value = bts_response
+    agents_graph_mockings["studi_rag_client"].rag_query_stream_async.return_value = bts_response
 
     # Create an async generator that yields words from the response with a delay
     async def mock_stream_response(*args, **kwargs):
@@ -113,9 +102,7 @@ async def test_query_response_about_courses(agents_graph_mockings):
 
     # Mock the rag_query_stream_async method to return the async generator
     # We need to return the generator function itself, not call it
-    agents_graph_mockings[
-        "studi_rag_client"
-    ].rag_query_stream_async = mock_stream_response
+    agents_graph_mockings["studi_rag_client"].rag_query_stream_async = mock_stream_response
 
     # Act
     updated_state: PhoneConversationState = await agents_graph.ainvoke(initial_state)
@@ -140,6 +127,11 @@ async def test_query_response_about_courses(agents_graph_mockings):
     # Verify outgoing_manager was called with the response (if the flow supports it)
     # Note: This might not be called in all flows, so we check if it was called at least 0 times
     assert agents_graph_mockings["outgoing_manager"].enqueue_text_async.call_count >= 0
+    
+    assert EnvHelper.get_available_actions() == available_actions.split(",")
+    await change_env_var_values({"AVAILABLE_ACTIONS": available_actions})
+    EnvHelper.load_all_env_var(force_load_from_env_file=True)
+    assert EnvHelper.get_available_actions() != available_actions.split(",")
 
 
 async def test_first_answer_to_calendar_appointment(agents_graph_mockings):
@@ -153,9 +145,7 @@ async def test_first_answer_to_calendar_appointment(agents_graph_mockings):
         salesforce_client=agents_graph_mockings["salesforce_client"],
         call_sid=agents_graph_mockings["call_sid"],
     )
-    CalendarAgent.now = datetime(
-        2025, 4, 2, 10, 0, 0, tzinfo=pytz.timezone("Europe/Paris")
-    )
+    CalendarAgent.now = datetime(2025, 4, 2, 10, 0, 0, tzinfo=pytz.timezone("Europe/Paris"))
 
     # Add necessary attributes for streaming
     agents.graph.is_speaking = True
@@ -169,9 +159,7 @@ async def test_first_answer_to_calendar_appointment(agents_graph_mockings):
             "get_scheduled_appointments_async",
             return_value=[
                 {
-                    "StartDateTime": (
-                        CalendarAgent.now + timedelta(hours=1)
-                    ).isoformat(),
+                    "StartDateTime": (CalendarAgent.now + timedelta(hours=1)).isoformat(),
                     "EndDateTime": (CalendarAgent.now + timedelta(hours=2)).isoformat(),
                     "object": "test slot",
                 }
@@ -230,26 +218,18 @@ async def test_first_answer_to_calendar_appointment(agents_graph_mockings):
         agents.calendar_agent_instance.salesforce_api_client.get_scheduled_appointments_async = mock_get_appointments
 
         # Act
-        updated_state: PhoneConversationState = await agents.graph.ainvoke(
-            initial_state
-        )
+        updated_state: PhoneConversationState = await agents.graph.ainvoke(initial_state)
 
         # Assert
         assert len(updated_state["history"]) >= 2  # At least initial message + response
 
         # Check that the last message is from assistant and contains appointment scheduling response
         assert updated_state["history"][-1][0] == "assistant"
-        assert updated_state["history"][-1][1].startswith(
-            "Je vous propose les créneaux suivants :"
-        )
+        assert updated_state["history"][-1][1].startswith("Je vous propose les créneaux suivants :")
 
         # Verify Salesforce client methods were called
-        agents_graph_mockings[
-            "salesforce_client"
-        ].get_person_by_phone_async.assert_not_called()
-        assert (
-            agents_graph_mockings["outgoing_manager"].enqueue_text_async.call_count >= 1
-        )
+        agents_graph_mockings["salesforce_client"].get_person_by_phone_async.assert_not_called()
+        assert agents_graph_mockings["outgoing_manager"].enqueue_text_async.call_count >= 1
 
         # Verify calendar agent 'tools' calls
         assert mock_get_appointments.call_count >= 1
@@ -276,9 +256,7 @@ async def test_long_conversation_history_is_truncated(agents_graph_mockings):
         # Create a long chat history that should be truncated
         # The new logic takes the last 8 messages and limits total chars to ~16k
         long_message = "a" * 2500  # A long message
-        chat_history = [
-            ("user" if i % 2 == 0 else "assistant", long_message) for i in range(10)
-        ]  # 10 messages > 8
+        chat_history = [("user" if i % 2 == 0 else "assistant", long_message) for i in range(10)]  # 10 messages > 8
 
         original_history_len = sum(len(text) for _, text in chat_history)
         assert original_history_len > 20000  # Ensure it's long enough to be truncated
@@ -290,9 +268,7 @@ async def test_long_conversation_history_is_truncated(agents_graph_mockings):
             caller_phone=agents_graph_mockings["phone_number"],
             user_input=user_input,
             history=chat_history,
-            agent_scratchpad={
-                "conversation_id": "39e81136-4525-4ea8-bd00-c22211110001"
-            },
+            agent_scratchpad={"conversation_id": "39e81136-4525-4ea8-bd00-c22211110001"},
         )
 
         # Act
@@ -331,21 +307,15 @@ def agents_graph_mockings():
     # Create mock for StudiRAGInferenceApiClient with all necessary methods
     mock_studi_rag_client = MagicMock(spec=StudiRAGInferenceApiClient)
     mock_studi_rag_client.rag_query_stream_async = AsyncMock()
-    mock_studi_rag_client.rag_query_stream_async.return_value = (
-        "This is a mock RAG response about BTS programs."
-    )
+    mock_studi_rag_client.rag_query_stream_async.return_value = "This is a mock RAG response about BTS programs."
 
     # Mock user creation/retrieval
     mock_studi_rag_client.create_or_retrieve_user_async = AsyncMock()
-    mock_studi_rag_client.create_or_retrieve_user_async.return_value = (
-        "39e81136-4525-4ea8-bd00-c22211110000"
-    )
+    mock_studi_rag_client.create_or_retrieve_user_async.return_value = "39e81136-4525-4ea8-bd00-c22211110000"
 
     # Mock conversation creation
     mock_studi_rag_client.create_new_conversation_async = AsyncMock()
-    mock_studi_rag_client.create_new_conversation_async.return_value = (
-        "39e81136-4525-4ea8-bd00-c22211110001"
-    )
+    mock_studi_rag_client.create_new_conversation_async.return_value = "39e81136-4525-4ea8-bd00-c22211110001"
 
     # Mock adding messages to conversation
     mock_studi_rag_client.add_external_ai_message_to_conversation = AsyncMock()

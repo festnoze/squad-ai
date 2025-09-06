@@ -1054,3 +1054,242 @@ class SalesforceApiClient(SalesforceApiClientInterface):
             return None
         else:  # Query successful, but no records (e.g. opp_response['records'] is empty list)
             return []
+
+    @measure_latency(OperationType.SALESFORCE, provider="salesforce")
+    async def get_opportunities_by_contact_async(self, contact_id: str) -> list[dict] | None:
+        """
+        Retrieve Opportunities related to a specific Contact via Account relationship (asynchronous).
+        
+        Args:
+            contact_id: The ID of the Salesforce Contact.
+            
+        Returns:
+            A list of Opportunity dictionaries related to the contact's account. 
+            Returns None on error, empty list if no related opportunities found.
+        """
+        await self._ensure_authenticated_async()
+
+        if not contact_id:
+            self.logger.info("Error: contact_id must be provided.")
+            return None
+
+        # Step 1: Get Contact's Account information
+        contact_info_soql = f"SELECT Id, AccountId, Account.Id FROM Contact WHERE Id = '{contact_id}'"
+        contact_response = await self._query_salesforce(contact_info_soql)
+
+        if not contact_response or contact_response.get("records") is None:
+            if contact_response and contact_response.get("totalSize", 0) == 0:
+                self.logger.info(f"Contact with ID '{contact_id}' not found.")
+                return []
+            return None  # Error occurred during query
+
+        contact_data = contact_response["records"]
+        account_id = contact_data[0].get("AccountId") if any(contact_data) else None
+
+        if not account_id:
+            self.logger.info(f"Contact '{contact_id}' has no associated Account. No opportunities can be retrieved.")
+            return []
+
+        # Step 2: Get Opportunities for the Account
+        self.logger.info(f"Contact '{contact_id}' is linked to Account '{account_id}'. Searching Opportunities for this Account.")
+        
+        opportunity_soql = (
+            "SELECT Id, Name, StageName, Amount, CloseDate, AccountId, Account.Name, OwnerId, Owner.Name, CreatedDate "
+            "FROM Opportunity "
+            f"WHERE AccountId = '{account_id}' "
+            "ORDER BY CreatedDate DESC LIMIT 200"
+        )
+
+        opp_response = await self._query_salesforce(opportunity_soql)
+        if opp_response and opp_response.get("records") is not None:
+            opportunities = opp_response["records"]
+            self.logger.info(f"Found {len(opportunities)} opportunities for Contact '{contact_id}' via Account '{account_id}'")
+            return opportunities
+        elif opp_response is None:  # Error in _query_salesforce
+            return None
+        else:  # Query successful, but no records
+            return []
+
+    @measure_latency(OperationType.SALESFORCE, provider="salesforce")
+    async def get_user_by_id_async(self, user_id: str) -> dict | None:
+        """
+        Retrieve detailed information about a Salesforce User by ID (asynchronous).
+        
+        Args:
+            user_id: The ID of the Salesforce User.
+            
+        Returns:
+            A dictionary containing user information, or None if user not found or error occurs.
+        """
+        await self._ensure_authenticated_async()
+
+        if not user_id:
+            self.logger.info("Error: user_id must be provided.")
+            return None
+
+        user_soql = (
+            "SELECT Id, Name, FirstName, LastName, Email, Phone, Title, Department, IsActive, CreatedDate "
+            "FROM User "
+            f"WHERE Id = '{user_id}' "
+            "LIMIT 1"
+        )
+
+        self.logger.info(f"Retrieving user information for ID: {user_id}")
+        
+        user_response = await self._query_salesforce(user_soql)
+        if user_response and user_response.get("records") is not None:
+            users = user_response["records"]
+            if users:
+                user_data = users[0]
+                self.logger.info(f"Found user: {user_data.get('Name')} ({user_data.get('Email')})")
+                return user_data
+            else:
+                self.logger.info(f"User with ID '{user_id}' not found.")
+                return None
+        elif user_response is None:  # Error in _query_salesforce
+            return None
+        else:  # Query successful, but no records
+            self.logger.info(f"User with ID '{user_id}' not found.")
+            return None
+
+    @measure_latency(OperationType.SALESFORCE, provider="salesforce")
+    async def get_complete_contact_info_by_phone_async(self, phone_number: str) -> dict | None:
+        """
+        Aggregated method to retrieve complete contact information from a phone number.
+        
+        This method combines multiple sub-methods:
+        1. Search for contact by phone number
+        2. Get opportunities related to the contact
+        3. Get the most recent opportunity
+        4. Get user associated with the opportunity (or contact owner if no opportunity)
+        
+        Args:
+            phone_number: The phone number to search for.
+            
+        Returns:
+            A dictionary containing contact, opportunities, and user information,
+            or None if no contact found or error occurs.
+        """
+        if not phone_number:
+            self.logger.info("Error: phone_number must be provided.")
+            return None
+
+        self.logger.info(f"Starting complete contact info retrieval for phone number: {phone_number}")
+
+        # Step 1: Search for contact by phone number
+        person_data = await self.get_person_by_phone_async(phone_number)
+        if not person_data:
+            self.logger.info(f"No contact or lead found for phone number: {phone_number}")
+            return None
+
+        person_type = person_data.get("type")
+        contact_info = person_data.get("data")
+        
+        result = {
+            "contact": contact_info,
+            "contact_type": person_type,
+            "opportunities": [],
+            "most_recent_opportunity": None,
+            "assigned_user": None,
+            "user_source": None
+        }
+
+        # Handle different contact types
+        if person_type == "Contact":
+            contact_id = contact_info.get("Id")
+            
+            # Step 2: Get opportunities related to the contact
+            self.logger.info(f"Retrieving opportunities for Contact ID: {contact_id}")
+            opportunities = await self.get_opportunities_by_contact_async(contact_id)
+            
+            if opportunities is None:
+                self.logger.warning("Error occurred while retrieving opportunities, but continuing with contact info")
+                opportunities = []
+            
+            result["opportunities"] = opportunities
+
+            # Step 3: Get the most recent opportunity
+            most_recent_opportunity = None
+            if opportunities:
+                most_recent_opportunity = opportunities[0]  # Already sorted by CreatedDate DESC
+                result["most_recent_opportunity"] = most_recent_opportunity
+                self.logger.info(f"Found {len(opportunities)} opportunities, most recent: {most_recent_opportunity.get('Name')}")
+
+            # Step 4: Get user information
+            user_id = None
+            user_source = None
+            
+            # Try to get user from most recent opportunity first
+            if most_recent_opportunity and most_recent_opportunity.get("OwnerId"):
+                user_id = most_recent_opportunity.get("OwnerId")
+                user_source = "opportunity"
+                self.logger.info(f"Using user ID from most recent opportunity: {user_id}")
+            
+            # Fallback to contact owner if no opportunity or no owner on opportunity
+            if not user_id and contact_info.get("Owner", {}).get("Id"):
+                user_id = contact_info.get("Owner", {}).get("Id")
+                user_source = "contact"
+                self.logger.info(f"Using user ID from contact owner: {user_id}")
+
+            # Step 5: Retrieve user information
+            if user_id:
+                user_info = await self.get_user_by_id_async(user_id)
+                if user_info:
+                    result["assigned_user"] = user_info
+                    result["user_source"] = user_source
+                    self.logger.info(f"Successfully retrieved user info for {user_info.get('Name')} (source: {user_source})")
+                else:
+                    self.logger.warning(f"Could not retrieve user information for ID: {user_id}")
+            else:
+                self.logger.info("No user ID available from either opportunity or contact")
+
+        elif person_type == "Lead":
+            # For Leads, we can try to get opportunities if it's converted
+            lead_id = contact_info.get("Id")
+            self.logger.info(f"Found Lead ID: {lead_id}, checking for converted opportunities")
+            
+            # Use existing method for lead opportunities
+            opportunities = await self.get_opportunities_for_lead_async(lead_id)
+            
+            if opportunities is None:
+                self.logger.warning("Error occurred while retrieving opportunities for lead, but continuing with lead info")
+                opportunities = []
+            
+            result["opportunities"] = opportunities
+
+            # Get most recent opportunity if any
+            if opportunities:
+                most_recent_opportunity = opportunities[0]  # Already sorted by CreatedDate DESC
+                result["most_recent_opportunity"] = most_recent_opportunity
+                self.logger.info(f"Found {len(opportunities)} opportunities for lead, most recent: {most_recent_opportunity.get('Name')}")
+
+            # Get user information
+            user_id = None
+            user_source = None
+            
+            # Try to get user from most recent opportunity first
+            if most_recent_opportunity and most_recent_opportunity.get("Owner", {}).get("Id"):
+                user_id = most_recent_opportunity.get("Owner", {}).get("Id")
+                user_source = "opportunity"
+                self.logger.info(f"Using user ID from most recent opportunity: {user_id}")
+            
+            # Fallback to lead owner
+            if not user_id and contact_info.get("Owner", {}).get("Id"):
+                user_id = contact_info.get("Owner", {}).get("Id")
+                user_source = "lead"
+                self.logger.info(f"Using user ID from lead owner: {user_id}")
+
+            # Retrieve user information
+            if user_id:
+                user_info = await self.get_user_by_id_async(user_id)
+                if user_info:
+                    result["assigned_user"] = user_info
+                    result["user_source"] = user_source
+                    self.logger.info(f"Successfully retrieved user info for {user_info.get('Name')} (source: {user_source})")
+                else:
+                    self.logger.warning(f"Could not retrieve user information for ID: {user_id}")
+            else:
+                self.logger.info("No user ID available from either opportunity or lead")
+
+        self.logger.info(f"Complete contact info retrieval finished for {phone_number}. Found {len(result['opportunities'])} opportunities.")
+        return result

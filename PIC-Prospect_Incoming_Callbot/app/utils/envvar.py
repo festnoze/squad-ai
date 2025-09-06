@@ -36,7 +36,7 @@ class EnvHelper:
     def get_rag_api_is_ssh() -> bool:
         value = EnvHelper.get_env_variable_value_by_name("RAG_API_IS_SSH")
         return value is not None and value.lower() == "true"
-    
+
     @staticmethod
     def get_python_paths() -> list[str]:
         paths = EnvHelper.get_env_variable_value_by_name("PYTHONPATH") or ""
@@ -122,9 +122,7 @@ class EnvHelper:
 
     @staticmethod
     def get_waiting_music_increasing_volume_duration() -> float:
-        value = EnvHelper.get_env_variable_value_by_name(
-            "WAITING_MUSIC_INCREASING_VOLUME_DURATION", fails_if_missing=False
-        )
+        value = EnvHelper.get_env_variable_value_by_name("WAITING_MUSIC_INCREASING_VOLUME_DURATION", fails_if_missing=False)
         return float(value) if value else 0.0
 
     @staticmethod
@@ -217,6 +215,13 @@ class EnvHelper:
         allowed_keys = EnvHelper.get_admin_api_keys()
         return api_key in allowed_keys and len(allowed_keys) > 0
 
+    @staticmethod
+    def load_all_env_var(force_load_from_env_file: bool = False):
+        if not EnvHelper.is_env_loaded or force_load_from_env_file:
+            load_dotenv()
+            EnvHelper._load_custom_env_files()
+            EnvHelper.is_env_loaded = True
+
     ### Internal methods###
     #######################
 
@@ -229,13 +234,6 @@ class EnvHelper:
         return EnvHelper.get_env_variable_value_by_name("LLMS_JSON") or ""
 
     @staticmethod
-    def _init_load_env():
-        if not EnvHelper.is_env_loaded:
-            load_dotenv()
-            EnvHelper._load_custom_env_files()
-            EnvHelper.is_env_loaded = True
-
-    @staticmethod
     def _load_custom_env_files():
         custom_env_files = EnvHelper._get_custom_env_files()
 
@@ -246,18 +244,14 @@ class EnvHelper:
         custom_env_filenames = [filename.strip() for filename in custom_env_files.split(",")]
         for custom_env_filename in custom_env_filenames:
             if not os.path.exists(custom_env_filename):
-                raise FileNotFoundError(
-                    f"/!\\ Environment file: '{custom_env_filename}' was not found at the project root."
-                )
+                raise FileNotFoundError(f"/!\\ Environment file: '{custom_env_filename}' was not found at the project root.")
             load_dotenv(custom_env_filename)
 
     @staticmethod
-    def get_env_variable_value_by_name(
-        variable_name: str, load_env: bool = True, fails_if_missing: bool = True, remove_comments: bool = True
-    ) -> str | None:
+    def get_env_variable_value_by_name(variable_name: str, load_env: bool = True, fails_if_missing: bool = True, remove_comments: bool = True, force_load_from_env_file: bool = False) -> str | None:
         if variable_name not in os.environ:
             if load_env:
-                EnvHelper._init_load_env()
+                EnvHelper.load_all_env_var()
             variable_value: str | None = os.getenv(variable_name, None)
             if not variable_value:
                 if fails_if_missing:
@@ -295,7 +289,4 @@ class EnvHelper:
 
     @staticmethod
     def get_latency_metrics_file_path() -> str:
-        return (
-            EnvHelper.get_env_variable_value_by_name("LATENCY_METRICS_FILE_PATH", fails_if_missing=False)
-            or "outputs/logs/latency_metrics.jsonl"
-        )
+        return EnvHelper.get_env_variable_value_by_name("LATENCY_METRICS_FILE_PATH", fails_if_missing=False) or "outputs/logs/latency_metrics.jsonl"
