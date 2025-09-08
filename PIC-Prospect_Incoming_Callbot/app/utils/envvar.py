@@ -24,6 +24,27 @@ class EnvHelper:
         return EnvHelper.get_env_variable_value_by_name("SALESFORCE_CLIENT_SECRET") or ""
 
     @staticmethod
+    def get_salesforce_owner_strategy() -> str:
+        """
+        Get the Salesforce owner retrieval strategy.
+        
+        Returns:
+            str: The strategy to use for retrieving owner information.
+                 - "both": Try opportunity owner first, fallback to contact owner (default)
+                 - "opport_only": Only use opportunity owner, no fallback
+                 - "direct_only": Only use direct contact owner, skip opportunities
+        """
+        strategy = EnvHelper.get_env_variable_value_by_name("SALESFORCE_OWNER_STRATEGY", fails_if_missing=False) or "both"
+        valid_strategies = ["both", "opport_only", "direct_only"]
+        if strategy.lower() not in valid_strategies:
+            # Log warning and default to "both"
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Invalid SALESFORCE_OWNER_STRATEGY '{strategy}'. Valid values: {valid_strategies}. Defaulting to 'both'.")
+            return "both"
+        return strategy.lower()
+
+    @staticmethod
     def get_rag_api_host() -> str:
         return EnvHelper.get_env_variable_value_by_name("RAG_API_HOST") or ""
 

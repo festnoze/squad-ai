@@ -57,8 +57,7 @@ def measure_latency(
                     
                     # Extraire call_sid, stream_sid et phone_number
                     call_sid, stream_sid, phone_number = _extract_call_stream_ids_and_phone(
-                        args, call_sid_attr, stream_sid_attr, phone_number_attr, kwargs
-                    )
+                                        args, call_sid_attr, stream_sid_attr, phone_number_attr, kwargs)
                     
                     metric = LatencyMetric(
                         operation_type=operation_type,
@@ -99,8 +98,7 @@ def measure_latency(
                     
                     # Extraire call_sid, stream_sid et phone_number
                     call_sid, stream_sid, phone_number = _extract_call_stream_ids_and_phone(
-                        args, call_sid_attr, stream_sid_attr, phone_number_attr, kwargs
-                    )
+                        args, call_sid_attr, stream_sid_attr, phone_number_attr, kwargs)
                     
                     metric = LatencyMetric(
                         operation_type=operation_type,

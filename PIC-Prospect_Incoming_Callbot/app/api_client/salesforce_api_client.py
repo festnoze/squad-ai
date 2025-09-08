@@ -1152,6 +1152,82 @@ class SalesforceApiClient(SalesforceApiClientInterface):
             self.logger.info(f"User with ID '{user_id}' not found.")
             return None
 
+    def _get_owner_by_strategy(
+        self, 
+        person_type: str, 
+        contact_info: dict, 
+        opportunities: list | None, 
+        strategy: str
+    ) -> tuple[str | None, str | None]:
+        """
+        Centralized logic for owner (CF) retrieval based on strategy.
+        
+        Args:
+            person_type: "Contact" or "Lead"
+            contact_info: Contact/Lead data dictionary
+            opportunities: List of opportunities (can be None or empty)
+            strategy: Owner retrieval strategy ("both", "opport_only", "direct_only")
+            
+        Returns:
+            tuple[str | None, str | None]: (user_id, user_source)
+        """
+        user_id = None
+        user_source = None
+        
+        # Strategy: direct_only - Always use contact/lead owner, skip opportunities
+        if strategy == "direct_only":
+            if contact_info.get("Owner", {}).get("Id"):
+                user_id = contact_info.get("Owner", {}).get("Id")
+                user_source = person_type.lower()
+                self.logger.info(f"Strategy 'direct_only': Using {person_type.lower()} owner: {user_id}")
+            return user_id, user_source
+            
+        # Strategy: opport_only - Only use opportunity owner, no fallback
+        elif strategy == "opport_only":
+            if opportunities:
+                most_recent_opportunity = opportunities[0]
+                if person_type == "Contact":
+                    # For contacts, OwnerId is directly on the opportunity
+                    if most_recent_opportunity.get("OwnerId"):
+                        user_id = most_recent_opportunity.get("OwnerId")
+                        user_source = "opportunity"
+                        self.logger.info(f"Strategy 'opport_only': Using opportunity owner: {user_id}")
+                elif person_type == "Lead":
+                    # For leads, Owner information is nested
+                    if most_recent_opportunity.get("Owner", {}).get("Id"):
+                        user_id = most_recent_opportunity.get("Owner", {}).get("Id")
+                        user_source = "opportunity"
+                        self.logger.info(f"Strategy 'opport_only': Using opportunity owner: {user_id}")
+            if not user_id:
+                self.logger.info(f"Strategy 'opport_only': No opportunity owner found, no fallback")
+            return user_id, user_source
+            
+        # Strategy: both (default) - Try opportunity first, fallback to contact/lead owner
+        elif strategy == "both":
+            # First try to get user from most recent opportunity
+            if opportunities:
+                most_recent_opportunity = opportunities[0]
+                if person_type == "Contact":
+                    if most_recent_opportunity.get("OwnerId"):
+                        user_id = most_recent_opportunity.get("OwnerId")
+                        user_source = "opportunity"
+                        self.logger.info(f"Strategy 'both': Using opportunity owner: {user_id}")
+                elif person_type == "Lead":
+                    if most_recent_opportunity.get("Owner", {}).get("Id"):
+                        user_id = most_recent_opportunity.get("Owner", {}).get("Id")
+                        user_source = "opportunity"
+                        self.logger.info(f"Strategy 'both': Using opportunity owner: {user_id}")
+            
+            # Fallback to contact/lead owner if no opportunity owner found
+            if not user_id and contact_info.get("Owner", {}).get("Id"):
+                user_id = contact_info.get("Owner", {}).get("Id")
+                user_source = person_type.lower()
+                self.logger.info(f"Strategy 'both': Fallback to {person_type.lower()} owner: {user_id}")
+                
+            return user_id, user_source
+        else:
+            return None, None
+
     @measure_latency(OperationType.SALESFORCE, provider="salesforce")
     async def get_complete_contact_info_by_phone_async(self, phone_number: str) -> dict | None:
         """
@@ -1159,9 +1235,9 @@ class SalesforceApiClient(SalesforceApiClientInterface):
         
         This method combines multiple sub-methods:
         1. Search for contact by phone number
-        2. Get opportunities related to the contact
+        2. Get opportunities related to the contact (based on strategy)
         3. Get the most recent opportunity
-        4. Get user associated with the opportunity (or contact owner if no opportunity)
+        4. Get user associated with the opportunity or contact (based on strategy)
         
         Args:
             phone_number: The phone number to search for.
@@ -1174,7 +1250,9 @@ class SalesforceApiClient(SalesforceApiClientInterface):
             self.logger.info("Error: phone_number must be provided.")
             return None
 
-        self.logger.info(f"Starting complete contact info retrieval for phone number: {phone_number}")
+        # Get the owner retrieval strategy from environment
+        strategy = EnvHelper.get_salesforce_owner_strategy()
+        self.logger.info(f"Starting complete contact info retrieval for phone number: {phone_number} with strategy: {strategy}")
 
         # Step 1: Search for contact by phone number
         person_data = await self.get_person_by_phone_async(phone_number)
@@ -1198,13 +1276,17 @@ class SalesforceApiClient(SalesforceApiClientInterface):
         if person_type == "Contact":
             contact_id = contact_info.get("Id")
             
-            # Step 2: Get opportunities related to the contact
-            self.logger.info(f"Retrieving opportunities for Contact ID: {contact_id}")
-            opportunities = await self.get_opportunities_by_contact_async(contact_id)
-            
-            if opportunities is None:
-                self.logger.warning("Error occurred while retrieving opportunities, but continuing with contact info")
-                opportunities = []
+            # Step 2: Get opportunities related to the contact (based on strategy)
+            opportunities = []
+            if strategy != "direct_only":
+                self.logger.info(f"Retrieving opportunities for Contact ID: {contact_id}")
+                opportunities = await self.get_opportunities_by_contact_async(contact_id)
+                
+                if opportunities is None:
+                    self.logger.warning("Error occurred while retrieving opportunities, but continuing with contact info")
+                    opportunities = []
+            else:
+                self.logger.info("Strategy 'direct_only': Skipping opportunity retrieval")
             
             result["opportunities"] = opportunities
 
@@ -1215,21 +1297,8 @@ class SalesforceApiClient(SalesforceApiClientInterface):
                 result["most_recent_opportunity"] = most_recent_opportunity
                 self.logger.info(f"Found {len(opportunities)} opportunities, most recent: {most_recent_opportunity.get('Name')}")
 
-            # Step 4: Get user information
-            user_id = None
-            user_source = None
-            
-            # Try to get user from most recent opportunity first
-            if most_recent_opportunity and most_recent_opportunity.get("OwnerId"):
-                user_id = most_recent_opportunity.get("OwnerId")
-                user_source = "opportunity"
-                self.logger.info(f"Using user ID from most recent opportunity: {user_id}")
-            
-            # Fallback to contact owner if no opportunity or no owner on opportunity
-            if not user_id and contact_info.get("Owner", {}).get("Id"):
-                user_id = contact_info.get("Owner", {}).get("Id")
-                user_source = "contact"
-                self.logger.info(f"Using user ID from contact owner: {user_id}")
+            # Step 4: Get user information using strategy
+            user_id, user_source = self._get_owner_by_strategy(person_type, contact_info, opportunities, strategy)
 
             # Step 5: Retrieve user information
             if user_id:
@@ -1241,43 +1310,35 @@ class SalesforceApiClient(SalesforceApiClientInterface):
                 else:
                     self.logger.warning(f"Could not retrieve user information for ID: {user_id}")
             else:
-                self.logger.info("No user ID available from either opportunity or contact")
+                self.logger.info(f"No user ID available for strategy '{strategy}'")
 
         elif person_type == "Lead":
-            # For Leads, we can try to get opportunities if it's converted
+            # For Leads, we can try to get opportunities if it's converted (based on strategy)
             lead_id = contact_info.get("Id")
-            self.logger.info(f"Found Lead ID: {lead_id}, checking for converted opportunities")
+            opportunities = []
             
-            # Use existing method for lead opportunities
-            opportunities = await self.get_opportunities_for_lead_async(lead_id)
-            
-            if opportunities is None:
-                self.logger.warning("Error occurred while retrieving opportunities for lead, but continuing with lead info")
-                opportunities = []
+            if strategy != "direct_only":
+                self.logger.info(f"Found Lead ID: {lead_id}, checking for converted opportunities")
+                # Use existing method for lead opportunities
+                opportunities = await self.get_opportunities_for_lead_async(lead_id)
+                
+                if opportunities is None:
+                    self.logger.warning("Error occurred while retrieving opportunities for lead, but continuing with lead info")
+                    opportunities = []
+            else:
+                self.logger.info("Strategy 'direct_only': Skipping opportunity retrieval for lead")
             
             result["opportunities"] = opportunities
 
             # Get most recent opportunity if any
+            most_recent_opportunity = None
             if opportunities:
                 most_recent_opportunity = opportunities[0]  # Already sorted by CreatedDate DESC
                 result["most_recent_opportunity"] = most_recent_opportunity
                 self.logger.info(f"Found {len(opportunities)} opportunities for lead, most recent: {most_recent_opportunity.get('Name')}")
 
-            # Get user information
-            user_id = None
-            user_source = None
-            
-            # Try to get user from most recent opportunity first
-            if most_recent_opportunity and most_recent_opportunity.get("Owner", {}).get("Id"):
-                user_id = most_recent_opportunity.get("Owner", {}).get("Id")
-                user_source = "opportunity"
-                self.logger.info(f"Using user ID from most recent opportunity: {user_id}")
-            
-            # Fallback to lead owner
-            if not user_id and contact_info.get("Owner", {}).get("Id"):
-                user_id = contact_info.get("Owner", {}).get("Id")
-                user_source = "lead"
-                self.logger.info(f"Using user ID from lead owner: {user_id}")
+            # Get user information using strategy
+            user_id, user_source = self._get_owner_by_strategy(person_type, contact_info, opportunities, strategy)
 
             # Retrieve user information
             if user_id:
@@ -1289,7 +1350,7 @@ class SalesforceApiClient(SalesforceApiClientInterface):
                 else:
                     self.logger.warning(f"Could not retrieve user information for ID: {user_id}")
             else:
-                self.logger.info("No user ID available from either opportunity or lead")
+                self.logger.info(f"No user ID available for strategy '{strategy}'")
 
         self.logger.info(f"Complete contact info retrieval finished for {phone_number}. Found {len(result['opportunities'])} opportunities.")
         return result

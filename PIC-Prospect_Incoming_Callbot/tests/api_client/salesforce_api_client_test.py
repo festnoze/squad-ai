@@ -2289,3 +2289,230 @@ class TestAdapterMethod:
         # But override the Owner with enhanced information
         assert result["Owner"]["Id"] == "enhanced_user"
         assert result["Owner"]["Name"] == "Enhanced Owner"
+
+
+class TestSalesforceOwnerStrategy:
+    """Unit tests for Salesforce owner retrieval strategies"""
+
+    async def test_strategy_both_with_opportunity(self):
+        """Test 'both' strategy when opportunities exist - should use opportunity owner"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+
+        # Mock contact data with opportunity
+        contact_data = {
+            "type": "Contact",
+            "data": {
+                "Id": "contact_123",
+                "FirstName": "John",
+                "LastName": "Doe",
+                "Owner": {"Id": "contact_owner", "Name": "Contact Owner"}
+            }
+        }
+
+        opportunity_data = [{
+            "Id": "opp_456",
+            "Name": "Test Deal",
+            "OwnerId": "opportunity_owner",
+            "CreatedDate": "2024-12-01T10:30:00.000+0000"
+        }]
+
+        user_data = {
+            "opportunity_owner": {"Id": "opportunity_owner", "Name": "Opportunity Owner"},
+            "contact_owner": {"Id": "contact_owner", "Name": "Contact Owner"}
+        }
+
+        # Mock the methods
+        with patch.object(client, 'get_person_by_phone_async', new_callable=AsyncMock) as mock_person:
+            with patch.object(client, 'get_opportunities_by_contact_async', new_callable=AsyncMock) as mock_opps:
+                with patch.object(client, 'get_user_by_id_async', new_callable=AsyncMock) as mock_user:
+                    with patch('utils.envvar.EnvHelper.get_salesforce_owner_strategy', return_value='both'):
+                        mock_person.return_value = contact_data
+                        mock_opps.return_value = opportunity_data
+                        mock_user.side_effect = lambda user_id: user_data.get(user_id)
+
+                        result = await client.get_complete_contact_info_by_phone_async("+33123456789")
+
+                        assert result is not None
+                        assert result["assigned_user"]["Id"] == "opportunity_owner"
+                        assert result["user_source"] == "opportunity"
+                        assert len(result["opportunities"]) == 1
+
+    async def test_strategy_both_without_opportunity(self):
+        """Test 'both' strategy when no opportunities - should fallback to contact owner"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+
+        # Mock contact data without opportunities
+        contact_data = {
+            "type": "Contact",
+            "data": {
+                "Id": "contact_123",
+                "FirstName": "Jane",
+                "LastName": "Smith",
+                "Owner": {"Id": "contact_owner", "Name": "Contact Owner"}
+            }
+        }
+
+        user_data = {"contact_owner": {"Id": "contact_owner", "Name": "Contact Owner"}}
+
+        with patch.object(client, 'get_person_by_phone_async', new_callable=AsyncMock) as mock_person:
+            with patch.object(client, 'get_opportunities_by_contact_async', new_callable=AsyncMock) as mock_opps:
+                with patch.object(client, 'get_user_by_id_async', new_callable=AsyncMock) as mock_user:
+                    with patch('utils.envvar.EnvHelper.get_salesforce_owner_strategy', return_value='both'):
+                        mock_person.return_value = contact_data
+                        mock_opps.return_value = []  # No opportunities
+                        mock_user.side_effect = lambda user_id: user_data.get(user_id)
+
+                        result = await client.get_complete_contact_info_by_phone_async("+33987654321")
+
+                        assert result is not None
+                        assert result["assigned_user"]["Id"] == "contact_owner"
+                        assert result["user_source"] == "contact"
+                        assert len(result["opportunities"]) == 0
+
+    async def test_strategy_opport_only_with_opportunity(self):
+        """Test 'opport_only' strategy with opportunities - should use opportunity owner"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+
+        # Mock contact data with opportunity
+        contact_data = {
+            "type": "Contact",
+            "data": {
+                "Id": "contact_789",
+                "FirstName": "Bob",
+                "LastName": "Johnson",
+                "Owner": {"Id": "contact_owner", "Name": "Contact Owner"}
+            }
+        }
+
+        opportunity_data = [{
+            "Id": "opp_999",
+            "Name": "Exclusive Deal",
+            "OwnerId": "opportunity_owner",
+            "CreatedDate": "2024-12-01T15:00:00.000+0000"
+        }]
+
+        user_data = {"opportunity_owner": {"Id": "opportunity_owner", "Name": "Opportunity Owner"}}
+
+        with patch.object(client, 'get_person_by_phone_async', new_callable=AsyncMock) as mock_person:
+            with patch.object(client, 'get_opportunities_by_contact_async', new_callable=AsyncMock) as mock_opps:
+                with patch.object(client, 'get_user_by_id_async', new_callable=AsyncMock) as mock_user:
+                    with patch('utils.envvar.EnvHelper.get_salesforce_owner_strategy', return_value='opport_only'):
+                        mock_person.return_value = contact_data
+                        mock_opps.return_value = opportunity_data
+                        mock_user.side_effect = lambda user_id: user_data.get(user_id)
+
+                        result = await client.get_complete_contact_info_by_phone_async("+33555666777")
+
+                        assert result is not None
+                        assert result["assigned_user"]["Id"] == "opportunity_owner"
+                        assert result["user_source"] == "opportunity"
+                        assert len(result["opportunities"]) == 1
+
+    async def test_strategy_opport_only_without_opportunity(self):
+        """Test 'opport_only' strategy without opportunities - should have no assigned user"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+
+        # Mock contact data without opportunities
+        contact_data = {
+            "type": "Contact",
+            "data": {
+                "Id": "contact_456",
+                "FirstName": "Alice",
+                "LastName": "Brown",
+                "Owner": {"Id": "contact_owner", "Name": "Contact Owner"}
+            }
+        }
+
+        with patch.object(client, 'get_person_by_phone_async', new_callable=AsyncMock) as mock_person:
+            with patch.object(client, 'get_opportunities_by_contact_async', new_callable=AsyncMock) as mock_opps:
+                with patch.object(client, 'get_user_by_id_async', new_callable=AsyncMock) as mock_user:
+                    with patch('utils.envvar.EnvHelper.get_salesforce_owner_strategy', return_value='opport_only'):
+                        mock_person.return_value = contact_data
+                        mock_opps.return_value = []  # No opportunities
+                        mock_user.return_value = None  # Should not be called
+
+                        result = await client.get_complete_contact_info_by_phone_async("+33111222333")
+
+                        assert result is not None
+                        assert result["assigned_user"] is None
+                        assert result["user_source"] is None
+                        assert len(result["opportunities"]) == 0
+                        mock_user.assert_not_called()  # Should not attempt user lookup
+
+    async def test_strategy_direct_only_with_contact(self):
+        """Test 'direct_only' strategy - should skip opportunities and use contact owner"""
+        client = SalesforceApiClient()
+        client._access_token = "mock_token"
+        client._instance_url = "https://mock-instance.salesforce.com"
+
+        # Mock contact data
+        contact_data = {
+            "type": "Contact",
+            "data": {
+                "Id": "contact_999",
+                "FirstName": "Charlie",
+                "LastName": "Wilson",
+                "Owner": {"Id": "contact_owner", "Name": "Contact Owner"}
+            }
+        }
+
+        user_data = {"contact_owner": {"Id": "contact_owner", "Name": "Contact Owner"}}
+
+        with patch.object(client, 'get_person_by_phone_async', new_callable=AsyncMock) as mock_person:
+            with patch.object(client, 'get_opportunities_by_contact_async', new_callable=AsyncMock) as mock_opps:
+                with patch.object(client, 'get_user_by_id_async', new_callable=AsyncMock) as mock_user:
+                    with patch('utils.envvar.EnvHelper.get_salesforce_owner_strategy', return_value='direct_only'):
+                        mock_person.return_value = contact_data
+                        mock_user.side_effect = lambda user_id: user_data.get(user_id)
+
+                        result = await client.get_complete_contact_info_by_phone_async("+33999888777")
+
+                        assert result is not None
+                        assert result["assigned_user"]["Id"] == "contact_owner"
+                        assert result["user_source"] == "contact"
+                        assert len(result["opportunities"]) == 0
+                        mock_opps.assert_not_called()  # Should not retrieve opportunities
+
+    def test_get_owner_by_strategy_method_direct_only(self):
+        """Test the _get_owner_by_strategy method with direct_only strategy"""
+        client = SalesforceApiClient()
+        
+        contact_info = {"Owner": {"Id": "contact_owner", "Name": "Contact Owner"}}
+        opportunities = [{"Id": "opp_1", "OwnerId": "opp_owner"}]
+        
+        user_id, user_source = client._get_owner_by_strategy("Contact", contact_info, opportunities, "direct_only")
+        
+        assert user_id == "contact_owner"
+        assert user_source == "contact"
+
+    def test_get_owner_by_strategy_method_opport_only_with_opps(self):
+        """Test the _get_owner_by_strategy method with opport_only strategy and opportunities"""
+        client = SalesforceApiClient()
+        
+        contact_info = {"Owner": {"Id": "contact_owner", "Name": "Contact Owner"}}
+        opportunities = [{"Id": "opp_1", "OwnerId": "opp_owner"}]
+        
+        user_id, user_source = client._get_owner_by_strategy("Contact", contact_info, opportunities, "opport_only")
+        
+        assert user_id == "opp_owner"
+        assert user_source == "opportunity"
+
+    def test_get_owner_by_strategy_method_opport_only_without_opps(self):
+        """Test the _get_owner_by_strategy method with opport_only strategy and no opportunities"""
+        client = SalesforceApiClient()
+        
+        contact_info = {"Owner": {"Id": "contact_owner", "Name": "Contact Owner"}}
+        opportunities = []
+        
+        user_id, user_source = client._get_owner_by_strategy("Contact", contact_info, opportunities, "opport_only")
+        
+        assert user_id is None
+        assert user_source is None

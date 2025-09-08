@@ -280,7 +280,7 @@ async def change_env_var_values(var_to_update: dict):
 
 async def reload_env_var(var_to_reload: dict):
     """Reload environment variables"""
-    if not var_to_update:
+    if not var_to_reload:
         raise HTTPException(status_code=400, detail="No query parameters provided")
 
     try:
@@ -288,11 +288,13 @@ async def reload_env_var(var_to_reload: dict):
         updated_vars = []
         missing_vars = []
 
-        for var_name, new_value in var_to_update.items():
+        for var_name, new_value in var_to_reload.items():
             # Check if the environment variable already exists
             if var_name not in os.environ:
                 missing_vars.append(var_name)
                 continue
-
-            # Update the environment variable only if it exists
             os.environ[var_name] = EnvHelper.get_env_variable_value_by_name(var_name)
+    
+    except Exception as e:
+        logger.error(f"Error reloading environment variable: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error reloading environment variables: {e!s}")

@@ -119,7 +119,8 @@ class StudiRAGInferenceApiClient(ConversationPersistenceInterface, RagQueryInter
                 "/rag/inference/conversation/add-external-message", json=request_model.to_dict(), timeout=self.timeout
             )
             resp.raise_for_status()
-            return resp.json()
+            json_resp = resp.json()
+            return json_resp
         except ValueError as exc:
             raise exc
         except httpx.ConnectError as exc:

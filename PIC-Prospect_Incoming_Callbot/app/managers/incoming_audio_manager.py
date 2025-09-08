@@ -462,7 +462,15 @@ class IncomingAudioManager(IncomingManager):
 
             current_state["history"].append(("user", user_query))
             messages: dict | None = await self.conversation_persistence.add_message_to_conversation_async(conv_id, user_query, "user")
-            user_query_msg_id: str | None = messages["messages"][-1]["id"] if messages else None
+            user_query_msg_id: str | None = None
+            
+            # Handle both local persistance and RAG API conversation format
+            if messages and isinstance(messages, dict) and "messages" in messages and messages["messages"]:
+                user_query_msg_id = messages["messages"][-1]["id"]
+            elif messages and isinstance(messages, list) and any(messages):
+                user_query_msg_id = messages[-1]["id"]
+            else:
+                self.logger.error(">>> Missing messages in response from conversation persistence")
 
             # Rename incoming speech file to match message id from SQL database
             if user_query_msg_id and user_query_audio_filename:
