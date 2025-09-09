@@ -11,7 +11,7 @@ from twilio.request_validator import RequestValidator
 from twilio.rest import Client
 from twilio.twiml.messaging_response import MessagingResponse
 from twilio.twiml.voice_response import Connect, VoiceResponse
-from utils.endpoints_decorator import api_key_required
+from utils.endpoints_api_key_required_decorator import api_key_required
 from utils.envvar import EnvHelper
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ twilio_client = Client(EnvHelper.get_twilio_sid(), EnvHelper.get_twilio_auth())
 
 
 async def verify_twilio_call_sid(call_sid: str, from_number: str) -> None:
-    if not EnvHelper.get_test_audio():
+    if not EnvHelper.get_allow_test_fake_incoming_calls():
         call = twilio_client.calls(call_sid).fetch()
         if call.status not in ("in-progress", "in-queue", "ringing"):
             err_msg = f"Call status is neither in-progress, in-queue nor ringing. Call status is: {call.status}"
@@ -60,8 +60,22 @@ async def voice_incoming_call_endpoint(request: Request) -> HTMLResponse:
     # await authenticate_twilio_request(request)
     return await create_websocket_for_incoming_call_async(request)
 
+# Secured endpoint to run performance tests with multiple concurrent incoming calls, do this GET query:
+# http://127.0.0.1:8344/test-parallel-incoming-calls?api_key=test-key-9535782!b%&calls_count=5
+@router.get("/test-parallel-incoming-calls")
+@api_key_required
+async def test_parallel_incoming_calls(request: Request) -> HTMLResponse:
+    import asyncio
+    from testing.audio_test_simulator import AudioTestManager
+
+    test_manager = AudioTestManager()
+    concurrent_calls_count = request.query_params.get("calls_count", 5)
+    # Lancer la simulation en arrière-plan
+    asyncio.create_task(test_manager.run_fake_incoming_calls(int(concurrent_calls_count)))
+    return HTMLResponse(content="Test started successfully")
 
 @router.get("/websocket-url")
+@api_key_required
 async def get_websocket_url_for_incoming_call(request: Request) -> HTMLResponse:
     logger.info("Received GET request for websocket URL endpoint")
     ws_url, phone_number, call_sid = await get_websocket_url_for_incoming_call_async(request)
@@ -117,15 +131,15 @@ async def _extract_request_data_async(request: Request) -> tuple:
     body: str = ""
     if request.method == "GET":
         # Pour les requêtes GET, utiliser les paramètres de requête
-        phone_number = request.var_to_update.get("From", "Unknown From")
-        call_sid = request.var_to_update.get("CallSid", "Unknown CallSid")
-        body = request.var_to_update.get("Body", "")
+        phone_number = request._query_params.get("From", "Unknown From")
+        call_sid = request._query_params.get("CallSid", "Unknown CallSid")
+        body = request._query_params.get("Body", "")
     elif request.method == "POST":
         # Pour les requêtes POST, utiliser les données du formulaire
         form = await request.form()
-        phone_number = form.get("From", "Unknown From")
-        call_sid = form.get("CallSid", "Unknown CallSid")
-        body = form.get("Body", "")
+        phone_number = str(form.get("From", "Unknown From"))
+        call_sid = str(form.get("CallSid", "Unknown CallSid"))
+        body = str(form.get("Body", ""))
     else:
         raise HTTPException(status_code=405, detail="Method not allowed")
     return phone_number, call_sid, body
@@ -136,7 +150,7 @@ async def _extract_request_data_async(request: Request) -> tuple:
 async def websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid: str) -> None:
     # await authenticate_twilio_request(ws)
     await verify_twilio_call_sid(call_sid, calling_phone_number)
-    logger.info(f"WebSocket connection for call SID {call_sid} from {ws.client.host}.")
+    logger.info(f"WebSocket connection for call SID {call_sid} from {ws.client.host if ws.client else 'unknown websocket client (and host)'}.")
     try:
         await ws.accept()
         logger.info(f"[SUCCESS] WebSocket connection accepted for call SID {call_sid}.")
@@ -144,16 +158,14 @@ async def websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid:
         logger.error(f"[FAIL] Failed to accept WebSocket connection for call SID {call_sid}: {e}", exc_info=True)
         return
 
-    call_handler = None
+    call_handler: PhoneCallWebsocketEventsHandler
     try:
-        call_handler: PhoneCallWebsocketEventsHandler = (
-            phone_call_websocket_events_handler_factory.get_new_phone_call_websocket_events_handler(websocket=ws)
-        )
+        call_handler = phone_call_websocket_events_handler_factory.get_new_phone_call_websocket_events_handler(websocket=ws)
         await call_handler.handle_websocket_all_receieved_events_async(calling_phone_number, call_sid)
         logger.info(f"WebSocket handler finished for call SID {call_sid}.")
 
     except WebSocketDisconnect:
-        logger.info(f"WebSocket disconnected: {ws.client.host}:{ws.client.port}")
+        logger.info(f"WebSocket disconnected: {ws.client.host if ws.client else 'unknown websocket client (and host)'}:{ws.client.port if ws.client else '(and port)'}")
         # Ensure call duration tracking is finished on disconnect
         if call_handler and call_handler.call_duration_context:
             call_handler._finish_call_duration_tracking("endpoint_websocket_disconnect")
@@ -171,7 +183,7 @@ async def websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid:
         # Final safety check to ensure call duration tracking is finished
         if call_handler and call_handler.call_duration_context:
             call_handler._finish_call_duration_tracking("endpoint_cleanup")
-        logger.info(f"WebSocket endpoint finished for: {ws.client.host}:{ws.client.port}")
+        logger.info(f"WebSocket endpoint finished for: {ws.client.host if ws.client else 'unknown websocket client (and host)'}:{ws.client.port if ws.client else '(and port)'}")
         # Pre-build a new handler for the next call
         phone_call_websocket_events_handler_factory.build_new_phone_call_websocket_events_handler()
 
@@ -191,7 +203,10 @@ async def handle_incoming_sms_async(request: Request) -> HTMLResponse:
 
         incoming_sms_handler = IncomingSMSHandler()
         conversation_id = await incoming_sms_handler.init_user_and_conversation_upon_incoming_sms(phone_number)
-        rag_answer = await incoming_sms_handler.get_rag_response_to_sms_query_async(conversation_id, body)
+        if conversation_id:
+            rag_answer = await incoming_sms_handler.get_rag_response_to_sms_query_async(conversation_id, body)
+        else:
+            rag_answer = "Je suis désolé, je ne peux pas répondre à votre message."
 
         logger.info(f'Original RAG answer: "{rag_answer}"')
 
@@ -202,22 +217,8 @@ async def handle_incoming_sms_async(request: Request) -> HTMLResponse:
         gsm_rag_answer = rag_answer.encode("utf-8", errors="ignore").decode("utf-8")
         logger.info(f'GSM-7 encoded RAG answer: "{gsm_rag_answer}"')
 
-        gsm_rag_answer = (
-            gsm_rag_answer.replace("“", '"')
-            .replace("”", '"')
-            .replace("‘", "'")
-            .replace("’", "'")
-            .replace("—", "-")
-            .replace("–", "-")
-            .replace("…", "...")
-            .replace(",", " ")
-        )
-        gsm_rag_answer = "".join(
-            c
-            for c in gsm_rag_answer
-            if c
-            in " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\n€£¥¤§¿¡ÄÅÆÇÉÑÖØÜßàäåæçèéìñòöøùü"
-        )
+        gsm_rag_answer = gsm_rag_answer.replace("“", '"').replace("”", '"').replace("‘", "'").replace("’", "'").replace("—", "-").replace("–", "-").replace("…", "...").replace(",", " ")
+        gsm_rag_answer = "".join(c for c in gsm_rag_answer if c in " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\n€£¥¤§¿¡ÄÅÆÇÉÑÖØÜßàäåæçèéìñòöøùü")
 
         # gsm_rag_answer = "Merci pour votre message, un conseiller vous contactera prochainement. Il s'appelle étienne et est très sympa. Il est disponible sur WhatsApp et Telegram.\n\n A très 'vite'!"
         logger.info(f'SMS answer: "{gsm_rag_answer}"')
@@ -278,6 +279,7 @@ async def change_env_var_values(var_to_update: dict):
         logger.error(f"Error changing environment variable: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error updating environment variables: {e!s}")
 
+
 async def reload_env_var(var_to_reload: dict):
     """Reload environment variables"""
     if not var_to_reload:
@@ -294,7 +296,7 @@ async def reload_env_var(var_to_reload: dict):
                 missing_vars.append(var_name)
                 continue
             os.environ[var_name] = EnvHelper.get_env_variable_value_by_name(var_name)
-    
+
     except Exception as e:
         logger.error(f"Error reloading environment variable: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error reloading environment variables: {e!s}")

@@ -1,12 +1,9 @@
-import operator
-from collections.abc import Sequence
-from typing import Annotated, TypedDict
-
+from typing import TypedDict
 
 class ConversationState(TypedDict):
     """Represents the state of the conversation at any point."""
 
-    history: Sequence[tuple[str, str]]
+    history: list[tuple[str, str]]
     agent_scratchpad: dict[str, str]
 
 class PhoneConversationState(ConversationState):

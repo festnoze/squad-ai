@@ -27,7 +27,7 @@ class EnvHelper:
     def get_salesforce_owner_strategy() -> str:
         """
         Get the Salesforce owner retrieval strategy.
-        
+
         Returns:
             str: The strategy to use for retrieving owner information.
                  - "both": Try opportunity owner first, fallback to contact owner (default)
@@ -39,6 +39,7 @@ class EnvHelper:
         if strategy.lower() not in valid_strategies:
             # Log warning and default to "both"
             import logging
+
             logger = logging.getLogger(__name__)
             logger.warning(f"Invalid SALESFORCE_OWNER_STRATEGY '{strategy}'. Valid values: {valid_strategies}. Defaulting to 'both'.")
             return "both"
@@ -117,8 +118,8 @@ class EnvHelper:
         return value is not None and value.lower() == "true"
 
     @staticmethod
-    def get_test_audio() -> bool:
-        value = EnvHelper.get_env_variable_value_by_name("TEST_AUDIO", fails_if_missing=False)
+    def get_allow_test_fake_incoming_calls() -> bool:
+        value = EnvHelper.get_env_variable_value_by_name("ALLOW_TEST_FAKE_INCOMING_CALLS", fails_if_missing=False)
         return value is not None and value.lower() == "true"
 
     @staticmethod

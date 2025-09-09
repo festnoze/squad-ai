@@ -1354,3 +1354,158 @@ class SalesforceApiClient(SalesforceApiClientInterface):
 
         self.logger.info(f"Complete contact info retrieval finished for {phone_number}. Found {len(result['opportunities'])} opportunities.")
         return result
+
+    async def get_phone_numbers_async(self, limit: int = 10) -> list[dict] | None:
+        """
+        Retrieve the first x phone numbers from both Contacts and Leads in Salesforce.
+        
+        Args:
+            limit: Number of phone numbers to retrieve (default: 10)
+            
+        Returns:
+            A list of dictionaries containing phone numbers and associated person data,
+            or None if an error occurs.
+        """
+        await self._ensure_authenticated_async()
+
+        if limit <= 0:
+            self.logger.info("Error: limit must be greater than 0")
+            return None
+
+        async def _execute_phone_numbers_search():
+            headers = {"Authorization": f"Bearer {self._access_token}", "Content-Type": "application/json"}
+            phone_numbers = []
+
+            async with httpx.AsyncClient() as client:
+                # Get phone numbers from Contacts first
+                contact_query = (
+                    "SELECT Id, FirstName, LastName, Email, Phone, MobilePhone, Account.Name, Owner.Name "
+                    "FROM Contact "
+                    "WHERE (Phone != null OR MobilePhone != null) "
+                    "ORDER BY Id DESC "
+                    f"LIMIT {limit}"
+                )
+                self.logger.debug(f"SOQL Query (Contacts): {contact_query}")
+                encoded_contact_query = urllib.parse.quote(contact_query)
+                url_contact_query = (
+                    f"{self._instance_url}/services/data/{self._version_api}/query/?q={encoded_contact_query}"
+                )
+
+                try:
+                    resp = await client.get(url_contact_query, headers=headers)
+                    resp.raise_for_status()
+                    data = resp.json()
+                    contact_records = data.get("records", [])
+                    
+                    for contact in contact_records:
+                        # Add Phone if available
+                        if contact.get("Phone"):
+                            phone_numbers.append({
+                                "phone_number": contact.get("Phone"),
+                                "type": "Contact",
+                                "person_id": contact.get("Id"),
+                                "first_name": contact.get("FirstName"),
+                                "last_name": contact.get("LastName"),
+                                "email": contact.get("Email"),
+                                "account_name": contact.get("Account", {}).get("Name") if contact.get("Account") else None,
+                                "owner_name": contact.get("Owner", {}).get("Name") if contact.get("Owner") else None,
+                                "phone_type": "Phone"
+                            })
+                        
+                        # Add MobilePhone if available and different from Phone
+                        if contact.get("MobilePhone") and contact.get("MobilePhone") != contact.get("Phone"):
+                            phone_numbers.append({
+                                "phone_number": contact.get("MobilePhone"),
+                                "type": "Contact",
+                                "person_id": contact.get("Id"),
+                                "first_name": contact.get("FirstName"),
+                                "last_name": contact.get("LastName"),
+                                "email": contact.get("Email"),
+                                "account_name": contact.get("Account", {}).get("Name") if contact.get("Account") else None,
+                                "owner_name": contact.get("Owner", {}).get("Name") if contact.get("Owner") else None,
+                                "phone_type": "MobilePhone"
+                            })
+
+                except httpx.HTTPStatusError as http_err:
+                    self.logger.info(f"HTTP error querying Contacts: {http_err} - Status: {http_err.response.status_code}")
+                    try:
+                        self.logger.info(json.dumps(http_err.response.json(), indent=2, ensure_ascii=False))
+                    except json.JSONDecodeError:
+                        self.logger.info(http_err.response.text)
+                    raise http_err
+                except Exception as e:
+                    self.logger.info(f"Error querying Contacts: {e!s}")
+                    raise e
+
+                # If we haven't reached the limit yet, get phone numbers from Leads
+                remaining_limit = limit - len(phone_numbers)
+                if remaining_limit > 0:
+                    lead_query = (
+                        "SELECT Id, FirstName, LastName, Email, Phone, MobilePhone, Company, Owner.Name, Status "
+                        "FROM Lead "
+                        "WHERE (Phone != null OR MobilePhone != null) AND IsConverted = false "
+                        "ORDER BY Id DESC "
+                        f"LIMIT {remaining_limit}"
+                    )
+                    self.logger.debug(f"SOQL Query (Leads): {lead_query}")
+                    encoded_lead_query = urllib.parse.quote(lead_query)
+                    url_lead_query = f"{self._instance_url}/services/data/{self._version_api}/query/?q={encoded_lead_query}"
+
+                    try:
+                        resp = await client.get(url_lead_query, headers=headers)
+                        resp.raise_for_status()
+                        data = resp.json()
+                        lead_records = data.get("records", [])
+                        
+                        for lead in lead_records:
+                            # Add Phone if available
+                            if lead.get("Phone"):
+                                phone_numbers.append({
+                                    "phone_number": lead.get("Phone"),
+                                    "type": "Lead",
+                                    "person_id": lead.get("Id"),
+                                    "first_name": lead.get("FirstName"),
+                                    "last_name": lead.get("LastName"),
+                                    "email": lead.get("Email"),
+                                    "company": lead.get("Company"),
+                                    "owner_name": lead.get("Owner", {}).get("Name") if lead.get("Owner") else None,
+                                    "status": lead.get("Status"),
+                                    "phone_type": "Phone"
+                                })
+                            
+                            # Add MobilePhone if available and different from Phone
+                            if lead.get("MobilePhone") and lead.get("MobilePhone") != lead.get("Phone"):
+                                phone_numbers.append({
+                                    "phone_number": lead.get("MobilePhone"),
+                                    "type": "Lead",
+                                    "person_id": lead.get("Id"),
+                                    "first_name": lead.get("FirstName"),
+                                    "last_name": lead.get("LastName"),
+                                    "email": lead.get("Email"),
+                                    "company": lead.get("Company"),
+                                    "owner_name": lead.get("Owner", {}).get("Name") if lead.get("Owner") else None,
+                                    "status": lead.get("Status"),
+                                    "phone_type": "MobilePhone"
+                                })
+
+                    except httpx.HTTPStatusError as http_err:
+                        self.logger.info(f"HTTP error querying Leads: {http_err} - Status: {http_err.response.status_code}")
+                        try:
+                            self.logger.info(json.dumps(http_err.response.json(), indent=2, ensure_ascii=False))
+                        except json.JSONDecodeError:
+                            self.logger.info(http_err.response.text)
+                        raise http_err
+                    except Exception as e:
+                        self.logger.info(f"Error querying Leads: {e!s}")
+                        raise e
+
+                # Limit the results to the requested number
+                phone_numbers = phone_numbers[:limit]
+                self.logger.info(f"Retrieved {len(phone_numbers)} phone numbers from Salesforce")
+                return phone_numbers
+
+        try:
+            return await self._with_auth_retry(_execute_phone_numbers_search)
+        except (httpx.RequestError, Exception) as e:
+            self.logger.info(f"Error retrieving phone numbers: {e!s}")
+            return None

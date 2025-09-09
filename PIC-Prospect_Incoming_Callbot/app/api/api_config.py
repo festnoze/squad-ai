@@ -46,14 +46,6 @@ class ApiConfig:
             logger.info("TTS cache pre-population completed at startup.")
         except Exception as e:
             logger.error(f"Failed to pre-populate TTS cache at startup: {e}")
-
-        if EnvHelper.get_test_audio():
-            from testing.audio_test_simulator import AudioTestManager
-
-            test_manager = AudioTestManager()
-            # Lancer la simulation en arrière-plan
-            asyncio.create_task(test_manager.run_if_enabled())
-
         try:
             yield
         finally:

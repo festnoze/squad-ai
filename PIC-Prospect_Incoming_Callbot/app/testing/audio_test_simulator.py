@@ -7,6 +7,7 @@ import uuid
 import wave
 
 import aiohttp
+from api_client.salesforce_api_client import SalesforceApiClient
 from speech.twilio_audio_sender import TwilioAudioSender
 from utils.envvar import EnvHelper
 
@@ -55,10 +56,13 @@ class AudioTestSimulator:
             self.logger.warning("Aucun fichier audio trouvé dans static/incoming_audio")
             return
 
+        # Get true existing phone numbers from SF client
+        client = SalesforceApiClient()
+        phone_numbers = await client.get_phone_numbers_async(concurrent_calls_count)
         # Créer les tâches pour les appels simultanés
         tasks = []
         for i in range(concurrent_calls_count):
-            call_id = f"test-call-{self.session_counter}-0000000{i}"
+            call_id = f"test-call-{self.session_counter}-{phone_numbers[i]['phone_number']}"
             self.session_counter += 1
 
             # Chaque appel concurrent va jouer TOUS les fichiers audio dans l'ordre chronologique
@@ -138,7 +142,7 @@ class AudioTestSimulator:
     async def _get_websocket_url(self, calling_phone: str, call_sid: str) -> str | None:
         """Obtient l'URL WebSocket via l'endpoint dédié"""
         url = f"{self.base_url}/websocket-url"
-        params = {"From": calling_phone, "CallSid": call_sid, "CallStatus": "ringing"}
+        params = {"From": calling_phone, "CallSid": call_sid, "CallStatus": "ringing", "api_key": EnvHelper.get_admin_api_keys()[0]}
 
         try:
             async with aiohttp.ClientSession() as session:
@@ -214,9 +218,7 @@ class AudioTestSimulator:
         try:
             with wave.open(file_path, "rb") as wav_file:
                 if wav_file.getframerate() != self.sample_rate:
-                    self.logger.warning(
-                        f"Taux d'échantillonnage inattendu: {wav_file.getframerate()} (attendu: {self.sample_rate})"
-                    )
+                    self.logger.warning(f"Taux d'échantillonnage inattendu: {wav_file.getframerate()} (attendu: {self.sample_rate})")
 
                 # Lire tout le fichier audio en une fois
                 all_frames = wav_file.readframes(wav_file.getnframes())
@@ -269,18 +271,15 @@ class AudioTestManager:
         self.logger = logging.getLogger(__name__)
         self.simulator = AudioTestSimulator()
 
-    async def run_if_enabled(self):
+    async def run_fake_incoming_calls(self, concurrent_calls_count: int):
         """Lance les tests si TEST_AUDIO=true"""
-        if not EnvHelper.get_test_audio():
+        if not EnvHelper.get_allow_test_fake_incoming_calls():
             return
 
         self.logger.info("Mode test audio activé - Démarrage de la simulation")
 
-        # Attendre que l'application soit prête et vérifier la santé
-        await self._wait_for_api_ready()
-
         # Lancer la simulation avec plusieurs appels simultanés
-        await self.simulator.start_simulation(concurrent_calls_count=EnvHelper.get_test_call_count())
+        await self.simulator.start_simulation(concurrent_calls_count)
 
     async def _wait_for_api_ready(self, max_attempts: int = 10, delay: float = 2.0):
         """Attend que l'API soit prête à recevoir des connexions"""
@@ -288,9 +287,7 @@ class AudioTestManager:
             try:
                 async with aiohttp.ClientSession() as session:
                     # Test de santé simple
-                    async with session.get(
-                        f"{self.simulator.base_url}/ping", timeout=aiohttp.ClientTimeout(total=5)
-                    ) as response:
+                    async with session.get(f"{self.simulator.base_url}/ping", timeout=aiohttp.ClientTimeout(total=5)) as response:
                         if response.status == 200:
                             self.logger.info(f"API prête après {attempt + 1} tentative(s)")
                             return

@@ -73,21 +73,21 @@ class AgentsGraph:
         self.available_actions: list[str] = EnvHelper.get_available_actions()
         self.consecutive_error_manager = ConsecutiveErrorManager(call_sid=call_sid)
 
+        self.conversation_persistence_type = EnvHelper.get_conversation_persistence_type()
         # Who handles conversation history persistence? local/ studi_rag/ desactivated (fake)
         self.conversation_persistence: ConversationPersistenceInterface
         if conversation_persistence:
             self.conversation_persistence = conversation_persistence
         else:
-            conversation_persistence_type = EnvHelper.get_conversation_persistence_type()
             # Check for inconsistent states
-            if "ask_rag" in self.available_actions:
-                assert conversation_persistence_type == "studi_rag", "when 'ask_rag' action is available, conversation persistence type must be 'studi_rag' but is: " + conversation_persistence_type
-            else:
-                assert conversation_persistence_type != "studi_rag", "when 'ask_rag' action is not available, conversation persistence type cannot be 'studi_rag' but is: " + conversation_persistence_type
-
-            if conversation_persistence_type == "local":
+            if "ask_rag" not in self.available_actions:
+                assert self.conversation_persistence_type != "studi_rag", "when 'ask_rag' action is not available, conversation persistence type cannot be 'studi_rag' but is: " + self.conversation_persistence_type
+            # else:
+            #     assert conversation_persistence_type == "studi_rag", "when 'ask_rag' action is available, conversation persistence type must be 'studi_rag' but is: " + conversation_persistence_type
+        
+            if self.conversation_persistence_type == "local":
                 self.conversation_persistence = ConversationPersistenceLocalService()
-            elif conversation_persistence_type == "studi_rag":
+            elif self.conversation_persistence_type == "studi_rag":
                 self.conversation_persistence = StudiRAGInferenceApiClient()
             else:
                 self.conversation_persistence = ConversationPersistenceServiceFake()
@@ -466,7 +466,8 @@ class AgentsGraph:
             self.logger.info(f"[{call_sid}] No SalesForce account found for phone number: {phone_number}. Retry once to retrieve.")
             complete_contact_info = await self.salesforce_api_client.get_complete_contact_info_by_phone_async(phone_number)
             if not complete_contact_info:
-                self.logger.warning(f"[{call_sid}] No SalesForce account found after retry for phone number: {phone_number}. New user: needs LID creation.")
+                self.logger.warning(f"[{call_sid}] No SalesForce account found after retry for phone number: {phone_number}. New user: needs creation.")
+                return state
 
         # Keep the leads info call for backward compatibility (though the new method includes this logic)
         leads_info = await self.salesforce_api_client.get_leads_by_details_async(phone_number)
@@ -740,7 +741,9 @@ class AgentsGraph:
 
             if full_answer:
                 self.logger.info(f"Full answer received from RAG API: '{full_answer}'")
-                await self.add_AI_response_message_to_conversation_async(full_answer, state, speak_out_text=False)
+                is_local_persistence = self.conversation_persistence_type == "local"
+                # Add answer, but: Don't speak out the full answer (as its streaming has been), and persist only onto local persistence (RAG API has already handled full answer persistance)
+                await self.add_AI_response_message_to_conversation_async(full_answer, state, speak_out_text=False, persist=is_local_persistence)
                 # RAG agent successful response - reset error counter
                 self.consecutive_error_manager.reset_consecutive_error_count(state)
 
