@@ -253,7 +253,6 @@ class AgentsGraph:
         # Multiple possible actions: schedule appointment or ask RAG for training infos
         elif len(self.available_actions) >= 1:
             category = await self.analyse_user_input_for_dispatch_async(self.calendar_classifier_llm, user_input, state["history"])
-            state["history"].append(("user", user_input))
             if category == "schedule_calendar_appointment":
                 # Successful routing to calendar agent - reset error counter
                 self.consecutive_error_manager.reset_consecutive_error_count(state)
@@ -494,7 +493,7 @@ class AgentsGraph:
         end_welcome_text = f"{self.thanks_to_come_back}, {first_name}."
 
         salesman_first_name = state["agent_scratchpad"]["sf_account_info"].get("Owner", {}).get("Name", "enformation DUPONT").split(" ")[0].strip()
-        end_welcome_text += f" Votre conseiller, {salesman_first_name}, est actuellement indisponible."
+        end_welcome_text += f" {salesman_first_name}, votre conseiller, est actuellement indisponible."
 
         if "schedule_appointement" in self.available_actions:
             end_welcome_text += f" {TextRegistry.appointment_text}"
