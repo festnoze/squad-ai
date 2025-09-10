@@ -8,6 +8,7 @@ class OperationType(Enum):
     STT = "speech_to_text"
     TTS = "text_to_speech"
     SALESFORCE = "salesforce_api"
+    CALENDAR = "calendar_api"
     RAG = "rag_inference"
     CALL_DURATION = "call_duration"
 

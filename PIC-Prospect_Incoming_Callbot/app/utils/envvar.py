@@ -370,3 +370,24 @@ class EnvHelper:
     @staticmethod
     def get_latency_metrics_file_path() -> str:
         return EnvHelper.get_env_variable_value_by_name("LATENCY_METRICS_FILE_PATH", fails_if_missing=False) or "outputs/logs/latency_metrics.jsonl"
+
+    # Google Calendar configuration methods
+    @staticmethod
+    def get_calendar_provider() -> str:
+        """Get the calendar provider to use (salesforce or google)"""
+        return EnvHelper.get_env_variable_value_by_name("CALENDAR_PROVIDER", fails_if_missing=False) or "salesforce"
+
+    @staticmethod
+    def get_google_calendar_credentials_filepath() -> str:
+        """Get the path to Google Calendar service account credentials JSON file"""
+        return EnvHelper.get_env_variable_value_by_name("GOOGLE_CALENDAR_CREDENTIALS_FILEPATH", fails_if_missing=False) or "secrets/google-calendar-service-account.json"
+
+    @staticmethod
+    def get_google_calendar_id() -> str:
+        """Get the Google Calendar ID to use for appointments"""
+        return EnvHelper.get_env_variable_value_by_name("GOOGLE_CALENDAR_ID", fails_if_missing=False) or "primary"
+
+    @staticmethod
+    def get_google_calendar_timezone() -> str:
+        """Get the timezone for Google Calendar operations"""
+        return EnvHelper.get_env_variable_value_by_name("GOOGLE_CALENDAR_TIMEZONE", fails_if_missing=False) or "Europe/Paris"
