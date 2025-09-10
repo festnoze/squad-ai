@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # FastAPI Backend
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:///./data/turtle_trading.db
+      - ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+    volumes:
+      - ./api:/app
+      - ./data:/app/data
+      - ./inputs:/app/inputs
+      - ./strategies:/app/strategies
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - turtle-network
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - VITE_WS_URL=ws://localhost:8000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev
+    depends_on:
+      - api
+    networks:
+      - turtle-network
+
+  # Redis for caching and WebSocket management (optional)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - turtle-network
+
+  # PostgreSQL for production (optional - can use SQLite for development)
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=turtle_trading
+      - POSTGRES_USER=turtle
+      - POSTGRES_PASSWORD=trading123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - turtle-network
+
+volumes:
+  redis_data:
+  postgres_data:
+
+networks:
+  turtle-network:
+    driver: bridge
