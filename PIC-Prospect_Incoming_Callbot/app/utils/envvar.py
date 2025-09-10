@@ -46,6 +46,10 @@ class EnvHelper:
         return strategy.lower()
 
     @staticmethod
+    def get_company_name() -> str:
+        return EnvHelper.get_env_variable_value_by_name("COMPANY_NAME") or "Studi"
+
+    @staticmethod
     def get_rag_api_host() -> str:
         return EnvHelper.get_env_variable_value_by_name("RAG_API_HOST") or ""
 
@@ -76,6 +80,22 @@ class EnvHelper:
         """Get RAG API test connection timeout in seconds (default: 10.0)"""
         value = EnvHelper.get_env_variable_value_by_name("RAG_API_TEST_TIMEOUT", fails_if_missing=False)
         return float(value) if value else 10.0
+
+    @staticmethod
+    def get_salesforce_use_lightning_scheduler() -> bool:
+        """Get whether to use Lightning Scheduler instead of Events (default: False)"""
+        value = EnvHelper.get_env_variable_value_by_name("SALESFORCE_USE_LIGHTNING_SCHEDULER", fails_if_missing=False)
+        return value is not None and value.lower() == "true"
+
+    @staticmethod
+    def get_salesforce_default_work_type_id() -> str | None:
+        """Get default Work Type ID for Lightning Scheduler appointments"""
+        return EnvHelper.get_env_variable_value_by_name("SALESFORCE_DEFAULT_WORK_TYPE_ID", fails_if_missing=False)
+
+    @staticmethod
+    def get_salesforce_default_service_territory_id() -> str | None:
+        """Get default Service Territory ID for Lightning Scheduler appointments"""
+        return EnvHelper.get_env_variable_value_by_name("SALESFORCE_DEFAULT_SERVICE_TERRITORY_ID", fails_if_missing=False)
 
     @staticmethod
     def get_python_paths() -> list[str]:

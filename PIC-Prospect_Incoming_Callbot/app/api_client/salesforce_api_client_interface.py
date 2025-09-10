@@ -181,3 +181,59 @@ class SalesforceApiClientInterface(ABC):
             or None if no contact found or error occurs.
         """
         pass
+
+    @abstractmethod
+    async def get_appointment_slots_async(
+        self,
+        start_datetime: str,
+        end_datetime: str,
+        work_type_id: str | None = None,
+        service_territory_id: str | None = None,
+    ) -> list[dict] | None:
+        """
+        Get available appointment slots using Lightning Scheduler API.
+        
+        Args:
+            start_datetime: Start date and time in ISO format (e.g., '2025-05-20T14:00:00Z')
+            end_datetime: End date and time in ISO format (e.g., '2025-05-20T15:00:00Z')
+            work_type_id: Work Type ID for the appointment (optional)
+            service_territory_id: Service Territory ID (optional)
+            
+        Returns:
+            List of available appointment slots if successful, None otherwise
+        """
+        pass
+
+    @abstractmethod
+    async def schedule_new_appointment_with_lightning_scheduler_async(
+        self,
+        subject: str,
+        start_datetime: str,
+        duration_minutes: int = 30,
+        description: str | None = None,
+        contact_id: str | None = None,
+        work_type_id: str | None = None,
+        service_territory_id: str | None = None,
+        parent_record_id: str | None = None,
+        max_retries: int = 2,
+        retry_delay: float = 1.0,
+    ) -> str | None:
+        """
+        Create a ServiceAppointment using Lightning Scheduler and return the appointment ID if successful.
+        
+        Args:
+            subject: The subject/title of the appointment
+            start_datetime: Start date and time in ISO format (e.g., '2025-05-20T14:00:00Z')
+            duration_minutes: Duration of the appointment in minutes (default: 30)
+            description: Optional description of the appointment
+            contact_id: Contact ID to associate with the appointment
+            work_type_id: Work Type ID (optional)
+            service_territory_id: Service Territory ID (optional) 
+            parent_record_id: Parent record ID (Work Order, etc.)
+            max_retries: Maximum number of retry attempts if verification fails
+            retry_delay: Delay in seconds before retry attempt
+            
+        Returns:
+            The ID of the created ServiceAppointment if successful, None otherwise
+        """
+        pass

@@ -1355,6 +1355,285 @@ class SalesforceApiClient(SalesforceApiClientInterface):
         self.logger.info(f"Complete contact info retrieval finished for {phone_number}. Found {len(result['opportunities'])} opportunities.")
         return result
 
+    @measure_latency(OperationType.SALESFORCE, provider="salesforce")
+    async def get_appointment_slots_async(
+        self,
+        start_datetime: str,
+        end_datetime: str,
+        work_type_id: str | None = None,
+        service_territory_id: str | None = None,
+    ) -> list[dict] | None:
+        """
+        Get available appointment slots using Lightning Scheduler API.
+        
+        Args:
+            start_datetime: Start date and time in ISO format (e.g., '2025-05-20T14:00:00Z')
+            end_datetime: End date and time in ISO format (e.g., '2025-05-20T15:00:00Z')
+            work_type_id: Work Type ID for the appointment (optional, uses default from env)
+            service_territory_id: Service Territory ID (optional, uses default from env)
+            
+        Returns:
+            List of available appointment slots if successful, None otherwise
+        """
+        await self._ensure_authenticated_async()
+
+        # Use defaults from environment if not provided
+        work_type_id = work_type_id or EnvHelper.get_salesforce_default_work_type_id()
+        service_territory_id = service_territory_id or EnvHelper.get_salesforce_default_service_territory_id()
+
+        if not work_type_id or not service_territory_id:
+            self.logger.error("Error: work_type_id and service_territory_id are required for Lightning Scheduler")
+            return None
+
+        async def _execute_get_appointment_slots():
+            headers = {"Authorization": f"Bearer {self._access_token}", "Content-Type": "application/json"}
+
+            # Prepare request payload for Lightning Scheduler API
+            payload = {
+                "startTime": start_datetime,
+                "endTime": end_datetime,
+                "workTypeId": work_type_id,
+                "serviceTerritoryId": service_territory_id,
+                "allowConcurrentAppointments": False
+            }
+
+            url_scheduler_api = f"{self._instance_url}/services/data/{self._version_api}/lightning/scheduler-api/getAppointmentSlots"
+            self.logger.debug(f"Lightning Scheduler API URL: {url_scheduler_api}")
+            self.logger.debug(f"Request payload: {payload}")
+
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(url_scheduler_api, headers=headers, json=payload)
+                resp.raise_for_status()
+                
+                data = resp.json()
+                available_slots = data.get("slots", [])
+                
+                self.logger.info(f"Found {len(available_slots)} available appointment slots")
+                return available_slots
+
+        try:
+            return await self._with_auth_retry(_execute_get_appointment_slots)
+        except httpx.HTTPStatusError as http_err:
+            self.logger.error(f"Error retrieving appointment slots: {http_err.response.status_code}")
+            try:
+                self.logger.error(json.dumps(http_err.response.json(), indent=2, ensure_ascii=False))
+            except Exception:
+                self.logger.error(http_err.response.text)
+            return None
+        except Exception as e:
+            self.logger.error(f"Error retrieving appointment slots: {e!s}")
+            return None
+
+    @measure_latency(OperationType.SALESFORCE, provider="salesforce")
+    async def schedule_new_appointment_with_lightning_scheduler_async(
+        self,
+        subject: str,
+        start_datetime: str,
+        duration_minutes: int = 30,
+        description: str | None = None,
+        contact_id: str | None = None,
+        work_type_id: str | None = None,
+        service_territory_id: str | None = None,
+        parent_record_id: str | None = None,
+        max_retries: int = 2,
+        retry_delay: float = 1.0,
+    ) -> str | None:
+        """
+        Create a ServiceAppointment using Lightning Scheduler and return the appointment ID if successful.
+        
+        Args:
+            subject: The subject/title of the appointment
+            start_datetime: Start date and time in ISO format (e.g., '2025-05-20T14:00:00Z')
+            duration_minutes: Duration of the appointment in minutes (default: 30)
+            description: Optional description of the appointment
+            contact_id: Contact ID to associate with the appointment
+            work_type_id: Work Type ID (optional, uses default from env)
+            service_territory_id: Service Territory ID (optional, uses default from env) 
+            parent_record_id: Parent record ID (Work Order, etc.)
+            max_retries: Maximum number of retry attempts if verification fails
+            retry_delay: Delay in seconds before retry attempt
+            
+        Returns:
+            The ID of the created ServiceAppointment if successful, None otherwise
+        """
+        await self._ensure_authenticated_async()
+        
+        if not subject or not start_datetime:
+            self.logger.error("Error: Required appointment fields (subject, start_datetime) are missing")
+            return None
+
+        # Validate retry parameters
+        if max_retries < 0:
+            max_retries = 0
+        if retry_delay < 0:
+            retry_delay = 0
+
+        # Use defaults from environment if not provided
+        work_type_id = work_type_id or EnvHelper.get_salesforce_default_work_type_id()
+        service_territory_id = service_territory_id or EnvHelper.get_salesforce_default_service_territory_id()
+
+        if not work_type_id or not service_territory_id:
+            self.logger.error("Error: work_type_id and service_territory_id are required for Lightning Scheduler")
+            return None
+
+        # Convert to UTC and calculate end time
+        start_dt = self._get_french_datetime_from_str(start_datetime)
+        if start_dt is None:
+            self.logger.error("Error: Invalid start_datetime format")
+            return None
+
+        # Apply timezone offset for docker container issue
+        french_now = datetime.now(pytz.timezone("Europe/Paris"))
+        utc_offset_hours = (french_now.utcoffset().total_seconds() or 0) / 3600
+        if utc_offset_hours != 0:
+            start_dt = start_dt - timedelta(hours=utc_offset_hours)
+            self.logger.debug(f"UTC offset hours removed: {utc_offset_hours}")
+
+        start_datetime_utc = self._to_utc_datetime(start_dt)
+        end_datetime_utc = self._calculate_end_datetime(start_datetime_utc, duration_minutes)
+
+        if not end_datetime_utc:
+            self.logger.error("Error: Invalid start_datetime or duration_minutes")
+            return None
+
+        if start_datetime_utc <= datetime.now(UTC):
+            self.logger.error("Error: Start datetime must be in the future")
+            return None
+
+        # Convert to string format for API calls
+        start_datetime_str = self._get_str_from_datetime(start_datetime_utc)
+        end_datetime_str = self._get_str_from_datetime(end_datetime_utc)
+
+        # Verify slot availability before creating appointment
+        self.logger.info("Verifying slot availability with Lightning Scheduler...")
+        
+        # Create a search window around the requested time (±15 minutes)
+        search_start_time = start_datetime_utc - timedelta(minutes=15)
+        search_end_time = end_datetime_utc + timedelta(minutes=15)
+        search_start_str = self._get_str_from_datetime(search_start_time)
+        search_end_str = self._get_str_from_datetime(search_end_time)
+        
+        available_slots = await self.get_appointment_slots_async(
+            start_datetime=search_start_str,
+            end_datetime=search_end_str,
+            work_type_id=work_type_id,
+            service_territory_id=service_territory_id
+        )
+        
+        if available_slots is None:
+            self.logger.error("Error: Could not verify slot availability - proceeding with caution")
+        elif not available_slots:
+            self.logger.warning("Warning: No available slots found in the requested time window - proceeding anyway")
+        else:
+            # Check if any slot overlaps with our requested time
+            slot_available = False
+            for slot in available_slots:
+                slot_start = slot.get('startTime', slot.get('Start', ''))
+                slot_end = slot.get('endTime', slot.get('End', ''))
+                
+                if slot_start and slot_end:
+                    # Parse slot times for comparison
+                    try:
+                        slot_start_dt = datetime.fromisoformat(slot_start.replace('Z', '+00:00')).replace(tzinfo=UTC)
+                        slot_end_dt = datetime.fromisoformat(slot_end.replace('Z', '+00:00')).replace(tzinfo=UTC)
+                        
+                        # Check if requested appointment fits within any available slot
+                        if (slot_start_dt <= start_datetime_utc and 
+                            slot_end_dt >= end_datetime_utc):
+                            slot_available = True
+                            self.logger.info(f"✓ Slot verified: Available from {slot_start} to {slot_end}")
+                            break
+                    except (ValueError, TypeError) as e:
+                        self.logger.debug(f"Could not parse slot time: {e}")
+                        continue
+            
+            if not slot_available:
+                self.logger.warning("Warning: Requested time slot may not be available - proceeding anyway")
+            else:
+                self.logger.info("✓ Slot availability confirmed")
+
+        self.logger.info("Creating ServiceAppointment with Lightning Scheduler...")
+        self.logger.debug(f"Start: {start_datetime_str}, End: {end_datetime_str}")
+
+        async def _execute_appointment_creation():
+            headers = {"Authorization": f"Bearer {self._access_token}", "Content-Type": "application/json"}
+
+            # Prepare ServiceAppointment payload
+            service_appointment_payload = {
+                "Subject": subject,
+                "Status": "Scheduled",
+                "SchedStartTime": start_datetime_str,
+                "SchedEndTime": end_datetime_str,
+                "ServiceTerritoryId": service_territory_id,
+                "WorkTypeId": work_type_id
+            }
+
+            # Add optional fields
+            if description:
+                service_appointment_payload["Description"] = description
+            if contact_id:
+                service_appointment_payload["ContactId"] = contact_id
+            if parent_record_id:
+                service_appointment_payload["ParentRecordId"] = parent_record_id
+
+            # Create ServiceAppointment using standard REST API
+            url_create_appointment = f"{self._instance_url}/services/data/{self._version_api}/sobjects/ServiceAppointment/"
+            
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(url_create_appointment, headers=headers, json=service_appointment_payload)
+                resp.raise_for_status()
+
+                appointment_data = resp.json()
+                appointment_id = appointment_data.get("id")
+                
+                if appointment_id:
+                    self.logger.info("ServiceAppointment created successfully!")
+                    self.logger.info(f"Appointment ID: {appointment_id}")
+                    self.logger.info(f"View URL: {self._instance_url}/lightning/r/ServiceAppointment/{appointment_id}/view")
+                    return appointment_id
+                else:
+                    self.logger.error("ServiceAppointment creation failed - no ID returned")
+                    return None
+
+        appointment_id = None
+        creation_failed = False
+
+        try:
+            appointment_id = await self._with_auth_retry(_execute_appointment_creation)
+        except httpx.HTTPStatusError as http_err:
+            self.logger.error(f"Error creating ServiceAppointment: {http_err.response.status_code}")
+            try:
+                self.logger.error(json.dumps(http_err.response.json(), indent=2, ensure_ascii=False))
+            except Exception:
+                self.logger.error(http_err.response.text)
+            creation_failed = True
+        except Exception as e:
+            self.logger.error(f"Error creating ServiceAppointment: {e!s}")
+            creation_failed = True
+
+        if not appointment_id:
+            if creation_failed and max_retries > 0:
+                self.logger.info(f"Creation failed, retrying in {retry_delay}s... ({max_retries} retries remaining)")
+                await asyncio.sleep(retry_delay)
+
+                # Recursive retry
+                return await self.schedule_new_appointment_with_lightning_scheduler_async(
+                    subject=subject,
+                    start_datetime=start_datetime,
+                    duration_minutes=duration_minutes,
+                    description=description,
+                    contact_id=contact_id,
+                    work_type_id=work_type_id,
+                    service_territory_id=service_territory_id,
+                    parent_record_id=parent_record_id,
+                    max_retries=max_retries - 1,
+                    retry_delay=retry_delay,
+                )
+            else:
+                self.logger.error("ServiceAppointment creation failed after all retry attempts")
+
+        return appointment_id
+
     async def get_phone_numbers_async(self, limit: int = 10) -> list[dict] | None:
         """
         Retrieve the first x phone numbers from both Contacts and Leads in Salesforce.

@@ -1,8 +1,11 @@
+from utils.envvar import EnvHelper
+
+
 class TextRegistry:
     """Centralized registry for all agent static texts used in TTS pregeneration."""
 
     # AgentsGraph texts
-    start_welcome_text = "Bonjour et bienvenue chez Studi. Je suis l'assistant virtuel de lécole."
+    start_welcome_text = f"Bonjour et bienvenue chez {EnvHelper.get_company_name()}. Je suis l'assistant virtuel de lécole."
     #unavailability_for_returning_prospect = "Votre conseiller attitré est actuellement indisponible."
     unavailability_for_new_prospect = "Nos conseillers en formation sont actuellement indisponibles."
     ask_to_repeat_text = "Désolé, je n'ai pas bien entendu. Merci de répéter."
