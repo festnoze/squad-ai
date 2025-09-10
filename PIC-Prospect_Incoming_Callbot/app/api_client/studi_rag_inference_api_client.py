@@ -31,32 +31,36 @@ class StudiRAGInferenceApiClient(ConversationPersistenceInterface, RagQueryInter
         host_base_name: str | None = None,
         host_port: int | None = None,
         is_ssh: bool | None = None,
-        connect_timeout: float = 5.0,
-        read_timeout: float = 60.0,
+        connect_timeout: float | None = None,
+        read_timeout: float | None = None,
     ):
         # Read host and port from environment if not provided
         self.host_base_name = host_base_name or EnvHelper.get_rag_api_host()
         self.host_port = host_port or int(EnvHelper.get_rag_api_port())
         self.is_ssh = is_ssh or EnvHelper.get_rag_api_is_ssh()
-        self.connect_timeout = connect_timeout
-        self.read_timeout = read_timeout
-        self.timeout = httpx.Timeout(
-            connect=self.connect_timeout, read=self.read_timeout, write=self.read_timeout, pool=self.connect_timeout
-        )
-
+        self.connect_timeout = connect_timeout or EnvHelper.get_rag_api_connect_timeout()
+        self.read_timeout = read_timeout or EnvHelper.get_rag_api_read_timeout()
+        self.test_timeout = EnvHelper.get_rag_api_test_timeout()
+        self.timeout = httpx.Timeout(connect=self.connect_timeout, read=self.read_timeout, write=self.read_timeout, pool=self.connect_timeout)
         self.host_base_url = f"http{'s' if self.is_ssh else ''}://{self.host_base_name}:{self.host_port}"
         self.client = httpx.AsyncClient(base_url=self.host_base_url, timeout=self.timeout)
 
     async def test_client_connection_async(self):
-        # Test client connection
+        # Test client connection with configurable timeout
         try:
-            short_timeout = httpx.Timeout(connect=3, read=3, write=3, pool=3)
-            resp = await self.client.get("/ping", timeout=short_timeout)
+            test_timeout = httpx.Timeout(connect=self.test_timeout, read=self.test_timeout, write=self.test_timeout, pool=self.test_timeout)
+            resp = await self.client.get("/ping", timeout=test_timeout)
             assert resp.status_code == 200
             assert resp.content == b'"pong"'
             return True
+        except httpx.ConnectTimeout as ex:
+            raise RuntimeError(f"Connection timeout to RAG inference server at {self.host_base_url} (timeout: {self.test_timeout}s): {ex!s}") from ex
         except httpx.ConnectError as ex:
             raise RuntimeError(f"Cannot connect to RAG inference server at {self.host_base_url}: {ex!s}") from ex
+        except httpx.TimeoutException as ex:
+            raise RuntimeError(f"Request timeout to RAG inference server at {self.host_base_url} (timeout: {self.test_timeout}s): {ex!s}") from ex
+        except AssertionError as ex:
+            raise RuntimeError(f"RAG inference server at {self.host_base_url} returned unexpected response. Status: {resp.status_code if 'resp' in locals() else 'unknown'}, Content: {resp.content if 'resp' in locals() else 'unknown'}") from ex
 
     async def reinitialize_async(self) -> None:
         """POST /rag/inference/reinitialize: Reinitialize the service."""
@@ -83,9 +87,7 @@ class StudiRAGInferenceApiClient(ConversationPersistenceInterface, RagQueryInter
     async def create_new_conversation_async(self, conversation_request_model: ConversationRequestModel, timeout: int = 10) -> UUID:
         """POST /rag/inference/conversation/create: Create a new conversation."""
         try:
-            resp = await self.client.post(
-                "/rag/inference/conversation/create", json=conversation_request_model.to_dict(), timeout=self.timeout
-            )
+            resp = await self.client.post("/rag/inference/conversation/create", json=conversation_request_model.to_dict(), timeout=self.timeout)
             resp.raise_for_status()
             return UUID(resp.json().get("id", ConversationPersistenceInterface.NoneUuid))
         except httpx.ConnectError as exc:
@@ -115,9 +117,7 @@ class StudiRAGInferenceApiClient(ConversationPersistenceInterface, RagQueryInter
                 role=role,
                 display_waiting_message=False,
             )
-            resp = await self.client.post(
-                "/rag/inference/conversation/add-external-message", json=request_model.to_dict(), timeout=self.timeout
-            )
+            resp = await self.client.post("/rag/inference/conversation/add-external-message", json=request_model.to_dict(), timeout=self.timeout)
             resp.raise_for_status()
             json_resp = resp.json()
             return json_resp
@@ -168,9 +168,7 @@ class StudiRAGInferenceApiClient(ConversationPersistenceInterface, RagQueryInter
                 # Return a Conversation object
                 from database.models.conversation import Conversation
 
-                return Conversation(
-                    id=conversation_id, user=User(id=user_id), messages=[Message(content=new_message, role="user")]
-                )
+                return Conversation(id=conversation_id, user=User(id=user_id), messages=[Message(content=new_message, role="user")])
 
         except httpx.ConnectError as exc:
             raise RuntimeError(f"Cannot connect to RAG inference server at {self.host_base_url}") from exc
@@ -178,9 +176,7 @@ class StudiRAGInferenceApiClient(ConversationPersistenceInterface, RagQueryInter
             raise RuntimeError(f"Timeout connecting to RAG inference server at {self.host_base_url}") from exc
 
     @measure_streaming_latency(OperationType.RAG, provider="studi_rag")
-    async def rag_query_stream_async(
-        self, query_asking_request_model: QueryAskingRequestModel, interrupt_flag: dict | None = None, timeout: int = 80
-    ) -> AsyncGenerator[str, None]:
+    async def rag_query_stream_async(self, query_asking_request_model: QueryAskingRequestModel, interrupt_flag: dict | None = None, timeout: int = 80) -> AsyncGenerator[str, None]:
         """
         POST /rag/inference/conversation/ask-question/phone/stream: Stream RAG answer for a conversation.
 
@@ -215,9 +211,7 @@ class StudiRAGInferenceApiClient(ConversationPersistenceInterface, RagQueryInter
             yield f"Une erreur s'est produite lors de la récupération de la réponse: {e!s}"
 
     @measure_latency(OperationType.RAG, provider="studi_rag")
-    async def rag_query_no_conversation_async(
-        self, query_no_conversation_request_model: QueryNoConversationRequestModel, timeout: int = 80
-    ) -> dict[str, Any]:
+    async def rag_query_no_conversation_async(self, query_no_conversation_request_model: QueryNoConversationRequestModel, timeout: int = 80) -> dict[str, Any]:
         """POST /rag/inference/no-conversation/ask-question: Get RAG answer without conversation (not streamed)."""
         try:
             resp = await self.client.post(

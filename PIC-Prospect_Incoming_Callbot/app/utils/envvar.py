@@ -60,6 +60,24 @@ class EnvHelper:
         return value is not None and value.lower() == "true"
 
     @staticmethod
+    def get_rag_api_connect_timeout() -> float:
+        """Get RAG API connect timeout in seconds (default: 10.0)"""
+        value = EnvHelper.get_env_variable_value_by_name("RAG_API_CONNECT_TIMEOUT", fails_if_missing=False)
+        return float(value) if value else 10.0
+
+    @staticmethod
+    def get_rag_api_read_timeout() -> float:
+        """Get RAG API read timeout in seconds (default: 80.0)"""
+        value = EnvHelper.get_env_variable_value_by_name("RAG_API_READ_TIMEOUT", fails_if_missing=False)
+        return float(value) if value else 80.0
+
+    @staticmethod
+    def get_rag_api_test_timeout() -> float:
+        """Get RAG API test connection timeout in seconds (default: 10.0)"""
+        value = EnvHelper.get_env_variable_value_by_name("RAG_API_TEST_TIMEOUT", fails_if_missing=False)
+        return float(value) if value else 10.0
+
+    @staticmethod
     def get_python_paths() -> list[str]:
         paths = EnvHelper.get_env_variable_value_by_name("PYTHONPATH") or ""
         return paths.split(";")

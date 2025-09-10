@@ -34,7 +34,13 @@
       "Read(/C:\\Dev\\squad-ai\\PIC-Prospect_Incoming_Callbot/**)",
       "Read(/C:\\Dev\\squad-ai\\PIC-Prospect_Incoming_Callbot\\tests\\agents/**)",
       "Read(/C:\\Dev\\squad-ai\\PIC-Prospect_Incoming_Callbot\\app\\agents/**)",
-      "WebFetch(domain:support.atlassian.com)"
+      "WebFetch(domain:support.atlassian.com)",
+      "Bash(echo:*)",
+      "Bash(if [ -f .env ])",
+      "Bash(then echo \"Found .env file\")",
+      "Bash(else echo \"No .env file found\")",
+      "Bash(fi)",
+      "Bash(curl:*)"
     ],
     "deny": []
   }

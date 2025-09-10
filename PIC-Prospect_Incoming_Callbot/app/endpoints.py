@@ -61,7 +61,7 @@ async def voice_incoming_call_endpoint(request: Request) -> HTMLResponse:
     return await create_websocket_for_incoming_call_async(request)
 
 # Secured endpoint to run performance tests with multiple concurrent incoming calls, do this GET query:
-# http://127.0.0.1:8344/test-parallel-incoming-calls?api_key=test-key-9535782!b%&calls_count=5
+# http://127.0.0.1:8344/test-parallel-incoming-calls?api_key=test-key-9535782!b%&calls_count=3
 @router.get("/test-parallel-incoming-calls")
 @api_key_required
 async def test_parallel_incoming_calls(request: Request) -> HTMLResponse:
