@@ -10,7 +10,7 @@ from fastapi import WebSocket
 #
 from speech.text_queue_manager import TextQueueManager
 from speech.text_to_speech import TextToSpeechProvider
-from speech.twilio_audio_sender import TwilioAudioSender
+from speech.audio_sender_factory import create_audio_sender
 
 #
 from utils.audio_mixer import AudioMixer
@@ -46,12 +46,17 @@ class OutgoingAudioManager(OutgoingManager):
         max_words_by_stream_chunk: int = 20,
         max_chars_by_stream_chunk: int = 100,
         cache_ttl_minutes: int = 5,
+        provider: str = None,
     ):
         self.logger = logging.getLogger(__name__)
         super().__init__(output_channel="audio", can_speech_be_interupted=can_speech_be_interupted)
         self.text_queue_manager = TextQueueManager()
-        self.audio_sender: TwilioAudioSender = TwilioAudioSender(
-            websocket, stream_sid=stream_sid, sample_rate=frame_rate, min_chunk_interval=min_chunk_interval
+        self.audio_sender = create_audio_sender(
+            websocket=websocket, 
+            stream_id=stream_sid, 
+            sample_rate=frame_rate, 
+            min_chunk_interval=min_chunk_interval,
+            provider=provider
         )
 
         self.tts_provider: TextToSpeechProvider = tts_provider  # Text-to-speech provider for converting text to audio
@@ -94,9 +99,14 @@ class OutgoingAudioManager(OutgoingManager):
         Updates the stream SID when it changes (e.g., when a new call starts or ends)
         Allows setting to None when resetting after a call ends
         """
-        self.audio_sender.stream_sid = stream_sid
+        # Handle different attribute names for different providers
+        if hasattr(self.audio_sender, 'stream_sid'):
+            self.audio_sender.stream_sid = stream_sid
+        elif hasattr(self.audio_sender, 'stream_id'):
+            self.audio_sender.stream_id = stream_sid
+        
         if not stream_sid:
-            self.logger.info("Reset stream SID to None")
+            self.logger.info("Reset stream ID to None")
         else:
             self.logger.info(f"Updated stream SID to: {stream_sid}")
         return

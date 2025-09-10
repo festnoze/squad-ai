@@ -41,7 +41,9 @@
       "WebFetch(domain:*)",
       "Write",
       "Edit",
-      "MultiEdit"
+      "MultiEdit",
+      "WebFetch(domain:developers.telnyx.com)",
+      "Bash(PYTHONPATH=app PHONE_PROVIDER=telnyx python -c \"from utils.envvar import EnvHelper; print(''Phone provider:'', EnvHelper.get_phone_provider())\")"
     ],
     "deny": []
   }

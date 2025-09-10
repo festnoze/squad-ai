@@ -21,6 +21,9 @@ from utils.envvar import EnvHelper
 from utils.latency_decorator import measure_latency_context
 from utils.latency_metric import OperationType, OperationStatus
 from utils.latency_tracker import latency_tracker
+from providers.phone_provider_base import PhoneProvider
+from providers.twilio_provider import TwilioProvider
+from providers.telnyx_provider import TelnyxProvider
 
 
 class PhoneCallWebsocketEventsHandler:
@@ -29,12 +32,23 @@ class PhoneCallWebsocketEventsHandler:
     outgoing_audio_processing: OutgoingAudioManager = None
     incoming_audio_processing: IncomingAudioManager = None
 
-    def __init__(self, websocket: WebSocket = None):
+    def __init__(self, websocket: WebSocket = None, provider: PhoneProvider = None):
         # Instance variables
         self.websocket = websocket
         self.logger = logging.getLogger(__name__)
         self.logger.info("IncomingPhoneCallHandler logger started")
-        # self.transcription_manager = TranscriptionManager()
+        
+        # Initialize phone provider
+        if provider is None:
+            provider_name = EnvHelper.get_phone_provider()
+            if provider_name == "telnyx":
+                self.provider = TelnyxProvider()
+            else:
+                self.provider = TwilioProvider()
+        else:
+            self.provider = provider
+        
+        self.logger.info(f"Initialized with provider: {self.provider.provider_name}")
 
         # State tracking for this instance
         self.openai_client = None
@@ -106,6 +120,7 @@ class PhoneCallWebsocketEventsHandler:
             sample_width=self.sample_width,
             frame_rate=self.frame_rate,
             channels=self.channels,
+            provider=self.provider.provider_name,
         )
 
         self.agents_graph = AgentsGraph(self.outgoing_audio_processing)
@@ -142,7 +157,7 @@ class PhoneCallWebsocketEventsHandler:
             self.call_duration_context = measure_latency_context(
                 operation_type=OperationType.CALL_DURATION,
                 operation_name="websocket_call_duration",
-                provider="twilio",
+                provider=self.provider.provider_name,
                 call_sid=self.current_call_sid,
                 phone_number=self.current_phone_number,
                 metadata={"tracking_method": "websocket_lifecycle"}
@@ -162,7 +177,7 @@ class PhoneCallWebsocketEventsHandler:
             self.call_duration_context = measure_latency_context(
                 operation_type=OperationType.CALL_DURATION,
                 operation_name="websocket_call_duration",
-                provider="twilio",
+                provider=self.provider.provider_name,
                 call_sid=call_sid,
                 phone_number=phone_number,
                 metadata={"tracking_method": "websocket_lifecycle"}
@@ -257,18 +272,21 @@ class PhoneCallWebsocketEventsHandler:
                     self._finish_call_duration_tracking("websocket_disconnect")
                     break
 
-                event = data.get("event")
+                # Parse event using provider
+                parsed_event = self.provider.parse_websocket_event(data)
+                event = parsed_event.get("event")
+                
                 if event == "connected":
                     self._handle_connected_event()
                 elif event == "start":
-                    await self._handle_start_event_async(data.get("start", {}))
+                    await self._handle_start_event_async(parsed_event)
                 elif event == "media":
-                    await self._handle_media_event_async(data)
+                    await self._handle_media_event_async(parsed_event)
                 elif event == "stop":
                     await self._handle_stop_event_async()
                     return
                 elif event == "mark":
-                    self._handle_mark_event(data)
+                    self._handle_mark_event(parsed_event)
                 else:
                     self.logger.warning(f"Received unknown event type: {event}")
 
@@ -286,21 +304,21 @@ class PhoneCallWebsocketEventsHandler:
             self.logger.info(f"WebSocket handler finished for {self.websocket.client.host}:{self.websocket.client.port} (Stream: {self.current_stream})")
 
     def _handle_connected_event(self):
-        """Handle the 'connected' event from Twilio."""
-        self.logger.info("Twilio WebSocket connected")
+        """Handle the 'connected' event from phone provider."""
+        self.logger.info(f"{self.provider.provider_name.title()} WebSocket connected")
 
-    async def _handle_start_event_async(self, start_data: dict) -> str:
-        """Handle the 'start' event from Twilio which begins a new call."""
-        call_sid = start_data.get("callSid", "N.C")
-        stream_sid = start_data.get("streamSid", "N.C")
-        await self.incoming_audio_processing.init_conversation_async(call_sid, stream_sid)
-        self.outgoing_audio_processing.update_stream_sid(stream_sid)
-        return stream_sid
+    async def _handle_start_event_async(self, parsed_start_data: dict) -> str:
+        """Handle the 'start' event from phone provider which begins a new call."""
+        call_id = parsed_start_data.get("call_id", "N.C")
+        stream_id = parsed_start_data.get("stream_id", "N.C")
+        await self.incoming_audio_processing.init_conversation_async(call_id, stream_id)
+        self.outgoing_audio_processing.update_stream_sid(stream_id)
+        return stream_id
 
-    async def _handle_media_event_async(self, media_data: dict) -> None:
-        """Handle the 'media' event from Twilio which contains audio data."""
-        # Process the media event
-        await self.incoming_audio_processing.process_incoming_data_async(media_data)
+    async def _handle_media_event_async(self, parsed_media_data: dict) -> None:
+        """Handle the 'media' event from phone provider which contains audio data."""
+        # Process the media event - pass the raw data to maintain compatibility
+        await self.incoming_audio_processing.process_incoming_data_async(parsed_media_data.get("raw_data", parsed_media_data))
         
         # Periodically check call duration (every 100 media events ~= every 2-3 seconds)
         self.media_event_counter += 1
@@ -354,8 +372,8 @@ class PhoneCallWebsocketEventsHandler:
         self.incoming_audio_processing.set_call_sid(None)
         self.logger.info("Reset AudioProcessing stream SID as call ended")
 
-    def _handle_mark_event(self, data):
-        mark_name = data.get("mark", {}).get("name")
+    def _handle_mark_event(self, parsed_mark_data):
+        mark_name = parsed_mark_data.get("name")
         self.logger.debug(f"Received mark event: {mark_name} for stream {self.current_stream}")
 
 
@@ -365,12 +383,12 @@ class PhoneCallWebsocketEventsHandlerFactory:
     def __init__(self):
         self.build_new_phone_call_websocket_events_handler()
 
-    def build_new_phone_call_websocket_events_handler(self, websocket: WebSocket = None):
+    def build_new_phone_call_websocket_events_handler(self, websocket: WebSocket = None, provider: PhoneProvider = None):
         if not self.websocket_events_handler_instance:
-            self.websocket_events_handler_instance = PhoneCallWebsocketEventsHandler(websocket=websocket)
+            self.websocket_events_handler_instance = PhoneCallWebsocketEventsHandler(websocket=websocket, provider=provider)
 
-    def get_new_phone_call_websocket_events_handler(self, websocket: WebSocket):
-        self.build_new_phone_call_websocket_events_handler()
+    def get_new_phone_call_websocket_events_handler(self, websocket: WebSocket, provider: PhoneProvider = None):
+        self.build_new_phone_call_websocket_events_handler(provider=provider)
         websocket_events_handler_to_return = self.websocket_events_handler_instance
         # Set the websocket for the handler
         websocket_events_handler_to_return.set_websocket(websocket)

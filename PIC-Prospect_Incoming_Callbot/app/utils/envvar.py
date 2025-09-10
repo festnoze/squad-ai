@@ -151,6 +151,26 @@ class EnvHelper:
         return EnvHelper.get_env_variable_value_by_name("TWILIO_AUTH") or ""
 
     @staticmethod
+    def get_phone_provider() -> str:
+        """Get the phone provider (twilio or telnyx)"""
+        provider = EnvHelper.get_env_variable_value_by_name("PHONE_PROVIDER", fails_if_missing=False) or "twilio"
+        valid_providers = ["twilio", "telnyx"]
+        if provider.lower() not in valid_providers:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Invalid PHONE_PROVIDER '{provider}'. Valid values: {valid_providers}. Defaulting to 'twilio'.")
+            return "twilio"
+        return provider.lower()
+
+    @staticmethod
+    def get_telnyx_api_key() -> str:
+        return EnvHelper.get_env_variable_value_by_name("TELNYX_API_KEY", fails_if_missing=False) or ""
+
+    @staticmethod
+    def get_telnyx_profile_id() -> str:
+        return EnvHelper.get_env_variable_value_by_name("TELNYX_PROFILE_ID", fails_if_missing=False) or ""
+
+    @staticmethod
     def get_repeat_user_input() -> bool:
         value = EnvHelper.get_env_variable_value_by_name("REPEAT_USER_INPUT")
         return value is not None and value.lower() == "true"
