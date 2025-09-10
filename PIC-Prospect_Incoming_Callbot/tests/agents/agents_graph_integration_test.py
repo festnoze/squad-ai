@@ -8,7 +8,7 @@ from agents.agents_graph import AgentsGraph
 from agents.calendar_agent import CalendarAgent
 from agents.phone_conversation_state_model import PhoneConversationState
 from agents.text_registry import TextRegistry
-from api_client.salesforce_api_client_interface import SalesforceApiClientInterface
+from api_client.salesforce_user_client_interface import SalesforceUserClientInterface
 from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
 from managers.outgoing_manager import OutgoingManager
 from utils.envvar import EnvHelper
@@ -155,7 +155,7 @@ async def test_first_answer_to_calendar_appointment(agents_graph_mockings):
     # Set up mocks for calendar agent methods
     with (
         patch.object(
-            SalesforceApiClientInterface,
+            SalesforceUserClientInterface,
             "get_scheduled_appointments_async",
             return_value=[
                 {
@@ -166,7 +166,7 @@ async def test_first_answer_to_calendar_appointment(agents_graph_mockings):
             ],
         ) as mock_get_appointments,
         patch.object(
-            SalesforceApiClientInterface,
+            SalesforceUserClientInterface,
             "schedule_new_appointment_async",
             return_value={},
         ) as mock_schedule_new_appointment,
@@ -324,8 +324,8 @@ def agents_graph_mockings():
         "messages": [{"role": "assistant", "content": "Welcome message"}],
     }
 
-    # Create mock for SalesforceApiClientInterface with all necessary methods
-    mock_salesforce_client = MagicMock(spec=SalesforceApiClientInterface)
+    # Create mock for SalesforceUserClientInterface with all necessary methods
+    mock_salesforce_client = MagicMock(spec=SalesforceUserClientInterface)
 
     # Mock get_person_by_phone_async method
     mock_salesforce_client.get_person_by_phone_async = AsyncMock()

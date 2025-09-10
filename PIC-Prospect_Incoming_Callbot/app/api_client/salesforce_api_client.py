@@ -7,13 +7,14 @@ from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytz
-from api_client.salesforce_api_client_interface import SalesforceApiClientInterface
+from .calendar_client_interface import CalendarClientInterface
+from .salesforce_user_client_interface import SalesforceUserClientInterface
 from utils.envvar import EnvHelper
 from utils.latency_decorator import measure_latency
 from utils.latency_metric import OperationType
 
 
-class SalesforceApiClient(SalesforceApiClientInterface):
+class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface):
     _client_id = "3MVG9IKwJOi7clC2.8QIzh9BkM6NhU53bup6EUfFQiXJ01nh.l2YJKF5vbNWqPkFEdjgzAXIqK3U1p2WCBUD3"
     _username = EnvHelper.get_salesforce_username()
     _password = EnvHelper.get_salesforce_password()

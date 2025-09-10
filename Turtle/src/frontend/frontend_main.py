@@ -34,22 +34,12 @@ def main():
     
     # Sidebar for data download and file selection
     with st.sidebar:
-        # Render download section
         render_download_section()
         
-        st.divider()
-        
-        # Render chart selection
         selected_file, selected_period = render_chart_selection(chart_files)
         
-        st.divider()
-        
-        # Render portfolio info section
         render_portfolio_info_section()
         
-        st.divider()
-        
-        # Render strategy section
         render_strategy_section()
     
     # Main content area

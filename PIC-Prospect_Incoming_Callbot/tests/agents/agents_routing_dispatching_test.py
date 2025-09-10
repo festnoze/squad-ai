@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, AsyncMock
 from app.agents.agents_graph import AgentsGraph
 from app.managers.outgoing_manager import OutgoingManager
 from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
-from app.api_client.salesforce_api_client_interface import SalesforceApiClientInterface
+from app.api_client.salesforce_user_client_interface import SalesforceUserClientInterface
 from app.endpoints import change_env_var_values
 
 @pytest.mark.parametrize("awaited_dispatch, user_input, chat_history", [
@@ -100,8 +100,8 @@ def agents_graph_mockings():
         ]
     }
 
-    # Create mock for SalesforceApiClientInterface with all necessary methods
-    mock_salesforce_client = MagicMock(spec=SalesforceApiClientInterface)
+    # Create mock for SalesforceUserClientInterface with all necessary methods
+    mock_salesforce_client = MagicMock(spec=SalesforceUserClientInterface)
 
     # Mock get_person_by_phone_async method
     mock_salesforce_client.get_person_by_phone_async = AsyncMock()

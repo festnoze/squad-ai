@@ -29,6 +29,6 @@ If you're getting an SSL error when you attempt to call out to the Alpaca Tradin
 
 # Who, When, Why?
 
-👨🏾‍💻 Author: Nick Renotte <br />
-📅 Version: 1.x<br />
+👨🏾‍💻 Author: Etienne MILLERIOUX <br />
+📅 Version: 0.1.12<br />
 📜 License: This project is licensed under the MIT License </br>

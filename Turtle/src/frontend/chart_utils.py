@@ -71,7 +71,7 @@ def resample_candles(candles: list[Candle], target_period: str) -> list[Candle]:
         "4h": "4h",
         "12h": "12h",
         "1d": "1d",
-        "1w": "1w"
+        "1w": "1W"
     }
     
     freq = freq_map.get(target_period, "1min")

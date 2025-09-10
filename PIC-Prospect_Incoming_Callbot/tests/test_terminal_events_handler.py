@@ -58,7 +58,7 @@
 #     """Test the initialization of incoming data handler."""
     
 #     with patch('app.terminal_events_handler.StudiRAGInferenceApiClient'), \
-#             patch('app.terminal_events_handler.SalesforceApiClientInterface'), \
+#             patch('app.terminal_events_handler.SalesforceUserClientInterface'), \
 #             patch('app.terminal_events_handler.OutgoingTextManager') as mock_outgoing_manager, \
 #             patch('app.terminal_events_handler.IncomingTextManager') as mock_incoming_manager, \
 #             patch('app.terminal_events_handler.AgentsGraph'), \
@@ -99,7 +99,7 @@
 #     test_media_data = {"text": test_text}
     
 #     with patch('app.terminal_events_handler.StudiRAGInferenceApiClient'), \
-#             patch('app.terminal_events_handler.SalesforceApiClientInterface'), \
+#             patch('app.terminal_events_handler.SalesforceUserClientInterface'), \
 #             patch('app.terminal_events_handler.OutgoingTextManager'), \
 #             patch('app.terminal_events_handler.IncomingTextManager') as mock_incoming_manager, \
 #             patch('app.terminal_events_handler.AgentsGraph'), \
@@ -126,7 +126,7 @@
 #     }
     
 #     with patch('app.terminal_events_handler.StudiRAGInferenceApiClient'), \
-#             patch('app.terminal_events_handler.SalesforceApiClientInterface'), \
+#             patch('app.terminal_events_handler.SalesforceUserClientInterface'), \
 #             patch('app.terminal_events_handler.OutgoingTextManager'), \
 #             patch('app.terminal_events_handler.IncomingTextManager') as mock_incoming_manager, \
 #             patch('app.terminal_events_handler.AgentsGraph'), \
@@ -153,7 +153,7 @@
 #     """Test closing of a session."""
     
 #     with patch('app.terminal_events_handler.StudiRAGInferenceApiClient'), \
-#             patch('app.terminal_events_handler.SalesforceApiClientInterface'), \
+#             patch('app.terminal_events_handler.SalesforceUserClientInterface'), \
 #             patch('app.terminal_events_handler.OutgoingTextManager') as mock_outgoing_manager, \
 #             patch('app.terminal_events_handler.IncomingTextManager'), \
 #             patch('app.terminal_events_handler.AgentsGraph'), \
@@ -181,7 +181,7 @@
 #     """Test handling of the stop event."""
     
 #     with patch('app.terminal_events_handler.StudiRAGInferenceApiClient'), \
-#             patch('app.terminal_events_handler.SalesforceApiClientInterface'), \
+#             patch('app.terminal_events_handler.SalesforceUserClientInterface'), \
 #             patch('app.terminal_events_handler.OutgoingTextManager'), \
 #             patch('app.terminal_events_handler.IncomingTextManager') as mock_incoming_manager, \
 #             patch('app.terminal_events_handler.AgentsGraph'), \
@@ -211,7 +211,7 @@
     
 #     # Test with two inputs: a normal message and then "bye" to exit the loop
 #     with patch('app.terminal_events_handler.StudiRAGInferenceApiClient'), \
-#             patch('app.terminal_events_handler.SalesforceApiClientInterface'), \
+#             patch('app.terminal_events_handler.SalesforceUserClientInterface'), \
 #             patch('app.terminal_events_handler.OutgoingTextManager'), \
 #             patch('app.terminal_events_handler.IncomingTextManager'), \
 #             patch('app.terminal_events_handler.AgentsGraph'), \

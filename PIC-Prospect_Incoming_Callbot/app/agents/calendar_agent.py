@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import pytz
 
 #
-from api_client.salesforce_api_client_interface import SalesforceApiClientInterface
+from api_client.calendar_client_interface import CalendarClientInterface
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain.tools import tool
 from langchain_core.language_models import BaseLanguageModel
@@ -16,14 +16,14 @@ from agents.text_registry import TextRegistry
 
 
 class CalendarAgent:
-    salesforce_api_client: SalesforceApiClientInterface
+    salesforce_api_client: CalendarClientInterface
     owner_id: str | None = None
     owner_name: str | None = None
     now: datetime = datetime.now(tz=pytz.timezone("Europe/Paris"))
 
     def __init__(
         self,
-        salesforce_api_client: SalesforceApiClientInterface,
+        salesforce_api_client: CalendarClientInterface,
         classifier_llm: BaseLanguageModel,
         available_timeframes_llm: BaseLanguageModel | None = None,
         date_extractor_llm: BaseLanguageModel | None = None,

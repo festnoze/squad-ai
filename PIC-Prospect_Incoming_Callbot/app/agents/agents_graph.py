@@ -18,7 +18,7 @@ from api_client.request_models.user_request_model import (
     UserRequestModel,
 )
 from api_client.salesforce_api_client import SalesforceApiClient
-from api_client.salesforce_api_client_interface import SalesforceApiClientInterface
+from api_client.salesforce_user_client_interface import SalesforceUserClientInterface
 
 # Clients
 from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
@@ -58,7 +58,7 @@ class AgentsGraph:
         self,
         outgoing_manager: OutgoingManager,
         call_sid: str | None = None,
-        salesforce_client: SalesforceApiClientInterface | None = None,
+        salesforce_client: SalesforceUserClientInterface | None = None,
         conversation_persistence: ConversationPersistenceInterface | None = None,
         rag_query_service: RagQueryInterface | None = None,
     ):
@@ -93,7 +93,7 @@ class AgentsGraph:
                 self.conversation_persistence = ConversationPersistenceServiceFake()
 
         self.rag_query_service = rag_query_service or StudiRAGInferenceApiClient()
-        self.salesforce_api_client: SalesforceApiClientInterface = salesforce_client or SalesforceApiClient()
+        self.salesforce_api_client: SalesforceUserClientInterface = salesforce_client or SalesforceApiClient()
         self.outgoing_manager: OutgoingManager = outgoing_manager
         self.has_waiting_music_on_calendar: bool = EnvHelper.get_waiting_music_on_calendar()
         self.has_waiting_music_on_rag: bool = EnvHelper.get_waiting_music_on_rag()

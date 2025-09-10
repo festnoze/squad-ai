@@ -3,11 +3,12 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Any
 
-from .salesforce_api_client_interface import SalesforceApiClientInterface
+from .calendar_client_interface import CalendarClientInterface
+from .salesforce_user_client_interface import SalesforceUserClientInterface
 
 
-class SalesforceApiClientFake(SalesforceApiClientInterface):
-    """A dummy implementation of ``SalesforceApiClientInterface`` used for local
+class SalesforceApiClientFake(CalendarClientInterface, SalesforceUserClientInterface):
+    """A dummy implementation of ``CalendarClientInterface`` and ``SalesforceUserClientInterface`` used for local
     testing.  Every method returns deterministic fake objects that satisfy the
     expectations encoded in *tests/api_client/salesforce_api_client_test.py*.
     """
@@ -88,7 +89,47 @@ class SalesforceApiClientFake(SalesforceApiClientInterface):
         ]
 
     async def delete_event_by_id_async(self, event_id: str) -> bool:
+        await self._ensure_authenticated_async()
         return True
+
+    async def verify_appointment_existance_async(self, event_id: str | None = None, expected_subject: str | None = None, start_datetime: str = "", duration_minutes: int = 30) -> str | None:
+        await self._ensure_authenticated_async()
+        # Return None to simulate no existing appointment found
+        return None
+
+    async def get_appointment_slots_async(
+        self,
+        start_datetime: str,
+        end_datetime: str,
+        work_type_id: str | None = None,
+        service_territory_id: str | None = None,
+    ) -> list[dict] | None:
+        await self._ensure_authenticated_async()
+        # Return fake available slots
+        return [
+            {
+                "startTime": start_datetime,
+                "endTime": end_datetime,
+                "id": "SLOT" + uuid.uuid4().hex[:10].upper()
+            }
+        ]
+
+    async def schedule_new_appointment_with_lightning_scheduler_async(
+        self,
+        subject: str,
+        start_datetime: str,
+        duration_minutes: int = 30,
+        description: str | None = None,
+        contact_id: str | None = None,
+        work_type_id: str | None = None,
+        service_territory_id: str | None = None,
+        parent_record_id: str | None = None,
+        max_retries: int = 2,
+        retry_delay: float = 1.0,
+    ) -> str | None:
+        await self._ensure_authenticated_async()
+        # Return a fake ServiceAppointment ID
+        return "SA" + uuid.uuid4().hex[:16].upper()
 
     # --- People -----------------------------------------------------------------
     async def get_person_by_phone_async(self, phone_number: str) -> dict[str, Any] | None:  # type: ignore[override]
@@ -142,6 +183,99 @@ class SalesforceApiClientFake(SalesforceApiClientInterface):
             ]
         # Default: empty list (valid behaviour for tests)
         return []
+
+    async def get_opportunities_by_contact_async(self, contact_id: str) -> list[dict] | None:
+        """Return fake opportunities for a contact."""
+        await self._ensure_authenticated_async()
+        return [
+            {
+                "Id": "006000000000001",
+                "Name": "Fake Opportunity",
+                "StageName": "Prospecting",
+                "Amount": 5000,
+                "OwnerId": "005000000000001",
+                "Owner": {"Name": "Alice Martin"}
+            }
+        ]
+
+    async def get_opportunities_for_lead_async(self, lead_id: str) -> list[dict] | None:
+        """Return fake opportunities for a lead."""
+        await self._ensure_authenticated_async()
+        # Most leads don't have converted opportunities
+        return []
+
+    async def get_user_by_id_async(self, user_id: str) -> dict | None:
+        """Return fake user information."""
+        await self._ensure_authenticated_async()
+        return {
+            "Id": user_id,
+            "Name": "Alice Martin",
+            "FirstName": "Alice",
+            "LastName": "Martin",
+            "Email": "alice.martin@fake.com",
+            "Phone": "+33600000001",
+            "Title": "Sales Manager",
+            "IsActive": True
+        }
+
+    async def get_complete_contact_info_by_phone_async(self, phone_number: str) -> dict | None:
+        """Return complete fake contact information."""
+        await self._ensure_authenticated_async()
+        
+        # Get basic person info
+        person_data = await self.get_person_by_phone_async(phone_number)
+        if not person_data:
+            return None
+            
+        contact_info = person_data.get("data")
+        person_type = person_data.get("type")
+        
+        # Get opportunities based on type
+        opportunities = []
+        if person_type == "Contact" and contact_info:
+            opportunities = await self.get_opportunities_by_contact_async(contact_info.get("Id"))
+        elif person_type == "Lead" and contact_info:
+            opportunities = await self.get_opportunities_for_lead_async(contact_info.get("Id"))
+            
+        # Get user info
+        owner_id = contact_info.get("Owner", {}).get("Id") if contact_info else None
+        assigned_user = None
+        if owner_id:
+            assigned_user = await self.get_user_by_id_async(owner_id)
+            
+        return {
+            "contact": contact_info,
+            "contact_type": person_type,
+            "opportunities": opportunities or [],
+            "most_recent_opportunity": opportunities[0] if opportunities else None,
+            "assigned_user": assigned_user,
+            "user_source": "contact" if assigned_user else None
+        }
+
+    async def get_phone_numbers_async(self, limit: int = 10) -> list[dict] | None:
+        """Return fake phone numbers."""
+        await self._ensure_authenticated_async()
+        return [
+            {
+                "phone_number": "+33600000000",
+                "type": "Contact",
+                "person_id": "003000000000001",
+                "first_name": "Jean",
+                "last_name": "Dupont",
+                "email": "jean.dupont@fake.com",
+                "phone_type": "Phone"
+            },
+            {
+                "phone_number": "+33600000001",
+                "type": "Lead",
+                "person_id": "00Q000000000001",
+                "first_name": "Marie",
+                "last_name": "Martin",
+                "email": "marie.martin@fake.com",
+                "company": "Fake Company",
+                "phone_type": "MobilePhone"
+            }
+        ][:limit]
 
     # --- Metadata ---------------------------------------------------------------
     async def discover_database_async(

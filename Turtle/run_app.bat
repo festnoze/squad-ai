@@ -3,7 +3,7 @@ echo Starting Chart Viewer application...
 echo.
 if not defined VIRTUAL_ENV (
     echo Activating virtual environment...
-    call venv\Scripts\activate.bat
+    call venv\Scripts\activate
 )
 
 cd src\frontend

@@ -1,17 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(*:*)",
-      "Bash(mkdir:*)",
-      "Bash(rm:*)",
-      "Bash(ls:*)",
-      "Bash(find:*)",
-      "Bash(rg:*)",
-      "Bash(run_app.bat)",
       "Bash(python:*)",
-      "Bash(sed:*)",
-      "Bash(del test_yfinance_forex.py)"
+      "Bash(tree:*)"
     ],
-    "deny": []
+    "deny": [],
+    "ask": []
   }
 }

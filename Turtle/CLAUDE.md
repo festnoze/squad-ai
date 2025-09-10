@@ -37,7 +37,12 @@ streamlit run frontend_main.py
 src/
 ├── frontend/
 │   ├── frontend_main.py      # Main Streamlit application entry point
-│   └── frontend_helper.py    # UI components and helper functions
+│   ├── chart_utils.py        # Chart utilities and processing functions
+│   ├── download_ui.py        # Data download UI components
+│   ├── sidebar_components.py # Sidebar UI components
+│   ├── display_components.py # Main display UI components
+│   ├── trading_pairs.py      # Trading pair definitions
+│   └── period_utils.py       # Period validation utilities
 ├── models/
 │   ├── __init__.py
 │   ├── candle.py            # OHLC candle data model
@@ -58,7 +63,10 @@ strategies/                  # Strategy definitions (Markdown files)
 
 ### Core Components
 - **`frontend_main.py`**: Main Streamlit application with UI orchestration
-- **`frontend_helper.py`**: Modular UI components for charts, portfolio, strategies
+- **`chart_utils.py`**: Chart utilities and data processing functions
+- **`download_ui.py`**: Data download interface components
+- **`sidebar_components.py`**: Sidebar UI components (chart selection, strategy, portfolio)
+- **`display_components.py`**: Main display components (portfolio summary, signals, data info)
 - **`models/`**: Type-safe data models using dataclasses
 - **`strategy_engine.py`**: Turtle trading strategy implementation
 - **`position_manager.py`**: Portfolio and position management
@@ -153,7 +161,7 @@ Chart files are JSON with this structure:
 This project uses `uv` instead of pip for faster dependency installation. The `install_requirements.bat` script handles this automatically.
 
 ### File Organization
-- Modular frontend with separated UI components in `frontend_helper.py`
+- Modular frontend with separated UI components across multiple specialized modules
 - Clean separation between data models, business logic, and presentation
 - Strategy definitions stored as Markdown files for easy modification
 - Type-safe data models using Python dataclasses
