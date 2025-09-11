@@ -1,0 +1,65 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "FastAPI Dev Server",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": [
+        "app.main:app",
+        "--reload",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000"
+      ],
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}",
+        "ENV": "development"
+      },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "python": "${workspaceFolder}/venv/Scripts/python.exe"
+    },
+    {
+      "name": "FastAPI Production Server",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": [
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+        "--workers",
+        "4"
+      ],
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}",
+        "ENV": "production"
+      },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "python": "${workspaceFolder}/venv/Scripts/python.exe"
+    },
+    {
+      "name": "Run API Tests",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "-v",
+        "tests/"
+      ],
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}",
+        "ENV": "testing"
+      },
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "python": "${workspaceFolder}/venv/Scripts/python.exe"
+    }
+  ]
+}

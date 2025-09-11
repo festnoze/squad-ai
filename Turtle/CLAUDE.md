@@ -4,30 +4,56 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Turtle is a comprehensive Python + Streamlit trading bot application that combines data visualization with algorithmic trading strategies. It features interactive candlestick charts, real-time data downloading, portfolio management, and automated strategy execution using the Turtle Trading methodology.
+Turtle is a comprehensive trading bot application with a React frontend and FastAPI backend that combines data visualization with algorithmic trading strategies. It features interactive candlestick charts, real-time data downloading, portfolio management, and automated strategy execution using the Turtle Trading methodology.
+
+### Architecture
+- **Frontend**: React + TypeScript + Vite + Tailwind CSS
+- **Backend**: FastAPI + Python with SQLAlchemy
+- **Communication**: REST API + WebSockets for real-time data
 
 ## Development Commands
 
-### Setup and Environment
+### Frontend (React + Vite)
 ```bash
-# Create virtual environment
-create_venv.bat
+cd frontend/
 
-# Activate environment (must be done manually)
-venv\Scripts\activate.bat
+# Install dependencies
+npm install
 
-# Install dependencies with uv (requires activated venv)
-install_requirements.bat
+# Run development server
+npm run dev
 
-# Run the application (auto-activates venv)
-run_app.bat
+# Build for production
+npm run build
+
+# Run linting
+npm run lint
+
+# Type checking
+npm run type-check
 ```
 
-### Running the Application
-The app runs via Streamlit from the frontend directory:
+### API (FastAPI + Python)
 ```bash
-cd src/frontend
-streamlit run frontend_main.py
+cd api/
+
+# Create virtual environment
+python -m venv venv
+
+# Activate environment (Windows)
+venv\Scripts\activate
+
+# Activate environment (Linux/Mac)
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run development server
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+
+# Run tests
+pytest -v tests/
 ```
 
 ## Architecture
