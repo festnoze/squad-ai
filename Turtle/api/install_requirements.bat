@@ -15,11 +15,3 @@ pip install uv
 
 echo Installing requirements using uv...
 uv pip install -r requirements.txt
-
-echo.
-echo Requirements installed successfully!
-echo.
-echo To run the application:
-echo cd src\frontend
-echo streamlit run frontend_main.py
-pause

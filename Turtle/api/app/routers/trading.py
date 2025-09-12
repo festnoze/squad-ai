@@ -2,7 +2,6 @@
 
 from typing import List
 from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse
 
 from app.models.trade import Trade, TradeRequest, TradeResponse
 from app.models.strategy import TradingSignal
@@ -138,8 +137,8 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             # Keep connection alive and handle incoming messages
             data = await websocket.receive_text()
-            # Process any client commands here if needed
     except WebSocketDisconnect:
+        print(f"Received message: {data}")
         websocket_manager.disconnect(websocket)
 
 

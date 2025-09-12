@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Dev/squad-ai/Turtle/api/**)",
+      "Bash(npm install:*)",
+      "Bash(npm run type-check:*)",
+      "Bash(npm run build:*)",
+      "Bash(set VITE_API_URL=http://localhost:8000)",
+      "Bash(set NODE_ENV=production)",
+      "Bash(npx vite:*)",
+      "Bash(cmd /c:*)",
+      "Bash(npm run dev:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

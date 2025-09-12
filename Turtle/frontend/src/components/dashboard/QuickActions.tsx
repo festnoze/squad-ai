@@ -19,7 +19,7 @@ interface QuickActionsProps {
   portfolioId?: string
 }
 
-export function QuickActions({ availableCharts, portfolioId }: QuickActionsProps) {
+export function QuickActions({ availableCharts }: Omit<QuickActionsProps, 'portfolioId'>) {
   const navigate = useNavigate()
   const { autoTradingEnabled, setAutoTradingEnabled } = useTradingStore()
   const [selectedChart, setSelectedChart] = useState('')

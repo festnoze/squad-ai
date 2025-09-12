@@ -1,0 +1,16 @@
+{
+  "id": "cc26b5c6-c204-4217-9188-70543b0e87da",
+  "name": "Default Portfolio",
+  "initial_balance": 100000.0,
+  "current_balance": 100000.0,
+  "currency": "USD",
+  "total_value": 100000.0,
+  "unrealized_pnl": 0,
+  "realized_pnl": 0,
+  "total_pnl": 0,
+  "total_trades": 0,
+  "winning_trades": 0,
+  "losing_trades": 0,
+  "max_drawdown": 0,
+  "risk_per_trade": 0.02
+}

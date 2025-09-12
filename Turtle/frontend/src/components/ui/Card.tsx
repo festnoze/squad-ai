@@ -1,6 +1,6 @@
 import { ReactNode } from 'react'
 
-interface CardProps {
+export interface CardProps {
   children: ReactNode
   className?: string
   padding?: boolean

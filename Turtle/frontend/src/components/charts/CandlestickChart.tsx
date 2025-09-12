@@ -291,7 +291,7 @@ export function CandlestickChart({
     <div className="chart-container" style={{ height: `${height}px` }}>
       <Chart
         ref={chartRef}
-        type="candlestick"
+        type={"candlestick" as any}
         data={chartData}
         options={options}
       />

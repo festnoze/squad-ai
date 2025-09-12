@@ -52,6 +52,7 @@ class ChartDataRequest(BaseModel):
     """Request model for chart data operations."""
     
     symbol: str = Field(..., description="Trading symbol")
+    source: str = Field(default="synthetic", description="Data source")
     interval: str = Field(default="1d", description="Time interval")
     limit: int = Field(default=100, ge=1, le=5000, description="Number of candles")
     start_date: str = Field(default=None, description="Start date (YYYY-MM-DD)")
@@ -61,7 +62,9 @@ class ChartDataRequest(BaseModel):
 class ChartDataResponse(BaseModel):
     """Response model for chart data."""
     
-    success: bool = Field(..., description="Operation success status")
+    success: bool = Field(default=True, description="Operation success status")
     message: str = Field(default="", description="Response message")
-    data: ChartData = Field(default=None, description="Chart data")
+    data: List[Candle] = Field(default_factory=list, description="Chart candles data")
+    indicators: dict = Field(default_factory=dict, description="Technical indicators data")
+    metadata: ChartMetadata = Field(default=None, description="Chart metadata")
     filename: str = Field(default="", description="Generated filename")

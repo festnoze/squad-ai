@@ -26,5 +26,26 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Core React libraries
+          react: ['react', 'react-dom', 'react-router-dom'],
+          // Chart libraries
+          charts: ['chart.js', 'react-chartjs-2', 'chartjs-chart-financial', 'chartjs-adapter-date-fns', 'recharts'],
+          // Data fetching and state management
+          data: ['react-query', 'zustand', 'axios'],
+          // UI and utilities
+          ui: ['lucide-react', 'clsx', 'tailwind-merge', 'react-hot-toast', 'react-hook-form'],
+          // Table functionality
+          table: ['@tanstack/react-table'],
+          // Date utilities
+          dates: ['date-fns'],
+          // Socket connection
+          socket: ['socket.io-client']
+        }
+      }
+    },
+    chunkSizeWarningLimit: 600
   },
 })

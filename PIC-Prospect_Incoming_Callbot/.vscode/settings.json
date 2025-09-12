@@ -7,7 +7,7 @@
     "python.testing.pytestEnabled": true,
     "python.testing.autoTestDiscoverOnSaveEnabled": false,
     "python.testing.cwd": "${workspaceFolder}",
-    "claudeCodeChat.permissions.yoloMode": false,
+    "claudeCodeChat.permissions.yoloMode": true,
     
     // Ruff configuration
     "ruff.enable": true,

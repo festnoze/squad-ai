@@ -10,20 +10,20 @@ import { PortfolioService } from '@/services/portfolioService'
 import { TradingService } from '@/services/tradingService'
 import { ChartService } from '@/services/chartService'
 import { useAppStore } from '@/stores/appStore'
-import type { PortfolioSummary as PortfolioSummaryType, Trade, TradingSignal } from '@/types'
+import type { Trade, TradingSignal } from '@/types'
 
 export function Dashboard() {
   const { selectedPortfolio } = useAppStore()
   const [timeRange, setTimeRange] = useState<'1d' | '7d' | '30d' | '90d'>('30d')
 
   // Get default portfolio ID if none selected
-  const { data: portfolios = [] } = useQuery('portfolios', PortfolioService.listPortfolios)
+  const { data: portfolios = [] } = useQuery('portfolios', PortfolioService.getPortfolios)
   const portfolioId = selectedPortfolio || portfolios[0]?.id
 
   // Portfolio summary
-  const { data: portfolioSummary, isLoading: portfolioLoading } = useQuery<PortfolioSummaryType>(
+  const { data: portfolioSummary, isLoading: portfolioLoading } = useQuery(
     ['portfolioSummary', portfolioId],
-    () => portfolioId ? PortfolioService.getPortfolioSummary(portfolioId) : null,
+    () => portfolioId ? PortfolioService.getPortfolioSummary(portfolioId) : undefined,
     { enabled: !!portfolioId }
   )
 
@@ -37,29 +37,20 @@ export function Dashboard() {
   // Recent signals
   const { data: recentSignals = [] } = useQuery<TradingSignal[]>(
     'recentSignals',
-    () => TradingService.getSignals(undefined, undefined, 10),
+    () => TradingService.getSignals(undefined, 10),
     { refetchInterval: 30000 }
   )
 
   // Available chart files
-  const { data: chartFiles = [] } = useQuery('chartFiles', ChartService.listChartFiles)
+  const { data: chartFiles = [] } = useQuery<string[]>('chartFiles', ChartService.listChartFiles)
 
   // Portfolio performance
   const { data: performance } = useQuery(
     ['portfolioPerformance', portfolioId, timeRange],
-    () => portfolioId ? PortfolioService.getPortfolioPerformance(portfolioId, getTimeRangeDays(timeRange)) : null,
+    () => portfolioId ? PortfolioService.getPortfolioPerformance(portfolioId) : null,
     { enabled: !!portfolioId }
   )
 
-  function getTimeRangeDays(range: string): number {
-    switch (range) {
-      case '1d': return 1
-      case '7d': return 7
-      case '30d': return 30
-      case '90d': return 90
-      default: return 30
-    }
-  }
 
   if (portfolioLoading) {
     return (
@@ -104,8 +95,19 @@ export function Dashboard() {
       </div>
 
       {/* Portfolio Summary */}
-      {portfolioSummary && (
-        <PortfolioSummary summary={portfolioSummary} />
+      {portfolioSummary && portfolioSummary.portfolio && portfolioSummary.value && (
+        <PortfolioSummary summary={{
+          current_balance: portfolioSummary.value.cash_balance,
+          equity: portfolioSummary.value.total_value,
+          total_pnl: portfolioSummary.value.realized_pnl + portfolioSummary.value.unrealized_pnl,
+          unrealized_pnl: portfolioSummary.value.unrealized_pnl,
+          realized_pnl: portfolioSummary.value.realized_pnl,
+          open_trades: 0, // This would need to be fetched separately
+          total_trades: portfolioSummary.portfolio.total_trades,
+          win_rate: portfolioSummary.portfolio.winning_trades / portfolioSummary.portfolio.total_trades * 100,
+          return_percentage: portfolioSummary.totalReturn,
+          max_drawdown: portfolioSummary.portfolio.max_drawdown
+        }} />
       )}
 
       {/* Main Grid */}
@@ -132,7 +134,6 @@ export function Dashboard() {
           {/* Quick Actions */}
           <QuickActions 
             availableCharts={chartFiles}
-            portfolioId={portfolioId}
           />
 
           {/* Market Overview */}

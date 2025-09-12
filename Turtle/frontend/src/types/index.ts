@@ -133,6 +133,19 @@ export interface PortfolioPerformance {
   volatility: number
 }
 
+export interface PortfolioRequest {
+  name: string
+  initial_balance: number
+  currency?: string
+  risk_per_trade?: number
+}
+
+export interface PortfolioResponse {
+  success: boolean
+  message?: string
+  portfolio?: Portfolio
+}
+
 // Strategy types
 export enum SignalType {
   ENTRY = 'entry',
@@ -217,6 +230,8 @@ export interface DataSource {
   description: string
   type: string
   supported_intervals: string[]
+  api_key_required?: boolean
+  rate_limit?: number
 }
 
 export interface PriceData {
@@ -224,7 +239,11 @@ export interface PriceData {
   price: number
   change: number
   change_percent: number
+  volume: number
   timestamp: string
+  high_24h?: number
+  low_24h?: number
+  market_cap?: number
 }
 
 // API response types

@@ -2,37 +2,43 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "React Dev Server",
+      "name": "Start Dev Server",
       "type": "node",
       "request": "launch",
-      "program": "${workspaceFolder}/node_modules/.bin/vite",
-      "args": ["--host"],
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}",
       "env": {
-        "NODE_ENV": "development"
-      }
+        "NODE_ENV": "development",
+        "NODE_OPTIONS": ""
+      },
+      "envFile": "${workspaceFolder}/.env.local",
+      "skipFiles": ["<node_internals>/**"]
     },
     {
       "name": "Debug React in Chrome",
       "type": "chrome",
       "request": "launch",
-      "url": "http://localhost:5173",
+      "url": "http://localhost:3000",
       "webRoot": "${workspaceFolder}/src",
       "sourceMaps": true,
-      "preLaunchTask": "npm: dev"
+      "preLaunchTask": "Start Dev Server"
     },
     {
-      "name": "React Production Build",
+      "name": "Build Production",
       "type": "node",
       "request": "launch",
-      "program": "${workspaceFolder}/node_modules/.bin/vite",
-      "args": ["build"],
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "build"],
       "console": "integratedTerminal",
       "cwd": "${workspaceFolder}",
       "env": {
-        "NODE_ENV": "production"
-      }
+        "NODE_ENV": "production",
+        "NODE_OPTIONS": "",
+        "VITE_API_URL": "http://localhost:8000"
+      },
+      "skipFiles": ["<node_internals>/**"]
     }
   ]
 }

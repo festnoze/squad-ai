@@ -53,9 +53,8 @@ export function ChartControls({
         <div className="flex flex-col sm:flex-row sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
           <div className="min-w-0 flex-1">
             <Select
-              label="Chart File"
               value={selectedFile || ''}
-              onChange={(e) => onFileChange(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onFileChange(e.target.value)}
             >
               <option value="">Select a chart file...</option>
               {availableFiles.map((file) => (
@@ -68,9 +67,8 @@ export function ChartControls({
 
           <div className="min-w-0 flex-1">
             <Select
-              label="Time Interval"
               value={selectedInterval}
-              onChange={(e) => onIntervalChange(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => onIntervalChange(e.target.value)}
               disabled={!selectedFile}
             >
               {availableIntervals.map((interval) => (

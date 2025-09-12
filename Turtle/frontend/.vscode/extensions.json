@@ -1,0 +1,36 @@
+{
+  "recommendations": [
+    // Essential React Development
+    "dsznajder.es7-react-js-snippets",
+    "esbenp.prettier-vscode",
+    "dbaeumer.vscode-eslint",
+    "formulahendry.auto-rename-tag",
+    "bradlc.vscode-tailwindcss",
+    
+    // Language Support
+    "ms-vscode.vscode-typescript-next",
+    "xabikos.JavaScriptSnippets",
+    "zignd.html-css-class-completion",
+    
+    // Development Tools
+    "eamodio.gitlens",
+    "rangav.vscode-thunder-client",
+    "humao.rest-client",
+    "christian-kohler.path-intellisense",
+    "ms-vscode.vscode-json",
+    
+    // Code Quality
+    "streetsidesoftware.code-spell-checker",
+    "usernamehw.errorlens",
+    "christian-kohler.npm-intellisense",
+    
+    // UI Enhancement
+    "PKief.material-icon-theme",
+    "ms-vscode.theme-tomorrow-night-blue",
+    
+    // Utilities
+    "ms-vscode.live-server",
+    "gruntfuggly.todo-tree",
+    "alefragnani.Bookmarks"
+  ]
+}

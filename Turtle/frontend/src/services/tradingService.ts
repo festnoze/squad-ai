@@ -4,106 +4,244 @@ import type {
   TradeRequest,
   TradeResponse,
   TradingSignal,
-  TradeStatus
+  StrategyConfig,
+  BacktestRequest,
+  BacktestResult
 } from '@/types'
+import { TradeStatus, TradeType } from '@/types'
+
+export interface Position {
+  symbol: string
+  quantity: number
+  entry_price: number
+  current_price: number
+  unrealized_pnl: number
+  side: 'long' | 'short'
+  entry_time: string
+}
+
+export interface PerformanceMetrics {
+  total_trades: number
+  winning_trades: number
+  losing_trades: number
+  win_rate: number
+  total_pnl: number
+  avg_win: number
+  avg_loss: number
+  profit_factor: number
+  max_drawdown: number
+  sharpe_ratio: number
+  return_percentage: number
+}
+
+export interface PositionCalculation {
+  symbol: string
+  position_size: number
+  risk_amount: number
+  entry_price: number
+  stop_loss: number
+  take_profit?: number
+  risk_reward_ratio: number
+}
+
+export interface StopTarget {
+  trade_id: string
+  symbol: string
+  current_price: number
+  stop_loss: number
+  take_profit?: number
+  should_close: boolean
+  reason: string
+}
 
 export class TradingService {
   /**
-   * Get trades with optional filtering
+   * Get trading strategies
    */
-  static async getTrades(
-    symbol?: string,
-    status?: TradeStatus,
-    limit: number = 100
-  ): Promise<Trade[]> {
-    const params: any = { limit }
-    if (symbol) params.symbol = symbol
-    if (status) params.status = status
-    
-    return ApiClient.get<Trade[]>('/api/trading/trades', params)
+  static async getStrategies(): Promise<StrategyConfig[]> {
+    return ApiClient.get<StrategyConfig[]>('/api/trading/strategies')
   }
 
   /**
-   * Get trade by ID
-   */
-  static async getTrade(tradeId: string): Promise<Trade> {
-    return ApiClient.get<Trade>(`/api/trading/trades/${tradeId}`)
-  }
-
-  /**
-   * Create a new trade
-   */
-  static async createTrade(request: TradeRequest): Promise<TradeResponse> {
-    return ApiClient.post<TradeResponse>('/api/trading/trades', request)
-  }
-
-  /**
-   * Close an open trade
-   */
-  static async closeTrade(tradeId: string, exitPrice?: number): Promise<TradeResponse> {
-    const data = exitPrice ? { exit_price: exitPrice } : {}
-    return ApiClient.put<TradeResponse>(`/api/trading/trades/${tradeId}/close`, data)
-  }
-
-  /**
-   * Cancel a pending trade
-   */
-  static async cancelTrade(tradeId: string): Promise<{ message: string }> {
-    return ApiClient.delete<{ message: string }>(`/api/trading/trades/${tradeId}`)
-  }
-
-  /**
-   * Get trading signals with optional filtering
+   * Get trading signals
    */
   static async getSignals(
     symbol?: string,
-    strategy?: string,
-    limit: number = 50
+    limit: number = 100
   ): Promise<TradingSignal[]> {
     const params: any = { limit }
     if (symbol) params.symbol = symbol
-    if (strategy) params.strategy = strategy
     
     return ApiClient.get<TradingSignal[]>('/api/trading/signals', params)
   }
 
   /**
-   * Process market data and generate trading signals
+   * Get backtest results
    */
-  static async processMarketData(
-    symbol: string,
-    strategyName?: string
-  ): Promise<{ signals: TradingSignal[]; count: number }> {
-    const data: any = { symbol }
-    if (strategyName) data.strategy_name = strategyName
+  static async getBacktestResults(
+    strategyName: string,
+    symbol?: string
+  ): Promise<BacktestResult[]> {
+    const params: any = { strategy_name: strategyName }
+    if (symbol) params.symbol = symbol
     
-    return ApiClient.post<{ signals: TradingSignal[]; count: number }>(
-      '/api/trading/signals/process',
-      data
-    )
+    return ApiClient.get<BacktestResult[]>('/api/trading/backtest/results', params)
   }
 
   /**
-   * Get current positions
+   * Run backtest
    */
-  static async getPositions(symbol?: string): Promise<any[]> {
+  static async runBacktest(request: BacktestRequest): Promise<BacktestResult> {
+    return ApiClient.post<BacktestResult>('/api/trading/backtest', request)
+  }
+
+  /**
+   * Activate strategy
+   */
+  static async activateStrategy(strategyName: string): Promise<{ success: boolean }> {
+    return ApiClient.post<{ success: boolean }>('/api/trading/strategy/activate', { 
+      strategy_name: strategyName 
+    })
+  }
+
+  /**
+   * Deactivate strategy
+   */
+  static async deactivateStrategy(strategyName: string): Promise<{ success: boolean }> {
+    return ApiClient.post<{ success: boolean }>('/api/trading/strategy/deactivate', { 
+      strategy_name: strategyName 
+    })
+  }
+
+  /**
+   * Start auto trading
+   */
+  static async startAutoTrading(): Promise<{ success: boolean }> {
+    return ApiClient.post<{ success: boolean }>('/api/trading/auto/start', {})
+  }
+
+  /**
+   * Stop auto trading
+   */
+  static async stopAutoTrading(): Promise<{ success: boolean }> {
+    return ApiClient.post<{ success: boolean }>('/api/trading/auto/stop', {})
+  }
+
+  /**
+   * Get all trades (open/closed)
+   */
+  static async getTrades(
+    status?: 'open' | 'closed' | 'all',
+    symbol?: string,
+    limit: number = 100
+  ): Promise<Trade[]> {
+    const params: any = { limit }
+    if (status && status !== 'all') params.status = status
+    if (symbol) params.symbol = symbol
+    
+    return ApiClient.get<Trade[]>('/api/trading/trades', params)
+  }
+
+  /**
+   * Create new trade
+   */
+  static async createTrade(request: TradeRequest): Promise<TradeResponse> {
+    return ApiClient.post<TradeResponse>('/api/trading/trade', request)
+  }
+
+  /**
+   * Close existing trade
+   */
+  static async closeTrade(tradeId: string, exitPrice?: number): Promise<TradeResponse> {
+    const data: any = { trade_id: tradeId }
+    if (exitPrice) data.exit_price = exitPrice
+    
+    return ApiClient.post<TradeResponse>('/api/trading/close', data)
+  }
+
+  /**
+   * Get open positions
+   */
+  static async getPositions(symbol?: string): Promise<Position[]> {
     const params = symbol ? { symbol } : {}
-    return ApiClient.get<any[]>('/api/trading/positions', params)
+    return ApiClient.get<Position[]>('/api/trading/positions', params)
   }
 
   /**
-   * Enable automatic trading for a strategy
+   * Get trading performance statistics
    */
-  static async enableAutoTrading(strategyName: string, symbol: string): Promise<{ message: string }> {
-    return ApiClient.post<{ message: string }>(`/api/trading/auto-trade/${strategyName}`, { symbol })
+  static async getPerformance(
+    symbol?: string,
+    startDate?: string,
+    endDate?: string
+  ): Promise<PerformanceMetrics> {
+    const params: any = {}
+    if (symbol) params.symbol = symbol
+    if (startDate) params.start_date = startDate
+    if (endDate) params.end_date = endDate
+    
+    return ApiClient.get<PerformanceMetrics>('/api/trading/performance', params)
   }
 
   /**
-   * Disable automatic trading for a strategy
+   * Check stop losses and take profits
    */
-  static async disableAutoTrading(strategyName: string, symbol?: string): Promise<{ message: string }> {
-    const data = symbol ? { symbol } : {}
-    return ApiClient.delete<{ message: string }>(`/api/trading/auto-trade/${strategyName}`, data)
+  static async checkStopsTargets(symbol?: string): Promise<StopTarget[]> {
+    const params = symbol ? { symbol } : {}
+    return ApiClient.get<StopTarget[]>('/api/trading/stops-targets', params)
+  }
+
+  /**
+   * Calculate position size based on risk
+   */
+  static async calculatePosition(
+    symbol: string,
+    entryPrice: number,
+    stopLoss: number,
+    riskAmount: number,
+    takeProfit?: number
+  ): Promise<PositionCalculation> {
+    const data = {
+      symbol,
+      entry_price: entryPrice,
+      stop_loss: stopLoss,
+      risk_amount: riskAmount,
+      take_profit: takeProfit
+    }
+    
+    return ApiClient.post<PositionCalculation>('/api/trading/calculate-position', data)
+  }
+
+  /**
+   * WebSocket connection for real-time trade updates
+   */
+  static connectWebSocket(onMessage: (data: any) => void): WebSocket | null {
+    try {
+      const wsUrl = (import.meta as any).env?.VITE_WS_URL || 'ws://localhost:8000/api/trading/ws'
+      const ws = new WebSocket(wsUrl)
+      
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data)
+          onMessage(data)
+        } catch (error) {
+          console.error('Error parsing WebSocket message:', error)
+        }
+      }
+      
+      ws.onerror = (error) => {
+        console.error('WebSocket error:', error)
+      }
+      
+      ws.onclose = () => {
+        console.log('WebSocket connection closed')
+      }
+      
+      return ws
+    } catch (error) {
+      console.error('Error creating WebSocket connection:', error)
+      return null
+    }
   }
 
   /**
@@ -133,16 +271,14 @@ export class TradingService {
     let realizedPnL = 0
     let unrealizedPnL = 0
 
-    if (trade.status === 'closed' && trade.exit_price) {
-      // Calculate realized P&L
-      if (trade.trade_type === 'long') {
+    if (trade.status === TradeStatus.CLOSED && trade.exit_price) {
+      if (trade.trade_type === TradeType.LONG) {
         realizedPnL = (trade.exit_price - trade.entry_price) * trade.quantity
       } else {
         realizedPnL = (trade.entry_price - trade.exit_price) * trade.quantity
       }
-    } else if (trade.status === 'open' && currentPrice) {
-      // Calculate unrealized P&L
-      if (trade.trade_type === 'long') {
+    } else if (trade.status === TradeStatus.OPEN && currentPrice) {
+      if (trade.trade_type === TradeType.LONG) {
         unrealizedPnL = (currentPrice - trade.entry_price) * trade.quantity
       } else {
         unrealizedPnL = (trade.entry_price - currentPrice) * trade.quantity
@@ -150,41 +286,5 @@ export class TradingService {
     }
 
     return { realizedPnL, unrealizedPnL }
-  }
-
-  /**
-   * Get trade statistics
-   */
-  static getTradeStats(trades: Trade[]) {
-    const totalTrades = trades.length
-    const openTrades = trades.filter(t => t.status === 'open').length
-    const closedTrades = trades.filter(t => t.status === 'closed')
-    
-    const winningTrades = closedTrades.filter(t => t.realized_pnl > 0).length
-    const losingTrades = closedTrades.filter(t => t.realized_pnl < 0).length
-    
-    const totalPnL = closedTrades.reduce((sum, trade) => sum + trade.realized_pnl, 0)
-    const winRate = closedTrades.length > 0 ? (winningTrades / closedTrades.length) * 100 : 0
-    
-    const avgWin = winningTrades > 0 
-      ? closedTrades.filter(t => t.realized_pnl > 0).reduce((sum, t) => sum + t.realized_pnl, 0) / winningTrades 
-      : 0
-    
-    const avgLoss = losingTrades > 0 
-      ? Math.abs(closedTrades.filter(t => t.realized_pnl < 0).reduce((sum, t) => sum + t.realized_pnl, 0)) / losingTrades 
-      : 0
-
-    return {
-      totalTrades,
-      openTrades,
-      closedTrades: closedTrades.length,
-      winningTrades,
-      losingTrades,
-      winRate,
-      totalPnL,
-      avgWin,
-      avgLoss,
-      profitFactor: avgLoss > 0 ? avgWin / avgLoss : 0
-    }
   }
 }

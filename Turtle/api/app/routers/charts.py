@@ -2,11 +2,9 @@
 
 from typing import List
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import JSONResponse
 
 from app.models.chart import ChartData, ChartDataRequest, ChartDataResponse
 from app.services.chart_service import ChartService
-from app.core.config import settings
 
 router = APIRouter()
 chart_service = ChartService()

@@ -1,107 +1,170 @@
 import { ApiClient } from './api'
-import type { ChartData, ChartDataRequest, ChartDataResponse, ChartMetadata } from '@/types'
+import type { ChartData } from '@/types'
+
+export interface TechnicalIndicators {
+  sma?: number[]
+  ema?: number[]
+  rsi?: number[]
+  macd?: {
+    macd: number[]
+    signal: number[]
+    histogram: number[]
+  }
+  bollinger_bands?: {
+    upper: number[]
+    middle: number[]
+    lower: number[]
+  }
+}
+
+export interface ChartPattern {
+  type: string
+  start_index: number
+  end_index: number
+  confidence: number
+  description: string
+}
+
+export interface SupportResistanceLevel {
+  level: number
+  type: 'support' | 'resistance'
+  strength: number
+  touches: number[]
+}
+
+export interface VolatilityData {
+  historical_volatility: number
+  implied_volatility?: number
+  volatility_percentile: number
+  rolling_volatility: number[]
+}
+
+export interface MarketSummary {
+  symbol: string
+  price: number
+  change: number
+  change_percent: number
+  volume: number
+  high_24h: number
+  low_24h: number
+  market_cap?: number
+  timestamp: string
+}
 
 export class ChartService {
   /**
-   * List all available chart files
+   * List available chart files
    */
   static async listChartFiles(): Promise<string[]> {
-    return ApiClient.get<string[]>('/api/charts')
+    return ApiClient.get<string[]>('/api/charts/files')
   }
 
   /**
-   * Get chart data from file
+   * Get chart data with technical indicators
    */
-  static async getChartData(filename: string): Promise<ChartData> {
-    return ApiClient.get<ChartData>(`/api/charts/${filename}`)
-  }
-
-  /**
-   * Download new chart data
-   */
-  static async downloadChartData(request: ChartDataRequest): Promise<ChartDataResponse> {
-    return ApiClient.post<ChartDataResponse>('/api/charts/download', request)
-  }
-
-  /**
-   * Resample chart data to different timeframe
-   */
-  static async resampleChartData(filename: string, targetPeriod: string): Promise<ChartData> {
-    return ApiClient.post<ChartData>('/api/charts/resample', null, {
-      params: { filename, target_period: targetPeriod }
-    })
-  }
-
-  /**
-   * Delete a chart file
-   */
-  static async deleteChartFile(filename: string): Promise<{ message: string }> {
-    return ApiClient.delete<{ message: string }>(`/api/charts/${filename}`)
-  }
-
-  /**
-   * Get chart metadata without loading full data
-   */
-  static async getChartMetadata(filename: string): Promise<ChartMetadata> {
-    return ApiClient.get<ChartMetadata>(`/api/charts/metadata/${filename}`)
-  }
-
-  /**
-   * Upload chart data file
-   */
-  static async uploadChartData(file: File): Promise<ChartDataResponse> {
-    const formData = new FormData()
-    formData.append('file', file)
+  static async getChartData(
+    symbol: string,
+    interval: string = '1d',
+    limit: number = 100,
+    indicators?: string[]
+  ): Promise<ChartData & { indicators?: TechnicalIndicators }> {
+    const params: any = { symbol, interval, limit }
+    if (indicators && indicators.length > 0) {
+      params.indicators = indicators.join(',')
+    }
     
-    return ApiClient.post<ChartDataResponse>('/api/charts/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    })
+    return ApiClient.get<ChartData & { indicators?: TechnicalIndicators }>('/api/charts/data', params)
   }
 
   /**
    * Get chart statistics
    */
-  static async getChartStats(filename: string) {
-    const chartData = await this.getChartData(filename)
-    const candles = chartData.candles
-    
-    if (candles.length === 0) {
-      return null
-    }
+  static async getChartStats(filename: string): Promise<any> {
+    return ApiClient.get(`/api/charts/stats/${filename}`)
+  }
 
-    const prices = candles.map(c => c.close)
-    const volumes = candles.map(c => c.volume || 0)
-    
-    const minPrice = Math.min(...prices)
-    const maxPrice = Math.max(...prices)
-    const avgPrice = prices.reduce((sum, price) => sum + price, 0) / prices.length
-    const totalVolume = volumes.reduce((sum, vol) => sum + vol, 0)
-    
-    const firstCandle = candles[0]
-    const lastCandle = candles[candles.length - 1]
-    const priceChange = lastCandle.close - firstCandle.close
-    const priceChangePercent = (priceChange / firstCandle.close) * 100
+  /**
+   * Resample chart data to different interval
+   */
+  static async resampleChartData(filename: string, interval: string): Promise<ChartData> {
+    return ApiClient.post<ChartData>('/api/charts/resample', { filename, interval })
+  }
 
-    return {
-      symbol: chartData.metadata.symbol || chartData.metadata.asset_name,
-      totalCandles: candles.length,
-      dateRange: {
-        start: firstCandle.timestamp,
-        end: lastCandle.timestamp
-      },
-      priceStats: {
-        min: minPrice,
-        max: maxPrice,
-        average: avgPrice,
-        change: priceChange,
-        changePercent: priceChangePercent
-      },
-      volumeStats: {
-        total: totalVolume,
-        average: totalVolume / candles.length
-      }
+  /**
+   * Calculate technical indicators
+   */
+  static async getIndicators(
+    symbol: string,
+    indicators: string[],
+    period?: number,
+    interval: string = '1d'
+  ): Promise<TechnicalIndicators> {
+    const data = {
+      symbol,
+      indicators,
+      period,
+      interval
     }
+    
+    return ApiClient.post<TechnicalIndicators>('/api/charts/indicators', data)
+  }
+
+  /**
+   * Detect chart patterns
+   */
+  static async getPatterns(
+    symbol: string,
+    pattern_types?: string[],
+    interval: string = '1d'
+  ): Promise<ChartPattern[]> {
+    const params: any = { symbol, interval }
+    if (pattern_types && pattern_types.length > 0) {
+      params.pattern_types = pattern_types.join(',')
+    }
+    
+    return ApiClient.get<ChartPattern[]>('/api/charts/patterns', params)
+  }
+
+  /**
+   * Get support and resistance levels
+   */
+  static async getSupportResistance(
+    symbol: string,
+    interval: string = '1d',
+    lookback_periods: number = 50
+  ): Promise<SupportResistanceLevel[]> {
+    const params = {
+      symbol,
+      interval,
+      lookback_periods
+    }
+    
+    return ApiClient.get<SupportResistanceLevel[]>('/api/charts/support-resistance', params)
+  }
+
+  /**
+   * Calculate price volatility
+   */
+  static async getVolatility(
+    symbol: string,
+    period: number = 20,
+    interval: string = '1d'
+  ): Promise<VolatilityData> {
+    const params = {
+      symbol,
+      period,
+      interval
+    }
+    
+    return ApiClient.get<VolatilityData>('/api/charts/volatility', params)
+  }
+
+  /**
+   * Get market summary for symbol
+   */
+  static async getMarketSummary(symbol: string): Promise<MarketSummary> {
+    const params = { symbol }
+    
+    return ApiClient.get<MarketSummary>('/api/charts/market-summary', params)
   }
 }

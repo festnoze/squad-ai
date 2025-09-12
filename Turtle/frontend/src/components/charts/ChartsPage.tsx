@@ -34,7 +34,7 @@ export function ChartsPage() {
   )
 
   // Query for chart data when file is selected
-  const { data: loadedChartData, isLoading: chartLoading, refetch: refetchChart } = useQuery(
+  const { isLoading: chartLoading, refetch: refetchChart } = useQuery(
     ['chartData', selectedChartFile],
     () => selectedChartFile ? ChartService.getChartData(selectedChartFile) : null,
     {
@@ -104,7 +104,7 @@ export function ChartsPage() {
 
   // Handle download (placeholder)
   const handleDownload = () => {
-    toast.info('Download functionality will be implemented')
+    toast('Download functionality will be implemented')
   }
 
   // Auto-select first file if none selected

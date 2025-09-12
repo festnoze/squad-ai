@@ -28,7 +28,7 @@ async def list_portfolios():
 async def get_portfolio(portfolio_id: str):
     """Get portfolio by ID."""
     try:
-        portfolio = await portfolio_service.get_portfolio(portfolio_id)
+        portfolio = await portfolio_service.get_portfolio_from_file_async(portfolio_id)
         if not portfolio:
             raise HTTPException(status_code=404, detail="Portfolio not found")
         return portfolio
@@ -40,7 +40,7 @@ async def get_portfolio(portfolio_id: str):
 async def create_portfolio(request: PortfolioRequest):
     """Create a new portfolio."""
     try:
-        result = await portfolio_service.create_portfolio(request)
+        result = await portfolio_service.create_portfolio_async(request)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -60,7 +60,7 @@ async def update_portfolio(portfolio_id: str, request: PortfolioRequest):
 async def delete_portfolio(portfolio_id: str):
     """Delete a portfolio."""
     try:
-        success = await portfolio_service.delete_portfolio(portfolio_id)
+        success = await portfolio_service.delete_portfolio_async(portfolio_id)
         if not success:
             raise HTTPException(status_code=404, detail="Portfolio not found")
         return {"message": "Portfolio deleted successfully"}
@@ -94,7 +94,7 @@ async def get_portfolio_positions(portfolio_id: str):
 async def get_position_summary(portfolio_id: str, symbol: str):
     """Get position summary for a specific symbol."""
     try:
-        position = await portfolio_service.get_position_summary(portfolio_id, symbol)
+        position = await portfolio_service.get_position_summary_async(portfolio_id, symbol)
         if not position:
             raise HTTPException(status_code=404, detail="Position not found")
         return position
@@ -106,7 +106,7 @@ async def get_position_summary(portfolio_id: str, symbol: str):
 async def get_portfolio_performance(portfolio_id: str, days: int = 30):
     """Get portfolio performance metrics over time."""
     try:
-        performance = await portfolio_service.get_portfolio_performance(portfolio_id, days)
+        performance = await portfolio_service.get_portfolio_performance_async(portfolio_id, days)
         if not performance:
             raise HTTPException(status_code=404, detail="Portfolio not found")
         return performance
@@ -118,7 +118,7 @@ async def get_portfolio_performance(portfolio_id: str, days: int = 30):
 async def reset_portfolio(portfolio_id: str):
     """Reset portfolio to initial state."""
     try:
-        success = await portfolio_service.reset_portfolio(portfolio_id)
+        success = await portfolio_service.reset_portfolio_async(portfolio_id)
         if not success:
             raise HTTPException(status_code=404, detail="Portfolio not found")
         return {"message": "Portfolio reset successfully"}
@@ -134,7 +134,7 @@ async def update_portfolio_balance(
 ):
     """Update portfolio balance and currency."""
     try:
-        success = await portfolio_service.update_balance(portfolio_id, new_balance, currency)
+        success = await portfolio_service.update_balance_async(portfolio_id, new_balance, currency)
         if not success:
             raise HTTPException(status_code=404, detail="Portfolio not found")
         return {"message": "Portfolio balance updated successfully"}
@@ -146,7 +146,7 @@ async def update_portfolio_balance(
 async def get_risk_metrics(portfolio_id: str):
     """Get portfolio risk metrics."""
     try:
-        metrics = await portfolio_service.get_risk_metrics(portfolio_id)
+        metrics = await portfolio_service.get_risk_metrics_async(portfolio_id)
         if not metrics:
             raise HTTPException(status_code=404, detail="Portfolio not found")
         return metrics

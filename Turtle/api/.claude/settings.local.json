@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Dev/squad-ai/Turtle/single_project/src/**)",
+      "Bash(python:*)",
+      "Bash(curl:*)",
+      "Bash(venv/Scripts/pip install:*)",
+      "Bash(venv/Scripts/python -m pytest tests/ -v)",
+      "Bash(venv/Scripts/python -m pytest tests/services/test_trading_service_simple.py -v)",
+      "Bash(venv/Scripts/python -m pytest tests/services/ -k \"simple\" -v)",
+      "Bash(venv/Scripts/python -m pytest tests/test_services_integration.py -v)",
+      "Bash(venv/Scripts/python -m pytest tests/services/test_trading_service_simple.py tests/test_services_integration.py -v)",
+      "Bash(venv/Scripts/python -m pytest tests/services/test_market_data_service.py::TestMarketDataService::test_get_available_sources -v -s)",
+      "Bash(venv/Scripts/python -m pytest tests/services/test_market_data_service_simple.py::TestMarketDataServiceSimple::test_get_latest_price_synthetic -v -s)",
+      "Bash(venv/Scripts/python -m pytest tests/services/test_market_data_service_simple.py::TestMarketDataServiceSimple::test_get_latest_price_synthetic -v)",
+      "Bash(venv/Scripts/python -m pytest tests/* -v)",
+      "Bash(venv/Scripts/python -m pytest tests/services/test_chart_service.py::TestChartService::test_get_chart_data_with_indicators -v)",
+      "Bash(venv/Scripts/python -m pytest tests/services/test_trading_service_simple.py::TestTradingServiceSimple::test_create_trade -v)",
+      "Bash(venv/Scripts/python -m pytest tests/services/ -v --tb=no)",
+      "Bash(venv/Scripts/python -m pytest tests/services/test_portfolio_service.py::TestPortfolioService::test_init -v)",
+      "Bash(venv/Scripts/python -m pytest tests/services/test_portfolio_service.py -v --tb=line)",
+      "Read(//c/Users/e.millerioux/.claude/**)",
+      "Bash(powershell:*)",
+      "Bash(venv/Scripts/python -m pytest tests/services/test_market_data_service.py::TestMarketDataService::test_get_available_sources -v)",
+      "Bash(venv/Scripts/python -m pytest tests/services/test_market_data_service.py tests/services/test_market_data_service_simple.py -v --tb=no)",
+      "Bash(venv/Scripts/python -m pytest tests/services/test_market_data_service.py::TestMarketDataService::test_get_chart_data -v -s)",
+      "Bash(venv/Scripts/python -m pytest tests/services/test_market_data_service.py::TestMarketDataService::test_get_chart_data -v)",
+      "Bash(venv/Scripts/python -m pytest tests/services/test_market_data_service*.py -v --tb=no)",
+      "Bash(venv/Scripts/python -m pytest tests/services/test_portfolio_service.py::TestPortfolioService::test_create_portfolio -v)",
+      "Bash(venv/Scripts/python -m pytest tests/services/test_portfolio_service.py -v)",
+      "Bash(venv/Scripts/python -m pytest tests/ -k \"websocket\" -v)",
+      "Bash(venv/Scripts/python -m pytest tests/services/test_websocket_manager_simple.py -v)",
+      "Bash(venv/Scripts/python -m pytest tests/ -v --tb=no)",
+      "Bash(venv/Scripts/python -m pytest tests/services/test_trading_service.py -v)",
+      "Bash(venv/Scripts/python:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

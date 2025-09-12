@@ -63,8 +63,9 @@ export function MarketOverview() {
           size="sm"
           onClick={handleRefresh}
           disabled={refreshing}
-          icon={<RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />}
-        />
+        >
+          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+        </Button>
       </div>
 
       <div className="space-y-3">

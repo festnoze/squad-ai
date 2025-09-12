@@ -1,6 +1,6 @@
 import { InputHTMLAttributes, SelectHTMLAttributes, forwardRef } from 'react'
 
-interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string
   error?: string
   helperText?: string
