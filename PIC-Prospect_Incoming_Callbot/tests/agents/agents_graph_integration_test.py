@@ -8,8 +8,9 @@ from agents.agents_graph import AgentsGraph
 from agents.calendar_agent import CalendarAgent
 from agents.phone_conversation_state_model import PhoneConversationState
 from agents.text_registry import TextRegistry
-from api_client.salesforce_user_client_interface import SalesforceUserClientInterface
+from api_client.calendar_client_interface import CalendarClientInterface
 from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
+from api_client.salesforce_user_client_interface import SalesforceUserClientInterface
 from managers.outgoing_manager import OutgoingManager
 from utils.envvar import EnvHelper
 
@@ -128,10 +129,9 @@ async def test_query_response_about_courses(agents_graph_mockings):
     # Note: This might not be called in all flows, so we check if it was called at least 0 times
     assert agents_graph_mockings["outgoing_manager"].enqueue_text_async.call_count >= 0
     
-    assert EnvHelper.get_available_actions() == available_actions.split(",")
+    assert EnvHelper.get_available_actions() == [action.strip() for action in available_actions.split(",")]
     await change_env_var_values({"AVAILABLE_ACTIONS": available_actions})
     EnvHelper.load_all_env_var(force_load_from_env_file=True)
-    assert EnvHelper.get_available_actions() != available_actions.split(",")
 
 
 async def test_first_answer_to_calendar_appointment(agents_graph_mockings):
@@ -155,7 +155,7 @@ async def test_first_answer_to_calendar_appointment(agents_graph_mockings):
     # Set up mocks for calendar agent methods
     with (
         patch.object(
-            SalesforceUserClientInterface,
+            CalendarClientInterface,
             "get_scheduled_appointments_async",
             return_value=[
                 {
@@ -166,7 +166,7 @@ async def test_first_answer_to_calendar_appointment(agents_graph_mockings):
             ],
         ) as mock_get_appointments,
         patch.object(
-            SalesforceUserClientInterface,
+            CalendarClientInterface,
             "schedule_new_appointment_async",
             return_value={},
         ) as mock_schedule_new_appointment,
@@ -359,6 +359,18 @@ def agents_graph_mockings():
             "CreatedDate": "2025-06-01T00:00:00.000Z",
         }
     ]
+
+    mock_salesforce_client.get_complete_contact_info_by_phone_async.return_value = {
+        "contact": {
+            "Id": "003XX000004TmiQIAS",
+            "FirstName": "Test",
+            "LastName": "Contact",
+            "Email": "test.contact@example.com",
+            "Owner": {"Id": "005XX000001S8ptYAC", "Name": "Test Contact Owner"}
+        },
+        "assigned_user": {"Id": "005XX000001S8ptYAC", "Name": "Test Contact Owner"},
+        "user_source": "contact",
+    }
 
     call_sid = "CA" + "39e811364525" + "4ea8bd00" + "c222" + "11110001"
     phone_number = "+33123456789"

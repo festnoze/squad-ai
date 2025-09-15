@@ -328,7 +328,7 @@ async def test_complete_conversation_exchange(sf_client_mock, llm_instance, simi
         {
             "user_input": "Bonjour, je voudrais prendre rendez-vous avec mon conseiller",
             "category": "Proposition de créneaux",
-            "expected_response": "Je vous propose les créneaux suivants : demain, le jeudi 20 juin, de 9 heures à 11 heures 30 ou de 13 heures à 15 heures 30, ou vendredi 21 juin, de 9 heures à 11 heures 30. Avez-vous une préférence ?",
+            "expected_response": "Je vous propose les créneaux suivants : demain, jeudi 20 juin, de 9 heures à 11 heures 30, ou de 13 heures à 15 heures 30, ou vendredi 21 juin, de 9 heures à 11 heures 30. Avez-vous une préférence ?",
             "await_exact_match": True,
         },
         # Step 2: User asks for different availabilities

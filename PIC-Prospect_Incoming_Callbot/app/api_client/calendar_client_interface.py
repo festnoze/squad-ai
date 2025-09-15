@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 
-
 class CalendarClientInterface(ABC):
     @abstractmethod
     def authenticate(self) -> bool:
