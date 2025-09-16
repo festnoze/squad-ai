@@ -3,7 +3,8 @@
     "allow": [
       "Bash(find:*)",
       "Bash(python:*)",
-      "Bash(pylint:*)"
+      "Bash(pylint:*)",
+      "Bash(mkdocs serve:*)"
     ],
     "deny": [],
     "ask": []

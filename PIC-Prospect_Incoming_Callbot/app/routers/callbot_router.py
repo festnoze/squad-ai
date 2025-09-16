@@ -19,15 +19,15 @@ from utils.envvar import EnvHelper
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-router = APIRouter()
+callbot_router = APIRouter()
 
 # Instanciate after app startup
-phone_call_websocket_events_handler_factory: PhoneCallWebsocketEventsHandlerFactory = None
+phone_call_websocket_events_handler_factory: PhoneCallWebsocketEventsHandlerFactory
 allowed_signatures: list[str] = []
 twilio_authenticate = RequestValidator(EnvHelper.get_twilio_auth())
 
 
-def get_phone_provider(provider_name: str = None) -> PhoneProvider:
+def get_phone_provider(provider_name: str | None = None) -> PhoneProvider:
     """Get phone provider instance based on configuration or parameter"""
     if provider_name is None:
         provider_name = EnvHelper.get_phone_provider()
@@ -68,40 +68,26 @@ async def verify_twilio_call_sid(call_sid: str, from_number: str) -> None:
 
 
 # ========= Incoming phone call endpoint ========= #
-@router.post("/")
+@callbot_router.post("/")
 async def voice_incoming_call_endpoint(request: Request) -> HTMLResponse:
     logger.info("Received POST request for voice endpoint")
     provider = get_phone_provider()
     return await create_websocket_for_incoming_call_async(request, provider)
 
 # ========= Provider-specific endpoints ========= #
-@router.post("/twilio")
+@callbot_router.post("/twilio")
 async def twilio_voice_incoming_call_endpoint(request: Request) -> HTMLResponse:
     logger.info("Received POST request for Twilio voice endpoint")
     provider = get_phone_provider("twilio")
     return await create_websocket_for_incoming_call_async(request, provider)
 
-@router.post("/telnyx")
+@callbot_router.post("/telnyx")
 async def telnyx_voice_incoming_call_endpoint(request: Request) -> HTMLResponse:
     logger.info("Received POST request for Telnyx voice endpoint")
     provider = get_phone_provider("telnyx")
     return await create_websocket_for_incoming_call_async(request, provider)
 
-# Secured endpoint to run performance tests with multiple concurrent incoming calls, do this GET query:
-# http://127.0.0.1:8344/test-parallel-incoming-calls?api_key=test-key-9535782!b%&calls_count=3
-@router.get("/test-parallel-incoming-calls")
-@api_key_required
-async def test_parallel_incoming_calls(request: Request) -> HTMLResponse:
-    import asyncio
-    from testing.audio_test_simulator import AudioTestManager
-
-    test_manager = AudioTestManager()
-    concurrent_calls_count = request.query_params.get("calls_count", 5)
-    # Lancer la simulation en arrière-plan
-    asyncio.create_task(test_manager.run_fake_incoming_calls(int(concurrent_calls_count)))
-    return HTMLResponse(content="Test started successfully")
-
-@router.get("/websocket-url")
+@callbot_router.get("/websocket-url")
 @api_key_required
 async def get_websocket_url_for_incoming_call(request: Request) -> HTMLResponse:
     logger.info("Received GET request for websocket URL endpoint")
@@ -162,13 +148,13 @@ async def _extract_request_data_async(request: Request) -> tuple:
 
 
 # ========= Incoming phone call WebSocket endpoint ========= #
-@router.websocket("/ws/phone/{calling_phone_number}/sid/{call_sid}")
+@callbot_router.websocket("/ws/phone/{calling_phone_number}/sid/{call_sid}")
 async def twilio_websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid: str) -> None:
     """WebSocket endpoint for Twilio calls"""
     provider = get_phone_provider("twilio")
     await handle_websocket_connection(ws, calling_phone_number, call_sid, provider)
 
-@router.websocket("/ws/phone/{calling_phone_number}/call_control_id/{call_control_id}")
+@callbot_router.websocket("/ws/phone/{calling_phone_number}/call_control_id/{call_control_id}")
 async def telnyx_websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_control_id: str) -> None:
     """WebSocket endpoint for Telnyx calls"""
     provider = get_phone_provider("telnyx")
@@ -221,7 +207,7 @@ async def handle_websocket_connection(ws: WebSocket, calling_phone_number: str, 
 
 
 # ========= Incoming SMS endpoint ========= #
-@router.api_route("/incoming-sms", methods=["GET", "POST"])
+@callbot_router.api_route("/incoming-sms", methods=["GET", "POST"])
 async def twilio_incoming_sms(request: Request):
     return await handle_incoming_sms_async(request)
 
@@ -268,7 +254,7 @@ async def handle_incoming_sms_async(request: Request) -> HTMLResponse:
 
 
 # ========= Hot Change of Environment Variables Endpoint ========= #
-@router.get("/change_env_var")
+@callbot_router.get("/change_env_var")
 @api_key_required
 async def change_env_var_endpoint(request: Request):
     """Change environment variable value via query parameter"""
@@ -327,7 +313,7 @@ async def reload_env_var(var_to_reload: dict):
             if var_name not in os.environ:
                 missing_vars.append(var_name)
                 continue
-            os.environ[var_name] = EnvHelper.get_env_variable_value_by_name(var_name)
+            os.environ[var_name] = EnvHelper.get_env_variable_value_by_name(var_name) or ""
 
     except Exception as e:
         logger.error(f"Error reloading environment variable: {e}", exc_info=True)

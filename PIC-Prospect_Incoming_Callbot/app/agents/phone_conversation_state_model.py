@@ -1,10 +1,10 @@
-from typing import TypedDict
+from typing import Any, TypedDict
 
 class ConversationState(TypedDict):
     """Represents the state of the conversation at any point."""
 
     history: list[tuple[str, str]]
-    agent_scratchpad: dict[str, str]
+    agent_scratchpad: dict[str, Any]
 
 class PhoneConversationState(ConversationState):
     """Represents the state of the phone conversation at any point."""

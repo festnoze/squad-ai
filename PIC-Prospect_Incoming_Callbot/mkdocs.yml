@@ -78,11 +78,14 @@ nav:
     - Installation: getting-started/installation.md
     - Configuration: getting-started/configuration.md
     - Running the Application: getting-started/running.md
+    - Google Calendar Setup: getting-started/google-calendar-setup.md
   - Architecture:
     - Overview: architecture/overview.md
     - Agent System: architecture/agents.md
     - Audio Processing: architecture/audio.md
     - External Integrations: architecture/integrations.md
+    - Background Noise Implementation: architecture/BACKGROUND_NOISE_IMPLEMENTATION.md
+    - Latency Monitoring: architecture/latency_monitoring.md
   - API Reference:
     - Endpoints: api/endpoints.md
     - Agents: api/agents.md
@@ -90,5 +93,11 @@ nav:
     - Utils: api/utils.md
   - Development:
     - Contributing: development/contributing.md
+    - Coding Standards: development/coding-standards.md
+    - Development Workflow: development/development-workflow.md
+    - Audio Samples: development/audio-samples.md
     - Testing: development/testing.md
     - Deployment: development/deployment.md
+  - Deployment:
+    - GCP Deployment (English): GCP-deployment.md
+    - GCP Deployment (Français): GCP-deployment.fr.md

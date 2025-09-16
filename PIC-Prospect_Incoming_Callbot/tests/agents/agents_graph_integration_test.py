@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime, timedelta
+from typing import cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -14,7 +15,7 @@ from api_client.salesforce_user_client_interface import SalesforceUserClientInte
 from managers.outgoing_manager import OutgoingManager
 from utils.envvar import EnvHelper
 
-from app.endpoints import change_env_var_values
+from routers.callbot_router import change_env_var_values
 
 
 async def test_graph_init_conversation_and_welcome_message(agents_graph_mockings):
@@ -106,7 +107,7 @@ async def test_query_response_about_courses(agents_graph_mockings):
     agents_graph_mockings["studi_rag_client"].rag_query_stream_async = mock_stream_response
 
     # Act
-    updated_state: PhoneConversationState = await agents_graph.ainvoke(initial_state)
+    updated_state: PhoneConversationState = cast(PhoneConversationState, await agents_graph.ainvoke(initial_state))
 
     # Assert - Check that we have at least the initial message and one more
     assert len(updated_state["history"]) >= 2
@@ -146,11 +147,6 @@ async def test_first_answer_to_calendar_appointment(agents_graph_mockings):
         call_sid=agents_graph_mockings["call_sid"],
     )
     CalendarAgent.now = datetime(2025, 4, 2, 10, 0, 0, tzinfo=pytz.timezone("Europe/Paris"))
-
-    # Add necessary attributes for streaming
-    agents.graph.is_speaking = True
-    agents.graph.start_time = 0
-    agents.graph.rag_interrupt_flag = {"interrupted": False}
 
     # Set up mocks for calendar agent methods
     with (
@@ -218,7 +214,7 @@ async def test_first_answer_to_calendar_appointment(agents_graph_mockings):
         agents.calendar_agent_instance.salesforce_api_client.get_scheduled_appointments_async = mock_get_appointments
 
         # Act
-        updated_state: PhoneConversationState = await agents.graph.ainvoke(initial_state)
+        updated_state: PhoneConversationState = cast(PhoneConversationState, await agents.graph.ainvoke(initial_state))
 
         # Assert
         assert len(updated_state["history"]) >= 2  # At least initial message + response

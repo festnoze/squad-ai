@@ -4,7 +4,7 @@ from app.agents.agents_graph import AgentsGraph
 from app.managers.outgoing_manager import OutgoingManager
 from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
 from app.api_client.salesforce_user_client_interface import SalesforceUserClientInterface
-from app.endpoints import change_env_var_values
+from routers.callbot_router import change_env_var_values
 
 @pytest.mark.parametrize("awaited_dispatch, user_input, chat_history", [
 

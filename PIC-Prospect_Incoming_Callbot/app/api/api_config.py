@@ -1,41 +1,27 @@
-import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime
-
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from phone_call_websocket_events_handler import PhoneCallWebsocketEventsHandlerFactory
 from speech.pregenerated_audio import PreGeneratedAudio
 from starlette.responses import Response as StarletteResponse
-from utils.envvar import EnvHelper
-
 #
-from app import endpoints
+from utils.envvar import EnvHelper
+from routers import callbot_router
+from routers.logs_router import logs_router
+from routers.test_router import test_router
 
 
 class ApiConfig:
-    # TMP TODO to remove: allow rapid transcription of a specified audio files
-    # async def transcript_audio_async():
-    #     from speech.speech_to_text import get_speech_to_text_provider
-    #     filename = "C:/Users/e.millerioux/Music/" + "2025_07_30_19_12_25.wav"
-    #     #audio_bytes = open(filename, "rb").read()
-    #     stt = get_speech_to_text_provider()
-
-    #     transcription = await stt.transcribe_audio_async(filename) # asyncio.create_task(tmp(audio_bytes[:1000000]))
-
-    #     #save into file
-    #     with open("transcription2.txt", "w", encoding="utf-8") as f:
-    #         f.write(transcription)
-
+    @staticmethod
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        # await ApiConfig.transcript_audio_async()
-
         # Startup logic
         logger = logging.getLogger(__name__)
         logger.info("Application startup.")
@@ -68,7 +54,12 @@ class ApiConfig:
         load_dotenv()
         EnvHelper.load_all_env_var()
 
-        app.include_router(endpoints.router)
+        app.include_router(callbot_router.callbot_router)
+        app.include_router(logs_router)
+        app.include_router(test_router)
+
+        # Serve documentation as static files
+        ApiConfig._setup_documentation_serving(app)
 
         app.add_middleware(
             CORSMiddleware,
@@ -82,7 +73,7 @@ class ApiConfig:
         logger = ApiConfig.configure_logging()
 
         # Initialize PhoneCallWebsocketEventsHandlerFactory
-        endpoints.phone_call_websocket_events_handler_factory = PhoneCallWebsocketEventsHandlerFactory()
+        callbot_router.phone_call_websocket_events_handler_factory = PhoneCallWebsocketEventsHandlerFactory()
 
         logger.info("-----------------------------------------------------")
         logger.info("🌐 PIC (Prospect Incoming Callbot) API 🚀 started 🚀")
@@ -134,29 +125,57 @@ class ApiConfig:
             logger.error("Ping request received.")
             return "pong"
 
-        @app.get("/logs/last", response_class=PlainTextResponse)
-        def get_last_log_file() -> str:
-            log_files = os.listdir("outputs/logs")
-            # Only include .log files, exclude latency_metrics.jsonl and other files
-            log_files = [f for f in log_files if f.endswith('.log')]
-            log_files.sort()
-            if not log_files or not any(log_files):
-                return "<<<No log files found.>>>"
-            latest_log_file = log_files[-1]
-            with open(f"outputs/logs/{latest_log_file}", encoding="utf-8") as file:
-                lines = file.readlines()
-                return ''.join(lines[-1000:])
-
-        @app.get("/logs/latency", response_class=PlainTextResponse)
-        def get_latency_metrics() -> str:
-            latency_file_path = "outputs/logs/latency_metrics.jsonl"
-            if not os.path.exists(latency_file_path):
-                return "<<<Latency metrics file not found.>>>"
-            with open(latency_file_path, encoding="utf-8") as file:
-                lines = file.readlines()
-                return ''.join(lines[-1000:])
+        @app.get("/")
+        def root() -> JSONResponse:
+            """Root endpoint with API information and documentation links"""
+            return JSONResponse(content={
+                "service": "PIC Prospect Incoming Callbot API",
+                "version": app.version,
+                "status": "running",
+                "documentation": {
+                    "api_docs": "/docs",
+                    "redoc": "/redoc",
+                    "site_documentation": "/docs-site/"
+                },
+                "endpoints": {
+                    "health": "/ping",
+                    "callbot": "/api/callbot/",
+                    "logs": "/api/logs/",
+                    "test": "/api/test/"
+                }
+            })
 
         return app
+
+    @staticmethod
+    def _setup_documentation_serving(app: FastAPI) -> None:
+        """Setup documentation serving for both development and production"""
+        import os
+        from pathlib import Path
+
+        logger = logging.getLogger(__name__)
+        project_root = Path(__file__).parent.parent.parent
+        docs_site_path = project_root / "static" / "docs-site"
+
+        # Check if built documentation exists
+        if docs_site_path.exists() and docs_site_path.is_dir():
+            logger.info(f"📚 Serving documentation at /docs-site/ from {docs_site_path}")
+            app.mount("/docs-site", StaticFiles(directory=str(docs_site_path), html=True), name="docs-site")
+        else:
+            logger.warning(f"📚 Documentation not found at {docs_site_path}")
+            logger.warning("   Run 'python scripts/build_docs.py' to build documentation")
+
+            # Add a placeholder endpoint
+            @app.get("/docs-site/")
+            def docs_not_built():
+                return JSONResponse(
+                    status_code=404,
+                    content={
+                        "error": "Documentation not built",
+                        "message": "Run 'python scripts/build_docs.py' to build documentation",
+                        "alternative": "For development, use 'python scripts/build_docs.py --dev' to start mkdocs serve"
+                    }
+                )
 
     @staticmethod
     def configure_logging(app_name: str = "Prospect-Incoming-Callbot-API", logs_dir: str = "outputs/logs/"):

@@ -5,6 +5,8 @@ from asyncio import Task
 from typing import Hashable
 from uuid import UUID
 
+from langgraph.graph.state import CompiledStateGraph
+
 from api_client.conversation_persistence_interface import (
     ConversationPersistenceInterface,
 )
@@ -130,9 +132,9 @@ class AgentsGraph:
 
         self.sf_agent_instance = SFAgent()
         self.logger.info("Initialize SF Agent succeed")
-        self.graph = self._build_graph()
+        self.graph: CompiledStateGraph = self._build_graph()
 
-    def _build_graph(self):
+    def _build_graph(self) -> CompiledStateGraph:
         workflow = StateGraph(PhoneConversationState)
         self.logger.info(f"[{self.call_sid}] Agents graph ongoing creation.")
 
@@ -490,10 +492,10 @@ class AgentsGraph:
     async def user_identified_node(self, state: PhoneConversationState) -> PhoneConversationState:
         """For existing user: User identity confirmation"""
         first_name = state["agent_scratchpad"]["sf_account_info"].get("FirstName", "").strip()
-        end_welcome_text = f"{self.thanks_to_come_back}, {first_name}."
+        end_welcome_text = f"{self.thanks_to_come_back} {first_name}."
 
         salesman_first_name = state["agent_scratchpad"]["sf_account_info"].get("Owner", {}).get("Name", "enformation DUPONT").split(" ")[0].strip()
-        end_welcome_text += f" {salesman_first_name}, votre conseiller, est actuellement indisponible."
+        end_welcome_text += f" votre conseiller, {salesman_first_name}, est actuellement indisponible."
 
         if "schedule_appointement" in self.available_actions:
             end_welcome_text += f" {TextRegistry.appointment_text}"

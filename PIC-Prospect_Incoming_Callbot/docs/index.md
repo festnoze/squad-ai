@@ -17,7 +17,7 @@ This is an AI-powered phone conversation system that handles incoming calls usin
 
 ```bash
 # Install dependencies
-pip install -e .[dev]
+uv pip install -e .[dev]
 
 # Run the application
 uvicorn app.api.startup:app --reload
@@ -49,6 +49,14 @@ The system is built with:
 - [Installation](getting-started/installation.md) - Set up your development environment
 - [Configuration](getting-started/configuration.md) - Configure environment variables and secrets
 - [Running the Application](getting-started/running.md) - Start the application and test it
+- [Google Calendar Setup](getting-started/google-calendar-setup.md) - Configure Google Calendar integration
+
+## Architecture
+
+- [Overview](architecture/overview.md) - System architecture and components
+- [Agent System](architecture/agents.md) - LangGraph agents and workflow
+- [Audio Processing](architecture/audio.md) - Real-time audio pipeline
+- [External Integrations](architecture/integrations.md) - Third-party service integrations
 
 ## API Reference
 
@@ -56,3 +64,15 @@ The system is built with:
 - [Agents](api/agents.md) - LangGraph agents and workflow
 - [Managers](api/managers.md) - Audio and conversation managers
 - [Utils](api/utils.md) - Utility functions and helpers
+
+## Development
+
+- [Contributing](development/contributing.md) - How to contribute to the project
+- [Coding Standards](development/coding-standards.md) - Code style and standards
+- [Testing](development/testing.md) - Testing strategies and frameworks
+- [Deployment](development/deployment.md) - Deployment procedures and environments
+
+## Deployment
+
+- [GCP Deployment (English)](GCP-deployment.md) - Deploy to Google Cloud Platform
+- [GCP Deployment (Français)](GCP-deployment.fr.md) - Déploiement sur Google Cloud Platform
