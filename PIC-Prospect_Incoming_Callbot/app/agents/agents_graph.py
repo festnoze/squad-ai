@@ -150,11 +150,18 @@ class AgentsGraph:
         workflow.add_edge("user_identified", END)
         workflow.add_node("user_new", self.user_new_node)
         workflow.add_edge("user_new", END)
+        workflow.add_node("anonymous_user", self.anonymous_user_node)
+        workflow.add_edge("anonymous_user", END)
 
         workflow.add_conditional_edges(
             "user_identification",
             self.user_identification_decide_next_step,
-            {"user_identified": "user_identified", "user_new": "user_new", END: END},
+            {
+                "user_identified": "user_identified",
+                "user_new": "user_new",
+                "anonymous_user": "anonymous_user",
+                END: END
+            },
         )
 
         workflow.add_node("wait_for_user_input", self.wait_for_user_input_node)
@@ -459,6 +466,11 @@ class AgentsGraph:
         call_sid = state.get("call_sid", "N/A")
         phone_number = state.get("caller_phone", "N/A")
 
+        if phone_number == "anonymous":
+            state.get("agent_scratchpad", {})["next_agent_needed"] = "anonymous_user"
+            self.logger.warning(f"No phone number found for call SID: {call_sid}")
+            return state
+
         # Use the new aggregated method that links through opportunities to find the most relevant user
         complete_contact_info = await self.salesforce_api_client.get_complete_contact_info_by_phone_async(phone_number)
 
@@ -482,7 +494,10 @@ class AgentsGraph:
 
         self.logger.info(f"[{call_sid}] Stored enhanced sf_account_info with {complete_contact_info.get('user_source', 'unknown')} user: {sf_account_info.get('Owner', {}).get('Name', 'N/A')} in agent_scratchpad")
 
-        state.get("agent_scratchpad", {})["next_agent_needed"] = "user_identified" if complete_contact_info else "user_new"
+        if complete_contact_info:
+            state.get("agent_scratchpad", {})["next_agent_needed"] = "user_identified"
+        else:
+            state.get("agent_scratchpad", {})["next_agent_needed"] = "user_new"
         return state
 
     async def user_identification_decide_next_step(self, state: PhoneConversationState) -> str | None:
@@ -516,6 +531,11 @@ class AgentsGraph:
     async def user_new_node(self, state: PhoneConversationState) -> PhoneConversationState:
         """For new user: Case not handled. Ask the user to call during the opening hours"""
         await self.add_AI_response_message_to_conversation_async(TextRegistry.unavailability_for_new_prospect, state)
+        return state
+
+    async def anonymous_user_node(self, state: PhoneConversationState) -> PhoneConversationState:
+        """For new user: Case not handled. Ask the user to call during the opening hours"""
+        await self.add_AI_response_message_to_conversation_async(TextRegistry.anonymous_prospect_message, state)
         return state
 
     async def wait_for_user_input_node(self, state: PhoneConversationState) -> PhoneConversationState:

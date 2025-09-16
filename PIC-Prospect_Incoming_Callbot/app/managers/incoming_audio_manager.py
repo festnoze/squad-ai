@@ -482,7 +482,7 @@ class IncomingAudioManager(IncomingManager):
             self.agents_graph.consecutive_error_manager.reset_consecutive_error_count(updated_state)
 
             # If the agents graph response ends with "au revoir.", do hang-up
-            if updated_state["history"][-1][1].endswith("au revoir."):
+            if updated_state["history"][-1][1].lower().endswith("au revoir."):
                 self.logger.info(">>> Agents graph response ends with 'au revoir.', hanging up the call.")
                 while self.outgoing_manager.has_text_to_be_sent() or self.outgoing_manager.is_sending():
                     await asyncio.sleep(0.3)

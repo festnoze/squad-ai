@@ -8,6 +8,7 @@ class TextRegistry:
     start_welcome_text = f"Bonjour et bienvenue chez {EnvHelper.get_company_name()}. Je suis l'assistant virtuel de lécole."
     #unavailability_for_returning_prospect = "Votre conseiller attitré est actuellement indisponible."
     unavailability_for_new_prospect = "Nos conseillers en formation sont actuellement indisponibles."
+    anonymous_prospect_message = "Nous sommes désolés, mais nous n'avons pas accès à votre numéro de téléphone et ne pouvons pas vous proposer de rendez-vous. Merci de nous recontacter durant les heures ouvrées, de 9h à 18h. Au revoir."
     ask_to_repeat_text = "Désolé, je n'ai pas bien entendu. Merci de répéter."
     # thanks_to_come_back = "Merci de nous recontacter "
     appointment_text = "Je vous propose de prendre rendez-vous avec lui."
