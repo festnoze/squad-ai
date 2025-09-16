@@ -1,0 +1,16 @@
+{
+  "id": "60218cf0-fc58-4071-b506-73471d479845",
+  "name": "Test Portfolio",
+  "initial_balance": 10000.0,
+  "current_balance": 10000.0,
+  "currency": "USD",
+  "total_value": 10000.0,
+  "unrealized_pnl": 0,
+  "realized_pnl": 0,
+  "total_pnl": 0,
+  "total_trades": 0,
+  "winning_trades": 0,
+  "losing_trades": 0,
+  "max_drawdown": 0,
+  "risk_per_trade": 0.02
+}

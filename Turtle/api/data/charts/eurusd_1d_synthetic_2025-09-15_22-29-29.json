@@ -1,0 +1,30 @@
+{
+  "metadata": {
+    "asset_name": "EURUSD",
+    "currency": "USD",
+    "period_duration": "1d"
+  },
+  "candles": [
+    {
+      "timestamp": "2025-09-12T22:29:29.236564",
+      "open": 100.0,
+      "high": 100.48,
+      "low": 98.24,
+      "close": 98.45
+    },
+    {
+      "timestamp": "2025-09-13T22:29:29.236564",
+      "open": 98.45,
+      "high": 99.45,
+      "low": 98.37,
+      "close": 99.06
+    },
+    {
+      "timestamp": "2025-09-14T22:29:29.236564",
+      "open": 99.06,
+      "high": 101.3,
+      "low": 98.16,
+      "close": 100.66
+    }
+  ]
+}

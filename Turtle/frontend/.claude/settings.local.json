@@ -9,7 +9,8 @@
       "Bash(set NODE_ENV=production)",
       "Bash(npx vite:*)",
       "Bash(cmd /c:*)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []

@@ -1,0 +1,44 @@
+{
+  "metadata": {
+    "asset_name": "BTCUSDT",
+    "currency": "USD",
+    "period_duration": "1d"
+  },
+  "candles": [
+    {
+      "timestamp": "2025-09-10T22:28:42.407869",
+      "open": 100.0,
+      "high": 100.51,
+      "low": 97.61,
+      "close": 98.53
+    },
+    {
+      "timestamp": "2025-09-11T22:28:42.408746",
+      "open": 98.53,
+      "high": 99.05,
+      "low": 97.72,
+      "close": 98.6
+    },
+    {
+      "timestamp": "2025-09-12T22:28:42.408804",
+      "open": 98.6,
+      "high": 99.33,
+      "low": 97.66,
+      "close": 97.75
+    },
+    {
+      "timestamp": "2025-09-13T22:28:42.408804",
+      "open": 97.75,
+      "high": 98.54,
+      "low": 96.38,
+      "close": 97.22
+    },
+    {
+      "timestamp": "2025-09-14T22:28:42.408804",
+      "open": 97.22,
+      "high": 97.4,
+      "low": 95.32,
+      "close": 95.33
+    }
+  ]
+}
