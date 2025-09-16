@@ -10,6 +10,7 @@ import json
 import os
 import pickle
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.decomposition import PCA
 from src.preprocess_data import load_and_preprocess_wine_data
 from src.train_model import WineQualityTrainer
 import torch
@@ -276,6 +277,229 @@ def plot_linear_regression_analysis(model_path, X_test, y_test):
 
     except Exception as e:
         st.error(f"Error analyzing linear regression: {e}")
+
+def plot_2d_projection(model_path, model_type, config):
+    """Create 2D projection plot showing model predictions vs actual training data"""
+    try:
+        # Load training data
+        X_train = pd.read_csv('processed_data/X_train.csv')
+        y_train = pd.read_csv('processed_data/y_train.csv').squeeze()
+
+        if X_train.empty or y_train.empty:
+            st.error("Training data not found!")
+            return
+
+        # Apply PCA to reduce to 2D
+        pca = PCA(n_components=2, random_state=42)
+        X_train_2d = pca.fit_transform(X_train)
+
+        # Load model and make predictions
+        if model_type in ['linear_regression', 'random_forest']:
+            model_file = os.path.join(model_path, 'model.pkl')
+            with open(model_file, 'rb') as f:
+                model = pickle.load(f)
+            y_pred = model.predict(X_train)
+
+        elif model_type == 'neural_network':
+            # Load neural network model
+            model_file = os.path.join(model_path, 'model.pth')
+            from src.train_model import WineQualityNN
+
+            # Recreate model architecture
+            input_size = X_train.shape[1]
+            hidden_layers = config.get('hidden_layers', '64,32')
+            dropout_rate = config.get('dropout_rate', 0.2)
+            activation = config.get('activation', 'relu')
+
+            model = WineQualityNN(input_size, hidden_layers, dropout_rate, activation)
+            model.load_state_dict(torch.load(model_file, map_location='cpu'))
+            model.eval()
+
+            with torch.no_grad():
+                X_train_tensor = torch.FloatTensor(X_train.values)
+                y_pred = model(X_train_tensor).numpy().flatten()
+
+        else:
+            st.error(f"Unsupported model type: {model_type}")
+            return
+
+        # Sort data by predicted values for better line visualization
+        sorted_indices = np.argsort(y_pred)
+        X_train_2d_sorted = X_train_2d[sorted_indices]
+        y_true_sorted = y_train.iloc[sorted_indices]
+        y_pred_sorted = y_pred[sorted_indices]
+
+        # Create the plot
+        fig = go.Figure()
+
+        # Add actual training data points colored by true quality
+        fig.add_trace(go.Scatter(
+            x=X_train_2d[:, 0],
+            y=X_train_2d[:, 1],
+            mode='markers',
+            marker=dict(
+                size=6,
+                color=y_train,
+                colorscale='Viridis',
+                colorbar=dict(title="True Quality Score"),
+                opacity=0.7,
+                line=dict(width=0.5, color='white')
+            ),
+            name='Actual Data',
+            text=[f'True: {true:.1f}<br>Pred: {pred:.1f}' for true, pred in zip(y_train, y_pred)],
+            hovertemplate='<b>Actual Data</b><br>' +
+                         'PC1: %{x:.3f}<br>' +
+                         'PC2: %{y:.3f}<br>' +
+                         '%{text}<br>' +
+                         '<extra></extra>'
+        ))
+
+        # Add prediction line/curve through the 2D space
+        # Sample points along the prediction trend for visualization
+        if len(X_train_2d_sorted) > 10:
+            # Sample points evenly along the prediction trend
+            step = max(1, len(X_train_2d_sorted) // 20)  # ~20 points for the curve
+            curve_indices = list(range(0, len(X_train_2d_sorted), step))
+            # Ensure we include the last point
+            if curve_indices[-1] != len(X_train_2d_sorted) - 1:
+                curve_indices.append(len(X_train_2d_sorted) - 1)
+
+            curve_x = X_train_2d_sorted[curve_indices, 0]
+            curve_y = X_train_2d_sorted[curve_indices, 1]
+            curve_pred = y_pred_sorted[curve_indices]
+
+            fig.add_trace(go.Scatter(
+                x=curve_x,
+                y=curve_y,
+                mode='lines+markers',
+                line=dict(color='red', width=3),
+                marker=dict(
+                    size=8,
+                    color=curve_pred,
+                    colorscale='Reds',
+                    opacity=0.8,
+                    line=dict(width=1, color='darkred')
+                ),
+                name='Prediction Trend',
+                text=[f'Pred: {pred:.1f}' for pred in curve_pred],
+                hovertemplate='<b>Prediction Trend</b><br>' +
+                             'PC1: %{x:.3f}<br>' +
+                             'PC2: %{y:.3f}<br>' +
+                             '%{text}<br>' +
+                             '<extra></extra>'
+            ))
+
+        # Update layout
+        explained_var_ratio = pca.explained_variance_ratio_
+        title = f'2D Projection of Training Data and Predictions<br>' + \
+                f'<sub>PC1: {explained_var_ratio[0]:.1%} variance, PC2: {explained_var_ratio[1]:.1%} variance</sub>'
+
+        fig.update_layout(
+            title=title,
+            xaxis_title=f'First Principal Component ({explained_var_ratio[0]:.1%} variance)',
+            yaxis_title=f'Second Principal Component ({explained_var_ratio[1]:.1%} variance)',
+            template='plotly_white',
+            hovermode='closest',
+            height=500,
+            showlegend=True
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Add explanation
+        st.info(
+            f"📊 **2D Projection Explanation:** This plot uses PCA to project the {X_train.shape[1]}-dimensional "
+            f"wine features into 2D space, preserving {explained_var_ratio[0] + explained_var_ratio[1]:.1%} "
+            f"of the total variance. Points are colored by true quality scores, and the red line shows "
+            f"the prediction trend across the feature space."
+        )
+
+    except Exception as e:
+        st.error(f"Error creating 2D projection: {e}")
+
+def cleanup_generated_files():
+    """Delete all files generated by the ML pipeline"""
+    import shutil
+
+    # Define paths to clean up
+    cleanup_paths = [
+        'processed_data',
+        'models',
+        'logs'
+    ]
+
+    deleted_items = []
+    errors = []
+
+    for path in cleanup_paths:
+        try:
+            if os.path.exists(path):
+                if os.path.isdir(path):
+                    # Count files before deletion
+                    file_count = sum([len(files) for r, d, files in os.walk(path)])
+                    shutil.rmtree(path)
+                    deleted_items.append(f"📁 {path}/ directory ({file_count} files)")
+                else:
+                    os.remove(path)
+                    deleted_items.append(f"📄 {path}")
+        except Exception as e:
+            errors.append(f"❌ Error deleting {path}: {str(e)}")
+
+    return deleted_items, errors
+
+def cleanup_streamlit():
+    """Streamlit interface for cleaning up generated files"""
+    st.header("🧹 Cleanup Generated Files")
+
+    st.markdown("Remove all files generated by the ML pipeline to start fresh.")
+
+    # Check what exists
+    paths_to_check = ['processed_data', 'models', 'logs']
+    existing_paths = []
+
+    for path in paths_to_check:
+        if os.path.exists(path):
+            if os.path.isdir(path):
+                file_count = sum([len(files) for r, d, files in os.walk(path)])
+                size_mb = sum([os.path.getsize(os.path.join(r, f)) for r, d, files in os.walk(path) for f in files]) / (1024*1024)
+                existing_paths.append(f"📁 **{path}/** - {file_count} files (~{size_mb:.1f} MB)")
+            else:
+                size_mb = os.path.getsize(path) / (1024*1024)
+                existing_paths.append(f"📄 **{path}** (~{size_mb:.1f} MB)")
+
+    if existing_paths:
+        st.subheader("Files to be deleted:")
+        for path_info in existing_paths:
+            st.write(f"- {path_info}")
+
+        st.warning("⚠️ **Warning:** This action cannot be undone!")
+
+        # Confirmation checkbox
+        confirm_delete = st.checkbox("I understand that all generated files will be permanently deleted")
+
+        if st.button("🗑️ Delete All Generated Files", type="primary", disabled=not confirm_delete):
+            with st.spinner("Deleting files..."):
+                deleted_items, errors = cleanup_generated_files()
+
+            if deleted_items:
+                st.success("✅ Cleanup completed!")
+                st.subheader("Deleted items:")
+                for item in deleted_items:
+                    st.write(f"- {item}")
+
+            if errors:
+                st.error("❌ Some errors occurred:")
+                for error in errors:
+                    st.write(f"- {error}")
+
+            if not deleted_items and not errors:
+                st.info("ℹ️ No files found to delete.")
+    else:
+        st.info("ℹ️ No generated files found. Nothing to clean up!")
+        st.markdown("Generated files will appear here after you:")
+        st.markdown("- 🔄 Process data")
+        st.markdown("- 🚀 Train models")
+        st.markdown("- 📊 Create visualizations")
 
 def process_data_streamlit():
     """Streamlit interface for data processing"""
@@ -547,6 +771,10 @@ def visualize_models():
                         st.metric("Final Validation R²", f"{metrics['val']['r2']:.4f}")
                         st.metric("Final Validation RMSE", f"{metrics['val']['rmse']:.4f}")
 
+            # Add 2D projection plot below the training history
+            st.subheader("2D Feature Space Projection")
+            plot_2d_projection(model_path, config['model_type'], config)
+
         with tab2:
             st.subheader("Model Analysis")
             X_test, y_test = load_test_data()
@@ -793,6 +1021,9 @@ def main():
     if st.sidebar.button("📊 Visualize Models", type="primary" if st.session_state.current_action == "📊 Visualize Models" else "secondary"):
         st.session_state.current_action = "📊 Visualize Models"
 
+    if st.sidebar.button("🧹 Cleanup Files", type="primary" if st.session_state.current_action == "🧹 Cleanup Files" else "secondary"):
+        st.session_state.current_action = "🧹 Cleanup Files"
+
     # Main content based on selected action
     if st.session_state.current_action == "🔄 Process Data":
         process_data_streamlit()
@@ -802,6 +1033,8 @@ def main():
         test_model_streamlit()
     elif st.session_state.current_action == "📊 Visualize Models":
         visualize_models()
+    elif st.session_state.current_action == "🧹 Cleanup Files":
+        cleanup_streamlit()
 
 if __name__ == "__main__":
     main()
