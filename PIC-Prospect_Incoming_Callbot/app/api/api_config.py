@@ -23,7 +23,7 @@ class ApiConfig:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         # Startup logic
-        logger = logging.getLogger(__name__)
+        logger = ApiConfig.configure_logging()
         logger.info("Application startup.")
 
         # Pre-populate TTS cache with welcome texts
@@ -150,10 +150,15 @@ class ApiConfig:
     @staticmethod
     def _setup_documentation_serving(app: FastAPI) -> None:
         """Setup documentation serving for both development and production"""
-        import os
         from pathlib import Path
 
-        logger = logging.getLogger(__name__)
+        logger = ApiConfig.configure_logging()
+
+        # Check if documentation serving is enabled
+        if not EnvHelper.get_serve_documentation():
+            logger.info("📚 Documentation serving disabled (SERVE_DOCUMENTATION=false)")
+            return
+
         project_root = Path(__file__).parent.parent.parent
         docs_site_path = project_root / "static" / "docs-site"
 

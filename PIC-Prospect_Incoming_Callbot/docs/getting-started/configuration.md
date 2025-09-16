@@ -13,7 +13,7 @@ ENVIRONMENT=development
 
 # Server configuration
 HOST=0.0.0.0
-PORT=8080
+PORT=8344
 ```
 
 ### Twilio Configuration

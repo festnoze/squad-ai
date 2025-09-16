@@ -39,7 +39,7 @@ class EnvVar:
 # Core application settings
 ENVIRONMENT = EnvVar.get_optional("ENVIRONMENT", "development")
 HOST = EnvVar.get_optional("HOST", "0.0.0.0")
-PORT = EnvVar.get_optional("PORT", 8080, int)
+PORT = EnvVar.get_optional("PORT", 8344, int)
 
 # Twilio configuration
 TWILIO_ACCOUNT_SID = EnvVar.get_required("TWILIO_ACCOUNT_SID")
@@ -313,7 +313,7 @@ class SalesforceConfig(BaseModel):
 class ApplicationConfig(BaseModel):
     environment: Literal["development", "production"] = "development"
     host: str = "0.0.0.0"
-    port: int = 8080
+    port: int = 8344
     debug: bool = False
     log_level: str = "INFO"
 
@@ -335,7 +335,7 @@ class ConfigLoader:
             config = ApplicationConfig(
                 environment=EnvVar.get_optional("ENVIRONMENT", "development"),
                 host=EnvVar.get_optional("HOST", "0.0.0.0"),
-                port=EnvVar.get_optional("PORT", 8080, int),
+                port=EnvVar.get_optional("PORT", 8344, int),
                 debug=EnvVar.get_boolean("DEBUG", False),
                 log_level=EnvVar.get_optional("LOG_LEVEL", "INFO"),
 

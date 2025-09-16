@@ -14,7 +14,7 @@ Before running the application, ensure you have:
 
 ### Using uvicorn (Recommended)
 ```bash
-uvicorn app.api.startup:app --reload --host 0.0.0.0 --port 8080
+uvicorn app.api.startup:app --reload --host 0.0.0.0 --port 8344
 ```
 
 ### Using Python module
@@ -49,7 +49,7 @@ Once the application is running, verify the services:
 
 ### Health Check
 ```bash
-curl http://localhost:8080/health
+curl http://localhost:8344/health
 ```
 
 Expected response:
@@ -63,8 +63,8 @@ Expected response:
 
 ### API Documentation
 Visit the interactive API documentation:
-- **Swagger UI**: http://localhost:8080/docs
-- **ReDoc**: http://localhost:8080/redoc
+- **Swagger UI**: http://localhost:8344/docs
+- **ReDoc**: http://localhost:8344/redoc
 
 ## Testing the Phone Integration
 
@@ -104,8 +104,8 @@ Monitor active WebSocket connections via the logs or health endpoints.
 
 ### Port Already in Use
 ```bash
-# Find process using port 8080
-lsof -i :8080
+# Find process using port 8344
+lsof -i :8344
 
 # Kill the process
 kill -9 <PID>

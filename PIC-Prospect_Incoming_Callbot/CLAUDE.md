@@ -14,12 +14,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `pylint app/` - Run pylint on the app directory (dev dependency)
 
 ### Running the Application
-- `uvicorn app.api.startup:app --reload` - Start the FastAPI development server
+- `uvicorn app.api.startup:app --reload --port 8344` - Start the FastAPI development server
 - `python -m app.api.startup` - Alternative way to start the application
+
+### Documentation
+- `mkdocs serve` - Start MkDocs documentation server (http://127.0.0.1:8000)
+- `python scripts/build_docs.py` - Build static documentation for production
+- `python scripts/build_docs.py --dev` - Start MkDocs serve on port 8001 alongside API
+- `python scripts/dev_with_docs.py` - Start both API and documentation servers simultaneously
 
 ### Docker
 - `docker_local_build_run.bat` - Build and run Docker container locally
 - `docker_gcp_deploy.bat` - Deploy to Google Cloud Platform
+
+**Note**: Both Docker files set `ENVIRONMENT=production` for consistent production behavior.
+To enable development features in Docker (like documentation serving), override with:
+```bash
+docker run -e ENVIRONMENT=development -e SERVE_DOCUMENTATION=true your-image
+```
 
 ## Architecture Overview
 

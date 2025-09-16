@@ -4,7 +4,10 @@
       "Bash(find:*)",
       "Bash(python:*)",
       "Bash(pylint:*)",
-      "Bash(mkdocs serve:*)"
+      "Bash(mkdocs serve:*)",
+      "Bash(PYTHONPATH=. python -c \"\nfrom app.api.startup import app\nimport logging\nlogging.basicConfig(level=logging.WARNING)\nprint(''✓ API loaded successfully with documentation support'')\n\")",
+      "Bash(echo:*)",
+      "Bash(curl:*)"
     ],
     "deny": [],
     "ask": []

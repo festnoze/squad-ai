@@ -31,7 +31,7 @@ export TWILIO_AUTH_TOKEN="your_twilio_auth_token"
 # ... other environment variables
 
 # Start development server
-uvicorn app.api.startup:app --reload --host 0.0.0.0 --port 8080
+uvicorn app.api.startup:app --reload --host 0.0.0.0 --port 8344
 
 # Alternative using Python module
 python -m app.api.startup
@@ -52,7 +52,7 @@ ENVIRONMENT=development
 DEBUG=true
 LOG_LEVEL=DEBUG
 HOST=0.0.0.0
-PORT=8080
+PORT=8344
 
 # Twilio configuration
 TWILIO_ACCOUNT_SID=your_twilio_account_sid
@@ -106,6 +106,12 @@ docker run -p 8080:8080 \
 
 # Run in detached mode
 docker run -d -p 8080:8080 --env-file .env --name callbot prospect-callbot
+
+# Override to development mode (enables features like documentation serving)
+docker run -p 8080:8080 \
+  -e ENVIRONMENT=development \
+  -e SERVE_DOCUMENTATION=true \
+  --env-file .env prospect-callbot
 ```
 
 **Container Management**:
@@ -410,7 +416,7 @@ kubectl scale deployment prospect-callbot --replicas=5
 
 ```bash
 # Production settings
-ENVIRONMENT=production
+ENVIRONMENT=production  # Set automatically in Docker files
 DEBUG=false
 LOG_LEVEL=INFO
 ALLOWED_HOSTS=your-domain.com,www.your-domain.com

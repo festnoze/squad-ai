@@ -559,7 +559,7 @@ class TestLoadTesting:
             """Create single WebSocket connection"""
             try:
                 async with session.ws_connect(
-                    "ws://localhost:8080/api/callbot/audio-stream"
+                    "ws://localhost:8344/api/callbot/audio-stream"
                 ) as ws:
                     # Send start message
                     await ws.send_str(json.dumps({
@@ -600,7 +600,7 @@ class TestLoadTesting:
         async def make_request(session):
             """Make single API request"""
             try:
-                async with session.get("http://localhost:8080/health") as response:
+                async with session.get("http://localhost:8344/health") as response:
                     return response.status == 200
             except Exception:
                 return False

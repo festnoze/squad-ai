@@ -141,13 +141,13 @@ async def audio_stream_websocket(websocket: WebSocket):
 **Usage Example**:
 ```bash
 # Get latest 50 log entries
-curl "http://localhost:8080/api/logs/latest?lines=50"
+curl "http://localhost:8344/api/logs/latest?lines=50"
 
 # Get only ERROR level logs
-curl "http://localhost:8080/api/logs/latest?level=ERROR"
+curl "http://localhost:8344/api/logs/latest?level=ERROR"
 
 # Get logs since specific timestamp
-curl "http://localhost:8080/api/logs/latest?since=2024-01-01T10:00:00Z"
+curl "http://localhost:8344/api/logs/latest?since=2024-01-01T10:00:00Z"
 ```
 
 ### Log Stream
@@ -171,7 +171,7 @@ curl "http://localhost:8080/api/logs/latest?since=2024-01-01T10:00:00Z"
 
 **Usage**:
 ```javascript
-const ws = new WebSocket('ws://localhost:8080/api/logs/stream');
+const ws = new WebSocket('ws://localhost:8344/api/logs/stream');
 ws.onmessage = function(event) {
     const logEntry = JSON.parse(event.data);
     console.log(`[${logEntry.level}] ${logEntry.message}`);
@@ -437,9 +437,9 @@ def validate_twilio_signature(request: Request) -> bool:
 
 ## OpenAPI Documentation
 
-**Swagger UI**: Available at `http://localhost:8080/docs`
-**ReDoc**: Available at `http://localhost:8080/redoc`
-**OpenAPI JSON**: Available at `http://localhost:8080/openapi.json`
+**Swagger UI**: Available at `http://localhost:8344/docs`
+**ReDoc**: Available at `http://localhost:8344/redoc`
+**OpenAPI JSON**: Available at `http://localhost:8344/openapi.json`
 
 The interactive documentation includes:
 - Endpoint descriptions and examples

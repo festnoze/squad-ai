@@ -351,6 +351,23 @@ class EnvHelper:
         value = EnvHelper.get_env_variable_value_by_name("REMOVE_LOGS_UPON_STARTUP", fails_if_missing=False)
         return value is not None and value.lower() == "true"
 
+    @staticmethod
+    def get_serve_documentation() -> bool:
+        """
+        Get whether to serve MkDocs documentation alongside the API.
+
+        Returns:
+            bool: True if documentation should be served at /docs-site/, False otherwise.
+                  Defaults to True for development, False for production.
+        """
+        value = EnvHelper.get_env_variable_value_by_name("SERVE_DOCUMENTATION", fails_if_missing=False)
+        if value is not None:
+            return value.lower() == "true"
+
+        # Default behavior: serve docs in development, not in production
+        environment = EnvHelper.get_env_variable_value_by_name("ENVIRONMENT", fails_if_missing=False) or "development"
+        return environment.lower() == "development"
+
     # Latency tracking configuration methods
     @staticmethod
     def get_latency_tracking_enabled() -> bool:

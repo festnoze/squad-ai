@@ -30,18 +30,18 @@ def build_docs():
             check=True
         )
 
-        print("✅ Documentation built successfully!")
-        print(f"   Output directory: {docs_output_dir}")
+        print("Documentation built successfully!")
+        print(f"Output directory: {docs_output_dir}")
         return True
 
     except subprocess.CalledProcessError as e:
-        print(f"❌ Error building documentation:")
-        print(f"   {e.stdout}")
-        print(f"   {e.stderr}")
+        print("X Error building documentation:")
+        print(f"  {e.stdout}")
+        print(f"  {e.stderr}")
         return False
     except FileNotFoundError:
-        print("❌ mkdocs command not found. Please install mkdocs:")
-        print("   pip install mkdocs mkdocs-material")
+        print("X mkdocs command not found. Please install mkdocs:")
+        print("  pip install mkdocs mkdocs-material")
         return False
 
 
@@ -54,11 +54,11 @@ def serve_docs_dev():
             ["mkdocs", "serve", "--dev-addr", "127.0.0.1:8001"],
             cwd=Path(__file__).parent.parent
         )
-        print("✅ MkDocs development server started on http://127.0.0.1:8001")
-        print("   Documentation available at: http://127.0.0.1:8001")
+        print("MkDocs development server started on http://127.0.0.1:8001")
+        print("Documentation available at: http://127.0.0.1:8001")
         return True
     except FileNotFoundError:
-        print("❌ mkdocs command not found.")
+        print("X mkdocs command not found.")
         return False
 
 
