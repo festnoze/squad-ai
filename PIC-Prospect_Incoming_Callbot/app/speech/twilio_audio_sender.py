@@ -116,9 +116,7 @@ class TwilioAudioSender:
             try:
                 for i in range(0, len(full_mulaw_audio), segment_size_mulaw):
                     if self.streaming_interruption_asked:
-                        self.logger.info(
-                            "~~ Streaming interruption asked by flag, stopping sending for this audio_chunk.~~"
-                        )
+                        self.logger.info("~~ Streaming interruption asked by flag, stopping sending for this audio_chunk.~~")
                         break
 
                     segment_mulaw = full_mulaw_audio[i : i + segment_size_mulaw]
@@ -138,21 +136,16 @@ class TwilioAudioSender:
                         await asyncio.sleep(delay_duration - 0.01)
 
                         if self.consecutive_errors > 0:
-                            self.logger.debug(
-                                f"Successfully sent a segment after {self.consecutive_errors} prior errors."
-                            )
+                            self.logger.debug(f"Successfully sent a segment after {self.consecutive_errors} prior errors.")
                             self.consecutive_errors = 0
 
                     except Exception as e:
                         self.consecutive_errors += 1
-                        self.logger.error(
-                            f"Error sending audio segment to Twilio: {e} (Consecutive error {self.consecutive_errors})"
-                        )
+                        self.logger.error(f"Error sending audio segment to Twilio: {e} (Consecutive error {self.consecutive_errors})")
                         if self.consecutive_errors >= self.max_consecutive_errors:
                             self.logger.critical(
                                 f"Max consecutive errors ({self.max_consecutive_errors}) reached while sending segment. "
-                                f"Stopping processing for current audio_chunk."
-                            )
+                                f"Stopping processing for current audio_chunk.")
                             break
                         break  # Stop processing this chunk on segment error for safety
 

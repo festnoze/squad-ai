@@ -1,0 +1,21 @@
+{
+  "model_type": "linear_regression",
+  "learning_rate": 0.001,
+  "epochs": 100,
+  "batch_size": 32,
+  "validation_patience": 10,
+  "n_estimators": 100,
+  "max_depth": null,
+  "min_samples_split": 2,
+  "min_samples_leaf": 1,
+  "hidden_layers": "64,32",
+  "dropout_rate": 0.2,
+  "activation": "relu",
+  "random_seed": 42,
+  "save_model": true,
+  "model_name": "wine_quality_model",
+  "verbose": true,
+  "data_path": "processed_data",
+  "model_path": "models",
+  "log_path": "logs"
+}

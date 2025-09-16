@@ -535,6 +535,7 @@ class AgentsGraph:
 
     async def anonymous_user_node(self, state: PhoneConversationState) -> PhoneConversationState:
         """For new user: Case not handled. Ask the user to call during the opening hours"""
+        await self.add_AI_response_message_to_conversation_async(TextRegistry.unavailability_for_new_prospect, state)
         await self.add_AI_response_message_to_conversation_async(TextRegistry.anonymous_prospect_message, state)
         return state
 

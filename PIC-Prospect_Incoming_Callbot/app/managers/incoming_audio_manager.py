@@ -259,7 +259,7 @@ class IncomingAudioManager(IncomingManager):
             updated_state = await self.agents_graph.ainvoke(current_state)
             self.stream_states[stream_sid] = updated_state
             self.agents_graph.consecutive_error_manager.reset_consecutive_error_count(current_state)
-
+            await self._hangup_upon_goodbye_async(updated_state)
         except Exception as e:
             self.logger.error(f"Error in initial graph invocation: {e}", exc_info=True)
 
@@ -480,13 +480,7 @@ class IncomingAudioManager(IncomingManager):
             updated_state = await self.agents_graph.ainvoke(current_state)
             self.stream_states[self.stream_sid] = updated_state
             self.agents_graph.consecutive_error_manager.reset_consecutive_error_count(updated_state)
-
-            # If the agents graph response ends with "au revoir.", do hang-up
-            if updated_state["history"][-1][1].lower().endswith("au revoir."):
-                self.logger.info(">>> Agents graph response ends with 'au revoir.', hanging up the call.")
-                while self.outgoing_manager.has_text_to_be_sent() or self.outgoing_manager.is_sending():
-                    await asyncio.sleep(0.3)
-                await self._hangup_call_async()
+            await self._hangup_upon_goodbye_async(updated_state)
 
         except Exception as e:
             self.logger.error(f"Error in user query to agents graph: {e}", exc_info=True)
@@ -501,6 +495,16 @@ class IncomingAudioManager(IncomingManager):
                     self.logger.warning(">>> Agents graph error - Max consecutive errors reached. Sent technical difficulties message.")
                     # Reset error count after handling
                     self.agents_graph.consecutive_error_manager.reset_consecutive_error_count(current_state)
+
+    async def _hangup_upon_goodbye_async(self, updated_state):
+        """If the agents graph state ends with "au revoir.", do hang-up"""
+        if updated_state["history"][-1][1].lower().endswith("au revoir."):
+            self.logger.info(">>> Agents graph response ends with 'au revoir.', hanging up the call.")
+            for _ in range(3): # Check 3 times that no text has to be sent before hanging up
+                while self.outgoing_manager.has_text_to_be_sent() or self.outgoing_manager.is_sending():
+                    await asyncio.sleep(0.3)
+                await asyncio.sleep(0.1)
+            await self._hangup_call_async()
 
     def _perform_background_noise_calibration(
         self,
