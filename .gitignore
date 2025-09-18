@@ -5,6 +5,8 @@ exchanges/
 node_modules/
 supabase/
 docs-site/
+processed_data/
+data/
 
 *.egg-info/
 *.save*/

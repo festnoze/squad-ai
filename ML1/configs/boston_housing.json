@@ -1,0 +1,17 @@
+{
+  "name": "Boston Housing Price Dataset",
+  "loader_type": "csv",
+  "files": [
+    {
+      "path": "data/boston_housing.csv"
+    }
+  ],
+  "target_column": "medv",
+  "separator": ",",
+  "test_size": 0.2,
+  "val_size": 0.5,
+  "random_state": 42,
+  "scale_features": true,
+  "exclude_columns": [],
+  "feature_engineering": {}
+}

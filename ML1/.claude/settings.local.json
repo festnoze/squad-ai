@@ -1,7 +1,20 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(.venvScriptsactivate)",
+      "Bash(.venvScriptsactivate.bat)",
+      "Bash(source:*)",
+      "Bash(export DATASET_CONFIG=configs/wine_quality.json MODEL_TYPE=random_forest)",
+      "Bash(uv add:*)",
+      "Bash(timeout:*)",
+      "Bash(export DATASET_CONFIG=configs/mnist.json TASK_TYPE=classification NUM_CLASSES=10 MODEL_TYPE=linear_regression EPOCHS=5)",
+      "Bash(export DATASET_CONFIG=configs/mnist.json TASK_TYPE=classification NUM_CLASSES=10 MODEL_TYPE=linear_regression)",
+      "Bash(export DATASET_CONFIG=configs/mnist.json TASK_TYPE=classification NUM_CLASSES=10 MODEL_TYPE=neural_network HIDDEN_LAYERS=512,256,128 DROPOUT_RATE=0.3 LEARNING_RATE=0.001 BATCH_SIZE=128 EPOCHS=20)",
+      "Bash(export DATASET_CONFIG=configs/mnist.json TASK_TYPE=classification NUM_CLASSES=10 MODEL_TYPE=neural_network HIDDEN_LAYERS=512,256,128 DROPOUT_RATE=0.3 LEARNING_RATE=0.001 BATCH_SIZE=128 EPOCHS=15)",
+      "Bash(export DATASET_CONFIG=configs/mnist.json TASK_TYPE=classification NUM_CLASSES=10 MODEL_TYPE=neural_network HIDDEN_LAYERS=256,128 DROPOUT_RATE=0.2 LEARNING_RATE=0.001 BATCH_SIZE=256 EPOCHS=5)",
+      "Bash(\".venv\\Scripts\\activate\")",
+      "Bash(uv run streamlit run:*)"
     ],
     "deny": [],
     "ask": []

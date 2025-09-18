@@ -1,0 +1,32 @@
+{
+  "name": "MNIST Handwritten Digit Classification",
+  "loader_type": "mnist",
+  "files": [
+    {
+      "path": "data/MNIST"
+    }
+  ],
+  "target_column": "digit",
+  "task_type": "classification",
+  "num_classes": 10,
+  "test_size": 0.0,
+  "val_size": 0.2,
+  "random_state": 42,
+  "scale_features": false,
+  "exclude_columns": [],
+  "feature_engineering": {},
+  "recommended_hyperparameters": {
+    "neural_network": {
+      "hidden_layers": "512,256,128",
+      "dropout_rate": 0.3,
+      "learning_rate": 0.001,
+      "batch_size": 128,
+      "epochs": 50,
+      "activation": "relu"
+    },
+    "random_forest": {
+      "n_estimators": 200,
+      "max_depth": 20
+    }
+  }
+}

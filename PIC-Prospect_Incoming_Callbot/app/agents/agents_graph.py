@@ -471,15 +471,16 @@ class AgentsGraph:
             self.logger.warning(f"No phone number found for call SID: {call_sid}")
             return state
 
-        # Use the new aggregated method that links through opportunities to find the most relevant user
+        # Try (and retry) to retrieve SalesForce prospect account with its associated CF owner, by opportunity or direct link
         complete_contact_info = await self.salesforce_api_client.get_complete_contact_info_by_phone_async(phone_number)
 
-        # Single retry upon failure to retrieve SalesForce account
+        # Retry upon failure to retrieve SalesForce account
         if not complete_contact_info:
             self.logger.info(f"[{call_sid}] No SalesForce account found for phone number: {phone_number}. Retry once to retrieve.")
             complete_contact_info = await self.salesforce_api_client.get_complete_contact_info_by_phone_async(phone_number)
             if not complete_contact_info:
                 self.logger.warning(f"[{call_sid}] No SalesForce account found after retry for phone number: {phone_number}. New user: needs creation.")
+                state.get("agent_scratchpad", {})["next_agent_needed"] = "user_new"
                 return state
 
         # Keep the leads info call for backward compatibility (though the new method includes this logic)
@@ -531,6 +532,7 @@ class AgentsGraph:
     async def user_new_node(self, state: PhoneConversationState) -> PhoneConversationState:
         """For new user: Case not handled. Ask the user to call during the opening hours"""
         await self.add_AI_response_message_to_conversation_async(TextRegistry.unavailability_for_new_prospect, state)
+        await self.add_AI_response_message_to_conversation_async(TextRegistry.new_prospect_message, state)
         return state
 
     async def anonymous_user_node(self, state: PhoneConversationState) -> PhoneConversationState:

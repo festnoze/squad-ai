@@ -1,0 +1,17 @@
+{
+  "name": "Iris Classification Dataset",
+  "loader_type": "csv",
+  "files": [
+    {
+      "path": "data/iris.csv"
+    }
+  ],
+  "target_column": "species",
+  "separator": ",",
+  "test_size": 0.2,
+  "val_size": 0.5,
+  "random_state": 42,
+  "scale_features": true,
+  "exclude_columns": [],
+  "feature_engineering": {}
+}

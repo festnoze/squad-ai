@@ -11,8 +11,8 @@ import os
 import pickle
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from sklearn.decomposition import PCA
-from src.preprocess_data import load_and_preprocess_wine_data
-from src.train_model import WineQualityTrainer
+from src.preprocess_data import load_and_preprocess_wine_data, load_and_preprocess_data
+from src.train_model import MLTrainer
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -20,8 +20,8 @@ from torch.utils.data import DataLoader, TensorDataset
 import time
 
 st.set_page_config(
-    page_title="🍷 Wine Quality ML Pipeline",
-    page_icon="🍷",
+    page_title="🤖 ML Pipeline Dashboard",
+    page_icon="🤖",
     layout="wide"
 )
 
@@ -501,17 +501,70 @@ def cleanup_streamlit():
         st.markdown("- 🚀 Train models")
         st.markdown("- 📊 Create visualizations")
 
+def get_available_datasets():
+    """Get list of available dataset configurations"""
+    datasets = {}
+    configs_dir = 'configs'
+
+    if os.path.exists(configs_dir):
+        for file in os.listdir(configs_dir):
+            if file.endswith('.json'):
+                config_path = os.path.join(configs_dir, file)
+                try:
+                    with open(config_path, 'r') as f:
+                        config = json.load(f)
+                    datasets[file.replace('.json', '')] = {
+                        'name': config.get('name', file.replace('.json', '')),
+                        'config_path': config_path,
+                        'task_type': config.get('task_type', 'regression'),
+                        'num_classes': config.get('num_classes', 1)
+                    }
+                except:
+                    continue
+
+    return datasets
+
 def process_data_streamlit():
     """Streamlit interface for data processing"""
     st.header("🔄 Data Processing")
+    st.markdown("Select and process datasets for training.")
 
-    st.markdown("Process and prepare wine quality datasets for training.")
+    # Dataset selection
+    datasets = get_available_datasets()
+
+    if not datasets:
+        st.error("No dataset configurations found in 'configs/' directory!")
+        return
+
+    # Dataset selector
+    dataset_names = list(datasets.keys())
+    selected_dataset = st.selectbox(
+        "📊 Select Dataset",
+        dataset_names,
+        help="Choose which dataset to process"
+    )
+
+    # Show dataset info
+    if selected_dataset:
+        dataset_info = datasets[selected_dataset]
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.info(f"**Dataset**: {dataset_info['name']}")
+        with col2:
+            st.info(f"**Task**: {dataset_info['task_type'].title()}")
+        with col3:
+            if dataset_info['task_type'] == 'classification':
+                st.info(f"**Classes**: {dataset_info['num_classes']}")
+            else:
+                st.info(f"**Type**: Regression")
 
     if st.button("Process Data", type="primary"):
-        with st.spinner("Processing data..."):
+        with st.spinner(f"Processing {dataset_info['name']}..."):
             try:
-                # Run preprocessing
-                X_train, X_val, X_test, y_train, y_val, y_test, scaler = load_and_preprocess_wine_data()
+                # Run preprocessing with selected dataset
+                X_train, X_val, X_test, y_train, y_val, y_test, scaler = load_and_preprocess_data(
+                    dataset_info['config_path']
+                )
 
                 # Save preprocessed data
                 os.makedirs('processed_data', exist_ok=True)
@@ -522,7 +575,17 @@ def process_data_streamlit():
                 y_val.to_csv('processed_data/y_val.csv', index=False)
                 y_test.to_csv('processed_data/y_test.csv', index=False)
 
-                st.success("✅ Data processing completed!")
+                # Save dataset info for training
+                dataset_meta = {
+                    'dataset_name': selected_dataset,
+                    'config_path': dataset_info['config_path'],
+                    'task_type': dataset_info['task_type'],
+                    'num_classes': dataset_info['num_classes']
+                }
+                with open('processed_data/dataset_meta.json', 'w') as f:
+                    json.dump(dataset_meta, f)
+
+                st.success(f"✅ {dataset_info['name']} processing completed!")
 
                 # Show data info
                 col1, col2, col3 = st.columns(3)
@@ -557,6 +620,22 @@ def train_model_streamlit():
         st.error("❌ Processed data not found!")
         st.info("Please process data first using the 'Process Data' action.")
         return
+
+    # Load dataset metadata
+    dataset_meta = {}
+    try:
+        with open('processed_data/dataset_meta.json', 'r') as f:
+            dataset_meta = json.load(f)
+    except:
+        st.warning("⚠️ Dataset metadata not found. Using defaults.")
+        dataset_meta = {
+            'dataset_name': 'unknown',
+            'task_type': 'regression',
+            'num_classes': 1
+        }
+
+    # Show current dataset info
+    st.info(f"🗂️ **Current Dataset**: {dataset_meta.get('dataset_name', 'Unknown')} ({dataset_meta.get('task_type', 'regression').title()})")
 
     st.markdown("Configure and train your ML model.")
 
@@ -601,6 +680,12 @@ def train_model_streamlit():
         # Update environment variables temporarily
         os.environ['MODEL_TYPE'] = model_type
         os.environ['MODEL_NAME'] = model_name
+        os.environ['TASK_TYPE'] = dataset_meta.get('task_type', 'regression')
+        os.environ['NUM_CLASSES'] = str(dataset_meta.get('num_classes', 1))
+
+        # Set dataset config if available
+        if 'config_path' in dataset_meta:
+            os.environ['DATASET_CONFIG'] = dataset_meta['config_path']
 
         if model_type == "random_forest":
             os.environ['N_ESTIMATORS'] = str(n_estimators)
@@ -623,7 +708,7 @@ def train_model_streamlit():
                 loss_chart_container = st.empty()
 
                 # Initialize trainer
-                trainer = WineQualityTrainer()
+                trainer = MLTrainer()
 
                 # Train with live updates
                 model, metrics = train_neural_network_with_progress(
@@ -633,7 +718,7 @@ def train_model_streamlit():
             else:
                 # Regular training for sklearn models
                 with st.spinner(f"Training {model_type} model..."):
-                    trainer = WineQualityTrainer()
+                    trainer = MLTrainer()
                     model, metrics = trainer.train()
 
             st.success("✅ Training completed!")
@@ -850,36 +935,50 @@ def train_neural_network_with_progress(trainer, progress_bar, epoch_status, metr
         'dropout_rate': trainer.config['dropout_rate'],
         'activation': trainer.config['activation'],
         'random_seed': trainer.config['random_seed'],
-        'input_size': X_train.shape[1]
+        'input_size': X_train.shape[1],
+        'task_type': trainer.config['task_type'],
+        'num_classes': trainer.config['num_classes']
     }
 
     model = ModelFactory.create_model('neural_network', **model_kwargs)
 
-    # Convert to tensors
+    # Convert to tensors based on task type
     X_train_tensor = torch.FloatTensor(X_train.values)
-    y_train_tensor = torch.FloatTensor(y_train.values.reshape(-1, 1))
     X_val_tensor = torch.FloatTensor(X_val.values)
-    y_val_tensor = torch.FloatTensor(y_val.values.reshape(-1, 1))
+
+    if trainer.config['task_type'] == 'classification':
+        y_train_tensor = torch.LongTensor(y_train.values)
+        y_val_tensor = torch.LongTensor(y_val.values)
+        criterion = nn.CrossEntropyLoss()
+    else:
+        y_train_tensor = torch.FloatTensor(y_train.values.reshape(-1, 1))
+        y_val_tensor = torch.FloatTensor(y_val.values.reshape(-1, 1))
+        criterion = nn.MSELoss()
 
     # Create data loaders
     train_dataset = TensorDataset(X_train_tensor, y_train_tensor)
     train_loader = DataLoader(train_dataset, batch_size=trainer.config['batch_size'], shuffle=True)
 
     # Setup training
-    criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=trainer.config['learning_rate'])
 
     # Training loop with live updates
     best_val_loss = float('inf')
+    best_val_acc = 0.0
     patience_counter = 0
     train_losses = []
     val_losses = []
+    train_accuracies = []
+    val_accuracies = []
     epochs_completed = 0
 
     for epoch in range(trainer.config['epochs']):
         # Training
         model.train()
         epoch_train_loss = 0
+        correct_train = 0
+        total_train = 0
+
         for batch_X, batch_y in train_loader:
             optimizer.zero_grad()
             outputs = model(batch_X)
@@ -888,8 +987,18 @@ def train_neural_network_with_progress(trainer, progress_bar, epoch_status, metr
             optimizer.step()
             epoch_train_loss += loss.item()
 
+            # Calculate training accuracy for classification
+            if trainer.config['task_type'] == 'classification':
+                _, predicted = torch.max(outputs.data, 1)
+                total_train += batch_y.size(0)
+                correct_train += (predicted == batch_y).sum().item()
+
         avg_train_loss = epoch_train_loss / len(train_loader)
         train_losses.append(avg_train_loss)
+
+        if trainer.config['task_type'] == 'classification':
+            train_accuracy = correct_train / total_train
+            train_accuracies.append(train_accuracy)
 
         # Validation
         model.eval()
@@ -898,6 +1007,13 @@ def train_neural_network_with_progress(trainer, progress_bar, epoch_status, metr
             val_loss = criterion(val_outputs, y_val_tensor).item()
             val_losses.append(val_loss)
 
+            # Calculate validation accuracy for classification
+            val_accuracy = 0.0
+            if trainer.config['task_type'] == 'classification':
+                _, val_predicted = torch.max(val_outputs, 1)
+                val_accuracy = (val_predicted == y_val_tensor).float().mean().item()
+                val_accuracies.append(val_accuracy)
+
         epochs_completed = epoch + 1
 
         # Update progress bar
@@ -905,46 +1021,98 @@ def train_neural_network_with_progress(trainer, progress_bar, epoch_status, metr
         progress_bar.progress(progress)
 
         # Update epoch status
-        epoch_status.write(f"**Epoch {epochs_completed}/{trainer.config['epochs']}** - Train Loss: {avg_train_loss:.4f}, Val Loss: {val_loss:.4f}")
+        if trainer.config['task_type'] == 'classification':
+            epoch_status.write(f"**Epoch {epochs_completed}/{trainer.config['epochs']}** - Train Loss: {avg_train_loss:.4f}, Val Loss: {val_loss:.4f}, Train Acc: {train_accuracy:.4f}, Val Acc: {val_accuracy:.4f}")
+        else:
+            epoch_status.write(f"**Epoch {epochs_completed}/{trainer.config['epochs']}** - Train Loss: {avg_train_loss:.4f}, Val Loss: {val_loss:.4f}")
 
         # Update metrics
         with metrics_container.container():
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric("Current Epoch", epochs_completed)
-            with col2:
-                st.metric("Train Loss", f"{avg_train_loss:.4f}")
-            with col3:
-                st.metric("Val Loss", f"{val_loss:.4f}")
+            if trainer.config['task_type'] == 'classification':
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("Current Epoch", epochs_completed)
+                with col2:
+                    st.metric("Train Loss", f"{avg_train_loss:.4f}")
+                with col3:
+                    st.metric("Val Loss", f"{val_loss:.4f}")
+                with col4:
+                    st.metric("Val Accuracy", f"{val_accuracy:.4f}")
+            else:
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Current Epoch", epochs_completed)
+                with col2:
+                    st.metric("Train Loss", f"{avg_train_loss:.4f}")
+                with col3:
+                    st.metric("Val Loss", f"{val_loss:.4f}")
 
-        # Update loss chart every 5 epochs or on last epoch
+        # Update charts every 5 epochs or on last epoch
         if epochs_completed % 5 == 0 or epochs_completed == trainer.config['epochs']:
             with loss_chart_container.container():
-                fig = go.Figure()
                 epochs_range = list(range(1, len(train_losses) + 1))
 
-                fig.add_trace(go.Scatter(
-                    x=epochs_range,
-                    y=train_losses,
-                    mode='lines',
-                    name='Training Loss',
-                    line=dict(color='blue')
-                ))
+                if trainer.config['task_type'] == 'classification':
+                    # Create subplots for loss and accuracy
+                    fig = make_subplots(
+                        rows=2, cols=1,
+                        subplot_titles=('Loss Over Time', 'Accuracy Over Time'),
+                        vertical_spacing=0.1
+                    )
 
-                fig.add_trace(go.Scatter(
-                    x=epochs_range,
-                    y=val_losses,
-                    mode='lines',
-                    name='Validation Loss',
-                    line=dict(color='red')
-                ))
+                    # Loss traces
+                    fig.add_trace(go.Scatter(
+                        x=epochs_range, y=train_losses,
+                        mode='lines', name='Training Loss',
+                        line=dict(color='blue')
+                    ), row=1, col=1)
 
-                fig.update_layout(
-                    title='Training Progress (Live)',
-                    xaxis_title='Epoch',
-                    yaxis_title='Loss',
-                    height=400
-                )
+                    fig.add_trace(go.Scatter(
+                        x=epochs_range, y=val_losses,
+                        mode='lines', name='Validation Loss',
+                        line=dict(color='red')
+                    ), row=1, col=1)
+
+                    # Accuracy traces
+                    fig.add_trace(go.Scatter(
+                        x=epochs_range, y=train_accuracies,
+                        mode='lines', name='Training Accuracy',
+                        line=dict(color='lightblue')
+                    ), row=2, col=1)
+
+                    fig.add_trace(go.Scatter(
+                        x=epochs_range, y=val_accuracies,
+                        mode='lines', name='Validation Accuracy',
+                        line=dict(color='orange')
+                    ), row=2, col=1)
+
+                    fig.update_layout(height=600, title_text="Training Progress (Live)")
+                    fig.update_xaxes(title_text="Epoch", row=2, col=1)
+                    fig.update_yaxes(title_text="Loss", row=1, col=1)
+                    fig.update_yaxes(title_text="Accuracy", row=2, col=1)
+
+                else:
+                    # Single plot for regression
+                    fig = go.Figure()
+
+                    fig.add_trace(go.Scatter(
+                        x=epochs_range, y=train_losses,
+                        mode='lines', name='Training Loss',
+                        line=dict(color='blue')
+                    ))
+
+                    fig.add_trace(go.Scatter(
+                        x=epochs_range, y=val_losses,
+                        mode='lines', name='Validation Loss',
+                        line=dict(color='red')
+                    ))
+
+                    fig.update_layout(
+                        title='Training Progress (Live)',
+                        xaxis_title='Epoch',
+                        yaxis_title='Loss',
+                        height=400
+                    )
 
                 st.plotly_chart(fig, use_container_width=True)
 
@@ -969,8 +1137,19 @@ def train_neural_network_with_progress(trainer, progress_bar, epoch_status, metr
     # Final evaluation
     model.eval()
     with torch.no_grad():
-        y_train_pred = model(X_train_tensor).numpy().flatten()
-        y_val_pred = model(X_val_tensor).numpy().flatten()
+        train_outputs = model(X_train_tensor)
+        val_outputs = model(X_val_tensor)
+
+        if trainer.config['task_type'] == 'classification':
+            # For classification, get predicted classes
+            _, y_train_pred = torch.max(train_outputs, 1)
+            _, y_val_pred = torch.max(val_outputs, 1)
+            y_train_pred = y_train_pred.numpy()
+            y_val_pred = y_val_pred.numpy()
+        else:
+            # For regression, use direct outputs
+            y_train_pred = train_outputs.numpy().flatten()
+            y_val_pred = val_outputs.numpy().flatten()
 
     train_metrics = trainer.evaluate_model(y_train, y_train_pred, "Training")
     val_metrics = trainer.evaluate_model(y_val, y_val_pred, "Validation")
@@ -978,7 +1157,13 @@ def train_neural_network_with_progress(trainer, progress_bar, epoch_status, metr
     # Test evaluation
     with torch.no_grad():
         X_test_tensor = torch.FloatTensor(X_test.values)
-        y_test_pred = model(X_test_tensor).numpy().flatten()
+        test_outputs = model(X_test_tensor)
+
+        if trainer.config['task_type'] == 'classification':
+            _, y_test_pred = torch.max(test_outputs, 1)
+            y_test_pred = y_test_pred.numpy()
+        else:
+            y_test_pred = test_outputs.numpy().flatten()
 
     test_metrics = trainer.evaluate_model(y_test, y_test_pred, "Test")
 
@@ -997,8 +1182,8 @@ def train_neural_network_with_progress(trainer, progress_bar, epoch_status, metr
     return model, metrics
 
 def main():
-    st.title("🍷 Wine Quality ML Pipeline")
-    st.markdown("Complete machine learning pipeline for wine quality prediction")
+    st.title("🤖 ML Pipeline - Multi-Dataset Support")
+    st.markdown("Complete machine learning pipeline supporting multiple datasets (Wine Quality, MNIST, and more)")
 
     # Sidebar for action selection
     st.sidebar.title("🎯 Actions")
