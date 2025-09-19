@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from functools import wraps
 
@@ -16,9 +17,7 @@ def api_key_required(func):
         # Check API key authorization
         api_key = request.headers.get("X-API-Key") or request.query_params.get("api_key")
         if not api_key:
-            raise HTTPException(
-                status_code=401, detail="API key required. Provide via X-API-Key header or api_key query parameter"
-            )
+            raise HTTPException(status_code=401, detail="API key required. Provide via X-API-Key header or api_key query parameter")
 
         if not EnvHelper.is_valid_admin_api_key(api_key):
             logger.warning(f"Invalid API key attempt: {api_key[:8]}...")
@@ -30,6 +29,10 @@ def api_key_required(func):
             request._query_params = query_params_but_api_key
 
         logger.info(f"Authorized API access with key: {api_key[:8]}...")
-        return await func(request, *args, **kwargs)
+
+        if asyncio.iscoroutinefunction(func):
+            return await func(request, *args, **kwargs)
+        else:
+            return func(request, *args, **kwargs)
 
     return wrapper

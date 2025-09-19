@@ -93,9 +93,7 @@ class PhoneCallWebsocketEventsHandler:
             os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = self.google_credentials_absolute_path
             self.logger.info(f"Set GOOGLE_APPLICATION_CREDENTIALS to: {self.google_credentials_absolute_path}")
         else:
-            self.logger.error(
-                f"/!\\ Google calendar credentials file not found at {self.google_credentials_absolute_path}"
-            )
+            self.logger.error(f"/!\\ Google calendar credentials file not found at {self.google_credentials_absolute_path}")
 
         # Initialize dependencies
         tts_provider_name = EnvHelper.get_text_to_speech_provider()
@@ -378,18 +376,18 @@ class PhoneCallWebsocketEventsHandler:
 
 
 class PhoneCallWebsocketEventsHandlerFactory:
-    websocket_events_handler_instance: PhoneCallWebsocketEventsHandler = None
+    websocket_events_handler_instance: PhoneCallWebsocketEventsHandler | None = None
 
     def __init__(self):
         self.build_new_phone_call_websocket_events_handler()
 
-    def build_new_phone_call_websocket_events_handler(self, websocket: WebSocket = None, provider: PhoneProvider = None):
+    def build_new_phone_call_websocket_events_handler(self, websocket: WebSocket | None = None, provider: PhoneProvider | None = None):
         if not self.websocket_events_handler_instance:
             self.websocket_events_handler_instance = PhoneCallWebsocketEventsHandler(websocket=websocket, provider=provider)
 
-    def get_new_phone_call_websocket_events_handler(self, websocket: WebSocket, provider: PhoneProvider = None):
+    def get_new_phone_call_websocket_events_handler(self, websocket: WebSocket | None = None, provider: PhoneProvider | None = None):
         self.build_new_phone_call_websocket_events_handler(provider=provider)
-        websocket_events_handler_to_return = self.websocket_events_handler_instance
+        websocket_events_handler_to_return: PhoneCallWebsocketEventsHandler = self.websocket_events_handler_instance
         # Set the websocket for the handler
         websocket_events_handler_to_return.set_websocket(websocket)
         self.websocket_events_handler_instance = None
