@@ -10,7 +10,7 @@ class TextRegistry:
     unavailability_for_new_prospect = "Nos conseillers en formation sont actuellement indisponibles."
     anonymous_prospect_message = "Nous sommes désolés, mais nous n'avons pas accès à votre numéro de téléphone et ne pouvons pas vous proposer de rendez-vous. Merci de nous recontacter durant les heures ouvrées, du lundi au vendredi, de 9 heures à 18 heures. Au revoir."
     new_prospect_message = "Merci de nous recontacter durant les heures ouvrées, du lundi au vendredi, de 9 heures à 18 heures. Au revoir."
-    ask_to_repeat_text = "Désolé, je n'ai pas bien entendu. Merci de répéter."
+    ask_to_repeat_text = "Désolé, je n'ai pas bien entendu, merci de répéter."
     # thanks_to_come_back = "Merci de nous recontacter "
     appointment_text = "Je vous propose de prendre rendez-vous avec lui."
     questions_text = "Je peux répondre à vos questions concernant nos formations."

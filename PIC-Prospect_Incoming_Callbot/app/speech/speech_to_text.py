@@ -28,7 +28,7 @@ class GoogleSTTProvider(SpeechToTextProvider):
 
         self.speech = speech
         self.logger = logging.getLogger(__name__)
-        self.google_client = self.speech.SpeechClient()
+        self.google_async_client = self.speech.SpeechAsyncClient()
         self.language_code = language_code
         self.frame_rate = frame_rate
         self.temp_dir = temp_dir
@@ -37,14 +37,15 @@ class GoogleSTTProvider(SpeechToTextProvider):
     async def transcribe_audio_async(self, file_name: str, call_sid: str = None, stream_sid: str = None, phone_number: str = None) -> str:
         """Transcribe audio file using Google STT API."""
         try:
-            return GoogleSTTProvider.transcribe_audio_static(self.temp_dir, self.speech, self.google_client, file_name, self.language_code, self.frame_rate)
+            return await GoogleSTTProvider.transcribe_audio_static_async(self.temp_dir, self.speech, self.google_async_client, file_name, self.language_code, self.frame_rate)
         except Exception as e:
             self.logger.error(f"Error transcribing audio with Google: {e}", exc_info=True)
             return ""
 
     @staticmethod
-    def transcribe_audio_static(temp_dir: str, speech: any, client: any, file_name: str, language_code: str, frame_rate: int) -> str:
-        """Transcribe audio file using Google Cloud Speech-to-Text API."""
+    async def transcribe_audio_static_async(temp_dir: str, speech: any, async_client: any, file_name: str, language_code: str, frame_rate: int) -> str:
+        """Transcribe audio file using Google Cloud Speech-to-Text API asynchronously."""
+        import os
 
         with open(os.path.join(temp_dir, file_name), "rb") as audio_file:
             content = audio_file.read()
@@ -55,10 +56,11 @@ class GoogleSTTProvider(SpeechToTextProvider):
             sample_rate_hertz=frame_rate,
             language_code=language_code,
             use_enhanced=True,
-            model="phone_call",  # Specialized model for phone audio
+            model="phone_call",
         )
 
-        response = client.recognize(config=config, audio=audio)
+        # Use the native async recognize method
+        response = await async_client.recognize(config=config, audio=audio)
 
         transcript = ""
         for result in response.results:
@@ -133,7 +135,7 @@ class HybridSTTProvider(SpeechToTextProvider):
     async def transcribe_audio_static_async(openai_client: AsyncOpenAI, speech: any, client: any, temp_dir: str, file_name: str, language_code: str, frame_rate: int) -> str:
         """Transcribe audio file using OpenAI STT API, fallback to Google Cloud Speech-to-Text API."""
         # Try Google transcription first
-        transcript = GoogleSTTProvider.transcribe_audio_static(temp_dir, speech, client, file_name, language_code, frame_rate)
+        transcript = await GoogleSTTProvider.transcribe_audio_static_async(temp_dir, speech, client, file_name, language_code, frame_rate)
         if transcript:
             return transcript
 

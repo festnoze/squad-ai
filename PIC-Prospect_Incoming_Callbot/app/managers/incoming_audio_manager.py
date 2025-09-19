@@ -11,6 +11,7 @@ import wave
 import webrtcvad
 #
 from agents.agents_graph import AgentsGraph
+from typing import cast
 from agents.phone_conversation_state_model import ConversationState, PhoneConversationState
 from agents.text_registry import TextRegistry
 from api_client.conversation_persistence_interface import ConversationPersistenceInterface
@@ -62,24 +63,16 @@ class IncomingAudioManager(IncomingManager):
         self.websocket_creation_time = None
         self.stream_states: dict[str, PhoneConversationState] = {}
         self.phones_by_call_sid = {}  # Map call_sid to phone numbers
-        self.average_noise_by_stream_sid: dict[
-            str, int
-        ] = {}  # List already etalonnated stream_sid
-        self.speech_to_noise_ratio_samples_by_stream_sid: dict[
-            str, list[int]
-        ] = {}  # Map stream_sid with noise calibration data
+        self.average_noise_by_stream_sid: dict[str, int] = {}  # List already etalonnated stream_sid
+        self.speech_to_noise_ratio_samples_by_stream_sid: dict[str, list[int]] = {}  # Map stream_sid with noise calibration data
         self.agents_graph: AgentsGraph = agents_graph
         self.openai_client = None
         self.rag_interrupt_flag: dict = {"interrupted": False}
         self.is_speaking: bool = False
         self.interuption_asked: bool = False
         self.removed_text_to_speak: str | None = None
-        self.speak_anew_on_long_silence: bool = (
-            EnvHelper.get_speak_anew_on_long_silence()
-        )
-        self.max_silence_duration_before_reasking: int = (
-            EnvHelper.get_max_silence_duration_before_reasking()
-        )  # ms of silence before reasking
+        self.speak_anew_on_long_silence: bool = EnvHelper.get_speak_anew_on_long_silence()
+        self.max_silence_duration_before_reasking: int = EnvHelper.get_max_silence_duration_before_reasking()
 
         # Audio processing parameters
         self.audio_buffer: bytes = b""
@@ -146,11 +139,7 @@ class IncomingAudioManager(IncomingManager):
             frame_duration_ms = 20
 
         # Calculate frame size and ensure audio chunk is the right length
-        frame_size = (
-            int(self.frame_rate * frame_duration_ms / 1000)
-            * self.sample_width
-            * self.channels
-        )
+        frame_size = int(self.frame_rate * frame_duration_ms / 1000) * self.sample_width * self.channels
 
         # If chunk is too small, return False
         if len(audio_chunk) < frame_size:
@@ -163,8 +152,8 @@ class IncomingAudioManager(IncomingManager):
         try:
             return self.vad.is_speech(audio_chunk, self.frame_rate)
         except Exception as e:
-            self.logger.error(f"/!\\ VAD error: {e}")
             # Fallback to RMS-based detection
+            self.logger.error(f"/!\\ VAD error: {e}")
             rms = audioop.rms(audio_chunk, self.sample_width)
             return rms > self.speech_threshold  # Default threshold
 
@@ -411,9 +400,7 @@ class IncomingAudioManager(IncomingManager):
 
             # Check if max errors reached
             if self.agents_graph.consecutive_error_manager.is_max_consecutive_errors_reached(current_state):
-                await self.outgoing_manager.enqueue_text_async(TextRegistry.max_consecutive_errors_text)
-                self.logger.warning(">>> Empty transcript - Max consecutive errors reached. Sent technical difficulties message.")
-                self.agents_graph.consecutive_error_manager.reset_consecutive_error_count(current_state)
+                await self._handle_max_consecutive_errors_async(current_state, "Empty transcript")
             else:
                 if self.removed_text_to_speak:
                     await self.outgoing_manager.enqueue_text_async(self.removed_text_to_speak)
@@ -427,6 +414,8 @@ class IncomingAudioManager(IncomingManager):
             self.logger.error(f"Error handling empty transcript: {e}", exc_info=True)
             # Fallback to simple handling if error tracking fails
             await self.outgoing_manager.enqueue_text_async(TextRegistry.ask_to_repeat_text)
+        finally:
+            await self._hangup_upon_goodbye_async(current_state)
 
     async def send_user_query_to_agents_graph_async(self, user_query: str, user_query_audio_filename: str | None = None):
         try:
@@ -449,16 +438,7 @@ class IncomingAudioManager(IncomingManager):
             conv_id = current_state["agent_scratchpad"].get("conversation_id", None)
             if not conv_id:
                 self.logger.error("/!\\ Conversation id not found in current state")
-                # Missing conversation ID is a system error - increment counter
-                self.agents_graph.consecutive_error_manager.increment_consecutive_error_count(current_state)
-
-                # Check if max errors reached
-                if self.agents_graph.consecutive_error_manager.is_max_consecutive_errors_reached(current_state):
-                    await self.outgoing_manager.enqueue_text_async(TextRegistry.max_consecutive_errors_text)
-                    self.logger.warning(">>> Missing conversation ID - Max consecutive errors reached. Sent technical difficulties message.")
-                    # Reset error count after handling
-                    self.agents_graph.consecutive_error_manager.reset_consecutive_error_count(current_state)
-                return
+                raise ValueError("Conversation id not found in current state")
 
             current_state["history"].append(("user", user_query))
             messages: dict | None = await self.conversation_persistence.add_message_to_conversation_async(conv_id, user_query, "user")
@@ -477,24 +457,18 @@ class IncomingAudioManager(IncomingManager):
                 self._rename_incoming_speech_file(user_query_audio_filename, user_query_msg_id + ".wav")
 
             # Invoke the graph with current state to get the AI-generated welcome message
-            updated_state = await self.agents_graph.ainvoke(current_state)
+            updated_state: PhoneConversationState = cast(PhoneConversationState, await self.agents_graph.ainvoke(current_state))
             self.stream_states[self.stream_sid] = updated_state
             self.agents_graph.consecutive_error_manager.reset_consecutive_error_count(updated_state)
             await self._hangup_upon_goodbye_async(updated_state)
 
         except Exception as e:
-            self.logger.error(f"Error in user query to agents graph: {e}", exc_info=True)
+            self.logger.error(f"Error while sending user query to agents graph: {e}", exc_info=True)
             # Agents graph communication failure - increment error counter
             if self.stream_sid in self.stream_states:
                 current_state = self.stream_states[self.stream_sid]
                 self.agents_graph.consecutive_error_manager.increment_consecutive_error_count(current_state)
-
-                # Check if max errors reached and handle it
-                if self.agents_graph.consecutive_error_manager.is_max_consecutive_errors_reached(current_state):
-                    await self.outgoing_manager.enqueue_text_async(TextRegistry.max_consecutive_errors_text)
-                    self.logger.warning(">>> Agents graph error - Max consecutive errors reached. Sent technical difficulties message.")
-                    # Reset error count after handling
-                    self.agents_graph.consecutive_error_manager.reset_consecutive_error_count(current_state)
+                await self._handle_max_consecutive_errors_async(current_state, e.args[0])
 
     async def _hangup_upon_goodbye_async(self, updated_state):
         """If the agents graph state ends with "au revoir.", do hang-up"""
@@ -528,11 +502,11 @@ class IncomingAudioManager(IncomingManager):
             if not any(calibration_data):
                 calibration_data = [min_noise_level]
             average_noise = round(sum(calibration_data) / len(calibration_data))
-            self.logger.info(f">>> Noise calibration completed for stream {stream_sid}. Average noise level: {average_noise:.2f}")
             # Replace list with the calculated average for memory efficiency
             self.average_noise_by_stream_sid[stream_sid] = average_noise
             del self.speech_to_noise_ratio_samples_by_stream_sid[stream_sid]
             self.speech_threshold = max(self.speech_threshold_base * 1.5, average_noise * 1.5)
+            self.logger.info(f">> Noise calibration completed [{stream_sid}]. Average noise level: {average_noise:.2f}. Applied speech threshold: {self.speech_threshold:.2f}")
 
     def _decode_audio_chunk(self, data: dict):
         try:
@@ -726,3 +700,11 @@ class IncomingAudioManager(IncomingManager):
         # Reset buffer to clear any previous speech before interruption
         self.audio_buffer = b""
         return removed_text
+
+    async def _handle_max_consecutive_errors_async(self, current_state: PhoneConversationState, last_error_cause_msg: str) -> None:
+        """Handle max consecutive errors reached scenario."""
+        if self.agents_graph.consecutive_error_manager.is_max_consecutive_errors_reached(current_state):
+            await self.outgoing_manager.enqueue_text_async(TextRegistry.max_consecutive_errors_text)
+            self.logger.warning(f">>> {last_error_cause_msg} - Max consecutive errors reached. Sent technical difficulties message.")
+            # Reset error count after handling
+            self.agents_graph.consecutive_error_manager.reset_consecutive_error_count(current_state)
