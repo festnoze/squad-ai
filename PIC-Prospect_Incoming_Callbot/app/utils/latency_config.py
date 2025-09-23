@@ -5,7 +5,6 @@ This module provides configuration management for latency thresholds,
 reporting settings, and alerting rules.
 """
 import os
-from typing import Dict, Optional
 
 from utils.envvar import EnvHelper
 from utils.latency_metric import OperationType
@@ -23,11 +22,11 @@ from utils.latency_tracker import LatencyThresholds, latency_tracker
 class ThresholdManager:
     """Manager for threshold operations with string-based operation types"""
     
-    def __init__(self, thresholds: Optional[LatencyThresholds] = None):
+    def __init__(self, thresholds: LatencyThresholds | None = None):
         # Use provided thresholds or get from global latency tracker
         self.thresholds = thresholds or latency_tracker.thresholds
     
-    def get_warning_threshold(self, operation_name: str) -> Optional[float]:
+    def get_warning_threshold(self, operation_name: str) -> float | None:
         """Get warning threshold for an operation by string name"""
         try:
             operation_type = OperationType(operation_name.lower())
@@ -35,7 +34,7 @@ class ThresholdManager:
         except ValueError:
             return None
     
-    def get_critical_threshold(self, operation_name: str) -> Optional[float]:
+    def get_critical_threshold(self, operation_name: str) -> float | None:
         """Get critical threshold for an operation by string name"""
         try:
             operation_type = OperationType(operation_name.lower())
@@ -68,19 +67,19 @@ class ThresholdManager:
 
 
 class LatencyConfig:
-    """Gestionnaire de configuration pour le système de monitoring de latence"""
+    """Configuration manager for the latency monitoring system"""
     
     def __init__(self):
         self.thresholds = LatencyThresholds()
         self.configured = False
         self.is_initialized = False
     
-    def configure_custom_thresholds(self, custom_thresholds: Dict[str, Dict[str, float]]) -> None:
+    def configure_custom_thresholds(self, custom_thresholds: dict[str, dict[str, float]]) -> None:
         """
-        Configure des seuils personnalisés pour la latence.
-        
+        Configure custom latency thresholds.
+
         Args:
-            custom_thresholds: Dict avec la structure:
+            custom_thresholds: Dict with the structure:
                 {
                     "speech_to_text": {"warning": 2000, "critical": 5000},
                     "text_to_speech": {"warning": 1500, "critical": 3000},
@@ -109,15 +108,15 @@ class LatencyConfig:
             except ValueError as e:
                 if "must be" in str(e):
                     raise  # Re-raise validation errors
-                print(f"Type d'opération inconnu: {operation_type_str}")
+                print(f"Unknown operation type: {operation_type_str}")
         
         # Sync configured thresholds to the latency tracker
         latency_tracker.thresholds = self.thresholds
     
     def configure_from_environment(self) -> None:
-        """Configure le système depuis les variables d'environnement"""
+        """Configure the system from environment variables"""
         try:
-            # Configuration des seuils depuis l'environnement
+            # Configure thresholds from environment
             custom_thresholds = {}
             
             # STT thresholds
@@ -164,28 +163,28 @@ class LatencyConfig:
                 self.configure_custom_thresholds(custom_thresholds)
             
         except Exception as e:
-            print(f"Erreur lors de la configuration des seuils depuis l'environnement: {e}")
+            print(f"Error configuring thresholds from environment: {e}")
     
     def setup_prometheus_reporter(
-        self, 
-        pushgateway_url: Optional[str] = None, 
+        self,
+        pushgateway_url: str | None = None,
         job_name: str = "prospect_callbot"
     ) -> None:
-        """Configure un reporter Prometheus"""
+        """Configure a Prometheus reporter"""
         url = pushgateway_url or os.getenv("PROMETHEUS_PUSHGATEWAY_URL")
         if url:
             reporter = PrometheusReporter(url, job_name)
             report_manager.add_reporter(reporter)
-            print(f"Reporter Prometheus configuré: {url}")
+            print(f"Prometheus reporter configured: {url}")
     
     def setup_influxdb_reporter(
         self,
-        influxdb_url: Optional[str] = None,
-        token: Optional[str] = None,
-        org: Optional[str] = None,
-        bucket: Optional[str] = None
+        influxdb_url: str | None = None,
+        token: str | None = None,
+        org: str | None = None,
+        bucket: str | None = None
     ) -> None:
-        """Configure un reporter InfluxDB"""
+        """Configure an InfluxDB reporter"""
         url = influxdb_url or os.getenv("INFLUXDB_URL")
         token = token or os.getenv("INFLUXDB_TOKEN")
         org = org or os.getenv("INFLUXDB_ORG")
@@ -194,21 +193,21 @@ class LatencyConfig:
         if url and token and org and bucket:
             reporter = InfluxDBReporter(url, token, org, bucket)
             report_manager.add_reporter(reporter)
-            print(f"Reporter InfluxDB configuré: {url}")
+            print(f"InfluxDB reporter configured: {url}")
     
     def setup_slack_reporter(
         self,
-        webhook_url: Optional[str] = None,
+        webhook_url: str | None = None,
         channel: str = "#alerts"
     ) -> None:
-        """Configure un reporter Slack pour les alertes"""
+        """Configure a Slack reporter for alerts"""
         url = webhook_url or os.getenv("SLACK_WEBHOOK_URL")
         channel = os.getenv("SLACK_CHANNEL", channel)
         
         if url:
             reporter = SlackReporter(url, channel)
             report_manager.add_reporter(reporter)
-            print(f"Reporter Slack configuré: {channel}")
+            print(f"Slack reporter configured: {channel}")
     
     def initialize_latency_system(self) -> None:
         """Initialize the complete latency monitoring system"""
@@ -265,7 +264,7 @@ class LatencyConfig:
         """Get a ThresholdManager that uses the current configuration"""
         return ThresholdManager(self.thresholds)
     
-    def get_current_stats(self) -> Dict:
+    def get_current_stats(self) -> dict:
         """Get current latency statistics"""
         return {
             "total_metrics": len(latency_tracker.metrics),
@@ -277,7 +276,7 @@ class LatencyConfig:
         }
 
 
-# Instance globale de configuration
+# Global configuration instance
 latency_config = LatencyConfig()
 
 

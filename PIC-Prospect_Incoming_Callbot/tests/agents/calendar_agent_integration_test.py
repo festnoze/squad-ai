@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from unittest.mock import patch
 
 import pytest
-
+import pytz
 #
 from agents.text_registry import TextRegistry
 
@@ -279,7 +279,7 @@ async def test_calendar_agent_integration_classification_plus_outputed_answer(
     """
     # Create the agent with mocked dependencies
     agent = CalendarAgent(sf_client_mock, llm_instance)
-    CalendarAgent.now = datetime(2024, 6, 19, 19, 0)
+    CalendarAgent.now = datetime(2024, 6, 19, 19, 0, tzinfo=pytz.timezone("Europe/Paris"))
     agent._set_user_info(
         "test_user_id",
         "Test",
@@ -312,7 +312,7 @@ async def test_complete_conversation_exchange(sf_client_mock, llm_instance, simi
     """
     # Create the agent with mocked dependencies
     agent = CalendarAgent(sf_client_mock, llm_instance)
-    CalendarAgent.now = datetime(2024, 6, 19, 20, 0)
+    CalendarAgent.now = datetime(2024, 6, 19, 20, 0, tzinfo=pytz.timezone("Europe/Paris"))
     agent._set_user_info(
         "test_user_id",
         "Test",

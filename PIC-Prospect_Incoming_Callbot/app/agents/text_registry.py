@@ -39,6 +39,12 @@ class TextRegistry:
     no_appointment_requested_text = "Votre appel a bien été prise en compte, votre conseiller en formation vous recontactera dès que possible. Merci et au revoir."
     appointment_too_far_text = "Désolé, il n'est pas possible de prendre de rendez-vous à plus de 30 jours. Quels autres créneaux vous conviendraient ?"
 
+    # Business hours validation texts
+    appointment_outside_hours_text = "Désolé, les rendez-vous ne peuvent être pris qu'aux heures ouvrées. Nos horaires sont : {business_hours}. Souhaitez-vous un autre créneau ?"
+    appointment_weekend_text = "Désolé, nous ne proposons pas de rendez-vous le weekend. Nos rendez-vous sont disponibles du lundi au vendredi. Quel jour vous conviendrait ?"
+    appointment_in_past_text = "Désolé, il n'est pas possible de prendre un rendez-vous dans le passé. Souhaitez-vous un autre créneau ?"
+    appointment_holiday_text = "Désolé, nous ne proposons pas de rendez-vous ce jour-là car c'est un jour férié. Souhaitez-vous un autre créneau ?"
+
     @classmethod
     def get_all_texts(cls) -> list[str]:
         """Get all text values for pregeneration."""

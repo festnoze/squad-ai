@@ -31,7 +31,7 @@ def measure_latency(
     
     Usage:
         @measure_latency(OperationType.STT, provider="google")
-        async def transcribe_audio_async(self, file_name: str) -> str:
+        async def function_async(self, param1: str) -> str:
             ...
     """
     def decorator(func: Callable) -> Callable:

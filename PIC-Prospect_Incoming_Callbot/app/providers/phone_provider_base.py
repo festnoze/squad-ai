@@ -2,13 +2,14 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Tuple
 from fastapi import Request, WebSocket, HTTPException
 from fastapi.responses import HTMLResponse
+from utils.phone_provider_type import PhoneProviderType
 
 
 class PhoneProvider(ABC):
     """Abstract base class for phone providers (Twilio, Telnyx, etc.)"""
     
-    def __init__(self, provider_name: str):
-        self.provider_name = provider_name
+    def __init__(self, provider_type: PhoneProviderType):
+        self.provider_type = provider_type
     
     @abstractmethod
     async def authenticate_request(self, request: Request | WebSocket) -> None:

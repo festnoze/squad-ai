@@ -279,15 +279,11 @@ class IncomingAudioManager(IncomingManager):
 
         # 6- If user is speaking while system is speaking, stop system speech
         if self.is_speaking and not is_silence and self.outgoing_manager.can_speech_be_interupted and not self.interuption_asked:
-            self.removed_text_to_speak = await self.stop_speaking_async(
-                speech_to_noise_ratio
-            )
+            self.removed_text_to_speak = await self.stop_speaking_async(speech_to_noise_ratio)
 
             # Log the interruption (but only the first time)
             if self.consecutive_silence_duration_ms > 0:
-                self.logger.info(
-                    f"\r>>> USER INTERRUPTION - Incoming speech while system was speaking ({speech_to_noise_ratio:.2f})"
-                )
+                self.logger.info(f"\r>>> USER INTERRUPTION - Incoming speech while system was speaking ({speech_to_noise_ratio:.2f})")
             self.consecutive_silence_duration_ms = 0.0
 
         # 7- Silence detection consecutive to user speech beginning
@@ -314,6 +310,7 @@ class IncomingAudioManager(IncomingManager):
         ):
             self.logger.info(f">>> User silence duration of {self.consecutive_silence_duration_ms:.1f}ms exceeded max. silence before speaking anew: {self.max_silence_duration_before_reasking:.1f}ms.")
             await self.outgoing_manager.enqueue_text_async(TextRegistry.ask_to_repeat_text)
+            await self._add_ai_answer_async(self.agents_graph.get_current_state(), TextRegistry.ask_to_repeat_text)
             await asyncio.sleep(0.05)
             return
 
@@ -416,6 +413,9 @@ class IncomingAudioManager(IncomingManager):
             await self.outgoing_manager.enqueue_text_async(TextRegistry.ask_to_repeat_text)
         finally:
             await self._hangup_upon_goodbye_async(current_state)
+
+    def get_current_state(self):
+        return self.agents_graph.get_current_state()
 
     async def send_user_query_to_agents_graph_async(self, user_query: str, user_query_audio_filename: str | None = None):
         try:
@@ -708,3 +708,12 @@ class IncomingAudioManager(IncomingManager):
             self.logger.warning(f">>> {last_error_cause_msg} - Max consecutive errors reached. Sent technical difficulties message.")
             # Reset error count after handling
             self.agents_graph.consecutive_error_manager.reset_consecutive_error_count(current_state)
+
+    async def _add_ai_answer_async(self, graph_state: PhoneConversationState, ai_answer: str):
+        await self.outgoing_manager.enqueue_text_async(ai_answer)
+        conv_id = graph_state["agent_scratchpad"].get("conversation_id", None)
+        if not conv_id:
+            self.logger.warning("Conversation ID not found in graph state, skipping message persistence")
+            return
+        graph_state["history"].append(("assistant", ai_answer))
+        await self.conversation_persistence.add_message_to_conversation_async(conv_id, ai_answer, "assistant")

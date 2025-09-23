@@ -30,7 +30,7 @@ class LatencyMetric:
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     call_sid: str | None = None
     stream_sid: str | None = None
-    provider: str | None = None  # e.g., "google", "openai", "salesforce"
+    provider: str | None = None  # like: "google", "openai", "salesforce"
     phone_number: str | None = None  # The caller's phone number
     criticality: str = "normal"  # "normal", "warning", "critical"
     error_message: str | None = None

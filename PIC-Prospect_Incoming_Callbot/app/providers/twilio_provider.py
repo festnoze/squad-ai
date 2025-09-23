@@ -7,13 +7,14 @@ from twilio.rest import Client
 from twilio.twiml.voice_response import Connect, VoiceResponse
 from utils.envvar import EnvHelper
 from providers.phone_provider_base import PhoneProvider
+from utils.phone_provider_type import PhoneProviderType
 
 
 class TwilioProvider(PhoneProvider):
     """Twilio implementation of phone provider"""
     
     def __init__(self):
-        super().__init__("twilio")
+        super().__init__(PhoneProviderType.TWILIO)
         self.logger = logging.getLogger(__name__)
         self.twilio_client = Client(EnvHelper.get_twilio_sid(), EnvHelper.get_twilio_auth())
         self.twilio_authenticate = RequestValidator(EnvHelper.get_twilio_auth())

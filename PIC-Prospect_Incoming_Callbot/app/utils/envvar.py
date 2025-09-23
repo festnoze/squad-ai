@@ -151,18 +151,6 @@ class EnvHelper:
         return EnvHelper.get_env_variable_value_by_name("TWILIO_AUTH") or ""
 
     @staticmethod
-    def get_phone_provider() -> str:
-        """Get the phone provider (twilio or telnyx)"""
-        provider = EnvHelper.get_env_variable_value_by_name("PHONE_PROVIDER", fails_if_missing=False) or "twilio"
-        valid_providers = ["twilio", "telnyx"]
-        if provider.lower() not in valid_providers:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(f"Invalid PHONE_PROVIDER '{provider}'. Valid values: {valid_providers}. Defaulting to 'twilio'.")
-            return "twilio"
-        return provider.lower()
-
-    @staticmethod
     def get_telnyx_api_key() -> str:
         return EnvHelper.get_env_variable_value_by_name("TELNYX_API_KEY", fails_if_missing=False) or ""
 
@@ -408,3 +396,56 @@ class EnvHelper:
     def get_google_calendar_timezone() -> str:
         """Get the timezone for Google Calendar operations"""
         return EnvHelper.get_env_variable_value_by_name("GOOGLE_CALENDAR_TIMEZONE", fails_if_missing=False) or "Europe/Paris"
+
+    # Business hours configuration methods
+    @staticmethod
+    def get_business_hours_slots() -> str:
+        """
+        Get business hours time slots in format "09:00-12:00,13:00-16:00".
+
+        Returns:
+            str: Comma-separated time slots in HH:MM-HH:MM format
+        """
+        return EnvHelper.get_env_variable_value_by_name("BUSINESS_HOURS_SLOTS", fails_if_missing=False) or ""
+
+    @staticmethod
+    def get_business_weekdays() -> str:
+        """
+        Get allowed business weekdays in format "0,1,2,3,4" (Monday=0, Sunday=6).
+
+        Returns:
+            str: Comma-separated weekday numbers
+        """
+        return EnvHelper.get_env_variable_value_by_name("BUSINESS_WEEKDAYS", fails_if_missing=False) or ""
+
+    @staticmethod
+    def get_business_timezone() -> str:
+        """
+        Get the timezone for business hours operations.
+
+        Returns:
+            str: Timezone string (e.g., "Europe/Paris")
+        """
+        return EnvHelper.get_env_variable_value_by_name("BUSINESS_TIMEZONE", fails_if_missing=False) or "Europe/Paris"
+
+    @staticmethod
+    def get_business_max_days_ahead() -> int:
+        """
+        Get the maximum number of days ahead appointments can be scheduled.
+
+        Returns:
+            int: Maximum days ahead (default: 30)
+        """
+        value = EnvHelper.get_env_variable_value_by_name("BUSINESS_MAX_DAYS_AHEAD", fails_if_missing=False)
+        return int(value) if value else 30
+
+    @staticmethod
+    def get_business_appointment_duration() -> int:
+        """
+        Get the default appointment duration in minutes.
+
+        Returns:
+            int: Appointment duration in minutes (default: 30)
+        """
+        value = EnvHelper.get_env_variable_value_by_name("BUSINESS_APPOINTMENT_DURATION", fails_if_missing=False)
+        return int(value) if value else 30

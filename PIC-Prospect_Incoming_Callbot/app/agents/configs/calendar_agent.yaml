@@ -5,7 +5,29 @@ google_calendar:
 appointments:
   duration_minutes: 30
   working_hours:
+    # Support for multiple time slots throughout the day
+    # Format: List of [start_time, end_time] pairs
+    time_slots:
+      - ["09:00", "12:00"]  # Morning slot
+      - ["13:00", "16:00"]  # Afternoon slot
+    # Alternative single slot format (for backward compatibility)
     start: 09:00
     end: 16:00
+    # Timezone for business hours (defaults to Europe/Paris)
+    timezone: "Europe/Paris"
+  # Allowed weekdays (0=Monday, 6=Sunday)
+  allowed_weekdays: [0, 1, 2, 3, 4]  # Monday to Friday
+  # Maximum days ahead appointments can be scheduled
+  max_days_ahead: 30
+  # How many days ahead to check when user asks for availability
   days_ahead: 2
+  # Maximum number of slots to show to user
   max_slots: 3
+  # Validation settings
+  validation:
+    # Whether to validate business hours before checking availability
+    enable_business_hours_validation: true
+    # Whether to allow appointments on weekends (overrides allowed_weekdays)
+    allow_weekends: false
+    # Custom holiday dates (format: YYYY-MM-DD)
+    holidays: []

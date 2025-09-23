@@ -5,13 +5,14 @@ from fastapi import Request, WebSocket, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from utils.envvar import EnvHelper
 from providers.phone_provider_base import PhoneProvider
+from utils.phone_provider_type import PhoneProviderType
 
 
 class TelnyxProvider(PhoneProvider):
     """Telnyx implementation of phone provider"""
     
     def __init__(self):
-        super().__init__("telnyx")
+        super().__init__(PhoneProviderType.TELNYX)
         self.logger = logging.getLogger(__name__)
         self.api_key = EnvHelper.get_telnyx_api_key()
         self.profile_id = EnvHelper.get_telnyx_profile_id()
@@ -47,10 +48,12 @@ class TelnyxProvider(PhoneProvider):
         # Telnyx TeXML response for media streaming
         texml_response = f'''<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Stream url="{ws_url}" track="inbound_track">
-        <Parameter name="mediaEncoding" value="audio/x-mulaw"/>
-        <Parameter name="sampleRate" value="8000"/>
-    </Stream>
+    <Start>
+        <Stream url="{ws_url}" track="inbound_track">
+            <Parameter name="mediaEncoding" value="audio/x-mulaw"/>
+            <Parameter name="sampleRate" value="8000"/>
+        </Stream>
+    </Start>
 </Response>'''
         
         return HTMLResponse(content=texml_response, media_type="application/xml")
@@ -69,7 +72,7 @@ class TelnyxProvider(PhoneProvider):
             # Telnyx typically sends JSON payloads
             try:
                 json_data = await request.json()
-            except:
+            except json.JSONDecodeError:
                 # Fallback to form data
                 form = await request.form()
                 phone_number = str(form.get("From", "Unknown From"))
@@ -77,7 +80,7 @@ class TelnyxProvider(PhoneProvider):
                 body = str(form.get("Body", ""))
             else:
                 # Extract from JSON payload
-                payload = json_data.get("payload", {})
+                payload = json_data.get("data", {}).get("payload", {})
                 phone_number = payload.get("from", "Unknown From")
                 call_control_id = payload.get("call_control_id", "Unknown Call Control ID")
                 body = payload.get("body", "")
@@ -91,7 +94,9 @@ class TelnyxProvider(PhoneProvider):
         x_forwarded_proto = request.headers.get("x-forwarded-proto")
         is_secure = x_forwarded_proto == "https" or request.url.scheme == "https"
         ws_scheme = "wss" if is_secure else "ws"
-        return f"{ws_scheme}://{request.url.netloc}/ws/phone/{phone_number}/call_control_id/{call_id}"
+        # Remove version prefix (e.g., "v3:") from call_id if present
+        clean_call_id = call_id.split(":", 1)[-1] if ":" in call_id else call_id
+        return f"{ws_scheme}://{request.url.netloc}/ws/phone/{phone_number}/call_control_id/{clean_call_id}"
     
     def parse_websocket_event(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Parse Telnyx websocket event and normalize to common format"""

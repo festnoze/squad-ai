@@ -23,7 +23,7 @@ async def test_all_chunks_processing():
     tts_provider = MagicMock(spec=TextToSpeechProvider)
     mocked_synthesize_audio_bytes = b"mock_audio_bytes"
     tts_provider.synthesize_speech_to_bytes_async = AsyncMock(return_value=mocked_synthesize_audio_bytes)
-    outgoing_audio_manager = OutgoingAudioManager(websocket=websocket, tts_provider=tts_provider)
+    outgoing_audio_manager = OutgoingAudioManager(websocket=websocket, tts_provider=tts_provider, phone_provider="twilio")
     outgoing_audio_manager.audio_sender = audio_sender
     
     sent_chunks = []
@@ -71,7 +71,7 @@ async def test_single_chunk_processing():
     tts_provider = MagicMock(spec=TextToSpeechProvider)
     mocked_synthesize_audio_bytes = b"mock_audio_bytes"
     tts_provider.synthesize_speech_to_bytes_async = AsyncMock(return_value=mocked_synthesize_audio_bytes)
-    outgoing_audio_manager = OutgoingAudioManager(websocket=websocket, tts_provider=tts_provider)
+    outgoing_audio_manager = OutgoingAudioManager(websocket=websocket, tts_provider=tts_provider, phone_provider="twilio")
     #
     mock_audio_sender = MagicMock(spec=TwilioAudioSender)
     mock_audio_sender.send_audio_chunk_async = AsyncMock(return_value=True)

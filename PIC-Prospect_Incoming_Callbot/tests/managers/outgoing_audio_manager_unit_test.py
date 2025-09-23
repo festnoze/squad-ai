@@ -18,6 +18,7 @@ def fixture(mocker):
     outgoing_audio_manager = OutgoingAudioManager(
         websocket=mock_websocket,
         tts_provider=mock_tts_provider,
+        phone_provider="twilio",
         stream_sid="test_stream_sid"
     )
     

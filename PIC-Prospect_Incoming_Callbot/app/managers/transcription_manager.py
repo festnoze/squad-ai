@@ -13,12 +13,8 @@ class TranscriptionManager:
         """Initializes the TranscriptionManager with separate STT providers for each track."""
         logger.info("Initializing TranscriptionManager...")
         # Assumption: SpeechToText can be instantiated without arguments or with necessary config.
-        self.inbound_stt: SpeechToTextProvider = get_speech_to_text_provider(
-            provider_name=stt_provider_name, language_code=language_code, frame_rate=frame_rate
-        )
-        self.outbound_stt: SpeechToTextProvider = get_speech_to_text_provider(
-            provider_name=stt_provider_name, language_code=language_code, frame_rate=frame_rate
-        )
+        self.inbound_stt: SpeechToTextProvider = get_speech_to_text_provider(stt_provider_name=stt_provider_name, language_code=language_code, frame_rate=frame_rate)
+        self.outbound_stt: SpeechToTextProvider = get_speech_to_text_provider(stt_provider_name=stt_provider_name, language_code=language_code, frame_rate=frame_rate)
         logger.info("TranscriptionManager initialized with separate STT handlers for inbound and outbound tracks.")
 
     async def process_media_event_async(self, media_data: dict) -> None:

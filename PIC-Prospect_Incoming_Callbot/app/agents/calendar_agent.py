@@ -6,12 +6,14 @@ import pytz
 
 #
 from api_client.calendar_client_interface import CalendarClientInterface
+from utils.business_hours_config import BusinessHoursConfig
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain.tools import tool
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 
+from utils.business_hours_config import ValidationResult
 from agents.text_registry import TextRegistry
 
 
@@ -20,6 +22,7 @@ class CalendarAgent:
     owner_id: str | None = None
     owner_name: str | None = None
     now: datetime = datetime.now(tz=pytz.timezone("Europe/Paris"))
+    business_hours_config: BusinessHoursConfig | None = None
 
     def __init__(
         self,
@@ -34,6 +37,10 @@ class CalendarAgent:
         self.date_extractor_llm = date_extractor_llm if date_extractor_llm else self.available_timeframes_llm
         CalendarAgent.salesforce_api_client = salesforce_api_client
         CalendarAgent.now = datetime.now(tz=pytz.timezone("Europe/Paris"))
+
+        # Initialize business hours configuration (both instance and class level)
+        self.business_hours_config = BusinessHoursConfig()
+        CalendarAgent.business_hours_config = self.business_hours_config
 
         # Init. calendar agent to retrieve available timeframes
         available_timeframes_prompt = self._load_available_timeframes_prompt()
@@ -69,6 +76,22 @@ class CalendarAgent:
             if days_from_now > 30:
                 return TextRegistry.appointment_too_far_text
 
+            # Validate business hours for the requested appointment time
+            validation_result = self.validate_appointment_time_async(requested_date)
+            if validation_result != "valid":
+                if validation_result.startswith("outside_hours:"):
+                    business_hours = validation_result.split(":", 1)[1]
+                    return TextRegistry.appointment_outside_hours_text.format(business_hours=business_hours)
+                elif validation_result == "weekend":
+                    return TextRegistry.appointment_weekend_text
+                elif validation_result == "in_past":
+                    return TextRegistry.appointment_in_past_text
+                elif validation_result == "holiday":
+                    return TextRegistry.appointment_holiday_text
+                elif validation_result.startswith("too_far_future:"):
+                    # This should already be caught above, but handle it just in case
+                    return TextRegistry.appointment_too_far_text
+
         # === Category-specific handling === #
         if category == "Proposition de créneaux":
             formatted_history = []
@@ -81,6 +104,7 @@ class CalendarAgent:
                     "owner_name": CalendarAgent.owner_name,
                     "user_input": user_input,
                     "chat_history": "- " + "\n- ".join(formatted_history),
+                    "business_hours_display": self.business_hours_config.get_business_hours_display(),
                 }
             )
 
@@ -93,7 +117,10 @@ class CalendarAgent:
             start_date = CalendarAgent.now.date()
             end_date = start_date + timedelta(days=2)
             appointments = await CalendarAgent.get_appointments_async.ainvoke({"start_date": str(start_date), "end_date": str(end_date)})
-            available_timeframes = CalendarAgent.get_available_timeframes_from_scheduled_slots(str(start_date), str(end_date), appointments)
+            available_timeframes = CalendarAgent.get_available_timeframes_from_scheduled_slots(
+                str(start_date), str(end_date), appointments,
+                business_hours_config=self.business_hours_config
+            )
 
             if not available_timeframes:
                 return TextRegistry.no_timeframes_text
@@ -109,6 +136,7 @@ class CalendarAgent:
                             "owner_name": CalendarAgent.owner_name,
                             "user_input": "Quels sont les prochains crénaux disponibles ?",
                             "chat_history": "",
+                            "business_hours_display": self.business_hours_config.get_business_hours_display(),
                         }
                     )
                     available_slots_text = available_timeframes_answer["output"]
@@ -120,14 +148,29 @@ class CalendarAgent:
                 return TextRegistry.date_not_found_text
 
         if category == "Rendez-vous confirmé":
-            requested_date: datetime | None = await self._extract_appointment_selected_date_and_time_async(user_input, chat_history)
-            if requested_date:
-                requested_date_str = self._to_str_iso(requested_date)
-                success = await CalendarAgent.schedule_new_appointment_async(requested_date_str)
+            confirmed_date: datetime | None = await self._extract_appointment_selected_date_and_time_async(user_input, chat_history)
+            if confirmed_date:
+                # Validate business hours for the confirmed appointment time
+                validation_result = self.validate_appointment_time_async(confirmed_date)
+                if validation_result != "valid":
+                    if validation_result.startswith("outside_hours:"):
+                        business_hours = validation_result.split(":", 1)[1]
+                        return TextRegistry.appointment_outside_hours_text.format(business_hours=business_hours)
+                    elif validation_result == "weekend":
+                        return TextRegistry.appointment_weekend_text
+                    elif validation_result == "in_past":
+                        return TextRegistry.appointment_in_past_text
+                    elif validation_result == "holiday":
+                        return TextRegistry.appointment_holiday_text
+                    elif validation_result.startswith("too_far_future:"):
+                        return TextRegistry.appointment_too_far_text
+
+                confirmed_date_str = self._to_str_iso(confirmed_date)
+                success = await CalendarAgent.schedule_new_appointment_async(confirmed_date_str)
                 if success:
                     return (
                         TextRegistry.appointment_confirmed_prefix_text
-                        + self._to_french_date(requested_date, include_weekday=True, include_year=False, include_hour=True)
+                        + self._to_french_date(confirmed_date, include_weekday=True, include_year=False, include_hour=True)
                         + ". "
                         + TextRegistry.appointment_confirmed_suffix_text
                     )
@@ -213,7 +256,10 @@ class CalendarAgent:
             end_date += "Z"
 
         scheduled_slots = await CalendarAgent.salesforce_api_client.get_scheduled_appointments_async(start_date, end_date, CalendarAgent.owner_id)
-        return CalendarAgent.get_available_timeframes_from_scheduled_slots(start_date, end_date, scheduled_slots)
+        return CalendarAgent.get_available_timeframes_from_scheduled_slots(
+            start_date, end_date, scheduled_slots,
+            business_hours_config=CalendarAgent.business_hours_config
+        )
 
     @staticmethod
     @tool
@@ -369,6 +415,7 @@ class CalendarAgent:
         slot_duration_minutes: int = 30,
         max_weekday: int = 5,
         availability_timeframe: list[tuple[str, str]] | None = None,
+        business_hours_config=None,
     ) -> list[str]:
         """
         Return available appointment timeframes between start_date and end_date as consolidated ranges.
@@ -384,7 +431,24 @@ class CalendarAgent:
             availability_timeframe: List of tuples with opening hours [("09:00", "12:00"), ("13:00", "16:00")]
                                    Default is morning 9-12 and afternoon 13-18.
                                    End times are adjusted by slot_duration_minutes to provide valid start hours only.
+            business_hours_config: BusinessHoursConfig instance for centralized configuration
         """
+        # Use business hours config if provided, otherwise fall back to parameters or defaults
+        if business_hours_config is not None:
+            # Always use business config appointment duration
+            slot_duration_minutes = business_hours_config.appointment_duration
+
+            # Override availability_timeframe if:
+            # 1. No availability_timeframe was provided (None), OR
+            # 2. Business config has non-default time_slots (explicitly configured)
+            default_time_slots = [("09:00", "12:00"), ("13:00", "16:00")]
+            if availability_timeframe is None or business_hours_config.time_slots != default_time_slots:
+                availability_timeframe = business_hours_config.time_slots
+
+            # Note: max_weekday is not used when business_hours_config is provided
+            # We use business_hours_config.allowed_weekdays instead
+
+        # Fall back to legacy defaults if still None
         if availability_timeframe is None:
             availability_timeframe = [("09:00", "12:00"), ("13:00", "16:00")]
 
@@ -402,10 +466,17 @@ class CalendarAgent:
 
         # Iterate through each day in the requested range
         while start_date_only <= end_date_only:
-            # Skip weekends if max_weekday is set to 5 (Friday)
-            if start_date_only.weekday() >= max_weekday:
-                start_date_only += timedelta(days=1)
-                continue
+            # Check if this day should be included based on business hours config or max_weekday
+            if business_hours_config is not None:
+                # Use business hours config for weekday filtering
+                if start_date_only.weekday() not in business_hours_config.allowed_weekdays:
+                    start_date_only += timedelta(days=1)
+                    continue
+            else:
+                # Legacy behavior: skip weekends if max_weekday is set to 5 (Friday)
+                if start_date_only.weekday() >= max_weekday:
+                    start_date_only += timedelta(days=1)
+                    continue
 
             # For each availability timeframe
             for timeframe in availability_timeframe:
@@ -531,3 +602,36 @@ class CalendarAgent:
             with open("app/agents/prompts/calendar_agent_available_timeframes_prompt.txt", encoding="utf-8") as f:
                 CalendarAgent.available_timeframes_prompt = f.read()
         return CalendarAgent.available_timeframes_prompt
+
+    def validate_appointment_time_async(self, requested_datetime: datetime) -> str:
+        """
+        Validate if the requested appointment time is within business hours and return appropriate response.
+
+        Args:
+            requested_datetime: The datetime for the requested appointment
+
+        Returns:
+            String indicating validation result or error message
+        """
+        if not self.business_hours_config:
+            # Fall back to basic validation if no config
+            return "valid"
+
+        validation_result = self.business_hours_config.validate_appointment_time(requested_datetime, CalendarAgent.now)
+
+        if validation_result == ValidationResult.VALID:
+            return "valid"
+        elif validation_result == ValidationResult.OUTSIDE_HOURS:
+            business_hours_display = self.business_hours_config.get_business_hours_display()
+            return f"outside_hours:{business_hours_display}"
+        elif validation_result == ValidationResult.WEEKEND:
+            return "weekend"
+        elif validation_result == ValidationResult.TOO_FAR_FUTURE:
+            max_days = self.business_hours_config.max_days_ahead
+            return f"too_far_future:{max_days}"
+        elif validation_result == ValidationResult.IN_PAST:
+            return "in_past"
+        elif validation_result == ValidationResult.HOLIDAY:
+            return "holiday"
+        else:
+            return "invalid"

@@ -6,11 +6,11 @@ import uuid
 import wave
 
 from fastapi import WebSocket
+from speech.audio_sender_factory import create_audio_sender
 
 #
 from speech.text_queue_manager import TextQueueManager
 from speech.text_to_speech import TextToSpeechProvider
-from speech.audio_sender_factory import create_audio_sender
 
 #
 from utils.audio_mixer import AudioMixer
@@ -35,7 +35,8 @@ class OutgoingAudioManager(OutgoingManager):
         self,
         websocket: any,
         tts_provider: TextToSpeechProvider,
-        stream_sid: str = None,
+        phone_provider: str,
+        stream_sid: str | None = None,
         min_chunk_interval: float = 0.05,  # 50ms~
         can_speech_be_interupted: bool = False,
         min_chars_for_interruptible_speech: int = 2,
@@ -46,18 +47,11 @@ class OutgoingAudioManager(OutgoingManager):
         max_words_by_stream_chunk: int = 20,
         max_chars_by_stream_chunk: int = 100,
         cache_ttl_minutes: int = 5,
-        provider: str = None,
     ):
         self.logger = logging.getLogger(__name__)
         super().__init__(output_channel="audio", can_speech_be_interupted=can_speech_be_interupted)
         self.text_queue_manager = TextQueueManager()
-        self.audio_sender = create_audio_sender(
-            websocket=websocket, 
-            stream_id=stream_sid, 
-            sample_rate=frame_rate, 
-            min_chunk_interval=min_chunk_interval,
-            provider=provider
-        )
+        self.audio_sender = create_audio_sender(websocket=websocket, phone_provider=phone_provider, stream_id=stream_sid, sample_rate=frame_rate, min_chunk_interval=min_chunk_interval)
 
         self.tts_provider: TextToSpeechProvider = tts_provider  # Text-to-speech provider for converting text to audio
         self.sender_task = None
@@ -100,11 +94,11 @@ class OutgoingAudioManager(OutgoingManager):
         Allows setting to None when resetting after a call ends
         """
         # Handle different attribute names for different providers
-        if hasattr(self.audio_sender, 'stream_sid'):
+        if hasattr(self.audio_sender, "stream_sid"):
             self.audio_sender.stream_sid = stream_sid
-        elif hasattr(self.audio_sender, 'stream_id'):
+        elif hasattr(self.audio_sender, "stream_id"):
             self.audio_sender.stream_id = stream_sid
-        
+
         if not stream_sid:
             self.logger.info("Reset stream ID to None")
         else:
@@ -155,9 +149,7 @@ class OutgoingAudioManager(OutgoingManager):
                     # All text was found in cache parts
                     combined_audio = self._combine_audio_parts(audio_parts_found)
                     if combined_audio:
-                        self.logger.info(
-                            f">>>>>> Using combined cached parts for: '{text}' (parts: {[p[:30] + '...' for p in parts_used]})"
-                        )
+                        self.logger.info(f">>>>>> Using combined cached parts for: '{text}' (parts: {[p[:30] + '...' for p in parts_used]})")
 
                         # Cache the combined result for future use (store clean audio without background noise)
                         self.add_synthesized_audio_to_cache(text, combined_audio)
@@ -262,9 +254,7 @@ class OutgoingAudioManager(OutgoingManager):
 
                 if remaining_text:
                     # Recursively search for more parts in the remaining text
-                    more_audio_parts, final_remaining, more_parts = self._find_partial_cached_audio(
-                        remaining_text, max_recursion_depth - 1
-                    )
+                    more_audio_parts, final_remaining, more_parts = self._find_partial_cached_audio(remaining_text, max_recursion_depth - 1)
                     audio_parts_found.extend(more_audio_parts)
                     parts_used.extend(more_parts)
                     remaining_text = final_remaining
@@ -397,9 +387,7 @@ class OutgoingAudioManager(OutgoingManager):
         """
         try:
             self.logger.info(f">>>>>> Fallback: Synthesizing complete text: '{text}'")
-            speech_bytes = await self.tts_provider.synthesize_speech_to_bytes_async(
-                text, call_sid=self.call_sid, stream_sid=self.audio_sender.stream_sid, phone_number=self.phone_number
-            )
+            speech_bytes = await self.tts_provider.synthesize_speech_to_bytes_async(text, call_sid=self.call_sid, stream_sid=self.audio_sender.stream_sid, phone_number=self.phone_number)
 
             if speech_bytes:
                 # Cache the complete synthesis (without background noise)
@@ -448,9 +436,7 @@ class OutgoingAudioManager(OutgoingManager):
             if not self.audio_sender.stream_sid:
                 streamSid_wait_count += 1
                 if streamSid_wait_count > max_streamSid_wait:
-                    self.logger.error(
-                        f"No StreamSid set after {streamSid_wait_count} attempts, audio transmission may fail"
-                    )
+                    self.logger.error(f"No StreamSid set after {streamSid_wait_count} attempts, audio transmission may fail")
                 await asyncio.sleep(0.2)
                 continue
 
@@ -564,10 +550,7 @@ class OutgoingAudioManager(OutgoingManager):
 
     def has_text_to_be_sent(self) -> bool:
         """Check if the audio stream manager has text to send."""
-        has_significant_text_queued = (
-            not self.text_queue_manager.is_empty()
-            and len(self.text_queue_manager.text_queue) > self.min_chars_for_interruptible_speech
-        )
+        has_significant_text_queued = not self.text_queue_manager.is_empty() and len(self.text_queue_manager.text_queue) > self.min_chars_for_interruptible_speech
         return has_significant_text_queued
 
     def is_sending(self) -> bool:

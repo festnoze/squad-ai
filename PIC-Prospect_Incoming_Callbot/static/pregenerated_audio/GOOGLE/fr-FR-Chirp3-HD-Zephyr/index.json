@@ -27,5 +27,9 @@
   "Bonjour et bienvenue chez Studi. Je suis l'assistant virtuel de lécole.": "b2518c860bbc",
   "Nous sommes désolés, mais nous n'avons pas accès à votre numéro de téléphone et ne pouvons pas vous proposer de rendez-vous. Merci de nous recontacter durant les heures ouvrées, du lundi au vendredi, de 9 heures à 18 heures. Au revoir.": "b0b6d4e6ecf2",
   "Merci de nous recontacter durant les heures ouvrées, du lundi au vendredi, de 9 heures à 18 heures. Au revoir.": "8476be4c61b0",
-  "Désolé, je n'ai pas bien entendu, merci de répéter.": "13ebc084cf86"
+  "Désolé, je n'ai pas bien entendu, merci de répéter.": "13ebc084cf86",
+  "Désolé, nous ne proposons pas de rendez-vous ce jour-là car c'est un jour férié. Souhaitez-vous un autre créneau ?": "7e62be73582c",
+  "Désolé, il n'est pas possible de prendre un rendez-vous dans le passé. Souhaitez-vous un autre créneau ?": "45d9ce52cc1f",
+  "Désolé, les rendez-vous ne peuvent être pris qu'aux heures ouvrées. Nos horaires sont : {business_hours}. Souhaitez-vous un autre créneau ?": "cc652833dbef",
+  "Désolé, nous ne proposons pas de rendez-vous le weekend. Nos rendez-vous sont disponibles du lundi au vendredi. Quel jour vous conviendrait ?": "7b55e5c11673"
 }

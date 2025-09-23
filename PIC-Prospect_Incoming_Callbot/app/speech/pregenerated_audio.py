@@ -35,9 +35,7 @@ class PreGeneratedAudio:
         texts_to_pregenerate = TextRegistry.get_all_texts()
 
         # Filter out empty texts
-        texts_to_pregenerate = [
-            text for text in texts_to_pregenerate if text and text.strip()
-        ]
+        texts_to_pregenerate = [text for text in texts_to_pregenerate if text and text.strip()]
 
         if not texts_to_pregenerate:
             PreGeneratedAudio.logger.warning("No texts to pregenerate from AgentsGraph")
@@ -53,12 +51,10 @@ class PreGeneratedAudio:
         try:
             # Create TTS provider instance
             tts_provider_name = EnvHelper.get_text_to_speech_provider() or "openai"
-            PreGeneratedAudio.logger.info(
-                f"Starting pregenerated audio population with {len(texts_to_pregenerate)} texts using {tts_provider_name} provider"
-            )
+            PreGeneratedAudio.logger.info(f"Starting pregenerated audio population with {len(texts_to_pregenerate)} texts using {tts_provider_name} provider")
 
             tts_provider: TextToSpeechProvider = get_text_to_speech_provider(
-                provider_name=tts_provider_name,
+                tts_provider_name=tts_provider_name,
                 frame_rate=8000,
                 channels=1,
                 sample_width=2,
@@ -66,23 +62,13 @@ class PreGeneratedAudio:
             )
 
             # Clean up index before populating cache - remove orphaned files and missing references
-            PreGeneratedAudio.logger.info(
-                f"Cleaning up index for {tts_provider_name}/{tts_provider.voice}"
-            )
-            rebuild_result = PreGeneratedAudio.clean_audio_files_index(
-                tts_provider_name, tts_provider.voice
-            )
-            PreGeneratedAudio.logger.info(
-                f"Index cleanup completed: {rebuild_result['message']}"
-            )
+            PreGeneratedAudio.logger.info(f"Cleaning up index for {tts_provider_name}/{tts_provider.voice}")
+            rebuild_result = PreGeneratedAudio.clean_audio_files_index(tts_provider_name, tts_provider.voice)
+            PreGeneratedAudio.logger.info(f"Index cleanup completed: {rebuild_result['message']}")
 
             # Load the pregenerated audio index (text -> hash mapping)
-            audio_index = PreGeneratedAudio.load_index(
-                tts_provider_name, tts_provider.voice
-            )
-            PreGeneratedAudio.logger.info(
-                f"Loaded index with {len(audio_index)} existing pregenerated audio files"
-            )
+            audio_index = PreGeneratedAudio.load_index(tts_provider_name, tts_provider.voice)
+            PreGeneratedAudio.logger.info(f"Loaded index with {len(audio_index)} existing pregenerated audio files")
 
             # Remove obsolete entries from index that are no longer in texts_to_pregenerate
             obsolete_texts = set(audio_index.keys()) - set(texts_to_pregenerate)
@@ -94,17 +80,13 @@ class PreGeneratedAudio:
                     try:
                         os.remove(obsolete_file_path)
                     except Exception as e:
-                        PreGeneratedAudio.logger.warning(
-                            f"Failed to remove obsolete audio file {obsolete_file_path}: {e}"
-                        )
+                        PreGeneratedAudio.logger.warning(f"Failed to remove obsolete audio file {obsolete_file_path}: {e}")
 
                 del audio_index[obsolete_text]
                 results["obsolete_removed"] += 1
 
             if obsolete_texts:
-                PreGeneratedAudio.save_index(
-                    tts_provider_name, tts_provider.voice, audio_index
-                )
+                PreGeneratedAudio.save_index(tts_provider_name, tts_provider.voice, audio_index)
 
             # Process each text
             for text in texts_to_pregenerate:
@@ -117,9 +99,7 @@ class PreGeneratedAudio:
                 if text in audio_index:
                     # Load the existing audio file using the hash from index
                     text_hash = audio_index[text]
-                    file_path = PreGeneratedAudio._get_pregenerated_file_path_from_hash(
-                        text_hash, tts_provider_name, tts_provider.voice
-                    )
+                    file_path = PreGeneratedAudio._get_pregenerated_file_path_from_hash(text_hash, tts_provider_name, tts_provider.voice)
 
                     if os.path.exists(file_path):
                         try:
@@ -127,58 +107,40 @@ class PreGeneratedAudio:
                                 pregenerated_audio = f.read()
                             results["loaded_count"] += 1
                         except Exception as e:
-                            PreGeneratedAudio.logger.warning(
-                                f"Failed to load pregenerated audio for '{text[:50]}...': {e}"
-                            )
+                            PreGeneratedAudio.logger.warning(f"Failed to load pregenerated audio for '{text[:50]}...': {e}")
                     else:
-                        PreGeneratedAudio.logger.error(
-                            f"Index references missing file for '{text[:50]}...': {file_path}"
-                        )
+                        PreGeneratedAudio.logger.error(f"Index references missing file for '{text[:50]}...': {file_path}")
 
                 # If not found in index or file missing, synthesize new audio
                 if not pregenerated_audio:
-                    PreGeneratedAudio.logger.info(
-                        f"Synthesizing and saving: {text[:50]}..."
-                    )
+                    PreGeneratedAudio.logger.info(f"Synthesizing and saving: {text[:50]}...")
                     try:
                         audio_bytes = await tts_provider.synthesize_speech_to_bytes_async(text)
                         if audio_bytes:
                             # Save to pregenerated file and update index
-                            PreGeneratedAudio.save_pregenerated_audio(
-                                text, tts_provider_name, tts_provider.voice, audio_bytes
-                            )
+                            PreGeneratedAudio.save_pregenerated_audio(text, tts_provider_name, tts_provider.voice, audio_bytes)
                             results["synthesized_count"] += 1
                         else:
                             results["failed_count"] += 1
-                            PreGeneratedAudio.logger.warning(
-                                f"Failed to synthesize audio for: {text[:50]}..."
-                            )
+                            PreGeneratedAudio.logger.warning(f"Failed to synthesize audio for: {text[:50]}...")
                     except Exception as e:
                         results["failed_count"] += 1
-                        PreGeneratedAudio.logger.error(
-                            f"Error synthesizing audio for '{text[:50]}...': {e}"
-                        )
+                        PreGeneratedAudio.logger.error(f"Error synthesizing audio for '{text[:50]}...': {e}")
 
                 # Add to OutgoingAudioManager cache
-                OutgoingAudioManager.add_synthesized_audio_to_cache(
-                    text, pregenerated_audio or audio_bytes, permanent=True
-                )
+                OutgoingAudioManager.add_synthesized_audio_to_cache(text, pregenerated_audio or audio_bytes, permanent=True)
 
             PreGeneratedAudio.logger.info(
                 f"Pregenerated audio population completed. Already existed: {results['loaded_count']}, Newly synthesized: {results['synthesized_count']}, Failed: {results['failed_count']}, Obsolete removed: {results['obsolete_removed']}"
             )
 
         except Exception as e:
-            PreGeneratedAudio.logger.error(
-                f"Error during pregenerated audio population: {e}", exc_info=True
-            )
+            PreGeneratedAudio.logger.error(f"Error during pregenerated audio population: {e}", exc_info=True)
 
         return results
 
     @staticmethod
-    def save_pregenerated_audio(
-        text: str, provider_name: str, voice: str, audio_bytes: bytes
-    ) -> None:
+    def save_pregenerated_audio(text: str, provider_name: str, voice: str, audio_bytes: bytes) -> None:
         """
         Save audio bytes to pregenerated file and update the index.
 
@@ -196,9 +158,7 @@ class PreGeneratedAudio:
             text_hash = PreGeneratedAudio._get_text_hash(text)
 
             # Save the audio file
-            file_path = PreGeneratedAudio._get_pregenerated_file_path_from_hash(
-                text_hash, provider_name, voice
-            )
+            file_path = PreGeneratedAudio._get_pregenerated_file_path_from_hash(text_hash, provider_name, voice)
             Path(file_path).parent.mkdir(parents=True, exist_ok=True)
             with open(file_path, "wb") as f:
                 f.write(audio_bytes)
@@ -253,9 +213,7 @@ class PreGeneratedAudio:
                             orphaned_files += 1
 
         except Exception as e:
-            PreGeneratedAudio.logger.warning(
-                f"Error getting pregenerated audio stats: {e}"
-            )
+            PreGeneratedAudio.logger.warning(f"Error getting pregenerated audio stats: {e}")
 
         return {
             "total_files": total_files,
@@ -308,9 +266,7 @@ class PreGeneratedAudio:
         Returns:
             Dictionary with rebuild results
         """
-        voice_dir = os.path.join(
-            PreGeneratedAudio.pregenerated_dir, provider_name, voice
-        )
+        voice_dir = os.path.join(PreGeneratedAudio.pregenerated_dir, provider_name, voice)
         if not os.path.exists(voice_dir):
             return {
                 "rebuilt_entries": 0,
@@ -345,9 +301,7 @@ class PreGeneratedAudio:
                     os.remove(file_path)
                     orphaned_files_removed += 1
                 except Exception as e:
-                    PreGeneratedAudio.logger.error(
-                        f"Error removing orphaned file {orphan}.pcm: {e}"
-                    )
+                    PreGeneratedAudio.logger.error(f"Error removing orphaned file {orphan}.pcm: {e}")
                     errors += 1
 
             # Find missing files (in index but don't exist) and remove their entries
@@ -424,9 +378,7 @@ class PreGeneratedAudio:
         return str(index_path)
 
     @staticmethod
-    def _get_pregenerated_file_path_from_hash(
-        hash_key: str, provider_name: str, voice: str
-    ) -> str:
+    def _get_pregenerated_file_path_from_hash(hash_key: str, provider_name: str, voice: str) -> str:
         """Get the pregenerated file path from a hash"""
         file_path = Path(PreGeneratedAudio.pregenerated_dir) / provider_name / voice / f"{hash_key}.pcm"
         return str(file_path)

@@ -53,7 +53,13 @@ def sf_client_mock():
 
 class TestCalendarAgentTimeframesRule:
     """Test cases for the timeframes inclusion rule"""
-    
+
+    def setup_method(self):
+        """Set up test fixtures before each test method"""
+        # Set a consistent time for all tests
+        test_time = datetime(2025, 1, 15, 14, 30, 0)  # Wednesday 2:30 PM
+        CalendarAgent.now = pytz.timezone('Europe/Paris').localize(test_time)
+
     def test_prompt_contains_timeframes_rule(self):
         """Test that the prompt file contains the expected rule text"""
         # Create a simple agent to access the prompt loading method

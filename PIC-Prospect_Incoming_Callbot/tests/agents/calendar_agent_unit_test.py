@@ -1,9 +1,9 @@
 from datetime import datetime
 from unittest.mock import AsyncMock
-
+import pytz
 import pytest
 from langchain_core.messages import AIMessage
-from langchain_core.runnables import Runnable
+from langchain_core.language_models import BaseLanguageModel
 
 from app.agents.agents_graph import EnvHelper, LangChainAdapterType, LangChainFactory, LlmInfo
 from app.agents.calendar_agent import CalendarAgent
@@ -12,24 +12,58 @@ from app.agents.text_registry import TextRegistry
 LLM_SHOULD_FAIL = object()  # Marker object to indicate LLM failure in tests
 
 
-class FakeLLM(Runnable):
+class FakeLLM(BaseLanguageModel):
     def __init__(self, fake_value_to_return: str = "fake llm response", raise_exception: bool = False):
         self._fake_value_to_return = fake_value_to_return
         self._raise_exception = raise_exception
+
+    def _check_exception(self, method_name: str):
+        """Check if exception should be raised for this method."""
+        if self._raise_exception:
+            raise Exception(f"LLM {method_name} failed for test")
+
+    def _get_text_response(self, method_name: str) -> str:
+        """Get text response, checking for exceptions first."""
+        self._check_exception(method_name)
+        return self._fake_value_to_return
+
+    def _get_message_response(self, method_name: str) -> AIMessage:
+        """Get AIMessage response, checking for exceptions first."""
+        self._check_exception(method_name)
+        return AIMessage(content=self._fake_value_to_return)
 
     def bind_tools(self, _tools):
         return self
 
     async def ainvoke(self, _messages, create_task=True):
-        if self._raise_exception:
-            raise Exception("LLM ainvoke failed for test")
-        return AIMessage(content=self._fake_value_to_return)
+        return self._get_message_response("ainvoke")
 
     def invoke(self, _messages, create_task=True):
-        if self._raise_exception:
-            raise Exception("LLM invoke failed for test")
-        return AIMessage(content=self._fake_value_to_return)
+        return self._get_message_response("invoke")
 
+    async def astream(self, _messages, create_task=True):
+        return self._get_message_response("astream")
+
+    def stream(self, _messages, create_task=True):
+        return self._get_message_response("stream")
+
+    async def agenerate_prompt(self, _messages, create_task=True):
+        return self._get_message_response("agenerate_prompt")
+
+    def generate_prompt(self, _messages, create_task=True):
+        return self._get_message_response("generate_prompt")
+
+    async def apredict(self, text, **kwargs):
+        return self._get_text_response("apredict")
+
+    async def apredict_messages(self, messages, **kwargs):
+        return self._get_message_response("apredict_messages")
+
+    def predict(self, text, **kwargs):
+        return self._get_text_response("predict")
+
+    def predict_messages(self, messages, **kwargs):
+        return self._get_message_response("predict_messages")
 
 @pytest.fixture
 def sf_client_mock():
@@ -66,7 +100,7 @@ async def test_calendar_agent_classification(sf_client_mock, user_input, chat_hi
 
     agent = CalendarAgent(sf_client_mock, llm_instance)
     # Set deterministic time for output
-    CalendarAgent.now = datetime(2025, 6, 19)
+    CalendarAgent.now = datetime(2025, 6, 19, tzinfo=pytz.timezone("Europe/Paris"))
     # User info is needed because categorize_request_for_dispatch_async formats a prompt with owner_name
     agent._set_user_info("test_user_id", "Test", "User", "test@example.com", "test_owner_id", "TestOwnerName")
 
@@ -81,7 +115,7 @@ async def test_proposition_de_creneaux_calls_get_appointments(sf_client_mock):
     openai_api_key = EnvHelper.get_openai_api_key()
     calendar_timeframes_llm = LangChainFactory.create_llm_from_info(LlmInfo(type=LangChainAdapterType.OpenAI, model="gpt-4.1", timeout=50, temperature=0.1, api_key=openai_api_key))
     agent = CalendarAgent(sf_client_mock, FakeLLM("Proposition de créneaux"), calendar_timeframes_llm)
-    CalendarAgent.now = datetime(2025, 6, 19)
+    CalendarAgent.now = datetime(2025, 6, 19, tzinfo=pytz.timezone("Europe/Paris"))
     agent._set_user_info("uid", "John", "Doe", "john@ex.com", "ownerId", "Alice")
 
     await agent.run_async("Je voudrais un rendez-vous", [])
@@ -105,7 +139,7 @@ async def test_proposition_de_creneaux_calls_get_appointments(sf_client_mock):
 )
 async def test_user_confirmation_calls_schedule_new_appointment(sf_client_mock, user_input, chat_history):
     agent = CalendarAgent(sf_client_mock, FakeLLM("Rendez-vous confirmé"), FakeLLM(""), FakeLLM("2025-06-10T10:00:00Z"))
-    CalendarAgent.now = datetime(2025, 6, 9)
+    CalendarAgent.now = datetime(2025, 6, 9, tzinfo=pytz.timezone("Europe/Paris"))
     agent._set_user_info("uid", "John", "Doe", "john@ex.com", "ownerId", "Alice")
     await agent.run_async(user_input, chat_history)
     sf_client_mock.schedule_new_appointment_async.assert_awaited()
@@ -145,7 +179,7 @@ async def test_appointment_too_far_validation(sf_client_mock, user_input, chat_h
     agent = CalendarAgent(sf_client_mock, classifier_llm, None, date_extractor_llm)
 
     # Set a fixed "now" date for consistent testing - June 19, 2025
-    CalendarAgent.now = datetime(2025, 6, 19)
+    CalendarAgent.now = datetime(2025, 6, 19, tzinfo=pytz.timezone("Europe/Paris"))
     agent._set_user_info("uid", "John", "Doe", "john@ex.com", "ownerId", "Alice")
 
     # Call run_async with the test input

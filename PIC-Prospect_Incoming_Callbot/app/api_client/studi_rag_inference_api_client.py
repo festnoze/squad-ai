@@ -11,14 +11,13 @@ from api_client.request_models.query_asking_request_model import (
     QueryNoConversationRequestModel,
 )
 from api_client.request_models.user_request_model import UserRequestModel
+from database.models.conversation import Conversation
+from database.models.message import Message
+from database.models.user import User
 from speech.text_processing import ProcessText
 from utils.envvar import EnvHelper
 from utils.latency_decorator import measure_latency, measure_streaming_latency
 from utils.latency_metric import OperationType
-
-from database.models.conversation import Conversation
-from database.models.message import Message
-from database.models.user import User
 
 
 class StudiRAGInferenceApiClient(ConversationPersistenceInterface, RagQueryInterface):
