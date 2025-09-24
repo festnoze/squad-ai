@@ -13,15 +13,35 @@ class EnvHelper:
 
     @staticmethod
     def get_salesforce_username() -> str:
-        return EnvHelper.get_env_variable_value_by_name("SALESFORCE_USERNAME") or ""
+        return EnvHelper.get_env_variable_value_by_name("SALESFORCE_USERNAME", fails_if_missing=False) or ""
 
     @staticmethod
     def get_salesforce_password() -> str:
-        return EnvHelper.get_env_variable_value_by_name("SALESFORCE_PASSWORD") or ""
+        return EnvHelper.get_env_variable_value_by_name("SALESFORCE_PASSWORD", fails_if_missing=False) or ""
 
     @staticmethod
     def get_salesforce_client_secret() -> str:
-        return EnvHelper.get_env_variable_value_by_name("SALESFORCE_CLIENT_SECRET") or ""
+        return EnvHelper.get_env_variable_value_by_name("SALESFORCE_CLIENT_SECRET", fails_if_missing=False) or ""
+
+    @staticmethod
+    def get_salesforce_private_key_file_path() -> str:
+        return EnvHelper.get_env_variable_value_by_name("SALESFORCE_PRIVATE_KEY_FILE_PATH", fails_if_missing=False) or ""
+
+    @staticmethod
+    def get_salesforce_private_key_file() -> str:
+        return EnvHelper.get_env_variable_value_by_name("SALESFORCE_PRIVATE_KEY_FILE", fails_if_missing=False) or ""
+
+    @staticmethod
+    def get_salesforce_consumer_key() -> str:
+        return EnvHelper.get_env_variable_value_by_name("SALESFORCE_CONSUMER_KEY", fails_if_missing=False) or ""
+
+    @staticmethod
+    def get_salesforce_url() -> str:
+        return EnvHelper.get_env_variable_value_by_name("SALESFORCE_URL", fails_if_missing=False) or ""
+
+    @staticmethod
+    def get_salesforce_auth_method() -> str:
+        return EnvHelper.get_env_variable_value_by_name("SALESFORCE_AUTH_METHOD", fails_if_missing=False) or "password"
 
     @staticmethod
     def get_salesforce_owner_strategy() -> str:
@@ -47,20 +67,20 @@ class EnvHelper:
 
     @staticmethod
     def get_company_name() -> str:
-        return EnvHelper.get_env_variable_value_by_name("COMPANY_NAME") or "Studi"
+        return EnvHelper.get_env_variable_value_by_name("COMPANY_NAME", fails_if_missing=False) or "Studi"
 
     @staticmethod
     def get_rag_api_host() -> str:
-        return EnvHelper.get_env_variable_value_by_name("RAG_API_HOST") or ""
+        return EnvHelper.get_env_variable_value_by_name("RAG_API_HOST", fails_if_missing=False) or ""
 
     @staticmethod
     def get_rag_api_port() -> int:
-        port_str = EnvHelper.get_env_variable_value_by_name("RAG_API_PORT")
+        port_str = EnvHelper.get_env_variable_value_by_name("RAG_API_PORT", fails_if_missing=False)
         return int(port_str) if port_str else 0
 
     @staticmethod
     def get_rag_api_is_ssh() -> bool:
-        value = EnvHelper.get_env_variable_value_by_name("RAG_API_IS_SSH")
+        value = EnvHelper.get_env_variable_value_by_name("RAG_API_IS_SSH", fails_if_missing=False)
         return value is not None and value.lower() == "true"
 
     @staticmethod
@@ -99,56 +119,56 @@ class EnvHelper:
 
     @staticmethod
     def get_python_paths() -> list[str]:
-        paths = EnvHelper.get_env_variable_value_by_name("PYTHONPATH") or ""
+        paths = EnvHelper.get_env_variable_value_by_name("PYTHONPATH", fails_if_missing=False) or ""
         return paths.split(";")
 
     @staticmethod
     def get_do_audio_preprocessing() -> bool:
-        value = EnvHelper.get_env_variable_value_by_name("DO_AUDIO_PREPROCESSING")
+        value = EnvHelper.get_env_variable_value_by_name("DO_AUDIO_PREPROCESSING", fails_if_missing=False)
         return value is not None and value.lower() == "true"
 
     @staticmethod
     def get_keep_incoming_audio_files() -> bool:
-        value = EnvHelper.get_env_variable_value_by_name("KEEP_INCOMING_AUDIO_FILES")
+        value = EnvHelper.get_env_variable_value_by_name("KEEP_INCOMING_AUDIO_FILES", fails_if_missing=False)
         return value is not None and value.lower() == "true"
 
     @staticmethod
     def get_keep_outgoing_audio_file() -> bool:
-        value = EnvHelper.get_env_variable_value_by_name("KEEP_OUTGOING_AUDIO_FILES")
+        value = EnvHelper.get_env_variable_value_by_name("KEEP_OUTGOING_AUDIO_FILES", fails_if_missing=False)
         return value is not None and value.lower() == "true"
 
     @staticmethod
     def get_text_to_speech_provider() -> str:
-        return EnvHelper.get_env_variable_value_by_name("TEXT_TO_SPEECH_PROVIDER") or ""
+        return EnvHelper.get_env_variable_value_by_name("TEXT_TO_SPEECH_PROVIDER", fails_if_missing=False) or ""
 
     @staticmethod
     def get_text_to_speech_voice() -> str:
-        return EnvHelper.get_env_variable_value_by_name("TEXT_TO_SPEECH_VOICE") or ""
+        return EnvHelper.get_env_variable_value_by_name("TEXT_TO_SPEECH_VOICE", fails_if_missing=False) or ""
 
     @staticmethod
     def get_text_to_speech_instructions() -> str:
-        return EnvHelper.get_env_variable_value_by_name("TEXT_TO_SPEECH_INSTRUCTIONS") or ""
+        return EnvHelper.get_env_variable_value_by_name("TEXT_TO_SPEECH_INSTRUCTIONS", fails_if_missing=False) or ""
 
     @staticmethod
     def get_text_to_speech_model() -> str:
-        return EnvHelper.get_env_variable_value_by_name("TEXT_TO_SPEECH_MODEL") or ""
+        return EnvHelper.get_env_variable_value_by_name("TEXT_TO_SPEECH_MODEL", fails_if_missing=False) or ""
 
     @staticmethod
     def get_speech_to_text_provider() -> str:
-        return EnvHelper.get_env_variable_value_by_name("SPEECH_TO_TEXT_PROVIDER") or ""
+        return EnvHelper.get_env_variable_value_by_name("SPEECH_TO_TEXT_PROVIDER", fails_if_missing=False) or ""
 
     @staticmethod
     def get_can_speech_be_interupted() -> bool:
-        value = EnvHelper.get_env_variable_value_by_name("CAN_SPEECH_BE_INTERUPTED") or ""
+        value = EnvHelper.get_env_variable_value_by_name("CAN_SPEECH_BE_INTERUPTED", fails_if_missing=False) or ""
         return value is not None and value.lower() == "true"
 
     @staticmethod
     def get_twilio_sid() -> str:
-        return EnvHelper.get_env_variable_value_by_name("TWILIO_SID") or ""
+        return EnvHelper.get_env_variable_value_by_name("TWILIO_SID", fails_if_missing=False) or ""
 
     @staticmethod
     def get_twilio_auth() -> str:
-        return EnvHelper.get_env_variable_value_by_name("TWILIO_AUTH") or ""
+        return EnvHelper.get_env_variable_value_by_name("TWILIO_AUTH", fails_if_missing=False) or ""
 
     @staticmethod
     def get_telnyx_api_key() -> str:
@@ -160,7 +180,7 @@ class EnvHelper:
 
     @staticmethod
     def get_repeat_user_input() -> bool:
-        value = EnvHelper.get_env_variable_value_by_name("REPEAT_USER_INPUT")
+        value = EnvHelper.get_env_variable_value_by_name("REPEAT_USER_INPUT", fails_if_missing=False)
         return value is not None and value.lower() == "true"
 
     @staticmethod

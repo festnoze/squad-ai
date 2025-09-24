@@ -2,10 +2,12 @@ import asyncio
 import json
 import logging
 import re
+import time
 import urllib.parse
 from datetime import UTC, datetime, timedelta
 
 import httpx
+import jwt
 import pytz
 from .calendar_client_interface import CalendarClientInterface
 from .salesforce_user_client_interface import SalesforceUserClientInterface
@@ -19,7 +21,11 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
     _username = EnvHelper.get_salesforce_username()
     _password = EnvHelper.get_salesforce_password()
     _client_secret = EnvHelper.get_salesforce_client_secret()
-    _private_key_file = "salesforce_server_private.key"
+    _private_key_file = EnvHelper.get_salesforce_private_key_file_path()
+    _consumer_key = EnvHelper.get_salesforce_consumer_key()
+    _private_key_file_jwt = EnvHelper.get_salesforce_private_key_file()
+    _salesforce_url = EnvHelper.get_salesforce_url()
+    _auth_method = EnvHelper.get_salesforce_auth_method()
     _is_sandbox = True
 
     def __init__(
@@ -28,11 +34,19 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
         username: str | None = None,
         private_key_file: str | None = None,
         is_sandbox: bool = True,
+        auth_method: str | None = None,
+        consumer_key: str | None = None,
+        private_key_file_jwt: str | None = None,
+        salesforce_url: str | None = None,
     ):
         self.logger = logging.getLogger(__name__)
         self._client_id = client_id or self._client_id
         self._username = username or self._username
         self._private_key_file = private_key_file or self._private_key_file
+        self._consumer_key = consumer_key or self._consumer_key
+        self._private_key_file_jwt = private_key_file_jwt or self._private_key_file_jwt
+        self._salesforce_url = salesforce_url or self._salesforce_url
+        self._auth_method = auth_method or self._auth_method
         self._is_sandbox = is_sandbox or self._is_sandbox
 
         # API settings
@@ -46,35 +60,127 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
         self.authenticate()  # Eager authentication on initialization
 
     def authenticate(self) -> bool:
-        """Authenticate with Salesforce using JWT and return success status"""
-        self.logger.info("Salesforce Authentication in progress...")
+        """Authenticate with Salesforce using JWT or password method based on configuration"""
+        self.logger.info(f"Salesforce Authentication in progress using {self._auth_method} method...")
 
-        # # Read private key
-        # try:
-        #     script_dir = os.path.dirname(os.path.abspath(__file__))
-        #     key_path = os.path.join(script_dir, self._private_key_file)
-        #     with open(key_path, 'r') as f:
-        #         private_key = f.read()
-        # except FileNotFoundError:
-        #     self.logger.error(f"Error: Private key file '{self._private_key_file}' not found")
-        #     self._access_token = None
-        #     self._instance_url = None
-        #     return False
+        if self._auth_method.lower() == "jwt":
+            return self._authenticate_jwt()
+        else:
+            return self._authenticate_password()
 
-        # # Create JWT payload
-        # payload = {
-        #     'iss': self._client_id,
-        #     'sub': self._username,
-        #     'aud': self._auth_url,
-        #     'exp': int(time.time()) + 300  # 5 minutes expiration
-        # }
-        # # Encode JWT
-        # jwt_token = jwt.encode(payload, private_key, algorithm='RS256')
-        # # Prepare authentication request
-        # params = {
-        #     'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-        #     'assertion': jwt_token
-        # }
+    def _authenticate_jwt(self) -> bool:
+        """Authenticate with Salesforce using JWT Bearer Token flow"""
+        self.logger.info("Using JWT authentication")
+
+        # Validate required JWT parameters
+        if not self._consumer_key:
+            self.logger.error("Error: SALESFORCE_CONSUMER_KEY is required for JWT authentication")
+            return False
+        if not self._username:
+            self.logger.error("Error: SALESFORCE_USERNAME is required for JWT authentication")
+            return False
+        if not self._private_key_file_jwt:
+            self.logger.error("Error: SALESFORCE_PRIVATE_KEY_FILE is required for JWT authentication")
+            return False
+
+        # Use salesforce_url if provided, otherwise use auth_url
+        audience_url = self._salesforce_url if self._salesforce_url else self._auth_url
+
+        try:
+            # Read private key file
+            with open(self._private_key_file_jwt, 'r', encoding='utf-8') as f:
+                private_key = f.read()
+
+            self.logger.debug(f"Using private key from: {self._private_key_file_jwt}")
+
+        except FileNotFoundError:
+            self.logger.error(f"Error: Private key file '{self._private_key_file_jwt}' not found")
+            self._access_token = None
+            self._instance_url = None
+            return False
+        except Exception as e:
+            self.logger.error(f"Error reading private key file: {e!s}")
+            self._access_token = None
+            self._instance_url = None
+            return False
+
+        try:
+            # Create JWT payload
+            payload = {
+                'iss': self._consumer_key,  # Issuer (Consumer Key from Connected App)
+                'sub': self._username,      # Subject (Salesforce username)
+                'aud': audience_url,        # Audience (Salesforce URL)
+                'exp': int(time.time()) + 300  # Expiration (5 minutes from now)
+            }
+
+            self.logger.debug(f"JWT payload: iss={self._consumer_key}, sub={self._username}, aud={audience_url}")
+
+            # Encode JWT using RS256 algorithm
+            jwt_token = jwt.encode(payload, private_key, algorithm='RS256')
+
+            # Prepare authentication request
+            params = {
+                'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+                'assertion': jwt_token
+            }
+
+            # Send authentication request
+            with httpx.Client() as client:
+                response = client.post(self._auth_url, data=params)
+                response.raise_for_status()
+
+                # Process response
+                auth_data = response.json()
+                self._access_token = auth_data.get("access_token")
+                self._instance_url = auth_data.get("instance_url")
+
+                if self._access_token and self._instance_url:
+                    self.logger.info("JWT Authentication successful.")
+                    return True
+                else:
+                    error_msg = "JWT Authentication completed but access_token or instance_url is missing."
+                    if not self._access_token:
+                        error_msg += " Access token is missing."
+                    if not self._instance_url:
+                        error_msg += " Instance URL is missing."
+                    self.logger.error(error_msg)
+                    self._access_token = None
+                    self._instance_url = None
+                    return False
+
+        except jwt.InvalidKeyError as e:
+            self.logger.error(f"JWT Invalid key error: {e!s}")
+            self._access_token = None
+            self._instance_url = None
+            return False
+        except httpx.HTTPStatusError as e:
+            self.logger.error(f"JWT Authentication HTTP error: {e.response.status_code} - {e.response.text}")
+            self._access_token = None
+            self._instance_url = None
+            return False
+        except Exception as e:
+            self.logger.error(f"JWT Authentication error: {e!s}")
+            self._access_token = None
+            self._instance_url = None
+            return False
+
+    def _authenticate_password(self) -> bool:
+        """Authenticate with Salesforce using password flow (legacy method)"""
+        self.logger.info("Using password authentication")
+
+        # Validate required password parameters
+        if not self._client_id:
+            self.logger.error("Error: Client ID is required for password authentication")
+            return False
+        if not self._client_secret:
+            self.logger.error("Error: SALESFORCE_CLIENT_SECRET is required for password authentication")
+            return False
+        if not self._username:
+            self.logger.error("Error: SALESFORCE_USERNAME is required for password authentication")
+            return False
+        if not self._password:
+            self.logger.error("Error: SALESFORCE_PASSWORD is required for password authentication")
+            return False
 
         params = {
             "grant_type": "password",
@@ -96,26 +202,26 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
                 self._instance_url = auth_data.get("instance_url")
 
                 if self._access_token and self._instance_url:
-                    self.logger.info("Authentication successful.")
+                    self.logger.info("Password Authentication successful.")
                     return True
                 else:
-                    error_msg = "Authentication completed but access_token or instance_url is missing."
+                    error_msg = "Password Authentication completed but access_token or instance_url is missing."
                     if not self._access_token:
                         error_msg += " Access token is missing."
                     if not self._instance_url:
                         error_msg += " Instance URL is missing."
-                    self.logger.info(error_msg)
+                    self.logger.error(error_msg)
                     self._access_token = None  # Ensure clean state
                     self._instance_url = None
                     return False
 
             except httpx.HTTPStatusError as e:
-                self.logger.info(f"Authentication HTTP error: {e.response.status_code} - {e.response.text}")
+                self.logger.error(f"Password Authentication HTTP error: {e.response.status_code} - {e.response.text}")
                 self._access_token = None
                 self._instance_url = None
                 return False
             except Exception as e:
-                self.logger.info(f"Authentication error: {e!s}")
+                self.logger.error(f"Password Authentication error: {e!s}")
                 self._access_token = None
                 self._instance_url = None
                 return False
