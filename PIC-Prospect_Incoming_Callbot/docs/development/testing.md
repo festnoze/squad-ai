@@ -410,40 +410,24 @@ class TestAgentIntegration:
         )
 
         # Mock external services
-        with patch('app.agents.lead_agent.LeadAgent.process_async') as mock_lead, \
-             patch('app.agents.calendar_agent.CalendarAgent.process_async') as mock_calendar, \
-             patch('app.agents.sf_agent.SalesforceAgent.process_async') as mock_sf:
+        with patch('app.agents.calendar_agent.CalendarAgent.process_async') as mock_calendar:
 
             # Configure mock responses
-            mock_lead.return_value = initial_state.copy()
-            mock_lead.return_value.update({
-                'qualification_complete': True,
-                'qualification_score': 8.0
-            })
-
             mock_calendar.return_value = initial_state.copy()
             mock_calendar.return_value.update({
                 'appointment_scheduled': True,
                 'calendar_event_id': 'event_123'
             })
 
-            mock_sf.return_value = initial_state.copy()
-            mock_sf.return_value.update({
-                'salesforce_lead_id': 'lead_456'
-            })
-
             # Execute workflow
             final_state = await agent_graph.execute_async(initial_state)
 
             # Verify all agents were called
-            mock_lead.assert_called_once()
             mock_calendar.assert_called_once()
-            mock_sf.assert_called_once()
 
             # Verify final state
-            assert final_state['qualification_complete'] is True
             assert final_state['appointment_scheduled'] is True
-            assert final_state['salesforce_lead_id'] == 'lead_456'
+            assert final_state['calendar_event_id'] == 'event_123'
 
     @pytest.mark.asyncio
     async def test_agent_transition_logic(self, agent_graph):

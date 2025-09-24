@@ -49,31 +49,7 @@ graph TD
 
 ## Individual Agents
 
-### 1. Lead Agent (`app/agents/lead_agent.py`)
-
-**Purpose**: Prospect qualification and information gathering
-
-**Key Responsibilities**:
-- Conduct qualification conversations
-- Collect prospect information (name, company, needs)
-- Assess lead quality and interest level
-- Determine next appropriate action
-
-**Configuration**: `app/agents/configs/lead_agent_config.yaml`
-
-**Key Methods**:
-```python
-async def qualify_prospect_async(state: PhoneConversationState) -> PhoneConversationState
-async def assess_lead_quality_async(state: PhoneConversationState) -> str
-async def collect_contact_info_async(state: PhoneConversationState) -> PhoneConversationState
-```
-
-**Transition Conditions**:
-- **To Calendar Agent**: High-quality lead ready to schedule
-- **To Termination**: Unqualified or uninterested prospect
-- **Loop Back**: Need more information for qualification
-
-### 2. Calendar Agent (`app/agents/calendar_agent.py`)
+### 1. Calendar Agent (`app/agents/calendar_agent.py`)
 
 **Purpose**: Appointment scheduling and calendar management
 
@@ -101,31 +77,6 @@ async def handle_scheduling_conflict_async(conflict: SchedulingConflict) -> Reso
 - `app/api_client/calendar_client_interface.py`: Generic calendar interface
 - `app/api_client/google_calendar_client.py`: Google Calendar implementation
 - `app/api_client/salesforce_api_client.py`: Salesforce calendar implementation
-
-### 3. Salesforce Agent (`app/agents/sf_agent.py`)
-
-**Purpose**: CRM integration and data management
-
-**Key Responsibilities**:
-- Create and update prospect records
-- Log call activities and outcomes
-- Update lead status and opportunity stages
-- Sync appointment data with CRM
-
-**Configuration**: `app/agents/configs/sf_agent_config.yaml`
-
-**Key Methods**:
-```python
-async def create_lead_record_async(prospect_data: ProspectData) -> LeadRecord
-async def update_opportunity_async(opportunity_id: str, updates: Dict) -> OpportunityRecord
-async def log_call_activity_async(call_details: CallDetails) -> ActivityRecord
-```
-
-**Data Operations**:
-- **Lead Creation**: New prospect records with qualification data
-- **Activity Logging**: Call transcripts and outcomes
-- **Opportunity Updates**: Stage progression and notes
-- **Contact Management**: Contact record creation and updates
 
 ## Agent Coordination
 

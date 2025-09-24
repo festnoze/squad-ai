@@ -41,9 +41,7 @@ This is a **Prospect Incoming Callbot** - an AI-powered phone conversation syste
 
 1. **Agent System (LangGraph-based)**:
    - `app/agents/agents_graph.py` - Main orchestration using LangGraph StateGraph
-   - `app/agents/lead_agent.py` - Lead qualification agent
    - `app/agents/calendar_agent.py` - Calendar scheduling agent  
-   - `app/agents/sf_agent.py` - Salesforce integration agent
    - State model: `phone_conversation_state_model.py`
 
 2. **Audio Processing Pipeline**:

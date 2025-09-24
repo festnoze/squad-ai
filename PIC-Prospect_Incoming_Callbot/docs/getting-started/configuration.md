@@ -81,7 +81,7 @@ Store sensitive credentials in the `secrets/` directory:
 secrets/
 ├── google-credentials-for-GCP-deploiement.json
 ├── google-calendar-credentials.json
-├── salesforce-credentials.json
+├── salesforce-uat-ia.key
 └── openai-api-key.txt
 ```
 
@@ -92,9 +92,7 @@ secrets/
 
 Agent behaviors are configured via YAML files in `app/agents/configs/`:
 
-- `lead_agent_config.yaml` - Lead qualification settings
 - `calendar_agent_config.yaml` - Calendar booking configuration
-- `sf_agent_config.yaml` - Salesforce integration settings
 
 ## Audio Configuration
 
