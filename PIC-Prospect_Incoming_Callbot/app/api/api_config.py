@@ -13,7 +13,8 @@ from speech.pregenerated_audio import PreGeneratedAudio
 from starlette.responses import Response as StarletteResponse
 #
 from utils.envvar import EnvHelper
-from routers import callbot_router
+from routers.callbot_router import callbot_router
+from routers.conversation_router import conversation_router
 from routers.logs_router import logs_router
 from routers.test_router import test_router
 
@@ -54,8 +55,9 @@ class ApiConfig:
         load_dotenv()
         EnvHelper.load_all_env_var()
 
-        app.include_router(callbot_router.callbot_router)
+        app.include_router(callbot_router)
         app.include_router(logs_router)
+        app.include_router(conversation_router)
         app.include_router(test_router)
 
         # Serve documentation as static files

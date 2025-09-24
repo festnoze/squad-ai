@@ -33,3 +33,9 @@ class Message:
             "elapsed_seconds": self.elapsed_seconds,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
+
+    def to_short_dict(self) -> dict:
+        return {
+            "role": self.role,
+            "content": self.content,
+        }

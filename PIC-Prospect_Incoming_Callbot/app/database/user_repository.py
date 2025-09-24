@@ -29,6 +29,13 @@ class UserRepository:
         user_entity = await self.data_context.get_first_entity_async(UserEntity, filters=[UserEntity.name == user_name])
         return ConversationEntityToDtoConverter.convert_user_entity_to_model(user_entity)
 
+    async def get_user_by_ip_or_phone_async(self, ip_or_phone: str) -> User | None:
+        """Get user by IP address"""
+        user_id = await self.get_device_info_by_IP_async(ip_or_phone, [DeviceInfoEntity.user_id])
+        if user_id:
+            return await self.get_user_by_id_async(user_id)
+        return None
+
     async def does_exist_user_async(self, user: User) -> bool:
         return await self.get_user_id_if_exists_async(user) is not None
 

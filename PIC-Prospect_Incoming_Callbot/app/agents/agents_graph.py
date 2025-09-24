@@ -5,8 +5,6 @@ from asyncio import Task
 from typing import Hashable
 from uuid import UUID
 
-from langgraph.graph.state import CompiledStateGraph
-
 from api_client.conversation_persistence_interface import (
     ConversationPersistenceInterface,
 )
@@ -24,8 +22,10 @@ from api_client.salesforce_user_client_interface import SalesforceUserClientInte
 
 # Clients
 from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
+from database.conversation_persistence_service_factory import ConversationPersistenceServiceFactory
 from langchain_core.language_models.chat_models import BaseChatModel
 from langgraph.graph import END, StateGraph
+from langgraph.graph.state import CompiledStateGraph
 from managers.consecutive_error_manager import ConsecutiveErrorManager
 from managers.outgoing_audio_manager import OutgoingAudioManager
 from managers.outgoing_manager import OutgoingManager
@@ -41,12 +41,6 @@ from agents.lead_agent import LeadAgent
 from agents.phone_conversation_state_model import PhoneConversationState
 from agents.sf_agent import SFAgent
 from agents.text_registry import TextRegistry
-from app.database.conversation_persistence_local_service import (
-    ConversationPersistenceLocalService,
-)
-from app.database.conversation_persistence_service_fake import (
-    ConversationPersistenceServiceFake,
-)
 from llms.langchain_adapter_type import LangChainAdapterType
 from llms.langchain_factory import LangChainFactory
 from llms.llm_info import LlmInfo
@@ -81,18 +75,7 @@ class AgentsGraph:
         if conversation_persistence:
             self.conversation_persistence = conversation_persistence
         else:
-            # Check for inconsistent states
-            if "ask_rag" not in self.available_actions:
-                assert self.conversation_persistence_type != "studi_rag", "when 'ask_rag' action is not available, conversation persistence type cannot be 'studi_rag' but is: " + self.conversation_persistence_type
-            # else:
-            #     assert conversation_persistence_type == "studi_rag", "when 'ask_rag' action is available, conversation persistence type must be 'studi_rag' but is: " + conversation_persistence_type
-        
-            if self.conversation_persistence_type == "local":
-                self.conversation_persistence = ConversationPersistenceLocalService()
-            elif self.conversation_persistence_type == "studi_rag":
-                self.conversation_persistence = StudiRAGInferenceApiClient()
-            else:
-                self.conversation_persistence = ConversationPersistenceServiceFake()
+            self.conversation_persistence = ConversationPersistenceServiceFactory.create_conversation_persistence_service(self.conversation_persistence_type, self.available_actions)
 
         self.rag_query_service = rag_query_service or StudiRAGInferenceApiClient()
         self.salesforce_api_client: SalesforceUserClientInterface = salesforce_client or SalesforceApiClient()
@@ -156,12 +139,7 @@ class AgentsGraph:
         workflow.add_conditional_edges(
             "user_identification",
             self.user_identification_decide_next_step,
-            {
-                "user_identified": "user_identified",
-                "user_new": "user_new",
-                "anonymous_user": "anonymous_user",
-                END: END
-            },
+            {"user_identified": "user_identified", "user_new": "user_new", "anonymous_user": "anonymous_user", END: END},
         )
 
         workflow.add_node("wait_for_user_input", self.wait_for_user_input_node)
