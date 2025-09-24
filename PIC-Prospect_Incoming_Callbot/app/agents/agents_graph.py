@@ -34,12 +34,8 @@ from utils.twilio_sid_converter import TwilioCallSidConverter
 
 from agents.calendar_agent import CalendarAgent
 
-# Agents
-from agents.lead_agent import LeadAgent
-
 # Models
 from agents.phone_conversation_state_model import PhoneConversationState
-from agents.sf_agent import SFAgent
 from agents.text_registry import TextRegistry
 from llms.langchain_adapter_type import LangChainAdapterType
 from llms.langchain_factory import LangChainFactory
@@ -83,7 +79,6 @@ class AgentsGraph:
         self.has_waiting_music_on_calendar: bool = EnvHelper.get_waiting_music_on_calendar()
         self.has_waiting_music_on_rag: bool = EnvHelper.get_waiting_music_on_rag()
         lid_config_file_path = os.path.join(os.path.dirname(__file__), "configs", "lid_api_config.yaml")
-        self.lead_agent_instance = LeadAgent(config_path=lid_config_file_path)
         self.logger.info(f"Initialize Lead Agent succeed with config: {lid_config_file_path}")
         openai_api_key = EnvHelper.get_openai_api_key()
         self.calendar_classifier_llm: BaseChatModel = LangChainFactory.create_llm_from_info(
@@ -113,7 +108,6 @@ class AgentsGraph:
         )
         self.logger.info("Initialize Calendar Agent succeed")
 
-        self.sf_agent_instance = SFAgent()
         self.logger.info("Initialize SF Agent succeed")
         self.graph: CompiledStateGraph = self._build_graph()
 
@@ -144,9 +138,6 @@ class AgentsGraph:
 
         workflow.add_node("wait_for_user_input", self.wait_for_user_input_node)
         workflow.add_edge("wait_for_user_input", END)
-
-        if "create_lead" in self.available_actions:
-            workflow.add_node("lead_agent", self.lead_agent_node)
 
         if "schedule_appointement" in self.available_actions:
             workflow.add_node("calendar_agent", self.calendar_agent_node)
@@ -522,94 +513,6 @@ class AgentsGraph:
     async def wait_for_user_input_node(self, state: PhoneConversationState) -> PhoneConversationState:
         """Wait for user input"""
         return state
-
-    async def lead_agent_node(self, state: PhoneConversationState) -> PhoneConversationState:
-        """Handles lead qualification and information gathering using LeadAgent."""
-        call_sid = state.get("call_sid", "N/A")
-        self.logger.info(f"[{call_sid}] Entering Lead Agent node")
-        user_input = state["user_input"]
-        # Retrieve previously extracted info from scratchpad if continuing interaction
-        current_extracted_info = state.get("agent_scratchpad", {}).get("lead_extracted_info", {})
-
-        if not self.lead_agent_instance:
-            self.logger.error(f"[{call_sid}] LeadAgent not initialized. Cannot process.")
-            await self.add_AI_response_message_to_conversation_async(TextRegistry.lead_agent_error_text, state)
-            return state
-
-        try:
-            # 1. Extract info using LLM (based on LeadAgent logic)
-            # Use latest user input + potentially context from history if needed
-            self.logger.debug(f"[{call_sid}] Extracting info from: {user_input}")
-            # Ensure the agent method handles potential errors gracefully
-            new_extracted_info = {}
-            try:
-                new_extracted_info = self.lead_agent_instance._extract_info_with_llm(user_input)
-            except Exception as llm_exc:
-                self.logger.error(f"[{call_sid}] Error during _extract_info_with_llm: {llm_exc}", exc_info=True)
-                # Handle error, maybe return a specific state or default info
-
-            self.logger.debug(f"[{call_sid}] Newly extracted info: {new_extracted_info}")
-
-            # Merge new info with existing info from scratchpad
-            combined_info = {**current_extracted_info, **new_extracted_info}
-            self.logger.debug(f"[{call_sid}] Combined extracted info: {combined_info}")
-
-            # 2. Identify missing fields (based on LeadAgent logic)
-            missing_fields = self.lead_agent_instance._get_missing_fields(combined_info)
-            self.logger.debug(f"[{call_sid}] Missing fields: {missing_fields}")
-
-            # 3. Format request data (based on LeadAgent logic)
-            request_data = self.lead_agent_instance._format_request(combined_info)
-            self.logger.debug(f"[{call_sid}] Formatted request data: {request_data}")
-
-            # 4. Validate request (based on LeadAgent logic)
-            is_valid, validation_error = self.lead_agent_instance._validate_request(request_data)
-            self.logger.info(f"[{call_sid}] Request validation - Valid: {is_valid}, Error: {validation_error}")
-
-            # 5. Determine response and next step
-            if not is_valid:
-                missing_desc = ", ".join([f["description"] for f in missing_fields])
-                response_text = f"Pourriez-vous me donner les informations manquantes, s'il vous plaît ? Il me manque : {missing_desc}"
-                next_step = "ask_user_for_info"  # Indicate we need more info
-            else:
-                # Attempt to send the lead data
-                try:
-                    self.logger.info(f"[{call_sid}] Sending valid lead data: {request_data}")
-                    # NOTE: send_request is synchronous in the original agent.
-                    # Consider making it async or running in a thread pool if it's slow.
-                    # For now, assume it's acceptable to run synchronously within the async node.
-                    result = self.lead_agent_instance.send_request(request_data)
-                    self.logger.info(f"[{call_sid}] Lead injection API response status: {result.status_code}")
-
-                    # Check response status code
-                    if 200 <= result.status_code < 300:
-                        response_text = "Vous êtes bien enregistré. Un conseiller en formation va vous rappeler au plus vite. Passez une bonne journée de la part de Studi."
-                        next_step = "lead_captured"  # Indicate success
-                    else:
-                        # Attempt to get error detail from response body if possible
-                        error_detail = result.text[:100] if hasattr(result, "text") else "No details"
-                        response_text = f"Désolé, une erreur est survenue ({result.status_code}: {error_detail}) lors de la création de votre fiche. Veuillez réessayer plus tard."
-                        next_step = "api_error"
-                except Exception as api_exc:
-                    self.logger.error(f"[{call_sid}] Error sending lead data: {api_exc}", exc_info=True)
-                    response_text = "Désolé, une erreur technique est survenue lors de l'enregistrement. Veuillez réessayer plus tard."
-                    next_step = "api_error"
-
-            # Update state
-            updated_scratchpad = state.get("agent_scratchpad", {})
-            updated_scratchpad["lead_extracted_info"] = combined_info
-            updated_scratchpad["lead_missing_fields"] = missing_fields
-            updated_scratchpad["lead_last_status"] = next_step
-
-            return state
-
-        except Exception as e:
-            self.logger.error(f"[{call_sid[-4:]}] Error in Lead Agent node: {e}", exc_info=True)
-            response_text = "Je rencontre un problème pour traiter votre demande."
-            # Include the error in the scratchpad for debugging if needed
-            error_scratchpad = state.get("agent_scratchpad", {})
-            error_scratchpad["error"] = str(e)
-            return state
 
     async def calendar_agent_node(self, state: PhoneConversationState) -> PhoneConversationState:
         """Handles calendar operations using CalendarAgent."""
