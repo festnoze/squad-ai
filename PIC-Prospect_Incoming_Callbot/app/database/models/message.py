@@ -34,6 +34,12 @@ class Message:
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 
+    def to_compact_text(self) -> str:
+        return f"{self.role}: {self.content}"
+
+    def to_compact_dict(self) -> dict:
+        return {self.role: self.content}
+
     def to_short_dict(self) -> dict:
         return {
             "role": self.role,

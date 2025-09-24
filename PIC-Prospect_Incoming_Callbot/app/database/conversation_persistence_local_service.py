@@ -11,7 +11,6 @@ from database.models.message import Message
 from database.models.user import User
 from database.user_repository import UserRepository
 
-
 class QuotaOverloadException(Exception):
     pass
 
@@ -44,22 +43,26 @@ class ConversationPersistenceLocalService(ConversationPersistenceInterface):
 
     async def create_new_conversation_async(self, conversation_request_model: ConversationRequestModel, timeout: int = 10) -> UUID:
         user_id = conversation_request_model.user_id
-        recent_conversation_count = await self.conversation_repository.get_recent_conversations_count_by_user_id_async(
-            user_id
-        )
+        if not user_id:
+            raise ValueError("User id is required.")
+        recent_conversation_count = await self.conversation_repository.get_recent_conversations_count_by_user_id_async(user_id)
         if self.max_conversations_by_day and recent_conversation_count >= self.max_conversations_by_day:
             raise QuotaOverloadException("You have reached the maximum number of conversations allowed per day.")
 
         conv_id = conversation_request_model.conversation_id
         new_conversation = await self.conversation_repository.create_new_conversation_empty_async(user_id, conv_id)
+        if not new_conversation:
+            raise ValueError(f"Conversation with id: {conv_id} does not exist.")
         new_conv = await self.conversation_repository.get_conversation_by_id_async(new_conversation.id)
 
+        if not new_conv:
+            raise ValueError(f"Conversation with id: {conv_id} does not exist.")
         if conversation_request_model.messages and any(conversation_request_model.messages):
             for message_model in conversation_request_model.messages:
                 message = Message(
                     role=message_model.role,
                     content=message_model.content,
-                    elapsed_seconds=message_model.elapsed_seconds,
+                    elapsed_seconds=int(message_model.elapsed_seconds),
                 )
                 new_conv.add_new_message(message.role, message.content)
                 await self.conversation_repository.add_message_to_existing_conversation_async(

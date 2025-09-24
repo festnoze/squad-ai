@@ -23,7 +23,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 callbot_router = APIRouter()
 
 # Instanciate after app startup
-phone_call_websocket_events_handler_factory: PhoneCallWebsocketEventsHandlerFactory
+phone_call_websocket_events_handler_factory: PhoneCallWebsocketEventsHandlerFactory = PhoneCallWebsocketEventsHandlerFactory()
 allowed_signatures: list[str] = []
 twilio_authenticate = RequestValidator(EnvHelper.get_twilio_auth())
 
@@ -65,25 +65,17 @@ async def verify_twilio_call_sid(call_sid: str, from_number: str) -> None:
             raise HTTPException(status_code=403, detail=err_msg)
 
 
-# ========= Incoming phone call endpoint ========= #
+# ========= Incoming phone call endpoints ========= #
 @callbot_router.post("/")
-async def voice_incoming_call_endpoint(request: Request) -> HTMLResponse:
-    logger.info("Received POST request for voice endpoint")
-    provider = get_phone_provider(PhoneProviderType.TWILIO)
-    return await create_websocket_for_incoming_call_async(request, provider)
-
-# ========= Provider-specific endpoints ========= #
 @callbot_router.post("/twilio")
 async def twilio_voice_incoming_call_endpoint(request: Request) -> HTMLResponse:
     logger.info("Received POST request for Twilio voice endpoint")
-    provider = get_phone_provider(PhoneProviderType.TWILIO)
-    return await create_websocket_for_incoming_call_async(request, provider)
+    return await create_websocket_for_incoming_call_async(request, PhoneProviderType.TWILIO)
 
 @callbot_router.post("/telnyx")
 async def telnyx_voice_incoming_call_endpoint(request: Request) -> HTMLResponse:
     logger.info("Received POST request for Telnyx voice endpoint")
-    provider = get_phone_provider(PhoneProviderType.TELNYX)
-    return await create_websocket_for_incoming_call_async(request, provider)
+    return await create_websocket_for_incoming_call_async(request, PhoneProviderType.TELNYX)
 
 @callbot_router.get("/websocket-url")
 @api_key_required
@@ -101,17 +93,18 @@ async def get_websocket_url_for_incoming_call_async(request: Request, provider: 
     ws_url = provider.get_websocket_url(request, phone_number, call_id)
     return ws_url, phone_number, call_id
 
-
-async def create_websocket_for_incoming_call_async(request: Request, provider: PhoneProvider) -> HTMLResponse:
+async def create_websocket_for_incoming_call_async(request: Request, phone_provider_type: PhoneProviderType) -> HTMLResponse:
     """Handle incoming phone calls from any provider"""
-    logger.info(f"Received POST request for {provider.provider_type.value} voice webhook")
+    
+    phone_provider = get_phone_provider(phone_provider_type)
+    logger.info(f"Received POST request for {phone_provider.provider_type.value} voice webhook")
     try:
-        return await provider.create_websocket_response(request)
+        return await phone_provider.create_websocket_response(request)
 
     except Exception as e:
-        logger.error(f"Error processing {provider.provider_type.value} voice webhook: {e}", exc_info=True)
+        logger.error(f"Error processing {phone_provider.provider_type.value} voice webhook: {e}", exc_info=True)
         # Create provider-specific error response
-        if provider.provider_type == PhoneProviderType.TWILIO:
+        if phone_provider.provider_type == PhoneProviderType.TWILIO:
             response = VoiceResponse()
             response.say("An error occurred processing your call. Please try again later.")
             return HTMLResponse(content=str(response), media_type="application/xml", status_code=500)
