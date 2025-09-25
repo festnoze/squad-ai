@@ -36,10 +36,6 @@ class EnvHelper:
         return EnvHelper.get_env_variable_value_by_name("SALESFORCE_CONSUMER_KEY", fails_if_missing=False) or ""
 
     @staticmethod
-    def get_salesforce_url() -> str:
-        return EnvHelper.get_env_variable_value_by_name("SALESFORCE_URL", fails_if_missing=False) or ""
-
-    @staticmethod
     def get_salesforce_auth_method() -> str:
         return EnvHelper.get_env_variable_value_by_name("SALESFORCE_AUTH_METHOD", fails_if_missing=False) or "password"
 

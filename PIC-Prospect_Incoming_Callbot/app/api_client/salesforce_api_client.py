@@ -24,7 +24,6 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
     _private_key_file = EnvHelper.get_salesforce_private_key_file_path()
     _consumer_key = EnvHelper.get_salesforce_consumer_key()
     _private_key_file_jwt = EnvHelper.get_salesforce_private_key_file()
-    _salesforce_url = EnvHelper.get_salesforce_url()
     _auth_method = EnvHelper.get_salesforce_auth_method()
     _is_sandbox = True
 
@@ -45,19 +44,17 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
         salesforce_url: str | None = None,
     ):
         self.logger = logging.getLogger(__name__)
+        salesforce_domain = "salesforce.com"
+        self.subdomain = "test" if is_sandbox else "login"
+        self._salesforce_url = f"https://{self.subdomain}.{salesforce_domain}"
+        self._auth_url = f"{self._salesforce_url}/services/oauth2/token"
         self._client_id = client_id or self._client_id
         self._username = username or self._username
         self._private_key_file = private_key_file or self._private_key_file
         self._consumer_key = consumer_key or self._consumer_key
         self._private_key_file_jwt = private_key_file_jwt or self._private_key_file_jwt
-        self._salesforce_url = salesforce_url or self._salesforce_url
         self._auth_method = auth_method or self._auth_method
         self._is_sandbox = is_sandbox or self._is_sandbox
-
-        # API settings
-        salesforce_domain = "salesforce.com"
-        self.subdomain = "test" if is_sandbox else "login"
-        self._auth_url = f"https://{self.subdomain}.{salesforce_domain}/services/oauth2/token"
         self._version_api = "v60.0"
 
         self.authenticate()
