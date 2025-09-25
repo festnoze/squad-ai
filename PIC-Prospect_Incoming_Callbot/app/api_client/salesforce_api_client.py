@@ -28,6 +28,11 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
     _auth_method = EnvHelper.get_salesforce_auth_method()
     _is_sandbox = True
 
+    # Static class-level authentication tokens (shared across all instances)
+    _static_access_token = None
+    _static_instance_url = None
+    _static_token_expiry = None
+
     def __init__(
         self,
         client_id: str | None = None,
@@ -55,12 +60,40 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
         self._auth_url = f"https://{self.subdomain}.{salesforce_domain}/services/oauth2/token"
         self._version_api = "v60.0"
 
-        self._access_token = None
-        self._instance_url = None
-        self.authenticate()  # Eager authentication on initialization
+        self.authenticate()
+
+    @classmethod
+    def _is_authenticated(cls) -> bool:
+        """Check if we have a valid static authentication token"""
+        if not cls._static_access_token or not cls._static_instance_url:
+            return False
+
+        # Check if token is expired (if we have expiry info)
+        if cls._static_token_expiry and datetime.now(UTC) >= cls._static_token_expiry:
+            cls._static_access_token = None
+            cls._static_instance_url = None
+            cls._static_token_expiry = None
+            return False
+
+        return True
+
+    @property
+    def _access_token(self) -> str | None:
+        """Get the current access token (static or None)"""
+        return self.__class__._static_access_token
+
+    @property
+    def _instance_url(self) -> str | None:
+        """Get the current instance URL (static or None)"""
+        return self.__class__._static_instance_url
 
     def authenticate(self) -> bool:
         """Authenticate with Salesforce using JWT or password method based on configuration"""
+        # Check if already authenticated
+        if self._is_authenticated():
+            self.logger.info(f"Already authenticated with Salesforce, skipping authentication")
+            return True
+
         self.logger.info(f"Salesforce Authentication in progress using {self._auth_method} method...")
 
         if self._auth_method.lower() == "jwt":
@@ -95,13 +128,15 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
 
         except FileNotFoundError:
             self.logger.error(f"Error: Private key file '{self._private_key_file_jwt}' not found")
-            self._access_token = None
-            self._instance_url = None
+            self.__class__._static_access_token = None
+            self.__class__._static_instance_url = None
+            self.__class__._static_token_expiry = None
             return False
         except Exception as e:
             self.logger.error(f"Error reading private key file: {e!s}")
-            self._access_token = None
-            self._instance_url = None
+            self.__class__._static_access_token = None
+            self.__class__._static_instance_url = None
+            self.__class__._static_token_expiry = None
             return False
 
         try:
@@ -131,37 +166,46 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
 
                 # Process response
                 auth_data = response.json()
-                self._access_token = auth_data.get("access_token")
-                self._instance_url = auth_data.get("instance_url")
+                access_token = auth_data.get("access_token")
+                instance_url = auth_data.get("instance_url")
 
-                if self._access_token and self._instance_url:
+                if access_token and instance_url:
+                    # Store tokens in static class variables
+                    self.__class__._static_access_token = access_token
+                    self.__class__._static_instance_url = instance_url
+                    # Set expiry time based on JWT payload expiration (5 minutes from now)
+                    self.__class__._static_token_expiry = datetime.now(UTC) + timedelta(minutes=4)  # 4 minutes to be safe
                     self.logger.info("JWT Authentication successful.")
                     return True
                 else:
                     error_msg = "JWT Authentication completed but access_token or instance_url is missing."
-                    if not self._access_token:
+                    if not access_token:
                         error_msg += " Access token is missing."
-                    if not self._instance_url:
+                    if not instance_url:
                         error_msg += " Instance URL is missing."
                     self.logger.error(error_msg)
-                    self._access_token = None
-                    self._instance_url = None
+                    self.__class__._static_access_token = None
+                    self.__class__._static_instance_url = None
+                    self.__class__._static_token_expiry = None
                     return False
 
         except jwt.InvalidKeyError as e:
             self.logger.error(f"JWT Invalid key error: {e!s}")
-            self._access_token = None
-            self._instance_url = None
+            self.__class__._static_access_token = None
+            self.__class__._static_instance_url = None
+            self.__class__._static_token_expiry = None
             return False
         except httpx.HTTPStatusError as e:
             self.logger.error(f"JWT Authentication HTTP error: {e.response.status_code} - {e.response.text}")
-            self._access_token = None
-            self._instance_url = None
+            self.__class__._static_access_token = None
+            self.__class__._static_instance_url = None
+            self.__class__._static_token_expiry = None
             return False
         except Exception as e:
             self.logger.error(f"JWT Authentication error: {e!s}")
-            self._access_token = None
-            self._instance_url = None
+            self.__class__._static_access_token = None
+            self.__class__._static_instance_url = None
+            self.__class__._static_token_expiry = None
             return False
 
     def _authenticate_password(self) -> bool:
@@ -198,36 +242,51 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
 
                 # Process response
                 auth_data = response.json()
-                self._access_token = auth_data.get("access_token")
-                self._instance_url = auth_data.get("instance_url")
+                access_token = auth_data.get("access_token")
+                instance_url = auth_data.get("instance_url")
 
-                if self._access_token and self._instance_url:
+                if access_token and instance_url:
+                    # Store tokens in static class variables
+                    self.__class__._static_access_token = access_token
+                    self.__class__._static_instance_url = instance_url
+                    # Password tokens typically last longer, set expiry to 1 hour
+                    self.__class__._static_token_expiry = datetime.now(UTC) + timedelta(hours=1)
                     self.logger.info("Password Authentication successful.")
                     return True
                 else:
                     error_msg = "Password Authentication completed but access_token or instance_url is missing."
-                    if not self._access_token:
+                    if not access_token:
                         error_msg += " Access token is missing."
-                    if not self._instance_url:
+                    if not instance_url:
                         error_msg += " Instance URL is missing."
                     self.logger.error(error_msg)
-                    self._access_token = None  # Ensure clean state
-                    self._instance_url = None
+                    self.__class__._static_access_token = None  # Ensure clean state
+                    self.__class__._static_instance_url = None
+                    self.__class__._static_token_expiry = None
                     return False
 
             except httpx.HTTPStatusError as e:
                 self.logger.error(f"Password Authentication HTTP error: {e.response.status_code} - {e.response.text}")
-                self._access_token = None
-                self._instance_url = None
+                self.__class__._static_access_token = None
+                self.__class__._static_instance_url = None
+                self.__class__._static_token_expiry = None
                 return False
             except Exception as e:
                 self.logger.error(f"Password Authentication error: {e!s}")
-                self._access_token = None
-                self._instance_url = None
+                self.__class__._static_access_token = None
+                self.__class__._static_instance_url = None
+                self.__class__._static_token_expiry = None
                 return False
 
+    @classmethod
+    def clear_authentication_cache(cls):
+        """Clear the static authentication cache to force re-authentication"""
+        cls._static_access_token = None
+        cls._static_instance_url = None
+        cls._static_token_expiry = None
+
     async def _ensure_authenticated_async(self):
-        if not self._access_token or not self._instance_url:
+        if not self._is_authenticated():
             if not self.authenticate():
                 raise Exception("Salesforce authentication failed. Cannot proceed with API call.")
 
