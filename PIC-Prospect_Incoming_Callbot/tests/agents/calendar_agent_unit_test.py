@@ -1,9 +1,10 @@
 from datetime import datetime
 from unittest.mock import AsyncMock
-import pytz
+
 import pytest
-from langchain_core.messages import AIMessage
+import pytz
 from langchain_core.language_models import BaseLanguageModel
+from langchain_core.messages import AIMessage
 
 from app.agents.agents_graph import EnvHelper, LangChainAdapterType, LangChainFactory, LlmInfo
 from app.agents.calendar_agent import CalendarAgent
@@ -65,6 +66,7 @@ class FakeLLM(BaseLanguageModel):
     def predict_messages(self, messages, **kwargs):
         return self._get_message_response("predict_messages")
 
+
 @pytest.fixture
 def sf_client_mock():
     class _DummyClient:
@@ -118,7 +120,7 @@ async def test_proposition_de_creneaux_calls_get_appointments(sf_client_mock):
     CalendarAgent.now = datetime(2025, 6, 19, tzinfo=pytz.timezone("Europe/Paris"))
     agent._set_user_info("uid", "John", "Doe", "john@ex.com", "ownerId", "Alice")
 
-    await agent.run_async("Je voudrais un rendez-vous", [])
+    await agent.schedule_new_appointement_async("Je voudrais un rendez-vous", [])
 
     sf_client_mock.get_scheduled_appointments_async.assert_awaited()
 
@@ -141,7 +143,7 @@ async def test_user_confirmation_calls_schedule_new_appointment(sf_client_mock, 
     agent = CalendarAgent(sf_client_mock, FakeLLM("Rendez-vous confirmé"), FakeLLM(""), FakeLLM("2025-06-10T10:00:00Z"))
     CalendarAgent.now = datetime(2025, 6, 9, tzinfo=pytz.timezone("Europe/Paris"))
     agent._set_user_info("uid", "John", "Doe", "john@ex.com", "ownerId", "Alice")
-    await agent.run_async(user_input, chat_history)
+    await agent.schedule_new_appointement_async(user_input, chat_history)
     sf_client_mock.schedule_new_appointment_async.assert_awaited()
 
 
@@ -183,7 +185,7 @@ async def test_appointment_too_far_validation(sf_client_mock, user_input, chat_h
     agent._set_user_info("uid", "John", "Doe", "john@ex.com", "ownerId", "Alice")
 
     # Call run_async with the test input
-    result = await agent.run_async(user_input, chat_history)
+    result = await agent.schedule_new_appointement_async(user_input, chat_history)
 
     # Validate the result based on expected behavior
     if expected_result == "too_far":

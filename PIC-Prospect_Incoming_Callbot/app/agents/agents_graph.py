@@ -22,7 +22,6 @@ from api_client.salesforce_user_client_interface import SalesforceUserClientInte
 
 # Clients
 from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
-from database.conversation_persistence_service_factory import ConversationPersistenceServiceFactory
 from langchain_core.language_models.chat_models import BaseChatModel
 from langgraph.graph import END, StateGraph
 from langgraph.graph.state import CompiledStateGraph
@@ -37,6 +36,7 @@ from agents.calendar_agent import CalendarAgent
 # Models
 from agents.phone_conversation_state_model import PhoneConversationState
 from agents.text_registry import TextRegistry
+from database.conversation_persistence_service_factory import ConversationPersistenceServiceFactory
 from llms.langchain_adapter_type import LangChainAdapterType
 from llms.langchain_factory import LangChainFactory
 from llms.llm_info import LlmInfo
@@ -545,7 +545,7 @@ class AgentsGraph:
                 if self.has_waiting_music_on_calendar:
                     waiting_music_task = await self._start_waiting_music_async()
 
-                calendar_agent_answer = await self.calendar_agent_instance.run_async(user_input, chat_history)
+                calendar_agent_answer = await self.calendar_agent_instance.schedule_new_appointement_async(user_input, chat_history)
 
                 if self.calendar_speech_cannot_be_interupted:
                     self.outgoing_manager.can_speech_be_interupted = False

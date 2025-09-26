@@ -6,14 +6,13 @@ import pytz
 
 #
 from api_client.calendar_client_interface import CalendarClientInterface
-from utils.business_hours_config import BusinessHoursConfig
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain.tools import tool
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from utils.business_hours_config import BusinessHoursConfig, ValidationResult
 
-from utils.business_hours_config import ValidationResult
 from agents.text_registry import TextRegistry
 
 
@@ -54,7 +53,7 @@ class CalendarAgent:
         agent = create_tool_calling_agent(self.available_timeframes_llm, tools_available_timeframes, available_timeframes_prompts)
         self.available_timeframes_agent = AgentExecutor(agent=agent, tools=tools_available_timeframes, verbose=True)
 
-    async def run_async(self, user_input: str, chat_history: list[dict] | None = None) -> str:
+    async def schedule_new_appointement_async(self, user_input: str, chat_history: list[dict] | None = None) -> str:
         """High-level dispatcher orchestrating calendar actions according to the category.
 
         Args:
@@ -117,10 +116,7 @@ class CalendarAgent:
             start_date = CalendarAgent.now.date()
             end_date = start_date + timedelta(days=2)
             appointments = await CalendarAgent.get_appointments_async.ainvoke({"start_date": str(start_date), "end_date": str(end_date)})
-            available_timeframes = CalendarAgent.get_available_timeframes_from_scheduled_slots(
-                str(start_date), str(end_date), appointments,
-                business_hours_config=self.business_hours_config
-            )
+            available_timeframes = CalendarAgent.get_available_timeframes_from_scheduled_slots(str(start_date), str(end_date), appointments, business_hours_config=self.business_hours_config)
 
             if not available_timeframes:
                 return TextRegistry.no_timeframes_text
@@ -256,10 +252,7 @@ class CalendarAgent:
             end_date += "Z"
 
         scheduled_slots = await CalendarAgent.salesforce_api_client.get_scheduled_appointments_async(start_date, end_date, CalendarAgent.owner_id)
-        return CalendarAgent.get_available_timeframes_from_scheduled_slots(
-            start_date, end_date, scheduled_slots,
-            business_hours_config=CalendarAgent.business_hours_config
-        )
+        return CalendarAgent.get_available_timeframes_from_scheduled_slots(start_date, end_date, scheduled_slots, business_hours_config=CalendarAgent.business_hours_config)
 
     @staticmethod
     @tool

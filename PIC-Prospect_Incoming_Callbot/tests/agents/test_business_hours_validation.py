@@ -5,21 +5,21 @@ This module tests the BusinessHoursConfig class and its integration
 with the CalendarAgent for appointment time validation.
 """
 
-import pytest
 import os
-import tempfile
-import yaml
-from datetime import datetime, time
-from unittest.mock import patch, Mock
-import pytz
-
 import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'app'))
+import tempfile
+from datetime import datetime
+from unittest.mock import Mock, patch
 
-from utils.business_hours_config import BusinessHoursConfig, ValidationResult
+import pytest
+import pytz
+import yaml
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "app"))
+
 from agents.calendar_agent import CalendarAgent
 from agents.text_registry import TextRegistry
+from utils.business_hours_config import BusinessHoursConfig, ValidationResult
 
 
 class TestBusinessHoursConfig:
@@ -28,7 +28,7 @@ class TestBusinessHoursConfig:
     def setup_method(self):
         """Set up test fixtures before each test method"""
         # Set a consistent time for all tests:  7:00 AM french timezone
-        self.fixed_now = pytz.timezone('Europe/Paris').localize(datetime(2025, 1, 20, 7, 0, 0))
+        self.fixed_now = pytz.timezone("Europe/Paris").localize(datetime(2025, 1, 20, 7, 0, 0))
 
     def test_default_configuration(self):
         """Test that default configuration is loaded correctly"""
@@ -45,17 +45,15 @@ class TestBusinessHoursConfig:
         """Test loading configuration from YAML file"""
         # Create temporary YAML configuration
         yaml_content = {
-            'appointments': {
-                'duration_minutes': 45,
-                'working_hours': {
-                    'time_slots': [["08:00", "12:00"], ["14:00", "18:00"]]
-                },
-                'allowed_weekdays': [0, 1, 2, 3, 4, 5],  # Monday to Saturday
-                'max_days_ahead': 60
+            "appointments": {
+                "duration_minutes": 45,
+                "working_hours": {"time_slots": [["08:00", "12:00"], ["14:00", "18:00"]]},
+                "allowed_weekdays": [0, 1, 2, 3, 4, 5],  # Monday to Saturday
+                "max_days_ahead": 60,
             }
         }
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(yaml_content, f)
             temp_yaml_path = f.name
 
@@ -71,11 +69,14 @@ class TestBusinessHoursConfig:
 
     def test_environment_variable_override(self):
         """Test that environment variables override YAML configuration"""
-        with patch.dict(os.environ, {
-            'BUSINESS_HOURS_SLOTS': '10:00-11:00,15:00-17:00',
-            'BUSINESS_WEEKDAYS': '1,2,3',  # Tuesday to Thursday
-            'BUSINESS_TIMEZONE': 'US/Eastern'
-        }):
+        with patch.dict(
+            os.environ,
+            {
+                "BUSINESS_HOURS_SLOTS": "10:00-11:00,15:00-17:00",
+                "BUSINESS_WEEKDAYS": "1,2,3",  # Tuesday to Thursday
+                "BUSINESS_TIMEZONE": "US/Eastern",
+            },
+        ):
             config = BusinessHoursConfig()
 
             assert config.time_slots == [("10:00", "11:00"), ("15:00", "17:00")]
@@ -84,16 +85,9 @@ class TestBusinessHoursConfig:
 
     def test_legacy_yaml_format_support(self):
         """Test backward compatibility with legacy YAML format"""
-        yaml_content = {
-            'appointments': {
-                'working_hours': {
-                    'start': '08:00',
-                    'end': '17:00'
-                }
-            }
-        }
+        yaml_content = {"appointments": {"working_hours": {"start": "08:00", "end": "17:00"}}}
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             yaml.dump(yaml_content, f)
             temp_yaml_path = f.name
 
@@ -110,7 +104,7 @@ class TestBusinessHoursConfig:
         config = BusinessHoursConfig()
         test_datetime = pytz.timezone("Europe/Paris").localize(datetime(2025, 1, 20, 10, 0))
 
-        with patch('utils.business_hours_config.datetime') as mock_datetime:
+        with patch("utils.business_hours_config.datetime") as mock_datetime:
             mock_datetime.now.return_value = self.fixed_now
             result = config.validate_appointment_time(test_datetime, self.fixed_now)
             assert result == ValidationResult.VALID
@@ -120,7 +114,7 @@ class TestBusinessHoursConfig:
         config = BusinessHoursConfig()
         test_datetime = pytz.timezone("Europe/Paris").localize(datetime(2025, 1, 21, 14, 30))
 
-        with patch('utils.business_hours_config.datetime') as mock_datetime:
+        with patch("utils.business_hours_config.datetime") as mock_datetime:
             mock_datetime.now.return_value = self.fixed_now
             result = config.validate_appointment_time(test_datetime, self.fixed_now)
             assert result == ValidationResult.VALID
@@ -130,7 +124,7 @@ class TestBusinessHoursConfig:
         config = BusinessHoursConfig()
         test_datetime = pytz.timezone("Europe/Paris").localize(datetime(2025, 1, 24, 9, 0))
 
-        with patch('utils.business_hours_config.datetime') as mock_datetime:
+        with patch("utils.business_hours_config.datetime") as mock_datetime:
             mock_datetime.now.return_value = self.fixed_now
             result = config.validate_appointment_time(test_datetime, self.fixed_now)
             assert result == ValidationResult.VALID
@@ -140,7 +134,7 @@ class TestBusinessHoursConfig:
         config = BusinessHoursConfig()
         test_datetime = pytz.timezone("Europe/Paris").localize(datetime(2025, 1, 20, 8, 0))
 
-        with patch('utils.business_hours_config.datetime') as mock_datetime:
+        with patch("utils.business_hours_config.datetime") as mock_datetime:
             mock_datetime.now.return_value = self.fixed_now
             result = config.validate_appointment_time(test_datetime, self.fixed_now)
             assert result == ValidationResult.OUTSIDE_HOURS
@@ -150,7 +144,7 @@ class TestBusinessHoursConfig:
         config = BusinessHoursConfig()
         test_datetime = pytz.timezone("Europe/Paris").localize(datetime(2025, 1, 20, 17, 0))
 
-        with patch('utils.business_hours_config.datetime') as mock_datetime:
+        with patch("utils.business_hours_config.datetime") as mock_datetime:
             mock_datetime.now.return_value = self.fixed_now
             result = config.validate_appointment_time(test_datetime, self.fixed_now)
             assert result == ValidationResult.OUTSIDE_HOURS
@@ -160,7 +154,7 @@ class TestBusinessHoursConfig:
         config = BusinessHoursConfig()
         test_datetime = pytz.timezone("Europe/Paris").localize(datetime(2025, 1, 20, 12, 30))
 
-        with patch('utils.business_hours_config.datetime') as mock_datetime:
+        with patch("utils.business_hours_config.datetime") as mock_datetime:
             mock_datetime.now.return_value = self.fixed_now
             result = config.validate_appointment_time(test_datetime, self.fixed_now)
             assert result == ValidationResult.OUTSIDE_HOURS
@@ -170,7 +164,7 @@ class TestBusinessHoursConfig:
         config = BusinessHoursConfig()
         test_datetime = pytz.timezone("Europe/Paris").localize(datetime(2025, 1, 25, 10, 0))
 
-        with patch('utils.business_hours_config.datetime') as mock_datetime:
+        with patch("utils.business_hours_config.datetime") as mock_datetime:
             mock_datetime.now.return_value = self.fixed_now
             result = config.validate_appointment_time(test_datetime, self.fixed_now)
             assert result == ValidationResult.WEEKEND
@@ -180,7 +174,7 @@ class TestBusinessHoursConfig:
         config = BusinessHoursConfig()
         test_datetime = pytz.timezone("Europe/Paris").localize(datetime(2025, 1, 26, 14, 0))
 
-        with patch('utils.business_hours_config.datetime') as mock_datetime:
+        with patch("utils.business_hours_config.datetime") as mock_datetime:
             mock_datetime.now.return_value = self.fixed_now
             result = config.validate_appointment_time(test_datetime, self.fixed_now)
             assert result == ValidationResult.WEEKEND
@@ -190,7 +184,7 @@ class TestBusinessHoursConfig:
         config = BusinessHoursConfig()
         test_datetime = pytz.timezone("Europe/Paris").localize(datetime(2024, 12, 1, 10, 0))
 
-        with patch('utils.business_hours_config.datetime') as mock_datetime:
+        with patch("utils.business_hours_config.datetime") as mock_datetime:
             mock_datetime.now.return_value = self.fixed_now
             result = config.validate_appointment_time(test_datetime, self.fixed_now)
             assert result == ValidationResult.IN_PAST
@@ -199,7 +193,7 @@ class TestBusinessHoursConfig:
         """Test appointment beyond the default 30-day limit"""
         config = BusinessHoursConfig()
 
-        with patch('utils.business_hours_config.datetime') as mock_datetime:
+        with patch("utils.business_hours_config.datetime") as mock_datetime:
             mock_datetime.now.return_value = self.fixed_now
 
             # Appointment 31 days in future (beyond default 30-day limit)
@@ -212,7 +206,7 @@ class TestBusinessHoursConfig:
         config = BusinessHoursConfig()
         config.max_days_ahead = 14  # Custom 14-day limit
 
-        with patch('utils.business_hours_config.datetime') as mock_datetime:
+        with patch("utils.business_hours_config.datetime") as mock_datetime:
             mock_datetime.now.return_value = self.fixed_now
 
             # Appointment 15 days in future (beyond 14-day limit)
@@ -225,7 +219,7 @@ class TestBusinessHoursConfig:
         config = BusinessHoursConfig()
         config.max_days_ahead = 14
 
-        with patch('utils.business_hours_config.datetime') as mock_datetime:
+        with patch("utils.business_hours_config.datetime") as mock_datetime:
             mock_datetime.now.return_value = self.fixed_now
 
             # Appointment exactly 14 days in future (at the limit)
@@ -237,7 +231,7 @@ class TestBusinessHoursConfig:
         """Test appointment very far in the future (several months)"""
         config = BusinessHoursConfig()
 
-        with patch('utils.business_hours_config.datetime') as mock_datetime:
+        with patch("utils.business_hours_config.datetime") as mock_datetime:
             mock_datetime.now.return_value = self.fixed_now
 
             # Appointment 6 months in future
@@ -251,7 +245,7 @@ class TestBusinessHoursConfig:
         # Use a specific time for this edge case test
         now = datetime(2025, 1, 20, 10, 30, tzinfo=pytz.timezone("Europe/Paris"))
 
-        with patch('utils.business_hours_config.datetime') as mock_datetime:
+        with patch("utils.business_hours_config.datetime") as mock_datetime:
             mock_datetime.now.return_value = now
 
             # Appointment 1 minute ago
@@ -265,7 +259,7 @@ class TestBusinessHoursConfig:
         # Use a specific time for this edge case test
         now = datetime(2025, 1, 20, 10, 30, tzinfo=pytz.timezone("Europe/Paris"))
 
-        with patch('utils.business_hours_config.datetime') as mock_datetime:
+        with patch("utils.business_hours_config.datetime") as mock_datetime:
             mock_datetime.now.return_value = now
 
             # Appointment at the exact same time
@@ -277,7 +271,7 @@ class TestBusinessHoursConfig:
         """Test appointment yesterday at the same time"""
         config = BusinessHoursConfig()
 
-        with patch('utils.business_hours_config.datetime') as mock_datetime:
+        with patch("utils.business_hours_config.datetime") as mock_datetime:
             mock_datetime.now.return_value = self.fixed_now
 
             # Appointment yesterday
@@ -289,7 +283,7 @@ class TestBusinessHoursConfig:
         """Test appointment last week"""
         config = BusinessHoursConfig()
 
-        with patch('utils.business_hours_config.datetime') as mock_datetime:
+        with patch("utils.business_hours_config.datetime") as mock_datetime:
             mock_datetime.now.return_value = self.fixed_now
 
             # Appointment last week
@@ -301,7 +295,7 @@ class TestBusinessHoursConfig:
         """Test appointment very early in the morning (edge of business hours)"""
         config = BusinessHoursConfig()
 
-        with patch('utils.business_hours_config.datetime') as mock_datetime:
+        with patch("utils.business_hours_config.datetime") as mock_datetime:
             mock_datetime.now.return_value = self.fixed_now
 
             # Appointment at exactly 9:00 AM (start of business hours)
@@ -313,7 +307,7 @@ class TestBusinessHoursConfig:
         """Test appointment at the end of business hours"""
         config = BusinessHoursConfig()
 
-        with patch('utils.business_hours_config.datetime') as mock_datetime:
+        with patch("utils.business_hours_config.datetime") as mock_datetime:
             mock_datetime.now.return_value = self.fixed_now
 
             # Appointment at exactly 3:30 PM (end of afternoon slot)
@@ -325,7 +319,7 @@ class TestBusinessHoursConfig:
         """Test appointment right after lunch break starts"""
         config = BusinessHoursConfig()
 
-        with patch('utils.business_hours_config.datetime') as mock_datetime:
+        with patch("utils.business_hours_config.datetime") as mock_datetime:
             mock_datetime.now.return_value = self.fixed_now
 
             # Appointment at exactly 1:00 PM (start of afternoon slot)
@@ -370,14 +364,14 @@ class TestBusinessHoursConfig:
 
         # From Thursday, next business day should be Friday
         thursday = datetime(2025, 1, 23).date()  # Thursday
-        friday = datetime(2025, 1, 24).date()   # Friday
+        friday = datetime(2025, 1, 24).date()  # Friday
 
         next_day = config.get_next_business_day(thursday)
         assert next_day == friday
 
         # From Friday, next business day should be Monday
         friday = datetime(2025, 1, 24).date()  # Friday
-        monday = datetime(2025, 1, 27).date()   # Monday
+        monday = datetime(2025, 1, 27).date()  # Monday
 
         next_day = config.get_next_business_day(friday)
         assert next_day == monday
@@ -387,11 +381,11 @@ class TestBusinessHoursConfig:
         config = BusinessHoursConfig()
         params = config.get_available_timeframe_params()
 
-        assert 'availability_timeframe' in params
-        assert 'max_weekday' in params
-        assert 'slot_duration_minutes' in params
-        assert params['availability_timeframe'] == config.time_slots
-        assert params['slot_duration_minutes'] == config.appointment_duration
+        assert "availability_timeframe" in params
+        assert "max_weekday" in params
+        assert "slot_duration_minutes" in params
+        assert params["availability_timeframe"] == config.time_slots
+        assert params["slot_duration_minutes"] == config.appointment_duration
 
 
 class TestCalendarAgentBusinessHoursIntegration:
@@ -404,19 +398,14 @@ class TestCalendarAgentBusinessHoursIntegration:
 
         # Set a consistent time for all tests
         test_time = datetime(2025, 1, 15, 7, 0, 0)  # Monday 7:00 AM
-        CalendarAgent.now = pytz.timezone('Europe/Paris').localize(test_time)
+        CalendarAgent.now = pytz.timezone("Europe/Paris").localize(test_time)
 
         # Create calendar agent
-        self.agent = CalendarAgent(
-            self.mock_salesforce_client,
-            self.mock_llm,
-            self.mock_llm,
-            self.mock_llm
-        )
+        self.agent = CalendarAgent(self.mock_salesforce_client, self.mock_llm, self.mock_llm, self.mock_llm)
 
     def test_validate_appointment_time_method(self):
         """Test the validate_appointment_time_async method"""
-        with patch('utils.business_hours_config.datetime') as mock_datetime:
+        with patch("utils.business_hours_config.datetime") as mock_datetime:
             # Mock current time to be earlier than test times
             now = datetime(2025, 1, 15, 7, 0, tzinfo=pytz.timezone("Europe/Paris"))
             mock_datetime.now.return_value = now
@@ -440,7 +429,7 @@ class TestCalendarAgentBusinessHoursIntegration:
     @pytest.mark.asyncio
     async def test_business_hours_validation_in_run_async(self):
         """Test business hours validation integration in run_async"""
-        with patch('utils.business_hours_config.datetime') as mock_datetime:
+        with patch("utils.business_hours_config.datetime") as mock_datetime:
             # Mock current time to be earlier than test times
             now = datetime(2025, 1, 15, 7, 0, tzinfo=pytz.timezone("Europe/Paris"))
             mock_datetime.now.return_value = now
@@ -449,12 +438,12 @@ class TestCalendarAgentBusinessHoursIntegration:
             # Mock the date extraction to return a weekend appointment
             weekend_appointment = datetime(2025, 1, 25, 10, 0, tzinfo=pytz.timezone("Europe/Paris"))
 
-            with patch.object(self.agent, '_extract_appointment_selected_date_and_time_async') as mock_extract:
-                with patch.object(self.agent, 'categorize_request_for_dispatch_async') as mock_categorize:
+            with patch.object(self.agent, "_extract_appointment_selected_date_and_time_async") as mock_extract:
+                with patch.object(self.agent, "categorize_request_for_dispatch_async") as mock_categorize:
                     mock_extract.return_value = weekend_appointment
                     mock_categorize.return_value = "Demande de confirmation du rendez-vous"
 
-                    result = await self.agent.run_async("Je veux un rendez-vous samedi", [])
+                    result = await self.agent.schedule_new_appointement_async("Je veux un rendez-vous samedi", [])
 
                     # Should return weekend error message
                     assert result == TextRegistry.appointment_weekend_text
@@ -462,7 +451,7 @@ class TestCalendarAgentBusinessHoursIntegration:
     @pytest.mark.asyncio
     async def test_outside_hours_validation_message(self):
         """Test outside hours validation returns correct message with business hours"""
-        with patch('utils.business_hours_config.datetime') as mock_datetime:
+        with patch("utils.business_hours_config.datetime") as mock_datetime:
             # Mock current time to be earlier than test times
             now = datetime(2025, 1, 15, 7, 0, tzinfo=pytz.timezone("Europe/Paris"))
             mock_datetime.now.return_value = now
@@ -471,12 +460,12 @@ class TestCalendarAgentBusinessHoursIntegration:
             # Mock appointment outside business hours
             outside_hours_appointment = datetime(2025, 1, 20, 8, 0, tzinfo=pytz.timezone("Europe/Paris"))
 
-            with patch.object(self.agent, '_extract_appointment_selected_date_and_time_async') as mock_extract:
-                with patch.object(self.agent, 'categorize_request_for_dispatch_async') as mock_categorize:
+            with patch.object(self.agent, "_extract_appointment_selected_date_and_time_async") as mock_extract:
+                with patch.object(self.agent, "categorize_request_for_dispatch_async") as mock_categorize:
                     mock_extract.return_value = outside_hours_appointment
                     mock_categorize.return_value = "Demande de confirmation du rendez-vous"
 
-                    result = await self.agent.run_async("Je veux un rendez-vous à 8h", [])
+                    result = await self.agent.schedule_new_appointement_async("Je veux un rendez-vous à 8h", [])
 
                     # Should return outside hours error with business hours info
                     assert "les rendez-vous ne peuvent être pris qu'aux heures ouvrées" in result
@@ -495,10 +484,7 @@ class TestCalendarAgentBusinessHoursIntegration:
         scheduled_slots = []
 
         # Call with business hours config
-        result = CalendarAgent.get_available_timeframes_from_scheduled_slots(
-            start_date, end_date, scheduled_slots,
-            business_hours_config=self.agent.business_hours_config
-        )
+        result = CalendarAgent.get_available_timeframes_from_scheduled_slots(start_date, end_date, scheduled_slots, business_hours_config=self.agent.business_hours_config)
 
         # Should return available timeframes based on business config
         assert isinstance(result, list)
@@ -511,12 +497,7 @@ class TestBusinessHoursErrorMessages:
 
     def test_all_error_texts_exist(self):
         """Test that all required error texts exist in TextRegistry"""
-        required_texts = [
-            'appointment_outside_hours_text',
-            'appointment_weekend_text',
-            'appointment_in_past_text',
-            'appointment_holiday_text'
-        ]
+        required_texts = ["appointment_outside_hours_text", "appointment_weekend_text", "appointment_in_past_text", "appointment_holiday_text"]
 
         for text_name in required_texts:
             assert hasattr(TextRegistry, text_name)
@@ -542,7 +523,7 @@ class TestBusinessHoursEdgeCases:
     def test_invalid_yaml_file_handling(self):
         """Test handling of invalid YAML configuration"""
         # Create invalid YAML file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
             f.write("invalid: yaml: content: [")
             temp_yaml_path = f.name
 
@@ -561,11 +542,7 @@ class TestBusinessHoursEdgeCases:
 
     def test_invalid_environment_variables(self):
         """Test handling of invalid environment variable values"""
-        with patch.dict(os.environ, {
-            'BUSINESS_HOURS_SLOTS': 'invalid_format_no_dash',
-            'BUSINESS_WEEKDAYS': 'not-numbers',
-            'BUSINESS_TIMEZONE': 'Invalid/Timezone'
-        }):
+        with patch.dict(os.environ, {"BUSINESS_HOURS_SLOTS": "invalid_format_no_dash", "BUSINESS_WEEKDAYS": "not-numbers", "BUSINESS_TIMEZONE": "Invalid/Timezone"}):
             # Should not raise exception, should fall back to defaults
             config = BusinessHoursConfig()
             assert config.time_slots == [("09:00", "12:00"), ("13:00", "16:00")]
@@ -587,7 +564,7 @@ class TestBusinessHoursEdgeCases:
         us_eastern = pytz.timezone("US/Eastern")
         us_time = us_eastern.localize(datetime(2025, 1, 20, 4, 0))  # 4 AM EST = 10 AM Paris
 
-        with patch('utils.business_hours_config.datetime') as mock_datetime:
+        with patch("utils.business_hours_config.datetime") as mock_datetime:
             now = datetime(2025, 1, 20, 8, 0, tzinfo=pytz.timezone("Europe/Paris"))
             mock_datetime.now.return_value = now
 
