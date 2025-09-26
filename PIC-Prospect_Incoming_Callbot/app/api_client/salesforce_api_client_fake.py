@@ -59,12 +59,7 @@ class SalesforceApiClientFake(CalendarClientInterface, SalesforceUserClientInter
         # Anything that looks like a Salesforce 18-char id is fine for the tests
         return "EVT" + uuid.uuid4().hex[:15].upper()
 
-    async def get_scheduled_appointments_async(
-        self,
-        start_datetime: str,
-        end_datetime: str,
-        owner_id: str | None = None,
-    ) -> list[dict[str, Any]]:
+    async def get_scheduled_appointments_async(self, start_datetime: str, end_datetime: str, owner_id: str | None = None, user_id: str | None = None) -> list:
         """Return at least one dummy appointment so `any(appointments)` is True."""
         await self._ensure_authenticated_async()
 

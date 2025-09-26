@@ -45,6 +45,9 @@ class TextRegistry:
     appointment_in_past_text = "Désolé, il n'est pas possible de prendre un rendez-vous dans le passé. Souhaitez-vous un autre créneau ?"
     appointment_holiday_text = "Désolé, nous ne proposons pas de rendez-vous ce jour-là car c'est un jour férié. Souhaitez-vous un autre créneau ?"
 
+    # Existing appointment management texts
+    existing_appointment_found_text = "Je vois que vous avez déjà un rendez-vous prévu avec lui le {appointment_date} ({appointment_subject}). Souhaitez-vous le déplacer ou l'annuler ?"
+
     @classmethod
     def get_all_texts(cls) -> list[str]:
         """Get all text values for pregeneration."""

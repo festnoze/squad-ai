@@ -45,7 +45,7 @@ def sf_client_mock():
     """Mock Salesforce client with no scheduled appointments"""
 
     class MockClient:
-        async def get_scheduled_appointments_async(self, start_date, end_date, owner_id):
+        async def get_scheduled_appointments_async(self, start_date, end_date, owner_id, user_id):
             return []  # No appointments scheduled
 
         async def schedule_new_appointment_async(self, *args, **kwargs):

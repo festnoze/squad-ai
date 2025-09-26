@@ -128,13 +128,12 @@ class GoogleCalendarClient(CalendarClientInterface):
             return None
     
     @measure_latency(OperationType.CALENDAR, provider="google")
-    async def get_scheduled_appointments_async(
-        self, 
-        start_datetime: str, 
-        end_datetime: str, 
-        owner_id: str | None = None
-    ) -> list:
-        """Get events from Google Calendar between specified start and end datetimes"""
+    async def get_scheduled_appointments_async(self, start_datetime: str, end_datetime: str, owner_id: str | None = None, user_id: str | None = None) -> list:
+        """Get events from Google Calendar between specified start and end datetimes
+
+        Note: For Google Calendar, user_id filtering is not applicable as it's a personal calendar.
+        The parameter is included for interface compatibility.
+        """
         await self._ensure_authenticated_async()
         
         try:

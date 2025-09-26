@@ -2,23 +2,18 @@ import asyncio
 import logging
 import os
 from asyncio import Task
+from datetime import timedelta
 from typing import Hashable
 from uuid import UUID
 
-from api_client.conversation_persistence_interface import (
-    ConversationPersistenceInterface,
-)
+from api_client.conversation_persistence_interface import ConversationPersistenceInterface
 from api_client.rag_query_interface import RagQueryInterface
-from api_client.request_models.conversation_request_model import (
-    ConversationRequestModel,
-)
+from api_client.request_models.conversation_request_model import ConversationRequestModel
 from api_client.request_models.query_asking_request_model import QueryAskingRequestModel
-from api_client.request_models.user_request_model import (
-    DeviceInfoRequestModel,
-    UserRequestModel,
-)
+from api_client.request_models.user_request_model import DeviceInfoRequestModel, UserRequestModel
 from api_client.salesforce_api_client import SalesforceApiClient
 from api_client.salesforce_user_client_interface import SalesforceUserClientInterface
+from api_client.calendar_client_interface import CalendarClientInterface
 
 # Clients
 from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
@@ -51,6 +46,7 @@ class AgentsGraph:
         outgoing_manager: OutgoingManager,
         call_sid: str | None = None,
         salesforce_client: SalesforceUserClientInterface | None = None,
+        calendar_client: CalendarClientInterface | None = None,
         conversation_persistence: ConversationPersistenceInterface | None = None,
         rag_query_service: RagQueryInterface | None = None,
     ):
@@ -75,6 +71,7 @@ class AgentsGraph:
 
         self.rag_query_service = rag_query_service or StudiRAGInferenceApiClient()
         self.salesforce_api_client: SalesforceUserClientInterface = salesforce_client or SalesforceApiClient()
+        self.calendar_api_client: CalendarClientInterface = calendar_client or SalesforceApiClient() if salesforce_client else self.salesforce_api_client
         self.outgoing_manager: OutgoingManager = outgoing_manager
         self.has_waiting_music_on_calendar: bool = EnvHelper.get_waiting_music_on_calendar()
         self.has_waiting_music_on_rag: bool = EnvHelper.get_waiting_music_on_rag()
@@ -117,7 +114,7 @@ class AgentsGraph:
 
         # Add nodes & fixed edges
         workflow.set_entry_point("router")
-        workflow.add_node("router", self.router)
+        workflow.add_node("router", self.router_node)
         workflow.add_node("begin_of_welcome_message", self.begin_of_welcome_message_node)
         workflow.add_edge("begin_of_welcome_message", "init_conversation")
         workflow.add_node("init_conversation", self.init_conversation_node)
@@ -195,7 +192,7 @@ class AgentsGraph:
         """Delegate invoke calls to the compiled graph."""
         return self.graph.invoke(*args, **kwargs)
 
-    async def router(self, state: PhoneConversationState) -> PhoneConversationState:
+    async def router_node(self, state: PhoneConversationState) -> PhoneConversationState:
         if not state.get("agent_scratchpad", None):
             state["agent_scratchpad"] = {}
 
@@ -542,6 +539,22 @@ class AgentsGraph:
                     self.logger.info(f"[{call_sid[-1 * max_history_length :]}] Chat history has {len(chat_history)} messages. Truncating to the last {max_history_length}.")
                     chat_history = chat_history[-max_history_length:]
 
+                # Check for existing appointments in next 30 days before scheduling new one
+                user_id = sf_account_info.get("Id", "")
+                if user_id:
+                    start_date = CalendarAgent.now.strftime("%Y-%m-%dT%H:%M:%SZ")
+                    end_date = (CalendarAgent.now + timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+                    self.logger.info(f"[{call_sid}] Checking for existing appointments for user {user_id} from {start_date} to {end_date}")
+                    existing_appointments = await self.calendar_api_client.get_scheduled_appointments_async(start_date, end_date, user_id=user_id)
+
+                    if existing_appointments:
+                        self.logger.info(f"[{call_sid}] Found {len(existing_appointments)} existing appointments for user")
+                        # User has existing appointments - ask for modify/cancel preference
+                        response = await self._handle_existing_appointments_async(existing_appointments, user_input)
+                        await self.add_AI_response_message_to_conversation_async(response, state)
+                        return state
+
                 if self.has_waiting_music_on_calendar:
                     waiting_music_task = await self._start_waiting_music_async()
 
@@ -688,6 +701,36 @@ class AgentsGraph:
         self.logger.warning(f"[{call_sid}] Max consecutive errors reached ({error_count}/{max_errors}). Sent technical difficulties message to {phone_number}")
         self.consecutive_error_manager.reset_consecutive_error_count(state)
         return state
+
+    async def _handle_existing_appointments_async(self, existing_appointments: list, user_input: str) -> str:
+        if not existing_appointments:
+            return ""
+
+        # Get the first (most recent) appointment
+        appointment = existing_appointments[0]
+        appointment_date = appointment.get("StartDateTime", "")
+        appointment_subject = appointment.get("Subject", "Rendez-vous")
+
+        # Format the date for display (convert from ISO to French format)
+        try:
+            if appointment_date:
+                # Parse ISO datetime and convert to French format
+                from datetime import datetime
+                dt = datetime.fromisoformat(appointment_date.replace("Z", ""))
+                french_days = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+                french_months = ["", "janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
+
+                day_name = french_days[dt.weekday()]
+                month_name = french_months[dt.month]
+                appointment_date_formatted = f"{day_name} {dt.day} {month_name} à {dt.hour} heure{'s' if dt.hour != 1 else ''}"
+                if dt.minute > 0:
+                    appointment_date_formatted += f" {dt.minute}"
+            else:
+                appointment_date_formatted = "date inconnue"
+        except Exception:
+            appointment_date_formatted = appointment_date
+
+        return TextRegistry.existing_appointment_found_text.format(appointment_date=appointment_date_formatted, appointment_subject=appointment_subject)
 
     ### Helper methods ###
 

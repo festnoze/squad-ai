@@ -31,5 +31,6 @@
   "Désolé, nous ne proposons pas de rendez-vous ce jour-là car c'est un jour férié. Souhaitez-vous un autre créneau ?": "7e62be73582c",
   "Désolé, il n'est pas possible de prendre un rendez-vous dans le passé. Souhaitez-vous un autre créneau ?": "45d9ce52cc1f",
   "Désolé, les rendez-vous ne peuvent être pris qu'aux heures ouvrées. Nos horaires sont : {business_hours}. Souhaitez-vous un autre créneau ?": "cc652833dbef",
-  "Désolé, nous ne proposons pas de rendez-vous le weekend. Nos rendez-vous sont disponibles du lundi au vendredi. Quel jour vous conviendrait ?": "7b55e5c11673"
+  "Désolé, nous ne proposons pas de rendez-vous le weekend. Nos rendez-vous sont disponibles du lundi au vendredi. Quel jour vous conviendrait ?": "7b55e5c11673",
+  "J'ai trouvé que vous avez déjà un rendez-vous prévu le {appointment_date} ({appointment_subject}). Souhaitez-vous le modifier ou l'annuler plutôt que d'en prendre un nouveau ?": "b70bf5c28c56"
 }

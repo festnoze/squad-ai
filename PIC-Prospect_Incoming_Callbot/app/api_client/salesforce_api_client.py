@@ -548,13 +548,14 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
             return None
 
     @measure_latency(OperationType.SALESFORCE, provider="salesforce")
-    async def get_scheduled_appointments_async(self, start_datetime: str, end_datetime: str, owner_id: str | None = None) -> list:
+    async def get_scheduled_appointments_async(self, start_datetime: str, end_datetime: str, owner_id: str | None = None, user_id: str | None = None) -> list:
         """Get events from Salesforce calendar between specified start and end datetimes
 
         Args:
             start_datetime: Start date and time in ISO format (e.g., '2025-05-20T14:00:00Z')
             end_datetime: End date and time in ISO format (e.g., '2025-05-20T15:00:00Z')
             owner_id: Optional Salesforce ID to filter events by owner
+            user_id: Optional Salesforce ID to filter events by user (WhoId)
 
         Returns:
             List of events if successful, None otherwise
@@ -574,6 +575,10 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
             # Add owner filter if specified
             if owner_id:
                 query += f"AND OwnerId = '{owner_id}' "
+
+            # Add user filter if specified (filter by WhoId for user appointments)
+            if user_id:
+                query += f"AND WhoId = '{user_id}' "
 
             query += "ORDER BY StartDateTime ASC "
 

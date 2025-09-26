@@ -45,13 +45,14 @@ class CalendarClientInterface(ABC):
         pass
 
     @abstractmethod
-    async def get_scheduled_appointments_async(self, start_datetime: str, end_datetime: str, owner_id: str | None = None) -> list:
+    async def get_scheduled_appointments_async(self, start_datetime: str, end_datetime: str, owner_id: str | None = None, user_id: str | None = None) -> list:
         """Get events from calendar between specified start and end datetimes
 
         Args:
             start_datetime: Start date and time in ISO format (e.g., '2025-05-20T14:00:00Z')
             end_datetime: End date and time in ISO format (e.g., '2025-05-20T15:00:00Z')
             owner_id: Optional calendar owner ID to filter events by owner
+            user_id: Optional user ID to filter events by user
 
         Returns:
             List of events if successful, None otherwise
