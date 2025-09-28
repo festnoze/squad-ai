@@ -164,12 +164,7 @@ class CalendarAgent:
                 confirmed_date_str = self._to_str_iso(confirmed_date)
                 success = await CalendarAgent.schedule_new_appointment_async(confirmed_date_str)
                 if success:
-                    return (
-                        TextRegistry.appointment_confirmed_prefix_text
-                        + self._to_french_date(confirmed_date, include_weekday=True, include_year=False, include_hour=True)
-                        + ". "
-                        + TextRegistry.appointment_confirmed_suffix_text
-                    )
+                    return TextRegistry.appointment_confirmed_prefix_text + self._to_french_date(confirmed_date, include_weekday=True, include_year=False, include_hour=True) + ". " + TextRegistry.end_call_suffix_text
             return TextRegistry.appointment_failed_text
 
         if category == "Demande de modification":

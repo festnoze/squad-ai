@@ -40,9 +40,7 @@ class TextQueueManager:
             self.logger.debug(f"Enqueued {len(text)} characters. Queue length: {len(self.text_queue)} characters")
             return True
 
-    async def get_next_text_chunk_async(
-        self, max_words_by_sentence: int = 20, max_chars_by_sentence: int = 150
-    ) -> str | None:
+    async def get_next_text_chunk_async(self, max_words_by_sentence: int = 20, max_chars_by_sentence: int = 150) -> str | None:
         """
         Gets a chunk of text from the queue.
         Returns a tuple of (text_chunk, estimated_duration_ms)
@@ -57,19 +55,18 @@ class TextQueueManager:
         if not self.text_queue:
             self.last_text_chunk = ""
 
+        next_text_chunk = ""
         async with self.lock:
-            splitted_text = ProcessText.chunk_text_by_sentences_size(
-                self.text_queue, max_words_by_sentence, max_chars_by_sentence
-            )
-            if not any(splitted_text) or (
-                not any(sep in splitted_text[0] for sep in ProcessText.split_separators)
-                and len(splitted_text[0]) < max_words_by_sentence
-            ):
+            splitted_text = ProcessText.chunk_text_by_sentences_size(self.text_queue, max_words_by_sentence, max_chars_by_sentence)
+            next_text_chunk = splitted_text[0]
+            next_text_chunk_len = len(next_text_chunk)
+            # If queue is empty or first chunk is not a sentence and is not long enough
+            if not any(splitted_text) or (not any(sep in next_text_chunk for sep in ProcessText.split_separators) and next_text_chunk_len < max_words_by_sentence):
                 return None
-            self.text_queue = "".join(splitted_text[1:])
-            self.total_processed_chars += len(splitted_text[0])
-            self.last_text_chunk = splitted_text[0]
-        return splitted_text[0]
+            self.last_text_chunk = next_text_chunk
+            self.total_processed_chars += next_text_chunk_len
+            self.text_queue = self.text_queue[next_text_chunk_len + 1:] # remove the processed text (+1 to include the separator)
+        return next_text_chunk
 
     def is_empty(self) -> bool:
         """

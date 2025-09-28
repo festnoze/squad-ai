@@ -21,18 +21,14 @@ class ConsecutiveErrorManager:
             state["agent_scratchpad"] = {}
         current_count = self.get_consecutive_error_count(state)
         state["agent_scratchpad"]["consecutive_error_count"] = current_count + 1
-        self.logger.warning(
-            f"[{self.call_sid[-4:]}] Consecutive errors incremented to: {current_count + 1}"
-        )
+        self.logger.warning(f"[{self.call_sid[-4:]}] Consecutive errors incremented to: {current_count + 1}")
 
     def reset_consecutive_error_count(self, state: PhoneConversationState) -> None:
         """Reset the consecutive error count in state."""
         if not state.get("agent_scratchpad", None):
             state["agent_scratchpad"] = {}
         if state["agent_scratchpad"].get("consecutive_error_count", 0) > 0:
-            self.logger.info(
-                f"[{self.call_sid[-4:]}] Consecutive errors reset from: {state['agent_scratchpad']['consecutive_error_count']}"
-            )
+            self.logger.info(f"[{self.call_sid[-4:]}] Consecutive errors reset from: {state['agent_scratchpad']['consecutive_error_count']}")
         state["agent_scratchpad"]["consecutive_error_count"] = 0
 
     def is_max_consecutive_errors_reached(self, state: PhoneConversationState) -> bool:

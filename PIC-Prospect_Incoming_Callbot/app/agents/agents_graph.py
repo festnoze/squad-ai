@@ -474,16 +474,34 @@ class AgentsGraph:
     async def user_identified_node(self, state: PhoneConversationState) -> PhoneConversationState:
         """For existing user: User identity confirmation"""
         first_name = state["agent_scratchpad"]["sf_account_info"].get("FirstName", "").strip()
-        end_welcome_text = f"{self.thanks_to_come_back} {first_name}."
+        middle_welcome_text = f"{self.thanks_to_come_back} {first_name}."
 
-        salesman_first_name = state["agent_scratchpad"]["sf_account_info"].get("Owner", {}).get("Name", "enformation DUPONT").split(" ")[0].strip()
-        end_welcome_text += f" votre conseiller, {salesman_first_name}, est actuellement indisponible."
+        salesman_first_name = state["agent_scratchpad"]["sf_account_info"].get("Owner", {}).get("Name", "en formation").split(" ")[0].strip()
+        middle_welcome_text += f" votre conseiller, {salesman_first_name}, est actuellement indisponible."
 
+        await self.add_AI_response_message_to_conversation_async(middle_welcome_text, state)
+        
+        # Ends call if user has an existing appointment (and single action available)
+        if len(self.available_actions) == 1 and "schedule_appointement" in self.available_actions:
+            existing_appointments = await self.get_existing_user_appointments_async(state)
+            if any(existing_appointments):
+                call_sid = state.get("call_sid", "N/A")
+                self.logger.info(f"[{call_sid}] Found existing appointments for user")
+                # User has existing appointments - ask for modify/cancel preference
+                existing_appointment_text = await self._get_existing_appointment_text_async(existing_appointments[0])
+                await self.add_AI_response_message_to_conversation_async(existing_appointment_text, state)
+                await self.add_AI_response_message_to_conversation_async(TextRegistry.end_call_suffix_text, state)
+                return state
+
+        end_welcome_text = ""
         if "schedule_appointement" in self.available_actions:
             end_welcome_text += f" {TextRegistry.appointment_text}"
 
         if "ask_rag" in self.available_actions:
-            end_welcome_text += f" {TextRegistry.also_questions_text}" if len(self.available_actions) > 1 else f" {TextRegistry.questions_text}"
+            if len(self.available_actions) > 1:
+                end_welcome_text += f" {TextRegistry.also_questions_text}"
+            else:
+                end_welcome_text += f" {TextRegistry.questions_text}"
 
         if len(self.available_actions) > 1:
             end_welcome_text += f" {TextRegistry.select_action_text}"
@@ -494,6 +512,22 @@ class AgentsGraph:
 
         await self.add_AI_response_message_to_conversation_async(end_welcome_text, state)
         return state
+
+    async def get_existing_user_appointments_async(self, state: PhoneConversationState) -> list[dict]:
+        """Check for existing appointments in next 30 days before scheduling new one """
+        call_sid = state.get("call_sid", "N/A")
+        sf_account_info: dict = state.get("agent_scratchpad", {}).get("sf_account_info", {})
+        user_id = sf_account_info.get("Id", "")
+
+        if user_id:
+            start_date = CalendarAgent.now.strftime("%Y-%m-%dT%H:%M:%SZ")
+            end_date = (CalendarAgent.now + timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+            self.logger.info(f"[{call_sid}] Checking for existing appointments for user {user_id} from {start_date} to {end_date}")
+            existing_appointments = await self.calendar_api_client.get_scheduled_appointments_async(start_date, end_date, user_id=user_id)
+            return existing_appointments
+        return []
+
 
     async def user_new_node(self, state: PhoneConversationState) -> PhoneConversationState:
         """For new user: Case not handled. Ask the user to call during the opening hours"""
@@ -528,8 +562,8 @@ class AgentsGraph:
                     first_name=sf_account_info.get("FirstName", ""),
                     last_name=sf_account_info.get("LastName", ""),
                     email=sf_account_info.get("Email", ""),
-                    owner_id=sf_account_info.get("Owner").get("Id", ""),
-                    owner_name=sf_account_info.get("Owner").get("Name", ""),
+                    owner_id=sf_account_info.get("Owner", {}).get("Id", ""),
+                    owner_name=sf_account_info.get("Owner", {}).get("Name", ""),
                 )
                 chat_history = state.get("history", [])
 
@@ -538,22 +572,6 @@ class AgentsGraph:
                 if len(chat_history) > max_history_length:
                     self.logger.info(f"[{call_sid[-1 * max_history_length :]}] Chat history has {len(chat_history)} messages. Truncating to the last {max_history_length}.")
                     chat_history = chat_history[-max_history_length:]
-
-                # Check for existing appointments in next 30 days before scheduling new one
-                user_id = sf_account_info.get("Id", "")
-                if user_id:
-                    start_date = CalendarAgent.now.strftime("%Y-%m-%dT%H:%M:%SZ")
-                    end_date = (CalendarAgent.now + timedelta(days=30)).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-                    self.logger.info(f"[{call_sid}] Checking for existing appointments for user {user_id} from {start_date} to {end_date}")
-                    existing_appointments = await self.calendar_api_client.get_scheduled_appointments_async(start_date, end_date, user_id=user_id)
-
-                    if existing_appointments:
-                        self.logger.info(f"[{call_sid}] Found {len(existing_appointments)} existing appointments for user")
-                        # User has existing appointments - ask for modify/cancel preference
-                        response = await self._handle_existing_appointments_async(existing_appointments, user_input)
-                        await self.add_AI_response_message_to_conversation_async(response, state)
-                        return state
 
                 if self.has_waiting_music_on_calendar:
                     waiting_music_task = await self._start_waiting_music_async()
@@ -702,35 +720,26 @@ class AgentsGraph:
         self.consecutive_error_manager.reset_consecutive_error_count(state)
         return state
 
-    async def _handle_existing_appointments_async(self, existing_appointments: list, user_input: str) -> str:
-        if not existing_appointments:
-            return ""
-
-        # Get the first (most recent) appointment
-        appointment = existing_appointments[0]
-        appointment_date = appointment.get("StartDateTime", "")
-        appointment_subject = appointment.get("Subject", "Rendez-vous")
-
-        # Format the date for display (convert from ISO to French format)
+    async def _get_existing_appointment_text_async(self, existing_appointment: dict) -> str:
         try:
-            if appointment_date:
-                # Parse ISO datetime and convert to French format
-                from datetime import datetime
-                dt = datetime.fromisoformat(appointment_date.replace("Z", ""))
-                french_days = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
-                french_months = ["", "janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
+            appointment_date = existing_appointment.get("StartDateTime", "")
+            if not appointment_date:
+                return ""
+            from datetime import datetime
 
-                day_name = french_days[dt.weekday()]
-                month_name = french_months[dt.month]
-                appointment_date_formatted = f"{day_name} {dt.day} {month_name} à {dt.hour} heure{'s' if dt.hour != 1 else ''}"
-                if dt.minute > 0:
-                    appointment_date_formatted += f" {dt.minute}"
-            else:
-                appointment_date_formatted = "date inconnue"
+            dt = datetime.fromisoformat(appointment_date.replace("Z", ""))
+            french_days = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+            french_months = ["", "janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"]
+
+            day_name = french_days[dt.weekday()]
+            month_name = french_months[dt.month]
+            appointment_date_formatted = f"{day_name} {dt.day} {month_name} à {dt.hour} heure{'s' if dt.hour != 1 else ''}"
+            if dt.minute > 0:
+                appointment_date_formatted += f" {dt.minute}"
         except Exception:
-            appointment_date_formatted = appointment_date
+            pass
 
-        return TextRegistry.existing_appointment_found_text.format(appointment_date=appointment_date_formatted, appointment_subject=appointment_subject)
+        return TextRegistry.existing_appointment_found_text + appointment_date_formatted + "."
 
     ### Helper methods ###
 

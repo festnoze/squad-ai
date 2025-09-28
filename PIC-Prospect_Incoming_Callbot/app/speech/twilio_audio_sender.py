@@ -4,16 +4,14 @@ import base64
 import json
 import logging
 import time
-
+from utils.envvar import EnvHelper
 
 class TwilioAudioSender:
     """
     Handles sending audio to Twilio with rate limiting to prevent connection issues.
     """
 
-    def __init__(
-        self, websocket: any, stream_sid: str = None, sample_rate: int = 8000, min_chunk_interval: float = 0.02
-    ):
+    def __init__(self, websocket: any, stream_sid: str | None = None, sample_rate: int = 8000, min_chunk_interval: float = 0.02):
         self.logger = logging.getLogger(__name__)
         self.websocket = websocket
         self.stream_sid = stream_sid
@@ -27,15 +25,13 @@ class TwilioAudioSender:
         self.bytes_sent = 0  # Alias for total_bytes_sent for consistency with stats API
         self.chunks_sent = 0
         self.consecutive_errors = 0
-        self.max_consecutive_errors = 5
+        self.max_consecutive_errors = EnvHelper.get_max_consecutive_errors()
         self.last_chunk_time = 0
         self.avg_chunk_size = 0
         self.start_time = time.time()
         self.total_send_duration = 0
 
-    async def send_audio_chunk_async(
-        self, audio_chunk: bytes, progressive_volume_increase_duration: float = 0.0, sending_start_delay: float = 0.0
-    ) -> bool:
+    async def send_audio_chunk_async(self, audio_chunk: bytes, progressive_volume_increase_duration: float = 0.0, sending_start_delay: float = 0.0) -> bool:
         """
         Sends an audio chunk to Twilio by breaking it into smaller segments,
         with proportional delays and interruption support.
@@ -103,6 +99,7 @@ class TwilioAudioSender:
             # Convert the entire 16-bit PCM audio_chunk to 8-bit μ-law.
             # Sample width is 2 for 16-bit PCM.
             full_mulaw_audio = audioop.lin2ulaw(audio_chunk, 2)
+
         except audioop.error as e:
             self.logger.error(f"Error converting PCM to μ-law: {e}. PCM chunk len: {len(audio_chunk)}")
             return False

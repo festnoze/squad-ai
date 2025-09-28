@@ -405,7 +405,7 @@ def sf_client_mock():
     class _DummyClient:
         exist_appointment = False
 
-        async def get_scheduled_appointments_async(self, start_datetime=None, end_datetime=None, *args, **kwargs) -> list:
+        async def get_scheduled_appointments_async(self, start_datetime=None, end_datetime=None, *args, **kwargs) -> list[dict]:
             # Check if the specific date range is requested
             if str(start_datetime)[:10] == "2024-06-24" and str(end_datetime)[:10] == "2024-06-28":
                 # Return 3 appointments, each 9 hours long, one per day

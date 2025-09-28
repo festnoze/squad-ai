@@ -6,7 +6,7 @@ class TextRegistry:
 
     # AgentsGraph texts
     start_welcome_text = f"Bonjour et bienvenue chez {EnvHelper.get_company_name()}. Je suis l'assistant virtuel de lécole."
-    #unavailability_for_returning_prospect = "Votre conseiller attitré est actuellement indisponible."
+    # unavailability_for_returning_prospect = "Votre conseiller attitré est actuellement indisponible."
     unavailability_for_new_prospect = "Nos conseillers en formation sont actuellement indisponibles."
     anonymous_prospect_message = "Nous sommes désolés, mais nous n'avons pas accès à votre numéro de téléphone et ne pouvons pas vous proposer de rendez-vous. Merci de nous recontacter durant les heures ouvrées, du lundi au vendredi, de 9 heures à 18 heures. Au revoir."
     new_prospect_message = "Merci de nous recontacter durant les heures ouvrées, du lundi au vendredi, de 9 heures à 18 heures. Au revoir."
@@ -31,7 +31,7 @@ class TextRegistry:
     confirmation_suffix_text = "Merci de confirmer ce rendez-vous pour le valider."
     date_not_found_text = "Je n'ai pas trouvé la date et l'heure du rendez-vous. Veuillez me préciser la date et l'heure du rendez-vous souhaité."
     appointment_confirmed_prefix_text = "C'est confirmé, votre rendez-vous est maintenant planifié pour le "
-    appointment_confirmed_suffix_text = "Merci et au revoir."
+    end_call_suffix_text = "Merci et au revoir."
     appointment_unavailable_slot_text = "Je suis désolé, ce créneau n'est pas disponible. A la place, "
     appointment_failed_text = "Je n'ai pas pu planifier le rendez-vous. Souhaitez-vous essayer un autre créneau ?"
     modification_not_supported_text = "Je ne suis pas en mesure de gérer les modifications de rendez-vous."
@@ -46,7 +46,7 @@ class TextRegistry:
     appointment_holiday_text = "Désolé, nous ne proposons pas de rendez-vous ce jour-là car c'est un jour férié. Souhaitez-vous un autre créneau ?"
 
     # Existing appointment management texts
-    existing_appointment_found_text = "Je vois que vous avez déjà un rendez-vous prévu avec lui le {appointment_date} ({appointment_subject}). Souhaitez-vous le déplacer ou l'annuler ?"
+    existing_appointment_found_text = "Je vois que vous avez déjà un rendez-vous prévu avec votre conseiller. Je vous confirme que votre rendez-vous est planifié pour le "  # Souhaitez-vous le déplacer ou l'annuler ?"
 
     @classmethod
     def get_all_texts(cls) -> list[str]:

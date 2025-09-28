@@ -498,9 +498,7 @@ class OutgoingAudioManager(OutgoingManager):
         return file_name
 
     def run_background_streaming_worker(self) -> None:
-        """
-        Starts the streaming process in a background task
-        """
+        """Starts the streaming process in a background task."""
         if self.is_sending() or self.sender_task is not None:
             self.logger.error("Streaming is already running")
             return
@@ -510,13 +508,10 @@ class OutgoingAudioManager(OutgoingManager):
         self.logger.info("Audio background streaming worker started")
 
     async def stop_background_streaming_worker_async(self) -> None:
-        """
-        Stops the streaming process and clears the text queue
-        """
+        """Stops the streaming process and clears the text queue."""
         self.audio_sender.is_sending = False
         await self.text_queue_manager.clear_queue_async()
 
-        # Stop the background streaming worker
         if self.sender_task:
             try:
                 self.ask_to_stop_streaming_worker = True
@@ -532,21 +527,19 @@ class OutgoingAudioManager(OutgoingManager):
         self.logger.info("Audio background streaming worker stopped")
 
     async def enqueue_text_async(self, text: str) -> bool:
-        """
-        Adds text to the queue for speech synthesis and streaming.
-        """
+        """Adds text to the queue for speech synthesis and streaming."""
         return await self.text_queue_manager.enqueue_text_async(text)
 
     async def clear_text_queue_async(self) -> str:
+        removed_text = ""
         if self.can_speech_be_interupted:
-            removed_text = ""
             if self.text_queue_manager.last_text_chunk:
                 removed_text += self.text_queue_manager.last_text_chunk + " "
             removed_text += self.text_queue_manager.text_queue
             await self.text_queue_manager.clear_queue_async()
             self.streaming_interuption_asked = True
             self.logger.info("Text queue cleared for interruption")
-            return removed_text
+        return removed_text
 
     def has_text_to_be_sent(self) -> bool:
         """Check if the audio stream manager has text to send."""
@@ -558,12 +551,7 @@ class OutgoingAudioManager(OutgoingManager):
         return self.audio_sender.is_sending
 
     def get_streaming_stats(self) -> dict:
-        """
-        Get comprehensive statistics about the text and audio streaming process.
-
-        Returns:
-            Dictionary with detailed statistics about text queue and audio processing
-        """
+        """ Get comprehensive statistics about the text and audio streaming process."""
         # Get text queue statistics
         text_queue_stats = self.text_queue_manager.get_queue_stats()
 
