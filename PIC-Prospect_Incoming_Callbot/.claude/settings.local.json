@@ -10,7 +10,10 @@
       "Bash(curl:*)",
       "WebSearch",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:developers.telnyx.com)"
+      "WebFetch(domain:developers.telnyx.com)",
+      "WebFetch(domain:www.twilio.com)",
+      "Bash(test:*)",
+      "Bash(set PYTHONPATH=.)"
     ],
     "deny": [],
     "ask": []

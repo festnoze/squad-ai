@@ -167,6 +167,10 @@ class EnvHelper:
         return EnvHelper.get_env_variable_value_by_name("TWILIO_AUTH", fails_if_missing=False) or ""
 
     @staticmethod
+    def get_twilio_phone_number() -> str:
+        return EnvHelper.get_env_variable_value_by_name("TWILIO_PHONE_NUMBER", fails_if_missing=False) or ""
+
+    @staticmethod
     def get_telnyx_api_key() -> str:
         return EnvHelper.get_env_variable_value_by_name("TELNYX_API_KEY", fails_if_missing=False) or ""
 
