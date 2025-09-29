@@ -20,9 +20,9 @@ outgoing_call_router = APIRouter(prefix="/outgoing-call", tags=["Outgoing Calls"
 class InitiateCallRequest(BaseModel):
     """Request model for initiating an outgoing call"""
     to_phone_number: str = Field(
-        ...,
+        "+33668422388",
         description="Target phone number in E.164 format (e.g., +33123456789)",
-        example="+33123456789"
+        example="+33668422388"
     )
     from_phone_number: Optional[str] = Field(
         None,
@@ -40,6 +40,7 @@ class InitiateCallResponse(BaseModel):
     message: str
 
 
+@outgoing_call_router.post("", response_model=InitiateCallResponse)
 @outgoing_call_router.post("/", response_model=InitiateCallResponse)
 @api_key_required
 async def initiate_outgoing_call_endpoint(request: Request, call_request: InitiateCallRequest) -> JSONResponse:
@@ -158,8 +159,8 @@ async def outgoing_call_twiml_callback_endpoint(request: Request) -> HTMLRespons
 
         logger.info(f"Outgoing call answered - To: {phone_number}, CallSid: {call_sid}")
 
-        # Generate WebSocket URL
-        ws_url = provider.get_websocket_url(request, phone_number, call_sid)
+        # Generate WebSocket URL with is_outgoing=True flag
+        ws_url = provider.get_websocket_url(request, phone_number, call_sid, is_outgoing=True)
         logger.info(f"Connecting outgoing call to WebSocket: {ws_url}")
 
         # Create TwiML response with WebSocket connection

@@ -88,12 +88,13 @@ class TwilioProvider(PhoneProvider):
         
         return phone_number, call_sid, body
     
-    def get_websocket_url(self, request: Request, phone_number: str, call_id: str) -> str:
+    def get_websocket_url(self, request: Request, phone_number: str, call_id: str, is_outgoing: bool = False) -> str:
         """Generate WebSocket URL for Twilio"""
         x_forwarded_proto = request.headers.get("x-forwarded-proto")
         is_secure = x_forwarded_proto == "https" or request.url.scheme == "https"
         ws_scheme = "wss" if is_secure else "ws"
-        return f"{ws_scheme}://{request.url.netloc}/ws/phone/{phone_number}/sid/{call_id}"
+        call_type_param = "?call_type=outgoing" if is_outgoing else ""
+        return f"{ws_scheme}://{request.url.netloc}/ws/phone/{phone_number}/sid/{call_id}{call_type_param}"
     
     def parse_websocket_event(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """Parse Twilio websocket event and normalize to common format"""

@@ -143,10 +143,11 @@ async def _extract_request_data_async(request: Request) -> tuple:
 
 # ========= Incoming phone call WebSocket endpoint ========= #
 @incoming_call_router.websocket("/ws/phone/{calling_phone_number}/sid/{call_sid}")
-async def twilio_websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid: str) -> None:
+async def twilio_websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid: str, call_type: str = "incoming") -> None:
     """WebSocket endpoint for Twilio calls"""
     provider = get_phone_provider(PhoneProviderType.TWILIO)
-    await handle_websocket_connection(ws, calling_phone_number, call_sid, provider)
+    is_outgoing = call_type == "outgoing"
+    await handle_websocket_connection(ws, calling_phone_number, call_sid, provider, is_outgoing)
 
 
 @incoming_call_router.websocket("/ws/phone/{calling_phone_number}/call_control_id/{call_control_id}")
@@ -156,7 +157,7 @@ async def telnyx_websocket_endpoint(ws: WebSocket, calling_phone_number: str, ca
     await handle_websocket_connection(ws, calling_phone_number, call_control_id, provider)
 
 
-async def handle_websocket_connection(ws: WebSocket, calling_phone_number: str, call_id: str, provider: PhoneProvider) -> None:
+async def handle_websocket_connection(ws: WebSocket, calling_phone_number: str, call_id: str, provider: PhoneProvider, is_outgoing: bool = False) -> None:
     """Generic WebSocket connection handler for any provider"""
     # Provider-specific authentication and verification
     if provider.provider_type == PhoneProviderType.TWILIO:
@@ -164,17 +165,18 @@ async def handle_websocket_connection(ws: WebSocket, calling_phone_number: str, 
     else:
         await provider.verify_call(call_id, calling_phone_number)
 
-    logger.info(f"WebSocket connection for {provider.provider_type.value} call ID {call_id} from {ws.client.host if ws.client else 'unknown websocket client (and host)'}.")
+    call_type_str = "outgoing" if is_outgoing else "incoming"
+    logger.info(f"WebSocket connection for {provider.provider_type.value} {call_type_str} call ID {call_id} from {ws.client.host if ws.client else 'unknown websocket client (and host)'}.")
     try:
         await ws.accept()
-        logger.info(f"[SUCCESS] WebSocket connection accepted for {provider.provider_type.value} call ID {call_id}.")
+        logger.info(f"[SUCCESS] WebSocket connection accepted for {provider.provider_type.value} {call_type_str} call ID {call_id}.")
     except Exception as e:
         logger.error(f"[FAIL] Failed to accept WebSocket connection for call ID {call_id}: {e}", exc_info=True)
         return
 
     call_handler: PhoneCallWebsocketEventsHandler
     try:
-        call_handler = phone_call_websocket_events_handler_factory.get_new_phone_call_websocket_events_handler(websocket=ws, provider=provider)
+        call_handler = phone_call_websocket_events_handler_factory.get_new_phone_call_websocket_events_handler(websocket=ws, provider=provider, is_outgoing=is_outgoing)
         await call_handler.handle_websocket_all_receieved_events_async(calling_phone_number, call_id)
         logger.info(f"WebSocket handler finished for {provider.provider_type.value} call ID {call_id}.")
 
